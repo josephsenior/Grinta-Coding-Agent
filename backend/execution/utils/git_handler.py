@@ -1,4 +1,4 @@
-﻿"""Helpers for invoking git commands within runtime environments."""
+"""Helpers for invoking git commands within runtime environments."""
 
 from __future__ import annotations
 
@@ -10,9 +10,9 @@ from pathlib import Path
 from backend.core.logger import app_logger as logger
 from backend.execution.utils import git_changes, git_diff
 
-GIT_CHANGES_CMD = "python3 /App/code/App/runtime/utils/git_changes.py"
+GIT_CHANGES_CMD = 'python3 /App/code/App/runtime/utils/git_changes.py'
 GIT_DIFF_CMD = 'python3 /App/code/App/runtime/utils/git_diff.py "{file_path}"'
-GIT_BRANCH_CMD = "git branch --show-current"
+GIT_BRANCH_CMD = 'git branch --show-current'
 
 
 @dataclass
@@ -55,9 +55,9 @@ class GitHandler:
         self.cwd = cwd
 
     def _create_python_script_file(self, file: str):
-        result = self.execute("mktemp -d", self.cwd)
+        result = self.execute('mktemp -d', self.cwd)
         script_file = Path(result.content.strip(), Path(file).name)
-        with open(file, encoding="utf-8") as f:
+        with open(file, encoding='utf-8') as f:
             self.create_file_fn(str(script_file), f.read())
             result = self.execute(f'chmod +x "{script_file}"', self.cwd)
         return script_file
@@ -95,17 +95,17 @@ class GitHandler:
                 return json.loads(result.content)
             except Exception:
                 logger.exception(
-                    "GitHandler:get_git_changes:error",
-                    extra={"content": result.content},
+                    'GitHandler:get_git_changes:error',
+                    extra={'content': result.content},
                 )
                 return None
         if self.git_changes_cmd != GIT_CHANGES_CMD:
             return None
         logger.info(
-            "GitHandler:get_git_changes: adding git_changes script to runtime..."
+            'GitHandler:get_git_changes: adding git_changes script to runtime...'
         )
         script_file = self._create_python_script_file(git_changes.__file__)
-        self.git_changes_cmd = f"python3 {script_file}"
+        self.git_changes_cmd = f'python3 {script_file}'
         return self.get_git_changes()
 
     def get_git_diff(self, file_path: str) -> dict[str, str]:
@@ -119,15 +119,15 @@ class GitHandler:
 
         """
         if not self.cwd:
-            msg = "no_dir_in_git_diff"
+            msg = 'no_dir_in_git_diff'
             raise ValueError(msg)
         result = self.execute(self.git_diff_cmd.format(file_path=file_path), self.cwd)
         if result.exit_code == 0:
             return json.loads(result.content, strict=False)
         if self.git_diff_cmd != GIT_DIFF_CMD:
-            msg = "error_in_git_diff"
+            msg = 'error_in_git_diff'
             raise ValueError(msg)
-        logger.info("GitHandler:get_git_diff: adding git_diff script to runtime...")
+        logger.info('GitHandler:get_git_diff: adding git_diff script to runtime...')
         script_file = self._create_python_script_file(git_diff.__file__)
         self.git_diff_cmd = f'python3 {script_file} "{{file_path}}"'
         return self.get_git_diff(file_path)

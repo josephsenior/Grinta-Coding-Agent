@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-
 from backend.core.errors import (
     AgentRuntimeError,
+    AppError,
     ConfigurationError,
     ContextLimitError,
     EventStreamError,
-    AppError,
     InvariantBrokenError,
     ModelProviderError,
     PersistenceError,
@@ -26,7 +25,6 @@ from backend.core.errors import (
     classify_error,
 )
 
-
 # ===================================================================
 # classify_error
 # ===================================================================
@@ -34,17 +32,17 @@ from backend.core.errors import (
 
 class TestClassifyError:
     def test_app_error_returns_own_type(self):
-        err = RetryableError("retryable")
+        err = RetryableError('retryable')
         assert classify_error(err) is RetryableError
 
     def test_value_error_maps_to_user_action(self):
-        assert classify_error(ValueError("bad")) is UserActionRequiredError
+        assert classify_error(ValueError('bad')) is UserActionRequiredError
 
     def test_type_error_maps_to_user_action(self):
-        assert classify_error(TypeError("wrong")) is UserActionRequiredError
+        assert classify_error(TypeError('wrong')) is UserActionRequiredError
 
     def test_key_error_maps_to_user_action(self):
-        assert classify_error(KeyError("missing")) is UserActionRequiredError
+        assert classify_error(KeyError('missing')) is UserActionRequiredError
 
     def test_timeout_maps_to_retryable(self):
         assert classify_error(TimeoutError()) is RetryableError
@@ -53,22 +51,22 @@ class TestClassifyError:
         assert classify_error(ConnectionError()) is RetryableError
 
     def test_os_error_maps_to_retryable(self):
-        assert classify_error(OSError("disk")) is RetryableError
+        assert classify_error(OSError('disk')) is RetryableError
 
     def test_assertion_error_maps_to_invariant(self):
-        assert classify_error(AssertionError("bad")) is InvariantBrokenError
+        assert classify_error(AssertionError('bad')) is InvariantBrokenError
 
     def test_runtime_error_maps_to_invariant(self):
-        assert classify_error(RuntimeError("crash")) is InvariantBrokenError
+        assert classify_error(RuntimeError('crash')) is InvariantBrokenError
 
     def test_unknown_exception_maps_to_app_error(self):
-        assert classify_error(Exception("?")) is AppError
+        assert classify_error(Exception('?')) is AppError
 
     def test_import_error_maps_to_app_error(self):
-        assert classify_error(ImportError("no mod")) is AppError
+        assert classify_error(ImportError('no mod')) is AppError
 
     def test_already_app_error_subtype(self):
-        err = InvariantBrokenError("inv")
+        err = InvariantBrokenError('inv')
         assert classify_error(err) is InvariantBrokenError
 
 
@@ -144,16 +142,16 @@ class TestErrorHierarchy:
 
 class TestAgentRuntimeErrorContext:
     def test_default_context_empty(self):
-        err = AgentRuntimeError("msg")
+        err = AgentRuntimeError('msg')
         assert err.context == {}
 
     def test_custom_context(self):
-        ctx = {"tool": "cmd_run", "code": 1}
-        err = AgentRuntimeError("msg", context=ctx)
+        ctx = {'tool': 'cmd_run', 'code': 1}
+        err = AgentRuntimeError('msg', context=ctx)
         assert err.context == ctx
-        assert str(err) == "msg"
+        assert str(err) == 'msg'
 
     def test_subclass_preserves_context(self):
-        err = ToolExecutionError("bad tool", context={"file": "/x.py"})
-        assert err.context["file"] == "/x.py"
+        err = ToolExecutionError('bad tool', context={'file': '/x.py'})
+        assert err.context['file'] == '/x.py'
         assert isinstance(err, AgentRuntimeError)

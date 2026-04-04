@@ -6,10 +6,9 @@ Contains argument parsing and config-override logic for CLI entry points.
 
 from __future__ import annotations
 
+import json
 import os
 from typing import TYPE_CHECKING
-
-import json
 
 from backend.core import logger
 from backend.core.app_paths import get_app_settings_root
@@ -23,20 +22,20 @@ if TYPE_CHECKING:
 def _load_json_config(json_file: str) -> dict | None:
     """Load and parse JSON configuration file."""
     try:
-        with open(json_file, "r", encoding="utf-8") as json_contents:
+        with open(json_file, 'r', encoding='utf-8') as json_contents:
             return json.load(json_contents)
     except FileNotFoundError as e:
-        logger.app_logger.error("Config file not found: %s. Error: %s", json_file, e)
+        logger.app_logger.error('Config file not found: %s. Error: %s', json_file, e)
         return None
     except Exception as e:
         logger.app_logger.error(
-            "Cannot parse config file %s. Exception: %s", json_file, e
+            'Cannot parse config file %s. Exception: %s', json_file, e
         )
         return None
 
 
 def get_llm_config_arg(
-    llm_config_arg: str, json_file: str = "settings.json"
+    llm_config_arg: str, json_file: str = 'settings.json'
 ) -> LLMConfig | None:
     """Get llm settings from the config file."""
     json_config = _load_json_config(json_file)
@@ -44,17 +43,17 @@ def get_llm_config_arg(
         return None
 
     # Check if there are any LLM keys present
-    llm_keys = ("llm_model", "llm_api_key", "llm_base_url")
+    llm_keys = ('llm_model', 'llm_api_key', 'llm_base_url')
     if not any(k in json_config for k in llm_keys):
         return None
 
     llm = LLMConfig()
-    if "llm_model" in json_config:
-        llm.model = json_config["llm_model"]
-    if "llm_api_key" in json_config:
-        llm.api_key = json_config["llm_api_key"]
-    if "llm_base_url" in json_config:
-        llm.base_url = json_config["llm_base_url"]
+    if 'llm_model' in json_config:
+        llm.model = json_config['llm_model']
+    if 'llm_api_key' in json_config:
+        llm.api_key = json_config['llm_api_key']
+    if 'llm_base_url' in json_config:
+        llm.base_url = json_config['llm_base_url']
     return llm
 
 
@@ -81,7 +80,7 @@ def _resolve_llm_config_from_cli(
 
 def _try_user_config_llm(llm_config_name: str, config_file: str) -> LLMConfig | None:
     """Try LLM keys from canonical ``settings.json`` if the primary file had no LLM block."""
-    canonical = os.path.join(get_app_settings_root(), "settings.json")
+    canonical = os.path.join(get_app_settings_root(), 'settings.json')
     canonical_abs = os.path.abspath(os.path.normpath(canonical))
     primary_abs = os.path.abspath(os.path.normpath(config_file))
     if primary_abs == canonical_abs or not os.path.isfile(canonical_abs):
@@ -100,17 +99,17 @@ def apply_llm_config_override(config: AppConfig, args: argparse.Namespace) -> No
     if not args.llm_config:
         return
 
-    logger.app_logger.debug("CLI specified LLM config: %s", args.llm_config)
+    logger.app_logger.debug('CLI specified LLM config: %s', args.llm_config)
     llm_config = _resolve_llm_config_from_cli(args.llm_config, config, args.config_file)
     config.set_llm_config(llm_config)
-    logger.app_logger.debug("Set LLM config from CLI parameter: %s", args.llm_config)
+    logger.app_logger.debug('Set LLM config from CLI parameter: %s', args.llm_config)
 
 
 def apply_additional_overrides(config: AppConfig, args: argparse.Namespace) -> None:
     """Apply additional config overrides from CLI arguments."""
-    if hasattr(args, "agent_cls") and args.agent_cls:
+    if hasattr(args, 'agent_cls') and args.agent_cls:
         config.default_agent = args.agent_cls
-    if hasattr(args, "max_iterations") and args.max_iterations is not None:
+    if hasattr(args, 'max_iterations') and args.max_iterations is not None:
         config.max_iterations = args.max_iterations
-    if hasattr(args, "max_budget_per_task") and args.max_budget_per_task is not None:
+    if hasattr(args, 'max_budget_per_task') and args.max_budget_per_task is not None:
         config.max_budget_per_task = args.max_budget_per_task

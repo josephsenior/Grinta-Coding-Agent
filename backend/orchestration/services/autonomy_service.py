@@ -17,11 +17,11 @@ class AutonomyService:
 
     def initialize(self, agent: Agent) -> None:
         """Configure autonomy controller and related validators."""
-        from backend.orchestration.autonomy import AutonomyController
         from backend.core.config.agent_config import AgentConfig as _AgentConfig
+        from backend.orchestration.autonomy import AutonomyController
 
         controller = self._controller
-        agent_config = getattr(agent, "config", None)
+        agent_config = getattr(agent, 'config', None)
 
         controller.circuit_breaker_service.reset()
 
@@ -47,20 +47,20 @@ class AutonomyService:
         controller.safety_validator = None
 
         if (
-            hasattr(agent.config, "safety")
+            hasattr(agent.config, 'safety')
             and agent.config.safety.enable_mandatory_validation
         ):
             from backend.orchestration.safety_validator import SafetyValidator
 
             controller.safety_validator = SafetyValidator(agent.config.safety)
-            logger.debug("SafetyValidator enabled for production safety")
+            logger.debug('SafetyValidator enabled for production safety')
 
     def _initialize_task_validator(self, agent: Agent) -> None:
         controller = self._controller
         controller.task_validator = None
 
         if (
-            hasattr(agent.config, "enable_completion_validation")
+            hasattr(agent.config, 'enable_completion_validation')
             and agent.config.enable_completion_validation
         ):
             from backend.validation.task_validator import (
@@ -76,9 +76,9 @@ class AutonomyService:
                 require_all_pass=False,
                 fail_open_on_empty=False,
             )
-            logger.debug("TaskValidator enabled for completion checking")
+            logger.debug('TaskValidator enabled for completion checking')
 
         controller._add_system_message()
 
 
-__all__ = ["AutonomyService"]
+__all__ = ['AutonomyService']

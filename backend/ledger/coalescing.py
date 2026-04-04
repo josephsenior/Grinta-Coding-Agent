@@ -28,16 +28,16 @@ if TYPE_CHECKING:
 # NOTE: StreamingChunkAction is intentionally NOT here — each chunk must be
 # dispatched individually so the frontend can display tokens as they arrive.
 _COALESCE_TYPES: set[str] = {
-    "AgentStateChangedObservation",
-    "NullObservation",
-    "ChangeAgentStateAction",
+    'AgentStateChangedObservation',
+    'NullObservation',
+    'ChangeAgentStateAction',
 }
 
 
 class CoalescedBatch:
     """Represents accumulated events of the same type waiting to be flushed."""
 
-    __slots__ = ("events", "first_ts", "last_ts", "event_type")
+    __slots__ = ('events', 'first_ts', 'last_ts', 'event_type')
 
     def __init__(self, event: Event) -> None:
         self.events: list[Event] = [event]
@@ -138,12 +138,12 @@ class EventCoalescer:
     def snapshot(self) -> dict[str, Any]:
         """Diagnostic snapshot."""
         return {
-            "pending_batches": len(self._pending),
-            "pending_events": sum(b.size for b in self._pending.values()),
-            "coalesced_total": self._coalesced_count,
-            "flushed_total": self._flushed_count,
-            "window_ms": self._window_ms,
-            "max_batch": self._max_batch,
+            'pending_batches': len(self._pending),
+            'pending_events': sum(b.size for b in self._pending.values()),
+            'coalesced_total': self._coalesced_count,
+            'flushed_total': self._flushed_count,
+            'window_ms': self._window_ms,
+            'max_batch': self._max_batch,
         }
 
     # ------------------------------------------------------------------ #
@@ -159,7 +159,7 @@ class EventCoalescer:
         self._flushed_count += 1
 
         # For streaming chunks: use the latest event (it has accumulated content)
-        if event_type == "StreamingChunkAction":
+        if event_type == 'StreamingChunkAction':
             return self._merge_streaming_chunks(batch)
 
         # For state changes: use the latest state

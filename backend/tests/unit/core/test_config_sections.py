@@ -9,6 +9,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic import SecretStr, ValidationError
 
+from backend.core.config.app_config import AppConfig
+from backend.core.config.config_loader import ConfigLoadSummary
 from backend.core.config.config_sections import (
     check_unknown_sections,
     process_agent_section,
@@ -20,44 +22,42 @@ from backend.core.config.config_sections import (
     process_runtime_section,
     process_security_section,
 )
-from backend.core.config.app_config import AppConfig
-from backend.core.config.config_loader import ConfigLoadSummary
 
 
 class TestCheckUnknownSections:
     def test_known_sections_no_warning(self):
         """All known sections should not trigger any warnings."""
         toml: dict[str, Any] = {
-            "core": {},
-            "agent": {},
-            "llm": {},
-            "security": {},
-            "runtime": {},
-            "compactor": {},
-            "mcp": {},
-            "extended": {},
+            'core': {},
+            'agent': {},
+            'llm': {},
+            'security': {},
+            'runtime': {},
+            'compactor': {},
+            'mcp': {},
+            'extended': {},
         }
         # Should not raise
-        check_unknown_sections(toml, "config.toml")
+        check_unknown_sections(toml, 'config.toml')
 
     def test_unknown_section_logged(self):
         """Unknown sections do not raise but get logged."""
-        toml: dict[str, Any] = {"core": {}, "custom_plugin": {}}
+        toml: dict[str, Any] = {'core': {}, 'custom_plugin': {}}
         # check_unknown_sections uses logger.debug — just ensure no exception
-        check_unknown_sections(toml, "config.toml")
+        check_unknown_sections(toml, 'config.toml')
 
     def test_empty_config(self):
-        check_unknown_sections({}, "config.toml")
+        check_unknown_sections({}, 'config.toml')
 
     def test_case_insensitive(self):
         """Known section names are matched case-insensitively."""
-        toml: dict[str, Any] = {"Core": {}, "LLM": {}, "SECURITY": {}}
-        check_unknown_sections(toml, "config.toml")
+        toml: dict[str, Any] = {'Core': {}, 'LLM': {}, 'SECURITY': {}}
+        check_unknown_sections(toml, 'config.toml')
 
 
 class DummySummary(ConfigLoadSummary):
     def __init__(self) -> None:
-        super().__init__("test.toml")
+        super().__init__('test.toml')
         self.records: list[Any] = []
 
     def record(self, section: str, reason: str, detail: str) -> None:
@@ -77,9 +77,9 @@ class TestProcessCoreSection:
     def test_applies_secret_str(self):
         cfg = DummyCfg()
         summary = DummySummary()
-        process_core_section({"secret": "value", "plain": 3}, cfg, summary)  # type: ignore[arg-type]
+        process_core_section({'secret': 'value', 'plain': 3}, cfg, summary)  # type: ignore[arg-type]
         assert isinstance(cfg.secret, SecretStr)
-        assert cfg.secret.get_secret_value() == "value"
+        assert cfg.secret.get_secret_value() == 'value'
         assert cfg.plain == 3
 
     def test_unknown_key_warning(self):
@@ -87,9 +87,9 @@ class TestProcessCoreSection:
         cfg = DummyCfg()
         summary = DummySummary()
         # Pass unknown key
-        process_core_section({"unknown_field": "value"}, cfg, summary)  # type: ignore[arg-type]
+        process_core_section({'unknown_field': 'value'}, cfg, summary)  # type: ignore[arg-type]
         # Should not raise, just log warning
-        assert not hasattr(cfg, "unknown_field")
+        assert not hasattr(cfg, 'unknown_field')
 
     def test_no_type_hints_fallback(self):
         """Test fallback when type hints aren't available."""
@@ -100,7 +100,7 @@ class TestProcessCoreSection:
 
         cfg = NoHintsCfg()
         summary = DummySummary()
-        process_core_section({"value": 42}, cfg, summary)  # type: ignore[arg-type]
+        process_core_section({'value': 42}, cfg, summary)  # type: ignore[arg-type]
         assert cfg.value == 42
 
 
@@ -109,10 +109,10 @@ class TestProcessAgentSection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.AgentConfig.from_toml_section",
-            side_effect=ValidationError.from_exception_data("AgentConfig", []),
+            'backend.core.config.config_sections.AgentConfig.from_toml_section',
+            side_effect=ValidationError.from_exception_data('AgentConfig', []),
         ):
-            process_agent_section({"agent": {"bad": True}}, cfg, summary)
+            process_agent_section({'agent': {'bad': True}}, cfg, summary)
         assert summary.records
 
     def test_valid_agent_section(self):
@@ -121,11 +121,11 @@ class TestProcessAgentSection:
         summary = DummySummary()
         fake_agent = MagicMock()
         with patch(
-            "backend.core.config.config_sections.AgentConfig.from_toml_section",
-            return_value={"agent": fake_agent},
+            'backend.core.config.config_sections.AgentConfig.from_toml_section',
+            return_value={'agent': fake_agent},
         ):
-            process_agent_section({"agent": {"name": "test"}}, cfg, summary)
-        cfg.set_agent_config.assert_called_once_with(fake_agent, "agent")
+            process_agent_section({'agent': {'name': 'test'}}, cfg, summary)
+        cfg.set_agent_config.assert_called_once_with(fake_agent, 'agent')
 
     def test_no_agent_section_does_nothing(self):
         """Test that missing agent section doesn't cause errors."""
@@ -139,10 +139,10 @@ class TestProcessAgentSection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.AgentConfig.from_toml_section",
-            side_effect=TypeError("bad type"),
+            'backend.core.config.config_sections.AgentConfig.from_toml_section',
+            side_effect=TypeError('bad type'),
         ):
-            process_agent_section({"agent": {"bad": True}}, cfg, summary)
+            process_agent_section({'agent': {'bad': True}}, cfg, summary)
         assert summary.records
 
     def test_key_error_records_summary(self):
@@ -150,10 +150,10 @@ class TestProcessAgentSection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.AgentConfig.from_toml_section",
-            side_effect=KeyError("missing_key"),
+            'backend.core.config.config_sections.AgentConfig.from_toml_section',
+            side_effect=KeyError('missing_key'),
         ):
-            process_agent_section({"agent": {"bad": True}}, cfg, summary)
+            process_agent_section({'agent': {'bad': True}}, cfg, summary)
         assert summary.records
 
 
@@ -169,50 +169,51 @@ class TestProcessLLMSection:
         fake_llm = MagicMock()
         fake_custom = MagicMock()
         with patch(
-            "backend.core.config.llm_config.suppress_llm_env_export",
+            'backend.core.config.llm_config.suppress_llm_env_export',
             _no_env,
         ):
             with patch.object(
                 MagicMock(),
-                "from_toml_section",
-                return_value={"llm": fake_llm, "custom": fake_custom},
+                'from_toml_section',
+                return_value={'llm': fake_llm, 'custom': fake_custom},
             ):
                 with patch(
-                    "backend.core.config.config_sections.LLMConfig"
+                    'backend.core.config.config_sections.LLMConfig'
                 ) as mock_llm_class:
                     mock_instance = MagicMock()
                     mock_instance.from_toml_section.return_value = {
-                        "llm": fake_llm,
-                        "custom": fake_custom,
+                        'llm': fake_llm,
+                        'custom': fake_custom,
                     }
                     mock_llm_class.return_value = mock_instance
-                    process_llm_section({"llm": {"model": "x"}}, cfg, summary)
+                    process_llm_section({'llm': {'model': 'x'}}, cfg, summary)
 
-        cfg.set_llm_config.assert_any_call(fake_custom, "custom")
-        cfg.set_llm_config.assert_any_call(fake_llm, "llm")
+        cfg.set_llm_config.assert_any_call(fake_custom, 'custom')
+        cfg.set_llm_config.assert_any_call(fake_llm, 'llm')
 
     def test_llm_validation_error_records_summary(self):
         """Test that ValidationError in LLM section is caught and recorded."""
         cfg = MagicMock()
         summary = DummySummary()
+
         def _noop_gen():
             yield
 
         with patch(
-            "backend.core.config.llm_config.suppress_llm_env_export",
+            'backend.core.config.llm_config.suppress_llm_env_export',
             contextmanager(_noop_gen),
         ):
             with patch(
-                "backend.core.config.config_sections.LLMConfig"
+                'backend.core.config.config_sections.LLMConfig'
             ) as mock_llm_class:
                 mock_instance = MagicMock()
                 mock_instance.from_toml_section.side_effect = (
-                    ValidationError.from_exception_data("LLMConfig", [])
+                    ValidationError.from_exception_data('LLMConfig', [])
                 )
                 mock_llm_class.return_value = mock_instance
-                process_llm_section({"llm": {"bad": True}}, cfg, summary)
+                process_llm_section({'llm': {'bad': True}}, cfg, summary)
         assert summary.records
-        assert summary.records[0][0] == "llm"
+        assert summary.records[0][0] == 'llm'
 
     def test_llm_no_section_does_nothing(self):
         """Test that missing LLM section doesn't cause errors."""
@@ -228,12 +229,12 @@ class TestProcessSecuritySection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.SecurityConfig.from_toml_section",
-            side_effect=ValueError("bad"),
+            'backend.core.config.config_sections.SecurityConfig.from_toml_section',
+            side_effect=ValueError('bad'),
         ):
-            process_security_section({"security": {"bad": True}}, cfg, summary)
+            process_security_section({'security': {'bad': True}}, cfg, summary)
         assert summary.records
-        assert summary.records[0][1] == "warning"
+        assert summary.records[0][1] == 'warning'
 
     def test_valid_security_section(self):
         """Test valid security section sets config."""
@@ -241,10 +242,10 @@ class TestProcessSecuritySection:
         summary = DummySummary()
         fake_security = MagicMock()
         with patch(
-            "backend.core.config.config_sections.SecurityConfig.from_toml_section",
-            return_value={"security": fake_security},
+            'backend.core.config.config_sections.SecurityConfig.from_toml_section',
+            return_value={'security': fake_security},
         ):
-            process_security_section({"security": {"enabled": True}}, cfg, summary)
+            process_security_section({'security': {'enabled': True}}, cfg, summary)
         assert cfg.security == fake_security
 
     def test_no_security_section_does_nothing(self):
@@ -260,10 +261,10 @@ class TestProcessSecuritySection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.SecurityConfig.from_toml_section",
-            side_effect=ValidationError.from_exception_data("SecurityConfig", []),
+            'backend.core.config.config_sections.SecurityConfig.from_toml_section',
+            side_effect=ValidationError.from_exception_data('SecurityConfig', []),
         ):
-            process_security_section({"security": {"bad": True}}, cfg, summary)
+            process_security_section({'security': {'bad': True}}, cfg, summary)
         assert summary.records
 
     def test_type_error_records_summary(self):
@@ -271,10 +272,10 @@ class TestProcessSecuritySection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.SecurityConfig.from_toml_section",
-            side_effect=TypeError("bad type"),
+            'backend.core.config.config_sections.SecurityConfig.from_toml_section',
+            side_effect=TypeError('bad type'),
         ):
-            process_security_section({"security": {"bad": True}}, cfg, summary)
+            process_security_section({'security': {'bad': True}}, cfg, summary)
         assert summary.records
 
 
@@ -283,11 +284,11 @@ class TestProcessRuntimeSection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.RuntimeConfig.from_toml_section",
-            side_effect=ValueError("bad"),
+            'backend.core.config.config_sections.RuntimeConfig.from_toml_section',
+            side_effect=ValueError('bad'),
         ):
             with pytest.raises(ValueError):
-                process_runtime_section({"runtime": {"bad": True}}, cfg, summary)
+                process_runtime_section({'runtime': {'bad': True}}, cfg, summary)
         assert summary.records
 
     def test_valid_runtime_section(self):
@@ -296,10 +297,10 @@ class TestProcessRuntimeSection:
         summary = DummySummary()
         fake_runtime = MagicMock()
         with patch(
-            "backend.core.config.config_sections.RuntimeConfig.from_toml_section",
-            return_value={"runtime_config": fake_runtime},
+            'backend.core.config.config_sections.RuntimeConfig.from_toml_section',
+            return_value={'runtime_config': fake_runtime},
         ):
-            process_runtime_section({"runtime": {"enabled": True}}, cfg, summary)
+            process_runtime_section({'runtime': {'enabled': True}}, cfg, summary)
         assert cfg.runtime_config == fake_runtime
 
     def test_no_runtime_section_does_nothing(self):
@@ -315,10 +316,10 @@ class TestProcessRuntimeSection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.RuntimeConfig.from_toml_section",
-            side_effect=ValidationError.from_exception_data("RuntimeConfig", []),
+            'backend.core.config.config_sections.RuntimeConfig.from_toml_section',
+            side_effect=ValidationError.from_exception_data('RuntimeConfig', []),
         ):
-            process_runtime_section({"runtime": {"bad": True}}, cfg, summary)
+            process_runtime_section({'runtime': {'bad': True}}, cfg, summary)
         assert summary.records
 
 
@@ -327,11 +328,11 @@ class TestProcessMcpSection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.MCPConfig.from_toml_section",
-            side_effect=ValueError("bad"),
+            'backend.core.config.config_sections.MCPConfig.from_toml_section',
+            side_effect=ValueError('bad'),
         ):
             with pytest.raises(ValueError):
-                process_mcp_section({"mcp": {"bad": True}}, cfg, summary)
+                process_mcp_section({'mcp': {'bad': True}}, cfg, summary)
         assert summary.records
 
     def test_valid_mcp_section(self):
@@ -340,10 +341,10 @@ class TestProcessMcpSection:
         summary = DummySummary()
         fake_mcp = MagicMock()
         with patch(
-            "backend.core.config.config_sections.MCPConfig.from_toml_section",
-            return_value={"mcp": fake_mcp},
+            'backend.core.config.config_sections.MCPConfig.from_toml_section',
+            return_value={'mcp': fake_mcp},
         ):
-            process_mcp_section({"mcp": {"enabled": True}}, cfg, summary)
+            process_mcp_section({'mcp': {'enabled': True}}, cfg, summary)
         assert cfg.mcp == fake_mcp
 
     def test_no_mcp_section_does_nothing(self):
@@ -359,10 +360,10 @@ class TestProcessMcpSection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.MCPConfig.from_toml_section",
-            side_effect=ValidationError.from_exception_data("MCPConfig", []),
+            'backend.core.config.config_sections.MCPConfig.from_toml_section',
+            side_effect=ValidationError.from_exception_data('MCPConfig', []),
         ):
-            process_mcp_section({"mcp": {"bad": True}}, cfg, summary)
+            process_mcp_section({'mcp': {'bad': True}}, cfg, summary)
         assert summary.records
 
 
@@ -376,7 +377,7 @@ class TestProcessCompactorSection:
 
         compactor_cfg = cfg.get_agent_config().compactor_config
         assert compactor_cfg is not None
-        assert compactor_cfg.type == "auto"
+        assert compactor_cfg.type == 'auto'
 
     def test_compactor_mapping_applied(self):
         cfg = AppConfig()
@@ -384,10 +385,10 @@ class TestProcessCompactorSection:
         dummy_compactor = MagicMock()
 
         with patch(
-            "backend.core.config.compactor_config.compactor_config_from_toml_section",
-            return_value={"compactor": dummy_compactor},
+            'backend.core.config.compactor_config.compactor_config_from_toml_section',
+            return_value={'compactor': dummy_compactor},
         ):
-            process_compactor_section({"compactor": {"type": "noop"}}, cfg, summary)
+            process_compactor_section({'compactor': {'type': 'noop'}}, cfg, summary)
 
         assert cfg.get_agent_config().compactor_config is dummy_compactor
 
@@ -396,10 +397,10 @@ class TestProcessCompactorSection:
         cfg = AppConfig()
         summary = DummySummary()
         with patch(
-            "backend.core.config.compactor_config.compactor_config_from_toml_section",
-            side_effect=ValidationError.from_exception_data("CompactorConfig", []),
+            'backend.core.config.compactor_config.compactor_config_from_toml_section',
+            side_effect=ValidationError.from_exception_data('CompactorConfig', []),
         ):
-            process_compactor_section({"compactor": {"bad": True}}, cfg, summary)
+            process_compactor_section({'compactor': {'bad': True}}, cfg, summary)
         assert summary.records
 
 
@@ -408,10 +409,10 @@ class TestProcessExtendedSection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.ExtendedConfig",
-            side_effect=ValidationError.from_exception_data("ExtendedConfig", []),
+            'backend.core.config.config_sections.ExtendedConfig',
+            side_effect=ValidationError.from_exception_data('ExtendedConfig', []),
         ):
-            process_extended_section({"extended": {"bad": True}}, cfg, summary)
+            process_extended_section({'extended': {'bad': True}}, cfg, summary)
         assert summary.records
 
     def test_valid_extended_section(self):
@@ -420,10 +421,10 @@ class TestProcessExtendedSection:
         summary = DummySummary()
         fake_extended = MagicMock()
         with patch(
-            "backend.core.config.config_sections.ExtendedConfig",
+            'backend.core.config.config_sections.ExtendedConfig',
             return_value=fake_extended,
         ):
-            process_extended_section({"extended": {"key": "value"}}, cfg, summary)
+            process_extended_section({'extended': {'key': 'value'}}, cfg, summary)
         assert cfg.extended == fake_extended
 
     def test_no_extended_section_does_nothing(self):
@@ -439,8 +440,8 @@ class TestProcessExtendedSection:
         cfg = MagicMock()
         summary = DummySummary()
         with patch(
-            "backend.core.config.config_sections.ExtendedConfig",
-            side_effect=TypeError("bad type"),
+            'backend.core.config.config_sections.ExtendedConfig',
+            side_effect=TypeError('bad type'),
         ):
-            process_extended_section({"extended": {"bad": True}}, cfg, summary)
+            process_extended_section({'extended': {'bad': True}}, cfg, summary)
         assert summary.records

@@ -1,6 +1,7 @@
 """Serialization and deserialization for App event schemas with version migration."""
 
 from __future__ import annotations
+
 from typing import Any, cast
 
 from pydantic import ValidationError
@@ -26,7 +27,7 @@ def serialize_event(event: BaseEventSchema) -> str:
     try:
         return json.dumps(event.to_dict(), default=str)
     except Exception as e:
-        raise ValueError(f"Failed to serialize event: {e}") from e
+        raise ValueError(f'Failed to serialize event: {e}') from e
 
 
 def deserialize_event(
@@ -48,13 +49,13 @@ def deserialize_event(
         try:
             data_dict = json.loads(data)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse JSON: {e}") from e
+            raise ValueError(f'Failed to parse JSON: {e}') from e
     else:
         data_dict = data
 
     # Migrate to latest version if needed
     if version is None:
-        schema_version = data_dict.get("schema_version", EventVersion.V1)
+        schema_version = data_dict.get('schema_version', EventVersion.V1)
         if isinstance(schema_version, str):
             try:
                 version = EventVersion(schema_version)
@@ -70,14 +71,14 @@ def deserialize_event(
     # Determine event type and deserialize
     try:
         # Try action schemas first
-        if "action_type" in data_dict:
+        if 'action_type' in data_dict:
             return _deserialize_action(data_dict)
         # Try observation schemas
-        if "observation_type" in data_dict:
+        if 'observation_type' in data_dict:
             return _deserialize_observation(data_dict)
-        raise ValueError("Event must have either action_type or observation_type")
+        raise ValueError('Event must have either action_type or observation_type')
     except ValidationError as e:
-        raise ValueError(f"Failed to validate event schema: {e}") from e
+        raise ValueError(f'Failed to validate event schema: {e}') from e
 
 
 def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
@@ -94,7 +95,7 @@ def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
     """
     from backend.core.schemas.actions import (
         AgentRejectActionSchema,
-            BrowseInteractiveActionSchema,
+        BrowseInteractiveActionSchema,
         ChangeAgentStateActionSchema,
         CmdRunActionSchema,
         FileEditActionSchema,
@@ -106,27 +107,27 @@ def _deserialize_action(data: dict[str, Any]) -> ActionSchemaUnion:
         SystemMessageActionSchema,
     )
 
-    action_type = data.get("action_type")
+    action_type = data.get('action_type')
     if not action_type:
-        raise ValueError("Action must have action_type field")
+        raise ValueError('Action must have action_type field')
 
     action_schemas: dict[str, type[BaseEventSchema]] = {
-        "read": FileReadActionSchema,
-        "write": FileWriteActionSchema,
-        "edit": FileEditActionSchema,
-        "run": CmdRunActionSchema,
-        "message": MessageActionSchema,
-        "system": SystemMessageActionSchema,
-            "browse_interactive": BrowseInteractiveActionSchema,
-        "finish": PlaybookFinishActionSchema,
-        "reject": AgentRejectActionSchema,
-        "change_agent_state": ChangeAgentStateActionSchema,
-        "null": NullActionSchema,
+        'read': FileReadActionSchema,
+        'write': FileWriteActionSchema,
+        'edit': FileEditActionSchema,
+        'run': CmdRunActionSchema,
+        'message': MessageActionSchema,
+        'system': SystemMessageActionSchema,
+        'browse_interactive': BrowseInteractiveActionSchema,
+        'finish': PlaybookFinishActionSchema,
+        'reject': AgentRejectActionSchema,
+        'change_agent_state': ChangeAgentStateActionSchema,
+        'null': NullActionSchema,
     }
 
     schema_class = action_schemas.get(action_type)
     if not schema_class:
-        raise ValueError(f"Unknown action type: {action_type}")
+        raise ValueError(f'Unknown action type: {action_type}')
 
     return cast(ActionSchemaUnion, schema_class.model_validate(data))
 
@@ -151,34 +152,34 @@ def _deserialize_observation(data: dict[str, Any]) -> ObservationSchemaUnion:
         MessageObservationSchema,
     )
 
-    observation_type = data.get("observation_type")
+    observation_type = data.get('observation_type')
     if not observation_type:
-        raise ValueError("Observation must have observation_type field")
+        raise ValueError('Observation must have observation_type field')
 
     observation_schemas: dict[str, type[BaseEventSchema]] = {
-        "run": CmdOutputObservationSchema,
-        "read": FileReadObservationSchema,
-        "edit": FileEditObservationSchema,
-        "error": ErrorObservationSchema,
-        "message": MessageObservationSchema,
+        'run': CmdOutputObservationSchema,
+        'read': FileReadObservationSchema,
+        'edit': FileEditObservationSchema,
+        'error': ErrorObservationSchema,
+        'message': MessageObservationSchema,
     }
 
     schema_class = observation_schemas.get(observation_type)
     if not schema_class:
-        raise ValueError(f"Unknown observation type: {observation_type}")
+        raise ValueError(f'Unknown observation type: {observation_type}')
 
     # Handle cmd_metadata conversion for CmdOutputObservation
     # Note: metadata field is for EventMetadata, cmd_metadata is for CmdOutputMetadata
-    if observation_type == "run" and "cmd_metadata" in data:
-        cmd_metadata = data["cmd_metadata"]
+    if observation_type == 'run' and 'cmd_metadata' in data:
+        cmd_metadata = data['cmd_metadata']
         # If cmd_metadata is already a dict, keep it as is
         # Pydantic will handle validation
         if not isinstance(cmd_metadata, dict):
             # Try to convert to dict if it's a Pydantic model
-            if hasattr(cmd_metadata, "model_dump"):
-                data["cmd_metadata"] = cmd_metadata.model_dump()
-            elif hasattr(cmd_metadata, "__dict__"):
-                data["cmd_metadata"] = cmd_metadata.__dict__
+            if hasattr(cmd_metadata, 'model_dump'):
+                data['cmd_metadata'] = cmd_metadata.model_dump()
+            elif hasattr(cmd_metadata, '__dict__'):
+                data['cmd_metadata'] = cmd_metadata.__dict__
 
     return cast(ObservationSchemaUnion, schema_class.model_validate(data))
 
@@ -206,7 +207,7 @@ def migrate_schema_version(
     if from_version == EventVersion.V1 and to_version == EventVersion.V2:
         # Add migration logic here when V2 is introduced
         raise ValueError(
-            f"Migration from {from_version} to {to_version} is not yet supported"
+            f'Migration from {from_version} to {to_version} is not yet supported'
         )
 
     # V2 to V1 migration (downgrade)
@@ -215,7 +216,7 @@ def migrate_schema_version(
         return data.copy()
         # Add downgrade logic here when V2 is introduced
 
-    raise ValueError(f"Migration from {from_version} to {to_version} is not supported")
+    raise ValueError(f'Migration from {from_version} to {to_version} is not supported')
 
 
 def validate_event_schema(event: BaseEventSchema) -> bool:
@@ -234,4 +235,4 @@ def validate_event_schema(event: BaseEventSchema) -> bool:
         event.__class__.model_validate(event.to_dict())
         return True
     except ValidationError as e:
-        raise ValueError(f"Event schema validation failed: {e}") from e
+        raise ValueError(f'Event schema validation failed: {e}') from e

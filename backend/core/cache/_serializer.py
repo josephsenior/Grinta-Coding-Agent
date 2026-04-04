@@ -14,7 +14,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, SecretStr
 
-T = TypeVar("T", bound=BaseModel)
+T = TypeVar('T', bound=BaseModel)
 
 
 def _json_fallback(obj: Any) -> Any:
@@ -26,7 +26,7 @@ def _json_fallback(obj: Any) -> Any:
     if isinstance(obj, Path | PurePosixPath | PureWindowsPath):
         return str(obj)
     if isinstance(obj, bytes):
-        return obj.decode("utf-8", errors="replace")
+        return obj.decode('utf-8', errors='replace')
     if isinstance(obj, set):
         return sorted(obj)
     # Last resort — str() is safer than raising and crashing the cache
@@ -39,9 +39,9 @@ def serialize_model(model: BaseModel) -> bytes:
     Uses ``model_dump(mode='python')`` so that ``SecretStr`` values are
     preserved (not masked) — required for cache round-tripping.
     """
-    data = model.model_dump(mode="python")
-    return json.dumps(data, default=_json_fallback, separators=(",", ":")).encode(
-        "utf-8"
+    data = model.model_dump(mode='python')
+    return json.dumps(data, default=_json_fallback, separators=(',', ':')).encode(
+        'utf-8'
     )
 
 
@@ -51,5 +51,5 @@ def deserialize_model[T: BaseModel](raw: bytes, model_class: type[T]) -> T:
         data = json.loads(raw)
         return model_class.model_validate(data)
     except (json.JSONDecodeError, UnicodeDecodeError):
-        msg = f"Cached value for {model_class.__name__} is not valid JSON"
+        msg = f'Cached value for {model_class.__name__} is not valid JSON'
         raise ValueError(msg) from None

@@ -52,43 +52,43 @@ class ModelResponseLite(BaseModel):
             return None
 
         if isinstance(function, dict):
-            name = function.get("name")
-            arguments = function.get("arguments")
+            name = function.get('name')
+            arguments = function.get('arguments')
             return {
-                "name": str(name) if name is not None else "",
-                "arguments": str(arguments) if arguments is not None else "{}",
+                'name': str(name) if name is not None else '',
+                'arguments': str(arguments) if arguments is not None else '{}',
             }
 
-        name = cls._getattr_or_get(function, "name")
-        arguments = cls._getattr_or_get(function, "arguments")
+        name = cls._getattr_or_get(function, 'name')
+        arguments = cls._getattr_or_get(function, 'arguments')
         if name is None and arguments is None:
             return None
         return {
-            "name": str(name) if name is not None else "",
-            "arguments": str(arguments) if arguments is not None else "{}",
+            'name': str(name) if name is not None else '',
+            'arguments': str(arguments) if arguments is not None else '{}',
         }
 
     @classmethod
     def from_sdk(cls, resp: Any) -> ModelResponseLite:
-        rid = cls._getattr_or_get(resp, "id")
-        rmodel = cls._getattr_or_get(resp, "model")
-        raw_choices = cls._getattr_or_get(resp, "choices", []) or []
+        rid = cls._getattr_or_get(resp, 'id')
+        rmodel = cls._getattr_or_get(resp, 'model')
+        raw_choices = cls._getattr_or_get(resp, 'choices', []) or []
         choices: list[ChoiceLite] = []
         for ch in raw_choices:
-            raw_msg = cls._getattr_or_get(ch, "message")
+            raw_msg = cls._getattr_or_get(ch, 'message')
             if raw_msg is None:
                 choices.append(ChoiceLite(message=None))
                 continue
-            role = cls._getattr_or_get(raw_msg, "role")
-            content = cls._getattr_or_get(raw_msg, "content")
-            raw_tool_calls = cls._getattr_or_get(raw_msg, "tool_calls")
+            role = cls._getattr_or_get(raw_msg, 'role')
+            content = cls._getattr_or_get(raw_msg, 'content')
+            raw_tool_calls = cls._getattr_or_get(raw_msg, 'tool_calls')
             tool_calls: list[AssistantToolCallLite] | None = None
             if isinstance(raw_tool_calls, list):
                 tool_calls = []
                 for tc in raw_tool_calls:
-                    tc_id = cls._getattr_or_get(tc, "id")
+                    tc_id = cls._getattr_or_get(tc, 'id')
                     function = cls._normalize_tool_function(
-                        cls._getattr_or_get(tc, "function")
+                        cls._getattr_or_get(tc, 'function')
                     )
                     tool_calls.append(
                         AssistantToolCallLite(id=tc_id, function=function)

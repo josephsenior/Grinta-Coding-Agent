@@ -1,4 +1,4 @@
-﻿"""Runtime and supporting infrastructure for App agents.
+"""Runtime and supporting infrastructure for App agents.
 
 This module provides the Runtime interface and its implementations.
 In this version, only LocalRuntimeInProcess is supported.
@@ -15,6 +15,7 @@ from backend.execution.orchestrator import (
     RuntimeOrchestrator,
     runtime_orchestrator,
 )
+from backend.execution.runtime_factory import get_runtime_cls
 from backend.execution.runtime_pool import (
     PooledRuntime,
     RuntimePool,
@@ -22,7 +23,6 @@ from backend.execution.runtime_pool import (
     WarmPoolPolicy,
     WarmRuntimePool,
 )
-from backend.execution.runtime_factory import get_runtime_cls
 from backend.execution.watchdog import runtime_watchdog
 from backend.utils.import_utils import get_impl
 
@@ -38,33 +38,32 @@ def _lazy_import(module_path: str, attr: str) -> Any:
 
 
 __all__ = [
-    "PooledRuntime",
-    "LocalRuntimeInProcess",
-    "RuntimeExecutor",
-    "RuntimePool",
-    "Runtime",
-    "RuntimeOrchestrator",
-    "RuntimeAcquireResult",
-    "runtime_orchestrator",
-    "runtime_watchdog",
-    "SingleUseRuntimePool",
-    "WarmPoolPolicy",
-    "WarmRuntimePool",
-    "get_runtime_cls",
-    "get_impl",
+    'PooledRuntime',
+    'LocalRuntimeInProcess',
+    'RuntimeExecutor',
+    'RuntimePool',
+    'Runtime',
+    'RuntimeOrchestrator',
+    'RuntimeAcquireResult',
+    'runtime_orchestrator',
+    'runtime_watchdog',
+    'SingleUseRuntimePool',
+    'WarmPoolPolicy',
+    'WarmRuntimePool',
+    'get_runtime_cls',
+    'get_impl',
 ]
 
 
 def __getattr__(name: str) -> Any:  # Lazy access to runtime classes
-    if name == "LocalRuntimeInProcess":
+    if name == 'LocalRuntimeInProcess':
         return _lazy_import(
-            "backend.execution.drivers.local.local_runtime_inprocess",
-            "LocalRuntimeInProcess",
+            'backend.execution.drivers.local.local_runtime_inprocess',
+            'LocalRuntimeInProcess',
         )
-    if name == "RuntimeExecutor":
+    if name == 'RuntimeExecutor':
         return _lazy_import(
-            "backend.execution.action_execution_server",
-            "RuntimeExecutor",
+            'backend.execution.action_execution_server',
+            'RuntimeExecutor',
         )
     raise AttributeError(name)
-

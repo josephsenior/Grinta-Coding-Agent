@@ -1,59 +1,55 @@
 import json
 
-import pytest
-from unittest.mock import MagicMock
-
 from backend.engine.tools.lsp_query import create_lsp_query_tool
+from backend.ledger.action.code_nav import LspQueryAction
 from backend.utils.lsp_client import (
     LspClient,
-    LspResult,
 )
-from backend.ledger.action.code_nav import LspQueryAction
 
 
 def test_create_lsp_query_tool():
     """Verify the LSP query tool schema is correct."""
     tool = create_lsp_query_tool()
 
-    assert tool["type"] == "function"
-    assert tool["function"]["name"] == "lsp_query"
+    assert tool['type'] == 'function'
+    assert tool['function']['name'] == 'lsp_query'
 
-    props = tool["function"]["parameters"]["properties"]
-    assert "command" in props
-    assert "file" in props
-    assert "line" in props
-    assert "column" in props
-    assert "symbol" in props
+    props = tool['function']['parameters']['properties']
+    assert 'command' in props
+    assert 'file' in props
+    assert 'line' in props
+    assert 'column' in props
+    assert 'symbol' in props
 
-    required = tool["function"]["parameters"]["required"]
-    assert "command" in required
-    assert "file" in required
+    required = tool['function']['parameters']['required']
+    assert 'command' in required
+    assert 'file' in required
 
 
 def test_lsp_query_action_creation():
     """Verify action dataclass parameters."""
     action = LspQueryAction(
-        command="find_definition",
-        file="/home/user/project/main.py",
+        command='find_definition',
+        file='/home/user/project/main.py',
         line=10,
         column=5,
     )
 
-    assert action.action == "lsp_query"
-    assert action.command == "find_definition"
-    assert action.file == "/home/user/project/main.py"
+    assert action.action == 'lsp_query'
+    assert action.command == 'find_definition'
+    assert action.file == '/home/user/project/main.py'
     assert action.line == 10
     assert action.column == 5
-    assert action.symbol == ""
+    assert action.symbol == ''
 
 
 def test_lsp_query_action_list_symbols():
     """Verify action dataclass handles list_symbols command."""
     action = LspQueryAction(
-        command="list_symbols", file="/home/user/project/main.py", symbol="MyClass"
+        command='list_symbols', file='/home/user/project/main.py', symbol='MyClass'
     )
-    assert action.command == "list_symbols"
-    assert action.symbol == "MyClass"
+    assert action.command == 'list_symbols'
+    assert action.symbol == 'MyClass'
     assert action.line == 1
 
 
@@ -62,40 +58,37 @@ def test_lsp_client_graceful_degradation(monkeypatch):
 
     # Mock subprocess.run to raise FileNotFoundError (command not found)
     def mock_run(*args, **kwargs):
-        raise FileNotFoundError("pylsp not found")
+        raise FileNotFoundError('pylsp not found')
 
-    monkeypatch.setattr("subprocess.run", mock_run)
-    monkeypatch.setattr("backend.utils.lsp_client._PYLSP_AVAILABLE", None)
+    monkeypatch.setattr('subprocess.run', mock_run)
+    monkeypatch.setattr('backend.utils.lsp_client._PYLSP_AVAILABLE', None)
 
     client = LspClient()
 
     # All commands should return empty/degraded results safely
-    assert client.query("find_definition", "file.py", 1, 1).locations == []
-    assert client.query("find_references", "file.py", 1, 1).locations == []
+    assert client.query('find_definition', 'file.py', 1, 1).locations == []
+    assert client.query('find_references', 'file.py', 1, 1).locations == []
     # hover returns LspResult with available=False when pylsp is not installed
-    res = client.query("hover", "file.py", 1, 1)
+    res = client.query('hover', 'file.py', 1, 1)
     assert not res.available
-    assert "LSP is not available" in res.format_text("hover")
-    assert client.query("list_symbols", "file.py").symbols == []
+    assert 'LSP is not available' in res.format_text('hover')
+    assert client.query('list_symbols', 'file.py').symbols == []
 
 
 def test_lsp_client_parse_content_length_framing() -> None:
     client = LspClient()
-    msg = {"jsonrpc": "2.0", "id": 1, "result": {"capabilities": {}}}
+    msg = {'jsonrpc': '2.0', 'id': 1, 'result': {'capabilities': {}}}
     raw = json.dumps(msg)
-    blob = f"Content-Length: {len(raw)}\r\n\r\n{raw}"
+    blob = f'Content-Length: {len(raw)}\r\n\r\n{raw}'
     parsed = client._parse_lsp_responses(blob)
     assert len(parsed) == 1
-    assert parsed[0]["id"] == 1
+    assert parsed[0]['id'] == 1
 
 
 def test_lsp_client_parse_multiple_messages() -> None:
     client = LspClient()
-    a = json.dumps({"jsonrpc": "2.0", "id": 1, "result": 1})
-    b = json.dumps({"jsonrpc": "2.0", "id": 2, "result": 2})
-    blob = (
-        f"Content-Length: {len(a)}\r\n\r\n{a}"
-        f"Content-Length: {len(b)}\r\n\r\n{b}"
-    )
+    a = json.dumps({'jsonrpc': '2.0', 'id': 1, 'result': 1})
+    b = json.dumps({'jsonrpc': '2.0', 'id': 2, 'result': 2})
+    blob = f'Content-Length: {len(a)}\r\n\r\n{a}Content-Length: {len(b)}\r\n\r\n{b}'
     parsed = client._parse_lsp_responses(blob)
-    assert [x["id"] for x in parsed] == [1, 2]
+    assert [x['id'] for x in parsed] == [1, 2]

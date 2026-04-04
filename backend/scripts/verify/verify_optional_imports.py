@@ -13,27 +13,27 @@ import sys
 
 OPTIONAL_TOP_LEVEL_MODULES = {
     # caching
-    "redis",
+    'redis',
     # memory
-    "chromadb",
-    "sentence_transformers",
+    'chromadb',
+    'sentence_transformers',
     # telemetry
-    "opentelemetry",
-    "protobuf",
+    'opentelemetry',
+    'protobuf',
 }
 
 
 def _iter_py_files(root: pathlib.Path) -> list[pathlib.Path]:
-    return [p for p in root.rglob("*.py") if p.is_file()]
+    return [p for p in root.rglob('*.py') if p.is_file()]
 
 
 def _top_module(name: str) -> str:
-    return name.split(".", 1)[0]
+    return name.split('.', 1)[0]
 
 
 def _check_file(path: pathlib.Path) -> list[str]:
     try:
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
     except Exception:
         return []
 
@@ -52,9 +52,9 @@ def _check_file(path: pathlib.Path) -> list[str]:
 def main() -> int:
     repo_root = pathlib.Path(__file__).resolve().parents[3]
     targets = [
-        repo_root / "backend" / "core",
-        repo_root / "backend" / "events",
-        repo_root / "backend" / "server",
+        repo_root / 'backend' / 'core',
+        repo_root / 'backend' / 'events',
+        repo_root / 'backend' / 'server',
     ]
 
     all_violations: list[str] = []
@@ -65,10 +65,10 @@ def main() -> int:
             all_violations.extend(_check_file(py))
 
     if all_violations:
-        sys.stderr.write("\n".join(all_violations) + "\n")
+        sys.stderr.write('\n'.join(all_violations) + '\n')
         return 1
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 
 class NonEmptyString(str):
@@ -38,9 +38,9 @@ class NonEmptyString(str):
             ValueError: If string is empty or whitespace-only
         """
         if not value or not isinstance(value, str):
-            raise ValueError("Value must be a non-empty string")
+            raise ValueError('Value must be a non-empty string')
         if not value.strip():
-            raise ValueError("String cannot be empty or whitespace-only")
+            raise ValueError('String cannot be empty or whitespace-only')
         return cls(value)
 
 
@@ -69,9 +69,9 @@ class PositiveInt(int):
             ValueError: If integer is not positive
         """
         if not isinstance(value, int):
-            raise ValueError("Value must be an integer")
+            raise ValueError('Value must be an integer')
         if value <= 0:
-            raise ValueError(f"Integer must be positive, got {value}")
+            raise ValueError(f'Integer must be positive, got {value}')
         return cls(value)
 
 
@@ -158,12 +158,12 @@ class SafeDict[T](dict[str, T]):
             KeyError: If key is missing
         """
         if key not in self:
-            raise KeyError(f"Required key missing: {key}")
+            raise KeyError(f'Required key missing: {key}')
         return self[key]
 
 
 # Convenience functions
-def validate_non_empty_string(value: str, name: str = "value") -> str:
+def validate_non_empty_string(value: str, name: str = 'value') -> str:
     """Validate that a string is non-empty.
 
     Args:
@@ -177,13 +177,13 @@ def validate_non_empty_string(value: str, name: str = "value") -> str:
         ValueError: If string is empty
     """
     if not value or not isinstance(value, str):
-        raise ValueError(f"{name} must be a non-empty string")
+        raise ValueError(f'{name} must be a non-empty string')
     if not value.strip():
-        raise ValueError(f"{name} cannot be empty or whitespace-only")
+        raise ValueError(f'{name} cannot be empty or whitespace-only')
     return value
 
 
-def validate_positive_int(value: int, name: str = "value") -> int:
+def validate_positive_int(value: int, name: str = 'value') -> int:
     """Validate that an integer is positive.
 
     Args:
@@ -197,7 +197,7 @@ def validate_positive_int(value: int, name: str = "value") -> int:
         ValueError: If integer is not positive
     """
     if not isinstance(value, int):
-        raise ValueError(f"{name} must be an integer")
+        raise ValueError(f'{name} must be an integer')
     if value <= 0:
-        raise ValueError(f"{name} must be positive, got {value}")
+        raise ValueError(f'{name} must be positive, got {value}')
     return value

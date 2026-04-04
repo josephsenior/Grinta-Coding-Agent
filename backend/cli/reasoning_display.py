@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import time
 from collections import deque
+from typing import Any
 
-from rich.console import Console, ConsoleOptions, RenderResult
-from rich.panel import Panel
+from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
@@ -58,7 +58,7 @@ class ReasoningDisplay:
         self._thought_lines: list[str] = []
         self._current_action: str = ''
         self._recent_actions: deque[str] = deque(maxlen=3)
-        self._max_lines: int = 4  # compact: max 4 thought lines
+        self._max_lines: int = 10  # show up to 10 thought lines for real-time stream
         self._start_time: float | None = None
         self._cost_at_start: float = 0.0
         self._current_cost: float = 0.0
@@ -133,44 +133,33 @@ class ReasoningDisplay:
             return
         yield self.renderable()
 
-    def renderable(self) -> Panel:
-        grid = Table.grid(expand=True, padding=(0, 1))
-        grid.add_column(width=2)
-        grid.add_column(ratio=1)
-
+    def renderable(self) -> Any:
         # Elapsed time
         elapsed = ''
         secs = self.elapsed_seconds
         if secs is not None:
-            elapsed = f' ({secs}s)'
+            m, s = divmod(secs, 60)
+            elapsed = f'{m}m {s}s' if m > 0 else f'{s}s'
 
-        # Tool-specific icon
         action_label = self._current_action or 'Thinking…'
-        icon = _icon_for_action(action_label)
+        rows: list[Any] = []
 
-        grid.add_row(
-            Spinner('dots', style='cyan'),
-            Text(
-                f'{icon} {action_label}{elapsed}',
-                style='bold cyan',
-            ),
-        )
-
-        # Action trail
-        if len(self._recent_actions) > 1:
-            trail = ' → '.join(self._recent_actions)
-            grid.add_row(Text(''), Text(trail, style='bright_black'))
-
-        # Thought lines (compact: max 4)
+        # Thought lines — italic dim flowing text, no border
         for line in self._thought_lines:
-            grid.add_row(Text('•', style='bright_black'), Text(line, style='dim italic'))
+            t = Text()
+            t.append('  ', style='')
+            t.append(line, style='italic bright_black')
+            rows.append(t)
 
-        # Budget burn when cost is meaningful
-        turn_cost = self._current_cost - self._cost_at_start
-        if turn_cost > 0.01:
-            grid.add_row(
-                Text('$', style='green dim'),
-                Text(f'Turn cost: ${turn_cost:.4f}', style='green dim'),
-            )
+        # Spinner row
+        spinner_grid = Table.grid(padding=(0, 1))
+        spinner_grid.add_column(width=3)
+        spinner_grid.add_column(ratio=1)
+        label = Text()
+        label.append(action_label, style='dim')
+        if elapsed:
+            label.append(f' ({elapsed} · esc to interrupt)', style='bright_black')
+        spinner_grid.add_row(Spinner('dots', style='bright_black'), label)
+        rows.append(spinner_grid)
 
-        return Panel(grid, title='[dim]agent[/dim]', border_style='bright_black', padding=(0, 1))
+        return Group(*rows)

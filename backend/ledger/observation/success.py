@@ -17,4 +17,3 @@ class SuccessObservation(Observation):
     def message(self) -> str:
         """Get success message content."""
         return self.content
-

@@ -28,9 +28,9 @@ logger = logging.getLogger(__name__)
 class AutonomyLevel(str, Enum):
     """Agent autonomy levels."""
 
-    SUPERVISED = "supervised"  # Always ask for confirmation
-    BALANCED = "balanced"  # Ask for high-risk actions only
-    FULL = "full"  # Never ask for confirmation
+    SUPERVISED = 'supervised'  # Always ask for confirmation
+    BALANCED = 'balanced'  # Ask for high-risk actions only
+    FULL = 'full'  # Never ask for confirmation
 
 
 class AutonomyController:
@@ -48,15 +48,15 @@ class AutonomyController:
 
         """
         self.autonomy_level = getattr(
-            config, "autonomy_level", AutonomyLevel.BALANCED.value
+            config, 'autonomy_level', AutonomyLevel.BALANCED.value
         )
-        self.auto_retry = getattr(config, "auto_retry_on_error", False)
-        self.max_iterations = getattr(config, "max_autonomous_iterations", 0)
-        self.stuck_detection = getattr(config, "stuck_detection_enabled", False)
-        self.stuck_threshold = getattr(config, "stuck_threshold_iterations", 0)
+        self.auto_retry = getattr(config, 'auto_retry_on_error', False)
+        self.max_iterations = getattr(config, 'max_autonomous_iterations', 0)
+        self.stuck_detection = getattr(config, 'stuck_detection_enabled', False)
+        self.stuck_threshold = getattr(config, 'stuck_threshold_iterations', 0)
 
         logger.info(
-            "AutonomyController initialized with level=%s, auto_retry=%s",
+            'AutonomyController initialized with level=%s, auto_retry=%s',
             self.autonomy_level,
             self.auto_retry,
         )
@@ -101,24 +101,24 @@ class AutonomyController:
 
             # Destructive commands
             destructive_patterns = [
-                "rm -rf",
-                "dd if=",
-                "mkfs",
-                "fdisk",
-                ":(){:|:&};:",  # Fork bomb
-                "> /dev/",
-                "chmod -r 777",
-                "chown -r",
+                'rm -rf',
+                'dd if=',
+                'mkfs',
+                'fdisk',
+                ':(){:|:&};:',  # Fork bomb
+                '> /dev/',
+                'chmod -r 777',
+                'chown -r',
             ]
 
             if any(pattern in command for pattern in destructive_patterns):
-                logger.warning("High-risk command detected: %s", command)
+                logger.warning('High-risk command detected: %s', command)
                 return True
 
             # System modification commands
-            system_commands = ["reboot", "shutdown", "init", "systemctl"]
+            system_commands = ['reboot', 'shutdown', 'init', 'systemctl']
             if any(cmd in command for cmd in system_commands):
-                logger.warning("System modification command detected: %s", command)
+                logger.warning('System modification command detected: %s', command)
                 return True
 
         # File operations are generally safe in isolated environments
@@ -149,7 +149,7 @@ class AutonomyController:
 
         # Only 1 retry for ImportError (for pip install)
         if attempts >= 1:
-            logger.info("Max retry attempts reached (%d), not retrying", attempts)
+            logger.info('Max retry attempts reached (%d), not retrying', attempts)
             return False
 
         # Only retry ImportError (for auto pip install)
@@ -157,7 +157,7 @@ class AutonomyController:
 
         if is_import_error:
             logger.info(
-                "ImportError detected, will auto-install package (attempt %d/1)",
+                'ImportError detected, will auto-install package (attempt %d/1)',
                 attempts + 1,
             )
 

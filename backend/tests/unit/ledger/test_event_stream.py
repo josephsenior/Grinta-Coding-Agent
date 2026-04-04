@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-
 from backend.ledger.stream import (
     EventStreamSubscriber,
     get_aggregated_event_stream_stats,
 )
-
 
 # ---------------------------------------------------------------------------
 # EventStreamSubscriber enum
@@ -16,12 +14,12 @@ from backend.ledger.stream import (
 
 class TestEventStreamSubscriber:
     def test_members(self):
-        assert EventStreamSubscriber.AGENT_CONTROLLER.value == "agent_controller"
-        assert EventStreamSubscriber.SERVER.value == "server"
-        assert EventStreamSubscriber.RUNTIME.value == "runtime"
-        assert EventStreamSubscriber.MEMORY.value == "memory"
-        assert EventStreamSubscriber.MAIN.value == "main"
-        assert EventStreamSubscriber.TEST.value == "test"
+        assert EventStreamSubscriber.AGENT_CONTROLLER.value == 'agent_controller'
+        assert EventStreamSubscriber.SERVER.value == 'server'
+        assert EventStreamSubscriber.RUNTIME.value == 'runtime'
+        assert EventStreamSubscriber.MEMORY.value == 'memory'
+        assert EventStreamSubscriber.MAIN.value == 'main'
+        assert EventStreamSubscriber.TEST.value == 'test'
 
     def test_is_string(self):
         assert isinstance(EventStreamSubscriber.TEST, str)
@@ -41,4 +39,4 @@ class TestAggregatedEventStreamStats:
         stats = get_aggregated_event_stream_stats()
         assert isinstance(stats, dict)
         # Should have at least the count key
-        assert "total_streams" in stats or isinstance(stats, dict)
+        assert 'total_streams' in stats or isinstance(stats, dict)

@@ -46,33 +46,33 @@ def cmd_list(args: argparse.Namespace) -> None:
     registry = _get_registry()
     plugins = registry.plugins
     if not plugins:
-        print("No plugins discovered.")
+        print('No plugins discovered.')
         return
 
-    print(f"\n{'Name':<30} {'Version':<10} {'API':<6} {'Hooks'}")
-    print("─" * 70)
+    print(f'\n{"Name":<30} {"Version":<10} {"API":<6} {"Hooks"}')
+    print('─' * 70)
     for plugin in plugins:
         name = type(plugin).__name__
-        version = getattr(plugin, "version", "?")
-        api = getattr(plugin, "api_version", "?")
+        version = getattr(plugin, 'version', '?')
+        api = getattr(plugin, 'api_version', '?')
         hooks = []
         for method_name in [
-            "on_action_pre",
-            "on_action_post",
-            "on_event",
-            "on_session_start",
-            "on_session_end",
-            "on_llm_pre",
-            "on_llm_post",
-            "on_condense",
-            "on_memory_recall",
-            "on_tool_invoke",
+            'on_action_pre',
+            'on_action_post',
+            'on_event',
+            'on_session_start',
+            'on_session_end',
+            'on_llm_pre',
+            'on_llm_post',
+            'on_condense',
+            'on_memory_recall',
+            'on_tool_invoke',
         ]:
             method = getattr(plugin, method_name, None)
             if method and not _is_base_method(method):
-                hooks.append(method_name.replace("on_", ""))
-        hook_str = ", ".join(hooks) if hooks else "(none)"
-        print(f"  {name:<28} {version:<10} {api:<6} {hook_str}")
+                hooks.append(method_name.replace('on_', ''))
+        hook_str = ', '.join(hooks) if hooks else '(none)'
+        print(f'  {name:<28} {version:<10} {api:<6} {hook_str}')
     print()
 
 
@@ -81,14 +81,14 @@ def cmd_validate(args: argparse.Namespace) -> None:
     registry = _get_registry()
     errors = registry.validate_all()
     if not errors:
-        print("✓ All plugins passed validation.")
+        print('✓ All plugins passed validation.')
         return
 
-    print(f"\n✗ {len(errors)} plugin validation error(s):\n")
+    print(f'\n✗ {len(errors)} plugin validation error(s):\n')
     for plugin_name, error_list in errors.items():
-        print(f"  {plugin_name}:")
+        print(f'  {plugin_name}:')
         for err in error_list:
-            print(f"    - {err}")
+            print(f'    - {err}')
     print()
     sys.exit(1)
 
@@ -109,59 +109,57 @@ def cmd_test(args: argparse.Namespace) -> None:
     if plugin is None:
         print(f"Plugin '{target}' not found. Available plugins:")
         for p in registry.plugins:
-            print(f"  - {type(p).__name__}")
+            print(f'  - {type(p).__name__}')
         sys.exit(1)
 
-    print(f"\nTesting plugin: {type(plugin).__name__}")
-    print("─" * 50)
+    print(f'\nTesting plugin: {type(plugin).__name__}')
+    print('─' * 50)
 
     # Run through lifecycle hooks with mock data
     async def _run_tests():
-        print("\n[1] on_session_start...")
+        print('\n[1] on_session_start...')
         try:
-            await _call_if_exists(plugin, "on_session_start", "test-session-001", {})
-            print("    ✓ OK")
+            await _call_if_exists(plugin, 'on_session_start', 'test-session-001', {})
+            print('    ✓ OK')
         except Exception as e:
-            print(f"    ✗ Error: {e}")
+            print(f'    ✗ Error: {e}')
 
-        print("\n[2] on_llm_pre...")
-        mock_messages = [{"role": "user", "content": "Hello"}]
+        print('\n[2] on_llm_pre...')
+        mock_messages = [{'role': 'user', 'content': 'Hello'}]
         try:
-            result = await _call_if_exists(plugin, "on_llm_pre", mock_messages)
-            print(f"    ✓ OK (returned {len(result or mock_messages)} messages)")
+            result = await _call_if_exists(plugin, 'on_llm_pre', mock_messages)
+            print(f'    ✓ OK (returned {len(result or mock_messages)} messages)')
         except Exception as e:
-            print(f"    ✗ Error: {e}")
+            print(f'    ✗ Error: {e}')
 
-        print("\n[3] on_llm_post...")
-        try:
-            await _call_if_exists(
-                plugin, "on_llm_post", {"choices": [{"message": {"content": "Hi!"}}]}
-            )
-            print("    ✓ OK")
-        except Exception as e:
-            print(f"    ✗ Error: {e}")
-
-        print("\n[4] on_session_end...")
+        print('\n[3] on_llm_post...')
         try:
             await _call_if_exists(
-                plugin, "on_session_end", "test-session-001", {"reason": "test"}
+                plugin, 'on_llm_post', {'choices': [{'message': {'content': 'Hi!'}}]}
             )
-            print("    ✓ OK")
+            print('    ✓ OK')
         except Exception as e:
-            print(f"    ✗ Error: {e}")
+            print(f'    ✗ Error: {e}')
 
-        print("\n" + "─" * 50)
-        print("Plugin test complete.")
+        print('\n[4] on_session_end...')
+        try:
+            await _call_if_exists(
+                plugin, 'on_session_end', 'test-session-001', {'reason': 'test'}
+            )
+            print('    ✓ OK')
+        except Exception as e:
+            print(f'    ✗ Error: {e}')
+
+        print('\n' + '─' * 50)
+        print('Plugin test complete.')
 
     asyncio.run(_run_tests())
 
 
-def _detect_changed_files(
-    watch_dir: Path, last_mtimes: dict[str, float]
-) -> bool:
+def _detect_changed_files(watch_dir: Path, last_mtimes: dict[str, float]) -> bool:
     """Detect changed .py files. Returns True if any changed."""
     changed = False
-    for py_file in watch_dir.rglob("*.py"):
+    for py_file in watch_dir.rglob('*.py'):
         mtime = py_file.stat().st_mtime
         key = str(py_file)
         if key not in last_mtimes:
@@ -169,7 +167,7 @@ def _detect_changed_files(
         elif last_mtimes[key] != mtime:
             last_mtimes[key] = mtime
             changed = True
-            print(f"\n  Changed: {py_file.name}")
+            print(f'\n  Changed: {py_file.name}')
     return changed
 
 
@@ -179,37 +177,37 @@ def _reload_plugins() -> None:
 
     importlib.reload(plugin_mod)
     registry = plugin_mod.get_plugin_registry()
-    print(f"  ✓ {len(registry.plugins)} plugin(s) loaded")
+    print(f'  ✓ {len(registry.plugins)} plugin(s) loaded')
     errors = registry.validate_all()
     if errors:
         for name, errs in errors.items():
             for e in errs:
-                print(f"    ✗ {name}: {e}")
+                print(f'    ✗ {name}: {e}')
     else:
-        print("  ✓ All plugins valid")
+        print('  ✓ All plugins valid')
 
 
 def cmd_watch(args: argparse.Namespace) -> None:
     """Watch a directory for plugin file changes and reload."""
     watch_dir = Path(args.dir).resolve()
     if not watch_dir.exists():
-        print(f"Directory not found: {watch_dir}")
+        print(f'Directory not found: {watch_dir}')
         sys.exit(1)
 
-    print(f"Watching {watch_dir} for changes... (Ctrl+C to stop)")
+    print(f'Watching {watch_dir} for changes... (Ctrl+C to stop)')
     last_mtimes: dict[str, float] = {}
 
     try:
         while True:
             if _detect_changed_files(watch_dir, last_mtimes):
-                print("  Reloading plugins...")
+                print('  Reloading plugins...')
                 try:
                     _reload_plugins()
                 except Exception as e:
-                    print(f"  ✗ Reload error: {e}")
+                    print(f'  ✗ Reload error: {e}')
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\nStopped.")
+        print('\nStopped.')
 
 
 # ── Utilities ───────────────────────────────────────────────────────────────
@@ -230,33 +228,33 @@ async def _call_if_exists(plugin: Any, method: str, *args: Any) -> Any:
 
 def _is_base_method(method: Any) -> bool:
     """Check if a method is the default ABC implementation (no-op)."""
-    qualname = getattr(method, "__qualname__", "")
-    return "AppPlugin." in qualname
+    qualname = getattr(method, '__qualname__', '')
+    return 'AppPlugin.' in qualname
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="plugin_dev",
-        description="App plugin development tools",
+        prog='plugin_dev',
+        description='App plugin development tools',
     )
-    sub = parser.add_subparsers(dest="command")
+    sub = parser.add_subparsers(dest='command')
 
-    sub.add_parser("list", help="List discovered plugins")
-    sub.add_parser("validate", help="Validate all plugins")
+    sub.add_parser('list', help='List discovered plugins')
+    sub.add_parser('validate', help='Validate all plugins')
 
-    test_p = sub.add_parser("test", help="Test a specific plugin")
-    test_p.add_argument("plugin_name", help="Plugin class name to test")
+    test_p = sub.add_parser('test', help='Test a specific plugin')
+    test_p.add_argument('plugin_name', help='Plugin class name to test')
 
-    watch_p = sub.add_parser("watch", help="Watch directory for plugin changes")
-    watch_p.add_argument("--dir", default=".", help="Directory to watch")
+    watch_p = sub.add_parser('watch', help='Watch directory for plugin changes')
+    watch_p.add_argument('--dir', default='.', help='Directory to watch')
 
     args = parser.parse_args()
 
     commands = {
-        "list": cmd_list,
-        "validate": cmd_validate,
-        "test": cmd_test,
-        "watch": cmd_watch,
+        'list': cmd_list,
+        'validate': cmd_validate,
+        'test': cmd_test,
+        'watch': cmd_watch,
     }
 
     if args.command in commands:
@@ -265,5 +263,5 @@ def main() -> None:
         parser.print_help()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -16,7 +16,9 @@ from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation_cause import attach_observation_cause
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
 
 
 class PendingActionService:
@@ -34,7 +36,7 @@ class PendingActionService:
         """MCP tool calls often need longer than the default (cold npx, network)."""
         if base <= 0:
             return math.inf
-        if type(action).__name__ == "MCPAction":
+        if type(action).__name__ == 'MCPAction':
             return max(float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR)
         return float(base)
 
@@ -49,12 +51,12 @@ class PendingActionService:
             self._pending = None
             return
 
-        action_id = getattr(action, "id", "unknown")
+        action_id = getattr(action, 'id', 'unknown')
         action_type = type(action).__name__
         controller.log(
-            "debug",
-            f"Set pending action: {action_type} (id={action_id})",
-            extra={"msg_type": "PENDING_ACTION_SET"},
+            'debug',
+            f'Set pending action: {action_type} (id={action_id})',
+            extra={'msg_type': 'PENDING_ACTION_SET'},
         )
         self._pending = (action, time.time())
         effective = self._effective_timeout_seconds(self._timeout, action)
@@ -82,10 +84,10 @@ class PendingActionService:
 
         if math.isfinite(limit) and elapsed > 60.0 and int(elapsed) % 30 == 0:
             controller.log(
-                "info",
-                f"Pending action active for {elapsed:.1f}s: {type(action).__name__} "
-                f"(id={getattr(action, 'id', 'unknown')})",
-                extra={"msg_type": "PENDING_ACTION_TIMEOUT"},
+                'info',
+                f'Pending action active for {elapsed:.1f}s: {type(action).__name__} '
+                f'(id={getattr(action, "id", "unknown")})',
+                extra={'msg_type': 'PENDING_ACTION_TIMEOUT'},
             )
         return action
 
@@ -100,35 +102,35 @@ class PendingActionService:
         self._pending = None
 
     def _log_clear(self, controller, prev_action: Action, timestamp: float) -> None:
-        action_id = getattr(prev_action, "id", "unknown")
+        action_id = getattr(prev_action, 'id', 'unknown')
         action_type = type(prev_action).__name__
         elapsed = time.time() - timestamp
         controller.log(
-            "debug",
-            f"Cleared pending action after {elapsed:.2f}s: {action_type} (id={action_id})",
-            extra={"msg_type": "PENDING_ACTION_CLEARED"},
+            'debug',
+            f'Cleared pending action after {elapsed:.2f}s: {action_type} (id={action_id})',
+            extra={'msg_type': 'PENDING_ACTION_CLEARED'},
         )
 
     def _handle_timeout(self, controller, action: Action, elapsed: float) -> None:
-        action_id = getattr(action, "id", "unknown")
+        action_id = getattr(action, 'id', 'unknown')
         action_type = type(action).__name__
         controller.log(
-            "warning",
-            f"Pending action timed out after {elapsed:.1f}s, auto-clearing: {action_type} (id={action_id})",
-            extra={"msg_type": "PENDING_ACTION_TIMEOUT_CLEARED"},
+            'warning',
+            f'Pending action timed out after {elapsed:.1f}s, auto-clearing: {action_type} (id={action_id})',
+            extra={'msg_type': 'PENDING_ACTION_TIMEOUT_CLEARED'},
         )
         timeout_obs = ErrorObservation(
             content=(
-                f"Pending action timed out after {elapsed:.1f}s: {action_type}. "
-                f"WARNING: The operation may still complete in the background. "
-                f"Before proceeding, verify the current state of any files or "
-                f"resources this action was modifying to avoid working with "
-                f"stale assumptions."
+                f'Pending action timed out after {elapsed:.1f}s: {action_type}. '
+                f'WARNING: The operation may still complete in the background. '
+                f'Before proceeding, verify the current state of any files or '
+                f'resources this action was modifying to avoid working with '
+                f'stale assumptions.'
             ),
-            error_id="PENDING_ACTION_TIMEOUT",
+            error_id='PENDING_ACTION_TIMEOUT',
         )
         attach_observation_cause(
-            timeout_obs, action, context="pending_action_service.timeout"
+            timeout_obs, action, context='pending_action_service.timeout'
         )
         controller.event_stream.add_event(timeout_obs, EventSource.ENVIRONMENT)
 
@@ -151,7 +153,7 @@ class PendingActionService:
             main_loop = get_main_event_loop()
             if main_loop is None or not main_loop.is_running():
                 logger.debug(
-                    "Skipping pending action watchdog scheduling because no active event loop is available"
+                    'Skipping pending action watchdog scheduling because no active event loop is available'
                 )
                 return
 
@@ -184,10 +186,10 @@ class PendingActionService:
         limit = self._effective_timeout_seconds(self._timeout, action)
         if math.isfinite(limit) and elapsed >= limit:
             logger.warning(
-                "Pending action watchdog fired after %.1fs for %s (id=%s); triggering step",
+                'Pending action watchdog fired after %.1fs for %s (id=%s); triggering step',
                 elapsed,
                 type(action).__name__,
-                getattr(action, "id", "unknown"),
+                getattr(action, 'id', 'unknown'),
             )
             self._context.trigger_step()
 
@@ -198,4 +200,4 @@ class PendingActionService:
             self._watchdog_handle = None
 
 
-__all__ = ["PendingActionService"]
+__all__ = ['PendingActionService']

@@ -14,14 +14,14 @@ def sanitize_operation_label(name: str | None, max_length: int = 100) -> str:
     prefix it with 'op_'.
     """
     if not name:
-        return "unknown"
+        return 'unknown'
     s = str(name)
-    s = re.sub("[^A-Za-z0-9_]", "_", s)
-    s = re.sub("_+", "_", s)
+    s = re.sub('[^A-Za-z0-9_]', '_', s)
+    s = re.sub('_+', '_', s)
     s = s[:max_length]
-    s = s.strip("_")
+    s = s.strip('_')
     if not s:
-        return "unknown"
+        return 'unknown'
     if s[0].isdigit():
-        s = f"op_{s}"
+        s = f'op_{s}'
     return s

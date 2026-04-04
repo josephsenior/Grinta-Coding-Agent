@@ -16,7 +16,7 @@ from backend.utils.treesitter_editor import (
 )
 
 pytestmark = pytest.mark.skipif(
-    not TREE_SITTER_AVAILABLE, reason="tree-sitter not installed"
+    not TREE_SITTER_AVAILABLE, reason='tree-sitter not installed'
 )
 
 
@@ -58,8 +58,8 @@ def py_file(tmp_path):
                     raise ValueError("Division by zero")
                 return x / y
     """)
-    f = tmp_path / "sample.py"
-    f.write_text(content, encoding="utf-8")
+    f = tmp_path / 'sample.py'
+    f.write_text(content, encoding='utf-8')
     return str(f)
 
 
@@ -70,8 +70,8 @@ def js_file(tmp_path):
             return `Hello, ${name}!`;
         }
     """)
-    f = tmp_path / "app.js"
-    f.write_text(content, encoding="utf-8")
+    f = tmp_path / 'app.js'
+    f.write_text(content, encoding='utf-8')
     return str(f)
 
 
@@ -129,33 +129,33 @@ class TestInit:
 
 class TestCreateFile:
     def test_creates_new_file(self, editor, tmp_path):
-        path = str(tmp_path / "new.py")
-        result = editor.create_file(path, "x = 1\n")
+        path = str(tmp_path / 'new.py')
+        result = editor.create_file(path, 'x = 1\n')
         assert result.success is True
         assert os.path.exists(path)
-        assert open(path, encoding="utf-8").read() == "x = 1\n"
+        assert open(path, encoding='utf-8').read() == 'x = 1\n'
 
     def test_fails_if_file_exists(self, editor, py_file):
-        result = editor.create_file(py_file, "overwrite")
+        result = editor.create_file(py_file, 'overwrite')
         assert result.success is False
-        assert "already exists" in result.message.lower()
+        assert 'already exists' in result.message.lower()
 
     def test_creates_parent_directories(self, editor, tmp_path):
-        path = str(tmp_path / "nested" / "deep" / "file.py")
-        result = editor.create_file(path, "# new file")
+        path = str(tmp_path / 'nested' / 'deep' / 'file.py')
+        result = editor.create_file(path, '# new file')
         assert result.success is True
         assert os.path.exists(path)
 
     def test_reports_lines_changed(self, editor, tmp_path):
-        path = str(tmp_path / "lines.py")
-        content = "a = 1\nb = 2\nc = 3\n"
+        path = str(tmp_path / 'lines.py')
+        content = 'a = 1\nb = 2\nc = 3\n'
         result = editor.create_file(path, content)
         assert result.success is True
         # lines_changed = content.count("\n") + 1
-        assert result.lines_changed == content.count("\n") + 1
+        assert result.lines_changed == content.count('\n') + 1
 
     def test_modified_code_in_result(self, editor, tmp_path):
-        path = str(tmp_path / "code.py")
+        path = str(tmp_path / 'code.py')
         content = "print('hello')\n"
         result = editor.create_file(path, content)
         assert result.modified_code == content
@@ -170,22 +170,22 @@ class TestViewFile:
     def test_view_full_file(self, editor, py_file):
         result = editor.view_file(py_file)
         assert result.success is True
-        assert "greet" in result.message
+        assert 'greet' in result.message
 
     def test_view_with_line_range(self, editor, py_file):
         result = editor.view_file(py_file, line_range=[1, 2])
         assert result.success is True
         # First two lines are visible
-        assert "greet" in result.message
+        assert 'greet' in result.message
 
     def test_view_nonexistent_file(self, editor):
-        result = editor.view_file("/no/such/file.py")
+        result = editor.view_file('/no/such/file.py')
         assert result.success is False
-        assert "not found" in result.message.lower()
+        assert 'not found' in result.message.lower()
 
     def test_view_directory(self, editor, tmp_path):
-        (tmp_path / "sub").mkdir()
-        (tmp_path / "file.py").write_text("x = 1")
+        (tmp_path / 'sub').mkdir()
+        (tmp_path / 'file.py').write_text('x = 1')
         result = editor.view_file(str(tmp_path))
         assert result.success is True
 
@@ -199,7 +199,7 @@ class TestViewFile:
         result = editor.view_file(py_file)
         assert result.success is True
         # Line numbers should be present as integers
-        assert "1" in result.message
+        assert '1' in result.message
 
 
 # ---------------------------------------------------------------------------
@@ -209,21 +209,21 @@ class TestViewFile:
 
 class TestInsertCode:
     def test_insert_at_beginning(self, editor_no_validate, tmp_path):
-        f = tmp_path / "insert.py"
-        f.write_text("b = 2\n")
-        result = editor_no_validate.insert_code(str(f), 0, "a = 1")
+        f = tmp_path / 'insert.py'
+        f.write_text('b = 2\n')
+        result = editor_no_validate.insert_code(str(f), 0, 'a = 1')
         assert result.success is True
         content = f.read_text()
-        assert "a = 1" in content
+        assert 'a = 1' in content
 
     def test_insert_after_first_line(self, editor_no_validate, tmp_path):
-        f = tmp_path / "insert2.py"
-        f.write_text("a = 1\nc = 3\n")
-        result = editor_no_validate.insert_code(str(f), 1, "b = 2")
+        f = tmp_path / 'insert2.py'
+        f.write_text('a = 1\nc = 3\n')
+        result = editor_no_validate.insert_code(str(f), 1, 'b = 2')
         assert result.success is True
 
     def test_insert_into_nonexistent_file(self, editor_no_validate):
-        result = editor_no_validate.insert_code("/no/file.py", 1, "x = 1")
+        result = editor_no_validate.insert_code('/no/file.py', 1, 'x = 1')
         assert result.success is False
 
 
@@ -234,26 +234,26 @@ class TestInsertCode:
 
 class TestUndoLastEdit:
     def test_undo_after_edit(self, editor, py_file):
-        original = open(py_file, encoding="utf-8").read()
+        original = open(py_file, encoding='utf-8').read()
         # Make an edit that records undo history
-        editor.replace_code_range(py_file, 1, 1, "# replaced\n")
+        editor.replace_code_range(py_file, 1, 1, '# replaced\n')
         result = editor.undo_last_edit(py_file)
         assert result.success is True
-        restored = open(py_file, encoding="utf-8").read()
+        restored = open(py_file, encoding='utf-8').read()
         assert restored == original
 
     def test_undo_no_history_fails(self, editor, tmp_path):
-        f = tmp_path / "noundo.py"
-        f.write_text("x = 1\n")
+        f = tmp_path / 'noundo.py'
+        f.write_text('x = 1\n')
         result = editor.undo_last_edit(str(f))
         assert result.success is False
-        assert "no undo history" in result.message.lower()
+        assert 'no undo history' in result.message.lower()
 
     def test_undo_write_error(self, editor, tmp_path):
-        f = tmp_path / "canundo.py"
-        f.write_text("x = 1\n")
+        f = tmp_path / 'canundo.py'
+        f.write_text('x = 1\n')
         # Manually push some history
-        editor._undo_history[str(f)] = [("h", "original = True\n")]
+        editor._undo_history[str(f)] = [('h', 'original = True\n')]
         result = editor.undo_last_edit(str(f))
         assert result.success is True
 
@@ -265,22 +265,22 @@ class TestUndoLastEdit:
 
 class TestEditFunction:
     def test_edit_known_function(self, editor, py_file):
-        result = editor.edit_function(py_file, "greet", '    return "Hi!"')
+        result = editor.edit_function(py_file, 'greet', '    return "Hi!"')
         assert result.success is True
-        content = open(py_file, encoding="utf-8").read()
-        assert "Hi!" in content
+        content = open(py_file, encoding='utf-8').read()
+        assert 'Hi!' in content
 
     def test_edit_unknown_function(self, editor, py_file):
-        result = editor.edit_function(py_file, "nonexistent_fn", "    pass")
+        result = editor.edit_function(py_file, 'nonexistent_fn', '    pass')
         assert result.success is False
 
     def test_edit_function_unknown_language(self, editor, tmp_path):
-        f = tmp_path / "file.zzz"
-        f.write_text("content")
-        result = editor.edit_function(str(f), "func", "body")
+        f = tmp_path / 'file.zzz'
+        f.write_text('content')
+        result = editor.edit_function(str(f), 'func', 'body')
         assert result.success is False
         assert (
-            "detect" in result.message.lower() or "language" in result.message.lower()
+            'detect' in result.message.lower() or 'language' in result.message.lower()
         )
 
 
@@ -291,13 +291,13 @@ class TestEditFunction:
 
 class TestRenameSymbol:
     def test_rename_function(self, editor, py_file):
-        result = editor.rename_symbol(py_file, "greet", "welcome")
+        result = editor.rename_symbol(py_file, 'greet', 'welcome')
         assert result.success is True
-        content = open(py_file, encoding="utf-8").read()
-        assert "def welcome" in content
+        content = open(py_file, encoding='utf-8').read()
+        assert 'def welcome' in content
 
     def test_rename_nonexistent(self, editor, py_file):
-        result = editor.rename_symbol(py_file, "no_such", "new_name")
+        result = editor.rename_symbol(py_file, 'no_such', 'new_name')
         assert result.success is False
 
 
@@ -308,16 +308,16 @@ class TestRenameSymbol:
 
 class TestFindSymbol:
     def test_find_existing_function(self, editor, py_file):
-        loc = editor.find_symbol(py_file, "greet")
+        loc = editor.find_symbol(py_file, 'greet')
         assert loc is not None
-        assert loc.symbol_name == "greet"
+        assert loc.symbol_name == 'greet'
 
     def test_find_nonexistent_returns_none(self, editor, py_file):
-        loc = editor.find_symbol(py_file, "nonexistent_xyz")
+        loc = editor.find_symbol(py_file, 'nonexistent_xyz')
         assert loc is None
 
     def test_find_with_type_filter(self, editor, py_file):
-        loc = editor.find_symbol(py_file, "Calculator", symbol_type="class")
+        loc = editor.find_symbol(py_file, 'Calculator', symbol_type='class')
         assert loc is not None
 
 
@@ -328,28 +328,28 @@ class TestFindSymbol:
 
 class TestReplaceCodeRange:
     def test_replace_single_line(self, editor_no_validate, tmp_path):
-        f = tmp_path / "rep.py"
-        f.write_text("a = 1\nb = 2\nc = 3\n")
-        result = editor_no_validate.replace_code_range(str(f), 2, 2, "b = 99")
+        f = tmp_path / 'rep.py'
+        f.write_text('a = 1\nb = 2\nc = 3\n')
+        result = editor_no_validate.replace_code_range(str(f), 2, 2, 'b = 99')
         assert result.success is True
         content = f.read_text()
-        assert "b = 99" in content
+        assert 'b = 99' in content
 
     def test_replace_invalid_range(self, editor_no_validate, tmp_path):
-        f = tmp_path / "inv.py"
-        f.write_text("a = 1\n")
-        result = editor_no_validate.replace_code_range(str(f), 5, 10, "x")
+        f = tmp_path / 'inv.py'
+        f.write_text('a = 1\n')
+        result = editor_no_validate.replace_code_range(str(f), 5, 10, 'x')
         assert result.success is False
-        assert "invalid" in result.message.lower()
+        assert 'invalid' in result.message.lower()
 
     def test_replace_nonexistent_file(self, editor_no_validate):
-        result = editor_no_validate.replace_code_range("/no/file.py", 1, 1, "x")
+        result = editor_no_validate.replace_code_range('/no/file.py', 1, 1, 'x')
         assert result.success is False
 
     def test_replace_preserves_undo_history(self, editor, tmp_path):
-        f = tmp_path / "undo_test.py"
-        f.write_text("x = 1\ny = 2\nz = 3\n")
-        editor.replace_code_range(str(f), 1, 1, "x = 99")
+        f = tmp_path / 'undo_test.py'
+        f.write_text('x = 1\ny = 2\nz = 3\n')
+        editor.replace_code_range(str(f), 1, 1, 'x = 99')
         assert str(f) in editor._undo_history
 
 
@@ -376,7 +376,7 @@ class TestRefactoring:
     def test_rollback_returns_result(self, editor):
         txn = editor.begin_refactoring()
         result = editor.rollback_refactoring(txn)
-        assert hasattr(result, "success")
+        assert hasattr(result, 'success')
 
 
 # ---------------------------------------------------------------------------
@@ -388,7 +388,7 @@ class TestGetSupportedLanguages:
     def test_returns_list(self, editor):
         langs = editor.get_supported_languages()
         assert isinstance(langs, list)
-        assert "python" in langs
+        assert 'python' in langs
 
     def test_delegates_to_universal(self, editor):
         assert (
@@ -409,16 +409,16 @@ class TestNormalizeFileIndent:
 
     def test_normalize_with_spaces_target(self, editor, py_file):
         result = editor.normalize_file_indent(
-            py_file, target_style="spaces", target_size=4
+            py_file, target_style='spaces', target_size=4
         )
         assert result.success is True
 
     def test_normalize_with_tabs_target(self, editor, py_file):
-        result = editor.normalize_file_indent(py_file, target_style="tabs")
+        result = editor.normalize_file_indent(py_file, target_style='tabs')
         assert result.success is True
 
     def test_normalize_nonexistent_file(self, editor):
-        result = editor.normalize_file_indent("/no/file.py")
+        result = editor.normalize_file_indent('/no/file.py')
         assert result.success is False
 
     def test_normalize_returns_original_code(self, editor, py_file):
@@ -480,19 +480,19 @@ class TestDetermineViewRange:
 
 class TestFormatViewOutput:
     def test_includes_line_numbers(self, editor):
-        lines = ["alpha\n", "beta\n", "gamma\n"]
+        lines = ['alpha\n', 'beta\n', 'gamma\n']
         output = editor._format_view_output(lines, 1, 3)
-        assert "1" in output
-        assert "3" in output
-        assert "alpha" in output
-        assert "gamma" in output
+        assert '1' in output
+        assert '3' in output
+        assert 'alpha' in output
+        assert 'gamma' in output
 
     def test_partial_range(self, editor):
-        lines = ["a\n", "b\n", "c\n", "d\n"]
+        lines = ['a\n', 'b\n', 'c\n', 'd\n']
         output = editor._format_view_output(lines, 2, 3)
-        assert "b" in output
-        assert "c" in output
-        assert "a" not in output
+        assert 'b' in output
+        assert 'c' in output
+        assert 'a' not in output
 
 
 # ---------------------------------------------------------------------------
@@ -504,27 +504,22 @@ class TestGetAvailableSymbols:
     def test_returns_list_for_python_file(self, editor, py_file):
         symbols = editor._get_available_symbols(py_file)
         assert isinstance(symbols, list)
-        assert "greet" in symbols
-        assert "add" in symbols
+        assert 'greet' in symbols
+        assert 'add' in symbols
 
     def test_filtered_by_function_type(self, editor, py_file):
-        symbols = editor._get_available_symbols(py_file, "function")
-        assert "greet" in symbols
+        symbols = editor._get_available_symbols(py_file, 'function')
+        assert 'greet' in symbols
 
     def test_filtered_by_class_type(self, editor, py_file):
-        symbols = editor._get_available_symbols(py_file, "class")
-        assert "Calculator" in symbols
+        symbols = editor._get_available_symbols(py_file, 'class')
+        assert 'Calculator' in symbols
 
     def test_nonexistent_file_returns_empty(self, editor):
-        symbols = editor._get_available_symbols("/no/file.py")
+        symbols = editor._get_available_symbols('/no/file.py')
         assert symbols == []
 
 
 # ---------------------------------------------------------------------------
 # _check_blast_radius
 # ---------------------------------------------------------------------------
-
-from unittest.mock import patch, MagicMock
-from backend.engine.tools.structure_editor import EditResult
-
-

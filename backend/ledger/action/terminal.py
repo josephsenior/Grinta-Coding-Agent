@@ -14,7 +14,7 @@ from backend.ledger.action.action import Action
 class TerminalRunAction(Action):
     """Action to start a new terminal session."""
 
-    command: str = ""
+    command: str = ''
     cwd: str | None = None
     action: ClassVar[str] = ActionType.TERMINAL_RUN
     runnable: ClassVar[bool] = True
@@ -24,20 +24,19 @@ class TerminalRunAction(Action):
     @property
     def message(self) -> str:
         """Get command execution message."""
-        return f"Starting terminal session with command: {self.command}"
+        return f'Starting terminal session with command: {self.command}'
 
     def __str__(self) -> str:
         """Return a readable summary."""
-        return f"**TerminalRunAction**\nCOMMAND:\n{self.command}"
-
+        return f'**TerminalRunAction**\nCOMMAND:\n{self.command}'
 
 
 @dataclass
 class TerminalInputAction(Action):
     """Action to send input to an existing terminal session."""
 
-    session_id: str = ""
-    input: str = ""
+    session_id: str = ''
+    input: str = ''
     is_control: bool = False
     action: ClassVar[str] = ActionType.TERMINAL_INPUT
     runnable: ClassVar[bool] = True
@@ -48,20 +47,19 @@ class TerminalInputAction(Action):
     def message(self) -> str:
         """Get input message."""
         if self.is_control:
-            return f"Sending control {self.input!r} to terminal {self.session_id}"
-        return f"Sending input to terminal {self.session_id}"
+            return f'Sending control {self.input!r} to terminal {self.session_id}'
+        return f'Sending input to terminal {self.session_id}'
 
     def __str__(self) -> str:
         """Return a readable summary."""
-        return f"**TerminalInputAction (session={self.session_id}, is_control={self.is_control})**\nINPUT:\n{self.input}"
-
+        return f'**TerminalInputAction (session={self.session_id}, is_control={self.is_control})**\nINPUT:\n{self.input}'
 
 
 @dataclass
 class TerminalReadAction(Action):
     """Action to read the output buffer of an existing terminal session."""
 
-    session_id: str = ""
+    session_id: str = ''
     action: ClassVar[str] = ActionType.TERMINAL_READ
     runnable: ClassVar[bool] = True
     confirmation_state: ActionConfirmationStatus = ActionConfirmationStatus.CONFIRMED
@@ -70,9 +68,8 @@ class TerminalReadAction(Action):
     @property
     def message(self) -> str:
         """Get read message."""
-        return f"Reading from terminal {self.session_id}"
+        return f'Reading from terminal {self.session_id}'
 
     def __str__(self) -> str:
         """Return a readable summary."""
-        return f"**TerminalReadAction (session={self.session_id})**"
-
+        return f'**TerminalReadAction (session={self.session_id})**'

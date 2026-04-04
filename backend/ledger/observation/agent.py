@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, ClassVar
 if TYPE_CHECKING:
     from backend.persistence.data_models.knowledge_base import KnowledgeBaseSearchResult
 
-from backend.core.schemas import AgentState, ObservationType
 from backend.core.enums import RecallType
+from backend.core.schemas import AgentState, ObservationType
 from backend.ledger.observation.observation import Observation
 
 
@@ -16,14 +16,13 @@ class AgentStateChangedObservation(Observation):
     """This data class represents an observation of an agent's state change."""
 
     agent_state: AgentState | str
-    reason: str = ""
+    reason: str = ''
     observation: ClassVar[str] = ObservationType.AGENT_STATE_CHANGED
 
     @property
     def message(self) -> str:
         """Get message (empty for state change observations)."""
-        return ""
-
+        return ''
 
 
 @dataclass
@@ -36,7 +35,6 @@ class AgentCondensationObservation(Observation):
     def message(self) -> str:
         """Get condensation result message."""
         return self.content
-
 
 
 @dataclass
@@ -53,7 +51,6 @@ class AgentThinkObservation(Observation):
     def message(self) -> str:
         """Get acknowledgment message."""
         return self.content
-
 
 
 @dataclass
@@ -77,18 +74,18 @@ class RecallObservation(Observation):
     """The retrieval of content from a playbook or more playbooks."""
 
     recall_type: RecallType
-    repo_name: str = ""
-    repo_directory: str = ""
-    repo_branch: str = ""
-    repo_instructions: str = ""
+    repo_name: str = ''
+    repo_directory: str = ''
+    repo_branch: str = ''
+    repo_instructions: str = ''
     runtime_hosts: dict[str, int] = field(default_factory=dict)
-    additional_agent_instructions: str = ""
-    date: str = ""
+    additional_agent_instructions: str = ''
+    date: str = ''
     custom_secrets_descriptions: dict[str, str] = field(default_factory=dict)
-    conversation_instructions: str = ""
-    working_dir: str = ""
+    conversation_instructions: str = ''
+    working_dir: str = ''
     playbook_knowledge: list[PlaybookKnowledge] = field(default_factory=list)
-    knowledge_base_results: list["KnowledgeBaseSearchResult"] = field(
+    knowledge_base_results: list['KnowledgeBaseSearchResult'] = field(
         default_factory=list
     )
     '\n    A list of PlaybookKnowledge objects, each containing information from a triggered playbook.\n\n    Example:\n    [\n        PlaybookKnowledge(\n            name="python_best_practices",\n            trigger="python",\n            content="Always use virtual environments for Python projects."\n        ),\n        PlaybookKnowledge(\n            name="git_workflow",\n            trigger="git",\n            content="Create a new branch for each feature or bugfix."\n        )\n    ]\n    '
@@ -98,9 +95,9 @@ class RecallObservation(Observation):
     def message(self) -> str:
         """Get recall completion message based on recall type."""
         return (
-            "Added workspace context"
+            'Added workspace context'
             if self.recall_type == RecallType.WORKSPACE_CONTEXT
-            else "Added playbook knowledge"
+            else 'Added playbook knowledge'
         )
 
     def __str__(self) -> str:
@@ -109,25 +106,24 @@ class RecallObservation(Observation):
         if self.recall_type == RecallType.WORKSPACE_CONTEXT:
             fields.extend(
                 [
-                    f"recall_type={self.recall_type}",
-                    f"repo_name={self.repo_name}",
-                    f"repo_instructions={self.repo_instructions[:20]}...",
-                    f"runtime_hosts={self.runtime_hosts}",
-                    f"additional_agent_instructions={self.additional_agent_instructions[:20]}...",
-                    f"date={self.date}custom_secrets_descriptions={self.custom_secrets_descriptions}",
-                    f"conversation_instructions={self.conversation_instructions[:20]}...",
+                    f'recall_type={self.recall_type}',
+                    f'repo_name={self.repo_name}',
+                    f'repo_instructions={self.repo_instructions[:20]}...',
+                    f'runtime_hosts={self.runtime_hosts}',
+                    f'additional_agent_instructions={self.additional_agent_instructions[:20]}...',
+                    f'date={self.date}custom_secrets_descriptions={self.custom_secrets_descriptions}',
+                    f'conversation_instructions={self.conversation_instructions[:20]}...',
                 ],
             )
         else:
-            fields.extend([f"recall_type={self.recall_type}"])
+            fields.extend([f'recall_type={self.recall_type}'])
         if self.playbook_knowledge:
             fields.extend(
                 [
-                    f"playbook_knowledge={', '.join([m.name for m in self.playbook_knowledge])}"
+                    f'playbook_knowledge={", ".join([m.name for m in self.playbook_knowledge])}'
                 ]
             )
-        return f"**RecallObservation**\n{', '.join(fields)}"
-
+        return f'**RecallObservation**\n{", ".join(fields)}'
 
 
 @dataclass
@@ -139,7 +135,7 @@ class RecallFailureObservation(Observation):
     """
 
     recall_type: RecallType | None = None
-    error_message: str = ""
+    error_message: str = ''
     observation: ClassVar[str] = ObservationType.RECALL_FAILURE
 
     @property
@@ -147,18 +143,16 @@ class RecallFailureObservation(Observation):
         return self.error_message or self.content
 
 
-
 @dataclass
 class DelegateTaskObservation(Observation):
     """Result of a delegated subtask."""
 
     success: bool = True
-    error_message: str = ""
+    error_message: str = ''
     observation: ClassVar[str] = ObservationType.DELEGATE_TASK_RESULT
 
     @property
     def message(self) -> str:
         if self.success:
-            return f"Delegated task completed: {self.content}"
-        return f"Delegated task failed: {self.error_message or self.content}"
-
+            return f'Delegated task completed: {self.content}'
+        return f'Delegated task failed: {self.error_message or self.content}'

@@ -6,9 +6,9 @@ the Runtime base class into a focused, testable mixin.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
 import shlex
+from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Any
 
@@ -21,36 +21,36 @@ if TYPE_CHECKING:
 
 
 _PACKAGE_INSTALL_RE = re.compile(
-    r"\b(?:python\s+-m\s+pip\s+install|pip(?:3)?\s+install|npm\s+install|pnpm\s+add|yarn\s+add|Install-Module|Install-Package)\b",
+    r'\b(?:python\s+-m\s+pip\s+install|pip(?:3)?\s+install|npm\s+install|pnpm\s+add|yarn\s+add|Install-Module|Install-Package)\b',
     re.I,
 )
 _SENSITIVE_PATH_PARTS = (
-    ".env",
-    ".env.local",
-    ".env.production",
-    ".ssh",
-    ".aws",
-    ".pypirc",
-    ".npmrc",
-    ".git-credentials",
-    ".docker",
-    "id_rsa",
-    "id_ed25519",
-    "known_hosts",
-    "credentials.json",
+    '.env',
+    '.env.local',
+    '.env.production',
+    '.ssh',
+    '.aws',
+    '.pypirc',
+    '.npmrc',
+    '.git-credentials',
+    '.docker',
+    'id_rsa',
+    'id_ed25519',
+    'known_hosts',
+    'credentials.json',
 )
-_GIT_FLAGS_WITH_VALUES = {"-c", "-C", "--git-dir", "--work-tree"}
+_GIT_FLAGS_WITH_VALUES = {'-c', '-C', '--git-dir', '--work-tree'}
 _NETWORK_COMMAND_ALIASES = {
-    "curl": "curl",
-    "wget": "wget",
-    "scp": "scp",
-    "rsync": "rsync",
-    "nc": "netcat",
-    "netcat": "netcat",
-    "invoke-webrequest": "invoke-webrequest",
-    "invoke-restmethod": "invoke-restmethod",
-    "iwr": "invoke-webrequest",
-    "irm": "invoke-restmethod",
+    'curl': 'curl',
+    'wget': 'wget',
+    'scp': 'scp',
+    'rsync': 'rsync',
+    'nc': 'netcat',
+    'netcat': 'netcat',
+    'invoke-webrequest': 'invoke-webrequest',
+    'invoke-restmethod': 'invoke-restmethod',
+    'iwr': 'invoke-webrequest',
+    'irm': 'invoke-restmethod',
 }
 
 
@@ -65,9 +65,7 @@ class SecurityPolicyDecision:
 
 def normalize_allowlist(values: Any) -> set[str]:
     return {
-        str(value).strip().lower()
-        for value in (values or ())
-        if str(value).strip()
+        str(value).strip().lower() for value in (values or ()) if str(value).strip()
     }
 
 
@@ -82,7 +80,7 @@ def tokenize_command(command: str) -> list[str]:
 
 def extract_git_subcommand(command: str) -> str | None:
     tokens = tokenize_command(command)
-    if not tokens or tokens[0].lower() != "git":
+    if not tokens or tokens[0].lower() != 'git':
         return None
 
     skip_next = False
@@ -93,7 +91,7 @@ def extract_git_subcommand(command: str) -> str | None:
         if token in _GIT_FLAGS_WITH_VALUES:
             skip_next = True
             continue
-        if token.startswith("-"):
+        if token.startswith('-'):
             continue
         return token.strip().lower()
     return None
@@ -101,18 +99,18 @@ def extract_git_subcommand(command: str) -> str | None:
 
 def classify_package_command(command: str) -> str | None:
     lowered = command.lower()
-    if re.search(r"\b(?:python\s+-m\s+pip|pip(?:3)?)\s+install\b", lowered):
-        return "pip_install"
-    if re.search(r"\bnpm\s+install\b", lowered):
-        return "npm_install"
-    if re.search(r"\bpnpm\s+add\b", lowered):
-        return "pnpm_add"
-    if re.search(r"\byarn\s+add\b", lowered):
-        return "yarn_add"
-    if re.search(r"\binstall-module\b", lowered):
-        return "install_module"
-    if re.search(r"\binstall-package\b", lowered):
-        return "install_package"
+    if re.search(r'\b(?:python\s+-m\s+pip|pip(?:3)?)\s+install\b', lowered):
+        return 'pip_install'
+    if re.search(r'\bnpm\s+install\b', lowered):
+        return 'npm_install'
+    if re.search(r'\bpnpm\s+add\b', lowered):
+        return 'pnpm_add'
+    if re.search(r'\byarn\s+add\b', lowered):
+        return 'yarn_add'
+    if re.search(r'\binstall-module\b', lowered):
+        return 'install_module'
+    if re.search(r'\binstall-package\b', lowered):
+        return 'install_package'
     return None
 
 
@@ -129,8 +127,8 @@ def classify_network_command(command: str, is_network_operation: bool) -> str | 
 
 
 def is_sensitive_path(path: str) -> bool:
-    normalized = str(PurePath(path or "")).replace("\\", "/").lower()
-    parts = [part.lower() for part in PurePath(path or "").parts]
+    normalized = str(PurePath(path or '')).replace('\\', '/').lower()
+    parts = [part.lower() for part in PurePath(path or '').parts]
     for sensitive in _SENSITIVE_PATH_PARTS:
         needle = sensitive.lower()
         if needle in normalized:
@@ -173,13 +171,15 @@ def evaluate_hardened_local_command_policy(
     base_cwd: str | Path | None = None,
     is_background: bool = False,
 ) -> str | None:
-    if getattr(security_config, "execution_profile", "standard") != "hardened_local":
+    if getattr(security_config, 'execution_profile', 'standard') != 'hardened_local':
         return None
 
-    if is_background and not getattr(security_config, "allow_background_processes", False):
+    if is_background and not getattr(
+        security_config, 'allow_background_processes', False
+    ):
         return (
-            "Action blocked by hardened_local policy: background processes are disabled. "
-            f"Command: {command}"
+            'Action blocked by hardened_local policy: background processes are disabled. '
+            f'Command: {command}'
         )
 
     effective_cwd = resolve_command_cwd(
@@ -189,63 +189,67 @@ def evaluate_hardened_local_command_policy(
     )
     if not path_is_within_workspace(effective_cwd, workspace_root):
         return (
-            "Action blocked by hardened_local policy: command execution must stay inside the workspace. "
-            f"Command: {command} | cwd={effective_cwd}"
+            'Action blocked by hardened_local policy: command execution must stay inside the workspace. '
+            f'Command: {command} | cwd={effective_cwd}'
         )
 
-    git_subcommand = extract_git_subcommand(command or "")
+    git_subcommand = extract_git_subcommand(command or '')
     if git_subcommand is not None:
         if git_subcommand in normalize_allowlist(
-            getattr(security_config, "hardened_local_git_allowlist", ())
+            getattr(security_config, 'hardened_local_git_allowlist', ())
         ):
             return None
         return (
-            "Action blocked by hardened_local policy: git "
-            f"{git_subcommand} is not in the workspace-scoped allowlist for git subcommands. "
-            f"Command: {command}"
+            'Action blocked by hardened_local policy: git '
+            f'{git_subcommand} is not in the workspace-scoped allowlist for git subcommands. '
+            f'Command: {command}'
         )
 
-    package_key = classify_package_command(command or "")
+    package_key = classify_package_command(command or '')
     if package_key is not None:
-        if getattr(security_config, "allow_package_installs", False):
+        if getattr(security_config, 'allow_package_installs', False):
             return None
         if package_key in normalize_allowlist(
-            getattr(security_config, "hardened_local_package_allowlist", ())
+            getattr(security_config, 'hardened_local_package_allowlist', ())
         ):
             return None
         return (
-            "Action blocked by hardened_local policy: "
-            f"{package_key} is not in the workspace-scoped allowlist for package installation commands. "
-            f"Command: {command}"
+            'Action blocked by hardened_local policy: '
+            f'{package_key} is not in the workspace-scoped allowlist for package installation commands. '
+            f'Command: {command}'
         )
 
     assessment = CommandAnalyzer().analyze_command(command)
-    network_key = classify_network_command(command or "", assessment.is_network_operation)
+    network_key = classify_network_command(
+        command or '', assessment.is_network_operation
+    )
     if network_key is not None:
-        if getattr(security_config, "allow_network_commands", False):
+        if getattr(security_config, 'allow_network_commands', False):
             return None
         if network_key in normalize_allowlist(
-            getattr(security_config, "hardened_local_network_allowlist", ())
+            getattr(security_config, 'hardened_local_network_allowlist', ())
         ):
             return None
         return (
-            "Action blocked by hardened_local policy: "
-            f"{network_key} is not in the workspace-scoped allowlist for network-capable commands. "
-            f"Command: {command}"
+            'Action blocked by hardened_local policy: '
+            f'{network_key} is not in the workspace-scoped allowlist for network-capable commands. '
+            f'Command: {command}'
         )
 
     return None
 
 
-def evaluate_hardened_local_file_policy(*, path: str, security_config: Any) -> str | None:
-    if getattr(security_config, "execution_profile", "standard") != "hardened_local":
+def evaluate_hardened_local_file_policy(
+    *, path: str, security_config: Any
+) -> str | None:
+    if getattr(security_config, 'execution_profile', 'standard') != 'hardened_local':
         return None
     if is_sensitive_path(path) and not getattr(
-        security_config, "allow_sensitive_path_access", False
+        security_config, 'allow_sensitive_path_access', False
     ):
         return (
-            "Action blocked by hardened_local policy: sensitive file access is disabled. "
-            f"Path: {path}"
+            'Action blocked by hardened_local policy: sensitive file access is disabled. '
+            f'Path: {path}'
         )
     return None
 
@@ -270,7 +274,7 @@ class SecurityEnforcementMixin:
         from backend.ledger.observation import NullObservation, UserRejectObservation
 
         if (
-            hasattr(action, "confirmation_state")
+            hasattr(action, 'confirmation_state')
             and action.confirmation_state
             == ActionConfirmationStatus.AWAITING_CONFIRMATION
         ):
@@ -278,14 +282,14 @@ class SecurityEnforcementMixin:
             # review diffs before confirming. Other actions remain blocked.
             if isinstance(action, FileEditAction):
                 return None
-            return NullObservation("")
+            return NullObservation('')
 
         if (
-            getattr(action, "confirmation_state", None)
+            getattr(action, 'confirmation_state', None)
             == ActionConfirmationStatus.REJECTED
         ):
             return UserRejectObservation(
-                "Action has been rejected by the user! Waiting for further user input."
+                'Action has been rejected by the user! Waiting for further user input.'
             )
 
         return None
@@ -312,23 +316,23 @@ class SecurityEnforcementMixin:
             return None
 
         if risk >= ActionSecurityRisk.HIGH:
-            action_desc = f"{action.action}: {str(action)[:120]}"
+            action_desc = f'{action.action}: {str(action)[:120]}'
             if decision.require_confirmation and (
-                hasattr(action, "confirmation_state")
+                hasattr(action, 'confirmation_state')
                 and action.confirmation_state != ActionConfirmationStatus.CONFIRMED
             ):
                 logger.info(
-                    "Security: requiring confirmation for high-risk action: %s",
+                    'Security: requiring confirmation for high-risk action: %s',
                     action_desc,
                 )
                 action.confirmation_state = (
                     ActionConfirmationStatus.AWAITING_CONFIRMATION
                 )  # type: ignore[union-attr]
-                return NullObservation("")
+                return NullObservation('')
 
         elif risk >= ActionSecurityRisk.MEDIUM:
             logger.info(
-                "Security: medium-risk action allowed: %s (risk=%s)",
+                'Security: medium-risk action allowed: %s (risk=%s)',
                 action.action,
                 risk.name,
             )
@@ -356,20 +360,18 @@ class SecurityEnforcementMixin:
         decision.risk = risk
 
         if risk >= ActionSecurityRisk.HIGH:
-            action_desc = f"{action.action}: {str(action)[:120]}"
+            action_desc = f'{action.action}: {str(action)[:120]}'
             if sec_cfg.block_high_risk:
                 logger.warning(
-                    "Security BLOCKED high-risk action: %s (risk=%s)",
+                    'Security BLOCKED high-risk action: %s (risk=%s)',
                     action_desc,
                     risk.name,
                 )
-                decision.block_message = (
-                    f"Action blocked by security policy (risk={risk.name}). Action: {action_desc}"
-                )
+                decision.block_message = f'Action blocked by security policy (risk={risk.name}). Action: {action_desc}'
                 return decision
             if (
-                hasattr(action, "confirmation_state")
-                and getattr(action, "confirmation_state", None)
+                hasattr(action, 'confirmation_state')
+                and getattr(action, 'confirmation_state', None)
                 != ActionConfirmationStatus.CONFIRMED
             ):
                 decision.require_confirmation = True
@@ -379,8 +381,11 @@ class SecurityEnforcementMixin:
     def _resolve_security_risk(self, action: Action) -> Any | None:
         from backend.core.enums import ActionSecurityRisk
 
-        existing_risk = getattr(action, "security_risk", ActionSecurityRisk.UNKNOWN)
-        if isinstance(existing_risk, ActionSecurityRisk) and existing_risk != ActionSecurityRisk.UNKNOWN:
+        existing_risk = getattr(action, 'security_risk', ActionSecurityRisk.UNKNOWN)
+        if (
+            isinstance(existing_risk, ActionSecurityRisk)
+            and existing_risk != ActionSecurityRisk.UNKNOWN
+        ):
             return existing_risk
 
         if self.security_analyzer is None:  # type: ignore[attr-defined]
@@ -390,12 +395,12 @@ class SecurityEnforcementMixin:
 
         try:
             risk = asyncio.run(self.security_analyzer.security_risk(action))
-            if hasattr(action, "security_risk"):
+            if hasattr(action, 'security_risk'):
                 action.security_risk = risk
             return risk
         except Exception:
             logger.warning(
-                "Security analysis failed for %s, allowing action to proceed",
+                'Security analysis failed for %s, allowing action to proceed',
                 action.action,
                 exc_info=True,
             )
@@ -403,27 +408,32 @@ class SecurityEnforcementMixin:
 
     def _enforce_hardened_local_policy(self, action: Action) -> Observation | None:
         """Apply deterministic local policy gates before heuristic risk handling."""
-        from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction, FileWriteAction
+        from backend.ledger.action import (
+            CmdRunAction,
+            FileEditAction,
+            FileReadAction,
+            FileWriteAction,
+        )
         from backend.ledger.observation import ErrorObservation
 
         sec_cfg = self.config.security  # type: ignore[attr-defined]
-        if getattr(sec_cfg, "execution_profile", "standard") != "hardened_local":
+        if getattr(sec_cfg, 'execution_profile', 'standard') != 'hardened_local':
             return None
 
         if isinstance(action, CmdRunAction):
             block_message = evaluate_hardened_local_command_policy(
-                command=action.command or "",
+                command=action.command or '',
                 security_config=sec_cfg,
                 workspace_root=self._workspace_root_path(),
-                requested_cwd=getattr(action, "cwd", None),
-                is_background=getattr(action, "is_background", False),
+                requested_cwd=getattr(action, 'cwd', None),
+                is_background=getattr(action, 'is_background', False),
             )
             if block_message is not None:
                 return ErrorObservation(content=block_message)
 
         if isinstance(action, (FileReadAction, FileWriteAction, FileEditAction)):
             block_message = evaluate_hardened_local_file_policy(
-                path=getattr(action, "path", ""),
+                path=getattr(action, 'path', ''),
                 security_config=sec_cfg,
             )
             if block_message is not None:
@@ -443,11 +453,11 @@ class SecurityEnforcementMixin:
         from backend.ledger.observation import ErrorObservation
 
         if not self._is_workspace_scoped_command(action):
-            cwd = getattr(action, "cwd", None) or str(self._workspace_root_path())
+            cwd = getattr(action, 'cwd', None) or str(self._workspace_root_path())
             return ErrorObservation(
                 content=(
-                    f"Action blocked by hardened_local policy: {category_label} must run inside the workspace. "
-                    f"Command: {getattr(action, 'command', '')} | cwd={cwd}"
+                    f'Action blocked by hardened_local policy: {category_label} must run inside the workspace. '
+                    f'Command: {getattr(action, "command", "")} | cwd={cwd}'
                 )
             )
 
@@ -457,8 +467,8 @@ class SecurityEnforcementMixin:
 
         return ErrorObservation(
             content=(
-                f"Action blocked by hardened_local policy: {command_label} is not in the workspace-scoped allowlist "
-                f"for {category_label}. Command: {getattr(action, 'command', '')}"
+                f'Action blocked by hardened_local policy: {command_label} is not in the workspace-scoped allowlist '
+                f'for {category_label}. Command: {getattr(action, "command", "")}'
             )
         )
 
@@ -466,17 +476,17 @@ class SecurityEnforcementMixin:
         return normalize_allowlist(values)
 
     def _workspace_root_path(self) -> Path:
-        raw_root = getattr(self, "workspace_root", None)
+        raw_root = getattr(self, 'workspace_root', None)
         if raw_root is not None:
             return Path(raw_root).resolve()
-        project_root = getattr(self, "project_root", None)
+        project_root = getattr(self, 'project_root', None)
         if project_root:
             return Path(project_root).resolve()
         return Path.cwd().resolve()
 
     def _resolve_command_cwd(self, action: Action) -> Path:
         workspace_root = self._workspace_root_path()
-        raw_cwd = getattr(action, "cwd", None)
+        raw_cwd = getattr(action, 'cwd', None)
         return resolve_command_cwd(
             raw_cwd,
             workspace_root=workspace_root,

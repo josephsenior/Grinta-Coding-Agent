@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import threading
 import time
@@ -195,7 +195,7 @@ class WarmRuntimePool(RuntimePool):
 def call_async_disconnect(runtime: Runtime) -> None:
     from backend.core.logger import app_logger as logger
 
-    disconnect_fn = getattr(runtime, "disconnect", None)
+    disconnect_fn = getattr(runtime, 'disconnect', None)
     try:
         if callable(disconnect_fn):
             from backend.core.constants import GENERAL_TIMEOUT
@@ -205,4 +205,4 @@ def call_async_disconnect(runtime: Runtime) -> None:
         else:
             runtime.close()
     except Exception as exc:
-        logger.warning("Error disconnecting runtime %s: %s", runtime.sid, exc)
+        logger.warning('Error disconnecting runtime %s: %s', runtime.sid, exc)

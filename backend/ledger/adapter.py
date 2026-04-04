@@ -33,7 +33,7 @@ class EventServiceAdapter:
         if use_grpc:
             # We keep the parameter for compatibility but raise error if used
             raise RuntimeError(
-                "gRPC mode is not available in this simplified EventServiceAdapter"
+                'gRPC mode is not available in this simplified EventServiceAdapter'
             )
 
         self._sessions: dict[str, dict[str, Any]] = {}
@@ -52,11 +52,11 @@ class EventServiceAdapter:
             session_id = str(uuid.uuid4())
 
         session_info = {
-            "session_id": session_id,
-            "user_id": user_id,
-            "repository": repository,
-            "branch": branch,
-            "labels": labels or {},
+            'session_id': session_id,
+            'user_id': user_id,
+            'repository': repository,
+            'branch': branch,
+            'labels': labels or {},
         }
         self._sessions[session_id] = session_info
 
@@ -74,9 +74,9 @@ class EventServiceAdapter:
             # For now, we just raise error or create a new one if it's expected to exist
             session_info = self.get_session_info(session_id)
             if not session_info:
-                raise ValueError(f"Session {session_id} not found")
+                raise ValueError(f'Session {session_id} not found')
 
-            user_id = session_info.get("user_id")
+            user_id = session_info.get('user_id')
             file_store = self.file_store_factory(user_id)
             self._streams[session_id] = EventStream(session_id, file_store, user_id)
 

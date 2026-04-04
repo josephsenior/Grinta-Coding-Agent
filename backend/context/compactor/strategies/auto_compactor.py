@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from backend.core.config.compactor_config import AutoCompactorConfig
     from backend.inference.llm_registry import LLMRegistry
 
 from backend.context.compactor.compactor import Compaction, Compactor
@@ -48,7 +47,7 @@ class AutoCompactor(Compactor):
             llm_config=self._llm_config,
         )
         logger.info(
-            "AutoCompactor selected strategy: %s for %d events",
+            'AutoCompactor selected strategy: %s for %d events',
             config.type,
             len(events),
         )
@@ -58,13 +57,11 @@ class AutoCompactor(Compactor):
             self._cached_config_type = config.type
         delegate = self._cached_delegate
         if delegate is None:
-            raise RuntimeError("Compactor.from_config returned None")
+            raise RuntimeError('Compactor.from_config returned None')
         return delegate.compact(view)
 
     @classmethod
-    def from_config(
-        cls, config: Any, llm_registry: LLMRegistry
-    ) -> AutoCompactor:
+    def from_config(cls, config: Any, llm_registry: LLMRegistry) -> AutoCompactor:
         llm_config: object | None = None
         if config.llm_config is not None:
             # Pass through either a named config section (str) or an LLMConfig instance.

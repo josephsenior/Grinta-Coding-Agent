@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 class RegistryEvent:
     """Metadata emitted when LLM registry mutates (add/remove providers)."""
 
-    event_type: str = "update"
+    event_type: str = 'update'
     key: str | None = None
     llm: LLM | None = None
     service_id: str | None = None
@@ -60,6 +60,7 @@ class LLMRegistry:
             config: App configuration with LLM settings
             agent_cls: Optional agent class name to determine default LLM
             retry_listener: Optional callback for retry events (attempt, max_attempts)
+            require_llm: When True, load the default agent LLM during init
 
         """
         self.registry_id = str(uuid4())
@@ -71,9 +72,11 @@ class LLMRegistry:
         self.active_agent_llm: LLM | None = None
         if require_llm:
             selected_agent_cls = agent_cls or self.config.default_agent
-            agent_name = selected_agent_cls if selected_agent_cls is not None else "agent"
+            agent_name = (
+                selected_agent_cls if selected_agent_cls is not None else 'agent'
+            )
             llm_config = self.config.get_llm_config_from_agent(agent_name)
-            self.active_agent_llm = self.get_llm("agent", llm_config)
+            self.active_agent_llm = self.get_llm('agent', llm_config)
 
     def _create_new_llm(
         self, service_id: str, config: LLMConfig, with_listener: bool = True
@@ -119,20 +122,20 @@ class LLMRegistry:
             Generated completion text
 
         """
-        logger.info("extraneous completion: %s", service_id)
+        logger.info('extraneous completion: %s', service_id)
         if service_id not in self.service_to_llm:
             self._create_new_llm(
                 config=llm_config, service_id=service_id, with_listener=False
             )
         llm = self.service_to_llm[service_id]
         response = llm.completion(messages=messages)
-        choices = getattr(response, "choices", None)
+        choices = getattr(response, 'choices', None)
         if not choices:
-            raise ValueError("LLM completion returned no choices") from None
-        msg = getattr(choices[0], "message", None)
-        content = getattr(msg, "content", None) if msg else None
+            raise ValueError('LLM completion returned no choices') from None
+        msg = getattr(choices[0], 'message', None)
+        content = getattr(msg, 'content', None) if msg else None
         if content is None:
-            raise ValueError("LLM completion choice has no message content") from None
+            raise ValueError('LLM completion choice has no message content') from None
         return content.strip()
 
     def get_llm_from_agent_config(self, service_id: str, agent_config: AgentConfig):
@@ -167,7 +170,7 @@ class LLMRegistry:
 
         """
         logger.info(
-            "[LLM registry %s]: Registering service for %s",
+            '[LLM registry %s]: Registering service for %s',
             self.registry_id,
             service_id,
         )
@@ -175,12 +178,12 @@ class LLMRegistry:
             service_id in self.service_to_llm
             and self.service_to_llm[service_id].config != config
         ):
-            msg = f"Requesting same service ID {service_id} with different config, use a new service ID"
+            msg = f'Requesting same service ID {service_id} with different config, use a new service ID'
             raise ValueError(msg)
         if service_id in self.service_to_llm:
             return self.service_to_llm[service_id]
         if not config:
-            msg = "Requesting new LLM without specifying LLM config"
+            msg = 'Requesting new LLM without specifying LLM config'
             raise ValueError(msg)
         return self._create_new_llm(config=config, service_id=service_id)
 
@@ -192,7 +195,7 @@ class LLMRegistry:
 
         """
         if self.active_agent_llm is None:
-            raise RuntimeError("No active LLM configured for this registry.")
+            raise RuntimeError('No active LLM configured for this registry.')
         return self.active_agent_llm
 
     def _set_active_llm(self, service_id) -> None:
@@ -206,7 +209,7 @@ class LLMRegistry:
 
         """
         if service_id not in self.service_to_llm:
-            msg = f"Unrecognized service ID: {service_id}"
+            msg = f'Unrecognized service ID: {service_id}'
             raise ValueError(msg)
         self.active_agent_llm = self.service_to_llm[service_id]
 
@@ -222,7 +225,11 @@ class LLMRegistry:
         self.subscriber = callback
         if self.active_agent_llm is None:
             return
-        self.notify(RegistryEvent(llm=self.active_agent_llm, service_id=self.active_agent_llm.service_id))
+        self.notify(
+            RegistryEvent(
+                llm=self.active_agent_llm, service_id=self.active_agent_llm.service_id
+            )
+        )
 
     def notify(self, event: RegistryEvent) -> None:
         """Notify subscriber of registry event.
@@ -235,4 +242,4 @@ class LLMRegistry:
             try:
                 self.subscriber(event)
             except Exception as e:
-                logger.warning("Failed to emit event: %s", e)
+                logger.warning('Failed to emit event: %s', e)

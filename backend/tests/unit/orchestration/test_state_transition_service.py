@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import pytest
 
+from backend.core.schemas import AgentState
 from backend.orchestration.services.state_transition_service import (
     VALID_TRANSITIONS,
     InvalidStateTransitionError,
     StateTransitionService,
 )
-from backend.core.schemas import AgentState
-
 
 # ---------------------------------------------------------------------------
 # InvalidStateTransitionError
@@ -20,19 +19,19 @@ from backend.core.schemas import AgentState
 class TestInvalidStateTransitionError:
     def test_message(self):
         err = InvalidStateTransitionError(
-            AgentState.LOADING, AgentState.FINISHED, "bot"
+            AgentState.LOADING, AgentState.FINISHED, 'bot'
         )
-        assert "LOADING" in str(err) or "loading" in str(err).lower()
-        assert "FINISHED" in str(err) or "finished" in str(err).lower()
-        assert "bot" in str(err)
+        assert 'LOADING' in str(err) or 'loading' in str(err).lower()
+        assert 'FINISHED' in str(err) or 'finished' in str(err).lower()
+        assert 'bot' in str(err)
 
     def test_attributes(self):
-        err = InvalidStateTransitionError(AgentState.PAUSED, AgentState.RUNNING, "ag")
+        err = InvalidStateTransitionError(AgentState.PAUSED, AgentState.RUNNING, 'ag')
         assert err.old_state == AgentState.PAUSED
         assert err.new_state == AgentState.RUNNING
 
     def test_is_runtime_error(self):
-        err = InvalidStateTransitionError(AgentState.ERROR, AgentState.RUNNING, "x")
+        err = InvalidStateTransitionError(AgentState.ERROR, AgentState.RUNNING, 'x')
         assert isinstance(err, RuntimeError)
 
 
@@ -92,9 +91,9 @@ class TestValidTransitions:
 class _FakeState:
     def __init__(self, agent_state: AgentState):
         self.agent_state = agent_state
-        self.last_error = ""
+        self.last_error = ''
 
-    def set_agent_state(self, new_state, source=""):
+    def set_agent_state(self, new_state, source=''):
         self.agent_state = new_state
 
 
@@ -110,7 +109,7 @@ class _FakeContext:
     def __init__(self, state: _FakeState):
         self.state = state
         self.event_stream = _FakeEventStream()
-        self.controller_name = "test-agent"
+        self.controller_name = 'test-agent'
         self.state_tracker = None
         self.pending_action = None
         self._saved = False

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-
 from backend.core.bootstrap.setup import generate_sid
 
 
@@ -22,30 +21,30 @@ class TestGenerateSid:
 
     def test_deterministic_with_same_name(self):
         cfg = self._fake_config()
-        sid1 = generate_sid(cfg, session_name="test-session")
-        sid2 = generate_sid(cfg, session_name="test-session")
+        sid1 = generate_sid(cfg, session_name='test-session')
+        sid2 = generate_sid(cfg, session_name='test-session')
         assert sid1 == sid2
 
     def test_different_names_different_sids(self):
         cfg = self._fake_config()
-        sid1 = generate_sid(cfg, session_name="session-a")
-        sid2 = generate_sid(cfg, session_name="session-b")
+        sid1 = generate_sid(cfg, session_name='session-a')
+        sid2 = generate_sid(cfg, session_name='session-b')
         assert sid1 != sid2
 
     def test_short_name_included(self):
         cfg = self._fake_config()
-        sid = generate_sid(cfg, session_name="abc")
-        assert sid.startswith("abc-")
+        sid = generate_sid(cfg, session_name='abc')
+        assert sid.startswith('abc-')
 
     def test_long_name_truncated(self):
         cfg = self._fake_config()
-        long_name = "a" * 50
+        long_name = 'a' * 50
         sid = generate_sid(cfg, session_name=long_name)
         assert len(sid) <= 32
-        assert sid.startswith("a" * 16)
+        assert sid.startswith('a' * 16)
 
     def test_without_session_name_uses_uuid(self):
         cfg = self._fake_config()
         sid = generate_sid(cfg)
         assert len(sid) <= 32
-        assert "-" in sid
+        assert '-' in sid

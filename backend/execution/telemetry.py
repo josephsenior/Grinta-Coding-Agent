@@ -20,7 +20,7 @@ class RuntimeTelemetry:
         if reused:
             self._reuse_counter[key] += 1
         logger.debug(
-            "[RuntimeTelemetry] acquire key=%s reused=%s counts=%s",
+            '[RuntimeTelemetry] acquire key=%s reused=%s counts=%s',
             key,
             reused,
             dict(self._acquire_counter),
@@ -29,7 +29,7 @@ class RuntimeTelemetry:
     def record_release(self, key: str) -> None:
         self._release_counter[key] += 1
         logger.debug(
-            "[RuntimeTelemetry] release key=%s counts=%s",
+            '[RuntimeTelemetry] release key=%s counts=%s',
             key,
             dict(self._release_counter),
         )
@@ -37,16 +37,16 @@ class RuntimeTelemetry:
     def record_watchdog_termination(self, key: str, reason: str) -> None:
         self._watchdog_counter[(key, reason)] += 1
         logger.warning(
-            "[RuntimeTelemetry] watchdog terminated runtime key=%s reason=%s",
+            '[RuntimeTelemetry] watchdog terminated runtime key=%s reason=%s',
             key,
             reason,
         )
 
-    def record_scaling_signal(self, signal: str, *, severity: str = "info") -> None:
+    def record_scaling_signal(self, signal: str, *, severity: str = 'info') -> None:
         self._scaling_counter[signal] += 1
-        log_fn = logger.info if severity == "info" else logger.warning
+        log_fn = logger.info if severity == 'info' else logger.warning
         log_fn(
-            "[RuntimeTelemetry] scaling signal=%s severity=%s count=%s",
+            '[RuntimeTelemetry] scaling signal=%s severity=%s count=%s',
             signal,
             severity,
             self._scaling_counter[signal],
@@ -54,15 +54,15 @@ class RuntimeTelemetry:
 
     def snapshot(self) -> dict[str, dict[str, int]]:
         watchdog = {
-            f"{key}|{reason}": count
+            f'{key}|{reason}': count
             for (key, reason), count in self._watchdog_counter.items()
         }
         return {
-            "acquire": dict(self._acquire_counter),
-            "reuse": dict(self._reuse_counter),
-            "release": dict(self._release_counter),
-            "watchdog": watchdog,
-            "scaling": dict(self._scaling_counter),
+            'acquire': dict(self._acquire_counter),
+            'reuse': dict(self._reuse_counter),
+            'release': dict(self._release_counter),
+            'watchdog': watchdog,
+            'scaling': dict(self._scaling_counter),
         }
 
     def reset(self) -> None:

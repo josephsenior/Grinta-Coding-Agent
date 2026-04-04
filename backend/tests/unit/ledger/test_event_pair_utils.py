@@ -4,33 +4,33 @@ from typing import Any
 
 from backend.ledger.action.empty import NullAction
 from backend.ledger.action.message import MessageAction
-from backend.ledger.observation import CmdOutputObservation, NullObservation
 from backend.ledger.event_utils import (
     _add_action_observation_pairs,
     _add_orphaned_observations,
     _build_action_and_observation_maps,
     get_pairs_from_events,
 )
+from backend.ledger.observation import CmdOutputObservation, NullObservation
 
 
-def _make_message(id_: int, content: str = "msg") -> MessageAction:
+def _make_message(id_: int, content: str = 'msg') -> MessageAction:
     m = MessageAction(content=content)
     m._id = id_
     return m
 
 
 def _make_cmd_obs(
-    cause_: int, content: str = "ok", exit_code: int = 0
+    cause_: int, content: str = 'ok', exit_code: int = 0
 ) -> CmdOutputObservation:
     obs = CmdOutputObservation(
-        content=content, command_id=0, command="echo", exit_code=exit_code
+        content=content, command_id=0, command='echo', exit_code=exit_code
     )
     obs._cause = cause_
     return obs
 
 
 def _make_null_obs(cause_: int) -> NullObservation:
-    obs = NullObservation(content="")
+    obs = NullObservation(content='')
     obs._cause = cause_
     return obs
 

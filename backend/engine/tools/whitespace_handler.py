@@ -16,9 +16,9 @@ from backend.core.constants import DEFAULT_INDENT_SIZES
 class IndentStyle(Enum):
     """Indentation style."""
 
-    SPACES = "spaces"
-    TABS = "tabs"
-    MIXED = "mixed"
+    SPACES = 'spaces'
+    TABS = 'tabs'
+    MIXED = 'mixed'
 
 
 @dataclass
@@ -52,7 +52,7 @@ class WhitespaceHandler:
             Line ending string
 
         """
-        return "\r\n" if "\r\n" in code else "\n"
+        return '\r\n' if '\r\n' in code else '\n'
 
     @staticmethod
     def _count_indent_styles(lines: list[str]) -> tuple[int, int, list[int]]:
@@ -75,9 +75,9 @@ class WhitespaceHandler:
 
             leading = len(line) - len(line.lstrip())
 
-            if line[0] == "\t":
+            if line[0] == '\t':
                 tab_count += 1
-            elif line[0] == " ":
+            elif line[0] == ' ':
                 space_count += 1
                 space_sizes.append(leading)
 
@@ -109,15 +109,15 @@ class WhitespaceHandler:
             size = (
                 WhitespaceHandler._find_indent_size(space_sizes)
                 if space_sizes
-                else DEFAULT_INDENT_SIZES.get(language or "", 4)
+                else DEFAULT_INDENT_SIZES.get(language or '', 4)
             )
             return IndentStyle.SPACES, size
 
         # No indented lines found, use language defaults
-        if language == "go":
+        if language == 'go':
             return IndentStyle.TABS, 1
 
-        return IndentStyle.SPACES, DEFAULT_INDENT_SIZES.get(language or "", 4)
+        return IndentStyle.SPACES, DEFAULT_INDENT_SIZES.get(language or '', 4)
 
     @staticmethod
     def detect_indent(code: str, language: str | None = None) -> IndentConfig:
@@ -131,7 +131,7 @@ class WhitespaceHandler:
             IndentConfig with detected settings
 
         """
-        lines = code.split("\n")
+        lines = code.split('\n')
         line_ending = WhitespaceHandler._detect_line_ending(code)
 
         tab_count, space_count, space_sizes = WhitespaceHandler._count_indent_styles(
@@ -219,8 +219,8 @@ class WhitespaceHandler:
 
         """
         if target_config.style == IndentStyle.TABS:
-            return "\t" * indent_level
-        return " " * (indent_level * target_config.size)
+            return '\t' * indent_level
+        return ' ' * (indent_level * target_config.size)
 
     @staticmethod
     def _normalize_line_indent(
@@ -282,7 +282,7 @@ class WhitespaceHandler:
             return code
 
         # Normalize each line
-        lines = code.split("\n")
+        lines = code.split('\n')
         normalized_lines = [
             WhitespaceHandler._normalize_line_indent(
                 line, current_config, target_config
@@ -290,11 +290,11 @@ class WhitespaceHandler:
             for line in lines
         ]
 
-        result = "\n".join(normalized_lines)
+        result = '\n'.join(normalized_lines)
 
         # Normalize line endings
-        if target_config.line_ending != "\n":
-            result = result.replace("\n", target_config.line_ending)
+        if target_config.line_ending != '\n':
+            result = result.replace('\n', target_config.line_ending)
 
         return result
 
@@ -322,7 +322,7 @@ class WhitespaceHandler:
             # If no indent detected, use language defaults
             if config.style == IndentStyle.SPACES and config.size == 4 and language:
                 default_size = DEFAULT_INDENT_SIZES.get(language, 4)
-                if language == "go":
+                if language == 'go':
                     config = IndentConfig(
                         style=IndentStyle.TABS, size=1, line_ending=config.line_ending
                     )
@@ -335,21 +335,21 @@ class WhitespaceHandler:
 
         # Generate base indentation string
         if config.style == IndentStyle.TABS:
-            base_indent_str = "\t" * base_indent
+            base_indent_str = '\t' * base_indent
         else:
-            base_indent_str = " " * (base_indent * config.size)
+            base_indent_str = ' ' * (base_indent * config.size)
 
         # Split into lines and indent each
-        lines = code_block.split("\n")
+        lines = code_block.split('\n')
         indented_lines = []
 
         for line in lines:
             if line.strip():  # Only indent non-empty lines
                 indented_lines.append(base_indent_str + line)
             else:
-                indented_lines.append("")  # Keep blank lines blank
+                indented_lines.append('')  # Keep blank lines blank
 
-        return "\n".join(indented_lines)
+        return '\n'.join(indented_lines)
 
     @staticmethod
     def get_line_indent(line: str, config: IndentConfig) -> int:
@@ -384,13 +384,13 @@ class WhitespaceHandler:
             Minimum indent level
 
         """
-        min_indent = float("inf")
+        min_indent = float('inf')
         for line in lines:
             if line.strip():
                 indent_level = WhitespaceHandler.get_line_indent(line, config)
                 min_indent = min(min_indent, indent_level)
 
-        return 0 if min_indent == float("inf") else int(min_indent)
+        return 0 if min_indent == float('inf') else int(min_indent)
 
     @staticmethod
     def _reindent_line(
@@ -409,16 +409,16 @@ class WhitespaceHandler:
 
         """
         if not line.strip():
-            return ""
+            return ''
 
         current_indent = WhitespaceHandler.get_line_indent(line, config)
         relative_indent = current_indent - min_indent
         total_indent = new_base_indent + relative_indent
 
         if config.style == IndentStyle.TABS:
-            new_indent_str = "\t" * total_indent
+            new_indent_str = '\t' * total_indent
         else:
-            new_indent_str = " " * (total_indent * config.size)
+            new_indent_str = ' ' * (total_indent * config.size)
 
         return new_indent_str + line.lstrip()
 
@@ -446,12 +446,12 @@ class WhitespaceHandler:
 
         if not config:
             config = WhitespaceHandler.detect_indent(code_block, language)
-            if language == "go" and config.style != IndentStyle.TABS:
+            if language == 'go' and config.style != IndentStyle.TABS:
                 config = IndentConfig(
                     style=IndentStyle.TABS, size=1, line_ending=config.line_ending
                 )
 
-        lines = code_block.split("\n")
+        lines = code_block.split('\n')
         min_indent = WhitespaceHandler._get_min_indent(lines, config)
 
         result_lines = [
@@ -459,19 +459,19 @@ class WhitespaceHandler:
             for line in lines
         ]
 
-        return "\n".join(result_lines)
+        return '\n'.join(result_lines)
 
     @staticmethod
     def strip_trailing_whitespace(code: str) -> str:
         """Remove trailing whitespace from all lines."""
-        lines = code.split("\n")
-        return "\n".join(line.rstrip() for line in lines)
+        lines = code.split('\n')
+        return '\n'.join(line.rstrip() for line in lines)
 
     @staticmethod
     def ensure_final_newline(code: str) -> str:
         """Ensure file ends with exactly one newline."""
-        code = code.rstrip("\n")
-        return code + "\n"
+        code = code.rstrip('\n')
+        return code + '\n'
 
     @staticmethod
     def clean_whitespace(
@@ -501,4 +501,4 @@ class WhitespaceHandler:
         code = WhitespaceHandler.ensure_final_newline(code)
 
         # Remove multiple consecutive blank lines (max 2)
-        return re.sub(r"\n{4,}", "\n\n\n", code)
+        return re.sub(r'\n{4,}', '\n\n\n', code)

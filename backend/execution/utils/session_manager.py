@@ -1,17 +1,19 @@
-﻿"""Session manager for handling multiple shell sessions."""
+"""Session manager for handling multiple shell sessions."""
 
 from __future__ import annotations
 
 import logging
 import os
 import uuid
-from typing import TYPE_CHECKING, Dict, Optional, cast
+from typing import TYPE_CHECKING, Optional, cast
 
 from backend.execution.utils.process_registry import TaskCancellationService
-from backend.execution.utils.unified_shell import UnifiedShellSession, create_shell_session
+from backend.execution.utils.unified_shell import (
+    UnifiedShellSession,
+    create_shell_session,
+)
 
 if TYPE_CHECKING:
-    from backend.execution.utils.tool_registry import ToolRegistry
     from backend.execution.utils.unified_shell import ShellToolRegistryLike
 
 logger = logging.getLogger(__name__)
@@ -42,9 +44,9 @@ class SessionManager:
         self.tool_registry = tool_registry
         self.max_memory_gb = max_memory_gb
         self.cancellation_service = cancellation_service or TaskCancellationService(
-            label=f"sessions:{work_dir}"
+            label=f'sessions:{work_dir}'
         )
-        self.sessions: Dict[str, UnifiedShellSession] = {}
+        self.sessions: dict[str, UnifiedShellSession] = {}
         self._ensure_tool_registry()
 
     def _ensure_tool_registry(self) -> None:
@@ -53,10 +55,10 @@ class SessionManager:
             try:
                 from backend.execution.utils.tool_registry import ToolRegistry
 
-                self.tool_registry = cast("ShellToolRegistryLike", ToolRegistry())
+                self.tool_registry = cast('ShellToolRegistryLike', ToolRegistry())
             except ImportError:
                 # This should ideally not happen if properly installed
-                logger.warning("Failed to import ToolRegistry")
+                logger.warning('Failed to import ToolRegistry')
 
     def create_session(
         self, session_id: Optional[str] = None, cwd: Optional[str] = None
@@ -73,7 +75,7 @@ class SessionManager:
         if not session_id:
             session_id = str(uuid.uuid4())
 
-        logger.info("Creating session %s (cwd=%s)", session_id, cwd or self.work_dir)
+        logger.info('Creating session %s (cwd=%s)', session_id, cwd or self.work_dir)
 
         try:
             session = create_shell_session(
@@ -81,17 +83,17 @@ class SessionManager:
                 tools=self.tool_registry,
                 username=self.username,
                 no_change_timeout_seconds=int(
-                    os.environ.get("NO_CHANGE_TIMEOUT_SECONDS", 10)
+                    os.environ.get('NO_CHANGE_TIMEOUT_SECONDS', 10)
                 ),
                 max_memory_mb=self.max_memory_gb * 1024 if self.max_memory_gb else None,
                 cancellation_service=self.cancellation_service,
             )
             session.initialize()
             self.sessions[session_id] = session
-            logger.info("Session %s initialized successfully", session_id)
+            logger.info('Session %s initialized successfully', session_id)
             return session
         except Exception as e:
-            logger.error("Failed to create session %s: %s", session_id, e)
+            logger.error('Failed to create session %s: %s', session_id, e)
             raise
 
     def get_session(self, session_id: str) -> Optional[UnifiedShellSession]:
@@ -105,7 +107,7 @@ class SessionManager:
             try:
                 session.close()
             except Exception as e:
-                logger.error("Error closing session %s: %s", session_id, e)
+                logger.error('Error closing session %s: %s', session_id, e)
 
     def close_all(self) -> None:
         """Close all active sessions."""
@@ -120,4 +122,4 @@ class SessionManager:
     @property
     def default_session(self) -> Optional[UnifiedShellSession]:
         """Get the default session if it exists."""
-        return self.sessions.get("default")
+        return self.sessions.get('default')

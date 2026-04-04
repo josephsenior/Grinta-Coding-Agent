@@ -45,7 +45,7 @@ class ToolCall(BaseModel):
     """
 
     id: str
-    type: str = "function"
+    type: str = 'function'
     function: ToolCallFunction
 
 
@@ -64,12 +64,12 @@ class Content(BaseModel):
     type: str
     cache_prompt: bool = False
 
-    @model_serializer(mode="plain")
+    @model_serializer(mode='plain')
     def serialize_model(
         self,
     ) -> dict[str, str | dict[str, str]] | list[dict[str, str | dict[str, str]]]:
         """Serialize content for LLM API (must be implemented by subclasses)."""
-        msg = "Subclasses should implement this method."
+        msg = 'Subclasses should implement this method.'
         raise NotImplementedError(msg)
 
 
@@ -84,12 +84,12 @@ class TextContent(Content):
     type: str = ContentType.TEXT.value
     text: str
 
-    @model_serializer(mode="plain")
+    @model_serializer(mode='plain')
     def serialize_model(self) -> dict[str, str | dict[str, str]]:
         """Serialize text content with optional cache control."""
-        data: dict[str, str | dict[str, str]] = {"type": self.type, "text": self.text}
+        data: dict[str, str | dict[str, str]] = {'type': self.type, 'text': self.text}
         if self.cache_prompt:
-            data["cache_control"] = {"type": "ephemeral"}
+            data['cache_control'] = {'type': 'ephemeral'}
         return data
 
 
@@ -104,14 +104,14 @@ class ImageContent(Content):
     type: str = ContentType.IMAGE_URL.value
     image_urls: list[str]
 
-    @model_serializer(mode="plain")
+    @model_serializer(mode='plain')
     def serialize_model(self) -> list[dict[str, str | dict[str, str]]]:
         """Serialize image URLs with optional cache control on last image."""
         images: list[dict[str, str | dict[str, str]]] = [
-            {"type": self.type, "image_url": {"url": url}} for url in self.image_urls
+            {'type': self.type, 'image_url': {'url': url}} for url in self.image_urls
         ]
         if self.cache_prompt and images:
-            images[-1]["cache_control"] = {"type": "ephemeral"}
+            images[-1]['cache_control'] = {'type': 'ephemeral'}
         return images
 
 
@@ -133,7 +133,7 @@ class Message(BaseModel):
 
     """
 
-    role: Literal["user", "system", "assistant", "tool"]
+    role: Literal['user', 'system', 'assistant', 'tool']
     content: list[TextContent | ImageContent] = Field(default_factory=list)
     cache_enabled: bool = False
     vision_enabled: bool = False
@@ -149,7 +149,7 @@ class Message(BaseModel):
     def __init_subclass__(cls, **kwargs):
         """Rebuild Pydantic models when subclasses are defined to refresh validators."""
         super().__init_subclass__(**kwargs)
-        if hasattr(cls, "model_rebuild"):
+        if hasattr(cls, 'model_rebuild'):
             cls.model_rebuild()
 
     @property
@@ -162,7 +162,7 @@ class Message(BaseModel):
         """
         return any(isinstance(content, ImageContent) for content in self.content)
 
-    @model_serializer(mode="plain")
+    @model_serializer(mode='plain')
     def serialize_model(self) -> dict[str, Any]:
         """Serialize message for LLM API.
 
@@ -180,10 +180,10 @@ class Message(BaseModel):
         return self._string_serializer()
 
     def _string_serializer(self) -> dict[str, Any]:
-        content = "\n".join(
+        content = '\n'.join(
             item.text for item in self.content if isinstance(item, TextContent)
         )
-        message_dict: dict[str, Any] = {"content": content, "role": self.role}
+        message_dict: dict[str, Any] = {'content': content, 'role': self.role}
         return self._add_tool_call_keys(message_dict)
 
     def _list_serializer(self) -> dict[str, Any]:
@@ -197,29 +197,29 @@ class Message(BaseModel):
             )
             self._add_item_to_content(item, d, content)
 
-        message_dict: dict[str, Any] = {"content": content, "role": self.role}
+        message_dict: dict[str, Any] = {'content': content, 'role': self.role}
         if role_tool_with_prompt_caching:
-            message_dict["cache_control"] = {"type": "ephemeral"}
+            message_dict['cache_control'] = {'type': 'ephemeral'}
         return self._add_tool_call_keys(message_dict)
 
     def _process_item_caching(
         self, item: Any, d: dict, role_tool_with_prompt_caching: bool
     ) -> bool:
         """Process caching for tool items."""
-        if self.role == "tool" and item.cache_prompt:
+        if self.role == 'tool' and item.cache_prompt:
             role_tool_with_prompt_caching = True
             if isinstance(item, TextContent):
-                d.pop("cache_control", None)
+                d.pop('cache_control', None)
             elif isinstance(item, ImageContent):
                 self._remove_cache_control_from_image_content(d)
         return role_tool_with_prompt_caching
 
     def _remove_cache_control_from_image_content(self, d: dict) -> None:
         """Remove cache_control from image content items."""
-        if hasattr(d, "__iter__"):
+        if hasattr(d, '__iter__'):
             for d_item in d:
-                if hasattr(d_item, "pop"):
-                    d_item.pop("cache_control", None)
+                if hasattr(d_item, 'pop'):
+                    d_item.pop('cache_control', None)
 
     def _add_item_to_content(
         self, item: Any, d: dict, content: list[dict[str, Any]]
@@ -236,25 +236,25 @@ class Message(BaseModel):
         NOTE: this is necessary for both native and non-native tool calling
         """
         if self.tool_calls is not None:
-            message_dict["tool_calls"] = [
+            message_dict['tool_calls'] = [
                 {
-                    "id": tool_call.id,
-                    "type": "function",
-                    "function": {
-                        "name": tool_call.function.name,
-                        "arguments": tool_call.function.arguments,
+                    'id': tool_call.id,
+                    'type': 'function',
+                    'function': {
+                        'name': tool_call.function.name,
+                        'arguments': tool_call.function.arguments,
                     },
                 }
                 for tool_call in self.tool_calls
             ]
         if self.tool_call_id is not None:
             assert self.name is not None, (
-                "name is required when tool_call_id is not None"
+                'name is required when tool_call_id is not None'
             )
-            message_dict["tool_call_id"] = self.tool_call_id
-            message_dict["name"] = self.name
-            if self.role == "tool" and self.tool_ok is not None:
-                message_dict["tool_ok"] = self.tool_ok
+            message_dict['tool_call_id'] = self.tool_call_id
+            message_dict['name'] = self.name
+            if self.role == 'tool' and self.tool_ok is not None:
+                message_dict['tool_ok'] = self.tool_ok
         return message_dict
 
 

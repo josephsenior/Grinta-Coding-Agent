@@ -12,7 +12,7 @@ import os
 
 def llm_step_timeout_seconds_from_env() -> float | None:
     """Return timeout in seconds, or ``None`` when no env cap applies."""
-    raw = os.getenv("APP_LLM_STEP_TIMEOUT_SECONDS", "").strip()
+    raw = os.getenv('APP_LLM_STEP_TIMEOUT_SECONDS', '').strip()
     if not raw:
         return None
     try:

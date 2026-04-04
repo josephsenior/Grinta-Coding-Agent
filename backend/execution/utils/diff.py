@@ -28,16 +28,16 @@ def get_diff(
     diff_generator = difflib.unified_diff(
         old_lines,
         new_lines,
-        fromfile=path or "old",
-        tofile=path or "new",
-        lineterm="",
+        fromfile=path or 'old',
+        tofile=path or 'new',
+        lineterm='',
         n=context_lines,
     )
 
     # Convert generator to list and filter out empty diffs
     diff_lines = list(diff_generator)
     if not diff_lines or len(diff_lines) <= 2:
-        return ""
+        return ''
 
     return _finalize_diff_text(diff_lines)
 
@@ -58,9 +58,9 @@ def _prepare_diff_lines(
 
 def _finalize_diff_text(diff_lines: list[str]) -> str:
     """Join diff lines and ensure proper trailing newline."""
-    diff_text = "\n".join(diff_lines)
-    if not diff_text.endswith("\n"):
-        diff_text += "\n"
+    diff_text = '\n'.join(diff_lines)
+    if not diff_text.endswith('\n'):
+        diff_text += '\n'
     return diff_text
 
 
@@ -71,13 +71,13 @@ def _check_binary(old: str, new: str, path: str | None) -> str | None:
     if path:
         mime_type, _ = mimetypes.guess_type(path)
         if mime_type and not mime_type.startswith(
-            ("text/", "application/json", "application/xml")
+            ('text/', 'application/json', 'application/xml')
         ):
-            return f"Binary file {path} - diff not available\n"
+            return f'Binary file {path} - diff not available\n'
 
     # Check for binary content
     if _is_binary(old) or _is_binary(new):
-        return f"Binary content detected - diff not available for {path or 'file'}\n"
+        return f'Binary content detected - diff not available for {path or "file"}\n'
 
     return None
 
@@ -95,7 +95,7 @@ def _is_binary(content: str) -> bool:
         return False
 
     # Check for null bytes (strong indicator of binary)
-    if "\x00" in content:
+    if '\x00' in content:
         return True
 
     # Check first 1000 bytes for high ratio of non-printable characters
@@ -104,7 +104,7 @@ def _is_binary(content: str) -> bool:
         return False
 
     non_printable = sum(
-        1 for c in sample if ord(c) < 32 and c not in "\n\r\t" and ord(c) != 0
+        1 for c in sample if ord(c) < 32 and c not in '\n\r\t' and ord(c) != 0
     )
     ratio = non_printable / len(sample)
 
@@ -118,14 +118,14 @@ def _normalize_whitespace(line: str) -> str:
     Preserves leading/trailing structure but normalizes internal whitespace.
     """
     # Preserve line ending
-    has_newline = line.endswith(("\n", "\r\n"))
-    line_content = line.rstrip("\n\r")
+    has_newline = line.endswith(('\n', '\r\n'))
+    line_content = line.rstrip('\n\r')
 
     # Normalize tabs to spaces and collapse multiple spaces
-    normalized = " ".join(line_content.split())
+    normalized = ' '.join(line_content.split())
 
     # Restore line ending
-    return normalized + ("\n" if has_newline else "")
+    return normalized + ('\n' if has_newline else '')
 
 
 def get_diff_stats(diff_text: str) -> dict[str, int]:
@@ -143,10 +143,10 @@ def get_diff_stats(diff_text: str) -> dict[str, int]:
     """
     if not diff_text:
         return {
-            "lines_added": 0,
-            "lines_removed": 0,
-            "hunks": 0,
-            "files_changed": 0,
+            'lines_added': 0,
+            'lines_removed': 0,
+            'hunks': 0,
+            'files_changed': 0,
         }
 
     lines = diff_text.splitlines()
@@ -156,18 +156,18 @@ def get_diff_stats(diff_text: str) -> dict[str, int]:
     changed_files = set()
 
     for line in lines:
-        if line.startswith("@@"):
+        if line.startswith('@@'):
             hunks += 1
-        elif line.startswith(("+++", "---")):
+        elif line.startswith(('+++', '---')):
             changed_files.add(line)
-        elif line.startswith("+"):
+        elif line.startswith('+'):
             lines_added += 1
-        elif line.startswith("-"):
+        elif line.startswith('-'):
             lines_removed += 1
 
     return {
-        "lines_added": lines_added,
-        "lines_removed": lines_removed,
-        "hunks": hunks,
-        "files_changed": len(changed_files) // 2 if changed_files else 0,
+        'lines_added': lines_added,
+        'lines_removed': lines_removed,
+        'hunks': hunks,
+        'files_changed': len(changed_files) // 2 if changed_files else 0,
     }

@@ -33,7 +33,7 @@ def _make_config(**kwargs):
     return cfg
 
 
-def _make_llm(model: str = "gpt-4-turbo") -> MagicMock:
+def _make_llm(model: str = 'gpt-4-turbo') -> MagicMock:
     llm = MagicMock()
     llm.config.model = model
     return llm
@@ -41,7 +41,7 @@ def _make_llm(model: str = "gpt-4-turbo") -> MagicMock:
 
 def _make_safety() -> MagicMock:
     safety = MagicMock()
-    safety.should_enforce_tools.return_value = "required"
+    safety.should_enforce_tools.return_value = 'required'
     return safety
 
 
@@ -55,7 +55,7 @@ def test_planner_toolset_has_dispatch_handlers():
     tools = planner.build_toolset()
     dispatch = _create_tool_dispatch_map()
 
-    exposed_names = {t.get("function", {}).get("name") for t in tools}
+    exposed_names = {t.get('function', {}).get('name') for t in tools}
     exposed_names.discard(None)
 
     missing = sorted(set(exposed_names) - set(dispatch.keys()))
@@ -64,12 +64,12 @@ def test_planner_toolset_has_dispatch_handlers():
 
 def test_validate_internal_toolset_raises_on_mismatch():
     fake_tools = [
-        {"type": "function", "function": {"name": "definitely_not_a_real_tool"}}
+        {'type': 'function', 'function': {'name': 'definitely_not_a_real_tool'}}
     ]
 
     try:
         validate_internal_toolset(fake_tools, strict=True)
     except RuntimeError as exc:
-        assert "definitely_not_a_real_tool" in str(exc)
+        assert 'definitely_not_a_real_tool' in str(exc)
     else:
-        raise AssertionError("Expected validate_internal_toolset to raise")
+        raise AssertionError('Expected validate_internal_toolset to raise')

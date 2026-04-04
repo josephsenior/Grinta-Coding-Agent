@@ -7,12 +7,12 @@ triggers:
   - /add_repo_inst
 inputs:
   - name: REPO_FOLDER_NAME
-    description: 'Branch for the agent to work on'
+    description: 'Folder name of the repository to document (relative to the working directory)'
 ---
 
 Please browse the current repository under /workspace/{{ REPO_FOLDER_NAME }}, look at the documentation and relevant code, and understand the purpose of this repository.
 
-Specifically, I want you to create a `.app/playbooks/repo.md` file. This file should contain succinct information that summarizes (1) the purpose of this repository, (2) the general setup of this repo, and (3) a brief description of the structure of this repo.
+Specifically, I want you to create a `.grinta/playbooks/repo.md` file. This file should contain succinct information that summarizes (1) the purpose of this repository, (2) the general setup of this repo, and (3) a brief description of the structure of this repo.
 
 Here's an example:
 
@@ -51,7 +51,8 @@ Backend:
 Web UI:
 
 - Served with the backend (default http://localhost:3000)
-- Launch server: `uv run app serve` or `python start_server.py`
+- Launch CLI: `uv run python -m backend.cli.entry`
+- Launch raw HTTP backend only when you need API/OpenAPI tooling: `./start_backend.ps1` or `uv run python -m backend.execution.action_execution_server 3000 --working-dir .`
 
 Python API client:
 

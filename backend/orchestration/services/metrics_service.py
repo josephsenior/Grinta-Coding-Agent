@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING
 from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
 
 
 @dataclass
@@ -88,7 +90,7 @@ class MetricsService:
     def start_task(self, task_id: str) -> None:
         """Start tracking a new task."""
         self._current_task = TaskMetrics(task_id=task_id)
-        logger.info("📊 Metrics: Started tracking task %s", task_id)
+        logger.info('📊 Metrics: Started tracking task %s', task_id)
 
     def record_iteration(self) -> None:
         """Record a completed iteration."""
@@ -121,8 +123,8 @@ class MetricsService:
     ) -> TaskMetrics:
         """Mark task as complete and update aggregate metrics."""
         if not self._current_task:
-            logger.warning("📊 Metrics: No active task to complete")
-            return TaskMetrics(task_id="unknown", success=False)
+            logger.warning('📊 Metrics: No active task to complete')
+            return TaskMetrics(task_id='unknown', success=False)
 
         self._current_task.completed_at = time.time()
         self._current_task.success = success
@@ -142,7 +144,7 @@ class MetricsService:
         self._aggregate.total_duration_seconds += self._current_task.duration_seconds
 
         logger.info(
-            "📊 Metrics: Task %s completed - success=%s, duration=%.2fs, iterations=%d, cost=$%.4f",
+            '📊 Metrics: Task %s completed - success=%s, duration=%.2fs, iterations=%d, cost=$%.4f',
             self._current_task.task_id,
             success,
             self._current_task.duration_seconds,
@@ -166,4 +168,4 @@ class MetricsService:
         """Reset all metrics."""
         self._current_task = None
         self._aggregate = AgentMetrics()
-        logger.info("📊 Metrics: Reset all metrics")
+        logger.info('📊 Metrics: Reset all metrics')

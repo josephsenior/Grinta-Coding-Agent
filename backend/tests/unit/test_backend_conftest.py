@@ -16,23 +16,25 @@ class _FakeItem:
 def test_pytest_collection_modifyitems_uses_app_run_tty_tests_env(monkeypatch):
     captured: dict[str, bool] = {}
 
-    monkeypatch.setenv("APP_RUN_TTY_TESTS", "1")
-    monkeypatch.setattr(backend_conftest, "_apply_path_markers", lambda items: None)
+    monkeypatch.setenv('APP_RUN_TTY_TESTS', '1')
+    monkeypatch.setattr(backend_conftest, '_apply_path_markers', lambda items: None)
 
     def _capture_context(items, context):
-        captured["run_tty_tests"] = context.run_tty_tests
+        captured['run_tty_tests'] = context.run_tty_tests
 
-    monkeypatch.setattr(backend_conftest, "_apply_skip_markers", _capture_context)
+    monkeypatch.setattr(backend_conftest, '_apply_skip_markers', _capture_context)
 
     backend_conftest.pytest_collection_modifyitems(None, [])
 
-    assert captured == {"run_tty_tests": True}
+    assert captured == {'run_tty_tests': True}
 
 
 def test_skip_reasons_mentions_app_run_tty_tests_env():
-    item = _FakeItem(keywords={"tty"}, path=str(Path("backend/tests/unit/test_dummy.py")))
+    item = _FakeItem(
+        keywords={'tty'}, path=str(Path('backend/tests/unit/test_dummy.py'))
+    )
     context = backend_conftest._CollectionContext(is_windows=True, run_tty_tests=False)
 
     assert list(backend_conftest._skip_reasons(item, context)) == [
-        "tty tests disabled; set APP_RUN_TTY_TESTS=1 to enable"
+        'tty tests disabled; set APP_RUN_TTY_TESTS=1 to enable'
     ]

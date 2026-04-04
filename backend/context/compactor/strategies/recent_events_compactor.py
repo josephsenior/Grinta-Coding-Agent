@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from backend.core.config.compactor_config import RecentEventsCompactorConfig
     from backend.inference.llm_registry import LLMRegistry
 
 from backend.context.compactor.compactor import Compaction, Compactor
@@ -67,7 +66,7 @@ class RecentEventsCompactor(Compactor):
         from backend.core.pydantic_compat import model_dump_with_options
 
         return RecentEventsCompactor(
-            **model_dump_with_options(config, exclude={"type"})
+            **model_dump_with_options(config, exclude={'type'})
         )
 
 

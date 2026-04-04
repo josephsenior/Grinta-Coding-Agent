@@ -13,7 +13,7 @@ from backend.ledger.observation_cause import attach_observation_cause
 
 @pytest.fixture()
 def obs() -> ErrorObservation:
-    return ErrorObservation(content="x")
+    return ErrorObservation(content='x')
 
 
 def test_attach_from_int(obs: ErrorObservation) -> None:
@@ -27,7 +27,7 @@ def test_attach_from_action(obs: ErrorObservation) -> None:
 
 
 def test_attach_string_numeric_id(obs: ErrorObservation) -> None:
-    attach_observation_cause(obs, SimpleNamespace(id="99"))
+    attach_observation_cause(obs, SimpleNamespace(id='99'))
     assert obs.cause == 99
 
 

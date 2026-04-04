@@ -11,8 +11,8 @@ from uuid import uuid4
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from backend.orchestration.safety_validator import ValidationResult
     from backend.ledger.action import Action
+    from backend.orchestration.safety_validator import ValidationResult
 
 from backend.core.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
@@ -45,7 +45,7 @@ class AuditLogger:
         # Create session-specific log file
         self.current_session_log = None
 
-        logger.info("AuditLogger initialized at %s", self.audit_base_path)
+        logger.info('AuditLogger initialized at %s', self.audit_base_path)
 
     async def log_action(
         self,
@@ -83,11 +83,11 @@ class AuditLogger:
 
         # Determine validation result string
         if not validation_result.allowed:
-            validation_status = "blocked"
+            validation_status = 'blocked'
         elif validation_result.requires_review:
-            validation_status = "requires_review"
+            validation_status = 'requires_review'
         else:
-            validation_status = "allowed"
+            validation_status = 'allowed'
 
         # Create audit entry
         entry = AuditEntry(
@@ -129,14 +129,14 @@ class AuditLogger:
         if isinstance(action, CmdRunAction):
             content = action.command
         elif isinstance(action, FileEditAction):
-            content = f"Edit {action.path}"
+            content = f'Edit {action.path}'
         else:
             content = str(action)
 
         # Truncate if too long
         max_length = 1000
         if len(content) > max_length:
-            content = content[:max_length] + "... (truncated)"
+            content = content[:max_length] + '... (truncated)'
 
         return content
 
@@ -153,12 +153,12 @@ class AuditLogger:
             log_file = self._get_session_log_file(session_id)
 
             # Append entry to log file (JSONL format)
-            with open(log_file, "a", encoding="utf-8") as f:
+            with open(log_file, 'a', encoding='utf-8') as f:  # noqa: ASYNC230
                 json.dump(entry.to_dict(), f)
-                f.write("\n")
+                f.write('\n')
 
         except Exception as e:
-            logger.error("Failed to write audit entry: %s", e)
+            logger.error('Failed to write audit entry: %s', e)
 
     async def update_entry_snapshot(
         self,
@@ -193,7 +193,7 @@ class AuditLogger:
 
             lines: list[str] = []
             updated = False
-            with open(log_file, encoding="utf-8") as f:
+            with open(log_file, encoding='utf-8') as f:  # noqa: ASYNC230
                 for line in f:
                     stripped = line.strip()
                     if not stripped:
@@ -201,21 +201,21 @@ class AuditLogger:
                         continue
                     try:
                         data = json.loads(stripped)
-                        if data.get("id") == audit_id:
-                            data["filesystem_snapshot_id"] = filesystem_snapshot_id
-                            data["rollback_available"] = rollback_available
+                        if data.get('id') == audit_id:
+                            data['filesystem_snapshot_id'] = filesystem_snapshot_id
+                            data['rollback_available'] = rollback_available
                             updated = True
-                        lines.append(json.dumps(data) + "\n")
+                        lines.append(json.dumps(data) + '\n')
                     except Exception:
                         lines.append(line)
 
             if updated:
-                with open(log_file, "w", encoding="utf-8") as f:
+                with open(log_file, 'w', encoding='utf-8') as f:  # noqa: ASYNC230
                     f.writelines(lines)
 
             return updated
         except Exception as e:
-            logger.error("Failed to update audit entry snapshot: %s", e)
+            logger.error('Failed to update audit entry snapshot: %s', e)
             return False
 
     def _get_session_log_file(self, session_id: str) -> Path:
@@ -229,13 +229,13 @@ class AuditLogger:
 
         """
         # Create session-specific log file
-        safe_session_id = session_id.replace("/", "_").replace("\\", "_")
-        log_file = self.audit_base_path / f"session_{safe_session_id}.jsonl"
+        safe_session_id = session_id.replace('/', '_').replace('\\', '_')
+        log_file = self.audit_base_path / f'session_{safe_session_id}.jsonl'
 
         # Create file if it doesn't exist
         if not log_file.exists():
             log_file.touch()
-            logger.info("Created audit log file: %s", log_file)
+            logger.info('Created audit log file: %s', log_file)
 
         return log_file
 
@@ -256,7 +256,7 @@ class AuditLogger:
                 return []
 
             entries = []
-            with open(log_file, encoding="utf-8") as f:
+            with open(log_file, encoding='utf-8') as f:
                 for line in f:
                     if line.strip():
                         try:
@@ -264,13 +264,13 @@ class AuditLogger:
                             entry = AuditEntry.from_dict(data)
                             entries.append(entry)
                         except Exception as e:
-                            logger.error("Failed to parse audit entry: %s", e)
+                            logger.error('Failed to parse audit entry: %s', e)
                             continue
 
             return entries
 
         except Exception as e:
-            logger.error("Failed to read audit trail: %s", e)
+            logger.error('Failed to read audit trail: %s', e)
             return []
 
     def get_blocked_actions(self, session_id: str) -> list[AuditEntry]:
@@ -284,7 +284,7 @@ class AuditLogger:
 
         """
         all_entries = self.read_session_audit(session_id)
-        return [entry for entry in all_entries if entry.validation_result == "blocked"]
+        return [entry for entry in all_entries if entry.validation_result == 'blocked']
 
     def get_high_risk_actions(self, session_id: str) -> list[AuditEntry]:
         """Get all high-risk actions for a session.
@@ -314,7 +314,7 @@ class AuditLogger:
         try:
             entries = self.read_session_audit(session_id)
 
-            with open(output_path, "w", encoding="utf-8") as f:
+            with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump(
                     [entry.to_dict() for entry in entries],
                     f,
@@ -322,7 +322,7 @@ class AuditLogger:
                     default=str,
                 )
 
-            logger.info("Exported audit trail to %s", output_path)
+            logger.info('Exported audit trail to %s', output_path)
 
         except Exception as e:
-            logger.error("Failed to export audit trail: %s", e)
+            logger.error('Failed to export audit trail: %s', e)

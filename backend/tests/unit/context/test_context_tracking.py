@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from unittest.mock import MagicMock
 
-
 from backend.context.context_tracking import ContextTracker
 from backend.context.graph_store import GraphMemoryStore, NodeType
 from backend.context.memory_types import DecisionType
@@ -34,26 +33,26 @@ class TestGraphRAGWiring:
     def test_store_in_memory_indexes_graph(self, tmp_path):
         mock_store = MagicMock()
         mock_store.delete_by_ids = MagicMock()
-        graph_store = GraphMemoryStore(persistence_path=str(tmp_path / "graph.json"))
+        graph_store = GraphMemoryStore(persistence_path=str(tmp_path / 'graph.json'))
         tracker = ContextTracker(vector_store=mock_store, graph_store=graph_store)
 
         tracker.store_in_memory(
-            event_id="e1",
-            role="observation",
-            content="import os\nfrom foo import bar\n",
-            metadata={"file_path": "example.py"},
+            event_id='e1',
+            role='observation',
+            content='import os\nfrom foo import bar\n',
+            metadata={'file_path': 'example.py'},
         )
 
-        mock_store.delete_by_ids.assert_called_once_with(["e1"])
-        assert graph_store.graph.has_node("example.py")
+        mock_store.delete_by_ids.assert_called_once_with(['e1'])
+        assert graph_store.graph.has_node('example.py')
 
     def test_store_in_memory_replaces_existing_step_id_when_supported(self):
         mock_store = MagicMock()
         tracker = ContextTracker(vector_store=mock_store)
 
-        tracker.store_in_memory("e1", "user", "hello")
+        tracker.store_in_memory('e1', 'user', 'hello')
 
-        mock_store.delete_by_ids.assert_called_once_with(["e1"])
+        mock_store.delete_by_ids.assert_called_once_with(['e1'])
         mock_store.add.assert_called_once()
 
     def test_recall_from_memory_prepends_graph_rag_context(self, tmp_path):
@@ -61,20 +60,20 @@ class TestGraphRAGWiring:
         # Ensure semantic search returns a seed with file_path metadata
         mock_store.search.return_value = [
             {
-                "content_text": "something about the file",
-                "metadata": {"file_path": "example.py"},
+                'content_text': 'something about the file',
+                'metadata': {'file_path': 'example.py'},
             }
         ]
-        graph_store = GraphMemoryStore(persistence_path=str(tmp_path / "graph.json"))
+        graph_store = GraphMemoryStore(persistence_path=str(tmp_path / 'graph.json'))
         tracker = ContextTracker(vector_store=mock_store, graph_store=graph_store)
 
         # Create a minimal node so graph expansion doesn't error.
-        graph_store.add_node("example.py", NodeType.FILE)
+        graph_store.add_node('example.py', NodeType.FILE)
 
-        results = tracker.recall_from_memory("example", k=3)
+        results = tracker.recall_from_memory('example', k=3)
         assert results
-        assert results[0]["role"] == "graph_rag"
-        assert "### Semantic Matches" in results[0]["content_text"]
+        assert results[0]['role'] == 'graph_rag'
+        assert '### Semantic Matches' in results[0]['content_text']
 
 
 class TestTrackDecision:
@@ -85,17 +84,17 @@ class TestTrackDecision:
         tracker = ContextTracker()
 
         decision = tracker.track_decision(
-            description="Use pattern X",
-            rationale="Best performance",
+            description='Use pattern X',
+            rationale='Best performance',
             decision_type=DecisionType.ARCHITECTURAL,
-            context="Working on module Y",
+            context='Working on module Y',
             confidence=0.95,
         )
 
-        assert decision.description == "Use pattern X"
-        assert decision.rationale == "Best performance"
+        assert decision.description == 'Use pattern X'
+        assert decision.rationale == 'Best performance'
         assert decision.type == DecisionType.ARCHITECTURAL
-        assert decision.context == "Working on module Y"
+        assert decision.context == 'Working on module Y'
         assert decision.confidence == 0.95
         assert isinstance(decision.timestamp, datetime)
 
@@ -104,31 +103,31 @@ class TestTrackDecision:
         tracker = ContextTracker()
 
         d1 = tracker.track_decision(
-            description="Decision 1",
-            rationale="Reason 1",
+            description='Decision 1',
+            rationale='Reason 1',
             decision_type=DecisionType.IMPLEMENTATION,
-            context="Context 1",
+            context='Context 1',
         )
         d2 = tracker.track_decision(
-            description="Decision 2",
-            rationale="Reason 2",
+            description='Decision 2',
+            rationale='Reason 2',
             decision_type=DecisionType.IMPLEMENTATION,
-            context="Context 2",
+            context='Context 2',
         )
 
         assert d1.decision_id != d2.decision_id
-        assert "decision_1_" in d1.decision_id
-        assert "decision_2_" in d2.decision_id
+        assert 'decision_1_' in d1.decision_id
+        assert 'decision_2_' in d2.decision_id
 
     def test_stores_decision_in_dict(self):
         """Test stores decision in internal dict by ID."""
         tracker = ContextTracker()
 
         decision = tracker.track_decision(
-            description="Test decision",
-            rationale="Test rationale",
+            description='Test decision',
+            rationale='Test rationale',
             decision_type=DecisionType.TECHNICAL,
-            context="Test context",
+            context='Test context',
         )
 
         assert decision.decision_id in tracker.decisions
@@ -139,10 +138,10 @@ class TestTrackDecision:
         tracker = ContextTracker()
 
         decision = tracker.track_decision(
-            description="Test",
-            rationale="Test",
+            description='Test',
+            rationale='Test',
             decision_type=DecisionType.IMPLEMENTATION,
-            context="Test",
+            context='Test',
         )
 
         assert decision.confidence == 1.0
@@ -151,9 +150,9 @@ class TestTrackDecision:
         """Test multiple decisions are stored without overwriting."""
         tracker = ContextTracker()
 
-        d1 = tracker.track_decision("D1", "R1", DecisionType.ARCHITECTURAL, "C1")
-        d2 = tracker.track_decision("D2", "R2", DecisionType.IMPLEMENTATION, "C2")
-        d3 = tracker.track_decision("D3", "R3", DecisionType.TECHNICAL, "C3")
+        d1 = tracker.track_decision('D1', 'R1', DecisionType.ARCHITECTURAL, 'C1')
+        d2 = tracker.track_decision('D2', 'R2', DecisionType.IMPLEMENTATION, 'C2')
+        d3 = tracker.track_decision('D3', 'R3', DecisionType.TECHNICAL, 'C3')
 
         assert len(tracker.decisions) == 3
         assert all(d.decision_id in tracker.decisions for d in [d1, d2, d3])
@@ -167,13 +166,13 @@ class TestAddAnchor:
         tracker = ContextTracker()
 
         anchor = tracker.add_anchor(
-            content="Critical requirement X",
-            category="requirement",
+            content='Critical requirement X',
+            category='requirement',
             importance=0.95,
         )
 
-        assert anchor.content == "Critical requirement X"
-        assert anchor.category == "requirement"
+        assert anchor.content == 'Critical requirement X'
+        assert anchor.category == 'requirement'
         assert anchor.importance == 0.95
         assert isinstance(anchor.timestamp, datetime)
         assert isinstance(anchor.last_accessed, datetime)
@@ -182,18 +181,18 @@ class TestAddAnchor:
         """Test each anchor gets a unique ID."""
         tracker = ContextTracker()
 
-        a1 = tracker.add_anchor("Anchor 1", "category1")
-        a2 = tracker.add_anchor("Anchor 2", "category2")
+        a1 = tracker.add_anchor('Anchor 1', 'category1')
+        a2 = tracker.add_anchor('Anchor 2', 'category2')
 
         assert a1.anchor_id != a2.anchor_id
-        assert "anchor_1_" in a1.anchor_id
-        assert "anchor_2_" in a2.anchor_id
+        assert 'anchor_1_' in a1.anchor_id
+        assert 'anchor_2_' in a2.anchor_id
 
     def test_stores_anchor_in_dict(self):
         """Test stores anchor in internal dict by ID."""
         tracker = ContextTracker()
 
-        anchor = tracker.add_anchor("Test content", "test_category")
+        anchor = tracker.add_anchor('Test content', 'test_category')
 
         assert anchor.anchor_id in tracker.anchors
         assert tracker.anchors[anchor.anchor_id] == anchor
@@ -202,7 +201,7 @@ class TestAddAnchor:
         """Test importance defaults to 0.9 when not provided."""
         tracker = ContextTracker()
 
-        anchor = tracker.add_anchor("Test", "category")
+        anchor = tracker.add_anchor('Test', 'category')
 
         assert anchor.importance == 0.9
 
@@ -210,9 +209,9 @@ class TestAddAnchor:
         """Test multiple anchors are stored without overwriting."""
         tracker = ContextTracker()
 
-        a1 = tracker.add_anchor("Content 1", "cat1", 0.8)
-        a2 = tracker.add_anchor("Content 2", "cat2", 0.9)
-        a3 = tracker.add_anchor("Content 3", "cat3", 1.0)
+        a1 = tracker.add_anchor('Content 1', 'cat1', 0.8)
+        a2 = tracker.add_anchor('Content 2', 'cat2', 0.9)
+        a3 = tracker.add_anchor('Content 3', 'cat3', 1.0)
 
         assert len(tracker.anchors) == 3
         assert all(a.anchor_id in tracker.anchors for a in [a1, a2, a3])
@@ -224,70 +223,70 @@ class TestGetContextSummary:
     def test_empty_tracker_returns_empty_string(self):
         """Test returns empty string when no anchors or decisions exist."""
         tracker = ContextTracker()
-        assert tracker.get_context_summary() == ""
+        assert tracker.get_context_summary() == ''
 
     def test_anchors_only_returns_anchor_section(self):
         """Test returns anchor section when only anchors exist."""
         tracker = ContextTracker()
-        tracker.add_anchor("Important requirement", "requirement", 0.95)
-        tracker.add_anchor("Secondary note", "note", 0.7)
+        tracker.add_anchor('Important requirement', 'requirement', 0.95)
+        tracker.add_anchor('Secondary note', 'note', 0.7)
 
         summary = tracker.get_context_summary()
 
-        assert "## Critical Context (Anchors)" in summary
-        assert "[REQUIREMENT]" in summary
-        assert "Important requirement" in summary
-        assert "[NOTE]" in summary
-        assert "Secondary note" in summary
-        assert "## Recent Decisions" not in summary
+        assert '## Critical Context (Anchors)' in summary
+        assert '[REQUIREMENT]' in summary
+        assert 'Important requirement' in summary
+        assert '[NOTE]' in summary
+        assert 'Secondary note' in summary
+        assert '## Recent Decisions' not in summary
 
     def test_decisions_only_returns_decision_section(self):
         """Test returns decision section when only decisions exist."""
         tracker = ContextTracker()
         tracker.track_decision(
-            "Use approach X",
-            "Better performance",
+            'Use approach X',
+            'Better performance',
             DecisionType.ARCHITECTURAL,
-            "Context A",
+            'Context A',
         )
 
         summary = tracker.get_context_summary()
 
-        assert "## Recent Decisions" in summary
-        assert "Use approach X" in summary
-        assert "## Critical Context (Anchors)" not in summary
+        assert '## Recent Decisions' in summary
+        assert 'Use approach X' in summary
+        assert '## Critical Context (Anchors)' not in summary
 
     def test_both_anchors_and_decisions_returns_both_sections(self):
         """Test returns both sections when both exist."""
         tracker = ContextTracker()
-        tracker.add_anchor("Key requirement", "requirement")
+        tracker.add_anchor('Key requirement', 'requirement')
         tracker.track_decision(
-            "Use pattern Y",
-            "Simplicity",
+            'Use pattern Y',
+            'Simplicity',
             DecisionType.IMPLEMENTATION,
-            "Context B",
+            'Context B',
         )
 
         summary = tracker.get_context_summary()
 
-        assert "## Critical Context (Anchors)" in summary
-        assert "## Recent Decisions" in summary
-        assert "Key requirement" in summary
-        assert "Use pattern Y" in summary
+        assert '## Critical Context (Anchors)' in summary
+        assert '## Recent Decisions' in summary
+        assert 'Key requirement' in summary
+        assert 'Use pattern Y' in summary
 
     def test_anchors_sorted_by_importance_descending(self):
         """Test anchors are sorted by importance (highest first)."""
         tracker = ContextTracker()
-        tracker.add_anchor("Low importance", "cat", 0.5)
-        tracker.add_anchor("High importance", "cat", 0.99)
-        tracker.add_anchor("Medium importance", "cat", 0.7)
+        tracker.add_anchor('Low importance', 'cat', 0.5)
+        tracker.add_anchor('High importance', 'cat', 0.99)
+        tracker.add_anchor('Medium importance', 'cat', 0.7)
 
         summary = tracker.get_context_summary()
 
         # High should appear before medium before low
-        high_idx = summary.index("High importance")
-        medium_idx = summary.index("Medium importance")
-        low_idx = summary.index("Low importance")
+        high_idx = summary.index('High importance')
+        medium_idx = summary.index('Medium importance')
+        low_idx = summary.index('Low importance')
 
         assert high_idx < medium_idx < low_idx
 
@@ -297,12 +296,12 @@ class TestGetContextSummary:
 
         # Track in order: old, middle, new
         d1 = tracker.track_decision(
-            "Old decision", "R1", DecisionType.ARCHITECTURAL, "C1"
+            'Old decision', 'R1', DecisionType.ARCHITECTURAL, 'C1'
         )
         d2 = tracker.track_decision(
-            "Middle decision", "R2", DecisionType.IMPLEMENTATION, "C2"
+            'Middle decision', 'R2', DecisionType.IMPLEMENTATION, 'C2'
         )
-        d3 = tracker.track_decision("New decision", "R3", DecisionType.WORKFLOW, "C3")
+        d3 = tracker.track_decision('New decision', 'R3', DecisionType.WORKFLOW, 'C3')
 
         # Manually adjust timestamps to ensure ordering
         d1.timestamp = datetime(2024, 1, 1)
@@ -311,9 +310,9 @@ class TestGetContextSummary:
 
         summary = tracker.get_context_summary()
 
-        new_idx = summary.index("New decision")
-        middle_idx = summary.index("Middle decision")
-        old_idx = summary.index("Old decision")
+        new_idx = summary.index('New decision')
+        middle_idx = summary.index('Middle decision')
+        old_idx = summary.index('Old decision')
 
         assert new_idx < middle_idx < old_idx
 
@@ -324,17 +323,17 @@ class TestGetContextSummary:
         # Create 10 decisions
         for i in range(10):
             tracker.track_decision(
-                f"Decision {i}",
-                f"Rationale {i}",
+                f'Decision {i}',
+                f'Rationale {i}',
                 DecisionType.IMPLEMENTATION,
-                f"Context {i}",
+                f'Context {i}',
             )
 
         summary = tracker.get_context_summary()
 
         # Should have exactly 5 decisions (last 5 created)
         decision_lines = [
-            line for line in summary.split("\n") if line.startswith("- Decision ")
+            line for line in summary.split('\n') if line.startswith('- Decision ')
         ]
         assert len(decision_lines) == 5
 
@@ -342,17 +341,15 @@ class TestGetContextSummary:
         """Only the top 5 anchors by importance appear in the summary."""
         tracker = ContextTracker()
         for i in range(7):
-            tracker.add_anchor(f"Anchor {i}", "cat", importance=0.1 + i * 0.01)
+            tracker.add_anchor(f'Anchor {i}', 'cat', importance=0.1 + i * 0.01)
 
         summary = tracker.get_context_summary()
         anchor_lines = [
-            line
-            for line in summary.split("\n")
-            if line.startswith("- [CAT]")
+            line for line in summary.split('\n') if line.startswith('- [CAT]')
         ]
         assert len(anchor_lines) == 5
-        assert "Anchor 6" in summary
-        assert "Anchor 0" not in summary
+        assert 'Anchor 6' in summary
+        assert 'Anchor 0' not in summary
 
 
 class TestStoreInMemory:
@@ -362,7 +359,7 @@ class TestStoreInMemory:
         """Test returns early when vector store is None."""
         tracker = ContextTracker()
         # Should not raise
-        tracker.store_in_memory("event1", "user", "content")
+        tracker.store_in_memory('event1', 'user', 'content')
 
     def test_calls_vector_store_add_with_correct_params(self):
         """Test calls vector_store.add with correct parameters."""
@@ -370,19 +367,19 @@ class TestStoreInMemory:
         tracker = ContextTracker(vector_store=mock_store)
 
         tracker.store_in_memory(
-            "evt123",
-            "assistant",
-            "Response content",
-            {"key": "value"},
+            'evt123',
+            'assistant',
+            'Response content',
+            {'key': 'value'},
         )
 
         mock_store.add.assert_called_once_with(
-            step_id="evt123",
-            role="assistant",
+            step_id='evt123',
+            role='assistant',
             artifact_hash=None,
             rationale=None,
-            content_text="Response content",
-            metadata={"key": "value"},
+            content_text='Response content',
+            metadata={'key': 'value'},
         )
 
     def test_uses_empty_dict_when_metadata_is_none(self):
@@ -390,20 +387,20 @@ class TestStoreInMemory:
         mock_store = MagicMock()
         tracker = ContextTracker(vector_store=mock_store)
 
-        tracker.store_in_memory("evt1", "user", "Content")
+        tracker.store_in_memory('evt1', 'user', 'Content')
 
         call_kwargs = mock_store.add.call_args[1]
-        assert call_kwargs["metadata"] == {}
+        assert call_kwargs['metadata'] == {}
 
     def test_handles_vector_store_exception(self):
         """Test catches and logs exception from vector store."""
         mock_store = MagicMock()
-        mock_store.add.side_effect = RuntimeError("Storage failed")
+        mock_store.add.side_effect = RuntimeError('Storage failed')
 
         tracker = ContextTracker(vector_store=mock_store)
 
         # Should not raise
-        tracker.store_in_memory("evt1", "user", "Content")
+        tracker.store_in_memory('evt1', 'user', 'Content')
 
 
 class TestRecallFromMemory:
@@ -412,22 +409,22 @@ class TestRecallFromMemory:
     def test_returns_empty_list_when_no_vector_store(self):
         """Test returns empty list when vector store is None."""
         tracker = ContextTracker()
-        results = tracker.recall_from_memory("query")
+        results = tracker.recall_from_memory('query')
         assert results == []
 
     def test_calls_vector_store_search_with_query_and_k(self):
         """Test calls vector_store.search with correct parameters."""
         mock_store = MagicMock()
         mock_store.search.return_value = [
-            {"content": "result1"},
-            {"content": "result2"},
+            {'content': 'result1'},
+            {'content': 'result2'},
         ]
 
         tracker = ContextTracker(vector_store=mock_store)
-        results = tracker.recall_from_memory("test query", k=10)
+        results = tracker.recall_from_memory('test query', k=10)
 
-        mock_store.search.assert_called_once_with("test query", k=10)
-        assert results == [{"content": "result1"}, {"content": "result2"}]
+        mock_store.search.assert_called_once_with('test query', k=10)
+        assert results == [{'content': 'result1'}, {'content': 'result2'}]
 
     def test_default_k_is_five(self):
         """Test k defaults to 5 when not provided."""
@@ -435,16 +432,16 @@ class TestRecallFromMemory:
         mock_store.search.return_value = []
 
         tracker = ContextTracker(vector_store=mock_store)
-        tracker.recall_from_memory("query")
+        tracker.recall_from_memory('query')
 
-        mock_store.search.assert_called_once_with("query", k=5)
+        mock_store.search.assert_called_once_with('query', k=5)
 
     def test_handles_vector_store_exception(self):
         """Test returns empty list when vector store raises exception."""
         mock_store = MagicMock()
-        mock_store.search.side_effect = RuntimeError("Search failed")
+        mock_store.search.side_effect = RuntimeError('Search failed')
 
         tracker = ContextTracker(vector_store=mock_store)
-        results = tracker.recall_from_memory("query")
+        results = tracker.recall_from_memory('query')
 
         assert results == []

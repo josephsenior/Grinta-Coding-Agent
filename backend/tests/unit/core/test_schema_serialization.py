@@ -6,7 +6,6 @@ import json
 import unittest
 from datetime import datetime, timezone
 
-
 from backend.core.enums import (
     EventSource,
     EventVersion,
@@ -55,13 +54,13 @@ class TestEventMetadata(unittest.TestCase):
             cause=10,
             hidden=True,
             timeout=5.0,
-            response_id="resp-1",
-            trace_id="trace-123",
+            response_id='resp-1',
+            trace_id='trace-123',
         )
         self.assertEqual(m.event_id, 42)
         self.assertEqual(m.source, EventSource.AGENT.value)
         self.assertTrue(m.hidden)
-        self.assertEqual(m.trace_id, "trace-123")
+        self.assertEqual(m.trace_id, 'trace-123')
 
     def test_factory_function(self):
         m = _create_default_event_metadata()
@@ -79,11 +78,11 @@ class TestBaseEventSchema(unittest.TestCase):
     def test_to_dict(self):
         e = BaseEventSchema()
         d = e.to_dict()
-        self.assertIn("schema_version", d)
+        self.assertIn('schema_version', d)
         self.assertIsInstance(d, dict)
 
     def test_from_dict(self):
-        d = {"schema_version": "1.0.0"}
+        d = {'schema_version': '1.0.0'}
         e = BaseEventSchema.from_dict(d)
         self.assertIsInstance(e, BaseEventSchema)
 
@@ -94,7 +93,7 @@ class TestEventSchemaV1(unittest.TestCase):
         self.assertEqual(e.schema_version, EventVersion.V1.value)
 
     def test_validator_coerces_string(self):
-        e = EventSchemaV1.model_validate({"schema_version": "1.0.0"})
+        e = EventSchemaV1.model_validate({'schema_version': '1.0.0'})
         self.assertIsNotNone(e)
 
 
@@ -107,61 +106,61 @@ class TestSerializeEvent(unittest.TestCase):
         s = serialize_event(e)
         self.assertIsInstance(s, str)
         parsed = json.loads(s)
-        self.assertIn("schema_version", parsed)
+        self.assertIn('schema_version', parsed)
 
 
 class TestDeserializeEvent(unittest.TestCase):
     def test_action_roundtrip(self):
         data = {
-            "action_type": "message",
-            "content": "hello",
+            'action_type': 'message',
+            'content': 'hello',
         }
         event = deserialize_event(data)
         self.assertIsNotNone(event)
 
     def test_action_from_json_string(self):
-        data = json.dumps({"action_type": "null"})
+        data = json.dumps({'action_type': 'null'})
         event = deserialize_event(data)
         self.assertIsNotNone(event)
 
     def test_observation_roundtrip(self):
         data = {
-            "observation_type": "error",
-            "content": "boom",
+            'observation_type': 'error',
+            'content': 'boom',
         }
         event = deserialize_event(data)
         self.assertIsNotNone(event)
 
     def test_missing_type_raises(self):
         with self.assertRaises(
-            ValueError, msg="must have either action_type or observation_type"
+            ValueError, msg='must have either action_type or observation_type'
         ):
-            deserialize_event({"foo": "bar"})
+            deserialize_event({'foo': 'bar'})
 
     def test_invalid_json_raises(self):
         with self.assertRaises(ValueError):
-            deserialize_event("{bad json}")
+            deserialize_event('{bad json}')
 
     def test_unknown_action_type_raises(self):
-        with self.assertRaises(ValueError, msg="Unknown action type"):
-            deserialize_event({"action_type": "nonexistent_action_xyz"})
+        with self.assertRaises(ValueError, msg='Unknown action type'):
+            deserialize_event({'action_type': 'nonexistent_action_xyz'})
 
     def test_unknown_observation_type_raises(self):
-        with self.assertRaises(ValueError, msg="Unknown observation type"):
-            deserialize_event({"observation_type": "nonexistent_obs_xyz"})
+        with self.assertRaises(ValueError, msg='Unknown observation type'):
+            deserialize_event({'observation_type': 'nonexistent_obs_xyz'})
 
     def test_schema_version_from_data(self):
         data = {
-            "action_type": "null",
-            "schema_version": "1.0.0",
+            'action_type': 'null',
+            'schema_version': '1.0.0',
         }
         event = deserialize_event(data)
         self.assertIsNotNone(event)
 
     def test_unknown_schema_version_raises(self):
         data = {
-            "action_type": "null",
-            "schema_version": "99.0.0",
+            'action_type': 'null',
+            'schema_version': '99.0.0',
         }
         with self.assertRaises(ValueError):
             deserialize_event(data)
@@ -172,57 +171,57 @@ class TestDeserializeEvent(unittest.TestCase):
 # ---------------------------------------------------------------------------
 class TestDeserializeAction(unittest.TestCase):
     def test_file_read(self):
-        data = {"action_type": "read", "path": "/a.py"}
+        data = {'action_type': 'read', 'path': '/a.py'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
     def test_file_write(self):
-        data = {"action_type": "write", "path": "/b.py", "content": "x"}
+        data = {'action_type': 'write', 'path': '/b.py', 'content': 'x'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
     def test_file_edit(self):
-        data = {"action_type": "edit", "path": "/c.py"}
+        data = {'action_type': 'edit', 'path': '/c.py'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
     def test_cmd_run(self):
-        data = {"action_type": "run", "command": "ls"}
+        data = {'action_type': 'run', 'command': 'ls'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
     def test_message(self):
-        data = {"action_type": "message", "content": "hi"}
+        data = {'action_type': 'message', 'content': 'hi'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
     def test_system(self):
-        data = {"action_type": "system", "content": "prompt"}
+        data = {'action_type': 'system', 'content': 'prompt'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
     def test_browse_interactive(self):
-        data = {"action_type": "browse_interactive", "browser_actions": "click()"}
+        data = {'action_type': 'browse_interactive', 'browser_actions': 'click()'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
     def test_finish(self):
-        data = {"action_type": "finish"}
+        data = {'action_type': 'finish'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
     def test_reject(self):
-        data = {"action_type": "reject"}
+        data = {'action_type': 'reject'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
     def test_change_agent_state(self):
-        data = {"action_type": "change_agent_state", "state": "running"}
+        data = {'action_type': 'change_agent_state', 'state': 'running'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
     def test_null(self):
-        data = {"action_type": "null"}
+        data = {'action_type': 'null'}
         a = _deserialize_action(data)
         self.assertIsNotNone(a)
 
@@ -236,27 +235,27 @@ class TestDeserializeAction(unittest.TestCase):
 # ---------------------------------------------------------------------------
 class TestDeserializeObservation(unittest.TestCase):
     def test_cmd_output(self):
-        data = {"observation_type": "run", "command": "ls", "content": "output"}
+        data = {'observation_type': 'run', 'command': 'ls', 'content': 'output'}
         o = _deserialize_observation(data)
         self.assertIsNotNone(o)
 
     def test_file_read(self):
-        data = {"observation_type": "read", "path": "/a.py", "content": "code"}
+        data = {'observation_type': 'read', 'path': '/a.py', 'content': 'code'}
         o = _deserialize_observation(data)
         self.assertIsNotNone(o)
 
     def test_file_edit(self):
-        data = {"observation_type": "edit", "path": "/b.py", "content": "edited"}
+        data = {'observation_type': 'edit', 'path': '/b.py', 'content': 'edited'}
         o = _deserialize_observation(data)
         self.assertIsNotNone(o)
 
     def test_error(self):
-        data = {"observation_type": "error", "content": "boom"}
+        data = {'observation_type': 'error', 'content': 'boom'}
         o = _deserialize_observation(data)
         self.assertIsNotNone(o)
 
     def test_message(self):
-        data = {"observation_type": "message", "content": "hello"}
+        data = {'observation_type': 'message', 'content': 'hello'}
         o = _deserialize_observation(data)
         self.assertIsNotNone(o)
 
@@ -266,10 +265,10 @@ class TestDeserializeObservation(unittest.TestCase):
 
     def test_cmd_output_with_dict_cmd_metadata(self):
         data = {
-            "observation_type": "run",
-            "command": "echo hi",
-            "content": "hi",
-            "cmd_metadata": {"exit_code": 0, "pid": 123},
+            'observation_type': 'run',
+            'command': 'echo hi',
+            'content': 'hi',
+            'cmd_metadata': {'exit_code': 0, 'pid': 123},
         }
         o = _deserialize_observation(data)
         self.assertIsNotNone(o)
@@ -280,16 +279,16 @@ class TestDeserializeObservation(unittest.TestCase):
 # ---------------------------------------------------------------------------
 class TestMigrateSchemaVersion(unittest.TestCase):
     def test_same_version_noop(self):
-        data = {"action_type": "null"}
+        data = {'action_type': 'null'}
         result = migrate_schema_version(data, EventVersion.V1, EventVersion.V1)
         self.assertEqual(result, data)
 
     def test_v1_to_v2_raises(self):
-        with self.assertRaises(ValueError, msg="not yet supported"):
+        with self.assertRaises(ValueError, msg='not yet supported'):
             migrate_schema_version({}, EventVersion.V1, EventVersion.V2)
 
     def test_v2_to_v1_returns_copy(self):
-        data = {"action_type": "null", "extra": "field"}
+        data = {'action_type': 'null', 'extra': 'field'}
         result = migrate_schema_version(data, EventVersion.V2, EventVersion.V1)
         self.assertEqual(result, data)
         self.assertIsNot(result, data)  # should be a copy
@@ -344,5 +343,5 @@ class TestRetryConfig(unittest.TestCase):
             self.assertEqual(rc.strategy, strat)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

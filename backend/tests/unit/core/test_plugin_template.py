@@ -16,11 +16,11 @@ from backend.core.plugin_template import MyPlugin, register
 class TestMyPlugin:
     def test_name_set(self):
         plugin = MyPlugin()
-        assert plugin.name == "my-plugin"
+        assert plugin.name == 'my-plugin'
 
     def test_version_set(self):
         plugin = MyPlugin()
-        assert plugin.version == "0.1.0"
+        assert plugin.version == '0.1.0'
 
     def test_description_set(self):
         plugin = MyPlugin()
@@ -41,12 +41,12 @@ class TestMyPlugin:
     @pytest.mark.asyncio
     async def test_on_session_start(self):
         plugin = MyPlugin()
-        await plugin.on_session_start("sid", {"key": "val"})
+        await plugin.on_session_start('sid', {'key': 'val'})
 
     @pytest.mark.asyncio
     async def test_on_session_end(self):
         plugin = MyPlugin()
-        await plugin.on_session_end("sid", {})
+        await plugin.on_session_end('sid', {})
 
     def test_validate_no_warnings(self):
         result = MyPlugin().validate()
@@ -57,9 +57,9 @@ class TestRegister:
     def test_registers_plugin(self):
         registry = PluginRegistry()
         register(registry)
-        assert registry.get_plugin("my-plugin") is not None
+        assert registry.get_plugin('my-plugin') is not None
 
     def test_registered_is_my_plugin(self):
         registry = PluginRegistry()
         register(registry)
-        assert isinstance(registry.get_plugin("my-plugin"), MyPlugin)
+        assert isinstance(registry.get_plugin('my-plugin'), MyPlugin)

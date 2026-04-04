@@ -4,22 +4,20 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-
 from backend.orchestration.services.stuck_detection_service import StuckDetectionService
-
 
 # ── is_stuck ─────────────────────────────────────────────────────────
 
 
 class TestIsStuck:
     def test_no_detector(self):
-        ctrl = MagicMock(spec=["delegate", "headless_mode"])
+        ctrl = MagicMock(spec=['delegate', 'headless_mode'])
         ctrl.delegate = None
         svc = StuckDetectionService(ctrl)
         assert svc.is_stuck() is False
 
     def test_detector_not_stuck(self):
-        ctrl = MagicMock(spec=["delegate", "headless_mode"])
+        ctrl = MagicMock(spec=['delegate', 'headless_mode'])
         ctrl.headless_mode = False
         ctrl.delegate = None
         svc = StuckDetectionService(ctrl)

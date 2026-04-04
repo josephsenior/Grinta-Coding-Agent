@@ -14,12 +14,12 @@ from backend.persistence.locations import get_conversation_events_dir
 
 
 def test_event_stream_replays_pending_event_on_startup() -> None:
-    sid = "wal-replay-session"
+    sid = 'wal-replay-session'
     with tempfile.TemporaryDirectory() as tmpdir:
         file_store = LocalFileStore(tmpdir)
         events_dir = get_conversation_events_dir(sid)
-        pending_path = f"{events_dir}0.json.pending"
-        event = NullObservation(content="recovered")
+        pending_path = f'{events_dir}0.json.pending'
+        event = NullObservation(content='recovered')
         event.id = 0
         event.source = EventSource.AGENT
         payload = event_to_dict(event)
@@ -29,20 +29,20 @@ def test_event_stream_replays_pending_event_on_startup() -> None:
         try:
             recovered = stream.get_event(0)
             assert recovered.id == 0
-            assert getattr(recovered, "observation", None) == "null"
+            assert getattr(recovered, 'observation', None) == 'null'
             assert stream.cur_id >= 1
         finally:
             stream.close()
 
 
 def test_event_stream_cleans_stale_pending_marker() -> None:
-    sid = "wal-clean-session"
+    sid = 'wal-clean-session'
     with tempfile.TemporaryDirectory() as tmpdir:
         file_store = LocalFileStore(tmpdir)
         events_dir = get_conversation_events_dir(sid)
-        event_path = f"{events_dir}0.json"
-        pending_path = f"{event_path}.pending"
-        event = NullObservation(content="already-written")
+        event_path = f'{events_dir}0.json'
+        pending_path = f'{event_path}.pending'
+        event = NullObservation(content='already-written')
         event.id = 0
         event.source = EventSource.AGENT
         payload = event_to_dict(event)
@@ -52,21 +52,21 @@ def test_event_stream_cleans_stale_pending_marker() -> None:
         stream = EventStream(sid, file_store)
         try:
             listing = file_store.list(events_dir)
-            assert f"{events_dir}0.json.pending" not in listing
-            assert f"{events_dir}0.json" in listing
+            assert f'{events_dir}0.json.pending' not in listing
+            assert f'{events_dir}0.json' in listing
         finally:
             stream.close()
 
 
 def test_event_stream_persists_and_loads_events_across_restart() -> None:
-    sid = "persist-restart-session"
+    sid = 'persist-restart-session'
     with tempfile.TemporaryDirectory() as tmpdir:
         file_store = LocalFileStore(tmpdir)
 
         stream = EventStream(sid, file_store)
         try:
-            stream.add_event(NullObservation(content="first"), EventSource.AGENT)
-            stream.add_event(NullObservation(content="second"), EventSource.AGENT)
+            stream.add_event(NullObservation(content='first'), EventSource.AGENT)
+            stream.add_event(NullObservation(content='second'), EventSource.AGENT)
         finally:
             stream.close()
 
@@ -78,4 +78,3 @@ def test_event_stream_persists_and_loads_events_across_restart() -> None:
             assert restarted.cur_id >= 2
         finally:
             restarted.close()
-

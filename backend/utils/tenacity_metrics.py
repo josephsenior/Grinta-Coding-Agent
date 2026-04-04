@@ -56,16 +56,16 @@ def tenacity_before_sleep_factory(operation: str) -> Callable[[RetryCallState], 
 
     def _before_sleep(retry_state: RetryCallState) -> None:
         with contextlib.suppress(Exception):
-            stop_state = getattr(retry_state, "stop", None)
+            stop_state = getattr(retry_state, 'stop', None)
             max_attempts = None
             if stop_state is not None:
-                max_attempts = getattr(stop_state, "max_attempts", None)
+                max_attempts = getattr(stop_state, 'max_attempts', None)
             _record_metrics_event_runtime(
                 {
-                    "status": "attempt",
-                    "operation": sanitize_operation_label(operation),
-                    "attempt_index": getattr(retry_state, "attempt_number", None),
-                    "max_attempts": max_attempts,
+                    'status': 'attempt',
+                    'operation': sanitize_operation_label(operation),
+                    'attempt_index': getattr(retry_state, 'attempt_number', None),
+                    'max_attempts': max_attempts,
                 },
             )
 
@@ -85,25 +85,25 @@ def tenacity_after_factory(operation: str) -> Callable[[RetryCallState], None]:
     def _after(retry_state: RetryCallState) -> None:
         try:
             op = sanitize_operation_label(operation)
-            outcome = getattr(retry_state, "outcome", None)
+            outcome = getattr(retry_state, 'outcome', None)
             try:
                 if (
                     outcome is not None
-                    and hasattr(outcome, "successful")
+                    and hasattr(outcome, 'successful')
                     and outcome.successful()
                 ):
                     _record_metrics_event_runtime(
-                        {"status": "retry_success", "operation": op}
+                        {'status': 'retry_success', 'operation': op}
                     )
                     return
             except Exception as exc:
                 logger.debug(
-                    "tenacity after-hook: outcome.successful() raised: %s", exc
+                    'tenacity after-hook: outcome.successful() raised: %s', exc
                 )
-            attempt_idx = getattr(retry_state, "attempt_number", None)
-            stop_state = getattr(retry_state, "stop", None)
+            attempt_idx = getattr(retry_state, 'attempt_number', None)
+            stop_state = getattr(retry_state, 'stop', None)
             max_attempts = (
-                getattr(stop_state, "max_attempts", None)
+                getattr(stop_state, 'max_attempts', None)
                 if stop_state is not None
                 else None
             )
@@ -114,18 +114,18 @@ def tenacity_after_factory(operation: str) -> Callable[[RetryCallState], None]:
             ):
                 _record_metrics_event_runtime(
                     {
-                        "status": "retry_failure",
-                        "operation": op,
-                        "attempt_index": attempt_idx,
-                        "max_attempts": max_attempts,
-                        "error": str(
-                            getattr(retry_state, "outcome", None)
-                            or getattr(retry_state, "exception", None)
-                            or "",
+                        'status': 'retry_failure',
+                        'operation': op,
+                        'attempt_index': attempt_idx,
+                        'max_attempts': max_attempts,
+                        'error': str(
+                            getattr(retry_state, 'outcome', None)
+                            or getattr(retry_state, 'exception', None)
+                            or '',
                         ),
                     },
                 )
         except Exception as exc:
-            logger.debug("tenacity after-hook failed for %s: %s", operation, exc)
+            logger.debug('tenacity after-hook failed for %s: %s', operation, exc)
 
     return _after

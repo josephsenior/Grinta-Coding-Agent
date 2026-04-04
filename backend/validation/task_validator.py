@@ -18,8 +18,11 @@ if TYPE_CHECKING:
 from backend.core.logger import app_logger as logger
 from backend.ledger.action import CmdRunAction
 from backend.ledger.action.files import FileEditAction, FileWriteAction
-from backend.ledger.observation import CmdOutputObservation
-from backend.ledger.observation.files import FileEditObservation, FileReadObservation, FileWriteObservation
+from backend.ledger.observation.files import (
+    FileEditObservation,
+    FileReadObservation,
+    FileWriteObservation,
+)
 from backend.validation.command_classification import (
     find_cmd_output_for_run,
     is_git_diff_command,
@@ -89,27 +92,27 @@ class TestPassingValidator(TaskValidator):
         if not test_executions:
             return ValidationResult(
                 passed=False,
-                reason="No test execution found in recent history",
+                reason='No test execution found in recent history',
                 confidence=0.8,
-                missing_items=["Run test suite to verify changes"],
-                suggestions=["Run pytest, npm test, or appropriate test command"],
+                missing_items=['Run test suite to verify changes'],
+                suggestions=['Run pytest, npm test, or appropriate test command'],
             )
 
         # Check if latest tests passed
         latest_test = test_executions[-1]
-        if latest_test["exit_code"] != 0:
+        if latest_test['exit_code'] != 0:
             return ValidationResult(
                 passed=False,
-                reason=f"Latest test execution failed with exit code {latest_test['exit_code']}",
+                reason=f'Latest test execution failed with exit code {latest_test["exit_code"]}',
                 confidence=1.0,
-                missing_items=["Fix failing tests"],
-                suggestions=["Review test output and fix the failing tests"],
+                missing_items=['Fix failing tests'],
+                suggestions=['Review test output and fix the failing tests'],
             )
 
-        logger.info("Test validation passed: tests are passing")
+        logger.info('Test validation passed: tests are passing')
         return ValidationResult(
             passed=True,
-            reason="Tests are passing",
+            reason='Tests are passing',
             confidence=1.0,
         )
 
@@ -132,9 +135,9 @@ class TestPassingValidator(TaskValidator):
                 if paired is not None:
                     test_executions.append(
                         {
-                            "command": event.command,
-                            "exit_code": paired.exit_code,
-                            "output": paired.content,
+                            'command': event.command,
+                            'exit_code': paired.exit_code,
+                            'output': paired.content,
                         },
                     )
 
@@ -161,10 +164,10 @@ class DiffValidator(TaskValidator):
         if not git_diff:
             return ValidationResult(
                 passed=False,
-                reason="No git changes detected",
+                reason='No git changes detected',
                 confidence=0.9,
-                missing_items=["Make code changes to complete the task"],
-                suggestions=["Implement the required functionality"],
+                missing_items=['Make code changes to complete the task'],
+                suggestions=['Implement the required functionality'],
             )
 
         # Check if diff is substantial (not just whitespace/comments)
@@ -173,18 +176,18 @@ class DiffValidator(TaskValidator):
         if meaningful_changes < 5:
             return ValidationResult(
                 passed=False,
-                reason=f"Only {meaningful_changes} meaningful changes detected (expected at least 5)",
+                reason=f'Only {meaningful_changes} meaningful changes detected (expected at least 5)',
                 confidence=0.7,
-                missing_items=["Add more substantial changes"],
-                suggestions=["Ensure all requirements are implemented"],
+                missing_items=['Add more substantial changes'],
+                suggestions=['Ensure all requirements are implemented'],
             )
 
         logger.info(
-            "Git diff validation passed: %s meaningful changes", meaningful_changes
+            'Git diff validation passed: %s meaningful changes', meaningful_changes
         )
         return ValidationResult(
             passed=True,
-            reason=f"Meaningful changes detected ({meaningful_changes} lines)",
+            reason=f'Meaningful changes detected ({meaningful_changes} lines)',
             confidence=0.8,
         )
 
@@ -219,7 +222,7 @@ class DiffValidator(TaskValidator):
 
         """
         return sum(
-            1 for line in diff.split("\n") if self._is_meaningful_change_line(line)
+            1 for line in diff.split('\n') if self._is_meaningful_change_line(line)
         )
 
     def _is_meaningful_change_line(self, line: str) -> bool:
@@ -237,7 +240,7 @@ class DiffValidator(TaskValidator):
             return False
 
         # Check if added/removed line
-        if not (line.startswith(("+", "-"))):
+        if not (line.startswith(('+', '-'))):
             return False
 
         # Check if content is meaningful
@@ -254,7 +257,7 @@ class DiffValidator(TaskValidator):
             True if metadata
 
         """
-        return line.startswith(("diff --git", "index ", "+++", "---"))
+        return line.startswith(('diff --git', 'index ', '+++', '---'))
 
     def _is_comment_line(self, content: str) -> bool:
         """Check if content is a comment.
@@ -266,7 +269,7 @@ class DiffValidator(TaskValidator):
             True if comment
 
         """
-        return content.startswith(("#", "//"))
+        return content.startswith(('#', '//'))
 
 
 class FileExistsValidator(TaskValidator):
@@ -306,10 +309,10 @@ class FileExistsValidator(TaskValidator):
             files_to_check = self._extract_expected_files(task.description)
 
         if not files_to_check:
-            logger.debug("FileExistsValidator: No expected files specified")
+            logger.debug('FileExistsValidator: No expected files specified')
             return ValidationResult(
                 passed=True,
-                reason="No expected files specified",
+                reason='No expected files specified',
                 confidence=0.9 if task.expected_output_files is not None else 0.5,
             )
 
@@ -321,16 +324,16 @@ class FileExistsValidator(TaskValidator):
         if missing_files:
             return ValidationResult(
                 passed=False,
-                reason=f"Expected files not found: {', '.join(missing_files)}",
+                reason=f'Expected files not found: {", ".join(missing_files)}',
                 confidence=0.9,
-                missing_items=[f"Create {file_path}" for file_path in missing_files],
-                suggestions=["Create the required output files"],
+                missing_items=[f'Create {file_path}' for file_path in missing_files],
+                suggestions=['Create the required output files'],
             )
 
-        logger.info("File existence validation passed: all expected files exist")
+        logger.info('File existence validation passed: all expected files exist')
         return ValidationResult(
             passed=True,
-            reason="All expected files exist",
+            reason='All expected files exist',
             confidence=0.9,
         )
 
@@ -374,17 +377,21 @@ class FileExistsValidator(TaskValidator):
             True if file appears to exist
 
         """
+
         def _normalize_path(path: str) -> str:
-            normalized = path.replace("\\", "/").strip("/")
-            if normalized.startswith("workspace/"):
-                normalized = normalized[len("workspace/"):]
+            normalized = path.replace('\\', '/').strip('/')
+            if normalized.startswith('workspace/'):
+                normalized = normalized[len('workspace/') :]
             return normalized
 
         recent_history = state.history[-100:]
         expected = _normalize_path(file_path)
         for event in recent_history:
-            event_path = getattr(event, "path", None)
-            if not isinstance(event_path, str) or _normalize_path(event_path) != expected:
+            event_path = getattr(event, 'path', None)
+            if (
+                not isinstance(event_path, str)
+                or _normalize_path(event_path) != expected
+            ):
                 continue
             if isinstance(
                 event,
@@ -424,10 +431,10 @@ class LLMTaskEvaluator(TaskValidator):
 
         """
         if not self.llm:
-            logger.debug("LLMTaskEvaluator: No LLM configured, skipping")
+            logger.debug('LLMTaskEvaluator: No LLM configured, skipping')
             return ValidationResult(
                 passed=True,
-                reason="LLM evaluation not configured",
+                reason='LLM evaluation not configured',
                 confidence=0.5,
             )
 
@@ -437,7 +444,7 @@ class LLMTaskEvaluator(TaskValidator):
         try:
             # Get LLM evaluation
             response = await self.llm.completion(
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{'role': 'user', 'content': prompt}],
                 temperature=0.3,
             )
 
@@ -445,10 +452,10 @@ class LLMTaskEvaluator(TaskValidator):
             return self._parse_llm_response(response)
 
         except Exception as e:
-            logger.error("LLM evaluation failed: %s", e)
+            logger.error('LLM evaluation failed: %s', e)
             return ValidationResult(
                 passed=False,
-                reason=f"LLM evaluation failed: {e}",
+                reason=f'LLM evaluation failed: {e}',
                 confidence=0.1,
             )
 
@@ -470,7 +477,7 @@ class LLMTaskEvaluator(TaskValidator):
 TASK: {task.description}
 
 REQUIREMENTS:
-{chr(10).join(f"- {req}" for req in task.requirements) if task.requirements else "None specified"}
+{chr(10).join(f'- {req}' for req in task.requirements) if task.requirements else 'None specified'}
 
 RECENT ACTIONS:
 {recent_actions}
@@ -498,9 +505,9 @@ Has this task been completed? Respond in JSON format:
         actions = [event for event in recent_history if isinstance(event, CmdRunAction)]
 
         if not actions:
-            return "No recent actions"
+            return 'No recent actions'
 
-        return "\n".join(f"- {action.command[:100]}" for action in actions[:10])
+        return '\n'.join(f'- {action.command[:100]}' for action in actions[:10])
 
     def _parse_llm_response(self, response) -> ValidationResult:
         """Parse LLM response into ValidationResult.
@@ -516,33 +523,33 @@ Has this task been completed? Respond in JSON format:
 
         try:
             # Extract JSON from response
-            choices = getattr(response, "choices", None)
+            choices = getattr(response, 'choices', None)
             if not choices or len(choices) == 0:
                 return ValidationResult(
                     passed=False,
-                    reason="LLM evaluation returned no choices",
+                    reason='LLM evaluation returned no choices',
                     confidence=0.1,
                 )
             content = choices[0].message.content
             if content is None:
                 return ValidationResult(
                     passed=False,
-                    reason="LLM evaluation choice has no content",
+                    reason='LLM evaluation choice has no content',
                     confidence=0.1,
                 )
             data = json.loads(content)
 
             return ValidationResult(
-                passed=data.get("completed", False),
-                reason=data.get("reason", "LLM evaluation"),
-                confidence=data.get("confidence", 0.5),
-                missing_items=data.get("missing_items", []),
+                passed=data.get('completed', False),
+                reason=data.get('reason', 'LLM evaluation'),
+                confidence=data.get('confidence', 0.5),
+                missing_items=data.get('missing_items', []),
             )
         except Exception as exc:
-            logger.warning("Could not parse LLM evaluation response: %s", exc)
+            logger.warning('Could not parse LLM evaluation response: %s', exc)
             return ValidationResult(
                 passed=False,
-                reason=f"Could not parse LLM response: {exc}",
+                reason=f'Could not parse LLM response: {exc}',
                 confidence=0.1,
             )
 
@@ -589,15 +596,15 @@ class CompositeValidator(TaskValidator):
             if not self.fail_open_on_empty:
                 return ValidationResult(
                     passed=False,
-                    reason="No validators ran successfully",
+                    reason='No validators ran successfully',
                     confidence=0.0,
-                    missing_items=["Run validation checks before finishing"],
+                    missing_items=['Run validation checks before finishing'],
                     suggestions=[
-                        "Ensure validator prerequisites are met (tests, diff, files)",
+                        'Ensure validator prerequisites are met (tests, diff, files)',
                     ],
                 )
             return ValidationResult(
-                passed=True, reason="No validators ran successfully", confidence=0.0
+                passed=True, reason='No validators ran successfully', confidence=0.0
             )
 
         if self.require_all_pass:
@@ -623,7 +630,7 @@ class CompositeValidator(TaskValidator):
                 result = await validator.validate_completion(task, state)
                 results.append(result)
             except Exception as e:
-                logger.error("Validator %s failed: %s", validator.__class__.__name__, e)
+                logger.error('Validator %s failed: %s', validator.__class__.__name__, e)
         return results
 
     def _validate_all_must_pass(
@@ -646,7 +653,7 @@ class CompositeValidator(TaskValidator):
 
         return ValidationResult(
             passed=True,
-            reason=f"All validators passed: {len(results)} validators",
+            reason=f'All validators passed: {len(results)} validators',
             confidence=combined_confidence,
         )
 
@@ -667,7 +674,7 @@ class CompositeValidator(TaskValidator):
 
         return ValidationResult(
             passed=False,
-            reason=f"{len(failed_validators)} validator(s) failed",
+            reason=f'{len(failed_validators)} validator(s) failed',
             confidence=confidence,
             missing_items=[item for r in failed_validators for item in r.missing_items],
             suggestions=[sug for r in failed_validators for sug in r.suggestions],
@@ -690,7 +697,7 @@ class CompositeValidator(TaskValidator):
         if self._vote_passes(passed_count, len(results), avg_confidence):
             return ValidationResult(
                 passed=True,
-                reason=f"All validators passed: {len(results)} validators",
+                reason=f'All validators passed: {len(results)} validators',
                 confidence=avg_confidence,
             )
 
@@ -751,9 +758,9 @@ class CompositeValidator(TaskValidator):
 
         return ValidationResult(
             passed=False,
-            reason=f"Task validation insufficient: {passed_count}/{
+            reason=f'Task validation insufficient: {passed_count}/{
                 len(results)
-            } passed, avg confidence: {avg_confidence:.2f}",
+            } passed, avg confidence: {avg_confidence:.2f}',
             confidence=avg_confidence,
             missing_items=[item for r in failed_validators for item in r.missing_items],
             suggestions=[sug for r in failed_validators for sug in r.suggestions],

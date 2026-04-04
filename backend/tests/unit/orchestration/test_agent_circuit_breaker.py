@@ -13,12 +13,12 @@ Tests cover:
 
 from unittest.mock import MagicMock
 
+from backend.ledger.action import ActionSecurityRisk
 from backend.orchestration.agent_circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerResult,
 )
-from backend.ledger.action import ActionSecurityRisk
 
 
 class TestCircuitBreakerConfig:
@@ -93,25 +93,25 @@ class TestCircuitBreakerResult:
         """CircuitBreakerResult should store trip information."""
         result = CircuitBreakerResult(
             tripped=True,
-            reason="Too many errors",
-            action="pause",
-            recommendation="Review logs",
+            reason='Too many errors',
+            action='pause',
+            recommendation='Review logs',
         )
 
         assert result.tripped is True
-        assert result.reason == "Too many errors"
-        assert result.action == "pause"
-        assert result.recommendation == "Review logs"
+        assert result.reason == 'Too many errors'
+        assert result.action == 'pause'
+        assert result.recommendation == 'Review logs'
 
     def test_result_default_recommendation(self):
         """CircuitBreakerResult should have empty default recommendation."""
         result = CircuitBreakerResult(
             tripped=False,
-            reason="All good",
-            action="continue",
+            reason='All good',
+            action='continue',
         )
 
-        assert result.recommendation == ""
+        assert result.recommendation == ''
 
 
 class TestCircuitBreakerInit:
@@ -152,8 +152,8 @@ class TestCheckMethod:
         result = breaker.check(state)
 
         assert result.tripped is False
-        assert result.action == "continue"
-        assert "disabled" in result.reason.lower()
+        assert result.action == 'continue'
+        assert 'disabled' in result.reason.lower()
 
     def test_check_no_issues_returns_not_tripped(self):
         """Check should pass when no issues detected."""
@@ -165,8 +165,8 @@ class TestCheckMethod:
         result = breaker.check(state)
 
         assert result.tripped is False
-        assert result.reason == "All checks passed"
-        assert result.action == "continue"
+        assert result.reason == 'All checks passed'
+        assert result.action == 'continue'
 
     def test_check_consecutive_errors_trips(self):
         """Should trip when consecutive errors exceed threshold."""
@@ -175,16 +175,16 @@ class TestCheckMethod:
 
         # Record 3 consecutive errors
         for _ in range(3):
-            breaker.record_error(RuntimeError("Test error"))
+            breaker.record_error(RuntimeError('Test error'))
 
         state = MagicMock()
         state.history = []
         result = breaker.check(state)
 
         assert result.tripped is True
-        assert "consecutive errors" in result.reason.lower()
-        assert result.action == "pause"
-        assert "review" in result.recommendation.lower()
+        assert 'consecutive errors' in result.reason.lower()
+        assert result.action == 'pause'
+        assert 'review' in result.recommendation.lower()
 
     def test_check_high_risk_actions_trips(self):
         """Should trip when high-risk actions exceed threshold."""
@@ -200,8 +200,8 @@ class TestCheckMethod:
         result = breaker.check(state)
 
         assert result.tripped is True
-        assert "high-risk actions" in result.reason.lower()
-        assert result.action == "pause"
+        assert 'high-risk actions' in result.reason.lower()
+        assert result.action == 'pause'
 
     def test_check_stuck_detections_trips(self):
         """Should trip when stuck detections exceed threshold."""
@@ -217,8 +217,8 @@ class TestCheckMethod:
         result = breaker.check(state)
 
         assert result.tripped is True
-        assert "stuck loop detection" in result.reason.lower()
-        assert result.action == "stop"
+        assert 'stuck loop detection' in result.reason.lower()
+        assert result.action == 'stop'
 
     def test_check_error_rate_trips(self):
         """Should trip when error rate exceeds threshold."""
@@ -231,7 +231,7 @@ class TestCheckMethod:
         # Record 10 actions with 6 errors (60% error rate)
         for i in range(10):
             if i < 6:
-                breaker.record_error(RuntimeError("Error"))
+                breaker.record_error(RuntimeError('Error'))
             else:
                 breaker.record_success()
 
@@ -240,8 +240,8 @@ class TestCheckMethod:
         result = breaker.check(state)
 
         assert result.tripped is True
-        assert "error rate too high" in result.reason.lower()
-        assert result.action == "pause"
+        assert 'error rate too high' in result.reason.lower()
+        assert result.action == 'pause'
 
     def test_check_error_rate_needs_minimum_samples(self):
         """Error rate check should require minimum sample size."""
@@ -256,7 +256,7 @@ class TestCheckMethod:
         # to avoid consecutive error threshold
         for i in range(5):
             if i % 2 == 0:
-                breaker.record_error(RuntimeError("Error"))
+                breaker.record_error(RuntimeError('Error'))
             else:
                 breaker.record_success()
 
@@ -276,10 +276,10 @@ class TestRecordError:
         config = CircuitBreakerConfig()
         breaker = CircuitBreaker(config)
 
-        breaker.record_error(RuntimeError("Error 1"))
+        breaker.record_error(RuntimeError('Error 1'))
         assert breaker.consecutive_errors == 1
 
-        breaker.record_error(ValueError("Error 2"))
+        breaker.record_error(ValueError('Error 2'))
         assert breaker.consecutive_errors == 2
 
     def test_record_error_adds_to_recent_errors(self):
@@ -287,18 +287,18 @@ class TestRecordError:
         config = CircuitBreakerConfig()
         breaker = CircuitBreaker(config)
 
-        error = RuntimeError("Test error")
+        error = RuntimeError('Test error')
         breaker.record_error(error)
 
         assert len(breaker.recent_errors) == 1
-        assert "Test error" in breaker.recent_errors[0]
+        assert 'Test error' in breaker.recent_errors[0]
 
     def test_record_error_adds_false_to_actions_success(self):
         """record_error should mark action as unsuccessful."""
         config = CircuitBreakerConfig()
         breaker = CircuitBreaker(config)
 
-        breaker.record_error(RuntimeError("Error"))
+        breaker.record_error(RuntimeError('Error'))
 
         assert len(breaker.recent_actions_success) == 1
         assert breaker.recent_actions_success[0] is False
@@ -312,7 +312,7 @@ class TestRecordSuccess:
         config = CircuitBreakerConfig()
         breaker = CircuitBreaker(config)
 
-        breaker.record_error(RuntimeError("Error"))
+        breaker.record_error(RuntimeError('Error'))
         assert breaker.consecutive_errors == 1
 
         breaker.record_success()
@@ -387,7 +387,7 @@ class TestCalculateErrorRate:
         breaker = CircuitBreaker(config)
 
         for _ in range(5):
-            breaker.record_error(RuntimeError("Error"))
+            breaker.record_error(RuntimeError('Error'))
 
         rate = breaker._calculate_error_rate()
         assert rate == 1.0
@@ -410,7 +410,7 @@ class TestCalculateErrorRate:
 
         # 3 errors, 7 successes = 30% error rate
         for _ in range(3):
-            breaker.record_error(RuntimeError("Error"))
+            breaker.record_error(RuntimeError('Error'))
         for _ in range(7):
             breaker.record_success()
 
@@ -424,7 +424,7 @@ class TestCalculateErrorRate:
 
         # Old errors (should be outside window)
         for _ in range(10):
-            breaker.record_error(RuntimeError("Old error"))
+            breaker.record_error(RuntimeError('Old error'))
 
         # Recent successes (within window)
         for _ in range(5):
@@ -439,12 +439,12 @@ class TestReset:
     """Test reset method."""
 
     def test_reset_clears_all_counters(self):
-        """reset should clear all counters and deques."""
+        """Reset should clear all counters and deques."""
         config = CircuitBreakerConfig()
         breaker = CircuitBreaker(config)
 
         # Add some state
-        breaker.record_error(RuntimeError("Error"))
+        breaker.record_error(RuntimeError('Error'))
         breaker.record_high_risk_action(ActionSecurityRisk.HIGH)
         breaker.record_stuck_detection()
 
@@ -462,15 +462,19 @@ class TestCircuitBreakerAdapt:
     """Test adapt method."""
 
     def test_adapt_scales_config(self):
-        """adapt should update breaker config with scaled thresholds (216-232)."""
+        """Adapt should update breaker config with scaled thresholds (216-232)."""
         config = CircuitBreakerConfig(adaptive=True)
         breaker = CircuitBreaker(config)
 
         # Adapt complexity 10 (2x multiplier)
         breaker.adapt(complexity=10, max_iterations=100)
 
-        assert breaker.config.max_consecutive_errors == config.max_consecutive_errors * 2
-        assert breaker.config.adaptive is False  # newly scaled config has adaptive=False
+        assert (
+            breaker.config.max_consecutive_errors == config.max_consecutive_errors * 2
+        )
+        assert (
+            breaker.config.adaptive is False
+        )  # newly scaled config has adaptive=False
 
     def test_adapt_no_scaling_if_new_config_is_same(self):
         """Should skip update if config has adaptive=False."""
@@ -493,8 +497,8 @@ class TestUpdateMetrics:
 
         state = MagicMock()
         # Create error observations in history
-        error1 = ErrorObservation(content="Error 1")
-        error2 = ErrorObservation(content="Error 2")
+        error1 = ErrorObservation(content='Error 1')
+        error2 = ErrorObservation(content='Error 2')
         state.history = [error1, error2]
 
         # Initially consecutive_errors is 0, recent_errors empty (length 0)

@@ -48,39 +48,39 @@ class DetectedServer:
 SERVER_START_PATTERNS = [
     # Generic patterns
     (
-        r"(?:Server|App|Application|Development\s+server).*(?:listening|running|started).*(?:port|:)\s*(\d+)",
-        "http",
+        r'(?:Server|App|Application|Development\s+server).*(?:listening|running|started).*(?:port|:)\s*(\d+)',
+        'http',
     ),
     (
-        r"(?:Local|Network):\s*https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(\d+)",
-        "http",
+        r'(?:Local|Network):\s*https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(\d+)',
+        'http',
     ),
     # Vite
-    (r"Local:\s+https?://localhost:(\d+)", "http"),
-    (r"VITE.*ready.*:(\d+)", "http"),
+    (r'Local:\s+https?://localhost:(\d+)', 'http'),
+    (r'VITE.*ready.*:(\d+)', 'http'),
     # Webpack
-    (r"webpack.*compiled.*https?://(?:localhost|127\.0\.0\.1):(\d+)", "http"),
-    (r"Project is running at\s+https?://(?:localhost|127\.0\.0\.1):(\d+)", "http"),
+    (r'webpack.*compiled.*https?://(?:localhost|127\.0\.0\.1):(\d+)', 'http'),
+    (r'Project is running at\s+https?://(?:localhost|127\.0\.0\.1):(\d+)', 'http'),
     # Next.js
-    (r"(?:ready|started)\s+server\s+on.*:(\d+)", "http"),
-    (r"Local:\s+https?://localhost:(\d+)", "http"),
+    (r'(?:ready|started)\s+server\s+on.*:(\d+)', 'http'),
+    (r'Local:\s+https?://localhost:(\d+)', 'http'),
     # Create React App
-    (r"(?:webpack\s+)?compiled successfully.*localhost:(\d+)", "http"),
-    (r"On Your Network:\s+https?://(?:[^:]+):(\d+)", "http"),
+    (r'(?:webpack\s+)?compiled successfully.*localhost:(\d+)', 'http'),
+    (r'On Your Network:\s+https?://(?:[^:]+):(\d+)', 'http'),
     # Express/Node
-    (r"(?:Express|Server|App).*listening.*port\s+(\d+)", "http"),
-    (r"Server running at\s+https?://(?:localhost|127\.0\.0\.1):(\d+)", "http"),
+    (r'(?:Express|Server|App).*listening.*port\s+(\d+)', 'http'),
+    (r'Server running at\s+https?://(?:localhost|127\.0\.0\.1):(\d+)', 'http'),
     # Django
     (
-        r"Starting development server at\s+https?://(?:localhost|127\.0\.0\.1):(\d+)",
-        "http",
+        r'Starting development server at\s+https?://(?:localhost|127\.0\.0\.1):(\d+)',
+        'http',
     ),
     # Flask
-    (r"Running on\s+https?://(?:localhost|127\.0\.0\.1):(\d+)", "http"),
+    (r'Running on\s+https?://(?:localhost|127\.0\.0\.1):(\d+)', 'http'),
     # Python http.server
-    (r"Serving HTTP on.*port\s+(\d+)", "http"),
+    (r'Serving HTTP on.*port\s+(\d+)', 'http'),
     # Generic localhost URLs
-    (r"https?://(localhost|127\.0\.0\.1|0\.0\.0\.0):(\d+)", "http"),
+    (r'https?://(localhost|127\.0\.0\.1|0\.0\.0\.0):(\d+)', 'http'),
 ]
 
 
@@ -94,7 +94,7 @@ def extract_port_from_output(output: str) -> tuple[int, str, str] | None:
         Tuple of (port, protocol, matched_line) if found, None otherwise
 
     """
-    lines = output.split("\n")
+    lines = output.split('\n')
 
     # Check last 50 lines (servers usually announce in recent output)
     for line in lines[-50:]:
@@ -120,7 +120,7 @@ def extract_port_from_output(output: str) -> tuple[int, str, str] | None:
     return None
 
 
-def is_port_listening(port: int, host: str = "localhost", timeout: float = 0.5) -> bool:
+def is_port_listening(port: int, host: str = 'localhost', timeout: float = 0.5) -> bool:
     """Check if a port is actively listening for connections.
 
     Args:
@@ -143,7 +143,7 @@ def is_port_listening(port: int, host: str = "localhost", timeout: float = 0.5) 
         sock.close()
 
 
-def health_check_http(port: int, host: str = "localhost", timeout: float = 2.0) -> str:
+def health_check_http(port: int, host: str = 'localhost', timeout: float = 2.0) -> str:
     """Perform HTTP health check on a port.
 
     Args:
@@ -155,29 +155,29 @@ def health_check_http(port: int, host: str = "localhost", timeout: float = 2.0) 
         'healthy' if responds with 2xx/3xx, 'unhealthy' if 4xx/5xx or no response
 
     """
-    scheme_host = "localhost" if host in ("localhost", "127.0.0.1") else host
-    scheme = "http" if scheme_host in ("localhost", "127.0.0.1") else "https"
-    url = f"{scheme}://{scheme_host}:{port}"
+    scheme_host = 'localhost' if host in ('localhost', '127.0.0.1') else host
+    scheme = 'http' if scheme_host in ('localhost', '127.0.0.1') else 'https'
+    url = f'{scheme}://{scheme_host}:{port}'
     try:
         response = httpx.get(url, timeout=timeout, follow_redirects=False)
         # Accept 2xx, 3xx, and even 404 (single-page apps often show 404 for API routes)
         if response.status_code < 500:
             logger.info(
-                "Health check passed: %s returned %d", url, response.status_code
+                'Health check passed: %s returned %d', url, response.status_code
             )
-            return "healthy"
-        logger.warning("Health check failed: %s returned %d", url, response.status_code)
-        return "unhealthy"
+            return 'healthy'
+        logger.warning('Health check failed: %s returned %d', url, response.status_code)
+        return 'unhealthy'
     except httpx.HTTPError as e:
-        logger.debug("Health check failed: %s - %s", url, type(e).__name__)
-        return "unhealthy"
+        logger.debug('Health check failed: %s - %s', url, type(e).__name__)
+        return 'unhealthy'
 
 
 async def health_check_http_async(
     port: int,
-    host: str = "localhost",
-    timeout: float = 2.0,
-) -> Literal["healthy", "unhealthy"]:
+    host: str = 'localhost',
+    request_timeout: float = 2.0,
+) -> Literal['healthy', 'unhealthy']:
     """Async HTTP health check using aiohttp when available.
 
     Falls back to running the sync requests-based check in a thread if aiohttp is unavailable.
@@ -185,30 +185,32 @@ async def health_check_http_async(
     Args:
         port: Port number to check
         host: Host to check
-        timeout: HTTP request timeout
+        request_timeout: HTTP request timeout
 
     Returns:
         'healthy' or 'unhealthy'
 
     """
-    url = f"http://{host}:{port}"
+    url = f'http://{host}:{port}'
     if aiohttp is None:
         # Run sync check in a thread to avoid blocking event loop
-        sync_result = await asyncio.to_thread(health_check_http, port, host, timeout)
-        return "healthy" if sync_result == "healthy" else "unhealthy"
-    timeout_cfg = aiohttp.ClientTimeout(total=timeout)
+        sync_result = await asyncio.to_thread(
+            health_check_http, port, host, request_timeout
+        )
+        return 'healthy' if sync_result == 'healthy' else 'unhealthy'
+    timeout_cfg = aiohttp.ClientTimeout(total=request_timeout)
     try:
         async with aiohttp.ClientSession(timeout=timeout_cfg) as session:
             async with session.get(url, allow_redirects=False) as resp:
                 status = resp.status
                 if status < 500:
-                    logger.info("Health check passed: %s returned %d", url, status)
-                    return "healthy"
-                logger.warning("Health check failed: %s returned %d", url, status)
-                return "unhealthy"
+                    logger.info('Health check passed: %s returned %d', url, status)
+                    return 'healthy'
+                logger.warning('Health check failed: %s returned %d', url, status)
+                return 'unhealthy'
     except Exception as e:  # Broad except to mirror sync function behavior
-        logger.debug("Health check failed: %s - %s", url, type(e).__name__)
-        return "unhealthy"
+        logger.debug('Health check failed: %s - %s', url, type(e).__name__)
+        return 'unhealthy'
 
 
 def detect_server_from_output(
@@ -239,20 +241,20 @@ def detect_server_from_output(
 
     # Layer 2: Port monitoring
     if not is_port_listening(port):
-        logger.debug("Port %d detected in output but not listening yet", port)
+        logger.debug('Port %d detected in output but not listening yet', port)
         return None
 
-    logger.info("Port %d is listening, server detected!", port)
+    logger.info('Port %d is listening, server detected!', port)
 
     # Layer 3: Health check (optional for performance)
-    health_status = "unknown"
+    health_status = 'unknown'
     if perform_health_check:
         health_status = health_check_http(port)
-        if health_status == "unhealthy":
-            logger.warning("Port %d is listening but health check failed", port)
+        if health_status == 'unhealthy':
+            logger.warning('Port %d is listening but health check failed', port)
             # Still return it - some servers take time to fully initialize
 
-    url = f"{protocol}://localhost:{port}"
+    url = f'{protocol}://localhost:{port}'
 
     return DetectedServer(
         port=port,

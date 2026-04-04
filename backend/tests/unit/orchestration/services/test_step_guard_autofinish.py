@@ -3,8 +3,8 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.orchestration.services.step_guard_service import StepGuardService
 from backend.ledger.action.files import FileEditAction, FileWriteAction
+from backend.orchestration.services.step_guard_service import StepGuardService
 
 
 class TestNormalizePath(unittest.TestCase):
@@ -12,36 +12,38 @@ class TestNormalizePath(unittest.TestCase):
 
     def test_workspace_prefix(self):
         self.assertEqual(
-            StepGuardService._normalize_path("/workspace/src/app/page.tsx"),
-            "src/app/page.tsx",
+            StepGuardService._normalize_path('/workspace/src/app/page.tsx'),
+            'src/app/page.tsx',
         )
 
     def test_backslash_normalization(self):
         self.assertEqual(
-            StepGuardService._normalize_path("workspace\\src\\app\\page.tsx"),
-            "src/app/page.tsx",
+            StepGuardService._normalize_path('workspace\\src\\app\\page.tsx'),
+            'src/app/page.tsx',
         )
 
     def test_plain_path(self):
         self.assertEqual(
-            StepGuardService._normalize_path("src/app/page.tsx"),
-            "src/app/page.tsx",
+            StepGuardService._normalize_path('src/app/page.tsx'),
+            'src/app/page.tsx',
         )
 
 
 class TestRecoveryMessage(unittest.TestCase):
     def test_build_message_with_created_files_is_generic(self):
         msg, planning = StepGuardService(MagicMock())._build_stuck_recovery_message(
-            {"src/app/page.tsx", "src/app/layout.tsx"}
+            {'src/app/page.tsx', 'src/app/layout.tsx'}
         )
-        self.assertIn("Files already touched in this session", msg)
-        self.assertIn("Do NOT assume the task is complete", msg)
-        self.assertIn("verify current state", planning)
+        self.assertIn('Files already touched in this session', msg)
+        self.assertIn('Do NOT assume the task is complete', msg)
+        self.assertIn('verify current state', planning)
 
     def test_build_message_without_created_files_is_generic(self):
-        msg, planning = StepGuardService(MagicMock())._build_stuck_recovery_message(set())
-        self.assertIn("Stop repeating", msg)
-        self.assertIn("verify state", planning)
+        msg, planning = StepGuardService(MagicMock())._build_stuck_recovery_message(
+            set()
+        )
+        self.assertIn('Stop repeating', msg)
+        self.assertIn('verify state', planning)
 
 
 class TestInjectReplanDirective(unittest.TestCase):
@@ -53,8 +55,8 @@ class TestInjectReplanDirective(unittest.TestCase):
         self.service = StepGuardService(self.context)
         self.controller.state = MagicMock()
         self.controller.state.history = [
-            FileWriteAction(path="/workspace/src/app/page.tsx"),
-            FileEditAction(path="src/app/layout.tsx"),
+            FileWriteAction(path='/workspace/src/app/page.tsx'),
+            FileEditAction(path='src/app/layout.tsx'),
         ]
         self.controller.state.set_planning_directive = MagicMock()
 
@@ -62,8 +64,8 @@ class TestInjectReplanDirective(unittest.TestCase):
         self.service._inject_replan_directive(self.controller)
         self.controller.event_stream.add_event.assert_called_once()
         obs = self.controller.event_stream.add_event.call_args[0][0]
-        self.assertIn("STUCK LOOP DETECTED", obs.content)
-        self.assertIn("Files already touched", obs.content)
+        self.assertIn('STUCK LOOP DETECTED', obs.content)
+        self.assertIn('Files already touched', obs.content)
 
     def test_inject_replan_directive_sets_planning_directive(self):
         self.service._inject_replan_directive(self.controller)
@@ -77,8 +79,12 @@ class TestEnsureCanStep(unittest.IsolatedAsyncioTestCase):
         context.get_controller.return_value = controller
         service = StepGuardService(context)
         with (
-            patch.object(service, "_check_circuit_breaker", new=AsyncMock(return_value=False)) as mock_check,
-            patch.object(service, "_handle_stuck_detection", new=AsyncMock(return_value=True)) as mock_handle,
+            patch.object(
+                service, '_check_circuit_breaker', new=AsyncMock(return_value=False)
+            ) as mock_check,
+            patch.object(
+                service, '_handle_stuck_detection', new=AsyncMock(return_value=True)
+            ) as mock_handle,
         ):
             allowed = await service.ensure_can_step()
 
@@ -92,8 +98,12 @@ class TestEnsureCanStep(unittest.IsolatedAsyncioTestCase):
         context.get_controller.return_value = controller
         service = StepGuardService(context)
         with (
-            patch.object(service, "_check_circuit_breaker", new=AsyncMock(return_value=True)) as mock_check,
-            patch.object(service, "_handle_stuck_detection", new=AsyncMock(return_value=True)) as mock_handle,
+            patch.object(
+                service, '_check_circuit_breaker', new=AsyncMock(return_value=True)
+            ) as mock_check,
+            patch.object(
+                service, '_handle_stuck_detection', new=AsyncMock(return_value=True)
+            ) as mock_handle,
         ):
             allowed = await service.ensure_can_step()
 

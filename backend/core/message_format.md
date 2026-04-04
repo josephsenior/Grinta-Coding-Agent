@@ -1,4 +1,4 @@
-# App Message Format and LLM Provider Integration
+# Grinta Message Format and LLM Provider Integration
 
 ## Overview
 

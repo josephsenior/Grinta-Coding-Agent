@@ -18,8 +18,8 @@ from backend.core.constants import MAX_PATH_LENGTH
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
 
 # Security constants
-DANGEROUS_CHARS = ["<", ">", "|", "&", ";", "`", "$", "(", ")", "\n", "\r", "\x00"]
-PATH_TRAVERSAL_PATTERNS = ["../", "..\\", "..%2F", "..%5C"]
+DANGEROUS_CHARS = ['<', '>', '|', '&', ';', '`', '$', '(', ')', '\n', '\r', '\x00']
+PATH_TRAVERSAL_PATTERNS = ['../', '..\\', '..%2F', '..%5C']
 # Regex to match ".." as a standalone path segment (not inside brackets like [...nextauth])
 _DOTDOT_SEGMENT_RE = re.compile(r'(^|/)\.\.(/|$)')
 
@@ -36,7 +36,7 @@ class PathValidationError(Exception):
         """
         super().__init__(message)
         self.message = message
-        self.path = path if not is_missing(path) else "<unknown>"
+        self.path = path if not is_missing(path) else '<unknown>'
 
 
 class SafePath:
@@ -111,7 +111,7 @@ class SafePath:
             ValueError: If workspace_root is not set
         """
         if self._workspace_root is None:
-            raise ValueError("Workspace root not set")
+            raise ValueError('Workspace root not set')
         try:
             return str(self._path.relative_to(self._workspace_root))
         except ValueError:
@@ -136,7 +136,7 @@ class SafePath:
 
     def __repr__(self) -> str:
         """Return representation."""
-        return f"SafePath({self._path!r}, workspace_root={self._workspace_root!r})"
+        return f'SafePath({self._path!r}, workspace_root={self._workspace_root!r})'
 
     def __fspath__(self) -> str:
         """Support os.fspath() protocol."""
@@ -178,7 +178,7 @@ class PathValidator:
         # Ensure workspace root exists
         if not self.workspace_root.exists():
             raise PathValidationError(
-                f"Workspace root does not exist: {self.workspace_root}"
+                f'Workspace root does not exist: {self.workspace_root}'
             )
 
     def validate(
@@ -213,26 +213,30 @@ class PathValidator:
 def _validate_path_string(path: str) -> str:
     """Validate path string: empty check, URL decode, null bytes, length, dangerous chars, traversal."""
     if not path or not isinstance(path, str):
-        raise PathValidationError("Path must be a non-empty string", path)
+        raise PathValidationError('Path must be a non-empty string', path)
     try:
         path = unquote(path)
     except Exception as e:
-        raise PathValidationError(f"Invalid URL encoding: {e}", path) from e
-    if "\x00" in path:
-        raise PathValidationError("Path contains null bytes", path)
+        raise PathValidationError(f'Invalid URL encoding: {e}', path) from e
+    if '\x00' in path:
+        raise PathValidationError('Path contains null bytes', path)
     if len(path) > MAX_PATH_LENGTH:
-        raise PathValidationError(f"Path too long (max {MAX_PATH_LENGTH}): {len(path)}", path)
+        raise PathValidationError(
+            f'Path too long (max {MAX_PATH_LENGTH}): {len(path)}', path
+        )
     for char in DANGEROUS_CHARS:
         if char in path:
-            raise PathValidationError(f"Path contains dangerous character: {repr(char)}", path)
-    normalized_input = path.replace("\\", "/")
+            raise PathValidationError(
+                f'Path contains dangerous character: {repr(char)}', path
+            )
+    normalized_input = path.replace('\\', '/')
     for pattern in PATH_TRAVERSAL_PATTERNS:
         if pattern in normalized_input:
-            raise PathValidationError(f"Path traversal detected: {pattern}", path)
+            raise PathValidationError(f'Path traversal detected: {pattern}', path)
     # Check for ".." as a standalone path segment (avoids false positives on
     # bracket patterns like Next.js catch-all routes:  [...nextauth])
     if _DOTDOT_SEGMENT_RE.search(normalized_input):
-        raise PathValidationError("Path traversal detected: ..", path)
+        raise PathValidationError('Path traversal detected: ..', path)
     return path
 
 
@@ -243,38 +247,49 @@ def _resolve_path(
     try:
         if must_be_relative:
             if workspace_root is None:
-                raise PathValidationError("workspace_root required for relative paths", path)
+                raise PathValidationError(
+                    'workspace_root required for relative paths', path
+                )
             workspace = Path(workspace_root).resolve()
-            normalized = posixpath.normpath(path.lstrip("/"))
+            normalized = posixpath.normpath(path.lstrip('/'))
             # Strip the virtual /workspace prefix that the LLM uses in tool
             # calls.  Without this, "/workspace/file.py" becomes a literal
             # "workspace/" subdirectory inside the workspace root.
-            if normalized.startswith("workspace/"):
-                normalized = normalized[len("workspace/"):]
-            elif normalized == "workspace":
-                normalized = "."
+            if normalized.startswith('workspace/'):
+                normalized = normalized[len('workspace/') :]
+            elif normalized == 'workspace':
+                normalized = '.'
             full_path = (workspace / normalized).resolve()
             try:
                 rel_parts = full_path.relative_to(workspace).parts
             except ValueError:
                 import os
+
                 if os.name == 'nt':
                     full_str = str(full_path).lower()
                     work_str = str(workspace).lower()
                     if not work_str.endswith(os.sep):
                         work_str += os.sep
-                    if not full_str.startswith(work_str) and full_str != work_str.rstrip(os.sep):
-                        raise PathValidationError(f"Path outside workspace boundary: {path}", path) from None
-                    rel_parts = full_path.parts[len(workspace.parts):]
+                    if not full_str.startswith(
+                        work_str
+                    ) and full_str != work_str.rstrip(os.sep):
+                        raise PathValidationError(
+                            f'Path outside workspace boundary: {path}', path
+                        ) from None
+                    rel_parts = full_path.parts[len(workspace.parts) :]
                 else:
-                    raise PathValidationError(f"Path outside workspace boundary: {path}", path) from None
+                    raise PathValidationError(
+                        f'Path outside workspace boundary: {path}', path
+                    ) from None
             depth = len(rel_parts)
             if depth > 100:
-                raise PathValidationError(f"Path depth too great (max 100): {depth}", path)
+                raise PathValidationError(
+                    f'Path depth too great (max 100): {depth}', path
+                )
             return full_path
         return Path(path).resolve()
     except (OSError, ValueError) as e:
-        raise PathValidationError(f"Invalid path: {e}", path) from e
+        raise PathValidationError(f'Invalid path: {e}', path) from e
 
 
 def validate_and_sanitize_path(
@@ -291,5 +306,5 @@ def validate_and_sanitize_path(
     sanitized = _validate_path_string(path)
     validated_path = _resolve_path(sanitized, workspace_root, must_be_relative)
     if must_exist and not validated_path.exists():
-        raise PathValidationError(f"Path does not exist: {path}", path)
+        raise PathValidationError(f'Path does not exist: {path}', path)
     return validated_path

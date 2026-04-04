@@ -11,28 +11,27 @@ from backend.utils.import_utils import (
     import_from,
 )
 
-
 # ── import_from ──────────────────────────────────────────────────────
 
 
 class TestImportFrom:
     def test_import_class(self):
-        cls = import_from("backend.utils.import_utils.import_from")
+        cls = import_from('backend.utils.import_utils.import_from')
         assert cls is import_from
 
     def test_import_module_level_function(self):
-        fn = import_from("os.path.join")
+        fn = import_from('os.path.join')
         import os.path
 
         assert fn is os.path.join
 
     def test_import_nonexistent_module(self):
         with pytest.raises(ModuleNotFoundError):
-            import_from("nonexistent_package_xyz.Foo")
+            import_from('nonexistent_package_xyz.Foo')
 
     def test_import_nonexistent_attr(self):
         with pytest.raises(AttributeError):
-            import_from("os.path.nonexistent_attr_xyz")
+            import_from('os.path.nonexistent_attr_xyz')
 
 
 # ── _impl_matches_base ──────────────────────────────────────────────
@@ -57,7 +56,7 @@ class TestImplMatchesBase:
 
 class TestRaiseInvalidImpl:
     def test_raises_assertion(self):
-        with pytest.raises(AssertionError, match="not a subclass"):
+        with pytest.raises(AssertionError, match='not a subclass'):
             _raise_invalid_impl(ValueError, TypeError)
 
 
@@ -76,18 +75,18 @@ class TestGetImpl:
 
     def test_valid_impl(self):
         # KeyError is a subclass of LookupError
-        result = get_impl(LookupError, "builtins.KeyError")
+        result = get_impl(LookupError, 'builtins.KeyError')
         assert result is KeyError
 
     def test_same_class_by_name(self):
-        result = get_impl(ValueError, "builtins.ValueError")
+        result = get_impl(ValueError, 'builtins.ValueError')
         assert result is ValueError
 
     def test_invalid_impl_raises(self):
-        with pytest.raises(AssertionError, match="not a subclass"):
-            get_impl(ValueError, "builtins.TypeError")
+        with pytest.raises(AssertionError, match='not a subclass'):
+            get_impl(ValueError, 'builtins.TypeError')
 
     def test_caching(self):
-        r1 = get_impl(LookupError, "builtins.KeyError")
-        r2 = get_impl(LookupError, "builtins.KeyError")
+        r1 = get_impl(LookupError, 'builtins.KeyError')
+        r2 = get_impl(LookupError, 'builtins.KeyError')
         assert r1 is r2

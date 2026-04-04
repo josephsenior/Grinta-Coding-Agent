@@ -3,14 +3,14 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from backend.orchestration.services.state_transition_service import (
-    StateTransitionService,
-    InvalidStateTransitionError,
-    VALID_TRANSITIONS,
-)
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import ActionConfirmationStatus
+from backend.orchestration.services.state_transition_service import (
+    VALID_TRANSITIONS,
+    InvalidStateTransitionError,
+    StateTransitionService,
+)
 
 
 class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
@@ -19,10 +19,10 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         """Create mock context for testing."""
         self.mock_context = MagicMock()
-        self.mock_context.controller_name = "TestAgent"
+        self.mock_context.controller_name = 'TestAgent'
         self.mock_context.state = MagicMock()
         self.mock_context.state.agent_state = AgentState.LOADING
-        self.mock_context.state.last_error = ""
+        self.mock_context.state.last_error = ''
         self.mock_context.event_stream = MagicMock()
         self.mock_context.pending_action = None
         self.mock_context.state_tracker = MagicMock()
@@ -47,7 +47,7 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
 
         # Should set new state
         self.mock_context.state.set_agent_state.assert_called_once_with(
-            AgentState.RUNNING, source="StateTransitionService.set_agent_state"
+            AgentState.RUNNING, source='StateTransitionService.set_agent_state'
         )
 
         # Should emit state changed event
@@ -64,20 +64,20 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
             await self.service.set_agent_state(AgentState.PAUSED)
 
         # Should contain error details (state values are lowercase)
-        self.assertIn("finished", str(ctx.exception))
-        self.assertIn("paused", str(ctx.exception))
+        self.assertIn('finished', str(ctx.exception))
+        self.assertIn('paused', str(ctx.exception))
 
     async def test_set_agent_state_to_error_with_reason(self):
         """Test set_agent_state to ERROR includes error reason."""
         self.mock_context.state.agent_state = AgentState.RUNNING
-        self.mock_context.state.last_error = "Connection timeout"
+        self.mock_context.state.last_error = 'Connection timeout'
 
         await self.service.set_agent_state(AgentState.ERROR)
 
         # Should include reason in observation (content is empty, reason has error)
         call_args = self.mock_context.event_stream.add_event.call_args
         observation = call_args[0][0]
-        self.assertEqual(observation.reason, "Connection timeout")
+        self.assertEqual(observation.reason, 'Connection timeout')
 
     async def test_set_agent_state_to_stopped_resets_controller(self):
         """Test set_agent_state to STOPPED resets controller."""
@@ -134,14 +134,14 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
         self.mock_context.state.agent_state = AgentState.AWAITING_USER_CONFIRMATION
 
         mock_pending = MagicMock()
-        mock_pending.thought = "Test thought"
-        mock_pending._id = "action-123"
+        mock_pending.thought = 'Test thought'
+        mock_pending._id = 'action-123'
         self.mock_context.pending_action = mock_pending
 
         await self.service.set_agent_state(AgentState.USER_CONFIRMED)
 
         # Should clear thought and set confirmation state
-        self.assertEqual(mock_pending.thought, "")
+        self.assertEqual(mock_pending.thought, '')
         self.assertEqual(
             mock_pending.confirmation_state, ActionConfirmationStatus.CONFIRMED
         )
@@ -158,8 +158,8 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
         self.mock_context.state.agent_state = AgentState.AWAITING_USER_CONFIRMATION
 
         mock_pending = MagicMock()
-        mock_pending.thought = "Thought"
-        mock_pending._id = "action-456"
+        mock_pending.thought = 'Thought'
+        mock_pending._id = 'action-456'
         self.mock_context.pending_action = mock_pending
 
         await self.service.set_agent_state(AgentState.USER_REJECTED)
@@ -187,8 +187,8 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
         """Test set_agent_state with pending action lacking thought attribute."""
         self.mock_context.state.agent_state = AgentState.AWAITING_USER_CONFIRMATION
 
-        mock_pending = MagicMock(spec=["_id", "confirmation_state"])
-        mock_pending._id = "action-789"
+        mock_pending = MagicMock(spec=['_id', 'confirmation_state'])
+        mock_pending._id = 'action-789'
         self.mock_context.pending_action = mock_pending
 
         await self.service.set_agent_state(AgentState.USER_CONFIRMED)
@@ -230,7 +230,7 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
         call_args = self.mock_context.event_stream.add_event.call_args[0]
         self.assertEqual(call_args[1], EventSource.ENVIRONMENT)
 
-    @patch("backend.orchestration.services.state_transition_service.logger")
+    @patch('backend.orchestration.services.state_transition_service.logger')
     async def test_set_agent_state_logs_transition(self, mock_logger):
         """Test set_agent_state logs the transition."""
         self.mock_context.state.agent_state = AgentState.LOADING
@@ -240,9 +240,9 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
         # Should log info message
         mock_logger.info.assert_called_once()
         call_args = mock_logger.info.call_args[0]
-        self.assertIn("TestAgent", call_args[1])
+        self.assertIn('TestAgent', call_args[1])
 
-    @patch("backend.orchestration.services.state_transition_service.logger")
+    @patch('backend.orchestration.services.state_transition_service.logger')
     async def test_set_agent_state_logs_invalid_transition(self, mock_logger):
         """Test set_agent_state logs warning for invalid transition."""
         self.mock_context.state.agent_state = AgentState.FINISHED
@@ -268,15 +268,15 @@ class TestInvalidStateTransitionError(unittest.TestCase):
     def test_exception_attributes(self):
         """Test exception stores state information."""
         exc = InvalidStateTransitionError(
-            AgentState.FINISHED, AgentState.PAUSED, "TestAgent"
+            AgentState.FINISHED, AgentState.PAUSED, 'TestAgent'
         )
 
         self.assertEqual(exc.old_state, AgentState.FINISHED)
         self.assertEqual(exc.new_state, AgentState.PAUSED)
-        self.assertIn("finished", str(exc))
-        self.assertIn("paused", str(exc))
-        self.assertIn("TestAgent", str(exc))
+        self.assertIn('finished', str(exc))
+        self.assertIn('paused', str(exc))
+        self.assertIn('TestAgent', str(exc))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

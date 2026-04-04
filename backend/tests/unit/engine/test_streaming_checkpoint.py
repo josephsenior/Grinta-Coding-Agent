@@ -21,25 +21,25 @@ def ckpt(tmp_path):
 
 class TestStreamingCheckpointLifecycle:
     def test_begin_creates_wal(self, ckpt: StreamingCheckpoint, tmp_path):
-        token = ckpt.begin({"model": "gpt-4", "messages": [1, 2]})
+        token = ckpt.begin({'model': 'gpt-4', 'messages': [1, 2]})
         assert token
-        wal = tmp_path / "streaming_wal.json"
+        wal = tmp_path / 'streaming_wal.json'
         assert wal.exists()
-        data = json.loads(wal.read_text(encoding="utf-8"))
-        assert data["token"] == token
-        assert data["params_summary"]["model"] == "gpt-4"
-        assert data["params_summary"]["message_count"] == 2
+        data = json.loads(wal.read_text(encoding='utf-8'))
+        assert data['token'] == token
+        assert data['params_summary']['model'] == 'gpt-4'
+        assert data['params_summary']['message_count'] == 2
 
     def test_commit_removes_wal(self, ckpt: StreamingCheckpoint, tmp_path):
-        token = ckpt.begin({"model": "x"})
+        token = ckpt.begin({'model': 'x'})
         ckpt.commit(token)
-        assert not (tmp_path / "streaming_wal.json").exists()
+        assert not (tmp_path / 'streaming_wal.json').exists()
         assert ckpt.active_token is None
 
     def test_discard(self, ckpt: StreamingCheckpoint, tmp_path):
-        ckpt.begin({"model": "x"})
+        ckpt.begin({'model': 'x'})
         ckpt.discard()
-        assert not (tmp_path / "streaming_wal.json").exists()
+        assert not (tmp_path / 'streaming_wal.json').exists()
         assert ckpt.active_token is None
 
 
@@ -69,17 +69,17 @@ class TestRecover:
 
     def test_recovers_uncommitted(self, tmp_path):
         ckpt1 = StreamingCheckpoint(str(tmp_path))
-        token = ckpt1.begin({"model": "test"})
+        token = ckpt1.begin({'model': 'test'})
         # Simulate crash — don't commit. Create new instance.
         ckpt2 = StreamingCheckpoint(str(tmp_path))
         record = ckpt2.recover()
         assert record is not None
         assert record.token == token
-        assert record.params_summary["model"] == "test"
+        assert record.params_summary['model'] == 'test'
 
     def test_corrupt_wal(self, tmp_path):
-        wal = tmp_path / "streaming_wal.json"
-        wal.write_text("not valid json", encoding="utf-8")
+        wal = tmp_path / 'streaming_wal.json'
+        wal.write_text('not valid json', encoding='utf-8')
         ckpt = StreamingCheckpoint(str(tmp_path))
         assert ckpt.recover() is None
         assert not wal.exists()
@@ -91,11 +91,11 @@ class TestRecover:
 class TestSummariseParams:
     def test_extracts_model_and_counts(self, ckpt):
         summary = ckpt._summarise_params(
-            {"model": "gpt-4", "messages": [1, 2, 3], "tools": [1]}
+            {'model': 'gpt-4', 'messages': [1, 2, 3], 'tools': [1]}
         )
-        assert summary["model"] == "gpt-4"
-        assert summary["message_count"] == 3
-        assert summary["tool_count"] == 1
+        assert summary['model'] == 'gpt-4'
+        assert summary['message_count'] == 3
+        assert summary['tool_count'] == 1
 
     def test_empty_params(self, ckpt):
         summary = ckpt._summarise_params({})
@@ -108,10 +108,10 @@ class TestSummariseParams:
 class TestAttemptTracking:
     def test_default_attempt(self, ckpt, tmp_path):
         ckpt.begin({})
-        data = json.loads((tmp_path / "streaming_wal.json").read_text(encoding="utf-8"))
-        assert data["attempt"] == 1
+        data = json.loads((tmp_path / 'streaming_wal.json').read_text(encoding='utf-8'))
+        assert data['attempt'] == 1
 
     def test_custom_attempt(self, ckpt, tmp_path):
         ckpt.begin({}, attempt=3)
-        data = json.loads((tmp_path / "streaming_wal.json").read_text(encoding="utf-8"))
-        assert data["attempt"] == 3
+        data = json.loads((tmp_path / 'streaming_wal.json').read_text(encoding='utf-8'))
+        assert data['attempt'] == 3

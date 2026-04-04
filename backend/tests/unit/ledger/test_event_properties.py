@@ -43,7 +43,7 @@ class TestEventDefaults:
 
     def test_message_default(self):
         e = Event()
-        assert e.message == ""
+        assert e.message == ''
 
     def test_tool_call_metadata_default(self):
         e = Event()
@@ -83,11 +83,11 @@ class TestEventTimestamp:
         e = Event()
         dt = datetime(2025, 6, 15, 12, 0, 0)
         e.timestamp = dt
-        assert e.timestamp == "2025-06-15T12:00:00"
+        assert e.timestamp == '2025-06-15T12:00:00'
 
     def test_set_non_datetime_ignored(self):
         e = Event()
-        e.timestamp = "not-a-datetime"  # type: ignore
+        e.timestamp = 'not-a-datetime'  # type: ignore
         # timestamp setter checks isinstance(value, datetime)
         assert e.timestamp is None
 
@@ -111,7 +111,7 @@ class TestEventSource:
 
     def test_set_invalid_type(self):
         e = Event()
-        with pytest.raises(TypeError, match="source must be"):
+        with pytest.raises(TypeError, match='source must be'):
             e.source = 123  # type: ignore
 
 
@@ -156,8 +156,8 @@ class TestEventTimeout:
 class TestEventMessage:
     def test_with_message(self):
         e = Event()
-        cast(Any, e)._message = "Hello"
-        assert e.message == "Hello"
+        cast(Any, e)._message = 'Hello'
+        assert e.message == 'Hello'
 
     def test_with_none_message(self):
         e = Event()
@@ -169,15 +169,15 @@ class TestEventToolCallMetadata:
     def test_set_and_get_duck_typed(self):
         e = Event()
         meta = SimpleNamespace(
-            function_name="test", tool_call_id="tc1", total_calls_in_response=1
+            function_name='test', tool_call_id='tc1', total_calls_in_response=1
         )
         cast(Any, e).tool_call_metadata = meta
         assert e.tool_call_metadata is not None
-        assert e.tool_call_metadata.function_name == "test"
+        assert e.tool_call_metadata.function_name == 'test'
 
     def test_rejects_incomplete_duck_type(self):
         e = Event()
-        bad = SimpleNamespace(function_name="test")  # missing required attrs
+        bad = SimpleNamespace(function_name='test')  # missing required attrs
         cast(Any, e)._tool_call_metadata = bad
         assert e.tool_call_metadata is None
 
@@ -185,5 +185,5 @@ class TestEventToolCallMetadata:
 class TestEventResponseId:
     def test_set_and_get(self):
         e = Event()
-        e.response_id = "resp-123"
-        assert e.response_id == "resp-123"
+        e.response_id = 'resp-123'
+        assert e.response_id == 'resp-123'

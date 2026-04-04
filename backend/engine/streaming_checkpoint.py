@@ -45,7 +45,7 @@ class RecoveryInspection:
 
     status: str
     record: CheckpointRecord | None = None
-    reason: str = ""
+    reason: str = ''
 
 
 class StreamingCheckpoint:
@@ -57,7 +57,7 @@ class StreamingCheckpoint:
     to retry or discard.
     """
 
-    _FILENAME = "streaming_wal.json"
+    _FILENAME = 'streaming_wal.json'
     _MAX_CHECKPOINT_AGE_SEC: float = 300.0  # 5 minutes
 
     def __init__(self, checkpoint_dir: str) -> None:
@@ -92,20 +92,20 @@ class StreamingCheckpoint:
         )
         self._write(record)
         self._active = record
-        logger.debug("Streaming checkpoint created: %s", token)
+        logger.debug('Streaming checkpoint created: %s', token)
         return token
 
     def commit(self, token: str) -> None:
         """Mark the LLM call as successfully completed — removes the WAL."""
         if self._active and self._active.token != token:
             logger.warning(
-                "Commit token mismatch: expected %s, got %s",
+                'Commit token mismatch: expected %s, got %s',
                 self._active.token,
                 token,
             )
         self._remove_wal()
         self._active = None
-        logger.debug("Streaming checkpoint committed: %s", token)
+        logger.debug('Streaming checkpoint committed: %s', token)
 
     def discard(self) -> None:
         """Explicitly abandon the active checkpoint."""
@@ -119,7 +119,7 @@ class StreamingCheckpoint:
         or ``None`` if the last call completed cleanly.
         """
         inspection = self.inspect_recovery()
-        if inspection.status == "blocked_uncommitted":
+        if inspection.status == 'blocked_uncommitted':
             return inspection.record
         return None
 
@@ -131,41 +131,41 @@ class StreamingCheckpoint:
         discarded eagerly.
         """
         if not self._wal_path.exists():
-            return RecoveryInspection(status="clean")
+            return RecoveryInspection(status='clean')
         try:
             record = self._read_record()
             age = time.time() - record.created_at
 
             if age > self._MAX_CHECKPOINT_AGE_SEC:
                 logger.warning(
-                    "Discarding stale streaming checkpoint %s (age=%.1fs > %.0fs limit)",
+                    'Discarding stale streaming checkpoint %s (age=%.1fs > %.0fs limit)',
                     record.token,
                     age,
                     self._MAX_CHECKPOINT_AGE_SEC,
                 )
                 self._remove_wal()
                 return RecoveryInspection(
-                    status="stale_discarded",
+                    status='stale_discarded',
                     record=record,
-                    reason="checkpoint exceeded max age",
+                    reason='checkpoint exceeded max age',
                 )
 
             reason = (
-                f"recent uncommitted checkpoint token={record.token} "
-                f"age={age:.1f}s attempt={record.attempt}"
+                f'recent uncommitted checkpoint token={record.token} '
+                f'age={age:.1f}s attempt={record.attempt}'
             )
-            logger.warning("Streaming checkpoint requires manual recovery: %s", reason)
+            logger.warning('Streaming checkpoint requires manual recovery: %s', reason)
             return RecoveryInspection(
-                status="blocked_uncommitted",
+                status='blocked_uncommitted',
                 record=record,
                 reason=reason,
             )
         except Exception:
-            logger.exception("Corrupt streaming WAL — discarding")
+            logger.exception('Corrupt streaming WAL — discarding')
             self._remove_wal()
             return RecoveryInspection(
-                status="corrupt_discarded",
-                reason="checkpoint WAL could not be parsed",
+                status='corrupt_discarded',
+                reason='checkpoint WAL could not be parsed',
             )
 
     @property
@@ -179,29 +179,29 @@ class StreamingCheckpoint:
     def _summarise_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Extract a small summary of params for diagnostics (not full messages)."""
         summary: dict[str, Any] = {}
-        if "model" in params:
-            summary["model"] = params["model"]
-        if "messages" in params:
-            summary["message_count"] = len(params["messages"])
-        if "tools" in params:
-            summary["tool_count"] = len(params["tools"])
+        if 'model' in params:
+            summary['model'] = params['model']
+        if 'messages' in params:
+            summary['message_count'] = len(params['messages'])
+        if 'tools' in params:
+            summary['tool_count'] = len(params['tools'])
         return summary
 
     def _read_record(self) -> CheckpointRecord:
-        raw = json.loads(self._wal_path.read_text(encoding="utf-8"))
+        raw = json.loads(self._wal_path.read_text(encoding='utf-8'))
         return CheckpointRecord(**raw)
 
     def _write(self, record: CheckpointRecord) -> None:
         try:
             self._wal_path.write_text(
                 json.dumps(asdict(record), default=str),
-                encoding="utf-8",
+                encoding='utf-8',
             )
         except OSError:
-            logger.exception("Failed to write streaming WAL")
+            logger.exception('Failed to write streaming WAL')
 
     def _remove_wal(self) -> None:
         try:
             self._wal_path.unlink(missing_ok=True)
         except OSError:
-            logger.exception("Failed to remove streaming WAL")
+            logger.exception('Failed to remove streaming WAL')

@@ -1,23 +1,24 @@
 """Tests for backend.inference.catalog_loader — model catalog and pricing lookups."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from backend.inference.catalog_loader import (
     ModelEntry,
     _load_raw,
-    apply_model_param_overrides,
-    get_catalog,
     _name_index,
-    lookup,
+    apply_model_param_overrides,
+    get_all_model_names,
+    get_catalog,
+    get_featured_models,
     get_pricing,
     get_token_limits,
-    get_featured_models,
     get_verified_models,
-    get_all_model_names,
-    supports_tool_choice,
+    lookup,
     prefers_short_tool_descriptions,
     sanitize_call_kwargs_for_provider,
+    supports_tool_choice,
 )
 
 
@@ -26,9 +27,9 @@ class TestModelEntry:
 
     def test_minimal_creation(self):
         """Test creating ModelEntry with required fields only."""
-        entry = ModelEntry(name="gpt-4o", provider="openai")
-        assert entry.name == "gpt-4o"
-        assert entry.provider == "openai"
+        entry = ModelEntry(name='gpt-4o', provider='openai')
+        assert entry.name == 'gpt-4o'
+        assert entry.provider == 'openai'
         assert entry.aliases == ()
         assert entry.verified is False
         assert entry.featured is False
@@ -36,9 +37,9 @@ class TestModelEntry:
     def test_full_creation(self):
         """Test creating ModelEntry with all fields."""
         entry = ModelEntry(
-            name="gpt-4o",
-            provider="openai",
-            aliases=("gpt4o", "gpt-4-optimized"),
+            name='gpt-4o',
+            provider='openai',
+            aliases=('gpt4o', 'gpt-4-optimized'),
             max_input_tokens=128000,
             max_output_tokens=16384,
             input_price_per_m=2.5,
@@ -52,7 +53,7 @@ class TestModelEntry:
             supports_response_schema=True,
             supports_vision=True,
         )
-        assert entry.name == "gpt-4o"
+        assert entry.name == 'gpt-4o'
         assert entry.max_input_tokens == 128000
         assert entry.input_price_per_m == 2.5
         assert entry.verified is True
@@ -60,13 +61,13 @@ class TestModelEntry:
 
     def test_frozen_dataclass(self):
         """Test ModelEntry is frozen (immutable)."""
-        entry = ModelEntry(name="test", provider="test")
+        entry = ModelEntry(name='test', provider='test')
         with pytest.raises(AttributeError):
-            setattr(entry, "name", "new-name")
+            setattr(entry, 'name', 'new-name')
 
     def test_default_supports_stop_words(self):
         """Test supports_stop_words defaults to True."""
-        entry = ModelEntry(name="test", provider="test")
+        entry = ModelEntry(name='test', provider='test')
         assert entry.supports_stop_words is True
 
 
@@ -77,7 +78,7 @@ class TestLoadRaw:
         """Test _load_raw returns dict from catalog.json."""
         data = _load_raw()
         assert isinstance(data, dict)
-        assert "models" in data
+        assert 'models' in data
 
     def test_caching(self):
         """Test _load_raw caches result."""
@@ -167,13 +168,13 @@ class TestLookup:
     def test_lookup_with_provider_prefix(self):
         """Test lookup strips provider prefix."""
         # Look up "openai/gpt-4o" should find "gpt-4o"
-        result = lookup("openai/gpt-4o")
+        result = lookup('openai/gpt-4o')
         if result:
-            assert "gpt-4o" in result.name or "gpt-4o" in result.aliases
+            assert 'gpt-4o' in result.name or 'gpt-4o' in result.aliases
 
     def test_lookup_nonexistent(self):
         """Test lookup returns None for nonexistent model."""
-        result = lookup("nonexistent-model-xyz-123")
+        result = lookup('nonexistent-model-xyz-123')
         assert result is None
 
     def test_lookup_strips_whitespace(self):
@@ -181,7 +182,7 @@ class TestLookup:
         catalog = get_catalog()
         if catalog:
             name = catalog[0].name
-            result = lookup(f"  {name}  ")
+            result = lookup(f'  {name}  ')
             assert result is not None
 
     def test_lookup_by_alias(self):
@@ -206,36 +207,36 @@ class TestGetPricing:
             if entry.input_price_per_m is not None:
                 pricing = get_pricing(entry.name)
                 assert pricing is not None
-                assert "input" in pricing
-                assert "output" in pricing
-                assert pricing["input"] == entry.input_price_per_m
+                assert 'input' in pricing
+                assert 'output' in pricing
+                assert pricing['input'] == entry.input_price_per_m
                 break
 
     def test_pricing_nonexistent_model(self):
         """Test get_pricing with tier fallback."""
         # Use a model that might match tier pricing
-        pricing = get_pricing("nonexistent-gpt-4-model")
+        pricing = get_pricing('nonexistent-gpt-4-model')
         # May or may not have tier pricing, just check type
         assert pricing is None or isinstance(pricing, dict)
 
     def test_pricing_output_defaults_to_zero(self):
         """Test output price defaults to 0 if not set."""
         # Create mock entry with input price only
-        with patch("backend.inference.catalog_loader.lookup") as mock_lookup:
+        with patch('backend.inference.catalog_loader.lookup') as mock_lookup:
             mock_entry = ModelEntry(
-                name="test",
-                provider="test",
+                name='test',
+                provider='test',
                 input_price_per_m=5.0,
                 output_price_per_m=None,
             )
             mock_lookup.return_value = mock_entry
-            pricing = get_pricing("test")
+            pricing = get_pricing('test')
             assert pricing is not None
-            assert pricing["output"] == 0.0
+            assert pricing['output'] == 0.0
 
     def test_pricing_returns_none_if_no_match(self):
         """Test returns None if no catalog or tier match."""
-        pricing = get_pricing("completely-unknown-model-xyz")
+        pricing = get_pricing('completely-unknown-model-xyz')
         # Should be None or a tier fallback
         assert pricing is None or isinstance(pricing, dict)
 
@@ -255,7 +256,7 @@ class TestGetTokenLimits:
 
     def test_token_limits_nonexistent(self):
         """Test get_token_limits returns (None, None) for unknown model."""
-        input_limit, output_limit = get_token_limits("nonexistent-model-xyz")
+        input_limit, output_limit = get_token_limits('nonexistent-model-xyz')
         assert input_limit is None
         assert output_limit is None
 
@@ -282,7 +283,7 @@ class TestGetFeaturedModels:
         """Test featured models are in 'provider/name' format."""
         featured = get_featured_models()
         for model in featured:
-            assert "/" in model
+            assert '/' in model
 
     def test_only_featured_models(self):
         """Test only models marked featured=True are included."""
@@ -290,7 +291,7 @@ class TestGetFeaturedModels:
         catalog = get_catalog()
         featured_set = set(featured)
         for entry in catalog:
-            formatted = f"{entry.provider}/{entry.name}"
+            formatted = f'{entry.provider}/{entry.name}'
             if entry.featured:
                 assert formatted in featured_set
             else:
@@ -333,7 +334,7 @@ class TestGetVerifiedModels:
 
     def test_filter_no_results(self):
         """Test filtering by provider with no verified models."""
-        verified = get_verified_models(provider="nonexistent-provider")
+        verified = get_verified_models(provider='nonexistent-provider')
         assert verified == []
 
 
@@ -342,103 +343,103 @@ class TestSanitizeCallKwargsForProvider:
 
     def test_google_sanitizes_openai_only_keys(self):
         kwargs = {
-            "model": "google/gemini-3-flash",
-            "temperature": 0.2,
-            "top_p": 0.9,
-            "tool_choice": "none",
-            "extra_body": {"x": 1},
-            "reasoning_effort": "medium",
-            "seed": 123,
-            "parallel_tool_calls": True,
-            "metadata": {"trace": "1"},
+            'model': 'google/gemini-3-flash',
+            'temperature': 0.2,
+            'top_p': 0.9,
+            'tool_choice': 'none',
+            'extra_body': {'x': 1},
+            'reasoning_effort': 'medium',
+            'seed': 123,
+            'parallel_tool_calls': True,
+            'metadata': {'trace': '1'},
         }
 
-        out = sanitize_call_kwargs_for_provider("google/gemini-3-flash", kwargs)
+        out = sanitize_call_kwargs_for_provider('google/gemini-3-flash', kwargs)
 
-        assert out["model"] == "google/gemini-3-flash"
-        assert out["temperature"] == 0.2
-        assert out["top_p"] == 0.9
-        assert "tool_choice" not in out
-        assert "extra_body" not in out
-        assert "reasoning_effort" not in out
-        assert "seed" not in out
-        assert "parallel_tool_calls" not in out
-        assert "metadata" not in out
+        assert out['model'] == 'google/gemini-3-flash'
+        assert out['temperature'] == 0.2
+        assert out['top_p'] == 0.9
+        assert 'tool_choice' not in out
+        assert 'extra_body' not in out
+        assert 'reasoning_effort' not in out
+        assert 'seed' not in out
+        assert 'parallel_tool_calls' not in out
+        assert 'metadata' not in out
 
     def test_anthropic_sanitizes_unsupported_keys(self):
         kwargs = {
-            "model": "anthropic/claude-sonnet-4",
-            "temperature": 0.1,
-            "tool_choice": "auto",
-            "response_format": {"type": "json_object"},
-            "parallel_tool_calls": True,
-            "extra_headers": {"x": "1"},
+            'model': 'anthropic/claude-sonnet-4',
+            'temperature': 0.1,
+            'tool_choice': 'auto',
+            'response_format': {'type': 'json_object'},
+            'parallel_tool_calls': True,
+            'extra_headers': {'x': '1'},
         }
 
-        out = sanitize_call_kwargs_for_provider("anthropic/claude-sonnet-4", kwargs)
+        out = sanitize_call_kwargs_for_provider('anthropic/claude-sonnet-4', kwargs)
 
-        assert out["model"] == "anthropic/claude-sonnet-4"
-        assert out["temperature"] == 0.1
-        assert "tool_choice" not in out
-        assert "response_format" not in out
-        assert "parallel_tool_calls" not in out
-        assert "extra_headers" not in out
+        assert out['model'] == 'anthropic/claude-sonnet-4'
+        assert out['temperature'] == 0.1
+        assert 'tool_choice' not in out
+        assert 'response_format' not in out
+        assert 'parallel_tool_calls' not in out
+        assert 'extra_headers' not in out
 
     def test_openai_keeps_optional_keys(self):
         kwargs = {
-            "model": "gpt-4o",
-            "temperature": 0.3,
-            "seed": 42,
-            "response_format": {"type": "json_object"},
-            "tool_choice": "none",
+            'model': 'gpt-4o',
+            'temperature': 0.3,
+            'seed': 42,
+            'response_format': {'type': 'json_object'},
+            'tool_choice': 'none',
         }
 
-        out = sanitize_call_kwargs_for_provider("gpt-4o", kwargs)
+        out = sanitize_call_kwargs_for_provider('gpt-4o', kwargs)
 
         assert out == kwargs
 
 
 class TestApplyModelParamOverrides:
     def test_unknown_model_does_not_add_reasoning_effort(self):
-        kwargs = {"temperature": 0.2}
+        kwargs = {'temperature': 0.2}
 
         out = apply_model_param_overrides(
-            "groq/meta-llama/llama-4-scout-17b-16e-instruct",
+            'groq/meta-llama/llama-4-scout-17b-16e-instruct',
             kwargs,
-            reasoning_effort="high",
+            reasoning_effort='high',
             is_stream=True,
         )
 
-        assert out["temperature"] == 0.2
-        assert "reasoning_effort" not in out
+        assert out['temperature'] == 0.2
+        assert 'reasoning_effort' not in out
 
 
 class TestPrefersShortToolDescriptions:
     def test_gpt_family_prefers_short(self):
-        assert prefers_short_tool_descriptions("gpt-4o") is True
+        assert prefers_short_tool_descriptions('gpt-4o') is True
 
     def test_o_family_prefers_short(self):
-        assert prefers_short_tool_descriptions("o3-mini") is True
+        assert prefers_short_tool_descriptions('o3-mini') is True
 
     def test_claude_does_not_prefer_short(self):
-        assert prefers_short_tool_descriptions("claude-3-opus") is False
+        assert prefers_short_tool_descriptions('claude-3-opus') is False
 
     def test_unknown_model_defaults_false(self):
-        assert prefers_short_tool_descriptions("some-obscure-model") is False
+        assert prefers_short_tool_descriptions('some-obscure-model') is False
 
 
 class TestSupportsToolChoice:
     def test_known_openai_model_supports(self):
-        assert supports_tool_choice("gpt-4o") is True
+        assert supports_tool_choice('gpt-4o') is True
 
     def test_known_google_model_does_not_support(self):
-        assert supports_tool_choice("google/gemini-3-flash") is False
+        assert supports_tool_choice('google/gemini-3-flash') is False
 
-    def test_prefixed_openhands_model_supports(self):
-        assert supports_tool_choice("openhands/claude-sonnet-4-5-20250929") is True
+    def test_prefixed_lightning_model_supports(self):
+        assert supports_tool_choice('lightning/claude-sonnet-4-20250514') is True
 
     def test_unknown_model_defaults_false(self):
-        assert supports_tool_choice("some-obscure-model") is False
+        assert supports_tool_choice('some-obscure-model') is False
 
 
 class TestGetAllModelNames:

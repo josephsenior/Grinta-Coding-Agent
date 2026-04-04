@@ -22,7 +22,7 @@ class TestPendingActionService(unittest.TestCase):
         # Without a running event loop, _schedule_watchdog falls back to
         # run_until_complete(sleep(timeout+2)) and blocks each test for minutes.
         self._watchdog_patcher = patch.object(
-            PendingActionService, "_schedule_watchdog", autospec=True
+            PendingActionService, '_schedule_watchdog', autospec=True
         )
         self._watchdog_patcher.start()
         self.addCleanup(self._watchdog_patcher.stop)
@@ -38,8 +38,8 @@ class TestPendingActionService(unittest.TestCase):
     def test_set_action(self):
         """Test set() stores action with timestamp."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
 
         self.service.set(mock_action)
 
@@ -54,8 +54,8 @@ class TestPendingActionService(unittest.TestCase):
         """Test set(None) clears pending action."""
         # First set an action
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
         self.service.set(mock_action)
 
         # Then clear it
@@ -68,8 +68,8 @@ class TestPendingActionService(unittest.TestCase):
     def test_set_none_clears_get_and_info_views(self):
         """Clearing a pending action must remove all observable pending state."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
 
         self.service.set(mock_action)
         self.service.set(None)
@@ -87,8 +87,8 @@ class TestPendingActionService(unittest.TestCase):
     def test_get_returns_action_when_not_timed_out(self):
         """Test get() returns action when within timeout."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
 
         self.service.set(mock_action)
         action = self.service.get()
@@ -101,12 +101,12 @@ class TestPendingActionService(unittest.TestCase):
 
         self.assertIsNone(action)
 
-    @patch("time.time")
+    @patch('time.time')
     def test_get_returns_none_when_timed_out(self, mock_time):
         """Test get() returns None and handles timeout when exceeded."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
 
         # Set action at t=0
         mock_time.return_value = 100.0
@@ -122,12 +122,12 @@ class TestPendingActionService(unittest.TestCase):
         # Should have logged timeout
         self.mock_controller.event_stream.add_event.assert_called_once()
 
-    @patch("time.time")
+    @patch('time.time')
     def test_get_logs_periodic_updates(self, mock_time):
         """Test get() logs periodic updates for long-running actions."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
 
         # Set action at t=0
         mock_time.return_value = 100.0
@@ -140,13 +140,13 @@ class TestPendingActionService(unittest.TestCase):
         self.assertEqual(action, mock_action)
         # Should have logged both set and periodic update
         log_calls = [call[0][1] for call in self.mock_controller.log.call_args_list]
-        self.assertTrue(any("Pending action active" in msg for msg in log_calls))
+        self.assertTrue(any('Pending action active' in msg for msg in log_calls))
 
     def test_info_returns_pending_tuple(self):
         """Test info() returns (action, timestamp) tuple."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
 
         self.service.set(mock_action)
         result = self.service.info()
@@ -157,12 +157,12 @@ class TestPendingActionService(unittest.TestCase):
         self.assertEqual(action, mock_action)
         self.assertIsInstance(timestamp, float)
 
-    @patch("time.time")
+    @patch('time.time')
     def test_info_returns_none_when_pending_has_timed_out(self, mock_time):
         """info() should not expose stale pending state after timeout."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
 
         mock_time.return_value = 100.0
         self.service.set(mock_action)
@@ -183,21 +183,21 @@ class TestPendingActionService(unittest.TestCase):
     def test_log_clear(self):
         """Test _log_clear logs action clearing."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
         timestamp = time.time() - 5.0
 
         self.service._log_clear(self.mock_controller, mock_action, timestamp)
 
         self.mock_controller.log.assert_called_once()
         log_args = self.mock_controller.log.call_args[0]
-        self.assertIn("Cleared pending action", log_args[1])
+        self.assertIn('Cleared pending action', log_args[1])
 
-    @patch("backend.orchestration.services.pending_action_service.ErrorObservation")
+    @patch('backend.orchestration.services.pending_action_service.ErrorObservation')
     def test_handle_timeout(self, mock_error_obs):
         """Test _handle_timeout logs and emits timeout error."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
+        mock_action.__class__.__name__ = 'TestAction'
         mock_action.id = 456
 
         mock_obs = MagicMock()
@@ -208,14 +208,14 @@ class TestPendingActionService(unittest.TestCase):
         # Should log warning
         self.mock_controller.log.assert_called_once()
         log_args = self.mock_controller.log.call_args[0]
-        self.assertEqual(log_args[0], "warning")
-        self.assertIn("timed out", log_args[1])
+        self.assertEqual(log_args[0], 'warning')
+        self.assertIn('timed out', log_args[1])
 
         # Should create ErrorObservation
         mock_error_obs.assert_called_once()
         call_kwargs = mock_error_obs.call_args[1]
-        self.assertIn("timed out", call_kwargs["content"])
-        self.assertEqual(call_kwargs["error_id"], "PENDING_ACTION_TIMEOUT")
+        self.assertIn('timed out', call_kwargs['content'])
+        self.assertEqual(call_kwargs['error_id'], 'PENDING_ACTION_TIMEOUT')
 
         # Should set cause to action ID
         self.assertEqual(mock_obs.cause, 456)
@@ -223,12 +223,12 @@ class TestPendingActionService(unittest.TestCase):
         # Should emit event
         self.mock_controller.event_stream.add_event.assert_called_once()
 
-    @patch("backend.orchestration.services.pending_action_service.ErrorObservation")
+    @patch('backend.orchestration.services.pending_action_service.ErrorObservation')
     def test_handle_timeout_unknown_action_id(self, mock_error_obs):
         """Test _handle_timeout handles unknown action ID."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "unknown"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'unknown'
 
         mock_obs = MagicMock()
         mock_error_obs.return_value = mock_obs
@@ -238,12 +238,12 @@ class TestPendingActionService(unittest.TestCase):
         # Cause should remain None for invalid IDs
         self.assertIsNone(mock_obs.cause)
 
-    @patch("backend.orchestration.services.pending_action_service.ErrorObservation")
+    @patch('backend.orchestration.services.pending_action_service.ErrorObservation')
     def test_handle_timeout_non_integer_action_id(self, mock_error_obs):
         """Test _handle_timeout handles non-integer action ID."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "not-an-int"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'not-an-int'
 
         mock_obs = MagicMock()
         mock_error_obs.return_value = mock_obs
@@ -253,16 +253,16 @@ class TestPendingActionService(unittest.TestCase):
 
         self.assertIsNone(mock_obs.cause)
 
-    @patch("time.time")
+    @patch('time.time')
     def test_set_action_replaces_previous(self, mock_time):
         """Test set() replaces previous pending action."""
         mock_action1 = MagicMock()
-        mock_action1.__class__.__name__ = "Action1"
-        mock_action1.id = "action-1"
+        mock_action1.__class__.__name__ = 'Action1'
+        mock_action1.id = 'action-1'
 
         mock_action2 = MagicMock()
-        mock_action2.__class__.__name__ = "Action2"
-        mock_action2.id = "action-2"
+        mock_action2.__class__.__name__ = 'Action2'
+        mock_action2.id = 'action-2'
 
         mock_time.return_value = 100.0
         self.service.set(mock_action1)
@@ -287,8 +287,8 @@ class TestPendingActionService(unittest.TestCase):
     def test_shutdown_clears_pending_and_cancels_watchdog(self):
         """shutdown() should clear pending state and cancel watchdog."""
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
         self.service.set(mock_action)
 
         fake_handle = MagicMock()
@@ -300,13 +300,13 @@ class TestPendingActionService(unittest.TestCase):
         self.assertIsNone(self.service._watchdog_handle)
         fake_handle.cancel.assert_called_once_with()
 
-    @patch("time.time")
+    @patch('time.time')
     def test_zero_timeout_never_times_out(self, mock_time):
         """pending_action_timeout <= 0 disables timeout and watchdog."""
         service = PendingActionService(self.mock_context, timeout=0.0)
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
 
         mock_time.return_value = 100.0
         service.set(mock_action)
@@ -316,13 +316,13 @@ class TestPendingActionService(unittest.TestCase):
         self.assertEqual(action, mock_action)
         self.mock_controller.event_stream.add_event.assert_not_called()
 
-    @patch("time.time")
+    @patch('time.time')
     def test_mcp_action_with_zero_base_uses_no_floor(self, mock_time):
         """When base timeout is disabled, MCP floor must not apply."""
         service = PendingActionService(self.mock_context, timeout=0.0)
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "MCPAction"
-        mock_action.id = "mcp-1"
+        mock_action.__class__.__name__ = 'MCPAction'
+        mock_action.id = 'mcp-1'
 
         mock_time.return_value = 0.0
         service.set(mock_action)
@@ -333,7 +333,7 @@ class TestPendingActionService(unittest.TestCase):
         self.mock_controller.event_stream.add_event.assert_not_called()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
 
 
@@ -349,11 +349,11 @@ class TestPendingActionWatchdog(unittest.IsolatedAsyncioTestCase):
 
         self.service = PendingActionService(self.mock_context, timeout=5.0)
 
-    @patch("time.time")
+    @patch('time.time')
     async def test_watchdog_fire_calls_trigger_step_after_timeout(self, mock_time):
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
-        mock_action.id = "action-123"
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
 
         mock_time.return_value = 100.0
         self.service._pending = (mock_action, 100.0)
@@ -363,26 +363,28 @@ class TestPendingActionWatchdog(unittest.IsolatedAsyncioTestCase):
 
         self.mock_context.trigger_step.assert_called_once_with()
 
-    @patch("backend.orchestration.services.pending_action_service.asyncio.get_running_loop")
-    @patch("backend.utils.async_utils.get_main_event_loop")
+    @patch(
+        'backend.orchestration.services.pending_action_service.asyncio.get_running_loop'
+    )
+    @patch('backend.utils.async_utils.get_main_event_loop')
     async def test_schedule_watchdog_skips_when_no_active_loop_exists(
         self, mock_get_main_event_loop, mock_get_running_loop
     ):
-        mock_get_running_loop.side_effect = RuntimeError("no running loop")
+        mock_get_running_loop.side_effect = RuntimeError('no running loop')
         mock_get_main_event_loop.return_value = None
 
         self.service._schedule_watchdog()
 
         self.assertIsNone(self.service._watchdog_handle)
 
-    @patch("time.time")
+    @patch('time.time')
     async def test_mcp_action_uses_timeout_floor_when_base_below_floor(self, mock_time):
         service = PendingActionService(self.mock_context, timeout=1.0)
-        mock_action = type("MCPAction", (), {})()
-        mock_action.id = "42"
+        mock_action = type('MCPAction', (), {})()
+        mock_action.id = '42'
 
         with patch(
-            "backend.orchestration.services.pending_action_service.MCP_PENDING_ACTION_TIMEOUT_FLOOR",
+            'backend.orchestration.services.pending_action_service.MCP_PENDING_ACTION_TIMEOUT_FLOOR',
             30.0,
         ):
             mock_time.return_value = 100.0

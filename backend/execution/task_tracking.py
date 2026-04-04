@@ -37,24 +37,26 @@ class TaskTrackingMixin:
     def _handle_task_tracking_action(self, action: TaskTrackingAction) -> Observation:
         """Handle task tracking actions (plan/view)."""
         if self.event_stream is None:
-            return ErrorObservation("Task tracking requires an event stream")
+            return ErrorObservation('Task tracking requires an event stream')
 
         conversation_dir = get_conversation_dir(self.sid, self.event_stream.user_id)
-        task_file_path = f"{conversation_dir}TASKS.md"
+        task_file_path = f'{conversation_dir}TASKS.md'
 
-        if action.command in ("plan", "update"):
+        if action.command in ('plan', 'update'):
             return self._handle_task_plan_action(action, task_file_path)
-        if action.command == "view":
+        if action.command == 'view':
             # If the agent passed a task_list with a view command, treat it as
             # an update — the model frequently calls view while providing tasks,
             # intending to set the plan rather than read it.
             if action.task_list:
                 return self._handle_task_plan_action(action, task_file_path)
             # Track consecutive view-only calls; intervene if stuck in a loop.
-            count = getattr(self, "_consecutive_task_view_count", 0) + 1
+            count = getattr(self, '_consecutive_task_view_count', 0) + 1
             self._consecutive_task_view_count = count
-            return self._handle_task_view_action(action, task_file_path, view_count=count)
-        return NullObservation("")
+            return self._handle_task_view_action(
+                action, task_file_path, view_count=count
+            )
+        return NullObservation('')
 
     # ------------------------------------------------------------------
     # Plan / View handlers
@@ -72,10 +74,10 @@ class TaskTrackingMixin:
             self.event_stream.file_store.write(task_file_path, content)
         except Exception as e:
             return ErrorObservation(
-                f"Failed to write task list to session directory {task_file_path}: {e!s}"
+                f'Failed to write task list to session directory {task_file_path}: {e!s}'
             )
 
-        msg = f"✅ Plan created with {n} tasks. Now begin implementing the first task."
+        msg = f'✅ Plan created with {n} tasks. Now begin implementing the first task.'
 
         return TaskTrackingObservation(
             content=msg,
@@ -94,14 +96,14 @@ class TaskTrackingMixin:
                 assert self.event_stream is not None
                 content = self.event_stream.file_store.read(task_file_path)
             except FileNotFoundError:
-                content = "No task list found."
+                content = 'No task list found.'
             except Exception as e:
-                content = f"Failed to read task list: {e!s}"
+                content = f'Failed to read task list: {e!s}'
             intervention = (
-                "\n\n⚠️ LOOP DETECTED: You have viewed your task list "
-                f"{view_count} times without making progress. "
-                "STOP calling task_tracker view. "
-                "Pick the first pending task and start working on it."
+                '\n\n⚠️ LOOP DETECTED: You have viewed your task list '
+                f'{view_count} times without making progress. '
+                'STOP calling task_tracker view. '
+                'Pick the first pending task and start working on it.'
             )
             return TaskTrackingObservation(
                 content=content + intervention,
@@ -112,7 +114,7 @@ class TaskTrackingMixin:
             assert self.event_stream is not None
             content = self.event_stream.file_store.read(task_file_path)
             return TaskTrackingObservation(
-                content=content + "\n\n→ Now implement the first pending (⏳) task.",
+                content=content + '\n\n→ Now implement the first pending (⏳) task.',
                 command=action.command,
                 task_list=[],
             )
@@ -126,7 +128,7 @@ class TaskTrackingMixin:
             return TaskTrackingObservation(
                 command=action.command,
                 task_list=[],
-                content=f"Failed to read the task list from session directory {task_file_path}. Error: {e!s}",
+                content=f'Failed to read the task list from session directory {task_file_path}. Error: {e!s}',
             )
 
     # ------------------------------------------------------------------
@@ -136,13 +138,13 @@ class TaskTrackingMixin:
     @staticmethod
     def _generate_task_list_content(task_list: list) -> str:
         """Generate markdown content for task list."""
-        content = "# Task List\n\n"
+        content = '# Task List\n\n'
         for i, task in enumerate(task_list, 1):
-            status_icon = {"todo": "⏳", "in_progress": "🔄", "done": "✅"}.get(
-                task.get("status", "todo"),
-                "⏳",
+            status_icon = {'todo': '⏳', 'in_progress': '🔄', 'done': '✅'}.get(
+                task.get('status', 'todo'),
+                '⏳',
             )
             content += (
-                f"{i}. {status_icon} {task.get('title', '')}\n{task.get('notes', '')}\n"
+                f'{i}. {status_icon} {task.get("title", "")}\n{task.get("notes", "")}\n'
             )
         return content

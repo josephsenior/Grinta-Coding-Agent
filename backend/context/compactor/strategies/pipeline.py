@@ -6,10 +6,9 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from backend.orchestration.state.state import State
-    from backend.core.config.compactor_config import CompactorPipelineConfig
     from backend.context.view import View
     from backend.inference.llm_registry import LLMRegistry
+    from backend.orchestration.state.state import State
 
 from backend.context.compactor.compactor import Compaction, Compactor
 
@@ -76,9 +75,7 @@ class CompactorPipeline(Compactor):
         return result
 
     @classmethod
-    def from_config(
-        cls, config: Any, llm_registry: LLMRegistry
-    ) -> CompactorPipeline:
+    def from_config(cls, config: Any, llm_registry: LLMRegistry) -> CompactorPipeline:
         """Build a pipeline from config-defined compactor specs."""
         compactors = [Compactor.from_config(c, llm_registry) for c in config.compactors]
         return CompactorPipeline(*compactors)

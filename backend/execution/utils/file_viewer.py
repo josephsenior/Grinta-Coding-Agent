@@ -20,24 +20,24 @@ def generate_file_viewer_html(file_path: str) -> str:
     """
     file_extension = os.path.splitext(file_path)[1].lower()
     file_name = os.path.basename(file_path)
-    supported_extensions = [".pdf", ".png", ".jpg", ".jpeg", ".gif"]
+    supported_extensions = ['.pdf', '.png', '.jpg', '.jpeg', '.gif']
     if file_extension not in supported_extensions:
-        msg = f"Unsupported file extension: {file_extension}. Supported extensions are: {', '.join(supported_extensions)}"
+        msg = f'Unsupported file extension: {file_extension}. Supported extensions are: {", ".join(supported_extensions)}'
         raise ValueError(
             msg,
         )
     if not os.path.exists(file_path):
-        msg = f"File not found locally: {file_path}. Please download the file to the local machine and try again."
+        msg = f'File not found locally: {file_path}. Please download the file to the local machine and try again.'
         raise ValueError(
             msg,
         )
     file_content = None
-    mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-    if file_extension in [".pdf", ".png", ".jpg", ".jpeg", ".gif", ".bmp"]:
-        with open(file_path, "rb") as file:
-            file_content = base64.b64encode(file.read()).decode("utf-8")
+    mime_type = mimetypes.guess_type(file_path)[0] or 'application/octet-stream'
+    if file_extension in ['.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp']:
+        with open(file_path, 'rb') as file:
+            file_content = base64.b64encode(file.read()).decode('utf-8')
     else:
-        with open(file_path, encoding="utf-8") as file:
+        with open(file_path, encoding='utf-8') as file:
             file_content = file.read()
     return f"""<!DOCTYPE html>\n<html lang="en">\n<head>\n    <meta charset="UTF-8">\n    <meta name="viewport" content="width=device-width, initial-scale=1.0">\n    <title>File Viewer - {
         file_name
@@ -46,14 +46,14 @@ def generate_file_viewer_html(file_path: str) -> str:
     }";\n    const fileExtension = "{file_extension}";\n    const fileContent = `{
         (
             file_content
-            if file_extension not in [".pdf", ".png", ".jpg", ".jpeg", ".gif", ".bmp"]
-            else ""
+            if file_extension not in ['.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp']
+            else ''
         )
     }`;\n    const fileBase64 = "{
         (
             file_content
-            if file_extension in [".pdf", ".png", ".jpg", ".jpeg", ".gif", ".bmp"]
-            else ""
+            if file_extension in ['.pdf', '.png', '.jpg', '.jpeg', '.gif', '.bmp']
+            else ''
         )
     }";\n    const mimeType = "{
         mime_type

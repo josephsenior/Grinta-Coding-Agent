@@ -1,11 +1,11 @@
-﻿"""Agent skills plugin metadata and placeholder runtime integration."""
+"""Agent skills plugin metadata and placeholder runtime integration."""
 
 from dataclasses import dataclass
 
-from backend.ledger.action import Action
-from backend.ledger.observation import Observation
 from backend.execution.plugins.agent_skills import agentskills
 from backend.execution.plugins.requirement import Plugin, PluginRequirement
+from backend.ledger.action import Action
+from backend.ledger.observation import Observation
 
 
 @dataclass
@@ -18,7 +18,7 @@ class AgentSkillsRequirement(PluginRequirement):
     system prompt; there is no ``Plugin.run()`` pathway.
     """
 
-    name: str = "agent_skills"
+    name: str = 'agent_skills'
     metadata_only: bool = True
     documentation: str = agentskills.DOCUMENTATION
 
@@ -32,7 +32,7 @@ class AgentSkillsPlugin(Plugin):
     clear message.
     """
 
-    name: str = "agent_skills"
+    name: str = 'agent_skills'
 
     async def initialize(self, username: str) -> None:
         """No-op — skills are installed at runtime build time."""
@@ -40,8 +40,8 @@ class AgentSkillsPlugin(Plugin):
     async def run(self, action: Action) -> Observation:
         """Not implemented — skills run inside the runtime, not via plugin dispatch."""
         raise NotImplementedError(
-            "AgentSkillsPlugin is metadata-only (metadata_only=True on its "
-            "PluginRequirement). Skills are executed inside the runtime via "
-            "direct Python imports, not through Plugin.run(). If you reached "
-            "this code path, the runtime dispatch logic has a bug."
+            'AgentSkillsPlugin is metadata-only (metadata_only=True on its '
+            'PluginRequirement). Skills are executed inside the runtime via '
+            'direct Python imports, not through Plugin.run(). If you reached '
+            'this code path, the runtime dispatch logic has a bug.'
         )

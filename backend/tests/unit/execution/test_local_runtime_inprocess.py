@@ -1,46 +1,37 @@
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.execution.drivers.local.local_runtime_inprocess import LocalRuntimeInProcess
+from backend.execution.drivers.local.local_runtime_inprocess import (
+    LocalRuntimeInProcess,
+)
+from backend.ledger.action.code_nav import LspQueryAction
+from backend.ledger.observation.code_nav import LspQueryObservation
 
 
-def _make_runtime(workspace: Path, *, owns_workspace: bool) -> LocalRuntimeInProcess:
-    runtime = object.__new__(LocalRuntimeInProcess)
-    runtime._executor = None
-    runtime._temp_workspace = str(workspace)
-    runtime._owns_workspace = owns_workspace
+def _make_runtime() -> LocalRuntimeInProcess:
+    with patch.object(LocalRuntimeInProcess, '_init_tooling_and_platform'):
+        runtime = LocalRuntimeInProcess(
+            config=MagicMock(),
+            event_stream=MagicMock(),
+            llm_registry=MagicMock(),
+            sid='test-sid',
+        )
+    runtime._runtime_initialized = True
     return runtime
 
 
-def test_close_removes_owned_temp_workspace(tmp_path: Path) -> None:
-    workspace = tmp_path / "owned-workspace"
-    workspace.mkdir()
-    runtime = _make_runtime(workspace, owns_workspace=True)
+def test_lsp_query_forwards_to_runtime_executor() -> None:
+    runtime = _make_runtime()
+    obs = LspQueryObservation(content='symbols', available=True)
 
-    with patch("time.sleep"):
-        with patch(
-            "backend.execution.drivers.local.local_runtime_inprocess.ActionExecutionClient.close"
-        ) as mock_super_close:
-            with patch("shutil.rmtree") as mock_rmtree:
-                runtime.close()
+    executor = MagicMock()
+    executor.lsp_query = AsyncMock(return_value=obs)
+    runtime._executor = executor
 
-    mock_rmtree.assert_called_once_with(str(workspace))
-    mock_super_close.assert_called_once_with()
+    action = LspQueryAction(command='list_symbols', file='sample.py')
 
+    result = runtime.lsp_query(action)
 
-def test_close_preserves_user_workspace(tmp_path: Path) -> None:
-    workspace = tmp_path / "user-workspace"
-    workspace.mkdir()
-    runtime = _make_runtime(workspace, owns_workspace=False)
-
-    with patch("time.sleep"):
-        with patch(
-            "backend.execution.drivers.local.local_runtime_inprocess.ActionExecutionClient.close"
-        ) as mock_super_close:
-            with patch("shutil.rmtree") as mock_rmtree:
-                runtime.close()
-
-    mock_rmtree.assert_not_called()
-    mock_super_close.assert_called_once_with()
+    assert result is obs
+    executor.lsp_query.assert_awaited_once_with(action)

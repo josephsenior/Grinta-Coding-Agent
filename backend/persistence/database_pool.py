@@ -17,6 +17,17 @@ from backend.core.logger import app_logger as logger
 
 _pool: Any | None = None
 _pool_lock = asyncio.Lock()
+_ASYNCPG_ERROR_MESSAGE = (
+    'asyncpg is required for database-backed storage. '
+    "Install it with: uv sync --extra database or pip install 'grinta-ai[database]'"
+)
+
+
+def _import_asyncpg() -> Any:
+    try:
+        return __import__('asyncpg')
+    except ImportError as exc:  # pragma: no cover - depends on optional install
+        raise RuntimeError(_ASYNCPG_ERROR_MESSAGE) from exc
 
 
 async def get_db_pool() -> Any:
@@ -24,7 +35,6 @@ async def get_db_pool() -> Any:
 
     Requires `DATABASE_URL` to be set when database-backed storage is enabled.
     """
-
     global _pool
     if _pool is not None:
         return _pool
@@ -33,33 +43,32 @@ async def get_db_pool() -> Any:
         # Double-checked locking: re-read global after acquiring lock
         # Use getattr to prevent mypy from narrowing _pool to None
         # after the check outside the lock (another coroutine may have set it).
-        current: Any | None = globals().get("_pool")
+        current: Any | None = globals().get('_pool')
         if current is not None:
             return current
 
-        database_url = os.getenv("DATABASE_URL")
+        database_url = os.getenv('DATABASE_URL')
         if not database_url:
             raise RuntimeError(
-                "DATABASE_URL is required when using database-backed storage"
+                'DATABASE_URL is required when using database-backed storage'
             )
 
-        min_size = int(os.getenv("DB_POOL_MIN_SIZE", os.getenv("DB_POOL_SIZE", "5")))
-        max_size = int(os.getenv("DB_POOL_MAX_SIZE", os.getenv("DB_POOL_SIZE", "20")))
+        min_size = int(os.getenv('DB_POOL_MIN_SIZE', os.getenv('DB_POOL_SIZE', '5')))
+        max_size = int(os.getenv('DB_POOL_MAX_SIZE', os.getenv('DB_POOL_SIZE', '20')))
 
-        asyncpg = __import__("asyncpg")
+        asyncpg = _import_asyncpg()
         _pool = await asyncpg.create_pool(
             dsn=database_url, min_size=min_size, max_size=max_size
         )
 
         logger.info(
-            "Database pool initialized: min_size=%s max_size=%s", min_size, max_size
+            'Database pool initialized: min_size=%s max_size=%s', min_size, max_size
         )
         return _pool
 
 
 async def close_db_pool() -> None:
     """Close the shared pool if it exists."""
-
     global _pool
     if _pool is None:
         return

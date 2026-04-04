@@ -17,7 +17,7 @@ import pytest
 
 
 def _get_regression_dir() -> Path | None:
-    raw = os.getenv("APP_TRAJECTORY_REGRESSION_DIR", "").strip()
+    raw = os.getenv('APP_TRAJECTORY_REGRESSION_DIR', '').strip()
     if raw:
         path = Path(raw)
         if path.exists() and path.is_dir():
@@ -25,14 +25,16 @@ def _get_regression_dir() -> Path | None:
 
     # Default to a minimal baseline directory committed to the repo so this
     # regression harness runs in CI without extra environment configuration.
-    default_dir = Path(__file__).resolve().parents[1] / "fixtures" / "trajectory_regression"
+    default_dir = (
+        Path(__file__).resolve().parents[1] / 'fixtures' / 'trajectory_regression'
+    )
     if default_dir.exists() and default_dir.is_dir():
         return default_dir
     return None
 
 
 def _iter_json_files(path: Path) -> list[Path]:
-    files = sorted(path.rglob("*.json"))
+    files = sorted(path.rglob('*.json'))
     return [f for f in files if f.is_file()]
 
 
@@ -40,7 +42,7 @@ def _extract_events(payload: Any) -> list[Any]:
     if isinstance(payload, list):
         return payload
     if isinstance(payload, dict):
-        for key in ("events", "history", "trajectory"):
+        for key in ('events', 'history', 'trajectory'):
             value = payload.get(key)
             if isinstance(value, list):
                 return value
@@ -49,7 +51,7 @@ def _extract_events(payload: Any) -> list[Any]:
 
 def _collect_agent_states(obj: Any, out: list[str]) -> None:
     if isinstance(obj, dict):
-        state = obj.get("agent_state")
+        state = obj.get('agent_state')
         if isinstance(state, str):
             out.append(state.lower())
         for value in obj.values():
@@ -63,43 +65,43 @@ def _collect_agent_states(obj: Any, out: list[str]) -> None:
 def _contains_error_markers(payload: Any) -> bool:
     text = json.dumps(payload, ensure_ascii=False).lower()
     markers = (
-        "circuit breaker tripped",
-        "action verification failed",
-        "task_validation_failed",
+        'circuit breaker tripped',
+        'action verification failed',
+        'task_validation_failed',
     )
     return any(marker in text for marker in markers)
 
 
 def pytest_generate_tests(metafunc):
-    if "trajectory_file" not in metafunc.fixturenames:
+    if 'trajectory_file' not in metafunc.fixturenames:
         return
 
     base = _get_regression_dir()
     if base is None:
-        metafunc.parametrize("trajectory_file", [])
+        metafunc.parametrize('trajectory_file', [])
         return
 
     files = _iter_json_files(base)
-    metafunc.parametrize("trajectory_file", files, ids=[f.name for f in files])
+    metafunc.parametrize('trajectory_file', files, ids=[f.name for f in files])
 
 
 @pytest.mark.integration
 def test_trajectory_regression(trajectory_file: Path) -> None:
     """Validate a recorded trajectory against baseline reliability checks."""
-    with trajectory_file.open("r", encoding="utf-8") as fh:
+    with trajectory_file.open('r', encoding='utf-8') as fh:
         payload = json.load(fh)
 
     events = _extract_events(payload)
-    assert events, f"Trajectory has no events: {trajectory_file}"
+    assert events, f'Trajectory has no events: {trajectory_file}'
 
     states: list[str] = []
     _collect_agent_states(payload, states)
     if states:
-        assert states[-1] != "error", (
-            f"Trajectory ended in ERROR state: {trajectory_file} "
-            f"(states tail={states[-5:]})"
+        assert states[-1] != 'error', (
+            f'Trajectory ended in ERROR state: {trajectory_file} '
+            f'(states tail={states[-5:]})'
         )
 
     assert not _contains_error_markers(payload), (
-        f"Reliability error marker detected in trajectory: {trajectory_file}"
+        f'Reliability error marker detected in trajectory: {trajectory_file}'
     )

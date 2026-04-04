@@ -11,7 +11,7 @@ from backend.ledger.observation.observation import Observation
 class TaskTrackingObservation(Observation):
     """This data class represents the result of a task tracking operation."""
 
-    command: str = ""
+    command: str = ''
     task_list: list[dict[str, Any]] = field(default_factory=list)
     observation: ClassVar[str] = ObservationType.TASK_TRACKING
 
@@ -19,4 +19,3 @@ class TaskTrackingObservation(Observation):
     def message(self) -> str:
         """Get task tracking operation result."""
         return self.content
-

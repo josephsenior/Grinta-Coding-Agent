@@ -2,24 +2,23 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
 from typing import cast
+from unittest.mock import MagicMock
 
 import pytest
-from backend.core.config.compactor_config import CompactorConfig
 
 from backend.context.compactor.compactor import (
     COMPACTOR_METADATA_KEY,
     COMPACTOR_REGISTRY,
+    MAX_COMPACTOR_META_BATCHES,
     BaseLLMCompactor,
     Compaction,
     Compactor,
-    MAX_COMPACTOR_META_BATCHES,
     get_compaction_metadata,
 )
 from backend.context.view import View
+from backend.core.config.compactor_config import CompactorConfig
 from backend.ledger.action import MessageAction
-
 
 # ===================================================================
 # Helpers
@@ -40,7 +39,7 @@ def _make_events(n: int) -> list:
     """Create n MessageAction events for building a View."""
     events = []
     for i in range(n):
-        e = MessageAction(content=f"msg-{i}")
+        e = MessageAction(content=f'msg-{i}')
         e._id = i
         events.append(e)
     return events
@@ -57,8 +56,8 @@ class TestGetCompactionMetadata:
         assert get_compaction_metadata(state) == []
 
     def test_with_metadata(self):
-        state = _make_state({COMPACTOR_METADATA_KEY: [{"batch": 1}]})
-        assert get_compaction_metadata(state) == [{"batch": 1}]
+        state = _make_state({COMPACTOR_METADATA_KEY: [{'batch': 1}]})
+        assert get_compaction_metadata(state) == [{'batch': 1}]
 
 
 # ===================================================================
@@ -77,17 +76,17 @@ class TestCompactorMetadata:
     def test_add_and_write(self):
         c = ConcreteCompactor()
         state = _make_state()
-        c.add_metadata("key1", "value1")
-        c.add_metadata("key2", 42)
+        c.add_metadata('key1', 'value1')
+        c.add_metadata('key2', 42)
         c.write_metadata(state)
         meta = state.extra_data[COMPACTOR_METADATA_KEY]
         assert len(meta) == 1
-        assert meta[0] == {"key1": "value1", "key2": 42}
+        assert meta[0] == {'key1': 'value1', 'key2': 42}
 
     def test_write_clears_batch(self):
         c = ConcreteCompactor()
         state = _make_state()
-        c.add_metadata("a", 1)
+        c.add_metadata('a', 1)
         c.write_metadata(state)
         # Second write should produce empty batch (nothing added)
         c.write_metadata(state)
@@ -99,24 +98,24 @@ class TestCompactorMetadata:
         state = _make_state(
             {
                 COMPACTOR_METADATA_KEY: [
-                    {"i": i} for i in range(MAX_COMPACTOR_META_BATCHES)
+                    {'i': i} for i in range(MAX_COMPACTOR_META_BATCHES)
                 ]
             }
         )
-        c.add_metadata("new", True)
+        c.add_metadata('new', True)
         c.write_metadata(state)
         meta = state.extra_data[COMPACTOR_METADATA_KEY]
         assert len(meta) == MAX_COMPACTOR_META_BATCHES
-        assert meta[-1] == {"new": True}
+        assert meta[-1] == {'new': True}
 
     def test_metadata_batch_context_manager(self):
         c = ConcreteCompactor()
         state = _make_state()
         with c.metadata_batch(state):
-            c.add_metadata("ctx", "test")
+            c.add_metadata('ctx', 'test')
         meta = state.extra_data[COMPACTOR_METADATA_KEY]
         assert len(meta) == 1
-        assert meta[0]["ctx"] == "test"
+        assert meta[0]['ctx'] == 'test'
 
 
 # ===================================================================
@@ -155,11 +154,9 @@ class TestCompactorRegistry:
         class DuplicateConfig:
             pass
 
-        ConcreteCompactor.register_config(
-            cast(type[CompactorConfig], DuplicateConfig)
-        )
+        ConcreteCompactor.register_config(cast(type[CompactorConfig], DuplicateConfig))
         try:
-            with pytest.raises(ValueError, match="already registered"):
+            with pytest.raises(ValueError, match='already registered'):
                 ConcreteCompactor.register_config(
                     cast(type[CompactorConfig], DuplicateConfig)
                 )
@@ -170,7 +167,7 @@ class TestCompactorRegistry:
         class UnknownConfig:
             pass
 
-        with pytest.raises(ValueError, match="Unknown compactor config"):
+        with pytest.raises(ValueError, match='Unknown compactor config'):
             Compactor.from_config(cast(CompactorConfig, UnknownConfig()), MagicMock())
 
 
@@ -187,7 +184,7 @@ class ConcreteLLMCompactor(BaseLLMCompactor):
             action=MagicMock(
                 pruned_events_start_id=0,
                 pruned_events_end_id=1,
-                summary="summarized",
+                summary='summarized',
                 summary_offset=0,
             )
         )
@@ -200,11 +197,11 @@ class TestBaseLLMCompactor:
         assert c.keep_first == 2
 
     def test_max_size_must_be_positive(self):
-        with pytest.raises(ValueError, match="max_size.*must be positive"):
+        with pytest.raises(ValueError, match='max_size.*must be positive'):
             ConcreteLLMCompactor(llm=None, max_size=0)
 
     def test_keep_first_cannot_be_negative(self):
-        with pytest.raises(ValueError, match="keep_first.*cannot be negative"):
+        with pytest.raises(ValueError, match='keep_first.*cannot be negative'):
             ConcreteLLMCompactor(llm=None, max_size=10, keep_first=-1)
 
     def test_keep_first_at_most_half_max_ok(self):
@@ -212,7 +209,7 @@ class TestBaseLLMCompactor:
         ConcreteLLMCompactor(llm=None, max_size=10, keep_first=5)
 
     def test_keep_first_greater_than_half_max_raises(self):
-        with pytest.raises(ValueError, match="keep_first.*half"):
+        with pytest.raises(ValueError, match='keep_first.*half'):
             ConcreteLLMCompactor(llm=None, max_size=10, keep_first=6)
 
     def test_should_compact(self):
@@ -252,16 +249,16 @@ class TestBaseLLMCompactor:
 
     def test_truncate(self):
         c = ConcreteLLMCompactor(llm=None, max_size=100, max_event_length=10)
-        result = c._truncate("a" * 200)
+        result = c._truncate('a' * 200)
         # truncate_content adds wrapper text, but result should be shorter than original
         assert len(result) < 200
 
     def test_sanitize_workspace_paths_rewrites_app_workspace_paths(self):
         result = BaseLLMCompactor._sanitize_workspace_paths(
-            "see /tmp/app_workspace_sid_123/src/main.py for details"
+            'see /tmp/app_workspace_sid_123/src/main.py for details'
         )
 
-        assert result == "see /workspace for details"
+        assert result == 'see /workspace for details'
 
 
 # ===================================================================
@@ -276,9 +273,9 @@ class TestCompaction:
         action = CondensationAction(
             pruned_events_start_id=0,
             pruned_events_end_id=10,
-            summary="Events were condensed",
+            summary='Events were condensed',
             summary_offset=1,
         )
         c = Compaction(action=action)
-        assert c.action.summary == "Events were condensed"
+        assert c.action.summary == 'Events were condensed'
         assert c.action.pruned_events_start_id == 0

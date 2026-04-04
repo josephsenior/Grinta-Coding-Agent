@@ -15,7 +15,6 @@ from backend.orchestration.tool_pipeline import (
     ToolInvocationPipeline,
 )
 
-
 # ── ToolInvocationContext ─────────────────────────────────────────────
 
 
@@ -35,9 +34,9 @@ class TestToolInvocationContextPipeline:
         ctx = ToolInvocationContext(
             controller=MagicMock(), action=MagicMock(), state=MagicMock()
         )
-        ctx.block("safety check")
+        ctx.block('safety check')
         assert ctx.blocked is True
-        assert ctx.block_reason == "safety check"
+        assert ctx.block_reason == 'safety check'
 
     def test_block_without_reason(self):
         ctx = ToolInvocationContext(
@@ -134,14 +133,14 @@ class TestToolInvocationPipelineCore:
         obs = MagicMock()
         await pipeline.run_observe(ctx, obs)
         mw.observe.assert_called_once_with(ctx, observation=obs)
-        assert ctx.metadata["observation"] is obs
+        assert ctx.metadata['observation'] is obs
 
     @pytest.mark.asyncio
     async def test_middleware_blocking_stops_chain(self):
         mw1 = MagicMock(spec=ToolInvocationMiddleware)
 
         async def block(ctx):
-            ctx.block("mw1 blocked")
+            ctx.block('mw1 blocked')
 
         mw1.plan = block
 
@@ -194,11 +193,11 @@ class TestCircuitBreakerMiddlewarePipeline:
         mw = CircuitBreakerMiddleware(controller)
         ctx = ToolInvocationContext(
             controller=controller,
-            action=MagicMock(security_risk="HIGH"),
+            action=MagicMock(security_risk='HIGH'),
             state=MagicMock(),
         )
         await mw.execute(ctx)
-        service.record_high_risk_action.assert_called_once_with("HIGH")
+        service.record_high_risk_action.assert_called_once_with('HIGH')
 
     @pytest.mark.asyncio
     async def test_observe_records_success_for_non_error(self):
@@ -223,7 +222,7 @@ class TestCircuitBreakerMiddlewarePipeline:
         ctx = ToolInvocationContext(
             controller=controller, action=MagicMock(), state=MagicMock()
         )
-        obs = ErrorObservation(content="something broke")
+        obs = ErrorObservation(content='something broke')
         await mw.observe(ctx, obs)
         service.record_error.assert_called_once()
 
@@ -254,7 +253,7 @@ class TestLoggingMiddlewarePipeline:
         )
         await mw.plan(ctx)
         controller.log.assert_called_once()
-        assert "PLAN" in controller.log.call_args[0][1]
+        assert 'PLAN' in controller.log.call_args[0][1]
 
     @pytest.mark.asyncio
     async def test_execute_logs(self):
@@ -265,7 +264,7 @@ class TestLoggingMiddlewarePipeline:
         )
         await mw.execute(ctx)
         controller.log.assert_called_once()
-        assert "EXECUTE" in controller.log.call_args[0][1]
+        assert 'EXECUTE' in controller.log.call_args[0][1]
 
     @pytest.mark.asyncio
     async def test_observe_none_is_noop(self):
@@ -286,4 +285,4 @@ class TestLoggingMiddlewarePipeline:
         )
         await mw.observe(ctx, MagicMock())
         controller.log.assert_called_once()
-        assert "OBSERVE" in controller.log.call_args[0][1]
+        assert 'OBSERVE' in controller.log.call_args[0][1]

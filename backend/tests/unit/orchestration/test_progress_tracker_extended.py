@@ -19,19 +19,19 @@ from backend.orchestration.progress_tracker import (
 # ---------------------------------------------------------------------------
 class TestMilestone:
     def test_creation(self):
-        m = Milestone(name="tests_passing", iteration=5, timestamp=datetime.now())
-        assert m.name == "tests_passing"
+        m = Milestone(name='tests_passing', iteration=5, timestamp=datetime.now())
+        assert m.name == 'tests_passing'
         assert m.iteration == 5
-        assert m.description == ""
+        assert m.description == ''
 
     def test_with_description(self):
         m = Milestone(
-            name="commit",
+            name='commit',
             iteration=10,
             timestamp=datetime.now(),
-            description="First commit",
+            description='First commit',
         )
-        assert m.description == "First commit"
+        assert m.description == 'First commit'
 
 
 class TestProgressMetrics:
@@ -144,11 +144,11 @@ class TestCalculateCompletionPercentage:
 
     def test_partial_progress(self):
         tracker = ProgressTracker(max_iterations=100)
-        tracker.files_modified = {"a.py", "b.py", "c.py", "d.py", "e.py"}
+        tracker.files_modified = {'a.py', 'b.py', 'c.py', 'd.py', 'e.py'}
         tracker.tests_run = 10
         tracker.tests_passed = 10
         tracker.milestones = [
-            Milestone(name="m1", iteration=1, timestamp=datetime.now())
+            Milestone(name='m1', iteration=1, timestamp=datetime.now())
         ]
         state = self._make_state(iteration=50)
         pct = tracker._calculate_completion_percentage(state)
@@ -156,11 +156,11 @@ class TestCalculateCompletionPercentage:
 
     def test_capped_at_one(self):
         tracker = ProgressTracker(max_iterations=10)
-        tracker.files_modified = {f"f{i}.py" for i in range(20)}
+        tracker.files_modified = {f'f{i}.py' for i in range(20)}
         tracker.tests_run = 100
         tracker.tests_passed = 100
         tracker.milestones = [
-            Milestone(name=f"m{i}", iteration=i, timestamp=datetime.now())
+            Milestone(name=f'm{i}', iteration=i, timestamp=datetime.now())
             for i in range(20)
         ]
         state = self._make_state(iteration=10)
@@ -176,11 +176,11 @@ class TestTrackFileModifications:
         from backend.ledger.action import FileEditAction
 
         tracker = ProgressTracker(max_iterations=100)
-        action = FileEditAction(path="/tmp/x.py", content="pass")
+        action = FileEditAction(path='/tmp/x.py', content='pass')
         state = MagicMock()
         state.history = [action]
         tracker._track_file_modifications(state)
-        assert "/tmp/x.py" in tracker.files_modified
+        assert '/tmp/x.py' in tracker.files_modified
 
     def test_ignores_non_edit_events(self):
         tracker = ProgressTracker(max_iterations=100)
@@ -199,8 +199,8 @@ class TestTrackTestExecutions:
         from backend.ledger.observation import CmdOutputObservation
 
         tracker = ProgressTracker(max_iterations=100)
-        cmd = CmdRunAction(command="pytest tests/")
-        obs = CmdOutputObservation(content="passed", command="pytest", exit_code=0)
+        cmd = CmdRunAction(command='pytest tests/')
+        obs = CmdOutputObservation(content='passed', command='pytest', exit_code=0)
         state = MagicMock()
         state.history = [cmd, obs]
         tracker._track_test_executions(state)
@@ -212,8 +212,8 @@ class TestTrackTestExecutions:
         from backend.ledger.observation import CmdOutputObservation
 
         tracker = ProgressTracker(max_iterations=100)
-        cmd = CmdRunAction(command="pytest tests/")
-        obs = CmdOutputObservation(content="failed", command="pytest", exit_code=1)
+        cmd = CmdRunAction(command='pytest tests/')
+        obs = CmdOutputObservation(content='failed', command='pytest', exit_code=1)
         state = MagicMock()
         state.history = [cmd, obs]
         tracker._track_test_executions(state)
@@ -230,20 +230,20 @@ class TestDetectMilestones:
 
         tracker = ProgressTracker(max_iterations=100)
         obs = CmdOutputObservation(
-            content="passed", command="pytest tests/", exit_code=0
+            content='passed', command='pytest tests/', exit_code=0
         )
         state = MagicMock()
         state.history = [obs]
         tracker._detect_milestones(state, current_iteration=5)
         assert len(tracker.milestones) == 1
-        assert tracker.milestones[0].name == "tests_passing"
+        assert tracker.milestones[0].name == 'tests_passing'
 
     def test_no_duplicate_milestones(self):
         from backend.ledger.observation import CmdOutputObservation
 
         tracker = ProgressTracker(max_iterations=100)
         obs = CmdOutputObservation(
-            content="passed", command="pytest tests/", exit_code=0
+            content='passed', command='pytest tests/', exit_code=0
         )
         state = MagicMock()
         state.history = [obs]

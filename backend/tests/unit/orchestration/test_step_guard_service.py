@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.orchestration.services.step_guard_service import StepGuardService
 from backend.core.schemas import AgentState
+from backend.orchestration.services.step_guard_service import StepGuardService
 
 
 def _make_service():
@@ -40,7 +40,7 @@ class TestEnsureCanStep:
     async def test_circuit_breaker_tripped_stop(self):
         svc, ctrl = _make_service()
         ctrl.circuit_breaker_service.check.return_value = SimpleNamespace(
-            tripped=True, reason="too many errors", action="stop", recommendation="wait"
+            tripped=True, reason='too many errors', action='stop', recommendation='wait'
         )
         assert await svc.ensure_can_step() is False
         ctrl.set_agent_state_to.assert_awaited_once_with(AgentState.STOPPED)
@@ -49,7 +49,7 @@ class TestEnsureCanStep:
     async def test_circuit_breaker_tripped_pause(self):
         svc, ctrl = _make_service()
         ctrl.circuit_breaker_service.check.return_value = SimpleNamespace(
-            tripped=True, reason="rate limit", action="pause", recommendation="slow"
+            tripped=True, reason='rate limit', action='pause', recommendation='slow'
         )
         assert await svc.ensure_can_step() is False
         ctrl.set_agent_state_to.assert_awaited_once_with(AgentState.PAUSED)

@@ -1,12 +1,11 @@
 """Tests for LifecycleService."""
 
 import unittest
-from unittest.mock import MagicMock, patch
 from typing import cast
+from unittest.mock import MagicMock, patch
 
 from backend.core.config import AgentConfig, LLMConfig
 from backend.ledger import Event
-
 from backend.orchestration.services.lifecycle_service import LifecycleService
 
 
@@ -18,11 +17,11 @@ class TestLifecycleService(unittest.TestCase):
         self.mock_controller = MagicMock()
         self.service = LifecycleService(self.mock_controller)
 
-    @patch("backend.orchestration.services.lifecycle_service.EventStreamSubscriber")
+    @patch('backend.orchestration.services.lifecycle_service.EventStreamSubscriber')
     def test_initialize_core_attributes(self, mock_subscriber_enum):
         """Test initialize_core_attributes sets all core attributes."""
         mock_event_stream = MagicMock()
-        mock_event_stream.sid = "stream-123"
+        mock_event_stream.sid = 'stream-123'
         mock_agent = MagicMock()
         mock_file_store = MagicMock()
         mock_conversation_stats = MagicMock()
@@ -30,10 +29,10 @@ class TestLifecycleService(unittest.TestCase):
         mock_security_analyzer = MagicMock()
 
         self.service.initialize_core_attributes(
-            sid="session-456",
+            sid='session-456',
             event_stream=mock_event_stream,
             agent=mock_agent,
-            user_id="user-789",
+            user_id='user-789',
             file_store=mock_file_store,
             headless_mode=True,
             conversation_stats=mock_conversation_stats,
@@ -42,7 +41,7 @@ class TestLifecycleService(unittest.TestCase):
         )
 
         # Check current implementation-set attributes
-        self.assertEqual(self.mock_controller.user_id, "user-789")
+        self.assertEqual(self.mock_controller.user_id, 'user-789')
         self.assertEqual(self.mock_controller.file_store, mock_file_store)
         self.assertTrue(self.mock_controller.headless_mode)
         self.assertEqual(self.mock_controller.status_callback, mock_status_callback)
@@ -51,11 +50,11 @@ class TestLifecycleService(unittest.TestCase):
         # Check event stream subscription
         mock_event_stream.subscribe.assert_called_once()
 
-    @patch("backend.orchestration.services.lifecycle_service.EventStreamSubscriber")
+    @patch('backend.orchestration.services.lifecycle_service.EventStreamSubscriber')
     def test_initialize_core_attributes_sid_fallback(self, mock_subscriber_enum):
         """Test initialize_core_attributes uses event_stream.sid when sid is None."""
         mock_event_stream = MagicMock()
-        mock_event_stream.sid = "fallback-sid"
+        mock_event_stream.sid = 'fallback-sid'
         mock_agent = MagicMock()
 
         self.service.initialize_core_attributes(
@@ -70,17 +69,17 @@ class TestLifecycleService(unittest.TestCase):
             security_analyzer=MagicMock(),
         )
 
-    @patch("backend.orchestration.services.lifecycle_service.EventStreamSubscriber")
-    @patch("backend.core.enums.LifecyclePhase")
+    @patch('backend.orchestration.services.lifecycle_service.EventStreamSubscriber')
+    @patch('backend.core.enums.LifecyclePhase')
     def test_initialize_core_attributes_sets_lifecycle_phase(
         self, mock_lifecycle_phase, mock_subscriber_enum
     ):
         """Test initialize_core_attributes sets lifecycle to ACTIVE."""
         mock_event_stream = MagicMock()
-        mock_event_stream.sid = "sid"
+        mock_event_stream.sid = 'sid'
 
         self.service.initialize_core_attributes(
-            sid="test",
+            sid='test',
             event_stream=mock_event_stream,
             agent=MagicMock(),
             user_id=None,
@@ -93,8 +92,8 @@ class TestLifecycleService(unittest.TestCase):
 
         self.assertEqual(self.mock_controller._lifecycle, mock_lifecycle_phase.ACTIVE)
 
-    @patch("backend.orchestration.services.lifecycle_service.StateTracker")
-    @patch("backend.orchestration.services.lifecycle_service.ReplayManager")
+    @patch('backend.orchestration.services.lifecycle_service.StateTracker')
+    @patch('backend.orchestration.services.lifecycle_service.ReplayManager')
     def test_initialize_state_and_tracking(
         self, mock_replay_manager_class, mock_state_tracker_class
     ):
@@ -112,9 +111,9 @@ class TestLifecycleService(unittest.TestCase):
         mock_replay_manager_class.return_value = mock_replay_manager
 
         self.service.initialize_state_and_tracking(
-            sid="session-123",
+            sid='session-123',
             file_store=mock_file_store,
-            user_id="user-456",
+            user_id='user-456',
             initial_state=mock_initial_state,
             conversation_stats=mock_conversation_stats,
             iteration_delta=100,
@@ -125,7 +124,7 @@ class TestLifecycleService(unittest.TestCase):
 
         # Check StateTracker created
         mock_state_tracker_class.assert_called_once_with(
-            "session-123", mock_file_store, "user-456"
+            'session-123', mock_file_store, 'user-456'
         )
         self.assertEqual(self.mock_controller.state_tracker, mock_state_tracker)
 
@@ -145,8 +144,8 @@ class TestLifecycleService(unittest.TestCase):
         mock_replay_manager_class.assert_called_once_with(mock_replay_events)
         self.assertEqual(self.mock_controller._replay_manager, mock_replay_manager)
 
-    @patch("backend.orchestration.services.lifecycle_service.StateTracker")
-    @patch("backend.orchestration.services.lifecycle_service.ReplayManager")
+    @patch('backend.orchestration.services.lifecycle_service.StateTracker')
+    @patch('backend.orchestration.services.lifecycle_service.ReplayManager')
     def test_initialize_state_and_tracking_none_values(
         self, mock_replay_manager_class, mock_state_tracker_class
     ):
@@ -179,10 +178,10 @@ class TestLifecycleService(unittest.TestCase):
     def test_initialize_agent_configs_with_configs(self):
         """Test initialize_agent_configs stores config dictionaries."""
         mock_agent_to_llm_config = cast(
-            dict[str, LLMConfig], {"agent1": MagicMock(), "agent2": MagicMock()}
+            dict[str, LLMConfig], {'agent1': MagicMock(), 'agent2': MagicMock()}
         )
         mock_agent_configs = cast(
-            dict[str, AgentConfig], {"agent1": MagicMock(), "agent2": MagicMock()}
+            dict[str, AgentConfig], {'agent1': MagicMock(), 'agent2': MagicMock()}
         )
 
         self.service.initialize_agent_configs(
@@ -228,19 +227,19 @@ class TestLifecycleService(unittest.TestCase):
         self.assertEqual(self.mock_controller._initial_max_iterations, 0)
         self.assertEqual(self.mock_controller._initial_max_budget_per_task, 0.0)
 
-    @patch("backend.orchestration.services.lifecycle_service.EventStreamSubscriber")
+    @patch('backend.orchestration.services.lifecycle_service.EventStreamSubscriber')
     def test_full_initialization_workflow(self, mock_subscriber_enum):
         """Test complete initialization workflow using all three methods."""
         # Step 1: Initialize core attributes
         mock_event_stream = MagicMock()
-        mock_event_stream.sid = "sid"
+        mock_event_stream.sid = 'sid'
         mock_agent = MagicMock()
 
         self.service.initialize_core_attributes(
-            sid="session-1",
+            sid='session-1',
             event_stream=mock_event_stream,
             agent=mock_agent,
-            user_id="user-1",
+            user_id='user-1',
             file_store=MagicMock(),
             headless_mode=False,
             conversation_stats=MagicMock(),
@@ -249,12 +248,14 @@ class TestLifecycleService(unittest.TestCase):
         )
 
         # Step 2: Initialize state and tracking
-        with patch("backend.orchestration.services.lifecycle_service.StateTracker"):
-            with patch("backend.orchestration.services.lifecycle_service.ReplayManager"):
+        with patch('backend.orchestration.services.lifecycle_service.StateTracker'):
+            with patch(
+                'backend.orchestration.services.lifecycle_service.ReplayManager'
+            ):
                 self.service.initialize_state_and_tracking(
-                    sid="session-1",
+                    sid='session-1',
                     file_store=MagicMock(),
-                    user_id="user-1",
+                    user_id='user-1',
                     initial_state=MagicMock(),
                     conversation_stats=MagicMock(),
                     iteration_delta=100,
@@ -265,8 +266,8 @@ class TestLifecycleService(unittest.TestCase):
 
         # Step 3: Initialize agent configs
         self.service.initialize_agent_configs(
-            agent_to_llm_config={"agent": MagicMock()},
-            agent_configs={"agent": MagicMock()},
+            agent_to_llm_config={'agent': MagicMock()},
+            agent_configs={'agent': MagicMock()},
             iteration_delta=100,
             budget_per_task_delta=50.0,
         )
@@ -277,5 +278,5 @@ class TestLifecycleService(unittest.TestCase):
         self.assertIsNotNone(self.mock_controller.agent_to_llm_config)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

@@ -39,16 +39,16 @@ logger = logging.getLogger(__name__)
 class MyPlugin(AppPlugin):
     """Example App plugin — replace with your implementation."""
 
-    name = "my-plugin"
-    version = "0.1.0"
-    description = "A template plugin for App."
+    name = 'my-plugin'
+    version = '0.1.0'
+    description = 'A template plugin for App.'
     min_api_version = (1, 0)
 
     # ── Override the hooks you need ─────────────────────
 
     async def on_action_pre(self, action):
         # Example: log every action before execution
-        logger.info("[%s] action_pre: %s", self.name, type(action).__name__)
+        logger.info('[%s] action_pre: %s', self.name, type(action).__name__)
         return action
 
     async def on_event(self, event):
@@ -56,10 +56,10 @@ class MyPlugin(AppPlugin):
         pass
 
     async def on_session_start(self, session_id: str, metadata: dict[str, Any]):
-        logger.info("[%s] session started: %s", self.name, session_id)
+        logger.info('[%s] session started: %s', self.name, session_id)
 
     async def on_session_end(self, session_id: str, metadata: dict[str, Any]):
-        logger.info("[%s] session ended: %s", self.name, session_id)
+        logger.info('[%s] session ended: %s', self.name, session_id)
 
     # ── Validation ──────────────────────────────────────
 
@@ -75,5 +75,5 @@ def register(registry: PluginRegistry) -> None:
     validation_warnings = plugin.validate()
     if validation_warnings:
         for w in validation_warnings:
-            logger.warning("[%s] validation: %s", plugin.name, w)
+            logger.warning('[%s] validation: %s', plugin.name, w)
     registry.register(plugin)

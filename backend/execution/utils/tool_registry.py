@@ -43,32 +43,32 @@ class ToolRegistry:
         self._detect_all_tools()
 
     def _detect_container_runtime(self) -> bool:
-        if os.getenv("APP_RUNTIME_IS_CONTAINER", "").strip().lower() in {
-            "1",
-            "true",
-            "yes",
-            "on",
+        if os.getenv('APP_RUNTIME_IS_CONTAINER', '').strip().lower() in {
+            '1',
+            'true',
+            'yes',
+            'on',
         }:
             return True
-        if os.getenv("container", "").strip():
+        if os.getenv('container', '').strip():
             return True
-        return os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv")
+        return os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv')
 
     def _detect_wsl_runtime(self) -> bool:
-        platform_name = getattr(sys, "platform", "")
-        if not str(platform_name).startswith("linux"):
+        platform_name = getattr(sys, 'platform', '')
+        if not str(platform_name).startswith('linux'):
             return False
-        if os.getenv("WSL_DISTRO_NAME") or os.getenv("WSL_INTEROP"):
+        if os.getenv('WSL_DISTRO_NAME') or os.getenv('WSL_INTEROP'):
             return True
         try:
-            with open("/proc/version", encoding="utf-8") as f:
-                return "microsoft" in f.read().lower()
+            with open('/proc/version', encoding='utf-8') as f:
+                return 'microsoft' in f.read().lower()
         except OSError:
             return False
 
     def _detect_all_tools(self) -> None:
         """Detect all tools at once during initialization."""
-        logger.info("🔍 Detecting available tools...")
+        logger.info('🔍 Detecting available tools...')
 
         # Detect shell
         self._detect_shell()
@@ -87,131 +87,131 @@ class ToolRegistry:
 
     def _detect_shell(self) -> None:
         """Detect the best available shell."""
-        if sys.platform == "win32":
+        if sys.platform == 'win32':
             # Windows: try pwsh -> powershell -> cmd
             if self._check_command(
-                "pwsh", ["-NoProfile", "-Command", "$PSVersionTable.PSVersion"]
+                'pwsh', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion']
             ):
-                self._tools["shell"] = ToolInfo(
-                    name="pwsh",
+                self._tools['shell'] = ToolInfo(
+                    name='pwsh',
                     available=True,
-                    path=shutil.which("pwsh"),
-                    version=self._get_powershell_version("pwsh"),
+                    path=shutil.which('pwsh'),
+                    version=self._get_powershell_version('pwsh'),
                 )
             elif self._check_command(
-                "powershell", ["-NoProfile", "-Command", "$PSVersionTable.PSVersion"]
+                'powershell', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion']
             ):
-                self._tools["shell"] = ToolInfo(
-                    name="powershell",
+                self._tools['shell'] = ToolInfo(
+                    name='powershell',
                     available=True,
-                    path=shutil.which("powershell"),
-                    version=self._get_powershell_version("powershell"),
+                    path=shutil.which('powershell'),
+                    version=self._get_powershell_version('powershell'),
                 )
             else:
                 # Fallback to cmd (always available on Windows)
-                self._tools["shell"] = ToolInfo(
-                    name="cmd",
+                self._tools['shell'] = ToolInfo(
+                    name='cmd',
                     available=True,
-                    path=shutil.which("cmd"),
+                    path=shutil.which('cmd'),
                 )
             # Also detect bash availability (Git Bash / WSL) on Windows
-            bash_path = shutil.which("bash")
-            if bash_path and self._check_command("bash", ["--version"]):
-                self._tools["bash"] = ToolInfo(
-                    name="bash",
+            bash_path = shutil.which('bash')
+            if bash_path and self._check_command('bash', ['--version']):
+                self._tools['bash'] = ToolInfo(
+                    name='bash',
                     available=True,
                     path=bash_path,
                     version=self._get_bash_version(),
                 )
         else:
             # Unix-like: try bash (should always be available)
-            bash_path = shutil.which("bash")
+            bash_path = shutil.which('bash')
             if bash_path:
-                self._tools["shell"] = ToolInfo(
-                    name="bash",
+                self._tools['shell'] = ToolInfo(
+                    name='bash',
                     available=True,
                     path=bash_path,
                     version=self._get_bash_version(),
                 )
             else:
                 # Fallback to sh (POSIX standard)
-                self._tools["shell"] = ToolInfo(
-                    name="sh",
+                self._tools['shell'] = ToolInfo(
+                    name='sh',
                     available=True,
-                    path=shutil.which("sh"),
+                    path=shutil.which('sh'),
                 )
 
     def _detect_search_tool(self) -> None:
         """Detect the best available search tool."""
         # Try ripgrep first (fastest)
-        if self._check_command("rg", ["--version"]):
-            self._tools["search"] = ToolInfo(
-                name="ripgrep",
+        if self._check_command('rg', ['--version']):
+            self._tools['search'] = ToolInfo(
+                name='ripgrep',
                 available=True,
-                path=shutil.which("rg"),
-                version=self._get_version_output("rg", ["--version"]),
+                path=shutil.which('rg'),
+                version=self._get_version_output('rg', ['--version']),
             )
         # Try grep (Unix standard)
-        elif self._check_command("grep", ["--version"]):
-            self._tools["search"] = ToolInfo(
-                name="grep",
+        elif self._check_command('grep', ['--version']):
+            self._tools['search'] = ToolInfo(
+                name='grep',
                 available=True,
-                path=shutil.which("grep"),
-                fallback="python",  # Can fall back to pure Python
+                path=shutil.which('grep'),
+                fallback='python',  # Can fall back to pure Python
             )
         # Windows findstr
-        elif sys.platform == "win32" and self._check_command(
-            "findstr", ["/?"], check_stderr=True
+        elif sys.platform == 'win32' and self._check_command(
+            'findstr', ['/?'], check_stderr=True
         ):
-            self._tools["search"] = ToolInfo(
-                name="findstr",
+            self._tools['search'] = ToolInfo(
+                name='findstr',
                 available=True,
-                path=shutil.which("findstr"),
-                fallback="python",
+                path=shutil.which('findstr'),
+                fallback='python',
             )
         else:
             # Pure Python fallback (always works)
-            self._tools["search"] = ToolInfo(
-                name="python",
+            self._tools['search'] = ToolInfo(
+                name='python',
                 available=True,
                 fallback=None,  # No further fallback
             )
 
     def _detect_git(self) -> None:
         """Detect Git (required tool)."""
-        if self._check_command("git", ["--version"]):
-            self._tools["git"] = ToolInfo(
-                name="git",
+        if self._check_command('git', ['--version']):
+            self._tools['git'] = ToolInfo(
+                name='git',
                 available=True,
-                path=shutil.which("git"),
-                version=self._get_version_output("git", ["--version"]),
+                path=shutil.which('git'),
+                version=self._get_version_output('git', ['--version']),
             )
         else:
-            self._tools["git"] = ToolInfo(
-                name="git",
+            self._tools['git'] = ToolInfo(
+                name='git',
                 available=False,
             )
 
     def _detect_tmux(self) -> None:
         """Detect tmux (Unix only, optional)."""
-        if sys.platform == "win32":
+        if sys.platform == 'win32':
             # tmux not available on Windows
-            self._tools["tmux"] = ToolInfo(
-                name="tmux",
+            self._tools['tmux'] = ToolInfo(
+                name='tmux',
                 available=False,
             )
-        elif self._check_command("tmux", ["-V"]):
-            self._tools["tmux"] = ToolInfo(
-                name="tmux",
+        elif self._check_command('tmux', ['-V']):
+            self._tools['tmux'] = ToolInfo(
+                name='tmux',
                 available=True,
-                path=shutil.which("tmux"),
-                version=self._get_version_output("tmux", ["-V"]),
+                path=shutil.which('tmux'),
+                version=self._get_version_output('tmux', ['-V']),
             )
         else:
-            self._tools["tmux"] = ToolInfo(
-                name="tmux",
+            self._tools['tmux'] = ToolInfo(
+                name='tmux',
                 available=False,
-                fallback="subprocess",  # Can use simple subprocess instead
+                fallback='subprocess',  # Can use simple subprocess instead
             )
 
     def _check_command(
@@ -247,7 +247,7 @@ class ToolRegistry:
                 timeout=5,
             )
             if result.returncode == 0:
-                return result.stdout.strip().split("\n")[0]  # First line only
+                return result.stdout.strip().split('\n')[0]  # First line only
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
         return None
@@ -258,9 +258,9 @@ class ToolRegistry:
             result = subprocess.run(
                 [
                     ps_exe,
-                    "-NoProfile",
-                    "-Command",
-                    "$PSVersionTable.PSVersion.ToString()",
+                    '-NoProfile',
+                    '-Command',
+                    '$PSVersionTable.PSVersion.ToString()',
                 ],
                 check=False,
                 capture_output=True,
@@ -277,7 +277,7 @@ class ToolRegistry:
         """Get Bash version."""
         try:
             result = subprocess.run(
-                ["bash", "--version"],
+                ['bash', '--version'],
                 check=False,
                 capture_output=True,
                 text=True,
@@ -285,7 +285,7 @@ class ToolRegistry:
             )
             if result.returncode == 0:
                 # Extract version from first line
-                return result.stdout.split("\n")[0]
+                return result.stdout.split('\n')[0]
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
         return None
@@ -293,77 +293,77 @@ class ToolRegistry:
     def _log_detection_summary(self) -> None:
         """Log a summary of detected tools."""
         logger.info(
-            "Runtime context: platform=%s container=%s wsl=%s",
+            'Runtime context: platform=%s container=%s wsl=%s',
             sys.platform,
             self._is_container,
             self._is_wsl,
         )
         for tool_name, tool_info in self._tools.items():
             if tool_info.available:
-                version_str = f" ({tool_info.version})" if tool_info.version else ""
+                version_str = f' ({tool_info.version})' if tool_info.version else ''
                 logger.info(
-                    "✅ %s: %s%s", tool_name.capitalize(), tool_info.name, version_str
+                    '✅ %s: %s%s', tool_name.capitalize(), tool_info.name, version_str
                 )
             else:
                 fallback_str = (
-                    f" (fallback: {tool_info.fallback})" if tool_info.fallback else ""
+                    f' (fallback: {tool_info.fallback})' if tool_info.fallback else ''
                 )
-                if tool_name == "git":
+                if tool_name == 'git':
                     logger.error(
-                        "❌ %s: Not found (REQUIRED)%s",
+                        '❌ %s: Not found (REQUIRED)%s',
                         tool_name.capitalize(),
                         fallback_str,
                     )
-                elif tool_name == "tmux" and sys.platform == "win32":
+                elif tool_name == 'tmux' and sys.platform == 'win32':
                     logger.debug(
-                        "⚠️  %s: Not available on Windows (expected)",
+                        '⚠️  %s: Not available on Windows (expected)',
                         tool_name.capitalize(),
                     )
                 else:
                     logger.warning(
-                        "⚠️  %s: Not found%s", tool_name.capitalize(), fallback_str
+                        '⚠️  %s: Not found%s', tool_name.capitalize(), fallback_str
                     )
 
     # Public API
 
     @property
-    def shell_type(self) -> Literal["bash", "pwsh", "powershell", "cmd", "sh"]:
+    def shell_type(self) -> Literal['bash', 'pwsh', 'powershell', 'cmd', 'sh']:
         """Get the detected shell type."""
-        return self._tools.get("shell", ToolInfo("unknown", False)).name  # type: ignore
+        return self._tools.get('shell', ToolInfo('unknown', False)).name  # type: ignore
 
     @property
     def has_bash(self) -> bool:
         """Check if bash is available (as primary shell or as a separate tool on Windows)."""
-        if self._tools.get("shell", ToolInfo("", False)).name == "bash":
+        if self._tools.get('shell', ToolInfo('', False)).name == 'bash':
             return True
         # On Windows, bash may be available as a separate tool (Git Bash / WSL)
-        return self._tools.get("bash", ToolInfo("", False)).available
+        return self._tools.get('bash', ToolInfo('', False)).available
 
     @property
     def has_powershell(self) -> bool:
         """Check if PowerShell is available."""
-        shell = self._tools.get("shell", ToolInfo("", False)).name
-        return shell in ("pwsh", "powershell")
+        shell = self._tools.get('shell', ToolInfo('', False)).name
+        return shell in ('pwsh', 'powershell')
 
     @property
     def has_tmux(self) -> bool:
         """Check if tmux is available."""
-        return self._tools.get("tmux", ToolInfo("", False)).available
+        return self._tools.get('tmux', ToolInfo('', False)).available
 
     @property
     def has_git(self) -> bool:
         """Check if Git is available."""
-        return self._tools.get("git", ToolInfo("", False)).available
+        return self._tools.get('git', ToolInfo('', False)).available
 
     @property
-    def search_tool(self) -> Literal["ripgrep", "grep", "findstr", "python"]:
+    def search_tool(self) -> Literal['ripgrep', 'grep', 'findstr', 'python']:
         """Get the detected search tool."""
-        return self._tools.get("search", ToolInfo("python", True)).name  # type: ignore
+        return self._tools.get('search', ToolInfo('python', True)).name  # type: ignore
 
     @property
     def has_ripgrep(self) -> bool:
         """Check if ripgrep is available."""
-        return self._tools.get("search", ToolInfo("", False)).name == "ripgrep"
+        return self._tools.get('search', ToolInfo('', False)).name == 'ripgrep'
 
     @property
     def is_container_runtime(self) -> bool:
@@ -383,5 +383,5 @@ class ToolRegistry:
         """Ensure Git is available, raise if not."""
         if not self.has_git:
             raise RuntimeError(
-                "Git is required but not found.\nInstall Git from: https://git-scm.com/downloads"
+                'Git is required but not found.\nInstall Git from: https://git-scm.com/downloads'
             )

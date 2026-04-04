@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 from datetime import UTC
 
+from backend.persistence.locations import get_active_local_data_root
+
 from backend.persistence.data_models.knowledge_base import (
     KnowledgeBaseCollection,
     KnowledgeBaseDocument,
@@ -45,12 +47,12 @@ class KnowledgeBaseStore:
 
         # Setup storage directory
         if storage_dir is None:
-            storage_dir = Path.home() / ".app" / "kb"
+            storage_dir = Path(get_active_local_data_root()) / 'kb'
         self.storage_dir = storage_dir
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
-        self.collections_file = self.storage_dir / "collections.json"
-        self.documents_file = self.storage_dir / "documents.json"
+        self.collections_file = self.storage_dir / 'collections.json'
+        self.documents_file = self.storage_dir / 'documents.json'
 
         # Load existing data
         self._load_from_disk()
@@ -59,54 +61,54 @@ class KnowledgeBaseStore:
         """Load collections and documents from disk."""
         try:
             if self.collections_file.exists():
-                with open(self.collections_file, encoding="utf-8") as f:
+                with open(self.collections_file, encoding='utf-8') as f:
                     data = json.load(f)
                     self._collections = {
                         k: KnowledgeBaseCollection.model_validate(v)
-                        for k, v in data.get("collections", {}).items()
+                        for k, v in data.get('collections', {}).items()
                     }
-                    self._collection_documents = data.get("collection_documents", {})
-                logger.info("Loaded %d collections from disk", len(self._collections))
+                    self._collection_documents = data.get('collection_documents', {})
+                logger.info('Loaded %d collections from disk', len(self._collections))
 
             if self.documents_file.exists():
-                with open(self.documents_file, encoding="utf-8") as f:
+                with open(self.documents_file, encoding='utf-8') as f:
                     data = json.load(f)
                     self._documents = {
                         k: KnowledgeBaseDocument.model_validate(v)
-                        for k, v in data.get("documents", {}).items()
+                        for k, v in data.get('documents', {}).items()
                     }
-                logger.info("Loaded %d documents from disk", len(self._documents))
+                logger.info('Loaded %d documents from disk', len(self._documents))
 
         except Exception as e:
-            logger.error("Failed to load knowledge base data from disk: %s", e)
+            logger.error('Failed to load knowledge base data from disk: %s', e)
 
     def _save_to_disk(self) -> None:
         """Save collections and documents to disk."""
         try:
             # Save collections
-            with open(self.collections_file, "w", encoding="utf-8") as f:
+            with open(self.collections_file, 'w', encoding='utf-8') as f:
                 data = {
-                    "collections": {
-                        k: v.model_dump(mode="json")
+                    'collections': {
+                        k: v.model_dump(mode='json')
                         for k, v in self._collections.items()
                     },
-                    "collection_documents": self._collection_documents,
+                    'collection_documents': self._collection_documents,
                 }
                 json.dump(data, f, indent=2, default=str)
 
             # Save documents
-            with open(self.documents_file, "w", encoding="utf-8") as f:
+            with open(self.documents_file, 'w', encoding='utf-8') as f:
                 data = {
-                    "documents": {
-                        k: v.model_dump(mode="json") for k, v in self._documents.items()
+                    'documents': {
+                        k: v.model_dump(mode='json') for k, v in self._documents.items()
                     }
                 }
                 json.dump(data, f, indent=2, default=str)
 
-            logger.debug("Saved knowledge base data to disk")
+            logger.debug('Saved knowledge base data to disk')
 
         except Exception as e:
-            logger.error("Failed to save knowledge base data to disk: %s", e)
+            logger.error('Failed to save knowledge base data to disk: %s', e)
 
     # Collection operations
 
@@ -126,7 +128,7 @@ class KnowledgeBaseStore:
             self._collection_documents[collection.id] = []
             self._save_to_disk()
             logger.info(
-                "Created collection: %s (ID: %s)", collection.name, collection.id
+                'Created collection: %s (ID: %s)', collection.name, collection.id
             )
             return collection
 
@@ -178,7 +180,7 @@ class KnowledgeBaseStore:
             self._collections.pop(collection_id)
             self._collection_documents.pop(collection_id, None)
             self._save_to_disk()
-            logger.info("Deleted collection: %s", collection_id)
+            logger.info('Deleted collection: %s', collection_id)
             return True
 
     # Document operations
@@ -203,7 +205,7 @@ class KnowledgeBaseStore:
                 collection.updated_at = datetime.now(UTC)
 
             self._save_to_disk()
-            logger.info("Added document: %s (ID: %s)", document.filename, document.id)
+            logger.info('Added document: %s (ID: %s)', document.filename, document.id)
             return document
 
     def get_document(self, document_id: str) -> KnowledgeBaseDocument | None:
@@ -236,9 +238,9 @@ class KnowledgeBaseStore:
                 except ValueError:
                     # Document ID not in list - already removed or corrupted state
                     logger.warning(
-                        "Document %s not found in collection %s document list",
+                        'Document %s not found in collection %s document list',
                         document_id,
-                        document.collection_id
+                        document.collection_id,
                     )
 
             # Update collection stats with validation
@@ -246,7 +248,9 @@ class KnowledgeBaseStore:
             if collection:
                 # Prevent negative counts from corrupting state
                 collection.document_count = max(0, collection.document_count - 1)
-                collection.total_size_bytes = max(0, collection.total_size_bytes - document.file_size_bytes)
+                collection.total_size_bytes = max(
+                    0, collection.total_size_bytes - document.file_size_bytes
+                )
                 from datetime import datetime
 
                 collection.updated_at = datetime.now(UTC)
@@ -254,7 +258,7 @@ class KnowledgeBaseStore:
             # Delete the document
             self._documents.pop(document_id)
             self._save_to_disk()
-            logger.info("Deleted document: %s", document_id)
+            logger.info('Deleted document: %s', document_id)
             return True
 
     def get_document_by_hash(self, content_hash: str) -> KnowledgeBaseDocument | None:
@@ -273,10 +277,10 @@ class KnowledgeBaseStore:
             total_size = sum(d.file_size_bytes for d in self._documents.values())
 
             return {
-                "total_collections": total_collections,
-                "total_documents": total_documents,
-                "total_size_bytes": total_size,
-                "total_size_mb": round(total_size / (1024 * 1024), 2),
+                'total_collections': total_collections,
+                'total_documents': total_documents,
+                'total_size_bytes': total_size,
+                'total_size_mb': round(total_size / (1024 * 1024), 2),
             }
 
 
@@ -294,8 +298,8 @@ def get_knowledge_base_store() -> KnowledgeBaseStore | Any:
     global _store
     if _store is None:
         # Check if database storage is requested
-        storage_type = os.getenv("APP_KB_STORAGE_TYPE", "file").lower()
-        if storage_type in ("database", "db"):
+        storage_type = os.getenv('APP_KB_STORAGE_TYPE', 'file').lower()
+        if storage_type in ('database', 'db'):
             # Use database-backed store
             from backend.persistence.knowledge_base.database_knowledge_base_store import (
                 DatabaseKnowledgeBaseStore,
@@ -308,7 +312,7 @@ def get_knowledge_base_store() -> KnowledgeBaseStore | Any:
             _store = DatabaseStoreAdapter(db_store)
         else:
             # File-based store (default)
-            storage_dir = os.getenv("APP_KB_STORAGE_PATH")
+            storage_dir = os.getenv('APP_KB_STORAGE_PATH')
             if storage_dir:
                 _store = KnowledgeBaseStore(storage_dir=Path(storage_dir))
             else:

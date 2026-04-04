@@ -12,20 +12,19 @@ import shlex
 from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action import CmdRunAction
 
-
 _SEARCH_EXCLUDED_DIRS = (
-    ".git",
-    ".venv",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    "__pycache__",
-    "node_modules",
-    ".tmp_cli_manual",
-    "logs",
-    "storage",
-    "build",
-    "dist",
+    '.git',
+    '.venv',
+    '.mypy_cache',
+    '.pytest_cache',
+    '.ruff_cache',
+    '__pycache__',
+    'node_modules',
+    '.tmp_cli_manual',
+    'logs',
+    'storage',
+    'build',
+    'dist',
 )
 
 _SEARCH_CODE_DESCRIPTION = """\
@@ -39,17 +38,16 @@ Use this when target location is unknown. For precise symbol refs at known posit
 For dependency traversal, use `explore_tree_structure`.
 """
 
-SEARCH_CODE_TOOL_NAME = "search_code"
+SEARCH_CODE_TOOL_NAME = 'search_code'
 
 
 def _build_pruned_find_command(path: str) -> str:
     """Build a find prefix that skips generated and cache directories."""
-
     safe_path = shlex.quote(path)
-    prune_terms = " -o ".join(
-        f"-name {shlex.quote(dir_name)}" for dir_name in _SEARCH_EXCLUDED_DIRS
+    prune_terms = ' -o '.join(
+        f'-name {shlex.quote(dir_name)}' for dir_name in _SEARCH_EXCLUDED_DIRS
     )
-    return f"find {safe_path} \\( {prune_terms} \\) -prune -o"
+    return f'find {safe_path} \\( {prune_terms} \\) -prune -o'
 
 
 def create_search_code_tool():
@@ -58,40 +56,40 @@ def create_search_code_tool():
         name=SEARCH_CODE_TOOL_NAME,
         description=_SEARCH_CODE_DESCRIPTION,
         properties={
-            "pattern": {
-                "type": "string",
-                "description": (
-                    "Text or regex pattern to search for. "
-                    "Omit (along with file_pattern) to list files only."
+            'pattern': {
+                'type': 'string',
+                'description': (
+                    'Text or regex pattern to search for. '
+                    'Omit (along with file_pattern) to list files only.'
                 ),
             },
-            "path": {
-                "type": "string",
-                "description": (
-                    "Directory or file path to search in. "
-                    "Defaults to the current workspace directory."
+            'path': {
+                'type': 'string',
+                'description': (
+                    'Directory or file path to search in. '
+                    'Defaults to the current workspace directory.'
                 ),
             },
-            "file_pattern": {
-                "type": "string",
-                "description": (
-                    "Glob pattern to restrict which files are searched "
+            'file_pattern': {
+                'type': 'string',
+                'description': (
+                    'Glob pattern to restrict which files are searched '
                     "(e.g. '*.py', '**/*.ts', 'src/**/*.js'). "
-                    "Leave empty to search all text files."
+                    'Leave empty to search all text files.'
                 ),
             },
-            "context_lines": {
-                "type": "integer",
-                "description": "Lines of context to show before and after each match (default: 2).",
+            'context_lines': {
+                'type': 'integer',
+                'description': 'Lines of context to show before and after each match (default: 2).',
             },
-            "case_sensitive": {
-                "type": "string",
-                "enum": ["true", "false"],
-                "description": "Whether the search is case-sensitive (default: 'false').",
+            'case_sensitive': {
+                'type': 'string',
+                'enum': ['true', 'false'],
+                'description': "Whether the search is case-sensitive (default: 'false').",
             },
-            "max_results": {
-                "type": "integer",
-                "description": "Maximum number of matching lines to return (default: 50).",
+            'max_results': {
+                'type': 'integer',
+                'description': 'Maximum number of matching lines to return (default: 50).',
             },
         },
         required=[],  # all params optional; tool is flexible
@@ -99,11 +97,11 @@ def create_search_code_tool():
 
 
 def build_search_code_action(
-    pattern: str = "",
-    path: str = ".",
-    file_pattern: str = "",
+    pattern: str = '',
+    path: str = '.',
+    file_pattern: str = '',
     context_lines: int = 2,
-    case_sensitive: str = "false",
+    case_sensitive: str = 'false',
     max_results: int = 50,
 ) -> CmdRunAction:
     """Build a CmdRunAction that performs the code search.
@@ -122,55 +120,61 @@ def build_search_code_action(
     Returns:
         CmdRunAction: The bash command action.
     """
-    path = path or "."
+    path = path or '.'
     context_lines = max(0, min(int(context_lines), 10))
     max_results = max(1, min(int(max_results), 500))
-    is_case_sensitive = str(case_sensitive).lower() == "true"
+    is_case_sensitive = str(case_sensitive).lower() == 'true'
 
     if not pattern:
         # File-discovery mode: just list matching files
         find_prefix = _build_pruned_find_command(path)
         if file_pattern:
             safe_glob = shlex.quote(file_pattern)
-            cmd = (
-                f"{find_prefix} -type f -name {safe_glob} -print | head -n {max_results}"
-            )
+            cmd = f'{find_prefix} -type f -name {safe_glob} -print | head -n {max_results}'
         else:
-            cmd = f"{find_prefix} -type f -print | head -n {max_results}"
+            cmd = f'{find_prefix} -type f -print | head -n {max_results}'
         return CmdRunAction(command=cmd)
 
     # Search mode — build rg command with grep fallback, then wrap in structured XML
     safe_pattern = shlex.quote(pattern)
     safe_path = shlex.quote(path)
 
-    rg_flags = [f"--context={context_lines}", f"--max-count={max_results}", "--line-number", "--no-heading"]
-    grep_flags = [f"-{context_lines}" if context_lines > 0 else "", "-rn"]
+    rg_flags = [
+        f'--context={context_lines}',
+        f'--max-count={max_results}',
+        '--line-number',
+        '--no-heading',
+    ]
+    grep_flags = [f'-{context_lines}' if context_lines > 0 else '', '-rn']
 
     if not is_case_sensitive:
-        rg_flags.append("--ignore-case")
-        grep_flags.append("-i")
+        rg_flags.append('--ignore-case')
+        grep_flags.append('-i')
 
-    rg_flags.extend(f"--glob=!**/{dir_name}/**" for dir_name in _SEARCH_EXCLUDED_DIRS)
+    rg_flags.extend(f'--glob=!**/{dir_name}/**' for dir_name in _SEARCH_EXCLUDED_DIRS)
     grep_flags.extend(
-        ["-I", "--binary-files=without-match"]
-        + [f"--exclude-dir={shlex.quote(dir_name)}" for dir_name in _SEARCH_EXCLUDED_DIRS]
+        ['-I', '--binary-files=without-match']
+        + [
+            f'--exclude-dir={shlex.quote(dir_name)}'
+            for dir_name in _SEARCH_EXCLUDED_DIRS
+        ]
     )
 
     if file_pattern:
         safe_glob = shlex.quote(file_pattern)
-        rg_flags.append(f"--glob={safe_glob}")
-        grep_flags.append(f"--include={safe_glob}")
+        rg_flags.append(f'--glob={safe_glob}')
+        grep_flags.append(f'--include={safe_glob}')
 
-    rg_flags_str = " ".join(rg_flags)
-    grep_flags_str = " ".join(f for f in grep_flags if f)
+    rg_flags_str = ' '.join(rg_flags)
+    grep_flags_str = ' '.join(f for f in grep_flags if f)
 
     # Build the raw search command
     raw_search = (
-        f"if command -v rg >/dev/null 2>&1; then "
-        f"rg {rg_flags_str} {safe_pattern} {safe_path}; "
-        f"else "
-        f"grep {grep_flags_str} {safe_pattern} {safe_path} | head -n {max_results}; "
-        f"fi"
+        f'if command -v rg >/dev/null 2>&1; then '
+        f'rg {rg_flags_str} {safe_pattern} {safe_path}; '
+        f'else '
+        f'grep {grep_flags_str} {safe_pattern} {safe_path} | head -n {max_results}; '
+        f'fi'
     )
 
     # Wrap output in structured XML so the LLM can parse results unambiguously.
@@ -178,7 +182,7 @@ def build_search_code_action(
     safe_pattern_display = pattern.replace('"', '\\"')
     safe_path_display = path.replace('"', '\\"')
     cmd = (
-        f'echo "<search_results pattern=\"{safe_pattern_display}\" path=\"{safe_path_display}\">" && '
+        f'echo "<search_results pattern="{safe_pattern_display}" path="{safe_path_display}">" && '
         f'( {raw_search} ) && '
         f'echo "</search_results>"'
     )

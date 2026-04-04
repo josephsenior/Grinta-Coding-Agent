@@ -14,7 +14,7 @@ try:
     from asyncpg import Pool
 except ImportError as _exc:
     raise ImportError(
-        "asyncpg is required for database storage mode. "
+        'asyncpg is required for database storage mode. '
         "Install with:  uv pip install 'app-ai[database]'"
     ) from _exc
 
@@ -96,10 +96,10 @@ class DatabaseKnowledgeBaseStore:
             pool = await self._get_pool()
             async with pool.acquire() as conn:
                 await conn.execute(INIT_SCHEMA_SQL)
-                logger.info("Knowledge Base database schema verified/initialized.")
+                logger.info('Knowledge Base database schema verified/initialized.')
         except Exception as e:
             logger.critical(
-                "Failed to initialize Knowledge Base database schema: %s", e
+                'Failed to initialize Knowledge Base database schema: %s', e
             )
             raise
 
@@ -135,7 +135,7 @@ class DatabaseKnowledgeBaseStore:
                     collection.updated_at,
                 )
 
-        logger.info("Created collection: %s (%s)", collection.name, collection.id)
+        logger.info('Created collection: %s (%s)', collection.name, collection.id)
         return collection
 
     async def get_collection(
@@ -145,7 +145,7 @@ class DatabaseKnowledgeBaseStore:
         pool = await self._get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT * FROM knowledge_base_collections WHERE id = $1",
+                'SELECT * FROM knowledge_base_collections WHERE id = $1',
                 collection_id,
             )
             return self._row_to_collection(row) if row else None
@@ -155,7 +155,7 @@ class DatabaseKnowledgeBaseStore:
         pool = await self._get_pool()
         async with pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM knowledge_base_collections WHERE user_id = $1 ORDER BY created_at DESC",
+                'SELECT * FROM knowledge_base_collections WHERE user_id = $1 ORDER BY created_at DESC',
                 user_id,
             )
             return [self._row_to_collection(row) for row in rows]
@@ -175,19 +175,19 @@ class DatabaseKnowledgeBaseStore:
                 param_idx = 1
 
                 if name is not None:
-                    updates.append(f"name = ${param_idx}")
+                    updates.append(f'name = ${param_idx}')
                     params.append(name)
                     param_idx += 1
 
                 if description is not None:
-                    updates.append(f"description = ${param_idx}")
+                    updates.append(f'description = ${param_idx}')
                     params.append(description)
                     param_idx += 1
 
                 if not updates:
                     return await self.get_collection(collection_id)
 
-                updates.append(f"updated_at = ${param_idx}")
+                updates.append(f'updated_at = ${param_idx}')
                 params.append(datetime.now(UTC))
                 param_idx += 1
 
@@ -195,7 +195,7 @@ class DatabaseKnowledgeBaseStore:
 
                 query = f"""
                     UPDATE knowledge_base_collections
-                    SET {", ".join(updates)}
+                    SET {', '.join(updates)}
                     WHERE id = ${param_idx}
                     RETURNING *
                 """
@@ -210,13 +210,13 @@ class DatabaseKnowledgeBaseStore:
             async with conn.transaction():
                 # Note: ON DELETE CASCADE in schema handles documents
                 result = await conn.execute(
-                    "DELETE FROM knowledge_base_collections WHERE id = $1",
+                    'DELETE FROM knowledge_base_collections WHERE id = $1',
                     collection_id,
                 )
 
-                deleted = result != "DELETE 0"
+                deleted = result != 'DELETE 0'
                 if deleted:
-                    logger.info("Deleted collection: %s", collection_id)
+                    logger.info('Deleted collection: %s', collection_id)
                 return deleted
 
     async def add_document(
@@ -257,7 +257,7 @@ class DatabaseKnowledgeBaseStore:
                     document.collection_id,
                 )
 
-        logger.info("Added document: %s (%s)", document.filename, document.id)
+        logger.info('Added document: %s (%s)', document.filename, document.id)
         return document
 
     async def get_document(self, document_id: str) -> KnowledgeBaseDocument | None:
@@ -265,7 +265,7 @@ class DatabaseKnowledgeBaseStore:
         pool = await self._get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT * FROM knowledge_base_documents WHERE id = $1",
+                'SELECT * FROM knowledge_base_documents WHERE id = $1',
                 document_id,
             )
             return self._row_to_document(row) if row else None
@@ -275,7 +275,7 @@ class DatabaseKnowledgeBaseStore:
         pool = await self._get_pool()
         async with pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT * FROM knowledge_base_documents WHERE collection_id = $1 ORDER BY uploaded_at DESC",
+                'SELECT * FROM knowledge_base_documents WHERE collection_id = $1 ORDER BY uploaded_at DESC',
                 collection_id,
             )
             return [self._row_to_document(row) for row in rows]
@@ -286,7 +286,7 @@ class DatabaseKnowledgeBaseStore:
         async with pool.acquire() as conn:
             async with conn.transaction():
                 doc_row = await conn.fetchrow(
-                    "SELECT collection_id, file_size_bytes FROM knowledge_base_documents WHERE id = $1",
+                    'SELECT collection_id, file_size_bytes FROM knowledge_base_documents WHERE id = $1',
                     document_id,
                 )
 
@@ -294,11 +294,11 @@ class DatabaseKnowledgeBaseStore:
                     return False
 
                 result = await conn.execute(
-                    "DELETE FROM knowledge_base_documents WHERE id = $1",
+                    'DELETE FROM knowledge_base_documents WHERE id = $1',
                     document_id,
                 )
 
-                if result != "DELETE 0":
+                if result != 'DELETE 0':
                     await conn.execute(
                         """
                         UPDATE knowledge_base_collections
@@ -307,11 +307,11 @@ class DatabaseKnowledgeBaseStore:
                             updated_at = $2
                         WHERE id = $3
                         """,
-                        doc_row["file_size_bytes"],
+                        doc_row['file_size_bytes'],
                         datetime.now(UTC),
-                        doc_row["collection_id"],
+                        doc_row['collection_id'],
                     )
-                    logger.info("Deleted document: %s", document_id)
+                    logger.info('Deleted document: %s', document_id)
                     return True
 
                 return False
@@ -323,39 +323,38 @@ class DatabaseKnowledgeBaseStore:
         pool = await self._get_pool()
         async with pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT * FROM knowledge_base_documents WHERE content_hash = $1",
+                'SELECT * FROM knowledge_base_documents WHERE content_hash = $1',
                 content_hash,
             )
             return self._row_to_document(row) if row else None
 
     def _row_to_collection(self, row: asyncpg.Record) -> KnowledgeBaseCollection:
         return KnowledgeBaseCollection(
-            id=str(row["id"]),
-            user_id=str(row["user_id"]),
-            name=row["name"],
-            description=row["description"],
-            document_count=row["document_count"],
-            total_size_bytes=row["total_size_bytes"],
-            created_at=row["created_at"].replace(tzinfo=UTC)
-            if row["created_at"].tzinfo is None
-            else row["created_at"],
-            updated_at=row["updated_at"].replace(tzinfo=UTC)
-            if row["updated_at"].tzinfo is None
-            else row["updated_at"],
+            id=str(row['id']),
+            user_id=str(row['user_id']),
+            name=row['name'],
+            description=row['description'],
+            document_count=row['document_count'],
+            total_size_bytes=row['total_size_bytes'],
+            created_at=row['created_at'].replace(tzinfo=UTC)
+            if row['created_at'].tzinfo is None
+            else row['created_at'],
+            updated_at=row['updated_at'].replace(tzinfo=UTC)
+            if row['updated_at'].tzinfo is None
+            else row['updated_at'],
         )
 
     def _row_to_document(self, row: asyncpg.Record) -> KnowledgeBaseDocument:
         return KnowledgeBaseDocument(
-            id=str(row["id"]),
-            collection_id=str(row["collection_id"]),
-            filename=row["filename"],
-            content_hash=row["content_hash"],
-            file_size_bytes=row["file_size_bytes"],
-            mime_type=row["mime_type"],
-            content_preview=row.get("content_preview"),
-            chunk_count=row["chunk_count"],
-            uploaded_at=row["uploaded_at"].replace(tzinfo=UTC)
-            if row["uploaded_at"].tzinfo is None
-            else row["uploaded_at"],
+            id=str(row['id']),
+            collection_id=str(row['collection_id']),
+            filename=row['filename'],
+            content_hash=row['content_hash'],
+            file_size_bytes=row['file_size_bytes'],
+            mime_type=row['mime_type'],
+            content_preview=row.get('content_preview'),
+            chunk_count=row['chunk_count'],
+            uploaded_at=row['uploaded_at'].replace(tzinfo=UTC)
+            if row['uploaded_at'].tzinfo is None
+            else row['uploaded_at'],
         )
-

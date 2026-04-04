@@ -38,7 +38,7 @@ class FileSecretsStore(SecretsStore):
 
     def _build_default_path(self) -> str:
         if self.user_id:
-            return f"users/{self.user_id}/{self.DEFAULT_FILENAME}"
+            return f'users/{self.user_id}/{self.DEFAULT_FILENAME}'
         return self.DEFAULT_FILENAME
 
     async def load(self) -> UserSecrets | None:
@@ -53,16 +53,16 @@ class FileSecretsStore(SecretsStore):
             kwargs = json.loads(json_str)
             if not isinstance(kwargs, dict):
                 kwargs = {}
-            raw_provider_tokens = kwargs.get("provider_tokens") or {}
+            raw_provider_tokens = kwargs.get('provider_tokens') or {}
             normalized_tokens: dict[str, dict[str, str | Any]] = {}
             for key, value in raw_provider_tokens.items():
                 if isinstance(value, dict):
-                    token_value = value.get("token")
+                    token_value = value.get('token')
                     if token_value:
                         normalized_tokens[key] = value
                 elif value:
-                    normalized_tokens[key] = {"token": value}
-            kwargs["provider_tokens"] = normalized_tokens if normalized_tokens else None
+                    normalized_tokens[key] = {'token': value}
+            kwargs['provider_tokens'] = normalized_tokens if normalized_tokens else None
             return UserSecrets(**kwargs)
         except FileNotFoundError:
             return None
@@ -74,7 +74,7 @@ class FileSecretsStore(SecretsStore):
             secrets: UserSecrets to persist
 
         """
-        json_str = model_dump_json(secrets, context={"expose_secrets": True})
+        json_str = model_dump_json(secrets, context={'expose_secrets': True})
         await call_sync_from_async(self.file_store.write, self.path, json_str)
 
     @classmethod

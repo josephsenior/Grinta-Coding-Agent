@@ -25,7 +25,7 @@ class AlertPolicy:
         metric: str,
         threshold: float,
         *,
-        comparison: str = ">",
+        comparison: str = '>',
         duration: float = 60.0,
         enabled: bool = True,
     ) -> None:
@@ -75,11 +75,11 @@ class AlertPolicy:
 
     def _is_threshold_violated(self, value: float) -> bool:
         comparisons = {
-            ">": value > self.threshold,
-            "<": value < self.threshold,
-            ">=": value >= self.threshold,
-            "<=": value <= self.threshold,
-            "==": value == self.threshold,
+            '>': value > self.threshold,
+            '<': value < self.threshold,
+            '>=': value >= self.threshold,
+            '<=': value <= self.threshold,
+            '==': value == self.threshold,
         }
         return comparisons.get(self.comparison, False)
 
@@ -189,12 +189,12 @@ class SLOTracker:
         error_rate = self.get_error_rate()
 
         return {
-            "availability": availability < self.availability_target,
-            "latency": latency_p95 > self.latency_p95_target_ms,
-            "error_rate": error_rate > self.error_rate_target,
-            "availability_value": availability,
-            "latency_p95_value": latency_p95,
-            "error_rate_value": error_rate,
+            'availability': availability < self.availability_target,
+            'latency': latency_p95 > self.latency_p95_target_ms,
+            'error_rate': error_rate > self.error_rate_target,
+            'availability_value': availability,
+            'latency_p95_value': latency_p95,
+            'error_rate_value': error_rate,
         }
 
     def _reset_window(self) -> None:
@@ -268,7 +268,7 @@ class AlertManager(ExternalServiceBase):
         return await self._send_request(
             build_payload=build_payload,
             execute_request=execute_request,
-            error_msg="Error sending alert",
+            error_msg='Error sending alert',
         )
 
     def _build_payload(
@@ -281,11 +281,11 @@ class AlertManager(ExternalServiceBase):
         message: str | None,
     ) -> dict[str, Any]:
         host = parsed_endpoint.netloc.lower()
-        if "pagerduty" in host:
+        if 'pagerduty' in host:
             return self._pagerduty_payload(
                 policy_name, metric, value, threshold, message
             )
-        if "slack" in host:
+        if 'slack' in host:
             return self._slack_payload(policy_name, metric, value, threshold, message)
         return self._generic_payload(policy_name, metric, value, threshold, message)
 
@@ -298,20 +298,20 @@ class AlertManager(ExternalServiceBase):
         message: str | None,
     ) -> dict[str, Any]:
         summary = (
-            message or f"{policy_name}: {metric} = {value} (threshold: {threshold})"
+            message or f'{policy_name}: {metric} = {value} (threshold: {threshold})'
         )
         return {
-            "routing_key": self.api_key,
-            "event_action": "trigger",
-            "payload": {
-                "summary": summary,
-                "severity": "error",
-                "source": "app",
-                "custom_details": {
-                    "policy": policy_name,
-                    "metric": metric,
-                    "value": value,
-                    "threshold": threshold,
+            'routing_key': self.api_key,
+            'event_action': 'trigger',
+            'payload': {
+                'summary': summary,
+                'severity': 'error',
+                'source': 'app',
+                'custom_details': {
+                    'policy': policy_name,
+                    'metric': metric,
+                    'value': value,
+                    'threshold': threshold,
                 },
             },
         }
@@ -324,15 +324,15 @@ class AlertManager(ExternalServiceBase):
         threshold: float,
         message: str | None,
     ) -> dict[str, Any]:
-        text = message or f"{metric} = {value} (threshold: {threshold})"
+        text = message or f'{metric} = {value} (threshold: {threshold})'
         return {
-            "text": f"Alert: {policy_name}",
-            "blocks": [
+            'text': f'Alert: {policy_name}',
+            'blocks': [
                 {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"*{policy_name}*\n{text}",
+                    'type': 'section',
+                    'text': {
+                        'type': 'mrkdwn',
+                        'text': f'*{policy_name}*\n{text}',
                     },
                 }
             ],
@@ -347,12 +347,12 @@ class AlertManager(ExternalServiceBase):
         message: str | None,
     ) -> dict[str, Any]:
         return {
-            "policy": policy_name,
-            "metric": metric,
-            "value": value,
-            "threshold": threshold,
-            "message": message,
-            "timestamp": time.time(),
+            'policy': policy_name,
+            'metric': metric,
+            'value': value,
+            'threshold': threshold,
+            'message': message,
+            'timestamp': time.time(),
         }
 
     async def _execute_alert_request(
@@ -369,11 +369,11 @@ class AlertManager(ExternalServiceBase):
             self.endpoint, json=payload, headers=headers
         ) as response:
             if response.status in (200, 201):
-                logger.info("Alert sent: %s (%s = %s)", policy_name, metric, value)
+                logger.info('Alert sent: %s (%s = %s)', policy_name, metric, value)
                 return True
             error_text = await response.text()
             logger.warning(
-                "Failed to send alert to %s: %s - %s",
+                'Failed to send alert to %s: %s - %s',
                 self.endpoint,
                 response.status,
                 error_text,
@@ -397,10 +397,10 @@ def get_alert_manager() -> AlertManager | None:
     """Get or create global alert manager instance."""
     global _alert_manager
     if _alert_manager is None:
-        endpoint = os.getenv("ALERTING_ENDPOINT")
-        api_key = os.getenv("ALERTING_API_KEY")
-        enabled = os.getenv("ALERTING_ENABLED", "false").lower() == "true"
-        cache_ttl = int(os.getenv("ALERTING_CACHE_TTL", "60"))
+        endpoint = os.getenv('ALERTING_ENDPOINT')
+        api_key = os.getenv('ALERTING_API_KEY')
+        enabled = os.getenv('ALERTING_ENABLED', 'false').lower() == 'true'
+        cache_ttl = int(os.getenv('ALERTING_CACHE_TTL', '60'))
 
         if enabled and endpoint:
             _alert_manager = AlertManager(
@@ -409,9 +409,9 @@ def get_alert_manager() -> AlertManager | None:
                 enabled=True,
                 cache_ttl=cache_ttl,
             )
-            logger.info("Alert manager initialized for %s", endpoint)
+            logger.info('Alert manager initialized for %s', endpoint)
         else:
-            logger.debug("Alerting not configured")
+            logger.debug('Alerting not configured')
 
     return _alert_manager
 
@@ -426,12 +426,12 @@ def get_slo_tracker() -> SLOTracker:
     global _slo_tracker
     if _slo_tracker is None:
         _slo_tracker = SLOTracker(
-            availability_target=float(os.getenv("SLO_AVAILABILITY_TARGET", "0.99")),
+            availability_target=float(os.getenv('SLO_AVAILABILITY_TARGET', '0.99')),
             latency_p95_target_ms=float(
-                os.getenv("SLO_LATENCY_P95_TARGET_MS", "1000.0")
+                os.getenv('SLO_LATENCY_P95_TARGET_MS', '1000.0')
             ),
-            error_rate_target=float(os.getenv("SLO_ERROR_RATE_TARGET", "0.01")),
+            error_rate_target=float(os.getenv('SLO_ERROR_RATE_TARGET', '0.01')),
         )
-        logger.info("SLO tracker initialized")
+        logger.info('SLO tracker initialized')
 
     return _slo_tracker

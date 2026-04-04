@@ -20,7 +20,7 @@ class TestStuckDetectionService(unittest.TestCase):
         self.assertEqual(self.service._controller, self.mock_controller)
         self.assertIsNone(self.service._detector)
 
-    @patch("backend.orchestration.services.stuck_detection_service.StuckDetector")
+    @patch('backend.orchestration.services.stuck_detection_service.StuckDetector')
     def test_initialize_creates_detector(self, mock_detector_class):
         """Test initialize() creates StuckDetector for state."""
         mock_state = MagicMock()
@@ -38,7 +38,7 @@ class TestStuckDetectionService(unittest.TestCase):
 
         self.assertFalse(result)
 
-    @patch("backend.orchestration.services.stuck_detection_service.StuckDetector")
+    @patch('backend.orchestration.services.stuck_detection_service.StuckDetector')
     def test_is_stuck_with_detector_not_stuck(self, mock_detector_class):
         """Test is_stuck() returns False when detector says not stuck."""
         mock_state = MagicMock()
@@ -52,7 +52,7 @@ class TestStuckDetectionService(unittest.TestCase):
         self.assertFalse(result)
         mock_detector.is_stuck.assert_called_once_with(False)  # headless_mode=False
 
-    @patch("backend.orchestration.services.stuck_detection_service.StuckDetector")
+    @patch('backend.orchestration.services.stuck_detection_service.StuckDetector')
     def test_is_stuck_with_detector_stuck(self, mock_detector_class):
         """Test is_stuck() returns True when detector says stuck."""
         mock_state = MagicMock()
@@ -66,7 +66,7 @@ class TestStuckDetectionService(unittest.TestCase):
         self.assertTrue(result)
         mock_detector.is_stuck.assert_called_once_with(False)
 
-    @patch("backend.orchestration.services.stuck_detection_service.StuckDetector")
+    @patch('backend.orchestration.services.stuck_detection_service.StuckDetector')
     def test_is_stuck_headless_mode(self, mock_detector_class):
         """Test is_stuck() passes headless_mode to detector."""
         self.mock_controller.headless_mode = True
@@ -95,7 +95,7 @@ class TestStuckDetectionService(unittest.TestCase):
         self.assertTrue(result)
         mock_delegate_stuck_service.is_stuck.assert_called_once()
 
-    @patch("backend.orchestration.services.stuck_detection_service.StuckDetector")
+    @patch('backend.orchestration.services.stuck_detection_service.StuckDetector')
     def test_is_stuck_with_delegate_not_stuck_checks_own_detector(
         self, mock_detector_class
     ):
@@ -141,7 +141,7 @@ class TestStuckDetectionService(unittest.TestCase):
         # Should not raise exception
         self.assertFalse(result)
 
-    @patch("backend.orchestration.services.stuck_detection_service.StuckDetector")
+    @patch('backend.orchestration.services.stuck_detection_service.StuckDetector')
     def test_is_stuck_detector_returns_non_bool(self, mock_detector_class):
         """Test is_stuck() handles detector returning non-bool value."""
         mock_state = MagicMock()
@@ -155,12 +155,12 @@ class TestStuckDetectionService(unittest.TestCase):
         # Should convert to bool
         self.assertFalse(result)
 
-    @patch("backend.orchestration.services.stuck_detection_service.StuckDetector")
+    @patch('backend.orchestration.services.stuck_detection_service.StuckDetector')
     def test_is_stuck_detector_returns_truthy_value(self, mock_detector_class):
         """Test is_stuck() converts truthy values to True."""
         mock_state = MagicMock()
         mock_detector = MagicMock()
-        mock_detector.is_stuck.return_value = "stuck"  # Truthy non-bool
+        mock_detector.is_stuck.return_value = 'stuck'  # Truthy non-bool
         mock_detector_class.return_value = mock_detector
 
         self.service.initialize(mock_state)
@@ -168,7 +168,7 @@ class TestStuckDetectionService(unittest.TestCase):
 
         self.assertTrue(result)
 
-    @patch("backend.orchestration.services.stuck_detection_service.StuckDetector")
+    @patch('backend.orchestration.services.stuck_detection_service.StuckDetector')
     def test_multiple_initialize_calls(self, mock_detector_class):
         """Test multiple initialize() calls replace detector."""
         mock_state1 = MagicMock()
@@ -188,5 +188,5 @@ class TestStuckDetectionService(unittest.TestCase):
         self.assertEqual(mock_detector_class.call_count, 2)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

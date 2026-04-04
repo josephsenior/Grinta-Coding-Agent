@@ -1,1 +1,1 @@
-﻿"""Tests for backend.execution.utils modules."""
+"""Tests for backend.execution.utils modules."""

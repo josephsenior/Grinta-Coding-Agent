@@ -22,14 +22,14 @@ class TestConversationMetadataResultSet:
         assert len(rs.results) == 2
 
     def test_with_next_page(self):
-        rs = ConversationMetadataResultSet(next_page_id="page2")
-        assert rs.next_page_id == "page2"
+        rs = ConversationMetadataResultSet(next_page_id='page2')
+        assert rs.next_page_id == 'page2'
 
     def test_full(self):
         mock = MagicMock()
-        rs = ConversationMetadataResultSet(results=[mock], next_page_id="next")
+        rs = ConversationMetadataResultSet(results=[mock], next_page_id='next')
         assert len(rs.results) == 1
-        assert rs.next_page_id == "next"
+        assert rs.next_page_id == 'next'
 
     def test_empty_results_list_independent(self):
         """Each instance gets its own list."""

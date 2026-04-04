@@ -5,28 +5,28 @@ import asyncio
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from backend.core.enums import LifecyclePhase
+from backend.core.schemas import AgentState
+from backend.ledger import EventSource
 from backend.orchestration.session_orchestrator import (
-    SessionOrchestrator,
     ERROR_ACTION_NOT_EXECUTED_ERROR,
     ERROR_ACTION_NOT_EXECUTED_STOPPED,
     ERROR_ACTION_NOT_EXECUTED_STOPPED_ID,
     TRAFFIC_CONTROL_REMINDER,
+    SessionOrchestrator,
 )
-from backend.core.enums import LifecyclePhase
-from backend.core.schemas import AgentState
-from backend.ledger import EventSource
 
 
 def _make_controller():
     """Create an SessionOrchestrator with fully mocked internals (no real __init__)."""
-    with patch.object(SessionOrchestrator, "__init__", lambda self, *a, **kw: None):
+    with patch.object(SessionOrchestrator, '__init__', lambda self, *a, **kw: None):
         ctrl = SessionOrchestrator.__new__(SessionOrchestrator)
 
     # Config
     ctrl.config = MagicMock()
-    ctrl.config.sid = "test-sid"
+    ctrl.config.sid = 'test-sid'
     ctrl.config.event_stream = MagicMock()
-    ctrl.config.event_stream.sid = "test-sid"
+    ctrl.config.event_stream.sid = 'test-sid'
     ctrl.config.agent = MagicMock()
     ctrl.config.conversation_stats = MagicMock()
 
@@ -69,12 +69,12 @@ class TestSessionOrchestratorProperties(unittest.TestCase):
         self.ctrl = _make_controller()
 
     def test_id_returns_config_sid(self):
-        self.assertEqual(self.ctrl.id, "test-sid")
+        self.assertEqual(self.ctrl.id, 'test-sid')
 
     def test_id_falls_back_to_event_stream_sid(self):
         self.ctrl.config.sid = None
-        self.ctrl.config.event_stream.sid = "stream-sid"
-        self.assertEqual(self.ctrl.id, "stream-sid")
+        self.ctrl.config.event_stream.sid = 'stream-sid'
+        self.assertEqual(self.ctrl.id, 'stream-sid')
 
     def test_agent_returns_config_agent(self):
         self.assertIs(self.ctrl.agent, self.ctrl.config.agent)
@@ -160,7 +160,7 @@ class TestServiceAliasing(unittest.TestCase):
     def test_alias_before_services_set(self):
         """Covers the edge case where services hasn't been set yet."""
         ctrl = _make_controller()
-        del ctrl.__dict__["services"]
+        del ctrl.__dict__['services']
         with self.assertRaises(AttributeError):
             _ = ctrl.action_service
 
@@ -194,24 +194,24 @@ class TestLogging(unittest.TestCase):
     def setUp(self):
         self.ctrl = _make_controller()
 
-    @patch("backend.orchestration.session_orchestrator.logger")
+    @patch('backend.orchestration.session_orchestrator.logger')
     def test_log_info(self, mock_logger):
-        self.ctrl.log("info", "Hello")
+        self.ctrl.log('info', 'Hello')
         mock_logger.info.assert_called_once()
 
-    @patch("backend.orchestration.session_orchestrator.logger")
+    @patch('backend.orchestration.session_orchestrator.logger')
     def test_log_includes_session_id(self, mock_logger):
-        self.ctrl.log("debug", "Testing")
+        self.ctrl.log('debug', 'Testing')
         call_kwargs = mock_logger.debug.call_args
-        self.assertIn("session_id", call_kwargs.kwargs.get("extra", {}))
+        self.assertIn('session_id', call_kwargs.kwargs.get('extra', {}))
 
-    @patch("backend.orchestration.session_orchestrator.logger")
+    @patch('backend.orchestration.session_orchestrator.logger')
     def test_log_merges_extra(self, mock_logger):
-        self.ctrl.log("warning", "Alert", extra={"custom_key": "val"})
+        self.ctrl.log('warning', 'Alert', extra={'custom_key': 'val'})
         call_kwargs = mock_logger.warning.call_args
-        extra = call_kwargs.kwargs.get("extra", {})
-        self.assertIn("custom_key", extra)
-        self.assertIn("session_id", extra)
+        extra = call_kwargs.kwargs.get('extra', {})
+        self.assertIn('custom_key', extra)
+        self.assertIn('session_id', extra)
 
 
 # ── Step execution ───────────────────────────────────────────────────
@@ -224,13 +224,13 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
         self.ctrl = _make_controller()
 
     async def test_step_with_exception_handling_success(self):
-        with patch.object(self.ctrl, "_step", new_callable=AsyncMock) as mock_step:
+        with patch.object(self.ctrl, '_step', new_callable=AsyncMock) as mock_step:
             await self.ctrl._step_with_exception_handling()
         mock_step.assert_awaited_once()
 
     async def test_step_with_exception_handling_delegates_error(self):
-        exc = RuntimeError("boom")
-        with patch.object(self.ctrl, "_step", new_callable=AsyncMock, side_effect=exc):
+        exc = RuntimeError('boom')
+        with patch.object(self.ctrl, '_step', new_callable=AsyncMock, side_effect=exc):
             self.ctrl.services.exception_handler.handle_step_exception = AsyncMock()
             await self.ctrl._step_with_exception_handling()
 
@@ -262,7 +262,7 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.budget_guard.sync_with_metrics = MagicMock()
 
         with patch.object(
-            self.ctrl, "_run_control_flags_safely", new_callable=AsyncMock
+            self.ctrl, '_run_control_flags_safely', new_callable=AsyncMock
         ) as mock_flags:
             mock_flags.return_value = False
             self.ctrl.services.action_execution.get_next_action = AsyncMock()
@@ -279,7 +279,7 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch.object(
-            self.ctrl, "_run_control_flags_safely", new_callable=AsyncMock
+            self.ctrl, '_run_control_flags_safely', new_callable=AsyncMock
         ) as mock_flags:
             mock_flags.return_value = True
             self.ctrl.services.action_execution.execute_action = AsyncMock()
@@ -300,10 +300,10 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(
-                self.ctrl, "_run_control_flags_safely", new_callable=AsyncMock
+                self.ctrl, '_run_control_flags_safely', new_callable=AsyncMock
             ) as mock_flags,
             patch.object(
-                self.ctrl, "_handle_post_execution", new_callable=AsyncMock
+                self.ctrl, '_handle_post_execution', new_callable=AsyncMock
             ) as mock_post,
         ):
             mock_flags.return_value = True
@@ -328,9 +328,9 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch.object(
-                self.ctrl, "_run_control_flags_safely", new_callable=AsyncMock
+                self.ctrl, '_run_control_flags_safely', new_callable=AsyncMock
             ) as mock_flags,
-            patch.object(self.ctrl, "_handle_post_execution", new_callable=AsyncMock),
+            patch.object(self.ctrl, '_handle_post_execution', new_callable=AsyncMock),
         ):
             mock_flags.return_value = True
             await self.ctrl._step()
@@ -364,7 +364,7 @@ class TestControlFlags(unittest.IsolatedAsyncioTestCase):
 
     async def test_run_control_flags_exception(self):
         self.ctrl.services.iteration_guard.run_control_flags = AsyncMock(
-            side_effect=RuntimeError("boom")
+            side_effect=RuntimeError('boom')
         )
         self.ctrl.services.recovery.react_to_exception = AsyncMock()
 
@@ -392,7 +392,7 @@ class TestEventHandling(unittest.IsolatedAsyncioTestCase):
         self.ctrl.services.event_router.route_event.assert_awaited_once_with(event)
 
     async def test_react_to_exception_delegates(self):
-        exc = RuntimeError("error")
+        exc = RuntimeError('error')
         self.ctrl.services.recovery.react_to_exception = AsyncMock()
 
         await self.ctrl._react_to_exception(exc)
@@ -499,7 +499,7 @@ class TestStateHelpers(unittest.TestCase):
         stats = MagicMock()
         self.ctrl.set_initial_state(None, stats, 100, 10.0, True)
         self.ctrl.state_tracker.set_initial_state.assert_called_once_with(
-            "test-sid", None, stats, 100, 10.0, True
+            'test-sid', None, stats, 100, 10.0, True
         )
 
 
@@ -519,9 +519,9 @@ class TestGetTranscript(unittest.TestCase):
 
     def test_get_transcript_when_closed(self):
         self.ctrl._lifecycle = LifecyclePhase.CLOSED
-        self.ctrl.state_tracker.get_transcript.return_value = [{"record": "test"}]
+        self.ctrl.state_tracker.get_transcript.return_value = [{'record': 'test'}]
         result = self.ctrl.get_transcript()
-        self.assertEqual(result, [{"record": "test"}])
+        self.assertEqual(result, [{'record': 'test'}])
 
     def test_get_transcript_with_screenshots(self):
         self.ctrl._lifecycle = LifecyclePhase.CLOSED
@@ -564,7 +564,7 @@ class TestFirstUserMessage(unittest.TestCase):
         # isinstance check needs real class
 
         with patch(
-            "backend.orchestration.session_orchestrator.isinstance",
+            'backend.orchestration.session_orchestrator.isinstance',
             side_effect=lambda o, c: c is MessageAction and o is msg,
         ):
             pass  # Can't easily patch isinstance; use different approach
@@ -588,26 +588,26 @@ class TestRepr(unittest.TestCase):
     def test_repr_contains_id(self):
         self.ctrl.services.action.get_pending_action_info.return_value = None
         result = repr(self.ctrl)
-        self.assertIn("SessionOrchestrator", result)
-        self.assertIn("test-sid", result)
+        self.assertIn('SessionOrchestrator', result)
+        self.assertIn('test-sid', result)
 
     def test_repr_no_pending_action(self):
         self.ctrl.services.action.get_pending_action_info.return_value = None
         result = repr(self.ctrl)
-        self.assertIn("<none>", result)
+        self.assertIn('<none>', result)
 
     def test_repr_with_pending_action(self):
         import time
 
         mock_action = MagicMock()
         mock_action.id = 42
-        mock_action.__class__.__name__ = "CmdRunAction"
+        mock_action.__class__.__name__ = 'CmdRunAction'
         self.ctrl.services.action.get_pending_action_info.return_value = (
             mock_action,
             time.time() - 5.0,
         )
         result = repr(self.ctrl)
-        self.assertIn("CmdRunAction", result)
+        self.assertIn('CmdRunAction', result)
 
 
 # ── _handle_post_execution ───────────────────────────────────────────
@@ -632,7 +632,7 @@ class TestPostExecution(unittest.IsolatedAsyncioTestCase):
 
     async def test_memory_pressure_condensation(self):
         # No metrics to avoid rate governor path; trigger condensation path
-        if hasattr(self.ctrl.state_tracker.state, "metrics"):
+        if hasattr(self.ctrl.state_tracker.state, 'metrics'):
             del self.ctrl.state_tracker.state.metrics
         self.ctrl.config.agent._last_llm_latency = None
         self.ctrl.memory_pressure.should_condense.return_value = True
@@ -645,7 +645,7 @@ class TestPostExecution(unittest.IsolatedAsyncioTestCase):
 
         self.ctrl.memory_pressure.record_condensation.assert_called_once()
         self.ctrl.state_tracker.state.set_memory_pressure.assert_called_once_with(
-            "WARNING", source="SessionOrchestrator"
+            'WARNING', source='SessionOrchestrator'
         )
 
 
@@ -713,8 +713,8 @@ class TestReset(unittest.TestCase):
         self.ctrl = _make_controller()
 
     def test_reset_clears_contexts(self):
-        self.ctrl._action_contexts_by_object[1] = "a"
-        self.ctrl._action_contexts_by_event_id[2] = "b"
+        self.ctrl._action_contexts_by_object[1] = 'a'
+        self.ctrl._action_contexts_by_event_id[2] = 'b'
 
         # Make pending_action return None
         self.ctrl.services.pending_action.get.return_value = None
@@ -734,7 +734,7 @@ class TestReset(unittest.TestCase):
         self.ctrl.config.agent.reset = MagicMock()
 
         with patch(
-            "backend.orchestration.session_orchestrator.ErrorObservation"
+            'backend.orchestration.session_orchestrator.ErrorObservation'
         ) as mock_obs_cls:
             mock_obs = MagicMock()
             mock_obs_cls.return_value = mock_obs
@@ -751,8 +751,8 @@ class TestReset(unittest.TestCase):
         self.ctrl.services.pending_action.get.return_value = None
 
         dropped = MagicMock()
-        dropped.tool_call_metadata = "meta"
-        dropped.id = "dropped-id"
+        dropped.tool_call_metadata = 'meta'
+        dropped.id = 'dropped-id'
         self.ctrl.agent.pending_actions = [dropped]
 
         self.ctrl._reset()
@@ -779,7 +779,7 @@ class TestIsAwaitingObservation(unittest.TestCase):
         self.ctrl.config.event_stream.search_events.return_value = [obs]
 
         with patch(
-            "backend.orchestration.session_orchestrator.isinstance",
+            'backend.orchestration.session_orchestrator.isinstance',
             side_effect=lambda o, c: o is obs and c is AgentStateChangedObservation,
         ):
             pass
@@ -804,50 +804,50 @@ class TestLogTaskAudit(unittest.IsolatedAsyncioTestCase):
     async def test_no_audit_callback(self):
         self.ctrl._audit_callback = None
         # Should not raise
-        await self.ctrl.log_task_audit("completed")
+        await self.ctrl.log_task_audit('completed')
 
     async def test_audit_callback_invoked(self):
         callback = MagicMock(return_value=None)
         self.ctrl._audit_callback = callback
 
         task_mock = MagicMock()
-        task_mock.description = "Test task"
-        with patch.object(self.ctrl, "_get_initial_task", return_value=task_mock):
+        task_mock.description = 'Test task'
+        with patch.object(self.ctrl, '_get_initial_task', return_value=task_mock):
             self.ctrl.state_tracker.state.metrics = MagicMock()
             self.ctrl.state_tracker.state.metrics.accumulated_token_usage.prompt_tokens = 100
             self.ctrl.state_tracker.state.metrics.accumulated_token_usage.completion_tokens = 50
             self.ctrl.state_tracker.state.metrics.accumulated_cost = 0.05
 
-            await self.ctrl.log_task_audit("completed")
+            await self.ctrl.log_task_audit('completed')
 
         callback.assert_called_once()
         call_kwargs = callback.call_args.kwargs
-        self.assertEqual(call_kwargs["status"], "completed")
-        self.assertEqual(call_kwargs["tokens_used"], 150)
+        self.assertEqual(call_kwargs['status'], 'completed')
+        self.assertEqual(call_kwargs['tokens_used'], 150)
 
     async def test_audit_callback_async(self):
         callback = AsyncMock(return_value=None)
         self.ctrl._audit_callback = callback
 
         task_mock = MagicMock()
-        task_mock.description = "Async task"
-        with patch.object(self.ctrl, "_get_initial_task", return_value=task_mock):
+        task_mock.description = 'Async task'
+        with patch.object(self.ctrl, '_get_initial_task', return_value=task_mock):
             self.ctrl.state_tracker.state.metrics = MagicMock()
             self.ctrl.state_tracker.state.metrics.accumulated_token_usage.prompt_tokens = 50
             self.ctrl.state_tracker.state.metrics.accumulated_token_usage.completion_tokens = 50
             self.ctrl.state_tracker.state.metrics.accumulated_cost = 0.01
 
-            await self.ctrl.log_task_audit("error", error_message="Failed")
+            await self.ctrl.log_task_audit('error', error_message='Failed')
 
         callback.assert_awaited_once()
 
     async def test_audit_callback_exception_handled(self):
-        callback = MagicMock(side_effect=RuntimeError("Audit fail"))
+        callback = MagicMock(side_effect=RuntimeError('Audit fail'))
         self.ctrl._audit_callback = callback
 
-        with patch.object(self.ctrl, "_get_initial_task", side_effect=RuntimeError):
+        with patch.object(self.ctrl, '_get_initial_task', side_effect=RuntimeError):
             # Should not raise
-            await self.ctrl.log_task_audit("error")
+            await self.ctrl.log_task_audit('error')
 
 
 # ── Constants ────────────────────────────────────────────────────────
@@ -857,17 +857,18 @@ class TestConstants(unittest.TestCase):
     """Test module-level constants exist."""
 
     def test_traffic_control_reminder(self):
-        self.assertIn("resume", TRAFFIC_CONTROL_REMINDER)
+        self.assertIn('resume', TRAFFIC_CONTROL_REMINDER)
 
     def test_error_action_not_executed_stopped(self):
-        self.assertIn("Stop button", ERROR_ACTION_NOT_EXECUTED_STOPPED)
+        self.assertIn('Stop button', ERROR_ACTION_NOT_EXECUTED_STOPPED)
 
     def test_error_action_not_executed_error(self):
-        self.assertIn("runtime error", ERROR_ACTION_NOT_EXECUTED_ERROR)
+        self.assertIn('runtime error', ERROR_ACTION_NOT_EXECUTED_ERROR)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
+
 
 class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
     """Explicitly target missing lines."""
@@ -879,12 +880,16 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         """Line 480-484 coverage."""
         self.ctrl.services.state.set_agent_state = AsyncMock()
         await self.ctrl.set_agent_state_to(AgentState.RUNNING)
-        self.ctrl.services.state.set_agent_state.assert_awaited_once_with(AgentState.RUNNING)
+        self.ctrl.services.state.set_agent_state.assert_awaited_once_with(
+            AgentState.RUNNING
+        )
 
     def test_on_event_schedule(self):
         """Line 353 and 357 (indirectly via on_event)."""
         event = MagicMock()
-        with patch("backend.orchestration.session_orchestrator.run_or_schedule") as mock_run:
+        with patch(
+            'backend.orchestration.session_orchestrator.run_or_schedule'
+        ) as mock_run:
             self.ctrl.on_event(event)
             mock_run.assert_called_once()
 
@@ -892,7 +897,7 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         """Line 509 coverage."""
         self.ctrl.state_tracker.state.get_local_step.return_value = 1
         self.ctrl.state_tracker.state.iteration_flag.current_value = 5
-        with patch.object(self.ctrl, "log") as mock_log:
+        with patch.object(self.ctrl, 'log') as mock_log:
             self.ctrl._log_step_info()
             mock_log.assert_called_once()
 
@@ -900,10 +905,12 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         """Line 538-541 coverage."""
         self.ctrl.services.step_prerequisites.can_step.return_value = True
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
-        self.ctrl.services.action_execution.get_next_action = AsyncMock(return_value=None)
+        self.ctrl.services.action_execution.get_next_action = AsyncMock(
+            return_value=None
+        )
         self.ctrl.services.retry.retry_count = 0
 
-        with patch.object(self.ctrl, "_run_control_flags_safely", return_value=True):
+        with patch.object(self.ctrl, '_run_control_flags_safely', return_value=True):
             await self.ctrl._step()
 
         # execute_action should not be called
@@ -918,16 +925,22 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         # 1st action: something. 2nd: something else. 3rd: None.
         a1 = MagicMock()
         a2 = MagicMock()
-        self.ctrl.services.action_execution.get_next_action = AsyncMock(side_effect=[a1, a2, None])
+        self.ctrl.services.action_execution.get_next_action = AsyncMock(
+            side_effect=[a1, a2, None]
+        )
         self.ctrl.services.action_execution.execute_action = AsyncMock()
 
         # _can_drain_pending: 1st True, 2nd False
-        with patch.object(self.ctrl, "_run_control_flags_safely", return_value=True), \
-             patch.object(self.ctrl, "_can_drain_pending", side_effect=[True, False]), \
-             patch.object(self.ctrl, "_handle_post_execution", new_callable=AsyncMock):
+        with (
+            patch.object(self.ctrl, '_run_control_flags_safely', return_value=True),
+            patch.object(self.ctrl, '_can_drain_pending', side_effect=[True, False]),
+            patch.object(self.ctrl, '_handle_post_execution', new_callable=AsyncMock),
+        ):
             await self.ctrl._step()
 
-        self.assertEqual(self.ctrl.services.action_execution.execute_action.call_count, 2)
+        self.assertEqual(
+            self.ctrl.services.action_execution.execute_action.call_count, 2
+        )
 
     def test_cleanup_action_context_no_action(self):
         """Line 213-228 coverage for action=None path."""
@@ -954,7 +967,8 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         """Line 230-245 coverage (early exit if system message exists)."""
         self.ctrl.state_tracker.state.start_id = 0
         from backend.ledger.action import SystemMessageAction
-        sys_msg = SystemMessageAction(content="test")
+
+        sys_msg = SystemMessageAction(content='test')
         self.ctrl.event_stream.search_events = MagicMock(return_value=[sys_msg])
 
         self.ctrl.agent.get_system_message = MagicMock()
@@ -1001,7 +1015,7 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl._main_loop = None
         self.ctrl._step_task = None
 
-        with patch.object(self.ctrl, "_create_step_task") as mock_create:
+        with patch.object(self.ctrl, '_create_step_task') as mock_create:
             self.ctrl.step()
             mock_create.assert_called_once()
 
@@ -1012,7 +1026,7 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl._main_loop = mock_loop
         self.ctrl._step_task = None
 
-        with patch.object(self.ctrl, "_create_step_task") as mock_create:
+        with patch.object(self.ctrl, '_create_step_task') as mock_create:
             self.ctrl.step()
             mock_create.assert_called_once()
         mock_loop.call_soon_threadsafe.assert_not_called()
@@ -1072,7 +1086,7 @@ class TestStepDispatch(unittest.TestCase):
 
     def test_get_initial_task_no_message(self):
         """Line 701 coverage."""
-        with patch.object(self.ctrl, "_first_user_message", return_value=None):
+        with patch.object(self.ctrl, '_first_user_message', return_value=None):
             self.assertIsNone(self.ctrl._get_initial_task())
 
     def test_save_state(self):
@@ -1083,7 +1097,9 @@ class TestStepDispatch(unittest.TestCase):
 
     async def test_close_complete(self):
         """Full coverage for close()."""
-        with patch.object(self.ctrl, "set_agent_state_to", new_callable=AsyncMock) as mock_set:
+        with patch.object(
+            self.ctrl, 'set_agent_state_to', new_callable=AsyncMock
+        ) as mock_set:
             self.ctrl.retry_service.shutdown = AsyncMock()
             await self.ctrl.close()
             mock_set.assert_awaited_once_with(AgentState.STOPPED)
@@ -1091,15 +1107,18 @@ class TestStepDispatch(unittest.TestCase):
 
     def test_repr(self):
         """Line 617-644 coverage."""
-        self.ctrl.services.action.get_pending_action_info = MagicMock(return_value=(MagicMock(), 100.0))
+        self.ctrl.services.action.get_pending_action_info = MagicMock(
+            return_value=(MagicMock(), 100.0)
+        )
         r = repr(self.ctrl)
-        self.assertIn("SessionOrchestrator", r)
-        self.assertIn("id=", r)
+        self.assertIn('SessionOrchestrator', r)
+        self.assertIn('id=', r)
 
     def test_is_awaiting_observation(self):
         """Line 646-663 coverage."""
         from backend.ledger.observation import AgentStateChangedObservation
-        event = AgentStateChangedObservation(content="", agent_state=AgentState.RUNNING)
+
+        event = AgentStateChangedObservation(content='', agent_state=AgentState.RUNNING)
         self.ctrl.event_stream.search_events = MagicMock(return_value=[event])
         self.assertTrue(self.ctrl._is_awaiting_observation())
 
@@ -1107,7 +1126,7 @@ class TestStepDispatch(unittest.TestCase):
         """Line 283-291 coverage (adding system message)."""
         self.ctrl.event_stream.search_events = MagicMock(return_value=[])
         mock_sys_msg = MagicMock()
-        mock_sys_msg.content = "System instruction"
+        mock_sys_msg.content = 'System instruction'
         self.ctrl.agent.get_system_message = MagicMock(return_value=mock_sys_msg)
         self.ctrl.event_stream.add_event = MagicMock()
 
@@ -1130,7 +1149,9 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl.rate_governor.record_llm_latency = MagicMock()
         self.ctrl.state.metrics = MagicMock()
 
-        with patch.object(self.ctrl.rate_governor, "check_and_wait", new_callable=AsyncMock):
+        with patch.object(
+            self.ctrl.rate_governor, 'check_and_wait', new_callable=AsyncMock
+        ):
             await self.ctrl._handle_post_execution()
 
         self.ctrl.rate_governor.record_llm_latency.assert_called_once_with(0.5)
@@ -1138,13 +1159,13 @@ class TestStepDispatch(unittest.TestCase):
     def test_reset_with_error_obs(self):
         """Line 380-381 coverage (error id for dropped action)."""
         mock_pending = MagicMock()
-        mock_pending.tool_call_metadata = MagicMock() # To trigger hasattr
-        mock_pending.tool_call_metadata.tool_call_id = "123"
+        mock_pending.tool_call_metadata = MagicMock()  # To trigger hasattr
+        mock_pending.tool_call_metadata.tool_call_id = '123'
         self.ctrl._pending_action = mock_pending
         self.ctrl.state.history = []
         self.ctrl.state.agent_state = AgentState.RUNNING
 
-        with patch.object(self.ctrl.event_stream, "add_event") as mock_add:
+        with patch.object(self.ctrl.event_stream, 'add_event') as mock_add:
             self.ctrl._reset()
             mock_add.assert_called()
 
@@ -1153,7 +1174,8 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl._cached_first_user_message = None
         self.ctrl.state_tracker.state.start_id = 10
         from backend.ledger.action import MessageAction
-        msg = MessageAction(content="user input")
+
+        msg = MessageAction(content='user input')
         msg.source = EventSource.USER
         self.ctrl.event_stream.search_events = MagicMock(return_value=[msg])
 
@@ -1170,14 +1192,16 @@ class TestStepDispatch(unittest.TestCase):
     def test_schedule_coroutine(self):
         """Line 355-357 coverage."""
         coro = MagicMock()
-        with patch("backend.orchestration.session_orchestrator.run_or_schedule") as mock_run:
+        with patch(
+            'backend.orchestration.session_orchestrator.run_or_schedule'
+        ) as mock_run:
             self.ctrl._schedule_coroutine(coro)
             mock_run.assert_called_once_with(coro)
 
     def test_bind_action_context_early_return(self):
         """Line 240 coverage."""
-        if hasattr(self.ctrl, "_action_contexts_by_event_id"):
-            delattr(self.ctrl, "_action_contexts_by_event_id")
+        if hasattr(self.ctrl, '_action_contexts_by_event_id'):
+            delattr(self.ctrl, '_action_contexts_by_event_id')
         self.ctrl._bind_action_context(MagicMock(), MagicMock())
         # Should not raise
 
@@ -1187,20 +1211,27 @@ class TestStepDispatch(unittest.TestCase):
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
         self.ctrl.services.retry.retry_count = 0
         # First action found, second None
-        self.ctrl.services.action_execution.get_next_action = AsyncMock(side_effect=[MagicMock(), None])
+        self.ctrl.services.action_execution.get_next_action = AsyncMock(
+            side_effect=[MagicMock(), None]
+        )
         self.ctrl.services.action_execution.execute_action = AsyncMock()
 
-        with patch.object(self.ctrl, "_run_control_flags_safely", return_value=True), \
-             patch.object(self.ctrl, "_can_drain_pending", return_value=True), \
-             patch.object(self.ctrl, "_handle_post_execution", new_callable=AsyncMock):
+        with (
+            patch.object(self.ctrl, '_run_control_flags_safely', return_value=True),
+            patch.object(self.ctrl, '_can_drain_pending', return_value=True),
+            patch.object(self.ctrl, '_handle_post_execution', new_callable=AsyncMock),
+        ):
             await self.ctrl._step()
 
-        self.assertEqual(self.ctrl.services.action_execution.execute_action.call_count, 1)
+        self.assertEqual(
+            self.ctrl.services.action_execution.execute_action.call_count, 1
+        )
 
     def test_add_system_message_user_present(self):
         """Line 280 coverage."""
         from backend.ledger.action import MessageAction
-        msg = MessageAction(content="hi")
+
+        msg = MessageAction(content='hi')
         msg.source = EventSource.USER
         self.ctrl.event_stream.search_events = MagicMock(return_value=[msg])
         self.ctrl._add_system_message()
@@ -1209,7 +1240,7 @@ class TestStepDispatch(unittest.TestCase):
     def test_step_task_creation(self):
         """Line 338 coverage — step() with no main loop calls _create_step_task directly."""
         self.ctrl._main_loop = None
-        with patch.object(self.ctrl, "_create_step_task") as mock_create:
+        with patch.object(self.ctrl, '_create_step_task') as mock_create:
             self.ctrl.step()
             mock_create.assert_called_once()
 
@@ -1228,15 +1259,16 @@ class TestStepDispatch(unittest.TestCase):
     def test_pending_action_no_service(self):
         """Line 538-541 and 549-551 fallback paths."""
         # We need to bypass the properties that look up services
-        with patch.object(self.ctrl.services, "pending_action", None), \
-             patch.object(self.ctrl, "pending_action_service", None), \
-             patch.object(self.ctrl, "action_service", None):
-
+        with (
+            patch.object(self.ctrl.services, 'pending_action', None),
+            patch.object(self.ctrl, 'pending_action_service', None),
+            patch.object(self.ctrl, 'action_service', None),
+        ):
             # Setter
             act = MagicMock()
             self.ctrl._pending_action = act
             # Check internal attr
-            self.assertEqual(getattr(self.ctrl, "_pending_action_val", None), None)
+            self.assertEqual(getattr(self.ctrl, '_pending_action_val', None), None)
             # Wait, where does it store it if no service?
             # Ah, looking at code:
             # service = getattr(self, "action_service", None)
@@ -1252,7 +1284,8 @@ class TestStepDispatch(unittest.TestCase):
     def test_first_user_message_with_list(self):
         """Line 678 coverage."""
         from backend.ledger.action import MessageAction
-        msg = MessageAction(content="hi")
+
+        msg = MessageAction(content='hi')
         msg.source = EventSource.USER
         res = self.ctrl._first_user_message(events=[msg])
         self.assertEqual(res, msg)
@@ -1261,10 +1294,11 @@ class TestStepDispatch(unittest.TestCase):
         """Line 709-711 coverage via direct call."""
         self.ctrl._audit_callback = MagicMock()
         from backend.ledger.action import MessageAction
-        msg = MessageAction(content="My task")
+
+        msg = MessageAction(content='My task')
         msg.source = EventSource.USER
         self.ctrl._cached_first_user_message = msg
         self.ctrl.state.metrics = MagicMock()
 
-        await self.ctrl.log_task_audit("completed")
+        await self.ctrl.log_task_audit('completed')
         self.ctrl._audit_callback.assert_called()

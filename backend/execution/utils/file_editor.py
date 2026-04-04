@@ -31,7 +31,7 @@ class ToolResult:
 class ToolError(Exception):
     """Exception raised by file editor operations."""
 
-    def __init__(self, message: str = "") -> None:
+    def __init__(self, message: str = '') -> None:
         """Initialize tool error with message."""
         super().__init__(message)
         self.message = message
@@ -102,13 +102,13 @@ class FileEditor:
             safe_path = self._resolve_path_safe(path)
             file_path = safe_path.path
 
-            if command == "view_file":
+            if command == 'view_file':
                 return self._handle_view(file_path, view_range, path)
             if command in (
-                "edit",
-                "replace_text",
-                "insert_text",
-                "view_and_replace",
+                'edit',
+                'replace_text',
+                'insert_text',
+                'view_and_replace',
             ):
                 return self._handle_edit(
                     file_path,
@@ -120,31 +120,31 @@ class FileEditor:
                     end_line,
                     dry_run=dry_run,
                 )
-            if command == "undo_last_edit":
+            if command == 'undo_last_edit':
                 # Runtime file editor has no durable undo stack yet.
                 return ToolResult(
-                    output="",
+                    output='',
                     error=(
-                        "undo_last_edit is not currently supported in runtime mode. "
-                        "Use checkpoint/rollback for reversal."
+                        'undo_last_edit is not currently supported in runtime mode. '
+                        'Use checkpoint/rollback for reversal.'
                     ),
                 )
-            if command in ("write", "create_file"):
+            if command in ('write', 'create_file'):
                 # Handle sentinels for write/create_file command
                 content = self._extract_content(file_text, new_str)
                 return self._handle_write(
                     file_path,
                     content,
-                    is_create=(command == "create_file"),
+                    is_create=(command == 'create_file'),
                     dry_run=dry_run,
                 )
 
-            raise ToolError(f"Unknown command: {command}")
+            raise ToolError(f'Unknown command: {command}')
 
         except PathValidationError as e:
-            return ToolResult(output="", error=f"Path validation error: {e.message}")
+            return ToolResult(output='', error=f'Path validation error: {e.message}')
         except Exception as e:
-            return ToolResult(output="", error=str(e))
+            return ToolResult(output='', error=str(e))
 
     def _resolve_path_safe(self, path: str) -> SafePath:
         """Resolve and validate file path with security checks.
@@ -185,7 +185,7 @@ class FileEditor:
         if not is_missing(new_str) and new_str is not None:
             return str(new_str)  # Type narrowing: if not MISSING and not None, it's str
         # Both are MISSING or None
-        return ""
+        return ''
 
     def _handle_view(
         self, file_path: Path, view_range: list[int] | None, display_path: str
@@ -204,28 +204,28 @@ class FileEditor:
 
             formatted_output = self._format_view_output(lines)
             return ToolResult(
-                output=f"{header}\n{formatted_output}",
+                output=f'{header}\n{formatted_output}',
                 old_content=content,
                 new_content=content,
             )
 
         except Exception as e:
-            return ToolResult(output="", error=f"Error reading file: {e}")
+            return ToolResult(output='', error=f'Error reading file: {e}')
 
     def _prepare_view_content(self, file_path: Path) -> str | ToolResult:
         """Prepare content for viewing, handling basic path checks."""
         if not file_path.exists():
             return ToolResult(
-                output="",
-                error=f"File not found: {file_path}",
+                output='',
+                error=f'File not found: {file_path}',
                 old_content=None,
                 new_content=None,
             )
 
         if file_path.is_dir():
             return ToolResult(
-                output="",
-                error=f"Path is a directory: {file_path}",
+                output='',
+                error=f'Path is a directory: {file_path}',
                 old_content=None,
                 new_content=None,
             )
@@ -236,12 +236,12 @@ class FileEditor:
         """Format lines with line numbers (cat -n style)."""
         numbered_lines = []
         for i, line in enumerate(lines, 1):
-            line_content = line.rstrip("\n\r")
-            numbered_lines.append(f"{i}\t{line_content}")
+            line_content = line.rstrip('\n\r')
+            numbered_lines.append(f'{i}\t{line_content}')
 
-        formatted_output = "\n".join(numbered_lines)
-        if lines and any(line.endswith(("\n", "\r")) for line in lines):
-            formatted_output += "\n"
+        formatted_output = '\n'.join(numbered_lines)
+        if lines and any(line.endswith(('\n', '\r')) for line in lines):
+            formatted_output += '\n'
         return formatted_output
 
     def _apply_view_range(
@@ -255,17 +255,17 @@ class FileEditor:
         # Re-format only the selected lines
         selected_lines = []
         for i in range(start_idx, end_idx):
-            line_content = lines[i].rstrip("\n\r")
-            selected_lines.append(f"{i + 1}\t{line_content}")
+            line_content = lines[i].rstrip('\n\r')
+            selected_lines.append(f'{i + 1}\t{line_content}')
 
-        selected_output = "\n".join(selected_lines)
+        selected_output = '\n'.join(selected_lines)
         if lines and any(
-            line.endswith(("\n", "\r")) for line in lines[start_idx:end_idx]
+            line.endswith(('\n', '\r')) for line in lines[start_idx:end_idx]
         ):
-            selected_output += "\n"
+            selected_output += '\n'
 
         return ToolResult(
-            output=f"{header}\n{selected_output}",
+            output=f'{header}\n{selected_output}',
             old_content=content,
             new_content=content,
         )
@@ -286,7 +286,7 @@ class FileEditor:
         try:
             # Read existing content
             old_content = self._read_file(file_path) if file_path.exists() else None
-            old_content_str = old_content or ""
+            old_content_str = old_content or ''
 
             # Extract params
             file_text_val, old_str_val, new_str_val = self._extract_edit_params(
@@ -309,7 +309,7 @@ class FileEditor:
 
             if dry_run:
                 return ToolResult(
-                    output="Preview generated (no changes applied)",
+                    output='Preview generated (no changes applied)',
                     old_content=old_content,
                     new_content=new_content,
                 )
@@ -319,8 +319,8 @@ class FileEditor:
 
         except Exception as e:
             return ToolResult(
-                output="",
-                error=f"Error editing file: {e}",
+                output='',
+                error=f'Error editing file: {e}',
                 old_content=None,
                 new_content=None,
             )
@@ -361,7 +361,7 @@ class FileEditor:
         new_str_val: str | None,
     ) -> str:
         """Resolve content from file_text or new_str. Empty string if neither."""
-        return new_str_val or file_text_val or ""
+        return new_str_val or file_text_val or ''
 
     def _apply_edit_logic(
         self,
@@ -378,7 +378,8 @@ class FileEditor:
             return self._replace_range(
                 old_content_str,
                 self._resolve_edit_content(file_text_val, new_str_val),
-                start_line, end_line,
+                start_line,
+                end_line,
             )
         if insert_line is not None:
             return self._insert_at_line(
@@ -393,8 +394,8 @@ class FileEditor:
         if new_str_val:
             return old_content_str + new_str_val
         return ToolResult(
-            output="",
-            error="No content provided for edit operation",
+            output='',
+            error='No content provided for edit operation',
             new_content=old_content_str,
         )
 
@@ -407,10 +408,10 @@ class FileEditor:
         window = len(old_lines)
 
         best_ratio = 0.0
-        best_block = ""
+        best_block = ''
 
         for i in range(max(1, len(lines) - window + 1)):
-            candidate = "".join(lines[i : i + window])
+            candidate = ''.join(lines[i : i + window])
             ratio = difflib.SequenceMatcher(None, old_str, candidate).ratio()
             if ratio > best_ratio:
                 best_ratio = ratio
@@ -418,24 +419,24 @@ class FileEditor:
 
         if best_ratio > 0.6:
             return ToolResult(
-                output="",
+                output='',
                 error=(
-                    f"ERROR: No exact match for old_str was found in the file. "
-                    f"Did you mean this block (similarity {best_ratio:.0%})?\n\n"
-                    f"<<<\n{best_block.rstrip()}\n>>>\n\n"
-                    f"Please provide the exact text to replace, "
-                    f"including whitespace and indentation."
+                    f'ERROR: No exact match for old_str was found in the file. '
+                    f'Did you mean this block (similarity {best_ratio:.0%})?\n\n'
+                    f'<<<\n{best_block.rstrip()}\n>>>\n\n'
+                    f'Please provide the exact text to replace, '
+                    f'including whitespace and indentation.'
                 ),
                 new_content=content,
             )
 
         return ToolResult(
-            output="",
+            output='',
             error=(
-                "ERROR: No match for old_str was found in the file. "
+                'ERROR: No match for old_str was found in the file. '
                 "The content you're trying to replace does not exist. "
-                "Use the view command to see the current file content, "
-                "then retry with the exact text."
+                'Use the view command to see the current file content, '
+                'then retry with the exact text.'
             ),
             new_content=content,
         )
@@ -452,7 +453,7 @@ class FileEditor:
         self._write_file(file_path, new_content)
 
         return ToolResult(
-            output="File updated successfully",
+            output='File updated successfully',
             old_content=old_content,
             new_content=new_content,
         )
@@ -484,13 +485,13 @@ class FileEditor:
                 # so stuck detection can recognize the re-creation.
                 # Telling the LLM about the duplicate confuses weak models.
                 return ToolResult(
-                    output="File created successfully",
+                    output='File created successfully',
                     old_content=old_content,
                     new_content=old_content,
                 )
 
             if dry_run:
-                output_msg = "Preview generated (no changes applied)"
+                output_msg = 'Preview generated (no changes applied)'
                 return ToolResult(
                     output=output_msg,
                     old_content=old_content,
@@ -505,9 +506,9 @@ class FileEditor:
 
             # Use appropriate message based on command and whether file existed
             if is_create:
-                output_msg = "File created successfully"
+                output_msg = 'File created successfully'
             else:
-                output_msg = "File written successfully"
+                output_msg = 'File written successfully'
 
             return ToolResult(
                 output=output_msg,
@@ -517,8 +518,8 @@ class FileEditor:
 
         except Exception as e:
             return ToolResult(
-                output="",
-                error=f"Error writing file: {e}",
+                output='',
+                error=f'Error writing file: {e}',
                 old_content=None,
                 new_content=None,
             )
@@ -526,11 +527,11 @@ class FileEditor:
     def _read_file(self, file_path: Path) -> str:
         """Read file content with proper encoding handling."""
         try:
-            with open(file_path, encoding="utf-8") as f:
+            with open(file_path, encoding='utf-8') as f:
                 return f.read()
         except UnicodeDecodeError:
             # Fallback to latin-1 for binary-like files
-            with open(file_path, encoding="latin-1", errors="replace") as f:
+            with open(file_path, encoding='latin-1', errors='replace') as f:
                 return f.read()
 
     def _write_file(self, file_path: Path, content: str) -> None:
@@ -539,9 +540,9 @@ class FileEditor:
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write file atomically (write to temp then rename)
-        temp_path = file_path.with_suffix(file_path.suffix + ".tmp")
+        temp_path = file_path.with_suffix(file_path.suffix + '.tmp')
         try:
-            with open(temp_path, "w", encoding="utf-8") as f:
+            with open(temp_path, 'w', encoding='utf-8') as f:
                 f.write(content)
             temp_path.replace(file_path)
         except Exception:
@@ -554,7 +555,7 @@ class FileEditor:
         """Insert text at a specific line number (1-indexed)."""
         lines = content.splitlines(keepends=True)
         if not lines:
-            lines = [""]
+            lines = ['']
 
         # Normalize line number
         line_idx = max(0, min(line_num - 1, len(lines)))
@@ -566,9 +567,11 @@ class FileEditor:
 
         # Insert at the specified line
         result_lines = lines[:line_idx] + new_lines + lines[line_idx:]
-        return "".join(result_lines)
+        return ''.join(result_lines)
 
-    def _replace_range(self, content: str, new_text: str, start_line: int, end_line: int) -> str | ToolResult:
+    def _replace_range(
+        self, content: str, new_text: str, start_line: int, end_line: int
+    ) -> str | ToolResult:
         """Replace a range of lines with new text."""
         lines = content.splitlines(keepends=True)
         # Handle empty file case
@@ -577,16 +580,16 @@ class FileEditor:
                 return new_text
             # If requesting to edit range in empty file but not starting at 1, that's ambiguous or error
             return ToolResult(
-                output="",
-                error=f"Cannot edit range {start_line}-{end_line} in an empty file.",
-                new_content=content
+                output='',
+                error=f'Cannot edit range {start_line}-{end_line} in an empty file.',
+                new_content=content,
             )
 
         if start_line < 1:
             return ToolResult(
-                output="",
-                error=f"Start line must be >= 1 (got {start_line})",
-                new_content=content
+                output='',
+                error=f'Start line must be >= 1 (got {start_line})',
+                new_content=content,
             )
 
         # 1-based to 0-based conversion
@@ -597,9 +600,9 @@ class FileEditor:
         # Validation
         if start_idx >= len(lines):
             return ToolResult(
-                output="",
-                error=f"Start line {start_line} is beyond file length ({len(lines)} lines)",
-                new_content=content
+                output='',
+                error=f'Start line {start_line} is beyond file length ({len(lines)} lines)',
+                new_content=content,
             )
 
         # Allow end_line to exceed file length (truncate/replace until end)
@@ -614,7 +617,7 @@ class FileEditor:
         # This is expected behavior for raw string replacement.
 
         result_lines = lines[:start_idx] + new_lines_to_insert + lines[end_idx:]
-        return "".join(result_lines)
+        return ''.join(result_lines)
 
     def _backup_file(self, file_path: Path, content: str | None) -> None:
         """Backup file content for transaction rollback.
@@ -677,4 +680,4 @@ class FileEditor:
                 # Log but continue rollback for other files
                 from backend.core.logger import app_logger as logger
 
-                logger.warning("Failed to rollback %s: %s", file_path, e)
+                logger.warning('Failed to rollback %s: %s', file_path, e)

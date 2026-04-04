@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:
-    from backend.orchestration.tool_pipeline import ToolInvocationContext
     from backend.ledger.observation import Observation
+    from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
 class EditVerifyMiddleware(ToolInvocationMiddleware):

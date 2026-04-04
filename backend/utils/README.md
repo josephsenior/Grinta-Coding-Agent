@@ -1,6 +1,6 @@
-# App Utilities
+# Grinta Utilities
 
-This directory contains various utility functions and classes used throughout App.
+This directory contains various utility functions and classes used throughout Grinta.
 
 ## Runtime Implementation Substitution
 

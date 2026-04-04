@@ -22,9 +22,8 @@ class FileDownloadObservation(Observation):
     @property
     def message(self) -> str:
         """Get file download completion message."""
-        return f"Downloaded the file at location: {self.file_path}"
+        return f'Downloaded the file at location: {self.file_path}'
 
     def __str__(self) -> str:
         """Return a readable summary highlighting the download location."""
-        return f"**FileDownloadObservation**\nLocation of downloaded file: {self.file_path}\n"
-
+        return f'**FileDownloadObservation**\nLocation of downloaded file: {self.file_path}\n'

@@ -18,10 +18,10 @@ class FileReadAction(Action):
     Default lines 0:-1 (whole file).
     """
 
-    path: str = ""
+    path: str = ''
     start: int = 0
     end: int = -1
-    thought: str = ""
+    thought: str = ''
     action: ClassVar[str] = ActionType.READ
     runnable: ClassVar[bool] = True
     security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN
@@ -31,8 +31,7 @@ class FileReadAction(Action):
     @property
     def message(self) -> str:
         """Get file read message."""
-        return f"Reading file: {self.path}"
-
+        return f'Reading file: {self.path}'
 
 
 @dataclass
@@ -43,11 +42,11 @@ class FileWriteAction(Action):
     Default lines 0:-1 (whole file).
     """
 
-    path: str = ""
-    content: str = ""
+    path: str = ''
+    content: str = ''
     start: int = 0
     end: int = -1
-    thought: str = ""
+    thought: str = ''
     action: ClassVar[str] = ActionType.WRITE
     runnable: ClassVar[bool] = True
     security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN
@@ -55,14 +54,13 @@ class FileWriteAction(Action):
     @property
     def message(self) -> str:
         """Get file write message."""
-        return f"Writing file: {self.path}"
+        return f'Writing file: {self.path}'
 
     def __repr__(self) -> str:
         """Return a readable summary of the write parameters."""
-        return f"**FileWriteAction**\nPath: {self.path}\nRange: [L{self.start}:L{
+        return f'**FileWriteAction**\nPath: {self.path}\nRange: [L{self.start}:L{
             self.end
-        }]\nThought: {self.thought}\nContent:\n```\n{self.content}\n```\n"
-
+        }]\nThought: {self.thought}\nContent:\n```\n{self.content}\n```\n'
 
 
 @dataclass
@@ -101,17 +99,17 @@ class FileEditAction(Action):
 
     """
 
-    path: str = ""
-    command: str = ""
+    path: str = ''
+    command: str = ''
     file_text: str | None = None
     old_str: str | None = None
     new_str: str | None = None
     insert_line: int | None = None
     view_range: list[int] | None = None
-    content: str = ""
+    content: str = ''
     start: int = 1
     end: int = -1
-    thought: str = ""
+    thought: str = ''
     action: ClassVar[str] = ActionType.EDIT
     runnable: ClassVar[bool] = True
     security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN
@@ -119,23 +117,22 @@ class FileEditAction(Action):
 
     def __repr__(self) -> str:
         """Return a readable summary capturing edit mode and key fields."""
-        ret = "**FileEditAction**\n"
-        ret += f"Path: [{self.path}]\n"
-        ret += f"Thought: {self.thought}\n"
+        ret = '**FileEditAction**\n'
+        ret += f'Path: [{self.path}]\n'
+        ret += f'Thought: {self.thought}\n'
         if self.impl_source == FileEditSource.LLM_BASED_EDIT:
-            ret += f"Range: [L{self.start}:L{self.end}]\n"
-            ret += f"Content:\n```\n{self.content}\n```\n"
+            ret += f'Range: [L{self.start}:L{self.end}]\n'
+            ret += f'Content:\n```\n{self.content}\n```\n'
         else:
-            ret += f"Command: {self.command}\n"
-            if self.command == "create_file":
-                ret += f"Created File with Text:\n```\n{self.file_text}\n```\n"
-            elif self.command == "replace_text":
-                ret += f"Old String: ```\n{self.old_str}\n```\n"
-                ret += f"New String: ```\n{self.new_str}\n```\n"
-            elif self.command == "insert_text":
-                ret += f"Insert Line: {self.insert_line}\n"
-                ret += f"New String: ```\n{self.new_str}\n```\n"
-            elif self.command == "undo_last_edit":
-                ret += "Undo Edit\n"
+            ret += f'Command: {self.command}\n'
+            if self.command == 'create_file':
+                ret += f'Created File with Text:\n```\n{self.file_text}\n```\n'
+            elif self.command == 'replace_text':
+                ret += f'Old String: ```\n{self.old_str}\n```\n'
+                ret += f'New String: ```\n{self.new_str}\n```\n'
+            elif self.command == 'insert_text':
+                ret += f'Insert Line: {self.insert_line}\n'
+                ret += f'New String: ```\n{self.new_str}\n```\n'
+            elif self.command == 'undo_last_edit':
+                ret += 'Undo Edit\n'
         return ret
-

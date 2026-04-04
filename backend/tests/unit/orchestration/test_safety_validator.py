@@ -1,16 +1,17 @@
 from typing import Any, cast
+
 """Tests for backend.orchestration.safety_validator module."""
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.ledger.action import ActionSecurityRisk, CmdRunAction
 from backend.orchestration.safety_validator import (
     ExecutionContext,
     SafetyValidator,
     ValidationResult,
 )
-from backend.ledger.action import ActionSecurityRisk, CmdRunAction
 from backend.security.command_analyzer import RiskCategory
 
 
@@ -20,25 +21,25 @@ class TestExecutionContext:
     def test_create_with_all_fields(self):
         """Test creating with all fields."""
         context = ExecutionContext(
-            session_id="test_session",
+            session_id='test_session',
             iteration=5,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=True,
         )
-        assert context.session_id == "test_session"
+        assert context.session_id == 'test_session'
         assert context.iteration == 5
-        assert context.agent_state == "running"
+        assert context.agent_state == 'running'
         assert context.recent_errors == []
         assert context.is_autonomous is True
 
     def test_create_with_errors(self):
         """Test creating with error list."""
-        errors = ["error1", "error2"]
+        errors = ['error1', 'error2']
         context = ExecutionContext(
-            session_id="sess",
+            session_id='sess',
             iteration=1,
-            agent_state="error",
+            agent_state='error',
             recent_errors=errors,
             is_autonomous=False,
         )
@@ -54,13 +55,13 @@ class TestValidationResult:
             allowed=True,
             risk_level=ActionSecurityRisk.LOW,
             risk_category=RiskCategory.NONE,
-            reason="safe command",
+            reason='safe command',
             matched_patterns=[],
         )
         assert result.allowed is True
         assert result.risk_level == ActionSecurityRisk.LOW
         assert result.risk_category == RiskCategory.NONE
-        assert result.reason == "safe command"
+        assert result.reason == 'safe command'
         assert result.matched_patterns == []
         assert result.requires_review is False
         assert result.audit_id is None
@@ -72,16 +73,16 @@ class TestValidationResult:
             allowed=False,
             risk_level=ActionSecurityRisk.HIGH,
             risk_category=RiskCategory.CRITICAL,
-            reason="dangerous",
-            matched_patterns=["rm -rf"],
+            reason='dangerous',
+            matched_patterns=['rm -rf'],
             requires_review=True,
-            audit_id="audit_123",
-            blocked_reason="Too dangerous",
+            audit_id='audit_123',
+            blocked_reason='Too dangerous',
         )
         assert result.allowed is False
         assert result.requires_review is True
-        assert result.audit_id == "audit_123"
-        assert result.blocked_reason == "Too dangerous"
+        assert result.audit_id == 'audit_123'
+        assert result.blocked_reason == 'Too dangerous'
 
 
 class TestSafetyValidator:
@@ -90,33 +91,33 @@ class TestSafetyValidator:
     def create_mock_config(self, **overrides):
         """Create a mock safety config."""
         config = MagicMock()
-        config.environment = overrides.get("environment", "development")
-        config.blocked_patterns = overrides.get("blocked_patterns", [])
-        config.allowed_exceptions = overrides.get("allowed_exceptions", [])
-        config.risk_threshold = overrides.get("risk_threshold", "high")
-        config.enable_audit_logging = overrides.get("enable_audit_logging", False)
-        config.audit_log_path = overrides.get("audit_log_path", "/tmp/audit.log")
+        config.environment = overrides.get('environment', 'development')
+        config.blocked_patterns = overrides.get('blocked_patterns', [])
+        config.allowed_exceptions = overrides.get('allowed_exceptions', [])
+        config.risk_threshold = overrides.get('risk_threshold', 'high')
+        config.enable_audit_logging = overrides.get('enable_audit_logging', False)
+        config.audit_log_path = overrides.get('audit_log_path', '/tmp/audit.log')
         config.enable_mandatory_validation = overrides.get(
-            "enable_mandatory_validation", True
+            'enable_mandatory_validation', True
         )
-        config.block_in_production = overrides.get("block_in_production", True)
+        config.block_in_production = overrides.get('block_in_production', True)
         config.require_review_for_high_risk = overrides.get(
-            "require_review_for_high_risk", False
+            'require_review_for_high_risk', False
         )
-        config.enable_risk_alerts = overrides.get("enable_risk_alerts", False)
-        config.alert_webhook_url = overrides.get("alert_webhook_url")
+        config.enable_risk_alerts = overrides.get('enable_risk_alerts', False)
+        config.alert_webhook_url = overrides.get('alert_webhook_url')
         return config
 
     def test_init_creates_analyzer(self):
         """Test initialization creates CommandAnalyzer."""
         config = self.create_mock_config(
-            blocked_patterns=["rm -rf"],
-            allowed_exceptions=["safe.txt"],
+            blocked_patterns=['rm -rf'],
+            allowed_exceptions=['safe.txt'],
         )
 
         validator = SafetyValidator(config)
 
-        assert hasattr(validator, "analyzer")
+        assert hasattr(validator, 'analyzer')
         assert validator.config == config
 
     def test_init_without_audit_logging(self):
@@ -135,14 +136,14 @@ class TestSafetyValidator:
 
         # Mock analyzer to return low risk
         cast(Any, validator.analyzer).analyze = MagicMock(
-            return_value=(RiskCategory.NONE, "safe command", [])
+            return_value=(RiskCategory.NONE, 'safe command', [])
         )
 
-        action = CmdRunAction(command="ls")
+        action = CmdRunAction(command='ls')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -162,16 +163,16 @@ class TestSafetyValidator:
         cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(
                 RiskCategory.CRITICAL,
-                "dangerous command",
-                ["rm -rf /"],
+                'dangerous command',
+                ['rm -rf /'],
             )
         )
 
-        action = CmdRunAction(command="rm -rf /")
+        action = CmdRunAction(command='rm -rf /')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -185,7 +186,7 @@ class TestSafetyValidator:
     async def test_validate_high_risk_blocked_in_production(self):
         """Test validate blocks high-risk actions in production."""
         config = self.create_mock_config(
-            environment="production",
+            environment='production',
             block_in_production=True,
         )
         validator = SafetyValidator(config)
@@ -194,16 +195,16 @@ class TestSafetyValidator:
         cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(
                 RiskCategory.HIGH,
-                "risky command",
-                ["sudo"],
+                'risky command',
+                ['sudo'],
             )
         )
 
-        action = CmdRunAction(command="sudo reboot")
+        action = CmdRunAction(command='sudo reboot')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -216,7 +217,7 @@ class TestSafetyValidator:
     async def test_validate_high_risk_allowed_in_development(self):
         """Test validate allows high-risk actions in development."""
         config = self.create_mock_config(
-            environment="development",
+            environment='development',
             enable_mandatory_validation=False,
         )
         validator = SafetyValidator(config)
@@ -225,16 +226,16 @@ class TestSafetyValidator:
         cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(
                 RiskCategory.HIGH,
-                "risky but allowed",
-                ["sudo"],
+                'risky but allowed',
+                ['sudo'],
             )
         )
 
-        action = CmdRunAction(command="sudo ls")
+        action = CmdRunAction(command='sudo ls')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -255,16 +256,16 @@ class TestSafetyValidator:
         cast(Any, validator.analyzer).analyze = MagicMock(
             return_value=(
                 RiskCategory.HIGH,
-                "risky",
+                'risky',
                 [],
             )
         )
 
-        action = CmdRunAction(command="test")
+        action = CmdRunAction(command='test')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -284,25 +285,25 @@ class TestSafetyValidator:
         validator = SafetyValidator(config)
 
         mock_logger = AsyncMock()
-        mock_logger.log_action = AsyncMock(return_value="audit_xyz")
+        mock_logger.log_action = AsyncMock(return_value='audit_xyz')
         validator.telemetry_logger = mock_logger  # Manually set
 
         cast(Any, validator.analyzer).analyze = MagicMock(
-            return_value=(RiskCategory.NONE, "safe", [])
+            return_value=(RiskCategory.NONE, 'safe', [])
         )
 
-        action = CmdRunAction(command="ls")
+        action = CmdRunAction(command='ls')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
 
         result = await validator.validate(action, context)
 
-        assert result.audit_id == "audit_xyz"
+        assert result.audit_id == 'audit_xyz'
         mock_logger.log_action.assert_called_once()
 
     @pytest.mark.asyncio
@@ -315,18 +316,18 @@ class TestSafetyValidator:
 
         # Mock analyzer
         cast(Any, validator.analyzer).analyze = MagicMock(
-            return_value=(RiskCategory.HIGH, "risky", [])
+            return_value=(RiskCategory.HIGH, 'risky', [])
         )
 
         # Mock _send_alert
         send_alert_mock = AsyncMock()
         cast(Any, validator)._send_alert = send_alert_mock
 
-        action = CmdRunAction(command="test")
+        action = CmdRunAction(command='test')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -346,12 +347,12 @@ class TestSafetyValidator:
         assessment = SimpleNamespace(
             risk_category=RiskCategory.CRITICAL,
             risk_level=ActionSecurityRisk.HIGH,
-            reason="critical risk",
+            reason='critical risk',
         )
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -362,7 +363,7 @@ class TestSafetyValidator:
     def test_should_block_action_blocks_high_in_production(self):
         """Test _should_block_action blocks HIGH risks in production."""
         config = self.create_mock_config(
-            environment="production",
+            environment='production',
             block_in_production=True,
         )
         validator = SafetyValidator(config)
@@ -372,12 +373,12 @@ class TestSafetyValidator:
         assessment = SimpleNamespace(
             risk_category=RiskCategory.HIGH,
             risk_level=ActionSecurityRisk.HIGH,
-            reason="high risk",
+            reason='high risk',
         )
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -388,7 +389,7 @@ class TestSafetyValidator:
     def test_should_block_action_allows_high_in_development(self):
         """Test _should_block_action allows HIGH risks in development."""
         config = self.create_mock_config(
-            environment="development",
+            environment='development',
         )
         validator = SafetyValidator(config)
 
@@ -397,12 +398,12 @@ class TestSafetyValidator:
         assessment = SimpleNamespace(
             risk_category=RiskCategory.HIGH,
             risk_level=ActionSecurityRisk.HIGH,
-            reason="high but dev",
+            reason='high but dev',
         )
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -443,18 +444,18 @@ class TestSafetyValidator:
 
         assessment = SimpleNamespace(
             risk_category=RiskCategory.CRITICAL,
-            reason="Destructive command",
-            matched_patterns=["rm -rf"],
+            reason='Destructive command',
+            matched_patterns=['rm -rf'],
         )
 
         reason = validator._get_blocked_reason(assessment)
-        assert "CRITICAL RISK DETECTED" in reason
-        assert "Destructive command" in reason
-        assert "rm -rf" in reason
+        assert 'CRITICAL RISK DETECTED' in reason
+        assert 'Destructive command' in reason
+        assert 'rm -rf' in reason
 
     def test_get_blocked_reason_for_high(self):
         """Test _get_blocked_reason for HIGH risk."""
-        config = self.create_mock_config(environment="production")
+        config = self.create_mock_config(environment='production')
         validator = SafetyValidator(config)
 
         from types import SimpleNamespace
@@ -462,14 +463,14 @@ class TestSafetyValidator:
         assessment = SimpleNamespace(
             risk_category=RiskCategory.HIGH,
             risk_level=ActionSecurityRisk.HIGH,
-            reason="Risky command",
-            matched_patterns=["sudo"],
+            reason='Risky command',
+            matched_patterns=['sudo'],
         )
 
         reason = validator._get_blocked_reason(assessment)
-        assert "HIGH RISK DETECTED" in reason
-        assert "production" in reason
-        assert "sudo" in reason
+        assert 'HIGH RISK DETECTED' in reason
+        assert 'production' in reason
+        assert 'sudo' in reason
 
     @pytest.mark.asyncio
     async def test_log_to_audit_returns_disabled_when_no_logger(self):
@@ -477,11 +478,11 @@ class TestSafetyValidator:
         config = self.create_mock_config(enable_audit_logging=False)
         validator = SafetyValidator(config)
 
-        action = CmdRunAction(command="test")
+        action = CmdRunAction(command='test')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -489,12 +490,12 @@ class TestSafetyValidator:
             allowed=True,
             risk_level=ActionSecurityRisk.LOW,
             risk_category=RiskCategory.NONE,
-            reason="safe",
+            reason='safe',
             matched_patterns=[],
         )
 
         audit_id = await validator._log_to_audit(action, context, result)
-        assert audit_id == "audit_disabled"
+        assert audit_id == 'audit_disabled'
 
     @pytest.mark.asyncio
     async def test_log_to_audit_handles_exception(self):
@@ -503,14 +504,14 @@ class TestSafetyValidator:
         validator = SafetyValidator(config)
 
         mock_logger = AsyncMock()
-        mock_logger.log_action = AsyncMock(side_effect=Exception("test error"))
+        mock_logger.log_action = AsyncMock(side_effect=Exception('test error'))
         validator.telemetry_logger = mock_logger  # Manually set
 
-        action = CmdRunAction(command="test")
+        action = CmdRunAction(command='test')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -518,23 +519,23 @@ class TestSafetyValidator:
             allowed=True,
             risk_level=ActionSecurityRisk.LOW,
             risk_category=RiskCategory.NONE,
-            reason="safe",
+            reason='safe',
             matched_patterns=[],
         )
 
         audit_id = await validator._log_to_audit(action, context, result)
-        assert audit_id == "audit_error"
+        assert audit_id == 'audit_error'
 
     def test_format_alert_message_for_blocked(self):
         """Test _format_alert_message for blocked action."""
-        config = self.create_mock_config(environment="production")
+        config = self.create_mock_config(environment='production')
         validator = SafetyValidator(config)
 
-        action = CmdRunAction(command="rm -rf /")
+        action = CmdRunAction(command='rm -rf /')
         context = ExecutionContext(
-            session_id="sess_123",
+            session_id='sess_123',
             iteration=10,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=True,
         )
@@ -542,29 +543,29 @@ class TestSafetyValidator:
             allowed=False,
             risk_level=ActionSecurityRisk.HIGH,
             risk_category=RiskCategory.CRITICAL,
-            reason="Dangerous command",
+            reason='Dangerous command',
             matched_patterns=[],
         )
 
         message = validator._format_alert_message(action, context, result)
 
-        assert "BLOCKED" in message
-        assert "sess_123" in message
-        assert "10" in message
-        assert "CmdRunAction" in message
-        assert "HIGH" in message
-        assert "production" in message
+        assert 'BLOCKED' in message
+        assert 'sess_123' in message
+        assert '10' in message
+        assert 'CmdRunAction' in message
+        assert 'HIGH' in message
+        assert 'production' in message
 
     def test_format_alert_message_for_high_risk(self):
         """Test _format_alert_message for allowed high-risk action."""
         config = self.create_mock_config()
         validator = SafetyValidator(config)
 
-        action = CmdRunAction(command="test")
+        action = CmdRunAction(command='test')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -572,12 +573,12 @@ class TestSafetyValidator:
             allowed=True,
             risk_level=ActionSecurityRisk.HIGH,
             risk_category=RiskCategory.HIGH,
-            reason="High risk but allowed",
+            reason='High risk but allowed',
             matched_patterns=[],
         )
 
         message = validator._format_alert_message(action, context, result)
-        assert "HIGH RISK" in message
+        assert 'HIGH RISK' in message
 
     @pytest.mark.asyncio
     async def test_send_alert_does_nothing_when_disabled(self):
@@ -585,11 +586,11 @@ class TestSafetyValidator:
         config = self.create_mock_config(enable_risk_alerts=False)
         validator = SafetyValidator(config)
 
-        action = CmdRunAction(command="test")
+        action = CmdRunAction(command='test')
         context = ExecutionContext(
-            session_id="test",
+            session_id='test',
             iteration=1,
-            agent_state="running",
+            agent_state='running',
             recent_errors=[],
             is_autonomous=False,
         )
@@ -597,7 +598,7 @@ class TestSafetyValidator:
             allowed=False,
             risk_level=ActionSecurityRisk.HIGH,
             risk_category=RiskCategory.HIGH,
-            reason="test",
+            reason='test',
             matched_patterns=[],
         )
 
@@ -611,19 +612,19 @@ class TestSafetyValidator:
         validator = SafetyValidator(config)
 
         # Should not raise, just log
-        await validator._send_webhook_alert("test message")
+        await validator._send_webhook_alert('test message')
 
     @pytest.mark.asyncio
     async def test_send_webhook_alert_handles_exception(self):
         """Test _send_webhook_alert handles exceptions gracefully."""
         config = self.create_mock_config(
-            alert_webhook_url="https://example.com/webhook"
+            alert_webhook_url='https://example.com/webhook'
         )
         validator = SafetyValidator(config)
 
         # Mock aiohttp to raise exception
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_session.return_value.__aenter__.side_effect = Exception("test error")
+        with patch('aiohttp.ClientSession') as mock_session:
+            mock_session.return_value.__aenter__.side_effect = Exception('test error')
 
             # Should not raise
-            await validator._send_webhook_alert("test message")
+            await validator._send_webhook_alert('test message')

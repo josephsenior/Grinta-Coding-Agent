@@ -10,7 +10,6 @@ from backend.orchestration.state.control_flags import (
     IterationControlFlag,
 )
 
-
 # ---------------------------------------------------------------------------
 # ControlFlag base (abstract)
 # ---------------------------------------------------------------------------
@@ -70,7 +69,7 @@ class TestIterationControlFlag:
         flag = IterationControlFlag(
             limit_increase_amount=5, current_value=10, max_value=10
         )
-        with pytest.raises(RuntimeError, match="maximum iteration"):
+        with pytest.raises(RuntimeError, match='maximum iteration'):
             flag.step()
 
     def test_step_increments_up_to_limit(self):
@@ -151,7 +150,7 @@ class TestBudgetControlFlag:
         flag = BudgetControlFlag(
             limit_increase_amount=5.0, current_value=10.0, max_value=10.0
         )
-        with pytest.raises(RuntimeError, match="maximum budget"):
+        with pytest.raises(RuntimeError, match='maximum budget'):
             flag.step()
 
     def test_step_does_not_increment(self):

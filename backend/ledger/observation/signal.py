@@ -18,13 +18,12 @@ class SignalProgressObservation(Observation):
     """
 
     acknowledged: bool = True
-    content: str = ""
+    content: str = ''
     observation_type: ClassVar[str] = ObservationType.SIGNAL_PROGRESS
 
     @property
     def message(self) -> str:
-        return "Progress signal acknowledged — stuck-detection counter reduced."
+        return 'Progress signal acknowledged — stuck-detection counter reduced.'
 
     def __str__(self) -> str:
-        return f"**SignalProgressObservation** acknowledged={self.acknowledged}\n{self.content}"
-
+        return f'**SignalProgressObservation** acknowledged={self.acknowledged}\n{self.content}'

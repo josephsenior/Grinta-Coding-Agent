@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -19,11 +19,11 @@ from backend.execution.telemetry import RuntimeTelemetry, runtime_telemetry
 from backend.execution.watchdog import runtime_watchdog
 
 if TYPE_CHECKING:
-    from backend.orchestration.agent import Agent
     from backend.core.config import AppConfig
-    from backend.ledger.stream import EventStream
-    from backend.inference.llm_registry import LLMRegistry
     from backend.execution.base import Runtime
+    from backend.inference.llm_registry import LLMRegistry
+    from backend.ledger.stream import EventStream
+    from backend.orchestration.agent import Agent
 
 
 @dataclass(slots=True)
@@ -67,13 +67,15 @@ class RuntimeOrchestrator:
         env_vars: dict[str, str] | None = None,
         user_id: str | None = None,
     ) -> RuntimeAcquireResult:
-        from backend.core.bootstrap.setup import create_runtime  # lazy import to avoid cycles
+        from backend.core.bootstrap.setup import (
+            create_runtime,  # lazy import to avoid cycles
+        )
 
         key = config.runtime
         pooled = self._pool.acquire(key)
         if pooled:
             runtime = pooled.runtime
-            rebind = getattr(runtime, "rebind_event_stream", None)
+            rebind = getattr(runtime, 'rebind_event_stream', None)
             if callable(rebind):
                 rebind(event_stream, sid=session_id)
             self._telemetry.record_acquire(key, reused=True)
@@ -110,7 +112,7 @@ class RuntimeOrchestrator:
 
     def drain_pooled_runtimes(self) -> None:
         """Clear warm pool so the next acquire creates a runtime in the new workspace."""
-        pool = getattr(self._pool, "drain_all", None)
+        pool = getattr(self._pool, 'drain_all', None)
         if callable(pool):
             pool()
 
@@ -153,10 +155,10 @@ class RuntimeOrchestrator:
         previous = self._last_idle_reclaim_totals.get(key, 0)
         delta = total - previous
         if delta >= IDLE_RECLAIM_SPIKE_THRESHOLD:
-            signal = f"overprovision|{key}"
-            self._telemetry.record_scaling_signal(signal, severity="info")
+            signal = f'overprovision|{key}'
+            self._telemetry.record_scaling_signal(signal, severity='info')
             logger.info(
-                "Idle reclaim spike detected for runtime=%s delta=%s total=%s",
+                'Idle reclaim spike detected for runtime=%s delta=%s total=%s',
                 key,
                 delta,
                 total,
@@ -172,10 +174,10 @@ class RuntimeOrchestrator:
         previous = self._last_eviction_totals.get(key, 0)
         delta = total - previous
         if delta >= EVICTION_SPIKE_THRESHOLD:
-            signal = f"capacity_exhausted|{key}"
-            self._telemetry.record_scaling_signal(signal, severity="warning")
+            signal = f'capacity_exhausted|{key}'
+            self._telemetry.record_scaling_signal(signal, severity='warning')
             logger.warning(
-                "Warm pool eviction spike for runtime=%s delta=%s total=%s",
+                'Warm pool eviction spike for runtime=%s delta=%s total=%s',
                 key,
                 delta,
                 total,
@@ -203,13 +205,13 @@ class RuntimeOrchestrator:
             if self._is_saturated(policy, key, count, pool_stats):
                 new_saturated.add(key)
                 if key not in self._saturated_keys:
-                    signal = f"saturation|{key}"
-                    self._telemetry.record_scaling_signal(signal, severity="warning")
+                    signal = f'saturation|{key}'
+                    self._telemetry.record_scaling_signal(signal, severity='warning')
                     logger.warning(
-                        "Runtime key=%s saturated: active=%s max_size=%s",
+                        'Runtime key=%s saturated: active=%s max_size=%s',
                         key,
                         count,
-                        policy.max_size if policy else "unknown",
+                        policy.max_size if policy else 'unknown',
                     )
         self._saturated_keys = new_saturated
 
@@ -227,17 +229,16 @@ class RuntimeOrchestrator:
         return active_count >= policy.max_size
 
     def idle_reclaim_stats(self) -> dict[str, int]:
-        stats_fn = getattr(self._pool, "idle_reclaim_stats", None)
+        stats_fn = getattr(self._pool, 'idle_reclaim_stats', None)
         if callable(stats_fn):
             return stats_fn()
         return {}
 
     def eviction_stats(self) -> dict[str, int]:
-        stats_fn = getattr(self._pool, "eviction_stats", None)
+        stats_fn = getattr(self._pool, 'eviction_stats', None)
         if callable(stats_fn):
             return stats_fn()
         return {}
 
 
 runtime_orchestrator = RuntimeOrchestrator()
-

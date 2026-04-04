@@ -16,11 +16,11 @@ if TYPE_CHECKING:
 class ConversationTrigger(str, Enum):
     """Describe external event that initiated a conversation."""
 
-    GUI = "gui"
-    SUGGESTED_TASK = "suggested_task"
-    PLAYBOOK_MANAGEMENT = "playbook_management"
-    EXTERNAL_API = "external_api"
-    UNKNOWN = "unknown"
+    GUI = 'gui'
+    SUGGESTED_TASK = 'suggested_task'
+    PLAYBOOK_MANAGEMENT = 'playbook_management'
+    EXTERNAL_API = 'external_api'
+    UNKNOWN = 'unknown'
 
 
 @dataclass

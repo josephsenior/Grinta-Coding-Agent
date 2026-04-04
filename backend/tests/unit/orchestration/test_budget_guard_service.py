@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 from typing import cast
-
-from backend.orchestration.services.orchestration_context import OrchestrationContext
-
+from unittest.mock import MagicMock
 
 from backend.orchestration.services.budget_guard_service import (
     _BUDGET_THRESHOLDS,
     BudgetGuardService,
 )
+from backend.orchestration.services.orchestration_context import OrchestrationContext
 
 
 class _FakeContext:
@@ -22,7 +20,7 @@ class _FakeContext:
     events: list[tuple[MagicMock, object]]
 
     def __init__(self, current: float, max_value: float):
-        self.id = "sess-1"
+        self.id = 'sess-1'
         budget_flag = SimpleNamespace(current_value=current, max_value=max_value)
         self.state = SimpleNamespace(budget_flag=budget_flag)
         self.state_tracker = None
@@ -98,7 +96,7 @@ class TestBudgetGuardService:
         assert len(ctx.events) >= 2
         # Check that the event content mentions budget
         for event, _source in ctx.events:
-            assert "budget" in event.content.lower() or "Budget" in event.content
+            assert 'budget' in event.content.lower() or 'Budget' in event.content
 
     def test_thresholds_are_sorted(self):
         assert list(_BUDGET_THRESHOLDS) == sorted(_BUDGET_THRESHOLDS)

@@ -7,14 +7,13 @@ from pydantic import ValidationError
 
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.app_config import (
+    AppConfig,
     EventStreamConfig,
     FileUploadsConfig,
-    AppConfig,
     GitIdentityConfig,
     TrajectoryConfig,
 )
 from backend.core.config.llm_config import LLMConfig
-
 
 # -- Sub-models ------------------------------------------------------
 
@@ -47,7 +46,7 @@ class TestEventStreamConfig:
     def test_defaults(self):
         e = EventStreamConfig()
         assert e.max_queue_size == 2000
-        assert e.drop_policy == "drop_oldest"
+        assert e.drop_policy == 'drop_oldest'
         assert 0 < e.hwm_ratio < 1.0
         assert e.workers > 0
         assert e.async_write is False
@@ -97,20 +96,20 @@ class TestAppConfigLlm:
 
     def test_get_llm_config_named(self):
         cfg = AppConfig()
-        custom = LLMConfig(model="gpt-4")
-        cfg.set_llm_config(custom, name="custom")
-        assert cfg.get_llm_config("custom").model == "gpt-4"
+        custom = LLMConfig(model='gpt-4')
+        cfg.set_llm_config(custom, name='custom')
+        assert cfg.get_llm_config('custom').model == 'gpt-4'
 
     def test_get_llm_config_missing_falls_back(self):
         cfg = AppConfig()
-        llm = cfg.get_llm_config("nonexistent")
+        llm = cfg.get_llm_config('nonexistent')
         assert isinstance(llm, LLMConfig)
 
     def test_set_llm_config(self):
         cfg = AppConfig()
-        llm = LLMConfig(model="test-model")
+        llm = LLMConfig(model='test-model')
         cfg.set_llm_config(llm)
-        assert cfg.get_llm_config().model == "test-model"
+        assert cfg.get_llm_config().model == 'test-model'
 
 
 # -- Agent config management -----------------------------------------
@@ -124,24 +123,24 @@ class TestAppConfigAgent:
 
     def test_set_agent_config(self):
         cfg = AppConfig()
-        agent = AgentConfig(name="MyAgent")
-        cfg.set_agent_config(agent, name="my_agent")
-        assert cfg.get_agent_config("my_agent").name == "MyAgent"
+        agent = AgentConfig(name='MyAgent')
+        cfg.set_agent_config(agent, name='my_agent')
+        assert cfg.get_agent_config('my_agent').name == 'MyAgent'
 
     def test_get_agent_configs(self):
         cfg = AppConfig()
-        cfg.set_agent_config(AgentConfig(name="A"), name="a")
-        cfg.set_agent_config(AgentConfig(name="B"), name="b")
+        cfg.set_agent_config(AgentConfig(name='A'), name='a')
+        cfg.set_agent_config(AgentConfig(name='B'), name='b')
         configs = cfg.get_agent_configs()
-        assert "a" in configs
-        assert "b" in configs
+        assert 'a' in configs
+        assert 'b' in configs
 
     def test_get_agent_to_llm_config_map(self):
         cfg = AppConfig()
-        cfg.set_agent_config(AgentConfig(name="agent1"), name="agent1")
+        cfg.set_agent_config(AgentConfig(name='agent1'), name='agent1')
         mapping = cfg.get_agent_to_llm_config_map()
-        assert "agent1" in mapping
-        assert isinstance(mapping["agent1"], LLMConfig)
+        assert 'agent1' in mapping
+        assert isinstance(mapping['agent1'], LLMConfig)
 
 
 # -- Post init sync --------------------------------------------------
@@ -149,26 +148,26 @@ class TestAppConfigAgent:
 
 class TestAppConfigPostInit:
     def test_git_identity_synced(self):
-        cfg = AppConfig(vcs_user_name="TestUser", vcs_user_email="test@test.com")
-        assert cfg.git.user_name == "TestUser"
-        assert cfg.git.user_email == "test@test.com"
+        cfg = AppConfig(vcs_user_name='TestUser', vcs_user_email='test@test.com')
+        assert cfg.git.user_name == 'TestUser'
+        assert cfg.git.user_email == 'test@test.com'
 
     def test_file_uploads_synced(self):
         cfg = AppConfig(file_uploads_max_file_size_mb=50)
         assert cfg.file_uploads.max_file_size_mb == 50
 
     def test_trajectory_synced(self):
-        cfg = AppConfig(replay_trajectory_path="/tmp/replay.json")
-        assert cfg.trajectory.replay_path == "/tmp/replay.json"
+        cfg = AppConfig(replay_trajectory_path='/tmp/replay.json')
+        assert cfg.trajectory.replay_path == '/tmp/replay.json'
 
     def test_trajectory_fields_sync_submodel(self):
         cfg = AppConfig(
-            replay_trajectory_path="/tmp/replay-trajectory.json",
-            save_trajectory_path="/tmp/save-trajectory.json",
+            replay_trajectory_path='/tmp/replay-trajectory.json',
+            save_trajectory_path='/tmp/save-trajectory.json',
             save_screenshots_in_trajectory=True,
         )
-        assert cfg.trajectory.replay_path == "/tmp/replay-trajectory.json"
-        assert cfg.trajectory.save_path == "/tmp/save-trajectory.json"
+        assert cfg.trajectory.replay_path == '/tmp/replay-trajectory.json'
+        assert cfg.trajectory.save_path == '/tmp/save-trajectory.json'
         assert cfg.trajectory.save_screenshots is True
 
     def test_git_init_synced(self):
@@ -182,7 +181,7 @@ class TestAppConfigPostInit:
 class TestAppConfigValidation:
     def test_extra_fields_rejected(self):
         with pytest.raises(ValidationError):
-            AppConfig(**{"totally_fake_field": "value"})
+            AppConfig(**{'totally_fake_field': 'value'})
 
 
 # -- get_llm_config_from_agent --------------------------------------
@@ -196,8 +195,8 @@ class TestGetLlmConfigFromAgent:
 
     def test_agent_with_llm_config(self):
         cfg = AppConfig()
-        llm = LLMConfig(model="agent-model")
-        agent = AgentConfig(name="special", llm_config=llm)
-        cfg.set_agent_config(agent, name="special")
-        result = cfg.get_llm_config_from_agent("special")
-        assert result.model == "agent-model"
+        llm = LLMConfig(model='agent-model')
+        agent = AgentConfig(name='special', llm_config=llm)
+        cfg.set_agent_config(agent, name='special')
+        result = cfg.get_llm_config_from_agent('special')
+        assert result.model == 'agent-model'

@@ -17,8 +17,8 @@ from pydantic import (  # noqa: E402
     model_validator,
 )
 
-from backend.core.config.mcp_config import MCPConfig  # noqa: E402
 from backend.core.config.config_loader import load_app_config  # noqa: E402
+from backend.core.config.mcp_config import MCPConfig  # noqa: E402
 from backend.core.constants import (  # noqa: E402
     DEFAULT_KB_AUTO_SEARCH,
     DEFAULT_KB_ENABLED,
@@ -26,7 +26,9 @@ from backend.core.constants import (  # noqa: E402
     DEFAULT_KB_SEARCH_STRATEGY,
     DEFAULT_KB_SEARCH_TOP_K,
 )
-from backend.persistence.data_models.knowledge_base import KnowledgeBaseSettings  # noqa: E402
+from backend.persistence.data_models.knowledge_base import (
+    KnowledgeBaseSettings,  # noqa: E402
+)
 from backend.persistence.data_models.user_secrets import UserSecrets  # noqa: E402
 
 try:
@@ -75,7 +77,7 @@ class Settings(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    @field_validator("agent")
+    @field_validator('agent')
     @classmethod
     def strip_agent_field(cls, value: str | None) -> str | None:
         if value is None:
@@ -83,7 +85,7 @@ class Settings(BaseModel):
         s = value.strip()
         return s if s else None
 
-    @field_validator("llm_provider")
+    @field_validator('llm_provider')
     @classmethod
     def normalize_llm_provider_field(cls, value: str | None) -> str | None:
         if value is None:
@@ -103,18 +105,18 @@ class Settings(BaseModel):
             search_strategy=self.kb_search_strategy,
         )
 
-    @model_validator(mode="after")
+    @model_validator(mode='after')
     def canonicalize_llm_selection(self) -> Settings:
         from backend.inference.provider_resolver import canonicalize_model_selection
 
         model, provider = canonicalize_model_selection(
             self.llm_model, self.llm_provider
         )
-        object.__setattr__(self, "llm_model", model)
-        object.__setattr__(self, "llm_provider", provider)
+        object.__setattr__(self, 'llm_model', model)
+        object.__setattr__(self, 'llm_provider', provider)
         return self
 
-    @field_serializer("llm_api_key")
+    @field_serializer('llm_api_key')
     def api_key_serializer(self, api_key: SecretStr | None, info: SerializationInfo):
         """Serialize API keys, exposing secrets only when requested.
 
@@ -123,65 +125,65 @@ class Settings(BaseModel):
         if api_key is None:
             return None
         context = info.context
-        if context and context.get("expose_secrets", False):
+        if context and context.get('expose_secrets', False):
             return api_key.get_secret_value()
-        return "**********"
+        return '**********'
 
-    @model_validator(mode="before")
+    @model_validator(mode='before')
     @classmethod
     def convert_provider_tokens(cls, data: dict | object) -> dict | object:
         """Convert provider tokens from JSON format to UserSecrets format."""
         if not isinstance(data, dict):
             return data
-        secrets_store = data.get("secrets_store")
+        secrets_store = data.get('secrets_store')
         if not isinstance(secrets_store, dict):
             return data
-        custom_secrets = secrets_store.get("custom_secrets")
-        tokens = secrets_store.get("provider_tokens")
+        custom_secrets = secrets_store.get('custom_secrets')
+        tokens = secrets_store.get('provider_tokens')
         secret_store = UserSecrets(provider_tokens={}, custom_secrets={})
         if isinstance(tokens, dict):
             converted_store = UserSecrets(provider_tokens=tokens)
             secret_store = secret_store.model_copy(
-                update={"provider_tokens": converted_store.provider_tokens}
+                update={'provider_tokens': converted_store.provider_tokens}
             )
         else:
-            secret_store.model_copy(update={"provider_tokens": tokens})
+            secret_store.model_copy(update={'provider_tokens': tokens})
         if isinstance(custom_secrets, dict):
             converted_store = UserSecrets(custom_secrets=custom_secrets)
             secret_store = secret_store.model_copy(
-                update={"custom_secrets": converted_store.custom_secrets}
+                update={'custom_secrets': converted_store.custom_secrets}
             )
         else:
             secret_store = secret_store.model_copy(
-                update={"custom_secrets": custom_secrets}
+                update={'custom_secrets': custom_secrets}
             )
-        data["secret_store"] = secret_store
+        data['secret_store'] = secret_store
         return data
 
-    @field_serializer("secrets_store")
+    @field_serializer('secrets_store')
     def secrets_store_serializer(self, secrets: UserSecrets, info: SerializationInfo):
         """Serialize the secrets store while forcing cache invalidation."""
-        "Force invalidate secret store"
-        return {"provider_tokens": {}}
+        'Force invalidate secret store'
+        return {'provider_tokens': {}}
 
     @staticmethod
     def _check_explicit_llm_config(app_config) -> bool:
         """Check if explicit LLM config should skip settings creation."""
-        if not (hasattr(app_config, "llms") and isinstance(app_config.llms, dict)):
+        if not (hasattr(app_config, 'llms') and isinstance(app_config.llms, dict)):
             return False
 
-        explicit = app_config.llms.get("llm")
+        explicit = app_config.llms.get('llm')
         if explicit is None:
             return False
 
-        explicit_api_key = getattr(explicit, "api_key", None)
+        explicit_api_key = getattr(explicit, 'api_key', None)
         if explicit_api_key is None:
             return True
 
         try:
             import os
 
-            env_key = os.environ.get("APP_API_KEY")
+            env_key = os.environ.get('APP_API_KEY')
             if (
                 env_key
                 and isinstance(explicit_api_key, SecretStr)
@@ -189,7 +191,7 @@ class Settings(BaseModel):
             ):
                 return True
         except Exception:
-            logger.warning("API key validation failed unexpectedly", exc_info=True)
+            logger.warning('API key validation failed unexpectedly', exc_info=True)
 
         return False
 
@@ -200,7 +202,7 @@ class Settings(BaseModel):
             return False
 
         try:
-            if isinstance(api_key, SecretStr) and api_key.get_secret_value() == "":
+            if isinstance(api_key, SecretStr) and api_key.get_secret_value() == '':
                 return False
         except Exception:
             if not api_key:
@@ -212,10 +214,10 @@ class Settings(BaseModel):
     def _has_explicit_api_key(config: object) -> bool:
         """Determine if the provided config carried an explicit API key."""
         try:
-            return bool(getattr(config, "_has_explicit_api_key"))
+            return bool(getattr(config, '_has_explicit_api_key'))
         except AttributeError:
             # Fallback if attribute missing: assume explicit when key provided
-            api_key = getattr(config, "api_key", None)
+            api_key = getattr(config, 'api_key', None)
             return api_key is not None
 
     @staticmethod
@@ -273,15 +275,15 @@ class Settings(BaseModel):
     def _should_use_llm_config(llm_config: LLMConfig) -> bool:
         if not Settings._has_explicit_api_key(llm_config):
             return False
-        api_key = llm_config.api_key if hasattr(llm_config, "api_key") else None
+        api_key = llm_config.api_key if hasattr(llm_config, 'api_key') else None
         return Settings._validate_api_key(api_key)
 
     @staticmethod
     def _build_settings_from_app_config(app_config, llm_config: LLMConfig) -> Settings:
         security = app_config.security
-        mcp_config = app_config.mcp if hasattr(app_config, "mcp") else None
+        mcp_config = app_config.mcp if hasattr(app_config, 'mcp') else None
         return Settings(
-            language="en",
+            language='en',
             agent=app_config.default_agent,
             max_iterations=app_config.max_iterations,
             security_analyzer=security.security_analyzer,

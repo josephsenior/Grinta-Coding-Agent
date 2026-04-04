@@ -1,6 +1,5 @@
-"""Core caching modules for distributed and local caching."""
+"""Core caching modules for local settings caching."""
 
 from backend.core.cache.async_smart_cache import AsyncSmartCache, get_async_smart_cache
-from backend.core.cache.redis_cache import DistributedCache
 
-__all__ = ["DistributedCache", "AsyncSmartCache", "get_async_smart_cache"]
+__all__ = ['AsyncSmartCache', 'get_async_smart_cache']

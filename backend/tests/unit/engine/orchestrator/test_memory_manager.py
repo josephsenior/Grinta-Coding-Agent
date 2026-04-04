@@ -1,8 +1,9 @@
 """Tests for backend.engine.memory_manager."""
+
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch, PropertyMock
 from typing import Any, cast
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -10,12 +11,13 @@ from backend.engine.memory_manager import (
     CondensedHistory,
     ContextMemoryManager,
 )
+from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import Event
-
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
+
 
 def _make_config(compactor_config=None) -> MagicMock:
     cfg = MagicMock()
@@ -34,9 +36,10 @@ def _make_manager(compactor_config=None) -> ContextMemoryManager:
     )
 
 
-def _make_event(source_value, is_message_action=False, action_type=None, content="hello"):
+def _make_event(
+    source_value, is_message_action=False, action_type=None, content='hello'
+):
     """Build a minimal mock event."""
-
     event = MagicMock()
     event.source = source_value
     event.content = content
@@ -46,6 +49,7 @@ def _make_event(source_value, is_message_action=False, action_type=None, content
     event.wait_for_response = False
     if is_message_action:
         from backend.ledger.action import MessageAction
+
         ma = MessageAction(
             content=content,
             file_urls=None,
@@ -60,6 +64,7 @@ def _make_event(source_value, is_message_action=False, action_type=None, content
 # ---------------------------------------------------------------------------
 # CondensedHistory dataclass
 # ---------------------------------------------------------------------------
+
 
 class TestCondensedHistory:
     def test_defaults_no_pending_action(self):
@@ -76,12 +81,14 @@ class TestCondensedHistory:
 
     def test_is_dataclass(self):
         import dataclasses
+
         assert dataclasses.is_dataclass(CondensedHistory)
 
 
 # ---------------------------------------------------------------------------
 # ContextMemoryManager.__init__
 # ---------------------------------------------------------------------------
+
 
 class TestContextMemoryManagerInit:
     def test_conversation_memory_none_initially(self):
@@ -104,19 +111,20 @@ class TestContextMemoryManagerInit:
 # initialize and _init_compactor
 # ---------------------------------------------------------------------------
 
+
 class TestInitialize:
     def test_initialize_creates_conversation_memory(self):
         m = _make_manager()
         pm = MagicMock()
-        with patch("backend.engine.memory_manager.ContextMemory") as MockCM:
-            MockCM.return_value = MagicMock(name="conv_mem")
+        with patch('backend.engine.memory_manager.ContextMemory') as MockCM:
+            MockCM.return_value = MagicMock(name='conv_mem')
             m.initialize(pm)
         assert m.conversation_memory is not None
 
     def test_initialize_no_compactor_config_leaves_compactor_none(self):
         m = _make_manager(compactor_config=None)
         pm = MagicMock()
-        with patch("backend.engine.memory_manager.ContextMemory"):
+        with patch('backend.engine.memory_manager.ContextMemory'):
             m.initialize(pm)
         assert m.compactor is None
 
@@ -126,8 +134,8 @@ class TestInitialize:
         pm = MagicMock()
         fake_compactor = MagicMock()
         with (
-            patch("backend.engine.memory_manager.ContextMemory"),
-            patch("backend.engine.memory_manager.Compactor") as MockCompactor,
+            patch('backend.engine.memory_manager.ContextMemory'),
+            patch('backend.engine.memory_manager.Compactor') as MockCompactor,
         ):
             MockCompactor.from_config.return_value = fake_compactor
             m.initialize(pm)
@@ -138,11 +146,15 @@ class TestInitialize:
 # condense_history
 # ---------------------------------------------------------------------------
 
+
 class TestCondenseHistory:
     def _make_state_with_history(self, events=None) -> MagicMock:
         state = MagicMock()
         state.history = events or []
         state.extra_data = {}
+        state.turn_signals = MagicMock(memory_pressure=None)
+        state.ack_memory_pressure = MagicMock()
+        state.view = MagicMock(unhandled_condensation_request=False)
         return state
 
     def test_no_compactor_returns_all_history(self):
@@ -176,7 +188,7 @@ class TestCondenseHistory:
         condensation = MagicMock()
         # Not a View instance → will reach the else branch
         cast(Any, condensation).__class__ = object  # NOT a View
-        condensation.action = MagicMock(name="action")
+        condensation.action = MagicMock(name='action')
         mock_compactor.compacted_history.return_value = condensation
         m.compactor = mock_compactor
 
@@ -200,17 +212,100 @@ class TestCondenseHistory:
         result = m.condense_history(state)
         assert isinstance(result, CondensedHistory)
 
+    def test_memory_pressure_cleared_when_compactor_returns_compaction(self):
+        m = _make_manager()
+
+        mock_compactor = MagicMock()
+        condensation = MagicMock()
+        cast(Any, condensation).__class__ = object
+        condensation.action = MagicMock(name='action')
+        mock_compactor.compacted_history.return_value = condensation
+        m.compactor = mock_compactor
+
+        state = self._make_state_with_history([MagicMock()])
+        state.turn_signals.memory_pressure = 'CRITICAL'
+
+        result = m.condense_history(state)
+
+        state.ack_memory_pressure.assert_called_once_with(
+            source='ContextMemoryManager'
+        )
+        assert result.pending_action is condensation.action
+
+    def test_short_history_skips_forced_compaction_under_memory_pressure(self):
+        m = _make_manager()
+        from backend.context.compactor.compactor import RollingCompactor
+        from backend.context.view import View
+
+        fake_view = MagicMock(spec=View)
+        fake_view.events = [MagicMock()]
+
+        fake_compactor = MagicMock(spec=RollingCompactor)
+        fake_compactor.compacted_history.return_value = fake_view
+        fake_compactor.get_compaction.return_value = MagicMock()
+        m.compactor = fake_compactor
+
+        state = self._make_state_with_history([MagicMock() for _ in range(5)])
+        state.turn_signals.memory_pressure = 'CRITICAL'
+
+        result = m.condense_history(state)
+
+        fake_compactor.get_compaction.assert_not_called()
+        state.ack_memory_pressure.assert_called_once_with(
+            source='ContextMemoryManager'
+        )
+        assert result.events == fake_view.events
+
+    def test_noop_condensation_without_request_returns_history(self):
+        m = _make_manager()
+
+        mock_compactor = MagicMock()
+        condensation = MagicMock()
+        cast(Any, condensation).__class__ = object
+        condensation.action = CondensationAction(pruned_event_ids=[])
+        mock_compactor.compacted_history.return_value = condensation
+        m.compactor = mock_compactor
+
+        history = [MagicMock(), MagicMock()]
+        state = self._make_state_with_history(history)
+
+        result = m.condense_history(state)
+
+        assert result.events == history
+        assert result.pending_action is None
+
+    def test_noop_condensation_request_is_still_returned(self):
+        m = _make_manager()
+
+        mock_compactor = MagicMock()
+        condensation = MagicMock()
+        cast(Any, condensation).__class__ = object
+        action = CondensationAction(pruned_event_ids=[])
+        condensation.action = action
+        mock_compactor.compacted_history.return_value = condensation
+        m.compactor = mock_compactor
+
+        state = self._make_state_with_history([MagicMock()])
+        state.view.unhandled_condensation_request = True
+
+        result = m.condense_history(state)
+
+        assert result.pending_action is action
+
 
 # ---------------------------------------------------------------------------
 # get_initial_user_message
 # ---------------------------------------------------------------------------
+
 
 class TestGetInitialUserMessage:
     def test_finds_message_action_from_user(self):
         from backend.ledger.action import MessageAction
         from backend.ledger.event import EventSource
 
-        msg = MessageAction(content="hi", file_urls=None, image_urls=None, wait_for_response=False)
+        msg = MessageAction(
+            content='hi', file_urls=None, image_urls=None, wait_for_response=False
+        )
         msg.source = EventSource.USER
 
         m = _make_manager()
@@ -224,7 +319,9 @@ class TestGetInitialUserMessage:
         agent_event = MagicMock()
         agent_event.source = EventSource.AGENT
 
-        user_msg = MessageAction(content="real", file_urls=None, image_urls=None, wait_for_response=False)
+        user_msg = MessageAction(
+            content='real', file_urls=None, image_urls=None, wait_for_response=False
+        )
         user_msg.source = EventSource.USER
 
         m = _make_manager()
@@ -238,26 +335,30 @@ class TestGetInitialUserMessage:
         agent_event.source = EventSource.AGENT
 
         m = _make_manager()
-        with pytest.raises(ValueError, match="Initial user message not found"):
+        with pytest.raises(ValueError, match='Initial user message not found'):
             m.get_initial_user_message([agent_event])
 
     def test_raises_value_error_on_empty_iterable(self):
         m = _make_manager()
-        with pytest.raises(ValueError, match="Initial user message not found"):
+        with pytest.raises(ValueError, match='Initial user message not found'):
             m.get_initial_user_message([])
 
     def test_returns_first_user_message_when_multiple(self):
         from backend.ledger.action import MessageAction
         from backend.ledger.event import EventSource
 
-        first = MessageAction(content="first", file_urls=None, image_urls=None, wait_for_response=False)
+        first = MessageAction(
+            content='first', file_urls=None, image_urls=None, wait_for_response=False
+        )
         first.source = EventSource.USER
-        second = MessageAction(content="second", file_urls=None, image_urls=None, wait_for_response=False)
+        second = MessageAction(
+            content='second', file_urls=None, image_urls=None, wait_for_response=False
+        )
         second.source = EventSource.USER
 
         m = _make_manager()
         result = m.get_initial_user_message([first, second])
-        assert result.content == "first"
+        assert result.content == 'first'
 
     def test_tolerates_exception_in_individual_event(self):
         from backend.ledger.action import MessageAction
@@ -265,15 +366,17 @@ class TestGetInitialUserMessage:
 
         # An event whose .source property raises
         bad_event = MagicMock()
-        bad_event.source = PropertyMock(side_effect=Exception("oops"))
-        type(bad_event).source = PropertyMock(side_effect=Exception("oops"))
+        bad_event.source = PropertyMock(side_effect=Exception('oops'))
+        type(bad_event).source = PropertyMock(side_effect=Exception('oops'))
 
-        good_event = MessageAction(content="ok", file_urls=None, image_urls=None, wait_for_response=False)
+        good_event = MessageAction(
+            content='ok', file_urls=None, image_urls=None, wait_for_response=False
+        )
         good_event.source = EventSource.USER
 
         m = _make_manager()
         result = m.get_initial_user_message([good_event])
-        assert result.content == "ok"
+        assert result.content == 'ok'
 
     def test_clones_non_message_action_user_event(self):
         """Events with ActionType.MESSAGE that are NOT MessageAction are cloned.
@@ -287,9 +390,10 @@ class TestGetInitialUserMessage:
 
         class _RawEvent:
             """Minimal non-MessageAction event that looks like a MESSAGE action."""
+
             source = EventSource.USER
             action = ActionType.MESSAGE
-            content = "cloned content"
+            content = 'cloned content'
             file_urls = None
             image_urls = None
             wait_for_response = False
@@ -297,17 +401,18 @@ class TestGetInitialUserMessage:
         m = _make_manager()
         result = m.get_initial_user_message([cast(Event, _RawEvent())])
         assert isinstance(result, MessageAction)
-        assert result.content == "cloned content"
+        assert result.content == 'cloned content'
 
 
 # ---------------------------------------------------------------------------
 # build_messages
 # ---------------------------------------------------------------------------
 
+
 class TestBuildMessages:
     def test_raises_runtime_error_if_not_initialized(self):
         m = _make_manager()
-        with pytest.raises(RuntimeError, match="not initialized"):
+        with pytest.raises(RuntimeError, match='not initialized'):
             m.build_messages([], MagicMock(), MagicMock())
 
     def test_returns_empty_list_when_process_events_returns_empty(self):
@@ -322,15 +427,15 @@ class TestBuildMessages:
         from backend.core.message import Message, TextContent
 
         m = _make_manager()
-        tc = TextContent(text="system prompt")
-        msg = Message(role="system", content=[tc])
+        tc = TextContent(text='system prompt')
+        msg = Message(role='system', content=[tc])
         m.conversation_memory = MagicMock()
         m.conversation_memory.process_events.return_value = [msg]
 
         llm_config = MagicMock()
         llm_config.max_message_chars = None
         llm_config.vision_is_active = False
-        llm_config.model = "claude-4-sonnet"
+        llm_config.model = 'claude-4-sonnet'
         llm_config.caching_prompt = True
 
         m.build_messages([], MagicMock(), llm_config)
@@ -340,17 +445,17 @@ class TestBuildMessages:
         from backend.core.message import Message, TextContent
 
         m = _make_manager()
-        system_tc = TextContent(text="sys")
-        user_tc = TextContent(text="user msg")
-        sys_msg = Message(role="system", content=[system_tc])
-        user_msg = Message(role="user", content=[user_tc])
+        system_tc = TextContent(text='sys')
+        user_tc = TextContent(text='user msg')
+        sys_msg = Message(role='system', content=[system_tc])
+        user_msg = Message(role='user', content=[user_tc])
         m.conversation_memory = MagicMock()
         m.conversation_memory.process_events.return_value = [sys_msg, user_msg]
 
         llm_config = MagicMock()
         llm_config.max_message_chars = None
         llm_config.vision_is_active = False
-        llm_config.model = "anthropic/claude-4-sonnet"
+        llm_config.model = 'anthropic/claude-4-sonnet'
         llm_config.caching_prompt = True
 
         m.build_messages([], MagicMock(), llm_config)
@@ -360,17 +465,17 @@ class TestBuildMessages:
         from backend.core.message import Message, TextContent
 
         m = _make_manager()
-        system_tc = TextContent(text="sys")
-        user_tc = TextContent(text="user msg")
-        sys_msg = Message(role="system", content=[system_tc])
-        user_msg = Message(role="user", content=[user_tc])
+        system_tc = TextContent(text='sys')
+        user_tc = TextContent(text='user msg')
+        sys_msg = Message(role='system', content=[system_tc])
+        user_msg = Message(role='user', content=[user_tc])
         m.conversation_memory = MagicMock()
         m.conversation_memory.process_events.return_value = [sys_msg, user_msg]
 
         llm_config = MagicMock()
         llm_config.max_message_chars = None
         llm_config.vision_is_active = False
-        llm_config.model = "gpt-4o"
+        llm_config.model = 'gpt-4o'
         llm_config.caching_prompt = True
 
         m.build_messages([], MagicMock(), llm_config)
@@ -381,15 +486,15 @@ class TestBuildMessages:
         from backend.core.message import Message, TextContent
 
         m = _make_manager()
-        tc = TextContent(text="system prompt")
-        msg = Message(role="system", content=[tc])
+        tc = TextContent(text='system prompt')
+        msg = Message(role='system', content=[tc])
         m.conversation_memory = MagicMock()
         m.conversation_memory.process_events.return_value = [msg]
 
         llm_config = MagicMock()
         llm_config.max_message_chars = None
         llm_config.vision_is_active = False
-        llm_config.model = "claude-4-sonnet"
+        llm_config.model = 'claude-4-sonnet'
         llm_config.caching_prompt = False
 
         m.build_messages([], MagicMock(), llm_config)

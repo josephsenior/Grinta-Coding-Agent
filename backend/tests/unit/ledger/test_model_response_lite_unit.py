@@ -19,9 +19,9 @@ class TestAssistantToolCallLite:
         assert tc.function is None
 
     def test_custom(self):
-        tc = AssistantToolCallLite(id="tc1", function={"name": "bash"})
-        assert tc.id == "tc1"
-        assert tc.function == {"name": "bash"}
+        tc = AssistantToolCallLite(id='tc1', function={'name': 'bash'})
+        assert tc.id == 'tc1'
+        assert tc.function == {'name': 'bash'}
 
 
 class TestAssistantMessageLite:
@@ -32,10 +32,10 @@ class TestAssistantMessageLite:
         assert msg.tool_calls is None
 
     def test_custom(self):
-        tc = AssistantToolCallLite(id="tc1")
-        msg = AssistantMessageLite(role="assistant", content="Hello", tool_calls=[tc])
-        assert msg.role == "assistant"
-        assert msg.content == "Hello"
+        tc = AssistantToolCallLite(id='tc1')
+        msg = AssistantMessageLite(role='assistant', content='Hello', tool_calls=[tc])
+        assert msg.role == 'assistant'
+        assert msg.content == 'Hello'
         assert msg.tool_calls is not None
         assert len(msg.tool_calls) == 1
 
@@ -46,10 +46,10 @@ class TestChoiceLite:
         assert c.message is None
 
     def test_with_message(self):
-        msg = AssistantMessageLite(role="assistant")
+        msg = AssistantMessageLite(role='assistant')
         c = ChoiceLite(message=msg)
         assert c.message is not None
-        assert c.message.role == "assistant"
+        assert c.message.role == 'assistant'
 
 
 class TestModelResponseLiteModel:
@@ -60,45 +60,45 @@ class TestModelResponseLiteModel:
         assert r.choices == []
 
     def test_get(self):
-        r = ModelResponseLite(id="resp-1", model="gpt-4")
-        assert r.get("id") == "resp-1"
-        assert r.get("model") == "gpt-4"
-        assert r.get("nonexistent", "default") == "default"
+        r = ModelResponseLite(id='resp-1', model='gpt-4')
+        assert r.get('id') == 'resp-1'
+        assert r.get('model') == 'gpt-4'
+        assert r.get('nonexistent', 'default') == 'default'
 
     def test_from_sdk_simple_namespace(self):
         resp = SimpleNamespace(
-            id="resp-1",
-            model="gpt-4",
+            id='resp-1',
+            model='gpt-4',
             choices=[
                 SimpleNamespace(
                     message=SimpleNamespace(
-                        role="assistant",
-                        content="Hello",
+                        role='assistant',
+                        content='Hello',
                         tool_calls=None,
                     )
                 )
             ],
         )
         lite = ModelResponseLite.from_sdk(resp)
-        assert lite.id == "resp-1"
-        assert lite.model == "gpt-4"
+        assert lite.id == 'resp-1'
+        assert lite.model == 'gpt-4'
         assert len(lite.choices) == 1
         assert lite.choices[0].message is not None
-        assert lite.choices[0].message.role == "assistant"
-        assert lite.choices[0].message.content == "Hello"
+        assert lite.choices[0].message.role == 'assistant'
+        assert lite.choices[0].message.content == 'Hello'
 
     def test_from_sdk_with_tool_calls(self):
         resp = SimpleNamespace(
-            id="resp-2",
-            model="claude-3",
+            id='resp-2',
+            model='claude-3',
             choices=[
                 SimpleNamespace(
                     message=SimpleNamespace(
-                        role="assistant",
+                        role='assistant',
                         content=None,
                         tool_calls=[
-                            SimpleNamespace(id="tc1", function={"name": "bash"}),
-                            SimpleNamespace(id="tc2", function={"name": "edit"}),
+                            SimpleNamespace(id='tc1', function={'name': 'bash'}),
+                            SimpleNamespace(id='tc2', function={'name': 'edit'}),
                         ],
                     )
                 )
@@ -108,38 +108,38 @@ class TestModelResponseLiteModel:
         assert lite.choices[0].message is not None
         assert lite.choices[0].message.tool_calls is not None
         assert len(lite.choices[0].message.tool_calls) == 2
-        assert lite.choices[0].message.tool_calls[0].id == "tc1"
-        assert lite.choices[0].message.tool_calls[1].id == "tc2"
+        assert lite.choices[0].message.tool_calls[0].id == 'tc1'
+        assert lite.choices[0].message.tool_calls[1].id == 'tc2'
 
     def test_from_sdk_dict(self):
         resp = {
-            "id": "resp-3",
-            "model": "mistral",
-            "choices": [{"message": {"role": "assistant", "content": "Hi"}}],
+            'id': 'resp-3',
+            'model': 'mistral',
+            'choices': [{'message': {'role': 'assistant', 'content': 'Hi'}}],
         }
         lite = ModelResponseLite.from_sdk(resp)
-        assert lite.id == "resp-3"
-        assert lite.model == "mistral"
+        assert lite.id == 'resp-3'
+        assert lite.model == 'mistral'
 
     def test_from_sdk_no_message(self):
         resp = SimpleNamespace(
-            id="r", model="m", choices=[SimpleNamespace(message=None)]
+            id='r', model='m', choices=[SimpleNamespace(message=None)]
         )
         lite = ModelResponseLite.from_sdk(resp)
         assert lite.choices[0].message is None
 
     def test_from_sdk_empty_choices(self):
-        resp = SimpleNamespace(id="r", model="m", choices=[])
+        resp = SimpleNamespace(id='r', model='m', choices=[])
         lite = ModelResponseLite.from_sdk(resp)
         assert lite.choices == []
 
     def test_from_sdk_none_choices(self):
-        resp = SimpleNamespace(id="r", model="m", choices=None)
+        resp = SimpleNamespace(id='r', model='m', choices=None)
         lite = ModelResponseLite.from_sdk(resp)
         assert lite.choices == []
 
     def test_getattr_or_get_dict(self):
-        assert ModelResponseLite._getattr_or_get({"key": "val"}, "key") == "val"
+        assert ModelResponseLite._getattr_or_get({'key': 'val'}, 'key') == 'val'
 
     def test_getattr_or_get_missing(self):
-        assert ModelResponseLite._getattr_or_get(object(), "foo", "bar") == "bar"
+        assert ModelResponseLite._getattr_or_get(object(), 'foo', 'bar') == 'bar'

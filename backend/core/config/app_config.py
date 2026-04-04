@@ -18,23 +18,23 @@ from backend.core.config.mcp_config import MCPConfig
 from backend.core.config.runtime_config import RuntimeConfig
 from backend.core.config.security_config import SecurityConfig
 from backend.core.constants import (
-    DEFAULT_CACHE_DIR,
     DEFAULT_AGENT_NAME,
+    DEFAULT_CACHE_DIR,
     DEFAULT_CONVERSATION_MAX_AGE_SECONDS,
     DEFAULT_ENABLE_BROWSER,
     DEFAULT_FILE_STORE,
-    DEFAULT_MCP_HOST,
-    DEFAULT_PENDING_ACTION_TIMEOUT,
-    DEFAULT_VCS_USER_EMAIL,
-    DEFAULT_VCS_USER_NAME,
+    DEFAULT_LOCAL_DATA_ROOT,
     DEFAULT_LOG_FORMAT,
     DEFAULT_LOG_LEVEL,
     DEFAULT_MAX_BUDGET_PER_TASK,
     DEFAULT_MAX_CONCURRENT_CONVERSATIONS,
     DEFAULT_MAX_FILE_UPLOAD_SIZE_MB,
     DEFAULT_MAX_ITERATIONS,
+    DEFAULT_MCP_HOST,
+    DEFAULT_PENDING_ACTION_TIMEOUT,
     DEFAULT_RUNTIME,
-    DEFAULT_LOCAL_DATA_ROOT,
+    DEFAULT_VCS_USER_EMAIL,
+    DEFAULT_VCS_USER_NAME,
 )
 
 
@@ -66,7 +66,7 @@ class EventStreamConfig(BaseModel):
     """Centralized EventStream queue/coalescing/backpressure defaults."""
 
     max_queue_size: int = Field(default=2000)
-    drop_policy: str = Field(default="drop_oldest")
+    drop_policy: str = Field(default='drop_oldest')
     hwm_ratio: float = Field(default=0.8)
     block_timeout: float = Field(default=0.1)
     rate_window_seconds: int = Field(default=60)
@@ -108,8 +108,8 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     local_data_root: str = Field(
         default=DEFAULT_LOCAL_DATA_ROOT,
         description=(
-            "Filesystem root for LocalFileStore (e.g. sessions/). "
-            "When a project is open, AppState sets this to match project_root."
+            'Filesystem root for LocalFileStore (e.g. sessions/). '
+            'Project-aware entrypoints set this to <project_root>/.grinta/storage.'
         ),
     )
     enable_browser: bool = Field(default=DEFAULT_ENABLE_BROWSER)
@@ -118,29 +118,29 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     pending_action_timeout: float = Field(
         default=DEFAULT_PENDING_ACTION_TIMEOUT,
         description=(
-            "Seconds to wait for an observation matching a pending tool call "
-            "before emitting a pending-action timeout error. "
-            "0 or negative disables the timeout (no watchdog)."
+            'Seconds to wait for an observation matching a pending tool call '
+            'before emitting a pending-action timeout error. '
+            '0 or negative disables the timeout (no watchdog).'
         ),
     )
     max_budget_per_task: float | None = Field(
         default=DEFAULT_MAX_BUDGET_PER_TASK,
         description=(
-            "Maximum LLM cost (USD) allowed per task. Set to 0 or None for no limit (not recommended)."
+            'Maximum LLM cost (USD) allowed per task. Set to 0 or None for no limit (not recommended).'
         ),
     )
     max_budget_per_session: float | None = Field(
         default=None,
         description=(
-            "Maximum LLM cost (USD) for a single conversation session. "
-            "Overrides max_budget_per_task when set. None = use max_budget_per_task."
+            'Maximum LLM cost (USD) for a single conversation session. '
+            'Overrides max_budget_per_task when set. None = use max_budget_per_task.'
         ),
     )
     max_budget_per_day: float | None = Field(
         default=None,
         description=(
-            "Maximum total LLM cost (USD) across all sessions in a calendar day. "
-            "Set to 0 or None for no daily limit."
+            'Maximum total LLM cost (USD) across all sessions in a calendar day. '
+            'Set to 0 or None for no daily limit.'
         ),
     )
     debug: bool = Field(default=False)
@@ -158,15 +158,15 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     event_stream: EventStreamConfig = Field(default_factory=EventStreamConfig)
     vcs_user_name: str = Field(
         default=DEFAULT_VCS_USER_NAME,
-        description="Git user name for commits made by the agent",
+        description='Git user name for commits made by the agent',
     )
     vcs_user_email: str = Field(
         default=DEFAULT_VCS_USER_EMAIL,
-        description="Git user email for commits made by the agent",
+        description='Git user email for commits made by the agent',
     )
     jwt_secret: SecretStr | None = Field(
         default=None,
-        description="JWT secret for the app",
+        description='JWT secret for the app',
     )
     # Logging configuration
     log_format: str = Field(
@@ -175,80 +175,80 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     log_level: str = Field(
         default=DEFAULT_LOG_LEVEL,
-        description="Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL",
+        description='Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL',
     )
     # Extended configuration for additional features
     extended: ExtendedConfig | None = Field(
-        default=None, description="Extended configuration for additional features"
+        default=None, description='Extended configuration for additional features'
     )
     # Optional attributes accessed via extended config or direct access
     project_root: str | None = Field(
         default=None,
-        description="User-opened project folder (agent + UI workspace).",
+        description='User-opened project folder (agent + UI workspace).',
     )
     workspace_mount_path_in_runtime: str | None = Field(
-        default=None, description="Workspace mount path in runtime"
+        default=None, description='Workspace mount path in runtime'
     )
     file_store_web_hook_url: str | None = Field(
-        default=None, description="File store webhook URL"
+        default=None, description='File store webhook URL'
     )
     file_store_web_hook_headers: dict[str, str] | None = Field(
-        default=None, description="File store webhook headers"
+        default=None, description='File store webhook headers'
     )
     file_store_web_hook_batch: bool = Field(
-        default=False, description="Enable file store webhook batching"
+        default=False, description='Enable file store webhook batching'
     )
     # Trajectory replay/save configuration
     replay_trajectory_path: str | None = Field(
-        default=None, description="Path to trajectory file for replay"
+        default=None, description='Path to trajectory file for replay'
     )
     save_trajectory_path: str | None = Field(
-        default=None, description="Path to save trajectory file"
+        default=None, description='Path to save trajectory file'
     )
     save_screenshots_in_trajectory: bool = Field(
-        default=False, description="Save screenshots in trajectory"
+        default=False, description='Save screenshots in trajectory'
     )
     # CLI configuration
     cli_multiline_input: bool = Field(
-        default=False, description="Enable multiline input in CLI"
+        default=False, description='Enable multiline input in CLI'
     )
     # MCP configuration (host:port; default matches local dev server on :3000)
-    mcp_host: str = Field(default=DEFAULT_MCP_HOST, description="MCP host address")
+    mcp_host: str = Field(default=DEFAULT_MCP_HOST, description='MCP host address')
     # Runtime configuration
     init_git_in_empty_workspace: bool = Field(
-        default=False, description="Initialize git in empty workspace"
+        default=False, description='Initialize git in empty workspace'
     )
     run_as_runtime_user: bool = Field(
         default=False,
-        description="Run commands as the configured non-root runtime user",
+        description='Run commands as the configured non-root runtime user',
     )
     # File upload configuration
     file_uploads_max_file_size_mb: int = Field(
         default=DEFAULT_MAX_FILE_UPLOAD_SIZE_MB,
-        description="Maximum file upload size in MB",
+        description='Maximum file upload size in MB',
     )
     file_uploads_restrict_file_types: bool = Field(
-        default=False, description="Whether to restrict file types"
+        default=False, description='Whether to restrict file types'
     )
     file_uploads_allowed_extensions: set[str] = Field(
-        default_factory=set, description="Allowed file extensions"
+        default_factory=set, description='Allowed file extensions'
     )
     defaults_dict: ClassVar[dict] = {}
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra='forbid', arbitrary_types_allowed=True)
 
-    def get_llm_config(self, name: str = "llm") -> LLMConfig:
+    def get_llm_config(self, name: str = 'llm') -> LLMConfig:
         """Return the named LLM config, creating the default entry when missing."""
         if name in self.llms:
             return self.llms[name]
-        if name is not None and name != "llm":
+        if name is not None and name != 'llm':
             logger.app_logger.warning(
-                "llm config group %s not found, using default config", name
+                'llm config group %s not found, using default config', name
             )
-        if "llm" not in self.llms:
-            self.llms["llm"] = LLMConfig()
-        return self.llms["llm"]
+        if 'llm' not in self.llms:
+            self.llms['llm'] = LLMConfig()
+        return self.llms['llm']
 
-    def set_llm_config(self, value: LLMConfig, name: str = "llm") -> None:
+    def set_llm_config(self, value: LLMConfig, name: str = 'llm') -> None:
         """Set LLM configuration by name.
 
         Args:
@@ -258,15 +258,15 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         """
         self.llms[name] = value
 
-    def get_agent_config(self, name: str = "agent") -> AgentConfig:
+    def get_agent_config(self, name: str = 'agent') -> AgentConfig:
         """Return the named agent config, creating the default entry when missing."""
         if name in self.agents:
             return self.agents[name]
-        if "agent" not in self.agents:
-            self.agents["agent"] = AgentConfig()
-        return self.agents["agent"]
+        if 'agent' not in self.agents:
+            self.agents['agent'] = AgentConfig()
+        return self.agents['agent']
 
-    def set_agent_config(self, value: AgentConfig, name: str = "agent") -> None:
+    def set_agent_config(self, value: AgentConfig, name: str = 'agent') -> None:
         """Set agent configuration by name.
 
         Args:
@@ -293,10 +293,10 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         llm_spec = agent_config.llm_config
         if isinstance(llm_spec, LLMConfig):
             return llm_spec
-        llm_config_name = llm_spec if llm_spec is not None else "llm"
+        llm_config_name = llm_spec if llm_spec is not None else 'llm'
         return self.get_llm_config(llm_config_name)
 
-    def get_llm_config_from_agent(self, name: str = "agent") -> LLMConfig:
+    def get_llm_config_from_agent(self, name: str = 'agent') -> LLMConfig:
         """Get LLM configuration for named agent.
 
         Args:

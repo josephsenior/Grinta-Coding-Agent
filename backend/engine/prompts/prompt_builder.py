@@ -60,27 +60,16 @@ def _render_routing(is_windows: bool) -> str:
 # security_risk_assessment
 # ---------------------------------------------------------------------------
 
-def _render_security(cli_mode: bool) -> str:
-    if cli_mode:
-        risk_block = (
-            "- **LOW**: Safe, read-only actions.\n"
-            "  - Viewing/summarizing content, reading project files, simple in-memory calculations.\n"
-            "- **MEDIUM**: Project-scoped edits or execution.\n"
-            "  - Modify user project files, run project scripts/tests, install project-local packages.\n"
-            "- **HIGH**: System-level or untrusted operations.\n"
-            "  - Changing system settings, global installs, elevated (`sudo`) commands, deleting critical files, "
-            "downloading & executing untrusted code, or sending local secrets/data out."
-        )
-    else:
-        risk_block = (
-            "- **LOW**: Read-only actions inside runtime.\n"
-            "  - Inspecting runtime files, calculations, viewing docs.\n"
-            "- **MEDIUM**: Runtime-scoped edits and installs.\n"
-            "  - Modify workspace files, install packages system-wide inside runtime, run user code.\n"
-            "- **HIGH**: Data exfiltration or privilege breaks.\n"
-            "  - Sending secrets/local data out, connecting to host filesystem, privileged runtime ops, "
-            "running unverified binaries with network access."
-        )
+def _render_security(cli_mode: bool = True) -> str:
+    risk_block = (
+        "- **LOW**: Safe, read-only actions.\n"
+        "  - Viewing/summarizing content, reading project files, simple in-memory calculations.\n"
+        "- **MEDIUM**: Project-scoped edits or execution.\n"
+        "  - Modify user project files, run project scripts/tests, install project-local packages.\n"
+        "- **HIGH**: System-level or untrusted operations.\n"
+        "  - Changing system settings, global installs, elevated (`sudo`) commands, deleting critical files, "
+        "downloading & executing untrusted code, or sending local secrets/data out."
+    )
     return (
         "# 🔐 Security Risk Policy\n"
         "When using tools that support the security_risk parameter, assess the safety risk of your actions:\n\n"
@@ -287,19 +276,20 @@ def build_system_prompt(
 ) -> str:
     """Assemble the full system prompt from partials.
 
-    Drop-in replacement for the old Jinja ``system_prompt.j2`` rendering.
+    Drop-in replacement for the old ``system_prompt`` rendering.
     """
     model_id = active_llm_model or "unknown"
 
     sections = [
         # Identity
-        "You are App, an expert AI assistant that solves complex technical tasks "
-        "through methodical reasoning and tool execution.\n\n"
+        "You are Grinta, an expert AI coding agent built by Youssef Mejdi (josephsenior on GitHub). "
+        "You solve complex technical tasks through methodical reasoning and tool execution.\n\n"
         "**Model identity:** The deployment calls you through an API using the configured "
-        "model id below. When the user asks what model you are, who built you, or to rank "
-        "AI assistants, answer as **App** and cite **only** that id (or \"unknown\" if empty). "
-        "Do **not** claim to be a different commercial product (e.g. \"Claude Sonnet\", \"GPT-4\") "
-        f"unless that exact string is the configured id.\n\nConfigured model id: `{model_id}`",
+        "model id below. When the user asks what model you are, clarify: you are **Grinta** (the agent), "
+        "powered by the configured model. Do **not** claim to be a different commercial product "
+        "(e.g. \"Claude Sonnet\", \"GPT-4\") unless that exact string is the configured id. "
+        "When asked who built you or who you are, you are Grinta, built by Youssef Mejdi.\n\n"
+        f"Configured model id: `{model_id}`",
         # Routing
         _render_routing(is_windows),
         # Security
@@ -437,3 +427,29 @@ def build_knowledge_base_info(kb_results: list[Any]) -> str:
             f"</KNOWLEDGE_BASE_INFO>"
         )
     return "\n".join(blocks).strip()
+
+
+def build_remember_prompt_template(events: str) -> str:
+    """Render the remember-prompt template (replaces generate_remember_prompt.j2)."""
+    return (
+        "You are tasked with generating a prompt that will be used by another AI to update a special reference file. "
+        "This file contains important information and learnings that are used to carry out certain tasks. "
+        "The file can be extended over time to incorporate new knowledge and experiences.\n\n"
+        "You have been provided with a subset of new events that may require updates to the special file. "
+        "These events are:\n"
+        "<events>\n"
+        f"{events}\n"
+        "</events>\n\n"
+        "Your task is to analyze these events and determine what updates, if any, should be made to the special file. "
+        "Then, you need to generate a prompt that will instruct another AI to make these updates correctly and efficiently.\n\n"
+        "When creating your prompt, follow these guidelines:\n"
+        "1. Clearly specify which parts of the file need to be updated or if new sections should be added.\n"
+        "2. Provide context for why these updates are necessary based on the new events.\n"
+        "3. Be specific about the information that should be added or modified.\n"
+        "4. Maintain the existing structure and formatting of the file.\n"
+        "5. Ensure that the updates are consistent with the current content and don't contradict existing information.\n\n"
+        "Now, based on the new events provided, generate a prompt that will guide the AI in making the appropriate "
+        "updates to the special file. Your prompt should be clear, specific, and actionable. "
+        "Include your prompt within <update_prompt> tags.\n\n"
+        "<update_prompt>\n\n</update_prompt>"
+    )

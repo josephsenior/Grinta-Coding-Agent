@@ -20,14 +20,14 @@ def _build_action_and_observation_maps(
 
     for event in events:
         if event.id is None or event.id == -1:
-            logger.debug("Event %s has no ID", event)
+            logger.debug('Event %s has no ID', event)
 
         if isinstance(event, Action):
             action_map[event.id] = event
 
         if isinstance(event, Observation):
             if event.cause is None or event.cause == -1:
-                logger.debug("Observation %s has no cause", event)
+                logger.debug('Observation %s has no cause', event)
             if event.cause is not None:
                 observation_map[event.cause] = event
 
@@ -44,7 +44,7 @@ def _add_action_observation_pairs(
         if observation := observation_map.get(action_id):
             tuples.append((action, observation))
         else:
-            tuples.append((action, NullObservation("")))
+            tuples.append((action, NullObservation('')))
 
 
 def _add_orphaned_observations(
@@ -58,7 +58,7 @@ def _add_orphaned_observations(
             if isinstance(observation, NullObservation):
                 continue
             if not isinstance(observation, CmdOutputObservation):
-                logger.debug("Observation %s has no cause", observation)
+                logger.debug('Observation %s has no cause', observation)
             tuples.append((NullAction(), observation))
 
 

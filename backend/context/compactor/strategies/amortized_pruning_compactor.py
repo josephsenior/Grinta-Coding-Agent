@@ -9,7 +9,6 @@ from backend.context.view import View
 from backend.ledger.action.agent import CondensationAction
 
 if TYPE_CHECKING:
-    from backend.core.config.compactor_config import AmortizedPruningCompactorConfig
     from backend.inference.llm_registry import LLMRegistry
 
 
@@ -28,13 +27,13 @@ class AmortizedPruningCompactor(RollingCompactor):
 
         """
         if keep_first >= max_size // 2:
-            msg = f"keep_first ({keep_first}) must be less than half of max_size ({max_size})"
+            msg = f'keep_first ({keep_first}) must be less than half of max_size ({max_size})'
             raise ValueError(msg)
         if keep_first < 0:
-            msg = f"keep_first ({keep_first}) cannot be negative"
+            msg = f'keep_first ({keep_first}) cannot be negative'
             raise ValueError(msg)
         if max_size < 1:
-            msg = f"max_size ({keep_first}) cannot be non-positive"
+            msg = f'max_size ({keep_first}) cannot be non-positive'
             raise ValueError(msg)
         self.max_size = max_size
         self.keep_first = keep_first
@@ -98,9 +97,9 @@ class AmortizedPruningCompactor(RollingCompactor):
         """
         from backend.core.pydantic_compat import model_dump_with_options
 
-        kwargs = model_dump_with_options(config, exclude={"type", "token_budget"})
+        kwargs = model_dump_with_options(config, exclude={'type', 'token_budget'})
         compactor = AmortizedPruningCompactor(**kwargs)
-        compactor.token_budget = getattr(config, "token_budget", None)
+        compactor.token_budget = getattr(config, 'token_budget', None)
         return compactor
 
 

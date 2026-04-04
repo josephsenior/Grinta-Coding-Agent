@@ -22,12 +22,8 @@ class _LLMStub:
     def completion(self, **kwargs):
         self.last_kwargs = kwargs
         return SimpleNamespace(
-            id="r1",
+            id='r1',
             choices=[
-                SimpleNamespace(
-                    message=SimpleNamespace(content=self._response_content)
-                )
+                SimpleNamespace(message=SimpleNamespace(content=self._response_content))
             ],
         )
-
-

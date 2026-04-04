@@ -59,7 +59,7 @@ class DurableEventWriter:
             return
         self._stop_flag.clear()
         self._thread = threading.Thread(
-            target=self._run, name="app-event-writer", daemon=True
+            target=self._run, name='app-event-writer', daemon=True
         )
         self._thread.start()
 
@@ -70,7 +70,7 @@ class DurableEventWriter:
             self._queue.join()
         except Exception:
             logger.error(
-                "DurableEventWriter: queue.join() failed during stop; pending events may be lost",
+                'DurableEventWriter: queue.join() failed during stop; pending events may be lost',
                 exc_info=True,
             )
         self._stop_flag.set()
@@ -107,7 +107,7 @@ class DurableEventWriter:
         except queue.Full:
             self._drops += 1
             logger.warning(
-                "DurableEventWriter queue full after %.1fs; dropped event id=%s filename=%s (total drops: %d)",
+                'DurableEventWriter queue full after %.1fs; dropped event id=%s filename=%s (total drops: %d)',
                 self._put_timeout,
                 persisted_event.event_id,
                 persisted_event.filename,
@@ -178,7 +178,7 @@ class DurableEventWriter:
             ) as exc:  # pragma: no cover - persistence must not crash thread
                 self._errors += 1
                 logger.error(
-                    "Permanently failed to persist event id=%s filename=%s after %d retries: %s",
+                    'Permanently failed to persist event id=%s filename=%s after %d retries: %s',
                     item.event_id,
                     item.filename,
                     _MAX_FLUSH_RETRIES,
@@ -200,7 +200,7 @@ class DurableEventWriter:
                 last_exc = exc
                 delay = _RETRY_BASE_DELAY * (2**attempt)
                 logger.warning(
-                    "Flush attempt %d/%d failed for event id=%s: %s (retrying in %.1fs)",
+                    'Flush attempt %d/%d failed for event id=%s: %s (retrying in %.1fs)',
                     attempt + 1,
                     _MAX_FLUSH_RETRIES,
                     persisted_event.event_id,
@@ -227,7 +227,7 @@ class DurableEventWriter:
                 )
             except Exception as exc:  # pragma: no cover - cache best effort
                 logger.debug(
-                    "Cache page write failed for event %s: %s",
+                    'Cache page write failed for event %s: %s',
                     persisted_event.event_id,
                     exc,
                 )

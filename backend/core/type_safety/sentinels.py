@@ -9,9 +9,9 @@ This prevents bugs where None is used ambiguously and makes code more explicit.
 
 from __future__ import annotations
 
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 
 class Sentinel:
@@ -34,7 +34,7 @@ class Sentinel:
 
     def __repr__(self) -> str:
         """Return string representation."""
-        return f"<{self.__class__.__name__}>"
+        return f'<{self.__class__.__name__}>'
 
     def __bool__(self) -> bool:
         """Sentinels are always falsy."""
@@ -159,5 +159,5 @@ def coalesce[T](*values: T | Sentinel | None) -> T | None:
 
 
 # Type aliases for better type hints
-MaybeSentinel = Union[T, Sentinel]
-OptionalSentinel = Union[T, None, Sentinel]
+type MaybeSentinel[T] = T | Sentinel
+type OptionalSentinel[T] = T | None | Sentinel

@@ -25,11 +25,11 @@ class RuntimeSupervisor:
 
     async def ensure_connected(self, conversation: object) -> None:
         """Connect a conversation runtime and wait for readiness if supported."""
-        runtime = getattr(conversation, "runtime", None)
+        runtime = getattr(conversation, 'runtime', None)
         if runtime is None:
             return
 
-        connect_coro = getattr(runtime, "connect", None)
+        connect_coro = getattr(runtime, 'connect', None)
         if connect_coro is None:
             return
 
@@ -39,27 +39,27 @@ class RuntimeSupervisor:
             )
         except TimeoutError:
             logger.warning(
-                "Runtime connect timed out after %.1fs for sid=%s",
+                'Runtime connect timed out after %.1fs for sid=%s',
                 self._config.connect_timeout_s,
-                getattr(conversation, "sid", ""),
+                getattr(conversation, 'sid', ''),
             )
             return
         except Exception as exc:
             logger.error(
-                "Runtime connect failed for sid=%s: %s",
-                getattr(conversation, "sid", ""),
+                'Runtime connect failed for sid=%s: %s',
+                getattr(conversation, 'sid', ''),
                 exc,
                 exc_info=True,
             )
             return
 
-        await self._wait_for_readiness(runtime, getattr(conversation, "sid", ""))
+        await self._wait_for_readiness(runtime, getattr(conversation, 'sid', ''))
 
     async def close(self, conversation: object) -> None:
-        runtime = getattr(conversation, "runtime", None)
+        runtime = getattr(conversation, 'runtime', None)
         if runtime is None:
             return
-        close_fn = getattr(runtime, "close", None)
+        close_fn = getattr(runtime, 'close', None)
         if close_fn is None:
             return
         try:
@@ -68,16 +68,16 @@ class RuntimeSupervisor:
                 await result
         except Exception as exc:
             logger.debug(
-                "Runtime close failed for sid=%s: %s",
-                getattr(conversation, "sid", ""),
+                'Runtime close failed for sid=%s: %s',
+                getattr(conversation, 'sid', ''),
                 exc,
             )
 
     async def _wait_for_readiness(self, runtime: object, sid: str) -> None:
-        if not hasattr(runtime, "runtime_initialized"):
+        if not hasattr(runtime, 'runtime_initialized'):
             return
         try:
-            if getattr(runtime, "runtime_initialized"):
+            if getattr(runtime, 'runtime_initialized'):
                 return
         except Exception:
             return
@@ -86,7 +86,7 @@ class RuntimeSupervisor:
         waited = 0.0
         while waited < deadline:
             try:
-                if getattr(runtime, "runtime_initialized"):
+                if getattr(runtime, 'runtime_initialized'):
                     return
             except Exception:
                 return
@@ -94,7 +94,7 @@ class RuntimeSupervisor:
             waited += self._config.readiness_poll_s
 
         logger.warning(
-            "Runtime for conversation %s did not initialize within %.1fs",
+            'Runtime for conversation %s did not initialize within %.1fs',
             sid,
             self._config.readiness_timeout_s,
         )

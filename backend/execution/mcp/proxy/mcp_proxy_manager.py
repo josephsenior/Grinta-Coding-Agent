@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from backend.core.config.mcp_config import MCPServerConfig
 
 logger = logging.getLogger(__name__)
-fastmcp_logger = fastmcp_get_logger("fastmcp")
+fastmcp_logger = fastmcp_get_logger('fastmcp')
 
 
 class MCPProxyManager:
@@ -49,11 +49,13 @@ class MCPProxyManager:
         self.auth_enabled = auth_enabled
         self.api_key = api_key
         self.proxy: FastMCP | None = None
-        self.config: dict[str, Any] = {"mcpServers": {}}
+        self.config: dict[str, Any] = {'mcpServers': {}}
         if logger_level is not None:
             fastmcp_logger.setLevel(logger_level)
 
-    def initialize(self, mcp_config: MCPServerConfig | list[MCPServerConfig] | None = None) -> None:
+    def initialize(
+        self, mcp_config: MCPServerConfig | list[MCPServerConfig] | None = None
+    ) -> None:
         """Initialize the FastMCP proxy with the current configuration.
 
         Args:
@@ -63,17 +65,17 @@ class MCPProxyManager:
             if not isinstance(mcp_config, list):
                 mcp_config = [mcp_config]
             tools = {t.name: model_dump_with_options(t) for t in mcp_config}
-            self.config["mcpServers"].update(tools)
+            self.config['mcpServers'].update(tools)
 
-        if not self.config["mcpServers"]:
+        if not self.config['mcpServers']:
             logger.info(
-                "No MCP servers configured for FastMCP Proxy, skipping initialization."
+                'No MCP servers configured for FastMCP Proxy, skipping initialization.'
             )
             return
         self.proxy = FastMCP.as_proxy(
             self.config, auth_enabled=self.auth_enabled, api_key=self.api_key
         )
-        logger.info("FastMCP Proxy initialized successfully")
+        logger.info('FastMCP Proxy initialized successfully')
 
     async def mount_to_app(
         self, app: FastAPI, allow_origins: list[str] | None = None
@@ -85,11 +87,11 @@ class MCPProxyManager:
             allow_origins: List of allowed origins for CORS
 
         """
-        if not self.config["mcpServers"]:
-            logger.info("No MCP servers configured for FastMCP Proxy, skipping mount.")
+        if not self.config['mcpServers']:
+            logger.info('No MCP servers configured for FastMCP Proxy, skipping mount.')
             return
         if not self.proxy:
-            msg = "FastMCP Proxy is not initialized"
+            msg = 'FastMCP Proxy is not initialized'
             raise ValueError(msg)
 
         def close_on_double_start(app):
@@ -102,9 +104,9 @@ class MCPProxyManager:
                 async def check_send(message) -> None:
                     """Proxy send coroutine raising if duplicate start detected."""
                     nonlocal start_sent
-                    if message["type"] == "http.response.start":
+                    if message['type'] == 'http.response.start':
                         if start_sent:
-                            msg = "closed because of double http.response.start (mcp issue https://github.com/modelcontextprotocol/python-sdk/issues/883)"
+                            msg = 'closed because of double http.response.start (mcp issue https://github.com/modelcontextprotocol/python-sdk/issues/883)'
                             raise get_cancelled_exc_class()(
                                 msg,
                             )
@@ -116,18 +118,18 @@ class MCPProxyManager:
             return wrapped
 
         mcp_app = close_on_double_start(
-            self.proxy.http_app(path="/sse", transport="sse")
+            self.proxy.http_app(path='/sse', transport='sse')
         )
-        app.mount("/mcp", mcp_app)
+        app.mount('/mcp', mcp_app)
         routes_to_remove = [
             route
             for route in list(app.routes)
-            if getattr(route, "path", None) == "/mcp"
+            if getattr(route, 'path', None) == '/mcp'
         ]
         for route in routes_to_remove:
             app.routes.remove(route)
-        app.mount("/", mcp_app)
-        logger.info("Mounted FastMCP Proxy app at /mcp")
+        app.mount('/', mcp_app)
+        logger.info('Mounted FastMCP Proxy app at /mcp')
 
     async def update_and_remount(
         self,
@@ -148,7 +150,7 @@ class MCPProxyManager:
 
         """
         tools = {t.name: model_dump_with_options(t) for t in stdio_servers}
-        self.config["mcpServers"] = tools
+        self.config['mcpServers'] = tools
         del self.proxy
         self.proxy = None
         self.initialize()

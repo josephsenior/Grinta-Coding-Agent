@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.persistence.local_file_store import LocalFileStore
 from backend.persistence.in_memory_file_store import InMemoryFileStore
+from backend.persistence.local_file_store import LocalFileStore
 
 if TYPE_CHECKING:
     from backend.persistence.files import FileStore
@@ -35,8 +35,8 @@ def get_file_store(
 
     """
     store: FileStore
-    if file_store_type == "local":
-        path = (local_data_root or "").strip()
+    if file_store_type == 'local':
+        path = (local_data_root or '').strip()
         if not path:
             from backend.core.app_paths import get_app_settings_root
 
@@ -58,4 +58,3 @@ def get_file_store(
         else:
             store = WebHookFileStore(store, file_store_web_hook_url, client)
     return store
-

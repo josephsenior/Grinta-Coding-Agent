@@ -1,4 +1,4 @@
-﻿"""Agent controller and execution management.
+"""Agent controller and execution management.
 
 Classes:
     Agent
@@ -17,13 +17,12 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from backend.orchestration.state.state import State
+    from backend.execution.plugins import PluginRequirement
+    from backend.inference.llm_registry import LLMRegistry
     from backend.ledger.action import Action
     from backend.ledger.action.message import SystemMessageAction
-    from backend.inference.llm_registry import LLMRegistry
-    from backend.execution.plugins import PluginRequirement
+    from backend.orchestration.state.state import State
     from backend.utils.prompt import PromptManager
-from backend.orchestration.agent_tools import build_tool
 from backend.core.config.agent_config import AgentConfig
 from backend.core.errors import (
     AgentAlreadyRegisteredError,
@@ -31,6 +30,7 @@ from backend.core.errors import (
 )
 from backend.core.logger import app_logger as logger
 from backend.ledger.event import EventSource
+from backend.orchestration.agent_tools import build_tool
 
 
 class Agent(ABC):
@@ -52,13 +52,13 @@ class Agent(ABC):
     runtime_plugins: list[PluginRequirement] = []
     config_model: type[AgentConfig] = AgentConfig
     (
-        "Class field that specifies the config model to use for the agent. "
-        "Subclasses may override with a derived config model if needed."
+        'Class field that specifies the config model to use for the agent. '
+        'Subclasses may override with a derived config model if needed.'
     )
 
     def __init__(self, config: AgentConfig, llm_registry: LLMRegistry) -> None:
         """Initialize the agent with its configuration and LLM registry."""
-        self.llm = llm_registry.get_llm_from_agent_config("agent", config)
+        self.llm = llm_registry.get_llm_from_agent_config('agent', config)
         self.llm_registry = llm_registry
         self.config = config
         self._complete = False
@@ -80,7 +80,7 @@ class Agent(ABC):
 
         """
         if self._prompt_manager is None:
-            msg = f"Prompt manager not initialized for agent {self.name}"
+            msg = f'Prompt manager not initialized for agent {self.name}'
             raise ValueError(msg)
         return self._prompt_manager
 
@@ -99,14 +99,14 @@ class Agent(ABC):
         try:
             if not self.prompt_manager:
                 logger.warning(
-                    "[%s] Prompt manager not initialized before getting system message",
+                    '[%s] Prompt manager not initialized before getting system message',
                     self.name,
                 )
                 return None
             system_message = self.prompt_manager.get_system_message(
-                cli_mode=self.config.cli_mode, config=self.config
+                cli_mode=True, config=self.config
             )
-            tools = getattr(self, "tools", None)
+            tools = getattr(self, 'tools', None)
             # Construct using the canonical class reference imported above. Some
             # test environments appear to load duplicate copies of the action
             # module, leading to identity mismatches for isinstance checks.
@@ -118,7 +118,7 @@ class Agent(ABC):
             system_message_action.source = EventSource.AGENT
             return system_message_action
         except Exception as e:
-            logger.warning("[%s] Failed to generate system message: %s", self.name, e)
+            logger.warning('[%s] Failed to generate system message: %s', self.name, e)
             return None
 
     @property
@@ -189,9 +189,9 @@ class Agent(ABC):
             built_tool = build_tool(tool)
             if built_tool is None:
                 continue
-            tool_name = built_tool["function"]["name"]
+            tool_name = built_tool['function']['name']
             if tool_name in self.mcp_tools:
-                logger.warning("Tool %s already exists, skipping", tool_name)
+                logger.warning('Tool %s already exists, skipping', tool_name)
                 continue
             self._register_tool(built_tool, tool_name)
         self._log_tool_update_end()
@@ -199,12 +199,12 @@ class Agent(ABC):
     def _log_tool_update_start(self, mcp_tools: list[dict]) -> None:
         try:
             tool_names = [
-                tool.get("function", {}).get("name", "<unknown>") for tool in mcp_tools
+                tool.get('function', {}).get('name', '<unknown>') for tool in mcp_tools
             ]
         except Exception:
-            tool_names = ["<unavailable>"]
+            tool_names = ['<unavailable>']
         logger.info(
-            "Setting %s MCP tools for agent %s: %s",
+            'Setting %s MCP tools for agent %s: %s',
             len(mcp_tools),
             self.name,
             tool_names,
@@ -218,8 +218,8 @@ class Agent(ABC):
 
     def _log_tool_update_end(self) -> None:
         logger.info(
-            "Tools updated for agent %s, total %s: %s",
+            'Tools updated for agent %s, total %s: %s',
             self.name,
             len(self.tools),
-            [tool["function"]["name"] for tool in self.tools],
+            [tool['function']['name'] for tool in self.tools],
         )

@@ -35,37 +35,37 @@ class TestRuntimeConfigValidation:
 
     def test_extra_field_rejected(self):
         with pytest.raises(Exception):
-            RuntimeConfig(**{"nonexistent": "x"})
+            RuntimeConfig(**{'nonexistent': 'x'})
 
     def test_custom_values(self):
         cfg = RuntimeConfig(
             timeout=300,
             enable_auto_lint=False,
-            runtime_startup_env_vars={"FOO": "BAR"},
-            selected_repo="owner/repo",
+            runtime_startup_env_vars={'FOO': 'BAR'},
+            selected_repo='owner/repo',
             close_delay=30,
             keep_runtime_alive=True,
         )
         assert cfg.timeout == 300
         assert cfg.enable_auto_lint is False
-        assert cfg.runtime_startup_env_vars == {"FOO": "BAR"}
-        assert cfg.selected_repo == "owner/repo"
+        assert cfg.runtime_startup_env_vars == {'FOO': 'BAR'}
+        assert cfg.selected_repo == 'owner/repo'
         assert cfg.close_delay == 30
         assert cfg.keep_runtime_alive is True
 
 
 class TestRuntimeConfigFromToml:
     def test_basic(self):
-        mapping = RuntimeConfig.from_toml_section({"timeout": 60})
-        assert "runtime_config" in mapping
-        cfg = mapping["runtime_config"]
+        mapping = RuntimeConfig.from_toml_section({'timeout': 60})
+        assert 'runtime_config' in mapping
+        cfg = mapping['runtime_config']
         assert cfg.timeout == 60
 
     def test_empty_dict(self):
         mapping = RuntimeConfig.from_toml_section({})
-        cfg = mapping["runtime_config"]
+        cfg = mapping['runtime_config']
         assert cfg.timeout == DEFAULT_RUNTIME_TIMEOUT
 
     def test_invalid_data_raises(self):
-        with pytest.raises(ValueError, match="Invalid runtime configuration"):
-            RuntimeConfig.from_toml_section({"unknown_key": True})
+        with pytest.raises(ValueError, match='Invalid runtime configuration'):
+            RuntimeConfig.from_toml_section({'unknown_key': True})

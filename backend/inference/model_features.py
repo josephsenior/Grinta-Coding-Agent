@@ -18,14 +18,14 @@ def normalize_model_name(model: str) -> str:
     - There is no provider:model form; providers, when present, use 'provider/model'
     - Drop a trailing "-gguf" suffix if present
     """
-    raw = (model or "").strip().lower()
-    if "/" in raw:
-        name = raw.split("/")[-1]
-        if ":" in name:
-            name = name.split(":", 1)[0]
+    raw = (model or '').strip().lower()
+    if '/' in raw:
+        name = raw.split('/')[-1]
+        if ':' in name:
+            name = name.split(':', 1)[0]
     else:
         name = raw
-    return name.removesuffix("-gguf")
+    return name.removesuffix('-gguf')
 
 
 def model_matches(model: str, patterns: list[str]) -> bool:
@@ -35,12 +35,12 @@ def model_matches(model: str, patterns: list[str]) -> bool:
     against the full, lowercased model string (including provider prefix).
     Otherwise, it is matched against the normalized basename.
     """
-    raw = (model or "").strip().lower()
+    raw = (model or '').strip().lower()
     name = normalize_model_name(model)
     for pat in patterns:
         pat_l = pat.lower()
-        if ("/" in pat_l and fnmatch(raw, pat_l)) or (
-            "/" not in pat_l and fnmatch(name, pat_l)
+        if ('/' in pat_l and fnmatch(raw, pat_l)) or (
+            '/' not in pat_l and fnmatch(name, pat_l)
         ):
             return True
     return False
@@ -58,74 +58,74 @@ class ModelFeatures(ModelCapabilities):
 
 
 FUNCTION_CALLING_PATTERNS: list[str] = [
-    "claude-3-7-sonnet*",
-    "claude-3.7-sonnet*",
-    "claude-3-5-sonnet*",
-    "claude-3.5-haiku*",
-    "claude-sonnet-4*",
-    "claude-opus-4*",
-    "claude-4*",
-    "gpt-4o*",
-    "gpt-4.1*",
-    "gpt-5*",
-    "o1-*",
-    "o3-*",
-    "o4-*",
-    "google/gemini-1.5-*",
-    "google/gemini-2.0-*",
-    "gemini-2.5-*",
-    "gemini-3*",
-    "grok-*",
-    "kimi-k2*",
-    "qwen3*",
+    'claude-3-7-sonnet*',
+    'claude-3.7-sonnet*',
+    'claude-3-5-sonnet*',
+    'claude-3.5-haiku*',
+    'claude-sonnet-4*',
+    'claude-opus-4*',
+    'claude-4*',
+    'gpt-4o*',
+    'gpt-4.1*',
+    'gpt-5*',
+    'o1-*',
+    'o3-*',
+    'o4-*',
+    'google/gemini-1.5-*',
+    'google/gemini-2.0-*',
+    'gemini-2.5-*',
+    'gemini-3*',
+    'grok-*',
+    'kimi-k2*',
+    'qwen3*',
 ]
 REASONING_EFFORT_PATTERNS: list[str] = [
-    "o1-*",
-    "o3-*",
-    "o4-*",
-    "gemini-2.0-flash-thinking*",
-    "gemini-2.5-*",
-    "gemini-3-deep-think*",
-    "gpt-5*",
-    "deepseek*",
+    'o1-*',
+    'o3-*',
+    'o4-*',
+    'gemini-2.0-flash-thinking*',
+    'gemini-2.5-*',
+    'gemini-3-deep-think*',
+    'gpt-5*',
+    'deepseek*',
 ]
 PROMPT_CACHE_PATTERNS: list[str] = [
-    "claude-3-7-sonnet*",
-    "claude-3.5-sonnet*",
-    "claude-3.5-haiku*",
-    "claude-3-haiku*",
-    "claude-3-opus*",
-    "claude-sonnet-4*",
-    "claude-opus-4*",
-    "claude-4*",
-    "deepseek*",
+    'claude-3-7-sonnet*',
+    'claude-3.5-sonnet*',
+    'claude-3.5-haiku*',
+    'claude-3-haiku*',
+    'claude-3-opus*',
+    'claude-sonnet-4*',
+    'claude-opus-4*',
+    'claude-4*',
+    'deepseek*',
     # Google Gemini explicit context cache (see GeminiClient + gemini_cache)
-    "google/gemini-1.5-*",
-    "google/gemini-2.0-*",
-    "gemini-2.5-*",
-    "gemini-3*",
+    'google/gemini-1.5-*',
+    'google/gemini-2.0-*',
+    'gemini-2.5-*',
+    'gemini-3*',
 ]
 SUPPORTS_STOP_WORDS_FALSE_PATTERNS: list[str] = [
-    "o1*",
-    "xai/grok-4*",
-    "deepseek*",
+    'o1*',
+    'xai/grok-4*',
+    'deepseek*',
 ]
 
 
 RESPONSE_SCHEMA_PATTERNS: list[str] = [
-    "gpt-4o*",
-    "gpt-4-turbo*",
-    "gpt-5*",
-    "o1-*",
-    "o3-*",
-    "o4-*",
-    "google/gemini-1.5-*",
-    "google/gemini-2.0-*",
-    "gemini-3*",
-    "claude-3-7-sonnet*",
-    "claude-3.5-sonnet*",
-    "claude-3.5-haiku*",
-    "claude-4*",
+    'gpt-4o*',
+    'gpt-4-turbo*',
+    'gpt-5*',
+    'o1-*',
+    'o3-*',
+    'o4-*',
+    'google/gemini-1.5-*',
+    'google/gemini-2.0-*',
+    'gemini-3*',
+    'claude-3-7-sonnet*',
+    'claude-3.5-sonnet*',
+    'claude-3.5-haiku*',
+    'claude-4*',
 ]
 
 

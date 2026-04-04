@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backend.ledger.action import CmdRunAction, FileEditAction
 from backend.orchestration.tool_pipeline import (
     ConflictDetectionMiddleware,
     ReflectionMiddleware,
@@ -14,8 +15,6 @@ from backend.orchestration.tool_pipeline import (
     ToolInvocationMiddleware,
     ToolInvocationPipeline,
 )
-from backend.ledger.action import CmdRunAction, FileEditAction
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -24,7 +23,7 @@ from backend.ledger.action import CmdRunAction, FileEditAction
 
 def _mock_controller():
     ctrl = MagicMock()
-    ctrl.id = "test-session"
+    ctrl.id = 'test-session'
     ctrl.state = MagicMock()
     ctrl.state.iteration_flag = MagicMock(current_value=1)
     ctrl.state.history = []
@@ -37,8 +36,8 @@ def _mock_controller():
 def _mock_action(runnable=True):
     action = MagicMock()
     action.runnable = runnable
-    action.action = "run"
-    action.command = "echo hello"
+    action.action = 'run'
+    action.command = 'echo hello'
     return action
 
 
@@ -71,9 +70,9 @@ class TestToolInvocationContext:
             action=_mock_action(),
             state=_mock_state(),
         )
-        ctx.block("test reason")
+        ctx.block('test reason')
         assert ctx.blocked is True
-        assert ctx.block_reason == "test reason"
+        assert ctx.block_reason == 'test reason'
 
     def test_block_without_reason(self):
         ctx = ToolInvocationContext(
@@ -90,9 +89,9 @@ class TestToolInvocationContext:
             controller=_mock_controller(),
             action=_mock_action(),
             state=_mock_state(),
-            metadata={"key": "value"},
+            metadata={'key': 'value'},
         )
-        assert ctx.metadata["key"] == "value"
+        assert ctx.metadata['key'] == 'value'
 
 
 # ---------------------------------------------------------------------------
@@ -154,23 +153,23 @@ class _RecordingMiddleware(ToolInvocationMiddleware):
         self.calls = []
 
     async def plan(self, ctx):
-        self.calls.append("plan")
+        self.calls.append('plan')
 
     async def verify(self, ctx):
-        self.calls.append("verify")
+        self.calls.append('verify')
 
     async def execute(self, ctx):
-        self.calls.append("execute")
+        self.calls.append('execute')
 
     async def observe(self, ctx, observation=None):
-        self.calls.append("observe")
+        self.calls.append('observe')
 
 
 class _BlockingMiddleware(ToolInvocationMiddleware):
     """Blocks execution during verify stage."""
 
     async def verify(self, ctx):
-        ctx.block("blocked by test")
+        ctx.block('blocked by test')
 
 
 class TestPipelineStageExecution:
@@ -181,7 +180,7 @@ class TestPipelineStageExecution:
         pip = ToolInvocationPipeline(ctrl, [mw])
         ctx = pip.create_context(_mock_action(), _mock_state())
         await pip.run_plan(ctx)
-        assert "plan" in mw.calls
+        assert 'plan' in mw.calls
 
     @pytest.mark.asyncio
     async def test_run_verify_calls_verify(self):
@@ -190,7 +189,7 @@ class TestPipelineStageExecution:
         pip = ToolInvocationPipeline(ctrl, [mw])
         ctx = pip.create_context(_mock_action(), _mock_state())
         await pip.run_verify(ctx)
-        assert "verify" in mw.calls
+        assert 'verify' in mw.calls
 
     @pytest.mark.asyncio
     async def test_run_execute_calls_execute(self):
@@ -199,7 +198,7 @@ class TestPipelineStageExecution:
         pip = ToolInvocationPipeline(ctrl, [mw])
         ctx = pip.create_context(_mock_action(), _mock_state())
         await pip.run_execute(ctx)
-        assert "execute" in mw.calls
+        assert 'execute' in mw.calls
 
     @pytest.mark.asyncio
     async def test_run_observe_calls_observe(self):
@@ -208,7 +207,7 @@ class TestPipelineStageExecution:
         pip = ToolInvocationPipeline(ctrl, [mw])
         ctx = pip.create_context(_mock_action(), _mock_state())
         await pip.run_observe(ctx, None)
-        assert "observe" in mw.calls
+        assert 'observe' in mw.calls
 
     @pytest.mark.asyncio
     async def test_observe_stores_observation_in_metadata(self):
@@ -218,7 +217,7 @@ class TestPipelineStageExecution:
         ctx = pip.create_context(_mock_action(), _mock_state())
         obs = MagicMock()
         await pip.run_observe(ctx, obs)
-        assert ctx.metadata["observation"] is obs
+        assert ctx.metadata['observation'] is obs
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +234,7 @@ class TestBlockingPropagation:
         ctx = pip.create_context(_mock_action(), _mock_state())
         ctx.blocked = True
         await pip.run_verify(ctx)
-        assert "verify" not in mw.calls
+        assert 'verify' not in mw.calls
 
     @pytest.mark.asyncio
     async def test_blocked_context_skips_execute(self):
@@ -245,7 +244,7 @@ class TestBlockingPropagation:
         ctx = pip.create_context(_mock_action(), _mock_state())
         ctx.blocked = True
         await pip.run_execute(ctx)
-        assert "execute" not in mw.calls
+        assert 'execute' not in mw.calls
 
     @pytest.mark.asyncio
     async def test_blocking_middleware_stops_subsequent(self):
@@ -256,8 +255,8 @@ class TestBlockingPropagation:
         ctx = pip.create_context(_mock_action(), _mock_state())
         await pip.run_verify(ctx)
         assert ctx.blocked is True
-        assert ctx.block_reason == "blocked by test"
-        assert "verify" not in recorder.calls
+        assert ctx.block_reason == 'blocked by test'
+        assert 'verify' not in recorder.calls
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +300,7 @@ class TestMiddlewareErrorHandling:
 
         class FailingMiddleware(ToolInvocationMiddleware):
             async def execute(self, ctx):
-                raise RuntimeError("boom")
+                raise RuntimeError('boom')
 
         recorder = _RecordingMiddleware()
         pip = ToolInvocationPipeline(ctrl, [FailingMiddleware(), recorder])
@@ -309,9 +308,9 @@ class TestMiddlewareErrorHandling:
         await pip.run_execute(ctx)
         assert ctx.blocked is True
         assert ctx.block_reason is not None
-        assert "execute_error" in ctx.block_reason
+        assert 'execute_error' in ctx.block_reason
         # recorder should NOT have been called
-        assert "execute" not in recorder.calls
+        assert 'execute' not in recorder.calls
 
 
 # ---------------------------------------------------------------------------
@@ -345,14 +344,14 @@ class TestNewPolicyMiddlewares:
         mw = ReflectionMiddleware(ctrl)
         ctx = ToolInvocationContext(
             controller=ctrl,
-            action=CmdRunAction(command="rm -rf /"),
+            action=CmdRunAction(command='rm -rf /'),
             state=_mock_state(),
         )
 
         await mw.verify(ctx)
 
         assert ctx.blocked is True
-        assert "destructive" in (ctx.block_reason or "")
+        assert 'destructive' in (ctx.block_reason or '')
         ctrl.event_stream.add_event.assert_called_once()
 
     @pytest.mark.asyncio
@@ -362,11 +361,11 @@ class TestNewPolicyMiddlewares:
         mw = ConflictDetectionMiddleware()
 
         # Even with prior unverified edits, verify should not block.
-        mw._unverified_edits["src/main.py"] = 2
+        mw._unverified_edits['src/main.py'] = 2
 
         ctx = ToolInvocationContext(
             controller=ctrl,
-            action=FileEditAction(path="src/main.py", command="replace_text"),
+            action=FileEditAction(path='src/main.py', command='replace_text'),
             state=_mock_state(),
         )
 

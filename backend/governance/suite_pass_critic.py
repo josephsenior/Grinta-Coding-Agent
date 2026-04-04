@@ -1,4 +1,4 @@
-﻿"""Critic that scores a run by whether the relevant test suite passes after the task."""
+"""Critic that scores a run by whether the relevant test suite passes after the task."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 
 # Patterns that identify test files touched during the session.
-_TEST_FILE_RE = re.compile(r"test_.*\.py$|_test\.py$", re.IGNORECASE)
+_TEST_FILE_RE = re.compile(r'test_.*\.py$|_test\.py$', re.IGNORECASE)
 
 
 def _extract_touched_files(events: Sequence[Event]) -> list[str]:
@@ -24,7 +24,7 @@ def _extract_touched_files(events: Sequence[Event]) -> list[str]:
     paths: list[str] = []
     for event in events:
         # FileEditAction stores the target path in .path
-        path = getattr(event, "path", None)
+        path = getattr(event, 'path', None)
         if isinstance(path, str) and path:
             paths.append(path)
     return list(dict.fromkeys(paths))  # deduplicate, preserve order
@@ -45,7 +45,7 @@ def _collect_test_dirs(touched: list[str], workspace_root: str) -> list[Path]:
     # Fallback: look for a tests/ directory alongside each touched source file.
     for p in touched:
         source = root / p
-        candidate = source.parent / "tests"
+        candidate = source.parent / 'tests'
         if candidate.exists() and candidate not in dirs:
             dirs.append(candidate)
 
@@ -55,12 +55,16 @@ def _collect_test_dirs(touched: list[str], workspace_root: str) -> list[Path]:
 def _run_pytest(test_dirs: list[Path], workspace_root: str) -> tuple[int, int, str]:
     """Run pytest on *test_dirs* and return (passed, failed, summary_line)."""
     if not test_dirs:
-        return 0, 0, "no tests found"
+        return 0, 0, 'no tests found'
 
     cmd = [
-        "python", "-m", "pytest",
+        'python',
+        '-m',
+        'pytest',
         *[str(d) for d in test_dirs],
-        "--tb=no", "-q", "--no-header",
+        '--tb=no',
+        '-q',
+        '--no-header',
     ]
     try:
         result = subprocess.run(
@@ -73,13 +77,15 @@ def _run_pytest(test_dirs: list[Path], workspace_root: str) -> tuple[int, int, s
         output = result.stdout + result.stderr
         passed, failed = parse_pytest_pass_fail_counts(output)
         # Last non-empty line is the concise summary.
-        summary = next((l for l in reversed(output.splitlines()) if l.strip()), "")
+        summary = next(
+            (line for line in reversed(output.splitlines()) if line.strip()), ''
+        )
         return passed, failed, summary
     except subprocess.TimeoutExpired:
-        return 0, 0, "pytest timed out after 120s"
+        return 0, 0, 'pytest timed out after 120s'
     except Exception as exc:
-        logger.debug("TestPassCritic: pytest run failed: %s", exc)
-        return 0, 0, f"pytest error: {exc}"
+        logger.debug('TestPassCritic: pytest run failed: %s', exc)
+        return 0, 0, f'pytest error: {exc}'
 
 
 class SuitePassCritic(BaseCritic):
@@ -92,7 +98,7 @@ class SuitePassCritic(BaseCritic):
       - All tests fail → 0.0
     """
 
-    def __init__(self, workspace_root: str = ".") -> None:
+    def __init__(self, workspace_root: str = '.') -> None:
         self.workspace_root = workspace_root
 
     def evaluate(
@@ -102,20 +108,26 @@ class SuitePassCritic(BaseCritic):
         test_dirs = _collect_test_dirs(touched, self.workspace_root)
 
         if not test_dirs:
-            return CriticResult(score=1.0, message="✅ Verification Passed: No relevant tests found; no regressions detected.")
+            return CriticResult(
+                score=1.0,
+                message='✅ Verification Passed: No relevant tests found; no regressions detected.',
+            )
 
         passed, failed, summary = _run_pytest(test_dirs, self.workspace_root)
         total = passed + failed
 
         if total == 0:
-            return CriticResult(score=1.0, message=f"✅ Verification Passed: Tests ran but no results parsed. Raw: {summary}")
+            return CriticResult(
+                score=1.0,
+                message=f'✅ Verification Passed: Tests ran but no results parsed. Raw: {summary}',
+            )
 
         score = passed / total
         if score == 1.0:
-            msg = f"✅ Verification Passed: All {passed} tests passed successfully. {summary}"
+            msg = f'✅ Verification Passed: All {passed} tests passed successfully. {summary}'
         elif score == 0.0:
-            msg = f"❌ Verification Failed: {failed} pytest failures detected. Continuing iteration."
+            msg = f'❌ Verification Failed: {failed} pytest failures detected. Continuing iteration.'
         else:
-            msg = f"⚠️ Verification Incomplete: {passed}/{total} tests pass ({score * 100:.0f}%). Continuing iteration."
+            msg = f'⚠️ Verification Incomplete: {passed}/{total} tests pass ({score * 100:.0f}%). Continuing iteration.'
 
         return CriticResult(score=score, message=msg)

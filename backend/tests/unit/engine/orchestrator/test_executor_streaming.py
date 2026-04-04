@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import sys
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 from typing import Any, cast
+from unittest.mock import MagicMock
 
 from backend.engine.safety import OrchestratorSafetyManager
 
@@ -16,28 +16,27 @@ class _Safety:
 
 def test_executor_emits_streaming_chunk_actions(monkeypatch):
     """Executor should emit StreamingChunkAction events even when provider streaming is unavailable."""
-    from backend.engine.executor import OrchestratorExecutor
-
     # The executor keeps a proxy to a module name under the `app.*` namespace.
     # In unit tests we import via `backend.*`, so we register an alias to keep
     # the proxy resolvable.
     import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
 
-    sys.modules.setdefault("app.engine.function_calling", fc)
+    sys.modules.setdefault('app.engine.function_calling', fc)
 
     # Stub function calling to avoid depending on tool parsing details here.
     from backend.engine import executor as executor_module
 
     monkeypatch.setattr(
         executor_module.orchestrator_function_calling,
-        "response_to_actions",
+        'response_to_actions',
         lambda *args, **kwargs: [],
     )
 
     llm = MagicMock()
     llm.completion.return_value = SimpleNamespace(
-        id="r1",
-        choices=[SimpleNamespace(message=SimpleNamespace(content="hello world"))],
+        id='r1',
+        choices=[SimpleNamespace(message=SimpleNamespace(content='hello world'))],
     )
 
     planner = MagicMock()
@@ -50,7 +49,7 @@ def test_executor_emits_streaming_chunk_actions(monkeypatch):
         mcp_tools_provider=lambda: {},
     )
 
-    executor.execute({"messages": [], "stream": True}, event_stream)
+    executor.execute({'messages': [], 'stream': True}, event_stream)
 
     # At least one streaming event should be emitted.
     assert event_stream.add_event.call_count >= 1
@@ -67,10 +66,10 @@ def test_executor_content_to_str_supports_output_text_parts():
     )
 
     content = [
-        {"type": "output_text", "text": "Hello"},
-        {"type": "text", "text": " world"},
+        {'type': 'output_text', 'text': 'Hello'},
+        {'type': 'text', 'text': ' world'},
     ]
-    assert executor._content_to_str(content) == "Hello world"
+    assert executor._content_to_str(content) == 'Hello world'
 
 
 def test_executor_extract_last_user_text_supports_object_messages():
@@ -86,44 +85,45 @@ def test_executor_extract_last_user_text_supports_object_messages():
     messages = cast(
         list[dict[str, Any]],
         [
-        {"role": "system", "content": "sys"},
-        {
-            "role": "user",
-            "content": [{"type": "output_text", "text": "say hello back please"}],
-        },
+            {'role': 'system', 'content': 'sys'},
+            {
+                'role': 'user',
+                'content': [{'type': 'output_text', 'text': 'say hello back please'}],
+            },
         ],
     )
 
-    assert executor._extract_last_user_text(messages) == "say hello back please"
+    assert executor._extract_last_user_text(messages) == 'say hello back please'
 
 
 def test_async_execute_emits_real_streaming_chunks(monkeypatch):
     """async_execute should stream real chunks via astream and emit StreamingChunkAction."""
+    import backend.engine.function_calling as fc
     from backend.engine.executor import OrchestratorExecutor
 
-    import backend.engine.function_calling as fc
-    sys.modules.setdefault("app.engine.function_calling", fc)
+    sys.modules.setdefault('app.engine.function_calling', fc)
 
     from backend.engine import executor as executor_module
+
     monkeypatch.setattr(
         executor_module.orchestrator_function_calling,
-        "response_to_actions",
+        'response_to_actions',
         lambda *args, **kwargs: [],
     )
 
     # Build fake async streaming chunks (OpenAI-style format)
     async def fake_astream(**kwargs):
-        for token in ["Hello", ", ", "world", "!"]:
+        for token in ['Hello', ', ', 'world', '!']:
             yield {
-                "id": "chatcmpl-test",
-                "model": "test-model",
-                "choices": [{"delta": {"content": token}, "finish_reason": None}],
+                'id': 'chatcmpl-test',
+                'model': 'test-model',
+                'choices': [{'delta': {'content': token}, 'finish_reason': None}],
             }
         # Final chunk with finish_reason
         yield {
-            "id": "chatcmpl-test",
-            "model": "test-model",
-            "choices": [{"delta": {}, "finish_reason": "stop"}],
+            'id': 'chatcmpl-test',
+            'model': 'test-model',
+            'choices': [{'delta': {}, 'finish_reason': 'stop'}],
         }
 
     llm = MagicMock()
@@ -138,7 +138,7 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
         mcp_tools_provider=lambda: {},
     )
 
-    asyncio.run(executor.async_execute({"messages": []}, event_stream))
+    asyncio.run(executor.async_execute({'messages': []}, event_stream))
 
     # Should have emitted streaming chunks (4 content chunks + 1 final marker)
     assert event_stream.add_event.call_count == 5
@@ -148,55 +148,75 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
     chunks = [c[0][0] for c in calls]
 
     # First 4 are content chunks
-    assert chunks[0].chunk == "Hello"
-    assert chunks[1].chunk == ", "
-    assert chunks[2].chunk == "world"
-    assert chunks[3].chunk == "!"
-    assert chunks[3].accumulated == "Hello, world!"
+    assert chunks[0].chunk == 'Hello'
+    assert chunks[1].chunk == ', '
+    assert chunks[2].chunk == 'world'
+    assert chunks[3].chunk == '!'
+    assert chunks[3].accumulated == 'Hello, world!'
     assert not chunks[3].is_final
 
     # Last is the final marker
     assert chunks[4].is_final
-    assert chunks[4].accumulated == "Hello, world!"
+    assert chunks[4].accumulated == 'Hello, world!'
 
 
 def test_async_execute_accumulates_tool_calls(monkeypatch):
     """async_execute should accumulate streamed tool call deltas into complete tool calls."""
+    import backend.engine.function_calling as fc
     from backend.engine.executor import OrchestratorExecutor
     from backend.ledger.action import MessageAction
 
-    import backend.engine.function_calling as fc
-    sys.modules.setdefault("app.engine.function_calling", fc)
+    sys.modules.setdefault('app.engine.function_calling', fc)
 
     from backend.engine import executor as executor_module
+
     monkeypatch.setattr(
         executor_module.orchestrator_function_calling,
-        "response_to_actions",
+        'response_to_actions',
         lambda response, **kwargs: [
-            MessageAction(content="tool_call_detected", wait_for_response=True)
+            MessageAction(content='tool_call_detected', wait_for_response=True)
         ],
     )
 
     # Simulate streamed tool call deltas
     async def fake_astream(**kwargs):
         yield {
-            "id": "chatcmpl-tc",
-            "model": "test-model",
-            "choices": [{"delta": {"tool_calls": [
-                {"index": 0, "id": "call_abc", "function": {"name": "read_file", "arguments": '{"pa'}}
-            ]}}],
+            'id': 'chatcmpl-tc',
+            'model': 'test-model',
+            'choices': [
+                {
+                    'delta': {
+                        'tool_calls': [
+                            {
+                                'index': 0,
+                                'id': 'call_abc',
+                                'function': {'name': 'read_file', 'arguments': '{"pa'},
+                            }
+                        ]
+                    }
+                }
+            ],
         }
         yield {
-            "id": "chatcmpl-tc",
-            "model": "test-model",
-            "choices": [{"delta": {"tool_calls": [
-                {"index": 0, "function": {"arguments": 'th": "/tmp/test.py"}'}}
-            ]}}],
+            'id': 'chatcmpl-tc',
+            'model': 'test-model',
+            'choices': [
+                {
+                    'delta': {
+                        'tool_calls': [
+                            {
+                                'index': 0,
+                                'function': {'arguments': 'th": "/tmp/test.py"}'},
+                            }
+                        ]
+                    }
+                }
+            ],
         }
         yield {
-            "id": "chatcmpl-tc",
-            "model": "test-model",
-            "choices": [{"delta": {}, "finish_reason": "tool_calls"}],
+            'id': 'chatcmpl-tc',
+            'model': 'test-model',
+            'choices': [{'delta': {}, 'finish_reason': 'tool_calls'}],
         }
 
     llm = MagicMock()
@@ -209,7 +229,7 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
         mcp_tools_provider=lambda: {},
     )
 
-    result = asyncio.run(executor.async_execute({"messages": []}, MagicMock()))
+    result = asyncio.run(executor.async_execute({'messages': []}, MagicMock()))
 
     # The response should have assembled the tool call from fragments
     resp = result.response
@@ -217,9 +237,9 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
     assert resp.tool_calls is not None
     assert len(resp.tool_calls) == 1
     tc = resp.tool_calls[0]
-    assert tc["id"] == "call_abc"
-    assert tc["function"]["name"] == "read_file"
-    assert tc["function"]["arguments"] == '{"path": "/tmp/test.py"}'
+    assert tc['id'] == 'call_abc'
+    assert tc['function']['name'] == 'read_file'
+    assert tc['function']['arguments'] == '{"path": "/tmp/test.py"}'
 
 
 def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_progress(
@@ -230,15 +250,13 @@ def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_pro
     from backend.engine.streaming_checkpoint import StreamingCheckpoint
     from backend.ledger.observation import AgentStateChangedObservation
 
-    monkeypatch.setenv("APP_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
 
     event_stream = MagicMock()
-    event_stream.sid = "sid-1"
-    control_event = AgentStateChangedObservation("", agent_state=AgentState.FINISHED)
+    event_stream.sid = 'sid-1'
+    control_event = AgentStateChangedObservation('', agent_state=AgentState.FINISHED)
     control_event.id = 9
-    event_stream.search_events.return_value = [
-        control_event
-    ]
+    event_stream.search_events.return_value = [control_event]
 
     executor = OrchestratorExecutor(
         llm=MagicMock(),
@@ -247,14 +265,12 @@ def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_pro
         mcp_tools_provider=lambda: {},
     )
 
-    checkpoint = StreamingCheckpoint(
-        str(tmp_path / "streaming_checkpoints" / "sid-1")
-    )
-    checkpoint.begin({"messages": []}, anchor_event_id=5)
+    checkpoint = StreamingCheckpoint(str(tmp_path / 'streaming_checkpoints' / 'sid-1'))
+    checkpoint.begin({'messages': []}, anchor_event_id=5)
 
     resolved = executor._get_checkpoint(event_stream)
 
-    assert resolved.inspect_recovery().status == "clean"
+    assert resolved.inspect_recovery().status == 'clean'
     assert executor._recovery_blocked_reasons == {}
 
 
@@ -264,10 +280,10 @@ def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
     from backend.engine.executor import OrchestratorExecutor
     from backend.engine.streaming_checkpoint import StreamingCheckpoint
 
-    monkeypatch.setenv("APP_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
 
     event_stream = MagicMock()
-    event_stream.sid = "sid-2"
+    event_stream.sid = 'sid-2'
     event_stream.search_events.return_value = []
 
     executor = OrchestratorExecutor(
@@ -277,11 +293,9 @@ def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
         mcp_tools_provider=lambda: {},
     )
 
-    checkpoint = StreamingCheckpoint(
-        str(tmp_path / "streaming_checkpoints" / "sid-2")
-    )
-    checkpoint.begin({"messages": []}, anchor_event_id=5)
+    checkpoint = StreamingCheckpoint(str(tmp_path / 'streaming_checkpoints' / 'sid-2'))
+    checkpoint.begin({'messages': []}, anchor_event_id=5)
 
     executor._get_checkpoint(event_stream)
 
-    assert "sid-2" in executor._recovery_blocked_reasons
+    assert 'sid-2' in executor._recovery_blocked_reasons

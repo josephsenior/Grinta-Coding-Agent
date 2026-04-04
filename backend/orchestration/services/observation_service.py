@@ -4,15 +4,19 @@ import copy
 import os
 from typing import TYPE_CHECKING, Any
 
-from backend.orchestration.state.state import AgentState
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventSource
 from backend.ledger.observation import ErrorObservation, Observation
 from backend.ledger.serialization.event import truncate_content
+from backend.orchestration.state.state import AgentState
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
-    from backend.orchestration.services.pending_action_service import PendingActionService
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
+    from backend.orchestration.services.pending_action_service import (
+        PendingActionService,
+    )
     from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
@@ -27,11 +31,11 @@ async def transition_agent_state_logic(
     elif controller.state.agent_state == AgentState.USER_REJECTED:
         await controller.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
 
-    pipeline = getattr(controller, "tool_pipeline", None)
+    pipeline = getattr(controller, 'tool_pipeline', None)
     if ctx and pipeline:
         await pipeline.run_observe(ctx, observation)
-        if getattr(ctx, "blocked", False) is True:
-            telemetry = getattr(controller, "telemetry_service", None)
+        if getattr(ctx, 'blocked', False) is True:
+            telemetry = getattr(controller, 'telemetry_service', None)
             if telemetry is not None:
                 telemetry.handle_blocked_invocation(ctx.action, ctx)
             return
@@ -54,7 +58,7 @@ class ObservationService:
         observation_to_print = self._prepare_observation_for_logging(observation)
         log_level = self._get_log_level()
         controller.log(
-            log_level, str(observation_to_print), extra={"msg_type": "OBSERVATION"}
+            log_level, str(observation_to_print), extra={'msg_type': 'OBSERVATION'}
         )
         await self._handle_pending_action_observation(observation)
 
@@ -89,7 +93,7 @@ class ObservationService:
             )
         except Exception as exc:
             logger.warning(
-                "ObservationService action_post hook failed for %s: %s",
+                'ObservationService action_post hook failed for %s: %s',
                 type(pending_action).__name__,
                 exc,
                 exc_info=True,
@@ -107,9 +111,9 @@ class ObservationService:
         # Inform the hallucination detector that this file operation actually happened.
         # This feeds the state-based verification layer so it can distinguish real
         # file edits from hallucinated ones in subsequent turns.
-        
+
         # Delegate confirmation state transitions to confirmation service
-        confirmation_service = getattr(controller, "confirmation_service", None)
+        confirmation_service = getattr(controller, 'confirmation_service', None)
         if confirmation_service:
             await confirmation_service.handle_observation_for_pending_action(
                 observation, ctx
@@ -124,12 +128,16 @@ class ObservationService:
         """Compare pending action id and observation cause robustly."""
         if pending_action is None:
             return False
-        pending_id = getattr(pending_action, "id", None)
-        cause = getattr(observation, "cause", None)
+        pending_id = getattr(pending_action, 'id', None)
+        cause = getattr(observation, 'cause', None)
         if pending_id == cause:
             return True
         try:
-            return pending_id is not None and cause is not None and int(pending_id) == int(cause)
+            return (
+                pending_id is not None
+                and cause is not None
+                and int(pending_id) == int(cause)
+            )
         except (TypeError, ValueError):
             return False
 
@@ -140,14 +148,14 @@ class ObservationService:
         pending_action,
         observation: Observation,
     ) -> None:
-        pending_id = getattr(pending_action, "id", None) if pending_action else None
+        pending_id = getattr(pending_action, 'id', None) if pending_action else None
         message = (
-            "Observation cause "
-            f"{observation.cause!r} did not match pending action id {pending_id!r} "
-            f"for {type(observation).__name__}"
+            'Observation cause '
+            f'{observation.cause!r} did not match pending action id {pending_id!r} '
+            f'for {type(observation).__name__}'
         )
         logger.warning(message)
-        controller.log("warning", message, extra={"msg_type": "OBSERVATION_MISMATCH"})
+        controller.log('warning', message, extra={'msg_type': 'OBSERVATION_MISMATCH'})
 
     async def _recover_from_pending_observation_mismatch(
         self,
@@ -161,18 +169,18 @@ class ObservationService:
         """
         self._context.discard_invocation_context_for_action(pending_action)
         self._pending_service.set(None)
-        pid = getattr(pending_action, "id", None)
-        oc = getattr(observation, "cause", None)
+        pid = getattr(pending_action, 'id', None)
+        oc = getattr(observation, 'cause', None)
         msg = (
-            "The environment reported an observation that does not match the action "
-            "the agent is waiting on. Pending action id was "
-            f"{pid!r}; observation referred to {oc!r}. "
-            "Treat any in-flight tool work as uncertain: verify the workspace before "
-            "continuing, then choose a new approach if needed."
+            'The environment reported an observation that does not match the action '
+            'the agent is waiting on. Pending action id was '
+            f'{pid!r}; observation referred to {oc!r}. '
+            'Treat any in-flight tool work as uncertain: verify the workspace before '
+            'continuing, then choose a new approach if needed.'
         )
         err = ErrorObservation(
             content=msg,
-            error_id="OBSERVATION_PENDING_MISMATCH",
+            error_id='OBSERVATION_PENDING_MISMATCH',
         )
         self._context.emit_event(err, EventSource.ENVIRONMENT)
         self._trigger_post_resolution_step()
@@ -192,4 +200,4 @@ class ObservationService:
         return observation_to_print
 
     def _get_log_level(self) -> str:
-        return "info" if os.getenv("LOG_ALL_EVENTS") in ("true", "1") else "debug"
+        return 'info' if os.getenv('LOG_ALL_EVENTS') in ('true', '1') else 'debug'

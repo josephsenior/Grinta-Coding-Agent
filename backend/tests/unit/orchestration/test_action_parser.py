@@ -5,12 +5,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backend.ledger.action import Action
 from backend.orchestration.action_parser import (
-    ActionParser,
     ActionParseError,
+    ActionParser,
     ResponseParser,
 )
-from backend.ledger.action import Action
 
 
 class TestActionParseError:
@@ -18,24 +18,24 @@ class TestActionParseError:
 
     def test_stores_error_message(self):
         """Test stores error message."""
-        error = ActionParseError("test error")
-        assert error.error == "test error"
+        error = ActionParseError('test error')
+        assert error.error == 'test error'
 
     def test_str_returns_error_message(self):
         """Test __str__ returns error message."""
-        error = ActionParseError("parse failed")
-        assert str(error) == "parse failed"
+        error = ActionParseError('parse failed')
+        assert str(error) == 'parse failed'
 
     def test_is_exception_subclass(self):
         """Test is subclass of Exception."""
-        error = ActionParseError("test")
+        error = ActionParseError('test')
         assert isinstance(error, Exception)
 
     def test_can_be_raised(self):
         """Test can be raised and caught."""
         with pytest.raises(ActionParseError) as exc_info:
-            raise ActionParseError("deliberate error")
-        assert str(exc_info.value) == "deliberate error"
+            raise ActionParseError('deliberate error')
+        assert str(exc_info.value) == 'deliberate error'
 
 
 class TestResponseParser:
@@ -58,36 +58,36 @@ class TestResponseParser:
                 return MagicMock(spec=Action)
 
             def parse_response(self, response):
-                return ""
+                return ''
 
             def parse_action(self, action_str):
                 return MagicMock(spec=Action)
 
         parser = ConcreteParser()
-        assert hasattr(parser, "action_parsers")
+        assert hasattr(parser, 'action_parsers')
         assert parser.action_parsers == []
         assert isinstance(parser.action_parsers, list)
 
     def test_has_required_abstract_methods(self):
         """Test has all required abstract methods."""
         # Check parse method
-        assert hasattr(ResponseParser, "parse")
-        assert callable(getattr(ResponseParser, "parse"))
+        assert hasattr(ResponseParser, 'parse')
+        assert callable(getattr(ResponseParser, 'parse'))
 
         # Check parse_response method
-        assert hasattr(ResponseParser, "parse_response")
-        assert callable(getattr(ResponseParser, "parse_response"))
+        assert hasattr(ResponseParser, 'parse_response')
+        assert callable(getattr(ResponseParser, 'parse_response'))
 
         # Check parse_action method
-        assert hasattr(ResponseParser, "parse_action")
-        assert callable(getattr(ResponseParser, "parse_action"))
+        assert hasattr(ResponseParser, 'parse_action')
+        assert callable(getattr(ResponseParser, 'parse_action'))
 
     def test_subclass_must_implement_parse(self):
         """Test subclass must implement parse method."""
 
         class IncompleteParser(ResponseParser):
             def parse_response(self, response):
-                return ""
+                return ''
 
             def parse_action(self, action_str):
                 return MagicMock(spec=Action)
@@ -116,7 +116,7 @@ class TestResponseParser:
                 return MagicMock(spec=Action)
 
             def parse_response(self, response):
-                return ""
+                return ''
 
         with pytest.raises(TypeError):
             IncompleteParser()  # type: ignore[abstract]
@@ -129,7 +129,7 @@ class TestResponseParser:
                 return MagicMock(spec=Action)
 
             def parse_response(self, response):
-                return "action"
+                return 'action'
 
             def parse_action(self, action_str):
                 return MagicMock(spec=Action)
@@ -154,12 +154,12 @@ class TestActionParser:
     def test_has_required_abstract_methods(self):
         """Test has all required abstract methods."""
         # Check check_condition method
-        assert hasattr(ActionParser, "check_condition")
-        assert callable(getattr(ActionParser, "check_condition"))
+        assert hasattr(ActionParser, 'check_condition')
+        assert callable(getattr(ActionParser, 'check_condition'))
 
         # Check parse method
-        assert hasattr(ActionParser, "parse")
-        assert callable(getattr(ActionParser, "parse"))
+        assert hasattr(ActionParser, 'parse')
+        assert callable(getattr(ActionParser, 'parse'))
 
     def test_subclass_must_implement_check_condition(self):
         """Test subclass must implement check_condition method."""
@@ -186,7 +186,7 @@ class TestActionParser:
 
         class ConcreteActionParser(ActionParser):
             def check_condition(self, action_str):
-                return "test" in action_str.lower()
+                return 'test' in action_str.lower()
 
             def parse(self, action_str):
                 return MagicMock(spec=Action)
@@ -199,14 +199,14 @@ class TestActionParser:
 
         class ConcreteActionParser(ActionParser):
             def check_condition(self, action_str):
-                return action_str.startswith("cmd:")
+                return action_str.startswith('cmd:')
 
             def parse(self, action_str):
                 return MagicMock(spec=Action)
 
         parser = ConcreteActionParser()
-        assert parser.check_condition("cmd:ls") is True
-        assert parser.check_condition("think:foo") is False
+        assert parser.check_condition('cmd:ls') is True
+        assert parser.check_condition('think:foo') is False
 
     def test_concrete_parse_works(self):
         """Test concrete implementation parse works."""
@@ -221,6 +221,6 @@ class TestActionParser:
                 return mock_action
 
         parser = ConcreteActionParser()
-        result = parser.parse("test command")
-        assert hasattr(result, "command")
-        assert result.command == "test command"
+        result = parser.parse('test command')
+        assert hasattr(result, 'command')
+        assert result.command == 'test command'

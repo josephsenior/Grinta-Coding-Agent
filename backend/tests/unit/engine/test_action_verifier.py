@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from backend.engine.action_verifier import ActionVerifier
-from backend.ledger.action.files import FileEditAction
 from backend.ledger.action.commands import CmdRunAction
+from backend.ledger.action.files import FileEditAction
 from backend.ledger.action.message import MessageAction
-from backend.ledger.observation.commands import CmdOutputObservation, CmdOutputMetadata
+from backend.ledger.observation.commands import CmdOutputMetadata, CmdOutputObservation
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ class TestVerifyAction:
         verifier.verification_enabled = False
         ok, msg, obs = await verifier.verify_action(MagicMock(spec=FileEditAction))
         assert ok is True
-        assert "disabled" in msg.lower()
+        assert 'disabled' in msg.lower()
 
     @pytest.mark.asyncio
     async def test_non_file_action(self, verifier):
@@ -57,19 +57,19 @@ class TestVerifyAction:
     @pytest.mark.asyncio
     async def test_file_edit_exists(self, verifier):
         action = MagicMock(spec=FileEditAction)
-        action.path = "/tmp/test.py"
+        action.path = '/tmp/test.py'
 
         # First call: file exists check
         exists_obs = CmdOutputObservation(
-            content="FILE_EXISTS",
-            command="python3 ...",
+            content='FILE_EXISTS',
+            command='python3 ...',
             command_id=1,
             metadata=CmdOutputMetadata(exit_code=0),
         )
         # Second call: content check
         content_obs = CmdOutputObservation(
-            content="10 lines, 200 bytes",
-            command="python3 ...",
+            content='10 lines, 200 bytes',
+            command='python3 ...',
             command_id=2,
             metadata=CmdOutputMetadata(exit_code=0),
         )
@@ -77,16 +77,16 @@ class TestVerifyAction:
 
         ok, msg, obs = await verifier.verify_action(action)
         assert ok is True
-        assert "Verified" in msg
+        assert 'Verified' in msg
 
     @pytest.mark.asyncio
     async def test_file_edit_missing(self, verifier):
         action = MagicMock(spec=FileEditAction)
-        action.path = "/tmp/missing.py"
+        action.path = '/tmp/missing.py'
 
         exists_obs = CmdOutputObservation(
-            content="FILE_MISSING",
-            command="python3 ...",
+            content='FILE_MISSING',
+            command='python3 ...',
             command_id=1,
             metadata=CmdOutputMetadata(exit_code=0),
         )
@@ -94,22 +94,22 @@ class TestVerifyAction:
 
         ok, msg, obs = await verifier.verify_action(action)
         assert ok is False
-        assert "CRITICAL" in msg
+        assert 'CRITICAL' in msg
 
     @pytest.mark.asyncio
     async def test_file_edit_empty(self, verifier):
         action = MagicMock(spec=FileEditAction)
-        action.path = "/tmp/empty.py"
+        action.path = '/tmp/empty.py'
 
         exists_obs = CmdOutputObservation(
-            content="FILE_EXISTS",
-            command="check",
+            content='FILE_EXISTS',
+            command='check',
             command_id=1,
             metadata=CmdOutputMetadata(exit_code=0),
         )
         content_obs = CmdOutputObservation(
-            content="0 lines, 0 bytes",
-            command="check",
+            content='0 lines, 0 bytes',
+            command='check',
             command_id=2,
             metadata=CmdOutputMetadata(exit_code=0),
         )
@@ -117,14 +117,14 @@ class TestVerifyAction:
 
         ok, msg, obs = await verifier.verify_action(action)
         assert ok is True
-        assert "empty" in msg.lower()
+        assert 'empty' in msg.lower()
 
     @pytest.mark.asyncio
     async def test_runtime_error(self, verifier):
         action = MagicMock(spec=FileEditAction)
-        action.path = "/tmp/error.py"
-        verifier._run_runtime_action = AsyncMock(side_effect=RuntimeError("boom"))
+        action.path = '/tmp/error.py'
+        verifier._run_runtime_action = AsyncMock(side_effect=RuntimeError('boom'))
 
         ok, msg, obs = await verifier.verify_action(action)
         assert ok is False
-        assert "error" in msg.lower()
+        assert 'error' in msg.lower()

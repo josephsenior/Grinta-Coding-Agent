@@ -39,13 +39,13 @@ def iter_events_until_corrupt(
             event = event_store.get_event(idx)
         except FileNotFoundError:
             # Missing file: treat as a gap, stop to preserve ordering guarantees.
-            logger.warning("Event file missing at id=%s; stopping replay", idx)
+            logger.warning('Event file missing at id=%s; stopping replay', idx)
             return
         except (json.JSONDecodeError, ValueError) as exc:
-            logger.warning("Corrupt event at id=%s; stopping replay: %s", idx, exc)
+            logger.warning('Corrupt event at id=%s; stopping replay: %s', idx, exc)
             return
         except Exception as exc:  # pragma: no cover - defensive
-            logger.warning("Unexpected replay error at id=%s; stopping: %s", idx, exc)
+            logger.warning('Unexpected replay error at id=%s; stopping: %s', idx, exc)
             return
 
         if event_filter is not None and not event_filter.include(event):

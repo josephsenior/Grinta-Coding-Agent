@@ -3,9 +3,9 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock
 
-from backend.orchestration.services.event_router_service import EventRouterService
 from backend.core.schemas import AgentState
 from backend.ledger.action import PlaybookFinishAction
+from backend.orchestration.services.event_router_service import EventRouterService
 
 
 class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
@@ -32,7 +32,7 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
         self.service = EventRouterService(self.mock_controller)
 
     async def test_finish_calls_validation_service(self):
-        action = PlaybookFinishAction(outputs={"result": "done"})
+        action = PlaybookFinishAction(outputs={'result': 'done'})
         await self.service._handle_finish_action(action)
         self.mock_controller.task_validation_service.handle_finish.assert_awaited_once_with(
             action
@@ -42,15 +42,15 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_finish_allowed_when_validation_passes(self):
-        action = PlaybookFinishAction(outputs={"result": "done"})
+        action = PlaybookFinishAction(outputs={'result': 'done'})
         await self.service._handle_finish_action(action)
         self.mock_controller.set_agent_state_to.assert_called_once_with(
             AgentState.FINISHED
         )
-        self.mock_controller.log_task_audit.assert_called_once_with(status="success")
+        self.mock_controller.log_task_audit.assert_called_once_with(status='success')
 
     async def test_validation_failure_blocks_finish(self):
-        action = PlaybookFinishAction(outputs={"result": "done"})
+        action = PlaybookFinishAction(outputs={'result': 'done'})
         self.mock_controller.task_validation_service.handle_finish = AsyncMock(
             return_value=False
         )
@@ -59,5 +59,5 @@ class TestFinishGuard(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.log_task_audit.assert_not_called()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

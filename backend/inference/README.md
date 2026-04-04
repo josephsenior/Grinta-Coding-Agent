@@ -2,7 +2,7 @@
 
 ## Overview
 
-App's LLM system provides a robust, provider-agnostic abstraction layer using direct SDK clients for major providers (OpenAI, Anthropic, Google Gemini, and xAI Grok). This approach ensures maximum stability, performance, and access to the latest provider-specific features.
+Grinta's LLM system provides a robust, provider-agnostic abstraction layer using direct SDK clients for major providers (OpenAI, Anthropic, Google Gemini, and xAI Grok). This approach ensures maximum stability, performance, and access to the latest provider-specific features.
 
 ## Key Features
 
@@ -18,7 +18,7 @@ App's LLM system provides a robust, provider-agnostic abstraction layer using di
 
 ### Provider Auto-Resolver Pattern
 
-App uses an intelligent routing system that automatically detects providers and discovers local endpoints:
+Grinta uses an intelligent routing system that automatically detects providers and discovers local endpoints:
 
 ```
 User specifies model: "ollama/qwen2.5-coder" (canonical id)
@@ -227,12 +227,12 @@ if features.supports_reasoning_effort:
 | LM Studio | 1234 | ✓ | GUI-based local models |
 | vLLM | 8000 | ✓ | Production local deployment |
 
-**No configuration needed** - App automatically discovers running local providers:
+**No configuration needed** - Grinta automatically discovers running local providers:
 
 ```python
 # Just specify the model
 llm = LLM(model="ollama/llama3.2")
-# App automatically:
+# Grinta automatically:
 # 1. Detects provider is "ollama"
 # 2. Probes localhost:11434
 # 3. Verifies it's a valid LLM endpoint
@@ -255,7 +255,7 @@ export VLLM_BASE_URL="http://localhost:8000/v1"
 
 ### Base URL Resolution Priority
 
-When determining where to send API requests, App uses this priority order:
+When determining where to send API requests, Grinta uses this priority order:
 
 1. **Explicit** - Passed directly in code: `LLM(base_url="http://custom:9000")`
 2. **Environment** - Provider-specific env vars (e.g., `OLLAMA_HOST`)
@@ -271,7 +271,7 @@ os.environ["OLLAMA_HOST"] = "http://192.168.1.100:11434"
 llm = LLM(model="ollama/llama3.2")
 
 # Priority 3: Auto-discovery
-# (App automatically probes localhost:11434)
+# (Grinta automatically probes localhost:11434)
 llm = LLM(model="ollama/llama3.2")
 
 # Priority 4: Default (for cloud providers)
@@ -330,7 +330,7 @@ LLM_API_VERSION=2024-12-01
 
 ### Step 1: Add Provider Config
 
-Edit `App/core/config/provider_config.py`:
+Edit `Grinta/core/config/provider_config.py`:
 
 ```python
 configs['newprovider'] = ProviderConfig(
@@ -348,7 +348,7 @@ configs['newprovider'] = ProviderConfig(
 
 ### Step 2: Add Feature Patterns (if needed)
 
-Edit `App/llm/model_features.py`:
+Edit `Grinta/llm/model_features.py`:
 
 ```python
 FUNCTION_CALLING_PATTERNS: list[str] = [
@@ -647,7 +647,7 @@ caching_prompt = true  # 35-50% cost savings
 
 ```bash
 # Check accumulated costs
-tail -f logs/App.log | grep "Accumulated Cost"
+tail -f logs/Grinta.log | grep "Accumulated Cost"
 
 # Or via Grafana
 open http://localhost:3001/grafana
@@ -720,7 +720,7 @@ ollama serve
 # Pull model
 ollama pull llama3.3:70b
 
-# Configure App
+# Configure Grinta
 LLM_MODEL=ollama/llama3.3:70b
 OLLAMA_BASE_URL=http://localhost:11434
 ```

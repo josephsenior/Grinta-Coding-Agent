@@ -9,20 +9,20 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from backend.inference.llm import LLM
 
+from backend.context.compactor.compactor import BaseLLMCompactor, Compaction
+from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.ledger.action import Action, MessageAction
 from backend.ledger.action.agent import CondensationAction, TaskTrackingAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import ErrorObservation, Observation
-from backend.context.compactor.compactor import BaseLLMCompactor, Compaction
-from backend.context.view import View
 
-_CRITICAL_ERROR_KEYWORDS = ("critical", "crash", "fatal", "stuck")
+_CRITICAL_ERROR_KEYWORDS = ('critical', 'crash', 'fatal', 'stuck')
 
 
 class SmartCompactor(BaseLLMCompactor):
@@ -58,18 +58,18 @@ class SmartCompactor(BaseLLMCompactor):
         self.recency_bonus_window = recency_bonus_window
 
         logger.info(
-            "SmartCompactor initialized: max_size=%s, threshold=%s, llm=%s",
+            'SmartCompactor initialized: max_size=%s, threshold=%s, llm=%s',
             max_size,
             importance_threshold,
-            llm.config.model if llm else "none",
+            llm.config.model if llm else 'none',
         )
 
     @staticmethod
     def _get_extra_config_args(config: Any) -> dict[str, Any]:
         """Get extra configuration arguments for the smart compactor."""
         return {
-            "importance_threshold": getattr(config, "importance_threshold", 0.6),
-            "recency_bonus_window": getattr(config, "recency_bonus_window", 20),
+            'importance_threshold': getattr(config, 'importance_threshold', 0.6),
+            'recency_bonus_window': getattr(config, 'recency_bonus_window', 20),
         }
 
     def get_compaction(self, view: View) -> Compaction:
@@ -106,14 +106,12 @@ class SmartCompactor(BaseLLMCompactor):
         pruned_event_ids = sorted(all_event_ids - events_to_keep)
 
         logger.info(
-            "SmartCompactor: Keeping %s events, pruning %s events",
+            'SmartCompactor: Keeping %s events, pruning %s events',
             len(events_to_keep),
             len(pruned_event_ids),
         )
 
-        return Compaction(
-            action=CondensationAction(pruned_event_ids=pruned_event_ids)
-        )
+        return Compaction(action=CondensationAction(pruned_event_ids=pruned_event_ids))
 
     def _identify_essential_events(self, events: list[Event]) -> set[int]:
         """Identify essential events that must always be kept.
@@ -130,7 +128,11 @@ class SmartCompactor(BaseLLMCompactor):
             essential.add(event.id)
 
         first_user = next(
-            (e for e in events if isinstance(e, MessageAction) and e.source == EventSource.USER),
+            (
+                e
+                for e in events
+                if isinstance(e, MessageAction) and e.source == EventSource.USER
+            ),
             None,
         )
         if first_user:
@@ -152,8 +154,12 @@ class SmartCompactor(BaseLLMCompactor):
             ):
                 essential.add(event.id)
 
-    def _anchor_active_plan_events(self, events: list[Event], essential: set[int]) -> None:
-        """Load .app/active_plan.json and mark the most recent TaskTrackingAction
+    def _anchor_active_plan_events(
+        self, events: list[Event], essential: set[int]
+    ) -> None:
+        """Anchor the active plan's TaskTrackingAction as essential.
+
+        Loads .app/active_plan.json and marks the most recent TaskTrackingAction
         event as essential. This creates a hard condensation anchor so the LLM
         always wakes up after condensation knowing exactly which task it was on.
         """
@@ -165,7 +171,9 @@ class SmartCompactor(BaseLLMCompactor):
 
     def _load_in_progress_task_ids(self) -> set[str]:
         """Load in-progress task IDs from .app/active_plan.json, or empty set."""
-        plan_path = Path(os.environ.get("APP_WORKSPACE_DIR", ".")) / ".app" / "active_plan.json"
+        plan_path = (
+            Path(os.environ.get('APP_WORKSPACE_DIR', '.')) / '.grinta' / 'active_plan.json'
+        )
         tasks = self._parse_tasks_from_plan(plan_path)
         return self._extract_in_progress_ids(tasks)
 
@@ -174,29 +182,33 @@ class SmartCompactor(BaseLLMCompactor):
         if not plan_path.exists():
             return []
         try:
-            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan = json.loads(plan_path.read_text(encoding='utf-8'))
         except (json.JSONDecodeError, OSError):
             return []
         if isinstance(plan, dict):
-            return plan.get("tasks", [])
+            return plan.get('tasks', [])
         return plan if isinstance(plan, list) else []
 
     def _extract_in_progress_ids(self, tasks: list[Any]) -> set[str]:
         """Extract IDs of tasks with status 'in_progress'."""
         ids: set[str] = set()
         for task in tasks:
-            if isinstance(task, dict) and task.get("status") == "in_progress":
-                tid = task.get("id") or task.get("title") or ""
+            if isinstance(task, dict) and task.get('status') == 'in_progress':
+                tid = task.get('id') or task.get('title') or ''
                 if tid:
                     ids.add(str(tid))
         return ids
 
-    def _anchor_last_task_tracker(self, events: list[Event], essential: set[int]) -> None:
+    def _anchor_last_task_tracker(
+        self, events: list[Event], essential: set[int]
+    ) -> None:
         """Anchor the last TaskTrackingAction when no in-progress tasks exist."""
         for event in reversed(events):
             if isinstance(event, TaskTrackingAction):
                 essential.add(event.id)
-                logger.debug("SmartCompactor: anchored last TaskTrackingAction id=%s", event.id)
+                logger.debug(
+                    'SmartCompactor: anchored last TaskTrackingAction id=%s', event.id
+                )
                 break
 
     def _anchor_by_task_ids(
@@ -205,11 +217,12 @@ class SmartCompactor(BaseLLMCompactor):
         """Anchor the most recent TaskTrackingAction that references an in-progress task."""
         for event in reversed(events):
             if isinstance(event, TaskTrackingAction):
-                content = getattr(event, "content", "") or ""
+                content = getattr(event, 'content', '') or ''
                 if any(tid in content for tid in in_progress_task_ids):
                     essential.add(event.id)
                     logger.debug(
-                        "SmartCompactor: anchored in-progress TaskTrackingAction id=%s", event.id
+                        'SmartCompactor: anchored in-progress TaskTrackingAction id=%s',
+                        event.id,
                     )
                     return
         self._anchor_last_task_tracker(events, essential)
@@ -273,7 +286,7 @@ class SmartCompactor(BaseLLMCompactor):
             return 1.0
         if isinstance(event, ErrorObservation):
             return 0.8
-        if isinstance(event, Action) and getattr(event, "runnable", False):
+        if isinstance(event, Action) and getattr(event, 'runnable', False):
             return 0.7
         if isinstance(event, Observation) and len(event.content) > 500:
             return 0.6
@@ -290,7 +303,7 @@ class SmartCompactor(BaseLLMCompactor):
 
         """
         if self.llm is None:
-            logger.debug("SmartCompactor: LLM not configured; skipping batch scoring.")
+            logger.debug('SmartCompactor: LLM not configured; skipping batch scoring.')
             return {}
 
         try:
@@ -299,7 +312,7 @@ class SmartCompactor(BaseLLMCompactor):
 
             # Get LLM response
             response = self.llm.completion(
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{'role': 'user', 'content': prompt}],
                 temperature=0.3,
             )
 
@@ -307,7 +320,7 @@ class SmartCompactor(BaseLLMCompactor):
             return self._parse_llm_scores(response, events)
 
         except Exception as e:
-            logger.warning("LLM scoring failed, using heuristics: %s", e)
+            logger.warning('LLM scoring failed, using heuristics: %s', e)
             return self._heuristic_scoring(events)
 
     def _create_scoring_prompt(self, events: list[Event]) -> str:
@@ -325,7 +338,7 @@ class SmartCompactor(BaseLLMCompactor):
         for i, event in enumerate(events):
             event_type = type(event).__name__
             event_content = self._get_event_summary(event)
-            event_summaries.append(f"{i}. [{event_type}] {event_content}")
+            event_summaries.append(f'{i}. [{event_type}] {event_content}')
 
         return f"""Score the importance of these conversation events for an autonomous agent task.
 
@@ -352,12 +365,12 @@ Respond ONLY with a JSON array of scores in order:
             Summary string (truncated to 100 chars)
 
         """
-        if hasattr(event, "content"):
+        if hasattr(event, 'content'):
             return str(event.content)[:100]
-        if hasattr(event, "command"):
-            return f"Command: {event.command[:50]}"
-        if hasattr(event, "code"):
-            return f"Code: {event.code[:50]}"
+        if hasattr(event, 'command'):
+            return f'Command: {event.command[:50]}'
+        if hasattr(event, 'code'):
+            return f'Code: {event.code[:50]}'
         return str(event)[:100]
 
     def _parse_llm_scores(self, response, events: list[Event]) -> dict[int, float]:
@@ -372,16 +385,16 @@ Respond ONLY with a JSON array of scores in order:
 
         """
         try:
-            choices = getattr(response, "choices", None)
+            choices = getattr(response, 'choices', None)
             if not choices or len(choices) == 0:
-                raise ValueError("LLM response has no choices")
+                raise ValueError('LLM response has no choices')
             content = choices[0].message.content
 
             # Extract JSON array from response
             # Handle both raw array and wrapped in markdown
-            if "```" in content:
-                json_str = content.split("```")[1].strip()
-                if json_str.startswith("json"):
+            if '```' in content:
+                json_str = content.split('```')[1].strip()
+                if json_str.startswith('json'):
                     json_str = json_str[4:].strip()
             else:
                 json_str = content.strip()
@@ -397,7 +410,7 @@ Respond ONLY with a JSON array of scores in order:
             return scores
 
         except Exception as e:
-            logger.warning("Failed to parse LLM scores: %s", e)
+            logger.warning('Failed to parse LLM scores: %s', e)
             return self._heuristic_scoring(events)
 
     def _select_events_to_keep(
@@ -470,7 +483,7 @@ Respond ONLY with a JSON array of scores in order:
             if event.id not in keep_ids:
                 continue
 
-            if isinstance(event, Action) and hasattr(event, "id"):
+            if isinstance(event, Action) and hasattr(event, 'id'):
                 self._pair_observation_for_action(events, i, event, paired_ids)
             elif isinstance(event, Observation) and event.cause is not None:
                 self._pair_action_for_observation(events, i, event, paired_ids)

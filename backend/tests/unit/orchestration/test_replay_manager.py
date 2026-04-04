@@ -2,24 +2,22 @@
 
 import hashlib
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 from typing import cast
+from unittest.mock import MagicMock
 
-
-from backend.orchestration.replay import ReplayDivergence, ReplayManager
 from backend.ledger.action.message import MessageAction
-from backend.ledger.event import EventSource
-from backend.ledger.event import Event
+from backend.ledger.event import Event, EventSource
 from backend.ledger.observation.empty import NullObservation
+from backend.orchestration.replay import ReplayDivergence, ReplayManager
 
 
-def _make_action(source=EventSource.USER, content="test"):
+def _make_action(source=EventSource.USER, content='test'):
     a = MessageAction(content=content)
     a.source = source
     return a
 
 
-def _make_observation(source=EventSource.ENVIRONMENT, content="obs"):
+def _make_observation(source=EventSource.ENVIRONMENT, content='obs'):
     o = NullObservation(content=content)
     o.source = source
     return o
@@ -29,16 +27,16 @@ class TestReplayDivergence:
     def test_fields(self):
         d = ReplayDivergence(
             index=5,
-            action_type="MessageAction",
-            expected_hash="abc123",
-            actual_hash="def456",
-            message="Diverged at 5",
+            action_type='MessageAction',
+            expected_hash='abc123',
+            actual_hash='def456',
+            message='Diverged at 5',
         )
         assert d.index == 5
-        assert d.action_type == "MessageAction"
-        assert d.expected_hash == "abc123"
-        assert d.actual_hash == "def456"
-        assert d.message == "Diverged at 5"
+        assert d.action_type == 'MessageAction'
+        assert d.expected_hash == 'abc123'
+        assert d.actual_hash == 'def456'
+        assert d.message == 'Diverged at 5'
 
 
 class TestReplayManagerInit:
@@ -60,7 +58,7 @@ class TestReplayManagerInit:
         assert rm.replay_mode is True
 
     def test_filters_null_observations(self):
-        null_obs = NullObservation(content="")
+        null_obs = NullObservation(content='')
         null_obs.source = EventSource.USER
         action = _make_action()
         rm = ReplayManager([null_obs, action])
@@ -68,9 +66,9 @@ class TestReplayManagerInit:
         assert len(rm.replay_events) == 1
 
     def test_disables_wait_for_response(self):
-        a1 = _make_action(content="msg1")
+        a1 = _make_action(content='msg1')
         a1.wait_for_response = True
-        a2 = _make_action(content="msg2")
+        a2 = _make_action(content='msg2')
         rm = ReplayManager([a1, a2])
         # First action's wait_for_response should be set to False
         first_action = cast(MessageAction, rm.replay_events[0])
@@ -96,18 +94,18 @@ class TestShouldReplay:
 
 class TestStep:
     def test_returns_action(self):
-        action = _make_action(content="first")
+        action = _make_action(content='first')
         rm = ReplayManager([action])
         result = rm.step()
-        assert cast(MessageAction, result).content == "first"
+        assert cast(MessageAction, result).content == 'first'
         assert rm.replay_index == 1
 
     def test_multiple_steps(self):
-        a1 = _make_action(content="first")
-        a2 = _make_action(content="second")
+        a1 = _make_action(content='first')
+        a2 = _make_action(content='second')
         rm = ReplayManager([a1, a2])
-        assert cast(MessageAction, rm.step()).content == "first"
-        assert cast(MessageAction, rm.step()).content == "second"
+        assert cast(MessageAction, rm.step()).content == 'first'
+        assert cast(MessageAction, rm.step()).content == 'second'
         assert rm.replay_index == 2
 
 
@@ -125,7 +123,7 @@ class TestVerifyObservation:
         rm = ReplayManager([action])
         rm._verify_determinism = False
         rm.step()
-        result = rm.verify_observation(MagicMock(content="different"))
+        result = rm.verify_observation(MagicMock(content='different'))
         assert result is True
 
     def test_no_events(self):
@@ -145,10 +143,10 @@ class TestDivergences:
         rm._divergences.append(
             ReplayDivergence(
                 index=0,
-                action_type="Test",
-                expected_hash="a",
-                actual_hash="b",
-                message="diverged",
+                action_type='Test',
+                expected_hash='a',
+                actual_hash='b',
+                message='diverged',
             )
         )
         assert rm.is_deterministic is False
@@ -159,38 +157,38 @@ class TestSnapshot:
     def test_initial_snapshot(self):
         rm = ReplayManager(None)
         snap = rm.snapshot()
-        assert snap["replay_mode"] is False
-        assert snap["replay_index"] == 0
-        assert snap["total_events"] == 0
-        assert snap["divergence_count"] == 0
-        assert snap["is_deterministic"] is True
+        assert snap['replay_mode'] is False
+        assert snap['replay_index'] == 0
+        assert snap['total_events'] == 0
+        assert snap['divergence_count'] == 0
+        assert snap['is_deterministic'] is True
 
     def test_active_replay_snapshot(self):
         action = _make_action()
         rm = ReplayManager([action])
         snap = rm.snapshot()
-        assert snap["replay_mode"] is True
-        assert snap["total_events"] == 1
+        assert snap['replay_mode'] is True
+        assert snap['total_events'] == 1
 
 
 class TestContentHash:
     def test_none_event(self):
-        assert ReplayManager._content_hash(None) == "none"
+        assert ReplayManager._content_hash(None) == 'none'
 
     def test_event_with_content(self):
-        event = SimpleNamespace(content="hello")
+        event = SimpleNamespace(content='hello')
         h = ReplayManager._content_hash(cast(Event, event))
-        expected = hashlib.sha256(b"hello").hexdigest()
+        expected = hashlib.sha256(b'hello').hexdigest()
         assert h == expected
 
     def test_event_with_none_content(self):
         event = SimpleNamespace(content=None)
         h = ReplayManager._content_hash(cast(Event, event))
-        expected = hashlib.sha256(b"").hexdigest()
+        expected = hashlib.sha256(b'').hexdigest()
         assert h == expected
 
     def test_event_without_content_attr(self):
         event = SimpleNamespace()
         h = ReplayManager._content_hash(cast(Event, event))
-        expected = hashlib.sha256(b"").hexdigest()
+        expected = hashlib.sha256(b'').hexdigest()
         assert h == expected

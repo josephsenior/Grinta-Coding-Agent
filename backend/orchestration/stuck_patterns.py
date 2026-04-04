@@ -8,12 +8,10 @@ and use eq_no_pid for comparison.
 from __future__ import annotations
 
 from backend.core.logger import app_logger as logger
-from backend.ledger.action.action import Action
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import CmdOutputObservation
-from backend.ledger.observation.agent import AgentCondensationObservation
 from backend.ledger.observation.error import ErrorObservation
 from backend.ledger.observation.observation import Observation
 
@@ -54,7 +52,7 @@ def is_stuck_repeating_action_observation(
         if check_actions_equal(last_actions) and check_observations_equal(
             last_observations
         ):
-            logger.warning("Action, Observation loop detected")
+            logger.warning('Action, Observation loop detected')
             return True
     return False
 
@@ -78,7 +76,7 @@ def check_simple_error_observations(last_observations: list[Event]) -> bool:
     if len(last_observations) < 3:
         return False
     if all(isinstance(obs, ErrorObservation) for obs in last_observations[:3]):
-        logger.warning("Action, ErrorObservation loop detected")
+        logger.warning('Action, ErrorObservation loop detected')
         return True
     return False
 
@@ -147,6 +145,6 @@ def is_stuck_monologue(filtered_history: list[Event]) -> bool:
                 for event in filtered_history[start_index + 1 : end_index]
             )
             if not has_observation_between:
-                logger.warning("Repeated MessageAction with source=AGENT detected")
+                logger.warning('Repeated MessageAction with source=AGENT detected')
                 return True
     return False

@@ -11,8 +11,8 @@ from typing import Literal, cast
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from backend.core.config.agent_config import AgentConfig
-from backend.core.config.extended_config import ExtendedConfig
 from backend.core.config.app_config import AppConfig
+from backend.core.config.extended_config import ExtendedConfig
 from backend.core.config.llm_config import LLMConfig
 from backend.core.config.mcp_config import MCPConfig
 from backend.core.config.runtime_config import RuntimeConfig
@@ -61,13 +61,13 @@ def rebuild_config_models() -> None:
 
     # 2. Compactor configs (depend on LLMConfig)
     compactor_ns = {
-        "LLMConfig": LLMConfig,
-        "Field": Field,
-        "BaseModel": BaseModel,
-        "ConfigDict": ConfigDict,
-        "ValidationError": ValidationError,
-        "Literal": Literal,
-        "cast": cast,
+        'LLMConfig': LLMConfig,
+        'Field': Field,
+        'BaseModel': BaseModel,
+        'ConfigDict': ConfigDict,
+        'ValidationError': ValidationError,
+        'Literal': Literal,
+        'cast': cast,
     }
     for compactor_cls in (
         NoOpCompactorConfig,

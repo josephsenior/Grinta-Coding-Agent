@@ -37,8 +37,8 @@ def find_candidate_files(root: Path) -> list[Path]:
 
     return [
         path
-        for path in root.rglob("*")
-        if path.is_file() and path.suffix.lower() in {".json", ".jsonl"}
+        for path in root.rglob('*')
+        if path.is_file() and path.suffix.lower() in {'.json', '.jsonl'}
     ]
 
 
@@ -66,7 +66,7 @@ def _sanitize_dict(obj: dict) -> object | None:
 
 def _is_null_event(obj: dict) -> bool:
     """Check if this is a null event that should be dropped."""
-    return obj.get("observation") == "null" or obj.get("action") == "null"
+    return obj.get('observation') == 'null' or obj.get('action') == 'null'
 
 
 def _process_dict_contents(obj: dict) -> dict:
@@ -95,7 +95,7 @@ def _should_drop_cleaned_value(cleaned: object, original: object, key: str) -> b
     """Determine if a cleaned value should be dropped."""
     if cleaned is None:
         # Drop if it's a container type or a special key
-        return isinstance(original, dict | list) or key in {"observation", "action"}
+        return isinstance(original, dict | list) or key in {'observation', 'action'}
     return False
 
 
@@ -121,14 +121,14 @@ def _sanitize_list(obj: list) -> list:
 
 def _sanitize_primitive(obj: object) -> object | None:
     """Sanitize a primitive object."""
-    return None if obj == "null" else obj
+    return None if obj == 'null' else obj
 
 
 def _read_file_content(path: str | Path) -> str | None:
     """Read file content and return it, or None if failed."""
     try:
         path = str(path)
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding='utf-8') as f:
             return f.read()
     except Exception:
         return None
@@ -136,7 +136,7 @@ def _read_file_content(path: str | Path) -> str | None:
 
 def _is_jsonl_file(path: str | Path) -> bool:
     """Check if file is a JSONL file."""
-    return str(path).lower().endswith(".jsonl")
+    return str(path).lower().endswith('.jsonl')
 
 
 def _process_jsonl_content(raw: str) -> tuple[list, list, bool]:
@@ -158,22 +158,22 @@ def _process_jsonl_content(raw: str) -> tuple[list, list, bool]:
 
 def _write_jsonl_file(path: str, sanitized: list) -> None:
     """Write sanitized content to JSONL file."""
-    with open(path, "w", encoding="utf-8") as f:
-        f.writelines(json.dumps(item, ensure_ascii=False) + "\n" for item in sanitized)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.writelines(json.dumps(item, ensure_ascii=False) + '\n' for item in sanitized)
 
 
 def _process_trajectory_data(data: dict[str, Any]) -> tuple[dict[str, Any], bool]:
     """Process data with trajectory field."""
     original = json.dumps(data, sort_keys=True)
-    sanitized_traj = sanitize_json_content(data["trajectory"])
-    data["trajectory"] = [] if sanitized_traj is None else sanitized_traj
+    sanitized_traj = sanitize_json_content(data['trajectory'])
+    data['trajectory'] = [] if sanitized_traj is None else sanitized_traj
     changed = json.dumps(data, sort_keys=True) != original
     return data, changed
 
 
 def _write_json_file(path: str, data: dict | None) -> None:
     """Write data to JSON file."""
-    with open(path, "w", encoding="utf-8") as f:
+    with open(path, 'w', encoding='utf-8') as f:
         if data is None:
             json.dump({}, f, ensure_ascii=False, indent=2)
         else:
@@ -186,7 +186,7 @@ def _process_regular_json_data(
     """Process regular JSON data."""
     sanitized_raw = sanitize_json_content(data)
     if sanitized_raw is not None and not isinstance(sanitized_raw, dict):
-        raise ValueError("Sanitization must produce a dictionary or None")
+        raise ValueError('Sanitization must produce a dictionary or None')
     sanitized = sanitized_raw
     changed = sanitized is None or json.dumps(sanitized, sort_keys=True) != json.dumps(
         data, sort_keys=True
@@ -208,8 +208,8 @@ def _process_json_file(raw: str, path: str | Path, apply: bool) -> bool:
 
     if (
         isinstance(data, dict)
-        and "trajectory" in data
-        and isinstance(data["trajectory"], list)
+        and 'trajectory' in data
+        and isinstance(data['trajectory'], list)
     ):
         # Process trajectory data
         data, changed = _process_trajectory_data(data)
@@ -270,15 +270,15 @@ def _parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     """Parse command line arguments."""
     p = argparse.ArgumentParser()
     p.add_argument(
-        "--paths",
-        "-p",
-        nargs="+",
-        default=["tests/runtime/trajs"],
-        help="Paths to scan",
+        '--paths',
+        '-p',
+        nargs='+',
+        default=['tests/runtime/trajs'],
+        help='Paths to scan',
     )
-    p.add_argument("--apply", action="store_true", help="Write changes to disk")
+    p.add_argument('--apply', action='store_true', help='Write changes to disk')
     p.add_argument(
-        "--dry-run", action="store_true", help="Show changes without writing"
+        '--dry-run', action='store_true', help='Show changes without writing'
     )
     return p.parse_args(argv)
 
@@ -299,17 +299,17 @@ def _process_files(files: list[Path], apply: bool) -> list[str]:
 def _print_summary(files: list[Path], changed_files: list[str]) -> None:
     """Print summary of processing results."""
     if changed_files:
-        preview = "\n".join(f"  - {path}" for path in changed_files[:20])
-        print("Changed files:")
+        preview = '\n'.join(f'  - {path}' for path in changed_files[:20])
+        print('Changed files:')
         print(preview)
         remaining = max(0, len(changed_files) - 20)
         if remaining:
-            print(f"  ... and {remaining} more")
+            print(f'  ... and {remaining} more')
     else:
-        print("No files required sanitization.")
+        print('No files required sanitization.')
 
-    print(f"Scanned {len(files)} files; {len(changed_files)} were modified.")
+    print(f'Scanned {len(files)} files; {len(changed_files)} were modified.')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(main())

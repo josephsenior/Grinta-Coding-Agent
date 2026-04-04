@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-
-from backend.orchestration.orchestration_config import OrchestrationConfig, OrchestrationServices
-from backend.orchestration.agent import Agent
-from backend.orchestration.state.state import State
 from backend.ledger import EventStream
+from backend.orchestration.agent import Agent
+from backend.orchestration.orchestration_config import (
+    OrchestrationConfig,
+    OrchestrationServices,
+)
+from backend.orchestration.state.state import State
 
 
 class TestOrchestrationConfig:
@@ -74,11 +76,11 @@ class TestOrchestrationConfig:
             conversation_stats=mock_stats,
             iteration_delta=15,
             budget_per_task_delta=100.5,
-            agent_to_llm_config={"agent1": MagicMock()},
-            agent_configs={"agent1": MagicMock()},
-            sid="session_123",
+            agent_to_llm_config={'agent1': MagicMock()},
+            agent_configs={'agent1': MagicMock()},
+            sid='session_123',
             file_store=mock_file_store,
-            user_id="user_456",
+            user_id='user_456',
             confirmation_mode=True,
             initial_state=mock_state,
             headless_mode=False,
@@ -88,8 +90,8 @@ class TestOrchestrationConfig:
         )
 
         assert config.budget_per_task_delta == 100.5
-        assert config.sid == "session_123"
-        assert config.user_id == "user_456"
+        assert config.sid == 'session_123'
+        assert config.user_id == 'user_456'
         assert config.confirmation_mode is True
         assert config.headless_mode is False
         assert config.replay_events is not None
@@ -166,7 +168,7 @@ class TestOrchestrationServices:
         service_attrs = [
             getattr(services, attr)
             for attr in dir(services)
-            if not attr.startswith("_") and not callable(getattr(services, attr))
+            if not attr.startswith('_') and not callable(getattr(services, attr))
         ]
 
         assert len({id(service) for service in service_attrs}) == 25
@@ -192,9 +194,9 @@ class TestOrchestrationServices:
 
         # Services built on context
         from backend.orchestration.services import (
+            BudgetGuardService,
             IterationService,
             SafetyService,
-            BudgetGuardService,
         )
 
         assert isinstance(services.iteration, IterationService)
@@ -242,4 +244,3 @@ class TestOrchestrationServices:
         assert services.action is not None
         assert services.pending_action is not None
         assert services.confirmation is not None
-

@@ -6,4 +6,4 @@ and proper error formatting. Fully self-contained implementation.
 
 from backend.validation.code_quality.linter import DefaultLinter, LintError, LintResult
 
-__all__ = ["DefaultLinter", "LintResult", "LintError"]
+__all__ = ['DefaultLinter', 'LintResult', 'LintError']

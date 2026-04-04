@@ -32,9 +32,9 @@ def run_git_cmd(cmd: str, cwd: str) -> str:
         capture_output=True,
         cwd=cwd,
     )
-    byte_content = result.stderr or result.stdout or b""
+    byte_content = result.stderr or result.stdout or b''
     if result.returncode != 0:
-        msg = f"error_running_cmd:{result.returncode}:{byte_content.decode()}"
+        msg = f'error_running_cmd:{result.returncode}:{byte_content.decode()}'
         raise RuntimeError(
             msg,
         )
@@ -59,9 +59,9 @@ def get_valid_git_ref(repo_dir: str) -> str | None:
     refs = []
     try:
         current_branch = run_git_cmd(
-            "git --no-pager rev-parse --abbrev-ref HEAD", repo_dir
+            'git --no-pager rev-parse --abbrev-ref HEAD', repo_dir
         )
-        refs.append(f"origin/{current_branch}")
+        refs.append(f'origin/{current_branch}')
     except RuntimeError:
         pass
     try:
@@ -73,17 +73,17 @@ def get_valid_git_ref(repo_dir: str) -> str | None:
             .strip()
         )
         ref_non_default_branch = f'$(git --no-pager merge-base HEAD "$(git --no-pager rev-parse --abbrev-ref origin/{default_branch})")'
-        ref_default_branch = f"origin/{default_branch}"
+        ref_default_branch = f'origin/{default_branch}'
         refs.extend((ref_non_default_branch, ref_default_branch))
     except RuntimeError:
         pass
     ref_new_repo = (
-        "$(git --no-pager rev-parse --verify 4b825dc642cb6eb9a060e54bf8d69288fbee4904)"
+        '$(git --no-pager rev-parse --verify 4b825dc642cb6eb9a060e54bf8d69288fbee4904)'
     )
     refs.append(ref_new_repo)
     for ref in refs:
         try:
-            return run_git_cmd(f"git --no-pager rev-parse --verify {ref}", repo_dir)
+            return run_git_cmd(f'git --no-pager rev-parse --verify {ref}', repo_dir)
         except RuntimeError:
             continue
     return None

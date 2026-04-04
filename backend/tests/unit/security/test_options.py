@@ -1,8 +1,9 @@
 """Tests for backend.security.options — security analyzer registry."""
 
+from typing import Any, cast
+
 import pytest
 
-from typing import Any, cast
 from backend.security.analyzer import SecurityAnalyzer
 from backend.security.options import SecurityAnalyzers, get_security_analyzer
 
@@ -16,11 +17,11 @@ class TestSecurityAnalyzersRegistry:
 
     def test_default_analyzer_registered(self):
         """Test 'default' analyzer is registered."""
-        assert "default" in SecurityAnalyzers
+        assert 'default' in SecurityAnalyzers
 
     def test_default_analyzer_is_security_analyzer_class(self):
         """Test default analyzer is SecurityAnalyzer class."""
-        assert SecurityAnalyzers["default"] is SecurityAnalyzer
+        assert SecurityAnalyzers['default'] is SecurityAnalyzer
 
     def test_registry_can_be_extended(self):
         """Test registry can be extended with custom analyzers."""
@@ -29,11 +30,11 @@ class TestSecurityAnalyzersRegistry:
             pass
 
         # Add custom analyzer
-        SecurityAnalyzers["custom"] = CustomAnalyzer
-        assert SecurityAnalyzers["custom"] is CustomAnalyzer
+        SecurityAnalyzers['custom'] = CustomAnalyzer
+        assert SecurityAnalyzers['custom'] is CustomAnalyzer
 
         # Clean up
-        del SecurityAnalyzers["custom"]
+        del SecurityAnalyzers['custom']
 
 
 class TestGetSecurityAnalyzer:
@@ -46,19 +47,19 @@ class TestGetSecurityAnalyzer:
 
     def test_get_default_analyzer_explicitly(self):
         """Test getting default analyzer by name."""
-        analyzer = get_security_analyzer(name="default")
+        analyzer = get_security_analyzer(name='default')
         assert isinstance(analyzer, SecurityAnalyzer)
 
     def test_get_default_analyzer_with_config(self):
         """Test getting default analyzer with config."""
-        config = {"some_option": "value"}
+        config = {'some_option': 'value'}
         analyzer = get_security_analyzer(config=config)
         assert isinstance(analyzer, SecurityAnalyzer)
 
     def test_unknown_analyzer_raises_keyerror(self):
         """Test requesting unknown analyzer raises KeyError."""
         with pytest.raises(KeyError):
-            get_security_analyzer(name="nonexistent")
+            get_security_analyzer(name='nonexistent')
 
     def test_get_analyzer_returns_instance_not_class(self):
         """Test get_security_analyzer returns instance, not class."""
@@ -88,18 +89,18 @@ class TestGetSecurityAnalyzer:
         class TestCustomAnalyzer(SecurityAnalyzer):
             def __init__(self, config=None):
                 super().__init__(config=config)
-                self.custom_attr = "test"
+                self.custom_attr = 'test'
 
         # Add to registry
-        SecurityAnalyzers["test_custom"] = TestCustomAnalyzer
+        SecurityAnalyzers['test_custom'] = TestCustomAnalyzer
 
         try:
-            analyzer = get_security_analyzer(name="test_custom")
+            analyzer = get_security_analyzer(name='test_custom')
             assert isinstance(analyzer, TestCustomAnalyzer)
-            assert analyzer.custom_attr == "test"
+            assert analyzer.custom_attr == 'test'
         finally:
             # Clean up
-            del SecurityAnalyzers["test_custom"]
+            del SecurityAnalyzers['test_custom']
 
     def test_analyzer_class_inheritance(self):
         """Test returned analyzer inherits from SecurityAnalyzer."""
@@ -114,11 +115,11 @@ class TestGetSecurityAnalyzer:
                 super().__init__(config=config)
                 self.captured_config = config
 
-        SecurityAnalyzers["config_capture"] = ConfigCaptureAnalyzer
+        SecurityAnalyzers['config_capture'] = ConfigCaptureAnalyzer
 
         try:
-            test_config = {"key": "value", "number": 42}
-            analyzer = get_security_analyzer(name="config_capture", config=test_config)
+            test_config = {'key': 'value', 'number': 42}
+            analyzer = get_security_analyzer(name='config_capture', config=test_config)
             assert cast(Any, analyzer).captured_config == test_config
         finally:
-            del SecurityAnalyzers["config_capture"]
+            del SecurityAnalyzers['config_capture']

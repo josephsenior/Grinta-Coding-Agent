@@ -261,14 +261,7 @@ class RetryService:
         return tasks
 
     def _is_retry_backend_failure(self, exc: Exception) -> bool:
-        try:
-            import redis.exceptions
-
-            return isinstance(
-                exc, redis.exceptions.ConnectionError | ConnectionError | OSError
-            )
-        except ImportError:
-            return isinstance(exc, ConnectionError | OSError)
+        return isinstance(exc, ConnectionError | OSError)
 
     async def _process_tasks(self, tasks: list[RetryTask]) -> None:
         queue = self._retry_queue
@@ -304,7 +297,6 @@ class RetryService:
         try:
             rescheduled = await queue.mark_failure(task, error_message=str(exc))
             if rescheduled is None:
-                await queue.dead_letter(task)
                 self._retry_pending = False
                 # All retries exhausted — show the prompt so user can act.
                 await self._transition_to_awaiting_user()

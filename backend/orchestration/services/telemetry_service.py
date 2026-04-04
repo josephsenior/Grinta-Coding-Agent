@@ -6,9 +6,11 @@ from unittest.mock import Mock
 from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
-    from backend.orchestration.tool_pipeline import ToolInvocationContext
     from backend.ledger.action import Action
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
+    from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
 class TelemetryService:
@@ -42,8 +44,8 @@ class TelemetryService:
         config = context.agent_config
         reflection_enabled = bool(
             config
-            and getattr(config, "enable_reflection", True)
-            and getattr(config, "enable_reflection_middleware", False)
+            and getattr(config, 'enable_reflection', True)
+            and getattr(config, 'enable_reflection_middleware', False)
         )
         controller._reflection_middleware_enabled = reflection_enabled
         middlewares = [
@@ -65,7 +67,7 @@ class TelemetryService:
         middlewares.append(AutoCheckMiddleware())
         # Warn when re-editing a file without verifying in between
         middlewares.append(ConflictDetectionMiddleware())
-# File state tracking (records files read/modified/created)
+        # File state tracking (records files read/modified/created)
         file_state_mw = FileStateMiddleware()
         middlewares.append(file_state_mw)
         # Store tracker on controller for context injection by planner
@@ -86,10 +88,10 @@ class TelemetryService:
         ctx: ToolInvocationContext,
     ) -> None:
         """Emit telemetry + user-facing events when middleware blocks an action."""
-        from backend.orchestration.tool_telemetry import ToolTelemetry
         from backend.ledger import EventSource
         from backend.ledger.observation import ErrorObservation
         from backend.ledger.observation_cause import attach_observation_cause
+        from backend.orchestration.tool_telemetry import ToolTelemetry
 
         context = self._context
         context.get_controller()
@@ -98,16 +100,16 @@ class TelemetryService:
         try:
             ToolTelemetry.get_instance().on_blocked(ctx, reason=ctx.block_reason)
         except Exception:  # pragma: no cover - telemetry must never break execution
-            logger.debug("Failed to record telemetry for blocked action", exc_info=True)
+            logger.debug('Failed to record telemetry for blocked action', exc_info=True)
 
-        if not ctx.metadata.get("handled"):
-            error_content = ctx.block_reason or "Action blocked by middleware pipeline."
+        if not ctx.metadata.get('handled'):
+            error_content = ctx.block_reason or 'Action blocked by middleware pipeline.'
             error_obs = ErrorObservation(
                 content=error_content,
-                error_id="TOOL_PIPELINE_BLOCKED",
+                error_id='TOOL_PIPELINE_BLOCKED',
             )
             attach_observation_cause(
-                error_obs, action, context="telemetry.handle_blocked_invocation"
+                error_obs, action, context='telemetry.handle_blocked_invocation'
             )
             context.emit_event(error_obs, EventSource.ENVIRONMENT)
 

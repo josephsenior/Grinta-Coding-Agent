@@ -117,27 +117,28 @@ class EventStreamError(AppError):
 
 
 __all__ = [
-    "AppError",
-    "RetryableError",
-    "UserActionRequiredError",
-    "InvariantBrokenError",
-    "classify_error",
-    "AgentRuntimeError",
-    "ToolExecutionError",
-    "ContextLimitError",
-    "PlanningError",
-    "ModelProviderError",
-    "ConfigurationError",
-    "SessionError",
-    "SessionStartupError",
-    "SessionAlreadyActiveError",
-    "RuntimeConnectError",
-    "SessionInvariantError",
-    "PersistenceError",
-    "ReplayError",
-    "SocketConnectionError",
-    "EventStreamError",
+    'AppError',
+    'RetryableError',
+    'UserActionRequiredError',
+    'InvariantBrokenError',
+    'classify_error',
+    'AgentRuntimeError',
+    'ToolExecutionError',
+    'ContextLimitError',
+    'PlanningError',
+    'ModelProviderError',
+    'ConfigurationError',
+    'SessionError',
+    'SessionStartupError',
+    'SessionAlreadyActiveError',
+    'RuntimeConnectError',
+    'SessionInvariantError',
+    'PersistenceError',
+    'ReplayError',
+    'SocketConnectionError',
+    'EventStreamError',
 ]
+
 
 class AgentError(AppError):
     """Base class for all agent exceptions."""
@@ -151,7 +152,7 @@ class AgentNoInstructionError(AgentError):
 
     """
 
-    def __init__(self, message: str = "Instruction must be provided") -> None:
+    def __init__(self, message: str = 'Instruction must be provided') -> None:
         """Initialize the error with an optional custom message."""
         super().__init__(message)
 
@@ -164,7 +165,7 @@ class AgentEventTypeError(AgentError):
 
     """
 
-    def __init__(self, message: str = "Event must be a dictionary") -> None:
+    def __init__(self, message: str = 'Event must be a dictionary') -> None:
         """Initialize the error describing the invalid event type."""
         super().__init__(message)
 
@@ -182,7 +183,7 @@ class AgentAlreadyRegisteredError(AgentError):
         if name is not None:
             message = f"Agent class already registered under '{name}'"
         else:
-            message = "Agent class already registered"
+            message = 'Agent class already registered'
         super().__init__(message)
 
 
@@ -199,7 +200,7 @@ class AgentNotRegisteredError(AgentError):
         if name is not None:
             message = f"No agent class registered under '{name}'"
         else:
-            message = "No agent class registered"
+            message = 'No agent class registered'
         super().__init__(message)
 
 
@@ -211,7 +212,7 @@ class AgentStuckInLoopError(AgentError):
 
     """
 
-    def __init__(self, message: str = "Agent got stuck in a loop") -> None:
+    def __init__(self, message: str = 'Agent got stuck in a loop') -> None:
         """Initialize the error with a message describing the loop condition."""
         super().__init__(message)
 
@@ -226,7 +227,7 @@ class TaskInvalidStateError(AppError):
 
     def __init__(self, state: str | None = None) -> None:
         """Initialize the error with the invalid state description if provided."""
-        message = f"Invalid state {state}" if state is not None else "Invalid state"
+        message = f'Invalid state {state}' if state is not None else 'Invalid state'
         super().__init__(message)
 
 
@@ -238,7 +239,7 @@ class LLMMalformedActionError(AppError):
 
     """
 
-    def __init__(self, message: str = "Malformed response") -> None:
+    def __init__(self, message: str = 'Malformed response') -> None:
         """Initialize the error with details about the malformed response."""
         self.message = message
         super().__init__(message)
@@ -256,7 +257,7 @@ class LLMNoActionError(AppError):
 
     """
 
-    def __init__(self, message: str = "Agent must return an action") -> None:
+    def __init__(self, message: str = 'Agent must return an action') -> None:
         """Initialize the error with details about the missing action."""
         super().__init__(message)
 
@@ -270,7 +271,7 @@ class LLMResponseError(AppError):
     """
 
     def __init__(
-        self, message: str = "Failed to retrieve action from LLM response"
+        self, message: str = 'Failed to retrieve action from LLM response'
     ) -> None:
         """Initialize the error with information about the extraction failure."""
         super().__init__(message)
@@ -288,7 +289,7 @@ class LLMNoResponseError(AppError):
 
     def __init__(
         self,
-        message: str = "LLM did not return a response. This is only seen in Gemini models so far.",
+        message: str = 'LLM did not return a response. This is only seen in Gemini models so far.',
     ) -> None:
         """Initialize the error with details about the missing LLM response."""
         super().__init__(message)
@@ -302,7 +303,7 @@ class UserCancelledError(AppError):
 
     """
 
-    def __init__(self, message: str = "User cancelled the request") -> None:
+    def __init__(self, message: str = 'User cancelled the request') -> None:
         """Initialize the error with an optional cancellation message."""
         super().__init__(message)
 
@@ -310,7 +311,7 @@ class UserCancelledError(AppError):
 class OperationCancelled(AppError):
     """Exception raised when an operation is cancelled (e.g. by a keyboard interrupt)."""
 
-    def __init__(self, message: str = "Operation was cancelled") -> None:
+    def __init__(self, message: str = 'Operation was cancelled') -> None:
         """Initialize the error with an optional cancellation message."""
         super().__init__(message)
 
@@ -326,8 +327,8 @@ class LLMContextWindowExceedError(AppError):
     def __init__(
         self,
         message: str = (
-            "Conversation history longer than LLM context window limit. "
-            "Consider turning on enable_history_truncation config to avoid this error"
+            'Conversation history longer than LLM context window limit. '
+            'Consider turning on enable_history_truncation config to avoid this error'
         ),
     ) -> None:
         """Initialize the error with guidance about the context window limit."""
@@ -335,11 +336,11 @@ class LLMContextWindowExceedError(AppError):
 
 
 class FunctionCallConversionError(AppError):
-    """Exception raised when FunctionCallingConverter failed to convert a non-function call message
-    to a function call message.
+    """Exception raised when a message cannot be converted to a function call.
 
-    This typically happens when there's a malformed message (e.g., missing <function=...> tags).
-    But not due to LLM output.
+    FunctionCallingConverter failed to convert a non-function-call message.
+    This typically happens when there's a malformed message (e.g., missing
+    <function=...> tags), not due to LLM output quality.
     """
 
     def __init__(self, message: str) -> None:
@@ -443,7 +444,7 @@ class BrowserInitException(AppError):
     """
 
     def __init__(
-        self, message: str = "Failed to initialize browser environment"
+        self, message: str = 'Failed to initialize browser environment'
     ) -> None:
         """Initialize the error with details about the initialization failure."""
         super().__init__(message)
@@ -459,7 +460,7 @@ class BrowserUnavailableException(AppError):
 
     def __init__(
         self,
-        message: str = "Browser environment is not available, please check if has been initialized",
+        message: str = 'Browser environment is not available, please check if has been initialized',
     ) -> None:
         """Initialize the error explaining why the browser is unavailable."""
         super().__init__(message)
@@ -472,6 +473,6 @@ class PlaybookError(AppError):
 class PlaybookValidationError(PlaybookError):
     """Raised when there's a validation error in playbook metadata."""
 
-    def __init__(self, message: str = "Playbook validation failed") -> None:
+    def __init__(self, message: str = 'Playbook validation failed') -> None:
         """Initialize the error with details about the validation failure."""
         super().__init__(message)

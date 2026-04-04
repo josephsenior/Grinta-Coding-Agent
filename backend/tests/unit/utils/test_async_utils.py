@@ -20,7 +20,6 @@ from backend.utils.async_utils import (
     wait_all,
 )
 
-
 # ── create_tracked_task ────────────────────────────────────────────────
 
 
@@ -44,12 +43,12 @@ class TestCreateTrackedTask:
         """Test task creation with custom name."""
 
         async def sample_coro():
-            return "named"
+            return 'named'
 
-        task = create_tracked_task(sample_coro(), name="my_task")
-        assert task.get_name() == "my_task"
+        task = create_tracked_task(sample_coro(), name='my_task')
+        assert task.get_name() == 'my_task'
         result = await task
-        assert result == "named"
+        assert result == 'named'
 
     @pytest.mark.asyncio
     async def test_task_added_to_default_set(self):
@@ -58,7 +57,7 @@ class TestCreateTrackedTask:
 
         async def sample_coro():
             await asyncio.sleep(0.01)
-            return "done"
+            return 'done'
 
         initial_count = len(_background_tasks)
         task = create_tracked_task(sample_coro())
@@ -75,7 +74,7 @@ class TestCreateTrackedTask:
         custom_set: set[asyncio.Task] = set()
 
         async def sample_coro():
-            return "custom"
+            return 'custom'
 
         task = create_tracked_task(sample_coro(), task_set=custom_set)
         assert task in custom_set
@@ -115,9 +114,9 @@ class TestCallSyncFromAsync:
         """Test exception from sync function propagates."""
 
         def failing_func():
-            raise ValueError("sync error")
+            raise ValueError('sync error')
 
-        with pytest.raises(ValueError, match="sync error"):
+        with pytest.raises(ValueError, match='sync error'):
             await call_sync_from_async(failing_func)
 
 
@@ -141,46 +140,52 @@ class TestCallAsyncFromSync:
         """Test calling async function with custom timeout."""
 
         async def quick_func():
-            return "quick"
+            return 'quick'
 
         result = call_async_from_sync(quick_func, timeout=5.0)
-        assert result == "quick"
+        assert result == 'quick'
 
     def test_raises_on_none_corofn(self):
         """Test raises ValueError when corofn is None."""
-        with pytest.raises(ValueError, match="corofn is None"):
+        with pytest.raises(ValueError, match='corofn is None'):
             call_async_from_sync(None)
 
     def test_raises_on_non_coroutine_function(self):
         """Test raises ValueError for non-coroutine function."""
 
         def regular_func():
-            return "not a coro"
+            return 'not a coro'
 
-        with pytest.raises(ValueError, match="not a coroutine function"):
+        with pytest.raises(ValueError, match='not a coroutine function'):
             call_async_from_sync(regular_func)
 
     def test_exception_propagates_from_async(self):
         """Test exception from async function propagates."""
 
         async def failing_async():
-            raise RuntimeError("async error")
+            raise RuntimeError('async error')
 
-        with pytest.raises(RuntimeError, match="async error"):
+        with pytest.raises(RuntimeError, match='async error'):
             call_async_from_sync(failing_async)
 
 
 class TestGetMaxWorkers:
     def test_reads_app_thread_pool_env(self):
-        with patch.dict("os.environ", {"APP_THREAD_POOL_MAX_WORKERS": "7"}, clear=False):
+        with patch.dict(
+            'os.environ', {'APP_THREAD_POOL_MAX_WORKERS': '7'}, clear=False
+        ):
             assert async_utils._get_max_workers() == 7
 
     def test_invalid_app_thread_pool_env_falls_back(self):
-        with patch.dict("os.environ", {"APP_THREAD_POOL_MAX_WORKERS": "abc"}, clear=False):
+        with patch.dict(
+            'os.environ', {'APP_THREAD_POOL_MAX_WORKERS': 'abc'}, clear=False
+        ):
             assert async_utils._get_max_workers() == 32
 
     def test_non_positive_app_thread_pool_env_falls_back(self):
-        with patch.dict("os.environ", {"APP_THREAD_POOL_MAX_WORKERS": "0"}, clear=False):
+        with patch.dict(
+            'os.environ', {'APP_THREAD_POOL_MAX_WORKERS': '0'}, clear=False
+        ):
             assert async_utils._get_max_workers() == 32
 
 
@@ -198,7 +203,7 @@ class TestCallCoroInBgThread:
             await asyncio.sleep(0.01)
             return value + 100
 
-        await call_coro_in_bg_thread(bg_coro, timeout=5.0, value=50)
+        await call_coro_in_bg_thread(bg_coro, timeout_sec=5.0, value=50)
         # Background task, no result expected.
 
     @pytest.mark.asyncio
@@ -206,10 +211,10 @@ class TestCallCoroInBgThread:
         """Test uses dynamic import delegate pattern."""
 
         async def sample():
-            return "delegated"
+            return 'delegated'
 
         # Should not raise even though it runs in the background.
-        await call_coro_in_bg_thread(sample, timeout=2.0)
+        await call_coro_in_bg_thread(sample, timeout_sec=2.0)
 
 
 # ── wait_all ───────────────────────────────────────────────────────────
@@ -245,12 +250,12 @@ class TestWaitAll:
         """Test raises exception from single failing task."""
 
         async def failing():
-            raise ValueError("task failed")
+            raise ValueError('task failed')
 
         async def successful():
-            return "ok"
+            return 'ok'
 
-        with pytest.raises(ValueError, match="task failed"):
+        with pytest.raises(ValueError, match='task failed'):
             await wait_all([failing(), successful()])
 
     @pytest.mark.asyncio
@@ -258,10 +263,10 @@ class TestWaitAll:
         """Test raises AsyncException for multiple failures."""
 
         async def fail1():
-            raise ValueError("error 1")
+            raise ValueError('error 1')
 
         async def fail2():
-            raise RuntimeError("error 2")
+            raise RuntimeError('error 2')
 
         with pytest.raises(AsyncException) as exc_info:
             await wait_all([fail1(), fail2()])
@@ -273,10 +278,10 @@ class TestWaitAll:
 
         async def slow_task():
             await asyncio.sleep(10)
-            return "never"
+            return 'never'
 
         with pytest.raises(TimeoutError):
-            await wait_all([slow_task()], timeout=1)
+            await wait_all([slow_task()], wait_timeout_sec=1)
 
 
 # ── AsyncException ─────────────────────────────────────────────────────
@@ -287,8 +292,8 @@ class TestAsyncException:
 
     def test_stores_exceptions(self):
         """Test stores list of exceptions."""
-        exc1 = ValueError("error 1")
-        exc2 = RuntimeError("error 2")
+        exc1 = ValueError('error 1')
+        exc2 = RuntimeError('error 2')
         agg_exc = AsyncException([exc1, exc2])
         assert len(agg_exc.exceptions) == 2
         assert exc1 in agg_exc.exceptions
@@ -296,13 +301,13 @@ class TestAsyncException:
 
     def test_str_joins_messages(self):
         """Test __str__ joins exception messages."""
-        exc1 = ValueError("first")
-        exc2 = RuntimeError("second")
+        exc1 = ValueError('first')
+        exc2 = RuntimeError('second')
         agg_exc = AsyncException([exc1, exc2])
         result = str(agg_exc)
-        assert "first" in result
-        assert "second" in result
-        assert "\n" in result
+        assert 'first' in result
+        assert 'second' in result
+        assert '\n' in result
 
 
 # ── run_in_loop ────────────────────────────────────────────────────────
@@ -316,24 +321,24 @@ class TestRunInLoop:
         """Test runs coroutine in same loop directly."""
 
         async def sample():
-            return "same_loop"
+            return 'same_loop'
 
         loop = asyncio.get_running_loop()
         result = await run_in_loop(sample(), loop)
-        assert result == "same_loop"
+        assert result == 'same_loop'
 
     @pytest.mark.asyncio
     async def test_runs_in_different_loop(self):
         """Test runs coroutine when on different loop."""
 
         async def sample():
-            return "different_loop"
+            return 'different_loop'
 
         # When on different loop, run_in_loop uses thread handoff
         # For this test, just verify same loop works correctly
         loop = asyncio.get_running_loop()
-        result = await run_in_loop(sample(), loop, timeout=2.0)
-        assert result == "different_loop"
+        result = await run_in_loop(sample(), loop, timeout_sec=2.0)
+        assert result == 'different_loop'
 
 
 # ── get_active_loop ────────────────────────────────────────────────────
@@ -368,7 +373,7 @@ class TestRunOrSchedule:
 
         async def to_schedule():
             await asyncio.sleep(0.01)
-            return "scheduled"
+            return 'scheduled'
 
         initial_count = len(_background_tasks)
         run_or_schedule(to_schedule())
@@ -382,7 +387,7 @@ class TestRunOrSchedule:
 
         async def to_run():
             executed.append(True)
-            return "executed"
+            return 'executed'
 
         run_or_schedule(to_run())
         assert executed == [True]

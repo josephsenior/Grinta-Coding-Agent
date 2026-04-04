@@ -50,7 +50,7 @@ class PythonSearcher:
         """
         directory = Path(directory)
         if not directory.exists():
-            logger.warning("Search directory does not exist: %s", directory)
+            logger.warning('Search directory does not exist: %s', directory)
             return []
 
         flags = 0 if self.case_sensitive else re.IGNORECASE
@@ -64,7 +64,7 @@ class PythonSearcher:
         # Walk directory and search files
         for file_path in self._iter_files(directory, file_pattern):
             if len(results) >= max_results:
-                logger.warning("Reached max results (%s), stopping search", max_results)
+                logger.warning('Reached max results (%s), stopping search', max_results)
                 break
 
             try:
@@ -72,7 +72,7 @@ class PythonSearcher:
                     self._search_file(file_path, regex, max_results - len(results))
                 )
             except Exception as e:
-                logger.debug("Error searching file %s: %s", file_path, e)
+                logger.debug('Error searching file %s: %s', file_path, e)
                 continue
 
         return results
@@ -102,7 +102,7 @@ class PythonSearcher:
                     for file in files:
                         yield root_path / file
         except (PermissionError, OSError) as e:
-            logger.debug("Cannot access directory %s: %s", directory, e)
+            logger.debug('Cannot access directory %s: %s', directory, e)
 
     def _search_file(
         self,
@@ -123,7 +123,7 @@ class PythonSearcher:
         results: list[tuple[Path, int, str]] = []
 
         try:
-            with open(file_path, encoding="utf-8", errors="ignore") as f:
+            with open(file_path, encoding='utf-8', errors='ignore') as f:
                 for line_num, line in enumerate(f, start=1):
                     if len(results) >= max_results:
                         break

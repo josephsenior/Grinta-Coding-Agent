@@ -36,7 +36,7 @@ class TestIterationService(unittest.IsolatedAsyncioTestCase):
         """Test apply_dynamic_iterations does nothing when feature disabled."""
         self.mock_config.enable_dynamic_iterations = False
         mock_ctx = MagicMock()
-        mock_ctx.metadata = {"task_complexity": 0.5}
+        mock_ctx.metadata = {'task_complexity': 0.5}
 
         await self.service.apply_dynamic_iterations(mock_ctx)
 
@@ -55,13 +55,13 @@ class TestIterationService(unittest.IsolatedAsyncioTestCase):
     async def test_apply_dynamic_iterations_with_fallback(self):
         """Test apply_dynamic_iterations uses fallback calculation."""
         mock_ctx = MagicMock()
-        mock_ctx.metadata = {"task_complexity": 0.8}
+        mock_ctx.metadata = {'task_complexity': 0.8}
 
         await self.service.apply_dynamic_iterations(mock_ctx)
 
         # Should calculate: 20 + 0.8 * 50 = 60
         self.mock_state.adjust_iteration_limit.assert_called_once_with(
-            60, source="IterationService"
+            60, source='IterationService'
         )
 
     async def test_apply_dynamic_iterations_with_analyzer(self):
@@ -71,13 +71,13 @@ class TestIterationService(unittest.IsolatedAsyncioTestCase):
         self.mock_agent.task_complexity_analyzer = mock_analyzer
 
         mock_ctx = MagicMock()
-        mock_ctx.metadata = {"task_complexity": 0.6}
+        mock_ctx.metadata = {'task_complexity': 0.6}
 
         await self.service.apply_dynamic_iterations(mock_ctx)
 
         # Should use analyzer estimate
         self.mock_state.adjust_iteration_limit.assert_called_once_with(
-            75, source="IterationService"
+            75, source='IterationService'
         )
         mock_analyzer.estimate_iterations.assert_called_once_with(0.6, self.mock_state)
 
@@ -85,33 +85,33 @@ class TestIterationService(unittest.IsolatedAsyncioTestCase):
         """Test apply_dynamic_iterations respects max_iterations_override."""
         self.mock_config.max_iterations_override = 40
         mock_ctx = MagicMock()
-        mock_ctx.metadata = {"task_complexity": 1.0}  # Would calculate to 70
+        mock_ctx.metadata = {'task_complexity': 1.0}  # Would calculate to 70
 
         await self.service.apply_dynamic_iterations(mock_ctx)
 
         # Should cap at 40
         self.mock_state.adjust_iteration_limit.assert_called_once_with(
-            40, source="IterationService"
+            40, source='IterationService'
         )
 
     async def test_apply_dynamic_iterations_respects_min(self):
         """Test apply_dynamic_iterations respects min_iterations."""
         self.mock_config.min_iterations = 30
         mock_ctx = MagicMock()
-        mock_ctx.metadata = {"task_complexity": 0.1}  # Would calculate to 25
+        mock_ctx.metadata = {'task_complexity': 0.1}  # Would calculate to 25
 
         await self.service.apply_dynamic_iterations(mock_ctx)
 
         # fallback: 30 + 0.1 * 50 = 35, bounded by min=30 → 35
         self.mock_state.adjust_iteration_limit.assert_called_once_with(
-            35, source="IterationService"
+            35, source='IterationService'
         )
 
     async def test_apply_dynamic_iterations_no_iteration_flag(self):
         """Test apply_dynamic_iterations handles missing iteration flag."""
         del self.mock_state.iteration_flag
         mock_ctx = MagicMock()
-        mock_ctx.metadata = {"task_complexity": 0.5}
+        mock_ctx.metadata = {'task_complexity': 0.5}
 
         # Should not raise exception
         await self.service.apply_dynamic_iterations(mock_ctx)
@@ -120,7 +120,7 @@ class TestIterationService(unittest.IsolatedAsyncioTestCase):
         """Test apply_dynamic_iterations handles None state."""
         self.mock_context.state = None
         mock_ctx = MagicMock()
-        mock_ctx.metadata = {"task_complexity": 0.5}
+        mock_ctx.metadata = {'task_complexity': 0.5}
 
         # Should not raise exception
         await self.service.apply_dynamic_iterations(mock_ctx)
@@ -194,11 +194,11 @@ class TestIterationService(unittest.IsolatedAsyncioTestCase):
         # 20 + 0.6 * 50 = 50
         self.assertEqual(result, 50)
 
-    @patch("backend.orchestration.services.iteration_service.logger")
+    @patch('backend.orchestration.services.iteration_service.logger')
     def test_estimate_iterations_from_analyzer_exception(self, mock_logger):
         """Test _estimate_iterations_from_analyzer handles exceptions."""
         mock_analyzer = MagicMock()
-        mock_analyzer.estimate_iterations.side_effect = ValueError("Test error")
+        mock_analyzer.estimate_iterations.side_effect = ValueError('Test error')
         self.mock_agent.task_complexity_analyzer = mock_analyzer
 
         result = self.service._estimate_iterations_from_analyzer(
@@ -233,7 +233,7 @@ class TestIterationService(unittest.IsolatedAsyncioTestCase):
         # 10 + 0.3 * 100 = 40
         self.assertEqual(result, 40)
 
-    @patch("backend.orchestration.services.iteration_service.logger")
+    @patch('backend.orchestration.services.iteration_service.logger')
     def test_apply_iteration_flag_direct_mutation(self, mock_logger):
         """Test _apply_iteration_flag mutates flag directly when state doesn't match."""
         # Create a flag that's NOT on the state
@@ -246,7 +246,7 @@ class TestIterationService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(detached_flag.max_value, 60)
         mock_logger.debug.assert_called_once()
 
-    @patch("backend.orchestration.services.iteration_service.logger")
+    @patch('backend.orchestration.services.iteration_service.logger')
     def test_apply_iteration_flag_via_state(self, mock_logger):
         """Test _apply_iteration_flag uses state.adjust_iteration_limit."""
         self.service._apply_iteration_flag(
@@ -255,34 +255,34 @@ class TestIterationService(unittest.IsolatedAsyncioTestCase):
 
         # Should use state method
         self.mock_state.adjust_iteration_limit.assert_called_once_with(
-            60, source="IterationService"
+            60, source='IterationService'
         )
         mock_logger.debug.assert_called_once()
 
     async def test_apply_dynamic_iterations_zero_complexity(self):
         """Test apply_dynamic_iterations with zero complexity."""
         mock_ctx = MagicMock()
-        mock_ctx.metadata = {"task_complexity": 0.0}
+        mock_ctx.metadata = {'task_complexity': 0.0}
 
         await self.service.apply_dynamic_iterations(mock_ctx)
 
         # Should use min_iterations (20)
         self.mock_state.adjust_iteration_limit.assert_called_once_with(
-            20, source="IterationService"
+            20, source='IterationService'
         )
 
     async def test_apply_dynamic_iterations_high_complexity(self):
         """Test apply_dynamic_iterations with high complexity."""
         mock_ctx = MagicMock()
-        mock_ctx.metadata = {"task_complexity": 2.0}
+        mock_ctx.metadata = {'task_complexity': 2.0}
 
         await self.service.apply_dynamic_iterations(mock_ctx)
 
         # 20 + 2.0 * 50 = 120
         self.mock_state.adjust_iteration_limit.assert_called_once_with(
-            120, source="IterationService"
+            120, source='IterationService'
         )
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

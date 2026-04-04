@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from backend.core.enums import RecallType
 from backend.core.logger import app_logger as logger
 from backend.core.message import ImageContent, Message, TextContent
-from backend.core.enums import RecallType
 from backend.ledger.event import Event
 from backend.ledger.observation.agent import PlaybookKnowledge, RecallObservation
 from backend.utils.prompt import (
@@ -42,7 +42,7 @@ def process_recall_observation(
     if not agent_config.enable_prompt_extensions:
         return []
 
-    recall_type: RecallType | str | None = getattr(obs, "recall_type", None)
+    recall_type: RecallType | str | None = getattr(obs, 'recall_type', None)
     if recall_type == RecallType.WORKSPACE_CONTEXT:
         return _process_workspace_context_recall(obs, agent_config, prompt_manager)
     if recall_type == RecallType.KNOWLEDGE:
@@ -53,7 +53,7 @@ def process_recall_observation(
             agent_config,
             prompt_manager,
         )
-    logger.debug("Unknown recall type encountered: %s", recall_type)
+    logger.debug('Unknown recall type encountered: %s', recall_type)
     return []
 
 
@@ -70,7 +70,7 @@ def _process_workspace_context_recall(
     repo_info = _create_repo_info(obs)
     runtime_info = _create_runtime_info(obs)
     conversation_instructions = _create_conversation_instructions(obs)
-    repo_instructions = obs.repo_instructions or ""
+    repo_instructions = obs.repo_instructions or ''
     filtered_agents = _filter_playbooks(obs, agent_config)
 
     has_content = _has_workspace_content(
@@ -91,14 +91,14 @@ def _process_workspace_context_recall(
         filtered_agents,
         prompt_manager,
     )
-    return [Message(role="user", content=message_content)]
+    return [Message(role='user', content=message_content)]
 
 
 def _create_repo_info(obs: RecallObservation) -> RepositoryInfo | None:
     if obs.repo_name or obs.repo_directory:
         return RepositoryInfo(
-            repo_name=obs.repo_name or "",
-            repo_directory=obs.repo_directory or "",
+            repo_name=obs.repo_name or '',
+            repo_directory=obs.repo_directory or '',
             branch_name=obs.repo_branch or None,
         )
     return None
@@ -222,18 +222,18 @@ def _process_knowledge_recall(
             prompt_manager.build_playbook_info(triggered_agents=filtered_agents)
         )
 
-    kb_results = getattr(obs, "knowledge_base_results", [])
+    kb_results = getattr(obs, 'knowledge_base_results', [])
     if kb_results:
         formatted_parts.append(
             prompt_manager.build_knowledge_base_info(kb_results=kb_results)
         )
 
     if formatted_parts:
-        formatted_text = "\n\n".join(formatted_parts)
+        formatted_text = '\n\n'.join(formatted_parts)
         content_items: list[TextContent | ImageContent] = [
             TextContent(text=formatted_text)
         ]
-        return [Message(role="user", content=content_items)]
+        return [Message(role='user', content=content_items)]
     return []
 
 
@@ -272,4 +272,4 @@ def _is_recall_observation(obj: object) -> bool:
     """Duck-type check for RecallObservation."""
     if isinstance(obj, RecallObservation):
         return True
-    return type(obj).__name__ == "RecallObservation"
+    return type(obj).__name__ == 'RecallObservation'

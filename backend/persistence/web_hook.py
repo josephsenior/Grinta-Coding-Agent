@@ -43,8 +43,8 @@ class WebHookFileStore(BaseWebHookFileStore):
     @tenacity.retry(
         wait=tenacity.wait_fixed(1),
         stop=tenacity.stop_after_attempt(3),
-        before_sleep=tenacity_before_sleep_factory("storage.webhook.on_write"),
-        after=tenacity_after_factory("storage.webhook.on_write"),
+        before_sleep=tenacity_before_sleep_factory('storage.webhook.on_write'),
+        after=tenacity_after_factory('storage.webhook.on_write'),
     )
     def _on_write(self, path: str, contents: str | bytes) -> None:
         """Send a POST request to the webhook URL when a file is written.
@@ -66,8 +66,8 @@ class WebHookFileStore(BaseWebHookFileStore):
     @tenacity.retry(
         wait=tenacity.wait_fixed(1),
         stop=tenacity.stop_after_attempt(3),
-        before_sleep=tenacity_before_sleep_factory("storage.webhook.on_delete"),
-        after=tenacity_after_factory("storage.webhook.on_delete"),
+        before_sleep=tenacity_before_sleep_factory('storage.webhook.on_delete'),
+        after=tenacity_after_factory('storage.webhook.on_delete'),
     )
     def _on_delete(self, path: str) -> None:
         """Send a DELETE request to the webhook URL when a file is deleted.

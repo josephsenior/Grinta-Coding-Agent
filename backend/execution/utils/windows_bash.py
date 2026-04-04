@@ -1,4 +1,4 @@
-﻿"""This module provides a Windows-specific implementation for running commands in PowerShell.
+"""This module provides a Windows-specific implementation for running commands in PowerShell.
 
 Uses subprocess calls to pwsh.exe (PowerShell 7) or powershell.exe (Windows PowerShell).
 This is simpler and more reliable than using the .NET SDK via pythonnet.
@@ -9,19 +9,19 @@ from __future__ import annotations
 import sys
 
 # CRITICAL: Platform check MUST be the very first thing after imports
-if sys.platform != "win32":
+if sys.platform != 'win32':
 
     class WindowsOnlyModuleError(RuntimeError):
         """Raised when Windows-specific module functionality is accessed on unsupported platforms."""
 
         def __init__(self, module: str):
             super().__init__(
-                f"FATAL ERROR: This module ({module}) requires Windows platform, "
-                f"but is running on {sys.platform}. This should never happen and indicates a "
-                f"serious configuration issue. Please use the appropriate platform-specific runtime."
+                f'FATAL ERROR: This module ({module}) requires Windows platform, '
+                f'but is running on {sys.platform}. This should never happen and indicates a '
+                f'serious configuration issue. Please use the appropriate platform-specific runtime.'
             )
 
-    raise WindowsOnlyModuleError("windows_bash.py")
+    raise WindowsOnlyModuleError('windows_bash.py')
 
 import os
 import subprocess
@@ -29,12 +29,12 @@ from threading import RLock
 from typing import TYPE_CHECKING
 
 from backend.core.logger import app_logger as logger
+from backend.execution.utils.process_registry import TaskCancellationService
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (
     CmdOutputMetadata,
     CmdOutputObservation,
 )
-from backend.execution.utils.process_registry import TaskCancellationService
 
 if TYPE_CHECKING:
     from backend.ledger.action import CmdRunAction
@@ -52,36 +52,36 @@ def _find_powershell_executable() -> str:
     # Try PowerShell 7 first (pwsh.exe)
     try:
         result = subprocess.run(
-            ["pwsh", "-NoProfile", "-Command", "$PSVersionTable.PSVersion"],
+            ['pwsh', '-NoProfile', '-Command', '$PSVersionTable.PSVersion'],
             capture_output=True,
             text=True,
             timeout=5,
             check=False,
         )
         if result.returncode == 0:
-            logger.info("Found PowerShell 7 (pwsh.exe)")
-            return "pwsh"
+            logger.info('Found PowerShell 7 (pwsh.exe)')
+            return 'pwsh'
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
 
     # Fall back to Windows PowerShell
     try:
         result = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", "$PSVersionTable.PSVersion"],
+            ['powershell', '-NoProfile', '-Command', '$PSVersionTable.PSVersion'],
             capture_output=True,
             text=True,
             timeout=5,
             check=False,
         )
         if result.returncode == 0:
-            logger.info("Found Windows PowerShell (powershell.exe)")
-            return "powershell"
+            logger.info('Found Windows PowerShell (powershell.exe)')
+            return 'powershell'
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
 
     raise RuntimeError(
-        "PowerShell is required on Windows but could not be found. "
-        "Please install PowerShell 7 (https://aka.ms/powershell) or ensure Windows PowerShell is available."
+        'PowerShell is required on Windows but could not be found. '
+        'Please install PowerShell 7 (https://aka.ms/powershell) or ensure Windows PowerShell is available.'
     )
 
 
@@ -119,17 +119,17 @@ class WindowsPowershellSession(BaseShellSession):
             # Verify the working directory exists
             if not os.path.isdir(self._cwd):
                 os.makedirs(self._cwd, exist_ok=True)
-                logger.info("Created working directory: %s", self._cwd)
+                logger.info('Created working directory: %s', self._cwd)
             self._initialized = True
             logger.info(
-                "PowerShell session initialized. Using: %s, Initial CWD: %s",
+                'PowerShell session initialized. Using: %s, Initial CWD: %s',
                 self.powershell_exe,
                 self._cwd,
             )
         except Exception as e:
-            logger.error("Failed to initialize PowerShell session: %s", e)
+            logger.error('Failed to initialize PowerShell session: %s', e)
             self.close()
-            raise RuntimeError(f"Failed to initialize PowerShell session: {e}") from e
+            raise RuntimeError(f'Failed to initialize PowerShell session: {e}') from e
 
     def initialize(self) -> None:
         """Initialize the session (already done in __init__).
@@ -137,7 +137,7 @@ class WindowsPowershellSession(BaseShellSession):
         This method is provided for compatibility with the base ShellSession interface.
         """
         if not self._initialized:
-            raise RuntimeError("PowerShell session failed to initialize in __init__")
+            raise RuntimeError('PowerShell session failed to initialize in __init__')
 
     def _run_command(
         self,
@@ -158,7 +158,7 @@ class WindowsPowershellSession(BaseShellSession):
             Tuple of (stdout, stderr, exit_code)
         """
         if self._closed:
-            raise RuntimeError("PowerShell session is closed")
+            raise RuntimeError('PowerShell session is closed')
 
         work_dir = cwd or self._cwd
         if not os.path.isdir(work_dir):
@@ -168,9 +168,9 @@ class WindowsPowershellSession(BaseShellSession):
         # Use -NoProfile for faster startup, -Command to execute
         ps_command = [
             self.powershell_exe,
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
+            '-NoProfile',
+            '-NonInteractive',
+            '-Command',
             command,
         ]
 
@@ -193,13 +193,13 @@ class WindowsPowershellSession(BaseShellSession):
             return_code = process.returncode
 
             # Update CWD if command changed directory
-            if "cd " in command.lower() or "Set-Location" in command:
+            if 'cd ' in command.lower() or 'Set-Location' in command:
                 self._update_cwd_from_output(  # type: ignore[attr-defined]
                     [
                         self.powershell_exe,
-                        "-NoProfile",
-                        "-Command",
-                        "Get-Location | Select-Object -ExpandProperty Path",
+                        '-NoProfile',
+                        '-Command',
+                        'Get-Location | Select-Object -ExpandProperty Path',
                     ]
                 )
 
@@ -252,9 +252,9 @@ class WindowsPowershellSession(BaseShellSession):
         self._update_cwd_from_output(
             [
                 self.powershell_exe,
-                "-NoProfile",
-                "-Command",
-                "Get-Location | Select-Object -ExpandProperty Path",
+                '-NoProfile',
+                '-Command',
+                'Get-Location | Select-Object -ExpandProperty Path',
             ]
         )
 
@@ -262,26 +262,26 @@ class WindowsPowershellSession(BaseShellSession):
         self, process: subprocess.Popen | None, timeout: int | None, command: str
     ) -> tuple[str, str, int]:
         """Handle subprocess timeout."""
-        logger.warning("Command timed out after %s seconds: %s", timeout, command)
+        logger.warning('Command timed out after %s seconds: %s', timeout, command)
         if process:
             try:
                 process.kill()
                 process.wait()
             except Exception:
                 pass
-        return ("", f"Command timed out after {timeout} seconds", 124)
+        return ('', f'Command timed out after {timeout} seconds', 124)
 
     def _handle_run_exception(
         self, process: subprocess.Popen | None, e: Exception
     ) -> tuple[str, str, int]:
         """Handle general subprocess exceptions."""
-        logger.error("Error running PowerShell command: %s", e)
+        logger.error('Error running PowerShell command: %s', e)
         if process:
             try:
                 process.kill()
             except Exception:
                 pass
-        return ("", str(e), 1)
+        return ('', str(e), 1)
 
     def _execute_background_command(
         self, command: str
@@ -293,25 +293,25 @@ class WindowsPowershellSession(BaseShellSession):
         start_proc = (
             f"$p = Start-Process -FilePath '{self.powershell_exe}' -NoNewWindow -PassThru "
             f"-ArgumentList @('-NoProfile','-NonInteractive','-Command','{child_script_escaped}'); "
-            "Write-Output $p.Id"
+            'Write-Output $p.Id'
         )
         stdout, stderr, exit_code = self._run_command(start_proc, timeout=10)
         if exit_code == 0 and stdout.strip().isdigit():
             child_pid = int(stdout.strip())
-            logger.info("Background process started with PID: %s", child_pid)
+            logger.info('Background process started with PID: %s', child_pid)
             self._cancellation.register_pid(child_pid)
             metadata = CmdOutputMetadata(
                 exit_code=0,
-                working_dir=self._cwd.replace("\\", "\\\\"),
+                working_dir=self._cwd.replace('\\', '\\\\'),
             )
             return CmdOutputObservation(
-                content=f"[{child_pid}]",
+                content=f'[{child_pid}]',
                 command=command,
                 metadata=metadata,
             )
 
         # Fallback: run normally if background start fails
-        logger.warning("Failed to start background job, running normally")
+        logger.warning('Failed to start background job, running normally')
         return self._execute_foreground_command(command, 60, None)
 
     def _execute_foreground_command(
@@ -331,17 +331,17 @@ class WindowsPowershellSession(BaseShellSession):
 
     def _session_not_ready_observation(self) -> ErrorObservation:
         return ErrorObservation(
-            content="PowerShell session is not initialized or has been closed."
+            content='PowerShell session is not initialized or has been closed.'
         )
 
     def read_output(self) -> str:
         """Read pending output from the shell session."""
         # Not supported in current Windows implementation (subprocess-based)
-        return ""
+        return ''
 
     def write_input(self, data: str, is_control: bool = False) -> None:
         """Write input to the shell session."""
         # Not supported in current Windows implementation (subprocess-based)
         logger.warning(
-            "Terminal input not supported on Windows subprocess implementation"
+            'Terminal input not supported on Windows subprocess implementation'
         )

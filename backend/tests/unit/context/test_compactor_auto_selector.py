@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
-
 import pytest
 
+from backend.context.compactor.strategies.auto_selector import (
+    _HIGH_ERROR_RATIO,
+    _LONG_SESSION,
+    _MEDIUM_SESSION,
+    _SHORT_SESSION,
+    TaskSignals,
+    compute_signals,
+    select_compactor_config,
+)
 from backend.core.config.compactor_config import (
     AmortizedPruningCompactorConfig,
     AutoCompactorConfig,
@@ -14,46 +22,35 @@ from backend.core.config.compactor_config import (
     SmartCompactorConfig,
 )
 from backend.ledger.action import CmdRunAction, MessageAction
-from backend.ledger.event import Event
-from backend.ledger.event import EventSource
-from backend.ledger.observation import ErrorObservation, CmdOutputObservation
-from backend.context.compactor.strategies.auto_selector import (
-    TaskSignals,
-    compute_signals,
-    select_compactor_config,
-    _HIGH_ERROR_RATIO,
-    _LONG_SESSION,
-    _MEDIUM_SESSION,
-    _SHORT_SESSION,
-)
-
+from backend.ledger.event import Event, EventSource
+from backend.ledger.observation import CmdOutputObservation, ErrorObservation
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_user_message(eid: int, content: str = "hello") -> MessageAction:
+def _make_user_message(eid: int, content: str = 'hello') -> MessageAction:
     ev = MessageAction(content=content)
     ev._source = EventSource.USER
     ev._id = eid
     return ev
 
 
-def _make_cmd(eid: int, command: str = "ls") -> CmdRunAction:
+def _make_cmd(eid: int, command: str = 'ls') -> CmdRunAction:
     ev = CmdRunAction(command=command)
     ev._id = eid
     return ev
 
 
-def _make_error(eid: int, content: str = "error occurred") -> ErrorObservation:
+def _make_error(eid: int, content: str = 'error occurred') -> ErrorObservation:
     ev = ErrorObservation(content=content)
     ev._id = eid
     return ev
 
 
-def _make_cmd_output(eid: int, content: str = "output") -> CmdOutputObservation:
-    ev = CmdOutputObservation(content=content, command_id=0, command="ls")
+def _make_cmd_output(eid: int, content: str = 'output') -> CmdOutputObservation:
+    ev = CmdOutputObservation(content=content, command_id=0, command='ls')
     ev._id = eid
     return ev
 
@@ -62,7 +59,7 @@ def _make_events(n: int) -> list[Event]:
     """Create n generic command events."""
     events: list[Event] = []
     for i in range(n):
-        events.append(_make_cmd(i, f"cmd_{i}"))
+        events.append(_make_cmd(i, f'cmd_{i}'))
     return events
 
 
@@ -71,9 +68,9 @@ def _make_error_heavy_events(total: int, error_count: int) -> list[Event]:
     events: list[Event] = []
     for i in range(total):
         if i < error_count:
-            events.append(_make_error(i, f"error_{i}"))
+            events.append(_make_error(i, f'error_{i}'))
         else:
-            events.append(_make_cmd(i, f"cmd_{i}"))
+            events.append(_make_cmd(i, f'cmd_{i}'))
     return events
 
 
@@ -91,7 +88,7 @@ class TestTaskSignals:
 
     def test_slots(self):
         """TaskSignals should be a slot class."""
-        assert hasattr(TaskSignals, "__slots__")
+        assert hasattr(TaskSignals, '__slots__')
 
 
 # ---------------------------------------------------------------------------
@@ -124,8 +121,8 @@ class TestComputeSignals:
 
     def test_avg_observation_length(self):
         events = [
-            _make_cmd_output(1, "short"),
-            _make_cmd_output(2, "a" * 100),
+            _make_cmd_output(1, 'short'),
+            _make_cmd_output(2, 'a' * 100),
         ]
         sig = compute_signals(events)
         assert sig.avg_observation_length == pytest.approx((5 + 100) / 2)
@@ -156,9 +153,9 @@ class TestSelectCompactorConfig:
 
     def test_long_session_with_llm_returns_smart(self):
         events = _make_events(_LONG_SESSION + 10)
-        config = select_compactor_config(events, llm_config="condenser_llm")
+        config = select_compactor_config(events, llm_config='condenser_llm')
         assert isinstance(config, SmartCompactorConfig)
-        assert config.llm_config == "condenser_llm"
+        assert config.llm_config == 'condenser_llm'
 
     def test_long_session_no_llm_returns_amortized(self):
         events = _make_events(_LONG_SESSION + 10)
@@ -181,7 +178,7 @@ class TestSelectCompactorConfig:
         total = _LONG_SESSION + 10
         error_count = int(total * _HIGH_ERROR_RATIO) + 5
         events = _make_error_heavy_events(total, error_count)
-        config = select_compactor_config(events, llm_config="llm")
+        config = select_compactor_config(events, llm_config='llm')
         # Error heuristic should fire before long-session heuristic
         assert isinstance(config, RecentEventsCompactorConfig)
 
@@ -194,12 +191,12 @@ class TestSelectCompactorConfig:
 class TestAutoCompactorConfig:
     def test_type_field(self):
         cfg = AutoCompactorConfig()
-        assert cfg.type == "auto"
+        assert cfg.type == 'auto'
 
     def test_with_llm_config(self):
-        cfg = AutoCompactorConfig(llm_config="my_llm")
-        assert cfg.llm_config == "my_llm"
+        cfg = AutoCompactorConfig(llm_config='my_llm')
+        assert cfg.llm_config == 'my_llm'
 
     def test_rejects_extra_fields(self):
         with pytest.raises(Exception):
-            AutoCompactorConfig.model_validate({"type": "auto", "unknown_field": True})
+            AutoCompactorConfig.model_validate({'type': 'auto', 'unknown_field': True})

@@ -44,13 +44,13 @@ class QueryCache:
                 # Move to end (most recently used)
                 self.cache.move_to_end(cache_key)
                 self.hits += 1
-                logger.debug("Cache HIT for query: %s", query[:50])
+                logger.debug('Cache HIT for query: %s', query[:50])
                 return results
             # Expired, remove
             del self.cache[cache_key]
 
         self.misses += 1
-        logger.debug("Cache MISS for query: %s", query[:50])
+        logger.debug('Cache MISS for query: %s', query[:50])
         return None
 
     def set(self, query: str, results: list[dict[str, Any]]) -> None:
@@ -67,11 +67,11 @@ class QueryCache:
         total = self.hits + self.misses
         hit_rate = self.hits / total if total > 0 else 0
         return {
-            "hits": self.hits,
-            "misses": self.misses,
-            "hit_rate": hit_rate,
-            "size": len(self.cache),
-            "max_size": self.max_size,
+            'hits': self.hits,
+            'misses': self.misses,
+            'hit_rate': hit_rate,
+            'size': len(self.cache),
+            'max_size': self.max_size,
         }
 
     @staticmethod
@@ -84,7 +84,7 @@ class ReRanker:
     """Cross-encoder re-ranker for improved accuracy."""
 
     def __init__(
-        self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+        self, model_name: str = 'cross-encoder/ms-marco-MiniLM-L-6-v2'
     ) -> None:
         """Configure the reranker with the chosen cross-encoder model name."""
         self.model_name = model_name
@@ -95,12 +95,12 @@ class ReRanker:
         """Lazy load the model."""
         if self._model is None:
             try:
-                logger.info("Loading re-ranker model: %s", self.model_name)
+                logger.info('Loading re-ranker model: %s', self.model_name)
                 from sentence_transformers import CrossEncoder
 
                 self._model = CrossEncoder(self.model_name)
             except Exception as e:
-                logger.warning("Failed to load re-ranker: %s", e)
+                logger.warning('Failed to load re-ranker: %s', e)
                 self.enabled = False
 
     def rerank(
@@ -126,7 +126,7 @@ class ReRanker:
 
         # Prepare pairs for cross-encoder
         pairs = [
-            (query, candidate.get("excerpt", "") or candidate.get("rationale", ""))
+            (query, candidate.get('excerpt', '') or candidate.get('rationale', ''))
             for candidate in candidates
         ]
 
@@ -136,19 +136,19 @@ class ReRanker:
 
             # Combine with original candidates
             reranked = [
-                {**candidate, "rerank_score": float(score)}
+                {**candidate, 'rerank_score': float(score)}
                 for candidate, score in zip(candidates, scores, strict=False)
             ]
 
             # Sort by rerank score
-            reranked.sort(key=lambda x: x["rerank_score"], reverse=True)
+            reranked.sort(key=lambda x: x['rerank_score'], reverse=True)
 
             # 4. Return top-k
             results = reranked[:top_k]
-            logger.debug("Re-ranked %s candidates to top %s", len(candidates), top_k)
+            logger.debug('Re-ranked %s candidates to top %s', len(candidates), top_k)
             return results
         except Exception as e:
-            logger.warning("Re-ranking failed: %s, returning original results", e)
+            logger.warning('Re-ranking failed: %s, returning original results', e)
             return candidates[:top_k]
 
 
@@ -165,7 +165,7 @@ class EnhancedVectorStore:
 
     def __init__(
         self,
-        collection_name: str = "APP_memory",
+        collection_name: str = 'APP_memory',
         backend_type: str | None = None,
         enable_cache: bool = True,
         enable_reranking: bool = True,
@@ -198,22 +198,22 @@ class EnhancedVectorStore:
 
         # Configuration
         self.config: dict[str, bool | int | float] = {
-            "accuracy_weight": 0.80,
-            "speed_weight": 0.20,
-            "reranking_enabled": enable_reranking,
-            "caching_enabled": enable_cache,
-            "initial_k": 20,  # Retrieve more candidates for re-ranking
-            "final_k": 5,  # Return top 5 after re-ranking
+            'accuracy_weight': 0.80,
+            'speed_weight': 0.20,
+            'reranking_enabled': enable_reranking,
+            'caching_enabled': enable_cache,
+            'initial_k': 20,  # Retrieve more candidates for re-ranking
+            'final_k': 5,  # Return top 5 after re-ranking
         }
 
         logger.info(
-            "Initialized EnhancedVectorStore (80%% accuracy / 20%% speed)\n"
-            "  Backend: %s\n"
-            "  Cache: %s\n"
-            "  Re-ranking: %s",
-            self.backend.stats()["backend"],
-            "enabled" if enable_cache else "disabled",
-            "enabled" if enable_reranking else "disabled",
+            'Initialized EnhancedVectorStore (80%% accuracy / 20%% speed)\n'
+            '  Backend: %s\n'
+            '  Cache: %s\n'
+            '  Re-ranking: %s',
+            self.backend.stats()['backend'],
+            'enabled' if enable_cache else 'disabled',
+            'enabled' if enable_reranking else 'disabled',
         )
 
     def add(
@@ -285,11 +285,11 @@ class EnhancedVectorStore:
                     cached_results, k, filter_metadata
                 )
                 elapsed_ms = (time.time() - start_time) * 1000
-                logger.debug("Cache hit! Returned in %.1fms", elapsed_ms)
+                logger.debug('Cache hit! Returned in %.1fms', elapsed_ms)
                 return filtered_results
 
         # Retrieve more candidates for re-ranking (higher recall)
-        initial_k_raw = self.config.get("initial_k", 20)
+        initial_k_raw = self.config.get('initial_k', 20)
         if isinstance(initial_k_raw, bool):
             initial_k_raw = 20
         elif not isinstance(initial_k_raw, int):
@@ -301,12 +301,12 @@ class EnhancedVectorStore:
         lexical_candidates = self.bm25_backend.search(
             query, k=initial_k, filter_metadata=filter_metadata
         )
-        
+
         seen_ids = set()
         candidates = []
         for doc in semantic_candidates + lexical_candidates:
-            if doc["step_id"] not in seen_ids:
-                seen_ids.add(doc["step_id"])
+            if doc['step_id'] not in seen_ids:
+                seen_ids.add(doc['step_id'])
                 candidates.append(doc)
 
         if not candidates:
@@ -324,7 +324,7 @@ class EnhancedVectorStore:
 
         elapsed_ms = (time.time() - start_time) * 1000
         logger.debug(
-            "Search completed in %.1fms (retrieved %s, re-ranked to %s)",
+            'Search completed in %.1fms (retrieved %s, re-ranked to %s)',
             elapsed_ms,
             len(candidates),
             len(results),
@@ -357,7 +357,7 @@ class EnhancedVectorStore:
         # Clear cache since results may have changed
         if self.cache:
             self.cache.cache.clear()
-            logger.debug("Cleared cache after deletion")
+            logger.debug('Cleared cache after deletion')
 
         return deleted_count
 
@@ -373,7 +373,7 @@ class EnhancedVectorStore:
         # Clear cache since results may have changed
         if self.cache:
             self.cache.cache.clear()
-            logger.debug("Cleared cache after deletion")
+            logger.debug('Cleared cache after deletion')
 
         return deleted_count
 
@@ -383,16 +383,16 @@ class EnhancedVectorStore:
 
         stats = {
             **backend_stats,
-            "config": self.config,
+            'config': self.config,
         }
 
         if self.cache:
-            stats["cache"] = self.cache.stats()
+            stats['cache'] = self.cache.stats()
 
         if self.reranker:
-            stats["reranker"] = {
-                "enabled": self.reranker.enabled,
-                "model": self.reranker.model_name,
+            stats['reranker'] = {
+                'enabled': self.reranker.enabled,
+                'model': self.reranker.model_name,
             }
 
         return stats
@@ -446,7 +446,7 @@ class EnhancedVectorStore:
 
 
 __all__ = [
-    "EnhancedVectorStore",
-    "QueryCache",
-    "ReRanker",
+    'EnhancedVectorStore',
+    'QueryCache',
+    'ReRanker',
 ]

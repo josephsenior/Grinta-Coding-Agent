@@ -51,18 +51,18 @@ def create_tracked_task(
 
 # Bounded worker pool — defaults to min(32, CPU+4) but can be overridden via env.
 def _get_max_workers() -> int:
-    raw = os.getenv("APP_THREAD_POOL_MAX_WORKERS", "32")
+    raw = os.getenv('APP_THREAD_POOL_MAX_WORKERS', '32')
     try:
         parsed = int(raw)
     except (TypeError, ValueError):
         _logger.warning(
-            "Invalid APP_THREAD_POOL_MAX_WORKERS=%r; using default 32",
+            'Invalid APP_THREAD_POOL_MAX_WORKERS=%r; using default 32',
             raw,
         )
         return 32
     if parsed <= 0:
         _logger.warning(
-            "Non-positive APP_THREAD_POOL_MAX_WORKERS=%r; using default 32",
+            'Non-positive APP_THREAD_POOL_MAX_WORKERS=%r; using default 32',
             raw,
         )
         return 32
@@ -96,10 +96,10 @@ def call_async_from_sync(
     and awaiting the result.
     """
     if corofn is None:
-        msg = "corofn is None"
+        msg = 'corofn is None'
         raise ValueError(msg)
     if not asyncio.iscoroutinefunction(corofn):
-        msg = "corofn is not a coroutine function"
+        msg = 'corofn is not a coroutine function'
         raise ValueError(msg)
 
     async def arun():
@@ -116,29 +116,29 @@ def call_async_from_sync(
         finally:
             loop_for_thread.close()
 
-    if getattr(EXECUTOR, "_shutdown", False):
+    if getattr(EXECUTOR, '_shutdown', False):
         return run()
     future = EXECUTOR.submit(run)
     futures.wait([future], timeout=timeout or None)
     if not future.done():
         _logger.warning(
-            "call_async_from_sync: future not done after %.1fs timeout for %s",
+            'call_async_from_sync: future not done after %.1fs timeout for %s',
             timeout,
-            getattr(corofn, "__name__", corofn),
+            getattr(corofn, '__name__', corofn),
         )
         # Cancel to avoid indefinite blocking.  result() with a timeout
         # ensures we don't park the calling thread forever.
         future.cancel()
         raise TimeoutError(
-            f"call_async_from_sync timed out after {timeout}s for "
-            f"{getattr(corofn, '__name__', corofn)}"
+            f'call_async_from_sync timed out after {timeout}s for '
+            f'{getattr(corofn, "__name__", corofn)}'
         )
     return future.result()
 
 
 async def call_coro_in_bg_thread(
     corofn: Callable[..., Awaitable[Any]] | None,
-    timeout: float = GENERAL_TIMEOUT,
+    timeout_sec: float = GENERAL_TIMEOUT,
     *args,
     **kwargs,
 ) -> None:
@@ -149,13 +149,13 @@ async def call_coro_in_bg_thread(
     """
     import importlib
 
-    mod = importlib.import_module("backend.utils.async_utils")
-    delegate = getattr(mod, "call_sync_from_async")
-    await delegate(call_async_from_sync, corofn, timeout, *args, **kwargs)
+    mod = importlib.import_module('backend.utils.async_utils')
+    delegate = getattr(mod, 'call_sync_from_async')
+    await delegate(call_async_from_sync, corofn, timeout_sec, *args, **kwargs)
 
 
 async def wait_all(
-    iterable: Iterable[Coroutine], timeout: int = GENERAL_TIMEOUT
+    iterable: Iterable[Coroutine], wait_timeout_sec: int = GENERAL_TIMEOUT
 ) -> list:
     """Shorthand for waiting for all the coroutines in the iterable given in parallel.
 
@@ -167,7 +167,7 @@ async def wait_all(
     if not tasks:
         return []
 
-    done, pending = await asyncio.wait(tasks, timeout=timeout)
+    done, pending = await asyncio.wait(tasks, timeout=wait_timeout_sec)
     if pending:
         _handle_pending_tasks(done, pending)
         raise TimeoutError
@@ -180,16 +180,16 @@ def _handle_pending_tasks(done: set[asyncio.Task], pending: set[asyncio.Task]) -
     logger = logging.getLogger(__name__)
     pending_info = []
     for task in pending:
-        coro_name = getattr(task.get_coro(), "__name__", "unknown")
-        pending_info.append(f"  - {coro_name}")
+        coro_name = getattr(task.get_coro(), '__name__', 'unknown')
+        pending_info.append(f'  - {coro_name}')
 
     logger.error(
-        "Timeout waiting for %s task(s) to complete. Completed: %s, Pending: %s\n"
-        "Pending tasks: %s",
+        'Timeout waiting for %s task(s) to complete. Completed: %s, Pending: %s\n'
+        'Pending tasks: %s',
         len(pending),
         len(done),
         len(pending),
-        "\n".join(pending_info) if pending_info else "Unable to get task names",
+        '\n'.join(pending_info) if pending_info else 'Unable to get task names',
     )
     for task in pending:
         task.cancel()
@@ -222,35 +222,37 @@ class AsyncException(Exception):
 
     def __str__(self) -> str:
         """Join aggregated exception messages into a newline-delimited string."""
-        return "\n".join(str(e) for e in self.exceptions)
+        return '\n'.join(str(e) for e in self.exceptions)
 
 
 async def run_in_loop(
-    coro: Coroutine, loop: asyncio.AbstractEventLoop, timeout: float = GENERAL_TIMEOUT
+    coro: Coroutine,
+    loop: asyncio.AbstractEventLoop,
+    timeout_sec: float = GENERAL_TIMEOUT,
 ) -> Any:
     """Run `coro` on `loop`, using thread handoff when switching event loops."""
     running_loop = asyncio.get_running_loop()
     if running_loop == loop:
         return await coro
-    return await call_sync_from_async(_run_in_loop, coro, loop, timeout)
+    return await call_sync_from_async(_run_in_loop, coro, loop, timeout_sec)
 
 
 def _run_in_loop(
-    coro: Coroutine, loop: asyncio.AbstractEventLoop, timeout: float
+    coro: Coroutine, loop: asyncio.AbstractEventLoop, timeout_sec: float
 ) -> Any:
     """Run a coroutine in a specific event loop with timeout.
 
     Args:
         coro: The coroutine to run.
         loop: The event loop to run the coroutine in.
-        timeout: Timeout in seconds for the coroutine execution.
+        timeout_sec: Timeout in seconds for the coroutine execution.
 
     Returns:
         The result of the coroutine execution.
 
     """
     future = asyncio.run_coroutine_threadsafe(coro, loop)
-    return future.result(timeout=timeout)
+    return future.result(timeout=timeout_sec)
 
 
 # ---------------------------------------------------------------------------
@@ -303,10 +305,10 @@ def _schedule_on_main_loop(coro: Coroutine[Any, Any, Any]) -> None:
     ``create_tracked_task`` happens inside the main loop's thread.
     """
     try:
-        create_tracked_task(coro, name="run_or_schedule")
+        create_tracked_task(coro, name='run_or_schedule')
     except RuntimeError:
         # Loop was closed between the threadsafe call and execution.
-        _logger.debug("Main loop closed before run_or_schedule task could be created")
+        _logger.debug('Main loop closed before run_or_schedule task could be created')
 
 
 def run_or_schedule(coro: Coroutine[Any, Any, Any]) -> None:
@@ -329,7 +331,7 @@ def run_or_schedule(coro: Coroutine[Any, Any, Any]) -> None:
     # 1. Currently inside a running loop → create a task directly.
     loop = get_active_loop()
     if loop is not None:
-        create_tracked_task(coro, name="run_or_schedule")
+        create_tracked_task(coro, name='run_or_schedule')
         return
 
     # 2. Dispatch to the registered main loop (from a background thread).

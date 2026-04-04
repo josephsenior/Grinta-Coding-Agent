@@ -28,10 +28,10 @@ def print_json_stdout(
     """
     txt = format_json(obj, pretty=pretty, ensure_ascii=ensure_ascii)
     try:
-        sys.stdout.write(txt + "\n")
+        sys.stdout.write(txt + '\n')
         sys.stdout.flush()
     except Exception:
-        logger.exception("Failed to write JSON to stdout")
+        logger.exception('Failed to write JSON to stdout')
 
 
 def format_json(obj: Any, *, pretty: bool = False, ensure_ascii: bool = False) -> str:
@@ -45,8 +45,8 @@ def format_json(obj: Any, *, pretty: bool = False, ensure_ascii: bool = False) -
         if pretty:
             return json.dumps(obj, indent=2, ensure_ascii=ensure_ascii, default=str)
         return json.dumps(
-            obj, separators=(",", ":"), ensure_ascii=ensure_ascii, default=str
+            obj, separators=(',', ':'), ensure_ascii=ensure_ascii, default=str
         )
     except Exception:
-        logger.exception("Failed to serialize object to JSON")
+        logger.exception('Failed to serialize object to JSON')
         return repr(obj)

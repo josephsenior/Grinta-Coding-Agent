@@ -26,7 +26,7 @@ class RequestHTTPError(httpx.HTTPStatusError):
         """Render the base error string and append any captured detail metadata."""
         s = super().__str__()
         if self.detail is not None:
-            s += f"\nDetails: {self.detail}"
+            s += f'\nDetails: {self.detail}'
         return str(s)
 
 
@@ -50,8 +50,8 @@ def is_retryable_error(exception: Any) -> bool:
     retry=retry_if_exception(is_retryable_error),
     stop=stop_after_attempt(3) | stop_if_should_exit(),
     wait=wait_exponential(multiplier=1, min=4, max=60),
-    before_sleep=tenacity_before_sleep_factory("runtime.request.send_request"),
-    after=tenacity_after_factory("runtime.request.send_request"),
+    before_sleep=tenacity_before_sleep_factory('runtime.request.send_request'),
+    after=tenacity_after_factory('runtime.request.send_request'),
 )
 def send_request(
     session: HttpSession, method: str, url: str, timeout: int = 60, **kwargs: Any
@@ -84,7 +84,7 @@ def send_request(
         finally:
             response.close()
         if isinstance(parsed, dict):
-            detail_payload = parsed.get("detail")
+            detail_payload = parsed.get('detail')
         raise RequestHTTPError(
             *e.args,
             request=e.request,

@@ -15,7 +15,7 @@ def _make_store(events: list, cur_id: int | None = None):
 
     def _get_event(idx):
         if idx < 0 or idx >= len(events):
-            raise FileNotFoundError(f"Event {idx} not found")
+            raise FileNotFoundError(f'Event {idx} not found')
         ev = events[idx]
         if isinstance(ev, Exception):
             raise ev
@@ -73,7 +73,7 @@ class TestIterEventsHappyPath:
 class TestIterEventsStopsAtCorruption:
     def test_stops_at_file_not_found(self):
         event0 = _make_event(0)
-        events = [event0, FileNotFoundError("missing"), _make_event(2)]
+        events = [event0, FileNotFoundError('missing'), _make_event(2)]
         store = _make_store(events, cur_id=3)
         result = list(iter_events_until_corrupt(store))
         assert len(result) == 1
@@ -81,14 +81,14 @@ class TestIterEventsStopsAtCorruption:
 
     def test_stops_at_json_decode_error(self):
         event0 = _make_event(0)
-        events = [event0, json.JSONDecodeError("bad", "", 0), _make_event(2)]
+        events = [event0, json.JSONDecodeError('bad', '', 0), _make_event(2)]
         store = _make_store(events, cur_id=3)
         result = list(iter_events_until_corrupt(store))
         assert len(result) == 1
 
     def test_stops_at_value_error(self):
         event0 = _make_event(0)
-        events = [event0, ValueError("corrupt"), _make_event(2)]
+        events = [event0, ValueError('corrupt'), _make_event(2)]
         store = _make_store(events, cur_id=3)
         result = list(iter_events_until_corrupt(store))
         assert len(result) == 1
@@ -129,7 +129,7 @@ class TestIterEventsWithFilter:
 
 class TestIterEventsEdgeCases:
     def test_corruption_at_first_event(self):
-        events = [FileNotFoundError("gone")]
+        events = [FileNotFoundError('gone')]
         store = _make_store(events, cur_id=1)
         result = list(iter_events_until_corrupt(store))
         assert result == []

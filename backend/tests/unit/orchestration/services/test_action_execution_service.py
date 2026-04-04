@@ -1,9 +1,8 @@
 """Tests for ActionExecutionService."""
 
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.orchestration.services.action_execution_service import ActionExecutionService
 from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
@@ -12,15 +11,18 @@ from backend.core.errors import (
     LLMNoActionError,
     LLMResponseError,
 )
-from backend.ledger import EventSource
-from backend.ledger.action import Action
-from backend.ledger.action.agent import CondensationRequestAction
 from backend.inference.exceptions import (
     APIConnectionError,
     AuthenticationError,
     BadRequestError,
     ContextWindowExceededError,
     RateLimitError,
+)
+from backend.ledger import EventSource
+from backend.ledger.action import Action
+from backend.ledger.action.agent import CondensationRequestAction
+from backend.orchestration.services.action_execution_service import (
+    ActionExecutionService,
 )
 
 
@@ -79,7 +81,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_next_action_malformed_action_error(self):
         """Test get_next_action handles LLMMalformedActionError."""
-        self.mock_context.agent.step.side_effect = LLMMalformedActionError("Bad action")
+        self.mock_context.agent.step.side_effect = LLMMalformedActionError('Bad action')
 
         result = await self.service.get_next_action()
 
@@ -89,7 +91,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_next_action_no_action_error(self):
         """Test get_next_action handles LLMNoActionError."""
-        self.mock_context.agent.step.side_effect = LLMNoActionError("No action")
+        self.mock_context.agent.step.side_effect = LLMNoActionError('No action')
 
         result = await self.service.get_next_action()
 
@@ -99,7 +101,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_next_action_response_error(self):
         """Test get_next_action handles LLMResponseError."""
-        self.mock_context.agent.step.side_effect = LLMResponseError("Response error")
+        self.mock_context.agent.step.side_effect = LLMResponseError('Response error')
 
         result = await self.service.get_next_action()
 
@@ -109,7 +111,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
     async def test_get_next_action_function_validation_error(self):
         """Test get_next_action handles FunctionCallValidationError."""
         self.mock_context.agent.step.side_effect = FunctionCallValidationError(
-            "Invalid"
+            'Invalid'
         )
 
         result = await self.service.get_next_action()
@@ -120,7 +122,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
     async def test_get_next_action_function_not_exists_error(self):
         """Test get_next_action handles FunctionCallNotExistsError."""
         self.mock_context.agent.step.side_effect = FunctionCallNotExistsError(
-            "Not found"
+            'Not found'
         )
 
         result = await self.service.get_next_action()
@@ -131,12 +133,12 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
     async def test_get_next_action_context_window_exceeded(self):
         """Test get_next_action handles context window exceeded."""
         self.mock_context.agent.step.side_effect = ContextWindowExceededError(
-            "Too large"
+            'Too large'
         )
         self.mock_context.agent.config.enable_history_truncation = True
 
         with patch.object(
-            self.service, "_handle_context_window_error", new_callable=AsyncMock
+            self.service, '_handle_context_window_error', new_callable=AsyncMock
         ) as mock_handle:
             mock_handle.return_value = None
             await self.service.get_next_action()
@@ -147,7 +149,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
     async def test_get_next_action_api_connection_error_raises(self):
         """Test get_next_action raises APIConnectionError."""
         self.mock_context.agent.step.side_effect = APIConnectionError(
-            "Connection failed"
+            'Connection failed'
         )
 
         with self.assertRaises(APIConnectionError):
@@ -155,14 +157,14 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_next_action_authentication_error_raises(self):
         """Test get_next_action raises AuthenticationError."""
-        self.mock_context.agent.step.side_effect = AuthenticationError("Auth failed")
+        self.mock_context.agent.step.side_effect = AuthenticationError('Auth failed')
 
         with self.assertRaises(AuthenticationError):
             await self.service.get_next_action()
 
     async def test_get_next_action_rate_limit_error_raises(self):
         """Test get_next_action raises RateLimitError."""
-        self.mock_context.agent.step.side_effect = RateLimitError("Rate limited")
+        self.mock_context.agent.step.side_effect = RateLimitError('Rate limited')
 
         with self.assertRaises(RateLimitError):
             await self.service.get_next_action()
@@ -180,7 +182,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         mock_pipeline.run_plan = AsyncMock()
         self.mock_context.operation_pipeline = mock_pipeline
 
-        with patch("backend.core.plugin.get_plugin_registry"):
+        with patch('backend.core.plugin.get_plugin_registry'):
             await self.service.execute_action(mock_action)
 
         # Should create context and run plan
@@ -213,7 +215,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         mock_pipeline.run_plan = AsyncMock()
         self.mock_context.operation_pipeline = mock_pipeline
 
-        with patch("backend.core.plugin.get_plugin_registry"):
+        with patch('backend.core.plugin.get_plugin_registry'):
             await self.service.execute_action(mock_action)
 
         # Should handle blocked invocation
@@ -229,7 +231,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         mock_action = MagicMock(spec=Action)
         mock_action.runnable = False
 
-        with patch("backend.core.plugin.get_plugin_registry"):
+        with patch('backend.core.plugin.get_plugin_registry'):
             await self.service.execute_action(mock_action)
 
         # Should run action without pipeline
@@ -242,13 +244,13 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
         self.mock_context.operation_pipeline = None
 
-        with patch("backend.core.plugin.get_plugin_registry"):
+        with patch('backend.core.plugin.get_plugin_registry'):
             await self.service.execute_action(mock_action)
 
         # Should run action without pipeline processing
         self.mock_context.run_action.assert_called_once()
 
-    @patch("backend.core.plugin.get_plugin_registry")
+    @patch('backend.core.plugin.get_plugin_registry')
     async def test_execute_action_plugin_hook(self, mock_get_registry):
         """Test execute_action fires plugin pre-action hook."""
         mock_action = MagicMock(spec=Action)
@@ -263,7 +265,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         # Should dispatch to plugin
         mock_registry.dispatch_action_pre.assert_called_once_with(mock_action)
 
-    @patch("backend.core.plugin.get_plugin_registry")
+    @patch('backend.core.plugin.get_plugin_registry')
     async def test_execute_action_plugin_exception(self, mock_get_registry):
         """Test execute_action handles plugin exceptions gracefully."""
         mock_action = MagicMock(spec=Action)
@@ -271,7 +273,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
         mock_registry = MagicMock()
         mock_registry.dispatch_action_pre = AsyncMock(
-            side_effect=RuntimeError("Plugin error")
+            side_effect=RuntimeError('Plugin error')
         )
         mock_get_registry.return_value = mock_registry
 
@@ -282,11 +284,11 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.mock_context.run_action.assert_called_once()
 
     @patch(
-        "backend.orchestration.services.action_execution_service.is_context_window_error"
+        'backend.orchestration.services.action_execution_service.is_context_window_error'
     )
     async def test_handle_context_window_error_with_truncation(self, mock_is_ctx_error):
         """Test _handle_context_window_error emits condensation request."""
-        exc = ContextWindowExceededError("Context too large")
+        exc = ContextWindowExceededError('Context too large')
         mock_is_ctx_error.return_value = True
         self.mock_context.agent.config.enable_history_truncation = True
 
@@ -301,13 +303,13 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(call_args[0], CondensationRequestAction)
 
     @patch(
-        "backend.orchestration.services.action_execution_service.is_context_window_error"
+        'backend.orchestration.services.action_execution_service.is_context_window_error'
     )
     async def test_handle_context_window_error_without_truncation(
         self, mock_is_ctx_error
     ):
         """Test _handle_context_window_error raises when truncation disabled."""
-        exc = ContextWindowExceededError("Context too large")
+        exc = ContextWindowExceededError('Context too large')
         mock_is_ctx_error.return_value = True
         self.mock_context.agent.config.enable_history_truncation = False
 
@@ -315,18 +317,18 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
             await self.service._handle_context_window_error(exc)
 
     @patch(
-        "backend.orchestration.services.action_execution_service.is_context_window_error"
+        'backend.orchestration.services.action_execution_service.is_context_window_error'
     )
     async def test_handle_context_window_error_not_context_window(
         self, mock_is_ctx_error
     ):
         """Test _handle_context_window_error re-raises non-context-window errors."""
-        exc = BadRequestError("Bad request")
+        exc = BadRequestError('Bad request')
         mock_is_ctx_error.return_value = False
 
         with self.assertRaises(BadRequestError):
             await self.service._handle_context_window_error(exc)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

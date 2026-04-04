@@ -18,11 +18,11 @@ def _extract_cost_from_events(events: Sequence[Event]) -> tuple[float, float]:
     budget guard service).  Returns (0.0, 0.0) when no cost data is found.
     """
     for event in reversed(list(events)):
-        metrics = getattr(event, "metrics", None) or getattr(event, "_metrics", None)
+        metrics = getattr(event, 'metrics', None) or getattr(event, '_metrics', None)
         if metrics is None:
             continue
-        cost = getattr(metrics, "accumulated_cost", None)
-        budget = getattr(metrics, "max_budget_per_task", None)
+        cost = getattr(metrics, 'accumulated_cost', None)
+        budget = getattr(metrics, 'max_budget_per_task', None)
         if cost is not None and budget is not None:
             try:
                 return float(cost), float(budget)
@@ -68,26 +68,26 @@ class BudgetCritic(BaseCritic):
         if budget <= 0.0:
             return CriticResult(
                 score=1.0,
-                message="No budget cap configured; spending not penalised.",
+                message='No budget cap configured; spending not penalised.',
             )
 
         pct = cost / budget
 
         if pct <= 0.50:
-            score, label = 1.0, "well within budget"
+            score, label = 1.0, 'well within budget'
         elif pct <= 0.80:
-            score, label = 0.8, "acceptable usage"
+            score, label = 0.8, 'acceptable usage'
         elif pct <= 1.00:
-            score, label = 0.5, "tight but within budget"
+            score, label = 0.5, 'tight but within budget'
         else:
-            score, label = 0.0, "over budget"
+            score, label = 0.0, 'over budget'
 
         # Tweak: Only output a warning if we are within 10% of hitting the budget.
         if pct < 0.90:
-            msg = ""
+            msg = ''
         else:
             msg = (
-                f"⚠️ Budget Warning: ${cost:.4f} of ${budget:.2f} budget used "
-                f"({pct * 100:.1f}%) — {label}."
+                f'⚠️ Budget Warning: ${cost:.4f} of ${budget:.2f} budget used '
+                f'({pct * 100:.1f}%) — {label}.'
             )
         return CriticResult(score=score, message=msg)

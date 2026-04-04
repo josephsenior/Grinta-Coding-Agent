@@ -11,11 +11,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, TypedDict, runtime_checkable
 
 if TYPE_CHECKING:
-    from backend.orchestration.state.state import State
     from backend.core.message import Message
     from backend.ledger.action import Action, MessageAction
     from backend.ledger.event import Event
     from backend.ledger.stream import EventStream
+    from backend.orchestration.state.state import State
 
 
 # Re-usable type alias for LLM tool definitions (OpenAI-compatible dict).

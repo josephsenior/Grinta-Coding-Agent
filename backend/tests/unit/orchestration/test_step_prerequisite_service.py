@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
 from typing import cast
+from unittest.mock import MagicMock
 
-from backend.orchestration.services.orchestration_context import OrchestrationContext
-
-
-from backend.orchestration.services.step_prerequisite_service import (
-    StepPrerequisiteService,
-)
 from backend.core.schemas import AgentState
 from backend.ledger import RecallType
 from backend.ledger.action.agent import RecallAction
+from backend.orchestration.services.orchestration_context import OrchestrationContext
+from backend.orchestration.services.step_prerequisite_service import (
+    StepPrerequisiteService,
+)
 
 
 class _FakeContext:
@@ -62,7 +60,7 @@ class TestStepPrerequisiteService:
         assert svc.can_step() is False
 
     def test_can_step_when_pending_recall_action(self):
-        pending = RecallAction(query="q", recall_type=RecallType.KNOWLEDGE)
+        pending = RecallAction(query='q', recall_type=RecallType.KNOWLEDGE)
         ctx = _FakeContext(AgentState.RUNNING, pending_action=pending)
         svc = StepPrerequisiteService(cast(OrchestrationContext, ctx))
         assert svc.can_step() is True

@@ -32,7 +32,7 @@ class GeminiCacheManager:
 
     def _get_hash(self, system_instruction: str | None, messages: list[dict]) -> str:
         """Create a stable hash of the context to identify existing caches."""
-        content = f"sys:{system_instruction or ''}|msgs:{str(messages)}"
+        content = f'sys:{system_instruction or ""}|msgs:{str(messages)}'
         return hashlib.sha256(content.encode()).hexdigest()
 
     def get_or_create_cache(
@@ -67,11 +67,11 @@ class GeminiCacheManager:
             try:
                 # Verify it still exists in Google's end
                 client.caches.get(name=cache_name)
-                logger.debug("Reusing Gemini context cache: %s", cache_name)
+                logger.debug('Reusing Gemini context cache: %s', cache_name)
                 return cache_name
             except Exception:
                 logger.debug(
-                    "Gemini cache %s expired or not found, recreating", cache_name
+                    'Gemini cache %s expired or not found, recreating', cache_name
                 )
                 del self._caches[content_hash]
 
@@ -80,29 +80,29 @@ class GeminiCacheManager:
             # Gemini caching usually takes system_instruction + initial messages
             contents = []
             for m in messages:
-                role = "user" if m.get("role") == "user" else "model"
+                role = 'user' if m.get('role') == 'user' else 'model'
                 contents.append(
-                    {"role": role, "parts": [{"text": m.get("content", "")}]}
+                    {'role': role, 'parts': [{'text': m.get('content', '')}]}
                 )
 
             cache = cast(Any, client.caches.create)(
                 model=model,
                 config={
-                    "display_name": f"app_cache_{int(time.time())}",
-                    "system_instruction": system_instruction,
-                    "ttl": f"{ttl_minutes * 60}s",
+                    'display_name': f'app_cache_{int(time.time())}',
+                    'system_instruction': system_instruction,
+                    'ttl': f'{ttl_minutes * 60}s',
                 },
                 contents=contents,
             )
 
             logger.info(
-                "Created new Gemini context cache: %s for model %s", cache.name, model
+                'Created new Gemini context cache: %s for model %s', cache.name, model
             )
             self._caches[content_hash] = cache.name
             return cache.name
 
         except Exception as e:
-            logger.warning("Failed to create Gemini context cache: %s", e)
+            logger.warning('Failed to create Gemini context cache: %s', e)
             return None
 
     def cleanup_old_caches(self, client: genai.Client):
@@ -113,7 +113,7 @@ class GeminiCacheManager:
                 # if we have too many or they are redundant.
                 pass
         except Exception as e:
-            logger.debug("Failed to list/cleanup Gemini caches: %s", e)
+            logger.debug('Failed to list/cleanup Gemini caches: %s', e)
 
 
 # Global instance

@@ -14,7 +14,7 @@ def _make_context():
     """Create a mock OrchestrationContext."""
     ctx = MagicMock()
     controller = MagicMock()
-    controller.id = "test-ctrl-id"
+    controller.id = 'test-ctrl-id'
     controller._closed = False
     controller._pending_action = None
     controller.state = MagicMock()
@@ -58,12 +58,13 @@ class TestControllerAccessor:
         ctx = _make_context()
         svc = RetryService(ctx)
         ctrl = svc.controller
-        assert ctrl.id == "test-ctrl-id"
+        assert ctrl.id == 'test-ctrl-id'
 
 
 class TestInitialize:
     @patch(
-        "backend.orchestration.services.retry_service.get_retry_queue", return_value=None
+        'backend.orchestration.services.retry_service.get_retry_queue',
+        return_value=None,
     )
     def test_no_queue(self, mock_get_queue):
         ctx = _make_context()
@@ -71,7 +72,7 @@ class TestInitialize:
         svc.initialize()
         assert svc._retry_worker_task is None
 
-    @patch("backend.orchestration.services.retry_service.get_retry_queue")
+    @patch('backend.orchestration.services.retry_service.get_retry_queue')
     def test_no_event_loop(self, mock_get_queue):
         queue = MagicMock()
         mock_get_queue.return_value = queue
@@ -86,17 +87,17 @@ class TestIsRetryBackendFailure:
     def test_connection_error(self):
         ctx = _make_context()
         svc = RetryService(ctx)
-        assert svc._is_retry_backend_failure(ConnectionError("conn lost")) is True
+        assert svc._is_retry_backend_failure(ConnectionError('conn lost')) is True
 
     def test_os_error(self):
         ctx = _make_context()
         svc = RetryService(ctx)
-        assert svc._is_retry_backend_failure(OSError("os err")) is True
+        assert svc._is_retry_backend_failure(OSError('os err')) is True
 
     def test_other_error(self):
         ctx = _make_context()
         svc = RetryService(ctx)
-        assert svc._is_retry_backend_failure(ValueError("bad value")) is False
+        assert svc._is_retry_backend_failure(ValueError('bad value')) is False
 
 
 class TestShutdown:
@@ -138,10 +139,10 @@ class TestScheduleRetryAfterFailure:
         ctx = _make_context()
         svc = RetryService(ctx)
         with patch(
-            "backend.orchestration.services.retry_service.get_retry_queue",
+            'backend.orchestration.services.retry_service.get_retry_queue',
             return_value=MagicMock(),
         ):
-            result = await svc.schedule_retry_after_failure(ValueError("not retryable"))
+            result = await svc.schedule_retry_after_failure(ValueError('not retryable'))
         assert result is False
 
     @pytest.mark.asyncio
@@ -149,13 +150,13 @@ class TestScheduleRetryAfterFailure:
         ctx = _make_context()
         svc = RetryService(ctx)
         with patch(
-            "backend.orchestration.services.retry_service.get_retry_queue",
+            'backend.orchestration.services.retry_service.get_retry_queue',
             return_value=None,
         ):
             from backend.inference.exceptions import RateLimitError
 
             result = await svc.schedule_retry_after_failure(
-                RateLimitError("rate limited")
+                RateLimitError('rate limited')
             )
         assert result is False
 
@@ -168,10 +169,10 @@ class TestScheduleRetryAfterFailure:
         svc._retry_pending = True
         queue = MagicMock()
         with patch(
-            "backend.orchestration.services.retry_service.get_retry_queue",
+            'backend.orchestration.services.retry_service.get_retry_queue',
             return_value=queue,
         ):
             result = await svc.schedule_retry_after_failure(
-                APIConnectionError("timeout")
+                APIConnectionError('timeout')
             )
         assert result is True

@@ -4,23 +4,21 @@ from __future__ import annotations
 
 import hashlib
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 from typing import cast
+from unittest.mock import MagicMock
 
-
-from backend.orchestration.replay import ReplayDivergence, ReplayManager
 from backend.ledger.action.action import Action
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation.empty import NullObservation
-
+from backend.orchestration.replay import ReplayDivergence, ReplayManager
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_action(source=EventSource.AGENT, content="do something"):
+def _make_action(source=EventSource.AGENT, content='do something'):
     """Build a minimal Action-compatible object."""
     a = MessageAction(content=content)
     a.source = source
@@ -28,7 +26,7 @@ def _make_action(source=EventSource.AGENT, content="do something"):
     return a
 
 
-def _make_observation(source=EventSource.ENVIRONMENT, content="done"):
+def _make_observation(source=EventSource.ENVIRONMENT, content='done'):
     """Build a minimal observation-like event."""
     obs = SimpleNamespace(content=content, source=source)
     # The replay manager only checks isinstance(event, Action) and
@@ -50,16 +48,16 @@ class TestReplayDivergence:
     def test_fields(self):
         d = ReplayDivergence(
             index=3,
-            action_type="CmdRunAction",
-            expected_hash="aaa",
-            actual_hash="bbb",
-            message="diverged",
+            action_type='CmdRunAction',
+            expected_hash='aaa',
+            actual_hash='bbb',
+            message='diverged',
         )
         assert d.index == 3
-        assert d.action_type == "CmdRunAction"
-        assert d.expected_hash == "aaa"
-        assert d.actual_hash == "bbb"
-        assert d.message == "diverged"
+        assert d.action_type == 'CmdRunAction'
+        assert d.expected_hash == 'aaa'
+        assert d.actual_hash == 'bbb'
+        assert d.message == 'diverged'
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +79,7 @@ class TestReplayManagerInit:
 
     def test_events_with_actions(self):
         a1 = _make_action(source=EventSource.AGENT)
-        a2 = _make_action(source=EventSource.AGENT, content="step 2")
+        a2 = _make_action(source=EventSource.AGENT, content='step 2')
         rm = ReplayManager(events=[a1, a2])
         assert rm.replay_mode is True
         assert len(rm.replay_events) == 2
@@ -95,13 +93,13 @@ class TestReplayManagerInit:
 
     def test_null_observations_filtered(self):
         a1 = _make_action(source=EventSource.AGENT)
-        null_obs = NullObservation(content="")
+        null_obs = NullObservation(content='')
         null_obs.source = EventSource.AGENT
         rm = ReplayManager(events=[a1, null_obs])
         assert len(rm.replay_events) == 1
 
     def test_wait_for_response_cleared(self):
-        a1 = MessageAction(content="query")
+        a1 = MessageAction(content='query')
         a1.source = EventSource.USER
         a1.wait_for_response = True
         a2 = _make_action(source=EventSource.AGENT)
@@ -133,15 +131,15 @@ class TestShouldReplayAndStep:
         assert rm.should_replay() is False
 
     def test_step_returns_action(self):
-        a = _make_action(content="step 1")
+        a = _make_action(content='step 1')
         rm = ReplayManager(events=[a])
         result = rm.step()
         assert isinstance(result, Action)
-        assert cast(MessageAction, result).content == "step 1"
+        assert cast(MessageAction, result).content == 'step 1'
 
     def test_step_advances_index(self):
-        a1 = _make_action(content="first")
-        a2 = _make_action(content="second")
+        a1 = _make_action(content='first')
+        a2 = _make_action(content='second')
         rm = ReplayManager(events=[a1, a2])
         rm.step()
         assert rm.replay_index == 1
@@ -150,12 +148,12 @@ class TestShouldReplayAndStep:
 
     def test_should_replay_skips_non_actions(self):
         """Non-action events between actions should be skipped."""
-        a1 = _make_action(content="first")
+        a1 = _make_action(content='first')
         obs = MagicMock(spec=Event)
         obs.source = EventSource.AGENT
         # Make isinstance(obs, Action) return False
         obs_event = cast(Event, obs)
-        a2 = _make_action(content="second")
+        a2 = _make_action(content='second')
         rm = ReplayManager(events=[a1, obs_event, a2])
         rm.step()  # first action
         # should_replay will advance past the non-action obs to a2
@@ -178,7 +176,7 @@ class TestDeterminismVerification:
     def test_divergence_detected(self):
         a = _make_action()
         expected_obs = MagicMock()
-        expected_obs.content = "expected output"
+        expected_obs.content = 'expected output'
         expected_obs.source = EventSource.AGENT
         expected_event = cast(Event, expected_obs)
 
@@ -186,7 +184,7 @@ class TestDeterminismVerification:
         rm.step()  # advance past the action
 
         actual_obs = MagicMock()
-        actual_obs.content = "different output"
+        actual_obs.content = 'different output'
 
         result = rm.verify_observation(actual_obs)
         assert result is False
@@ -196,7 +194,7 @@ class TestDeterminismVerification:
     def test_no_divergence_for_matching_content(self):
         a = _make_action()
         expected_obs = MagicMock()
-        expected_obs.content = "same output"
+        expected_obs.content = 'same output'
         expected_obs.source = EventSource.AGENT
         expected_event = cast(Event, expected_obs)
 
@@ -204,7 +202,7 @@ class TestDeterminismVerification:
         rm.step()
 
         actual_obs = MagicMock()
-        actual_obs.content = "same output"
+        actual_obs.content = 'same output'
 
         result = rm.verify_observation(actual_obs)
         assert result is True
@@ -227,23 +225,23 @@ class TestDeterminismVerification:
 class TestContentHash:
     def test_none_event_hashes_to_none(self):
         h = ReplayManager._content_hash(None)
-        assert h == "none"
+        assert h == 'none'
 
     def test_event_with_content(self):
         ev = MagicMock()
-        ev.content = "hello"
+        ev.content = 'hello'
         h = ReplayManager._content_hash(ev)
-        assert h == hashlib.sha256(b"hello").hexdigest()
+        assert h == hashlib.sha256(b'hello').hexdigest()
 
     def test_event_without_content(self):
         ev = MagicMock(spec=[])  # no attributes
         h = ReplayManager._content_hash(ev)
-        expected = hashlib.sha256(b"").hexdigest()
+        expected = hashlib.sha256(b'').hexdigest()
         assert h == expected
 
     def test_deterministic_hash(self):
         ev = MagicMock()
-        ev.content = "test"
+        ev.content = 'test'
         h1 = ReplayManager._content_hash(ev)
         h2 = ReplayManager._content_hash(ev)
         assert h1 == h2
@@ -259,24 +257,24 @@ class TestSnapshot:
         a = _make_action()
         rm = ReplayManager(events=[a])
         snap = rm.snapshot()
-        assert snap["replay_mode"] is True
-        assert snap["replay_index"] == 0
-        assert snap["total_events"] == 1
-        assert snap["divergence_count"] == 0
-        assert snap["is_deterministic"] is True
+        assert snap['replay_mode'] is True
+        assert snap['replay_index'] == 0
+        assert snap['total_events'] == 1
+        assert snap['divergence_count'] == 0
+        assert snap['is_deterministic'] is True
 
     def test_snapshot_reflects_state(self):
         a = _make_action()
         rm = ReplayManager(events=[a])
         rm.step()
         snap = rm.snapshot()
-        assert snap["replay_index"] == 1
+        assert snap['replay_index'] == 1
 
     def test_snapshot_empty_manager(self):
         rm = ReplayManager(events=None)
         snap = rm.snapshot()
-        assert snap["replay_mode"] is False
-        assert snap["total_events"] == 0
+        assert snap['replay_mode'] is False
+        assert snap['total_events'] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -293,10 +291,10 @@ class TestProperties:
         divergences.append(
             ReplayDivergence(
                 index=999,
-                action_type="Fake",
-                expected_hash="x",
-                actual_hash="y",
-                message="fake",
+                action_type='Fake',
+                expected_hash='x',
+                actual_hash='y',
+                message='fake',
             )
         )
         assert not rm.divergences

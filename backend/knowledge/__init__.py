@@ -9,9 +9,9 @@ from backend.persistence.data_models.knowledge_base import (
 )
 
 __all__ = [
-    "KnowledgeBaseManager",
-    "KnowledgeBaseCollection",
-    "KnowledgeBaseDocument",
-    "KnowledgeBaseSearchResult",
-    "KnowledgeBaseSettings",
+    'KnowledgeBaseManager',
+    'KnowledgeBaseCollection',
+    'KnowledgeBaseDocument',
+    'KnowledgeBaseSearchResult',
+    'KnowledgeBaseSettings',
 ]

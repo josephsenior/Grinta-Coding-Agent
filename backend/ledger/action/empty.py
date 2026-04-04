@@ -16,5 +16,4 @@ class NullAction(Action):
     @property
     def message(self) -> str:
         """Get null action message."""
-        return "No action"
-
+        return 'No action'

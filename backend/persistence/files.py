@@ -13,7 +13,7 @@ class FileStore:
     include local filesystem and in-memory storage.
     """
 
-    root: str = ""
+    root: str = ''
 
     @abstractmethod
     def write(self, path: str, contents: str | bytes) -> None:

@@ -8,9 +8,9 @@ from pydantic import BaseModel
 
 if TYPE_CHECKING:
     pass
-from backend.ledger.action.agent import CondensationAction
 from backend.context.compactor.compactor import BaseLLMCompactor, Compaction
 from backend.context.view import View
+from backend.ledger.action.agent import CondensationAction
 
 if TYPE_CHECKING:
     pass
@@ -61,9 +61,7 @@ class LLMAttentionCompactor(BaseLLMCompactor):
             if event.id not in response_ids and event.id not in head_event_ids
         ]
 
-        return Compaction(
-            action=CondensationAction(pruned_event_ids=pruned_ids)
-        )
+        return Compaction(action=CondensationAction(pruned_event_ids=pruned_ids))
 
     def _get_llm_ranked_ids(self, view: View) -> list:
         """Get event IDs ranked by LLM importance.
@@ -76,39 +74,41 @@ class LLMAttentionCompactor(BaseLLMCompactor):
 
         """
         message = (
-            "You will be given a list of actions, observations, and thoughts from a coding agent.\n"
-            "        Each item in the list has an identifier. Please sort the identifiers in order of how important the\n"
+            'You will be given a list of actions, observations, and thoughts from a coding agent.\n'
+            '        Each item in the list has an identifier. Please sort the identifiers in order of how important the\n'
             "        contents of the item are for the next step of the coding agent's task, from most important to least\n"
-            "        important."
+            '        important.'
         )
 
         messages = [
-            {"content": message, "role": "user"},
+            {'content': message, 'role': 'user'},
             *[
                 {
-                    "content": f"<ID>{e.id}</ID>\n<CONTENT>{e.message}</CONTENT>",
-                    "role": "user",
+                    'content': f'<ID>{e.id}</ID>\n<CONTENT>{e.message}</CONTENT>',
+                    'role': 'user',
                 }
                 for e in view
             ],
         ]
 
-        assert self.llm is not None, "LLM required for attention compactor"
+        assert self.llm is not None, 'LLM required for attention compactor'
         response = self.llm.completion(
             messages=messages,
             response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "ImportantEventSelection",
-                    "schema": ImportantEventSelection.model_json_schema(),
+                'type': 'json_schema',
+                'json_schema': {
+                    'name': 'ImportantEventSelection',
+                    'schema': ImportantEventSelection.model_json_schema(),
                 },
             },
         )
 
-        self.add_metadata("metrics", self.llm.metrics.get())
-        choices = getattr(response, "choices", None)
+        self.add_metadata('metrics', self.llm.metrics.get())
+        choices = getattr(response, 'choices', None)
         if not choices or len(choices) == 0:
-            raise ValueError("LLM attention compactor received response with no choices")
+            raise ValueError(
+                'LLM attention compactor received response with no choices'
+            )
         return ImportantEventSelection.model_validate_json(
             choices[0].message.content
         ).ids

@@ -4,15 +4,15 @@
 
 
 def __getattr__(name: str):
-    if name == "Memory":
+    if name == 'Memory':
         from backend.context.agent_memory import Memory
 
         return Memory
-    if name == "ContextMemory":
+    if name == 'ContextMemory':
         from backend.context.conversation_memory import ContextMemory
 
         return ContextMemory
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
 
 
-__all__ = ["Memory", "ContextMemory"]
+__all__ = ['Memory', 'ContextMemory']

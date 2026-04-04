@@ -22,36 +22,36 @@ class RuntimeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     timeout: int = Field(
         default=DEFAULT_RUNTIME_TIMEOUT,
         ge=1,
-        description="The timeout in seconds for the default runtime action execution",
+        description='The timeout in seconds for the default runtime action execution',
     )
     enable_auto_lint: bool = Field(
         default=DEFAULT_RUNTIME_AUTO_LINT_ENABLED,
-        description="Whether to enable auto-lint",
+        description='Whether to enable auto-lint',
     )
     runtime_startup_env_vars: dict[str, str] = Field(
         default_factory=dict,
-        description="The environment variables to set at the launch of the runtime",
+        description='The environment variables to set at the launch of the runtime',
     )
     selected_repo: str | None = Field(
-        default=None, description="Selected repository for runtime operations"
+        default=None, description='Selected repository for runtime operations'
     )
     close_delay: int = Field(
         default=DEFAULT_RUNTIME_CLOSE_DELAY,
-        description="Delay in seconds before closing runtime",
+        description='Delay in seconds before closing runtime',
     )
     keep_runtime_alive: bool = Field(
         default=DEFAULT_RUNTIME_KEEP_ALIVE,
-        description="Whether to keep runtime alive between requests",
+        description='Whether to keep runtime alive between requests',
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
     @classmethod
     def from_toml_section(cls, data: dict) -> dict[str, RuntimeConfig]:
         """Create a mapping of RuntimeConfig instances from the [runtime] section."""
         runtime_mapping: dict[str, RuntimeConfig] = {}
         try:
-            runtime_mapping["runtime_config"] = cls.model_validate(data)
+            runtime_mapping['runtime_config'] = cls.model_validate(data)
         except ValidationError as e:
-            msg = f"Invalid runtime configuration: {e}"
+            msg = f'Invalid runtime configuration: {e}'
             raise ValueError(msg) from e
         return runtime_mapping

@@ -68,7 +68,7 @@ class LLMRateGovernor:
             self._consecutive_throttles += 1
             wait_s = self._compute_backoff()
             logger.warning(
-                "Token rate limit exceeded (%d tokens in last %ds). Limit: %d/min. Throttling %.1fs (consecutive=%d)",
+                'Token rate limit exceeded (%d tokens in last %ds). Limit: %d/min. Throttling %.1fs (consecutive=%d)',
                 usage_in_window,
                 self.history_window_seconds,
                 self.max_tokens_per_minute,
@@ -90,12 +90,12 @@ class LLMRateGovernor:
         """Diagnostic snapshot for debug endpoints."""
         p95 = self._latency_p95()
         return {
-            "max_tokens_per_minute": self.max_tokens_per_minute,
-            "window_seconds": self.history_window_seconds,
-            "current_backoff_s": round(self._current_backoff, 2),
-            "consecutive_throttles": self._consecutive_throttles,
-            "latency_p95_s": round(p95, 3) if p95 else None,
-            "history_size": len(self._history),
+            'max_tokens_per_minute': self.max_tokens_per_minute,
+            'window_seconds': self.history_window_seconds,
+            'current_backoff_s': round(self._current_backoff, 2),
+            'consecutive_throttles': self._consecutive_throttles,
+            'latency_p95_s': round(p95, 3) if p95 else None,
+            'history_size': len(self._history),
         }
 
     # ------------------------------------------------------------------ #

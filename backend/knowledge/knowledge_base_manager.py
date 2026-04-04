@@ -14,7 +14,9 @@ from backend.persistence.data_models.knowledge_base import (
     KnowledgeBaseDocument,
     KnowledgeBaseSearchResult,
 )
-from backend.persistence.knowledge_base.knowledge_base_store import get_knowledge_base_store
+from backend.persistence.knowledge_base.knowledge_base_store import (
+    get_knowledge_base_store,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +39,7 @@ class KnowledgeBaseManager:
         """Get or create a vector store for a collection."""
         if collection_id not in self._vector_stores:
             self._vector_stores[collection_id] = EnhancedVectorStore(
-                collection_name=f"kb_{collection_id}",
+                collection_name=f'kb_{collection_id}',
                 enable_cache=True,
                 enable_reranking=True,
             )
@@ -59,21 +61,21 @@ class KnowledgeBaseManager:
         try:
             vector_store.add(
                 step_id=chunk.id,
-                role="document",
+                role='document',
                 artifact_hash=document.content_hash,
-                rationale=f"Document: {filename}",
+                rationale=f'Document: {filename}',
                 content_text=chunk.content,
                 metadata={
-                    "document_id": document.id,
-                    "collection_id": collection_id,
-                    "filename": filename,
-                    "chunk_index": chunk.chunk_index,
+                    'document_id': document.id,
+                    'collection_id': collection_id,
+                    'filename': filename,
+                    'chunk_index': chunk.chunk_index,
                     **(chunk.metadata or {}),
                 },
             )
             return True
         except Exception as e:
-            logger.error("Failed to add chunk %s to vector store: %s", chunk.id, e)
+            logger.error('Failed to add chunk %s to vector store: %s', chunk.id, e)
             return False
 
     def _add_chunks_to_vector_store(
@@ -103,7 +105,7 @@ class KnowledgeBaseManager:
 
             if chunks_added < len(chunks):
                 logger.warning(
-                    "Only %s/%s chunks added to vector store. Failed chunks: %s",
+                    'Only %s/%s chunks added to vector store. Failed chunks: %s',
                     chunks_added,
                     len(chunks),
                     failed_chunks,
@@ -111,8 +113,8 @@ class KnowledgeBaseManager:
 
             if chunks_added == 0:
                 logger.error(
-                    "Failed to add any chunks to vector store for document %s. "
-                    "Document exists but is not searchable.",
+                    'Failed to add any chunks to vector store for document %s. '
+                    'Document exists but is not searchable.',
                     document.id,
                 )
             else:
@@ -124,7 +126,7 @@ class KnowledgeBaseManager:
                     len(chunks),
                 )
         except Exception as e:
-            logger.error("Failed to add document chunks to vector store: %s", e)
+            logger.error('Failed to add document chunks to vector store: %s', e)
 
         return chunks_added
 
@@ -177,16 +179,16 @@ class KnowledgeBaseManager:
             vector_store = self._get_vector_store(collection_id)
             # Delete all chunks for this collection
             deleted_count = vector_store.delete_by_metadata(
-                filter_metadata={"collection_id": collection_id}
+                filter_metadata={'collection_id': collection_id}
             )
             logger.info(
-                "Deleted %s vector chunks for collection %s",
+                'Deleted %s vector chunks for collection %s',
                 deleted_count,
                 collection_id,
             )
         except Exception as e:
             logger.error(
-                "Failed to delete vectors for collection %s: %s", collection_id, e
+                'Failed to delete vectors for collection %s: %s', collection_id, e
             )
             # Continue with store deletion even if vector deletion fails
 
@@ -203,7 +205,7 @@ class KnowledgeBaseManager:
         collection_id: str,
         filename: str,
         content: str,
-        mime_type: str = "text/plain",
+        mime_type: str = 'text/plain',
         metadata: dict[str, Any] | None = None,
     ) -> KnowledgeBaseDocument | None:
         """Add a document to a collection.
@@ -222,7 +224,7 @@ class KnowledgeBaseManager:
         # Verify collection exists and user has access
         collection = self.get_collection(collection_id)
         if not collection:
-            logger.error("Collection %s not found or access denied", collection_id)
+            logger.error('Collection %s not found or access denied', collection_id)
             return None
 
         # Calculate content hash for deduplication
@@ -231,7 +233,7 @@ class KnowledgeBaseManager:
         # Check if document already exists
         existing = self.store.get_document_by_hash(content_hash)
         if existing and existing.collection_id == collection_id:
-            logger.info("Document with hash %s already exists", content_hash)
+            logger.info('Document with hash %s already exists', content_hash)
             return existing
 
         # Create document
@@ -271,7 +273,7 @@ class KnowledgeBaseManager:
         collection_id: str,
         filename: str,
         content: str,
-        mime_type: str = "text/plain",
+        mime_type: str = 'text/plain',
         metadata: dict[str, Any] | None = None,
     ) -> KnowledgeBaseDocument | None:
         """Async wrapper for adding a document without blocking.
@@ -330,7 +332,7 @@ class KnowledgeBaseManager:
             return None
 
         for c in chunks:
-            c.metadata.pop("_byte_start", None)
+            c.metadata.pop('_byte_start', None)
         return chunks
 
     def _collect_ast_boundaries(
@@ -363,13 +365,22 @@ class KnowledgeBaseManager:
 
         try:
             parser = _get_parser(lang)
-            tree = parser.parse(content.encode("utf-8"))
+            tree = parser.parse(content.encode('utf-8'))
         except Exception:
             return None
 
         keywords = (
-            "function", "method", "class", "module", "interface",
-            "struct", "enum", "impl", "trait", "declaration", "definition",
+            'function',
+            'method',
+            'class',
+            'module',
+            'interface',
+            'struct',
+            'enum',
+            'impl',
+            'trait',
+            'declaration',
+            'definition',
         )
         boundaries = [
             (child.start_byte, child.end_byte)
@@ -388,8 +399,11 @@ class KnowledgeBaseManager:
     ) -> tuple[list[DocumentChunk], int]:
         """Split oversized segment via sliding window. Returns (new_chunks, new_index)."""
         sub_chunks = self._sliding_window_chunk(
-            segment, document_id, metadata,
-            chunk_size=max_chunk_bytes, start_index=chunk_index
+            segment,
+            document_id,
+            metadata,
+            chunk_size=max_chunk_bytes,
+            start_index=chunk_index,
         )
         return sub_chunks, chunk_index + len(sub_chunks)
 
@@ -408,7 +422,7 @@ class KnowledgeBaseManager:
     ) -> int:
         """Append new chunk or extend last. Returns updated chunk_index."""
         if chunks:
-            merged_bytes = len((content[last_start:sym_end]).encode("utf-8"))
+            merged_bytes = len((content[last_start:sym_end]).encode('utf-8'))
             if merged_bytes <= max_chunk_bytes:
                 last = chunks[-1]
                 merged = content[last_start:sym_end]
@@ -416,10 +430,12 @@ class KnowledgeBaseManager:
                     document_id=document_id,
                     chunk_index=last.chunk_index,
                     content=merged,
-                    metadata={**(metadata or {}), "_byte_start": last_start},
+                    metadata={**(metadata or {}), '_byte_start': last_start},
                 )
                 return chunk_index
-        overlap_start = max(0, current_start - overlap_bytes) if chunk_index > 0 else current_start
+        overlap_start = (
+            max(0, current_start - overlap_bytes) if chunk_index > 0 else current_start
+        )
         chunk_text = content[overlap_start:sym_end]
         if chunk_text.strip():
             chunks.append(
@@ -427,7 +443,7 @@ class KnowledgeBaseManager:
                     document_id=document_id,
                     chunk_index=chunk_index,
                     content=chunk_text,
-                    metadata={**(metadata or {}), "_byte_start": overlap_start},
+                    metadata={**(metadata or {}), '_byte_start': overlap_start},
                 )
             )
             return chunk_index + 1
@@ -453,7 +469,7 @@ class KnowledgeBaseManager:
 
         for sym_start, sym_end in boundaries:
             segment = content[current_start:sym_end]
-            segment_bytes = len(segment.encode("utf-8"))
+            segment_bytes = len(segment.encode('utf-8'))
 
             if segment_bytes > max_chunk_bytes and chunks:
                 sub_chunks, chunk_index = self._merge_handle_oversized_segment(
@@ -463,10 +479,18 @@ class KnowledgeBaseManager:
                 current_start = sym_end
                 continue
 
-            last_start = int(chunks[-1].metadata.get("_byte_start", 0) if chunks else 0)
+            last_start = int(chunks[-1].metadata.get('_byte_start', 0) if chunks else 0)
             chunk_index = self._merge_append_or_extend_chunk(
-                chunks, content, document_id, metadata,
-                max_chunk_bytes, overlap_bytes, chunk_index, last_start, current_start, sym_end,
+                chunks,
+                content,
+                document_id,
+                metadata,
+                max_chunk_bytes,
+                overlap_bytes,
+                chunk_index,
+                last_start,
+                current_start,
+                sym_end,
             )
             current_start = sym_end
 
@@ -548,13 +572,13 @@ class KnowledgeBaseManager:
             vector_store = self._get_vector_store(collection_id)
             # Delete all chunks for this document
             deleted_count = vector_store.delete_by_metadata(
-                filter_metadata={"document_id": document_id}
+                filter_metadata={'document_id': document_id}
             )
             logger.info(
-                "Deleted %s vector chunks for document %s", deleted_count, document_id
+                'Deleted %s vector chunks for document %s', deleted_count, document_id
             )
         except Exception as e:
-            logger.error("Failed to delete vectors for document %s: %s", document_id, e)
+            logger.error('Failed to delete vectors for document %s: %s', document_id, e)
             # Continue with store deletion even if vector deletion fails
 
         # Delete from store
@@ -599,27 +623,27 @@ class KnowledgeBaseManager:
                 raw_results = vector_store.search(
                     query=query,
                     k=top_k,
-                    filter_metadata={"collection_id": collection_id},
+                    filter_metadata={'collection_id': collection_id},
                 )
 
                 # Convert to search results
                 for result in raw_results:
-                    score = result.get("score", 0.0)
+                    score = result.get('score', 0.0)
                     if score < relevance_threshold:
                         continue
 
                     search_result = KnowledgeBaseSearchResult(
-                        document_id=result.get("metadata", {}).get("document_id", ""),
+                        document_id=result.get('metadata', {}).get('document_id', ''),
                         collection_id=collection_id,
-                        filename=result.get("metadata", {}).get("filename", ""),
-                        chunk_content=result.get("content", ""),
+                        filename=result.get('metadata', {}).get('filename', ''),
+                        chunk_content=result.get('content', ''),
                         relevance_score=score,
-                        metadata=result.get("metadata", {}),
+                        metadata=result.get('metadata', {}),
                     )
                     all_results.append(search_result)
 
             except Exception as e:
-                logger.error("Error searching collection %s: %s", collection_id, e)
+                logger.error('Error searching collection %s: %s', collection_id, e)
                 continue
 
         # Sort by relevance
@@ -651,16 +675,16 @@ class KnowledgeBaseManager:
         total_size = sum(c.total_size_bytes for c in collections)
 
         return {
-            "total_collections": len(collections),
-            "total_documents": total_docs,
-            "total_size_bytes": total_size,
-            "total_size_mb": round(total_size / (1024 * 1024), 2),
-            "collections": [
+            'total_collections': len(collections),
+            'total_documents': total_docs,
+            'total_size_bytes': total_size,
+            'total_size_mb': round(total_size / (1024 * 1024), 2),
+            'collections': [
                 {
-                    "id": c.id,
-                    "name": c.name,
-                    "document_count": c.document_count,
-                    "size_mb": round(c.total_size_bytes / (1024 * 1024), 2),
+                    'id': c.id,
+                    'name': c.name,
+                    'document_count': c.document_count,
+                    'size_mb': round(c.total_size_bytes / (1024 * 1024), 2),
                 }
                 for c in collections
             ],

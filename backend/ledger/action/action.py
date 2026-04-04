@@ -24,7 +24,7 @@ class Action(Event, metaclass=CanonicalMeta):
     They are executed by the runtime and produce Observations.
     """
 
-    action: ClassVar[str] = ""
+    action: ClassVar[str] = ''
     runnable: ClassVar[bool] = False
     __test__: ClassVar[bool] = False
 
@@ -35,8 +35,8 @@ class Action(Event, metaclass=CanonicalMeta):
 
     def __post_init__(self) -> None:
         # Ensure confirmation_state always has a value (idempotent with field default)
-        if not hasattr(self, "confirmation_state"):
+        if not hasattr(self, 'confirmation_state'):
             self.confirmation_state = ActionConfirmationStatus.CONFIRMED
 
 
-__all__ = ["Action", "ActionConfirmationStatus"]
+__all__ = ['Action', 'ActionConfirmationStatus']

@@ -4,12 +4,12 @@ from typing import Any, cast
 
 import pytest
 
+from backend.context.view import View
 from backend.ledger.action.message import MessageAction
 from backend.ledger.event import EventSource
-from backend.context.view import View
 
 
-def _make_event(event_id=1, content="test"):
+def _make_event(event_id=1, content='test'):
     """Create a real MessageAction event."""
     e = MessageAction(content=content)
     e._id = event_id
@@ -34,15 +34,15 @@ class TestViewBasics:
         assert len(result) == 3
 
     def test_getitem_int(self):
-        events = [_make_event(i, content=f"msg-{i}") for i in range(3)]
+        events = [_make_event(i, content=f'msg-{i}') for i in range(3)]
         v = View(events=events)
-        assert cast(Any, v[0]).content == "msg-0"
-        assert cast(Any, v[2]).content == "msg-2"
+        assert cast(Any, v[0]).content == 'msg-0'
+        assert cast(Any, v[2]).content == 'msg-2'
 
     def test_getitem_negative(self):
-        events = [_make_event(i, content=f"msg-{i}") for i in range(3)]
+        events = [_make_event(i, content=f'msg-{i}') for i in range(3)]
         v = View(events=events)
-        assert cast(Any, v[-1]).content == "msg-2"
+        assert cast(Any, v[-1]).content == 'msg-2'
 
     def test_getitem_slice(self):
         events = [_make_event(i) for i in range(5)]
@@ -52,8 +52,8 @@ class TestViewBasics:
 
     def test_getitem_invalid_type_raises(self):
         v = View(events=[])
-        with pytest.raises(TypeError, match="Invalid key type"):
-            cast(Any, v)["bad"]
+        with pytest.raises(TypeError, match='Invalid key type'):
+            cast(Any, v)['bad']
 
     def test_getitem_index_error(self):
         v = View(events=[_make_event(0)])
@@ -104,12 +104,12 @@ class TestFindSummaryInfo:
 
         ca = CondensationAction(
             pruned_event_ids=[1],
-            summary="AI decided to use X",
+            summary='AI decided to use X',
             summary_offset=0,
         )
         events = [_make_event(1), ca]
         summary, offset = View._find_summary_info(events)
-        assert summary == "AI decided to use X"
+        assert summary == 'AI decided to use X'
         assert offset == 0
 
 

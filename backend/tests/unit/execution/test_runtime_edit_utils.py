@@ -1,4 +1,4 @@
-﻿"""Tests for backend.execution.utils.edit — pure helper functions and FileEditRuntimeMixin."""
+"""Tests for backend.execution.utils.edit — pure helper functions and FileEditRuntimeMixin."""
 
 from __future__ import annotations
 
@@ -7,10 +7,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from backend.execution.utils.edit import (
-    _extract_code,
     FileEditRuntimeMixin,
+    _extract_code,
 )
-
 
 # ── _extract_code ─────────────────────────────────────────────────────
 
@@ -22,27 +21,27 @@ class TestExtractCode:
         assert result == "print('hello')"
 
     def test_returns_none_when_no_tags(self):
-        assert _extract_code("no tags here") is None
+        assert _extract_code('no tags here') is None
 
     def test_handles_multiline_code(self):
-        code = "line1\nline2\nline3"
-        response = f"<updated_code>{code}</updated_code>"
+        code = 'line1\nline2\nline3'
+        response = f'<updated_code>{code}</updated_code>'
         assert _extract_code(response) == code
 
     def test_strips_edit_prefix(self):
-        response = "<updated_code>#EDIT: some comment\nactual code</updated_code>"
-        assert _extract_code(response) == "actual code"
+        response = '<updated_code>#EDIT: some comment\nactual code</updated_code>'
+        assert _extract_code(response) == 'actual code'
 
     def test_first_match_when_multiple_tags(self):
         response = (
-            "<updated_code>first</updated_code> <updated_code>second</updated_code>"
+            '<updated_code>first</updated_code> <updated_code>second</updated_code>'
         )
-        assert _extract_code(response) == "first"
+        assert _extract_code(response) == 'first'
 
     def test_empty_tags(self):
-        response = "<updated_code></updated_code>"
+        response = '<updated_code></updated_code>'
         result = _extract_code(response)
-        assert result == ""
+        assert result == ''
 
 
 # ── _validate_range (via mixin) ───────────────────────────────────────
@@ -114,7 +113,7 @@ class TestCalculateEditRange:
         action.start = 3
         action.end = 7
         start_idx, end_idx, length = self.editor._calculate_edit_range(
-            action, [""] * 20
+            action, [''] * 20
         )
         assert start_idx == 2
         assert end_idx == 7
@@ -124,7 +123,7 @@ class TestCalculateEditRange:
         action = MagicMock()
         action.start = 1
         action.end = -1
-        lines = [""] * 10
+        lines = [''] * 10
         start_idx, end_idx, length = self.editor._calculate_edit_range(action, lines)
         assert start_idx == 0
         assert end_idx == 10
@@ -155,5 +154,5 @@ class TestCheckRetryNum:
 
     def test_raises_when_no_llm(self):
         editor = _ConcreteEditor()
-        with pytest.raises(RuntimeError, match="disabled"):
+        with pytest.raises(RuntimeError, match='disabled'):
             editor.check_retry_num(1)

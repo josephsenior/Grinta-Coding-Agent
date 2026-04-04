@@ -21,10 +21,10 @@ class Chunk(BaseModel):
 
     def visualize(self) -> str:
         """Render chunk with prefixed line numbers for display/debugging."""
-        lines = self.text.split("\n")
+        lines = self.text.split('\n')
         assert len(lines) == self.line_range[1] - self.line_range[0] + 1
-        return "".join(
-            (f"{self.line_range[0] + i}|{line}\n" for i, line in enumerate(lines))
+        return ''.join(
+            (f'{self.line_range[0] + i}|{line}\n' for i, line in enumerate(lines))
         )
 
 
@@ -39,12 +39,12 @@ def _create_chunks_from_raw_string(content: str, size: int):
         list[Chunk]: List of chunks with line ranges.
 
     """
-    lines = content.split("\n")
+    lines = content.split('\n')
     ret = []
     for i in range(0, len(lines), size):
         _cur_lines = lines[i : i + size]
         ret.append(
-            Chunk(text="\n".join(_cur_lines), line_range=(i + 1, i + len(_cur_lines)))
+            Chunk(text='\n'.join(_cur_lines), line_range=(i + 1, i + len(_cur_lines)))
         )
     return ret
 
@@ -61,17 +61,17 @@ def create_chunks(
         if language is not None:
             import importlib
 
-            mod = importlib.import_module("backend.utils.chunk_localizer")
-            parser_fn = getattr(mod, "get_parser")
+            mod = importlib.import_module('backend.utils.chunk_localizer')
+            parser_fn = getattr(mod, 'get_parser')
             parser = parser_fn(language)
         else:
             parser = None
     except AttributeError:
-        logger.debug("Language %s not supported. Falling back to raw string.", language)
+        logger.debug('Language %s not supported. Falling back to raw string.', language)
         parser = None
     if parser is None:
         return _create_chunks_from_raw_string(text, size)
-    msg = "Tree-sitter chunking not implemented yet."
+    msg = 'Tree-sitter chunking not implemented yet.'
     raise NotImplementedError(msg)
 
 

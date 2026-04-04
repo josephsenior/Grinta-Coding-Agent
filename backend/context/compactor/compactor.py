@@ -10,21 +10,21 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 
+from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.compaction import EventCompactor
 from backend.ledger.serialization.event import event_to_dict
-from backend.context.view import View
 
 if TYPE_CHECKING:
-    from backend.orchestration.state.state import State
     from backend.core.config.compactor_config import CompactorConfig
-    from backend.ledger.event import Event
     from backend.inference.llm import LLM
     from backend.inference.llm_registry import LLMRegistry
+    from backend.ledger.event import Event
+    from backend.orchestration.state.state import State
 
 
-COMPACTOR_METADATA_KEY = "compactor_meta"
+COMPACTOR_METADATA_KEY = 'compactor_meta'
 """Key identifying where metadata is stored in a ``State`` object's ``extra_data`` field."""
 
 # Maximum number of condensation metadata batches to retain.
@@ -98,7 +98,7 @@ class Compactor(ABC):
         """
         if COMPACTOR_METADATA_KEY not in state.extra_data:
             state.set_extra(
-                COMPACTOR_METADATA_KEY, [], source="Compactor.write_metadata"
+                COMPACTOR_METADATA_KEY, [], source='Compactor.write_metadata'
             )
         if self._metadata_batch:
             state.extra_data[COMPACTOR_METADATA_KEY].append(self._metadata_batch)
@@ -108,7 +108,7 @@ class Compactor(ABC):
             state.set_extra(
                 COMPACTOR_METADATA_KEY,
                 meta_list[-MAX_COMPACTOR_META_BATCHES:],
-                source="Compactor.write_metadata.evict",
+                source='Compactor.write_metadata.evict',
             )
         self._metadata_batch = {}
 
@@ -136,9 +136,9 @@ class Compactor(ABC):
 
     def compacted_history(self, state: State) -> View | Compaction:
         """Compact the state's history."""
-        model_name = self.llm.config.model if hasattr(self, "llm") else "unknown"
+        model_name = self.llm.config.model if hasattr(self, 'llm') else 'unknown'
         self._llm_metadata = state.to_llm_metadata(
-            model_name=model_name, agent_name="compactor"
+            model_name=model_name, agent_name='compactor'
         )
         with self.metadata_batch(state):
             return self.compact(state.view)
@@ -151,7 +151,7 @@ class Compactor(ABC):
         """
         if not self._llm_metadata:
             logger.warning(
-                "LLM metadata is empty. Ensure to set it in the compactor implementation."
+                'LLM metadata is empty. Ensure to set it in the compactor implementation.'
             )
         return self._llm_metadata
 
@@ -169,7 +169,7 @@ class Compactor(ABC):
 
         """
         if configuration_type in COMPACTOR_REGISTRY:
-            msg = f"Compactor configuration {configuration_type} is already registered"
+            msg = f'Compactor configuration {configuration_type} is already registered'
             raise ValueError(msg)
         COMPACTOR_REGISTRY[configuration_type] = cls
 
@@ -194,7 +194,7 @@ class Compactor(ABC):
             compactor_class = COMPACTOR_REGISTRY[type(config)]
             return compactor_class.from_config(config, llm_registry)
         except KeyError as e:
-            msg = f"Unknown compactor config: {config}"
+            msg = f'Unknown compactor config: {config}'
             raise ValueError(msg) from e
 
 
@@ -243,14 +243,14 @@ class BaseLLMCompactor(RollingCompactor, ABC):
             max_event_length: Maximum character length for individual event content.
         """
         if max_size < 1:
-            msg = f"max_size ({max_size}) must be positive"
+            msg = f'max_size ({max_size}) must be positive'
             raise ValueError(msg)
         if keep_first < 0:
-            msg = f"keep_first ({keep_first}) cannot be negative"
+            msg = f'keep_first ({keep_first}) cannot be negative'
             raise ValueError(msg)
         if keep_first > max_size // 2 and max_size > 1:
             # Only check if max_size is large enough to have a middle
-            msg = f"keep_first ({keep_first}) must be at most half of max_size ({max_size})"
+            msg = f'keep_first ({keep_first}) must be at most half of max_size ({max_size})'
             raise ValueError(msg)
 
         self.llm = llm
@@ -279,15 +279,15 @@ class BaseLLMCompactor(RollingCompactor, ABC):
             BaseLLMCompactor: A compactor instance.
         """
         llm_instance: LLM | None = None
-        if hasattr(config, "llm_config") and config.llm_config:
+        if hasattr(config, 'llm_config') and config.llm_config:
             from backend.core.config.llm_config import LLMConfig
 
             if isinstance(config.llm_config, LLMConfig):
                 llm_config_obj = config.llm_config
-                service_id = f"compactor_{llm_config_obj.model}"
+                service_id = f'compactor_{llm_config_obj.model}'
             else:
                 llm_config_obj = llm_registry.config.get_llm_config(config.llm_config)
-                service_id = f"compactor_{config.llm_config}"
+                service_id = f'compactor_{config.llm_config}'
 
             # Ensure caching is disabled for compactor LLM to avoid overhead
             llm_config_obj = llm_config_obj.model_copy()
@@ -298,11 +298,11 @@ class BaseLLMCompactor(RollingCompactor, ABC):
 
         compactor = cls(
             llm=llm_instance,
-            max_size=getattr(config, "max_size", 100),
-            keep_first=getattr(config, "keep_first", 1),
+            max_size=getattr(config, 'max_size', 100),
+            keep_first=getattr(config, 'keep_first', 1),
             **cls._get_extra_config_args(config),
         )
-        compactor.token_budget = getattr(config, "token_budget", None)
+        compactor.token_budget = getattr(config, 'token_budget', None)
         # If no explicit token_budget was configured but the LLM reports its context
         # size, derive a safe 80% budget so _exceeds_token_budget() is active by
         # default for any LLM-backed compactor. This prevents large single-event
@@ -310,7 +310,7 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         # window before the event-count threshold is reached.
         if compactor.token_budget is None and llm_instance is not None:
             max_input = getattr(
-                getattr(llm_instance, "config", None), "max_input_tokens", None
+                getattr(llm_instance, 'config', None), 'max_input_tokens', None
             )
             if max_input:
                 compactor.token_budget = int(max_input * 0.80)
@@ -323,8 +323,8 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         Subclasses should override this to provide additional arguments from the config.
         """
         extra_args = {}
-        if hasattr(config, "max_event_length"):
-            extra_args["max_event_length"] = config.max_event_length
+        if hasattr(config, 'max_event_length'):
+            extra_args['max_event_length'] = config.max_event_length
         return extra_args
 
     def should_compact(self, view: View) -> bool:
@@ -343,9 +343,9 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         """Add LLM response metadata to the compactor's metadata batch."""
         from backend.core.pydantic_compat import model_dump_with_options
 
-        self.add_metadata("response", model_dump_with_options(response))
-        if hasattr(self, "llm") and self.llm:
-            self.add_metadata("metrics", self.llm.metrics.get())
+        self.add_metadata('response', model_dump_with_options(response))
+        if hasattr(self, 'llm') and self.llm:
+            self.add_metadata('metrics', self.llm.metrics.get())
 
     def _create_compaction_result(
         self, pruned_events: list[Event], summary: str
@@ -363,20 +363,41 @@ class BaseLLMCompactor(RollingCompactor, ABC):
 
     @staticmethod
     def _sanitize_workspace_paths(text: str) -> str:
-        """Strip real workspace temp paths that may appear in LLM-generated summaries."""
+        """Strip real workspace temp paths that may appear in LLM-generated summaries.
+
+        When ``APP_WORKSPACE_DIR`` is set in the environment the replacement is
+        precise — only the exact known path is substituted, avoiding false
+        positives on unrelated text that happens to contain "app_workspace".
+        When the env var is absent (e.g. in unit tests) a fuzzy regex falls back
+        to matching any path-like token containing "app_workspace".
+        """
+        import os
         import re
 
-        if "app_workspace" not in text:
+        # ── Precise replacement using the known workspace path ──────────────
+        ws_dir = os.environ.get('APP_WORKSPACE_DIR', '')
+        if ws_dir and 'app_workspace' in ws_dir:
+            ws_fwd = ws_dir.replace('\\', '/')
+            ws_back = ws_dir.replace('/', '\\')
+            ws_dbl = ws_back.replace('\\', '\\\\')
+            # Replace longest/most-specific variants first to avoid partial matches.
+            for token in (ws_dbl, ws_back, ws_fwd, ws_dir):
+                if token:
+                    text = text.replace(token, '/workspace')
+            return text
+
+        # ── Fuzzy fallback when env var is unavailable ──────────────────────
+        if 'app_workspace' not in text:
             return text
         # Full paths with drive letter or Unix root.
         text = re.sub(
-            r"(?:[A-Za-z]:[/\\]|/)\S*app_workspace\S*",
-            "/workspace",
+            r'(?:[A-Za-z]:[/\\]|/)\S*app_workspace\S*',
+            '/workspace',
             text,
         )
         # Bare references without a leading path root.
-        if "app_workspace" in text:
-            text = re.sub(r"app_workspace\S*", "/workspace", text)
+        if 'app_workspace' in text:
+            text = re.sub(r'app_workspace\S*', '/workspace', text)
         return text
 
     def _truncate(self, content: str) -> str:
@@ -401,9 +422,9 @@ class BaseLLMCompactor(RollingCompactor, ABC):
             try:
                 payload_parts.append(json.dumps(event_to_dict(event), default=str))
             except Exception:
-                payload_parts.append(str(getattr(event, "message", "")))
+                payload_parts.append(str(getattr(event, 'message', '')))
 
-        text = "\n".join(payload_parts)
+        text = '\n'.join(payload_parts)
         if not text:
             return 1
 
@@ -421,7 +442,7 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         try:
             import tiktoken  # type: ignore
 
-            return tiktoken.get_encoding("cl100k_base")
+            return tiktoken.get_encoding('cl100k_base')
         except Exception:
             return None
 
@@ -432,7 +453,7 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         estimated = self.estimate_view_tokens(view)
         if estimated > self.token_budget:
             logger.debug(
-                "Token budget exceeded: %d estimated > %d budget",
+                'Token budget exceeded: %d estimated > %d budget',
                 estimated,
                 self.token_budget,
             )
@@ -447,8 +468,12 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         should = self.should_compact(view)
         budget = self._exceeds_token_budget(view)
         logger.debug(
-            "compact check: len(view)=%d max_size=%d should_compact=%s token_budget=%s exceeds_budget=%s",
-            len(view), self.max_size, should, self.token_budget, budget,
+            'compact check: len(view)=%d max_size=%d should_compact=%s token_budget=%s exceeds_budget=%s',
+            len(view),
+            self.max_size,
+            should,
+            self.token_budget,
+            budget,
         )
         if should or budget:
             return self.get_compaction(view)
@@ -459,11 +484,11 @@ class BaseLLMCompactor(RollingCompactor, ABC):
 Compaction.model_rebuild()
 
 __all__ = [
-    "COMPACTOR_METADATA_KEY",
-    "COMPACTOR_REGISTRY",
-    "Compaction",
-    "Compactor",
-    "RollingCompactor",
-    "BaseLLMCompactor",
-    "get_compaction_metadata",
+    'COMPACTOR_METADATA_KEY',
+    'COMPACTOR_REGISTRY',
+    'Compaction',
+    'Compactor',
+    'RollingCompactor',
+    'BaseLLMCompactor',
+    'get_compaction_metadata',
 ]

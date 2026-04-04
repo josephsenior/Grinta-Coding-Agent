@@ -19,11 +19,11 @@ def check_tools(tools: list[dict], llm_config: LLMConfig) -> list[dict]:
         Modified tools compatible with the LLM
 
     """
-    if not llm_config.model or "gemini" not in llm_config.model.lower():
+    if not llm_config.model or 'gemini' not in llm_config.model.lower():
         return tools
 
     logger.info(
-        "Removing default fields and unsupported formats from tools for Gemini model %s "
+        'Removing default fields and unsupported formats from tools for Gemini model %s '
         "since Gemini models have limited format support (only 'enum' and 'date-time' for STRING types).",
         llm_config.model,
     )
@@ -46,9 +46,9 @@ def _clean_tools_for_gemini(
     checked_tools = copy.deepcopy(tools)
 
     for tool in checked_tools:
-        if "function" in tool and "parameters" in tool["function"]:
-            if "properties" in tool["function"]["parameters"]:
-                _clean_tool_properties(tool["function"]["parameters"]["properties"])
+        if 'function' in tool and 'parameters' in tool['function']:
+            if 'properties' in tool['function']['parameters']:
+                _clean_tool_properties(tool['function']['parameters']['properties'])
 
     return checked_tools
 
@@ -62,23 +62,23 @@ def _clean_tool_properties(properties: dict) -> None:
     """
     for prop_name, prop in properties.items():
         # Remove default values
-        if "default" in prop:
-            del prop["default"]
+        if 'default' in prop:
+            del prop['default']
 
         # Remove unsupported string formats
-        if prop.get("type") == "string" and "format" in prop:
-            if prop["format"] not in ["enum", "date-time"]:
+        if prop.get('type') == 'string' and 'format' in prop:
+            if prop['format'] not in ['enum', 'date-time']:
                 logger.info(
                     'Removing unsupported format "%s" for STRING parameter "%s"',
-                    prop["format"],
+                    prop['format'],
                     prop_name,
                 )
-                del prop["format"]
+                del prop['format']
 
 
 def get_token_count(
     messages: list[dict] | list[Message],
-    model: str = "gpt-4o",
+    model: str = 'gpt-4o',
     custom_tokenizer: Any = None,
 ) -> int:
     """Standalone function to estimate token count."""
@@ -87,19 +87,19 @@ def get_token_count(
         # But for now we just fallback to the simple estimation
         pass
 
-    text = ""
+    text = ''
     for m in messages:
         if isinstance(m, dict):
-            content = m.get("content", "")
+            content = m.get('content', '')
         else:
-            content = getattr(m, "content", "")
+            content = getattr(m, 'content', '')
 
         if isinstance(content, list):
             for part in content:
                 if isinstance(part, dict):
-                    text += str(part.get("text", ""))
+                    text += str(part.get('text', ''))
                 else:
-                    text += str(getattr(part, "text", ""))
+                    text += str(getattr(part, 'text', ''))
         else:
             text += str(content)
 

@@ -85,7 +85,7 @@ class ConversationResumer:
 
         try:
             entries = await call_sync_from_async(self._fs.list, CONVERSATION_BASE_DIR)
-            return [e.rstrip("/") for e in entries if not e.startswith(".")]
+            return [e.rstrip('/') for e in entries if not e.startswith('.')]
         except FileNotFoundError:
             return []
 
@@ -115,18 +115,18 @@ class ConversationResumer:
 
         # Sort by numeric ID
         json_files = [
-            f for f in files if f.endswith(".json") and not f.endswith(".pending")
+            f for f in files if f.endswith('.json') and not f.endswith('.pending')
         ]
-        json_files.sort(key=lambda f: int(f.replace(".json", "")))
+        json_files.sort(key=lambda f: int(f.replace('.json', '')))
 
         events: list[Event] = []
         for fname in json_files:
             try:
-                raw = await call_sync_from_async(self._fs.read, f"{events_dir}{fname}")
+                raw = await call_sync_from_async(self._fs.read, f'{events_dir}{fname}')
                 data = json.loads(raw)
                 events.append(event_from_dict(data))
             except Exception as exc:
-                logger.warning("Skipping corrupt event %s: %s", fname, exc)
+                logger.warning('Skipping corrupt event %s: %s', fname, exc)
         return events
 
     async def _load_latest_checkpoint(
@@ -148,8 +148,8 @@ class ConversationResumer:
             return None, None
         # Convert State to dict for portability
         state_dict: dict[str, Any] = {}
-        if hasattr(state, "__dict__"):
+        if hasattr(state, '__dict__'):
             state_dict = {
-                k: v for k, v in state.__dict__.items() if not k.startswith("_")
+                k: v for k, v in state.__dict__.items() if not k.startswith('_')
             }
         return state_dict, latest

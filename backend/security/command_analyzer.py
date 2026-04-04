@@ -20,20 +20,20 @@ logger = logging.getLogger(__name__)
 class RiskCategory(str, Enum):
     """Risk classification for shell commands."""
 
-    NONE = "none"
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    CRITICAL = "critical"
+    NONE = 'none'
+    LOW = 'low'
+    MEDIUM = 'medium'
+    HIGH = 'high'
+    CRITICAL = 'critical'
 
 
 # Map from RiskCategory to ActionSecurityRisk for convenience.
 _RISK_TO_ACTION_LEVEL: dict[str, str] = {
-    "none": "LOW",
-    "low": "LOW",
-    "medium": "MEDIUM",
-    "high": "HIGH",
-    "critical": "HIGH",  # ActionSecurityRisk has no CRITICAL; map to HIGH
+    'none': 'LOW',
+    'low': 'LOW',
+    'medium': 'MEDIUM',
+    'high': 'HIGH',
+    'critical': 'HIGH',  # ActionSecurityRisk has no CRITICAL; map to HIGH
 }
 
 
@@ -54,7 +54,7 @@ class CommandAssessment:
         """Return the corresponding ``ActionSecurityRisk`` enum member."""
         from backend.ledger.action import ActionSecurityRisk
 
-        level_name = _RISK_TO_ACTION_LEVEL.get(self.risk_category.value, "LOW")
+        level_name = _RISK_TO_ACTION_LEVEL.get(self.risk_category.value, 'LOW')
         return ActionSecurityRisk[level_name]
 
 
@@ -66,106 +66,109 @@ _CRITICAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # Destructive filesystem operations
     (
         re.compile(
-            r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|--force\s+--recursive|-[a-zA-Z]*f[a-zA-Z]*r)\b",
+            r'\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|--force\s+--recursive|-[a-zA-Z]*f[a-zA-Z]*r)\b',
             re.I,
         ),
-        "recursive forced delete",
+        'recursive forced delete',
     ),
     (
-        re.compile(r"\brm\s+-[a-zA-Z]*r[a-zA-Z]*\s+/\s*$", re.I),
-        "recursive delete on root",
+        re.compile(r'\brm\s+-[a-zA-Z]*r[a-zA-Z]*\s+/\s*$', re.I),
+        'recursive delete on root',
     ),
-    (re.compile(r"\bmkfs\b", re.I), "filesystem format"),
-    (re.compile(r"\bdd\s+.*\bof=/dev/", re.I), "raw device write"),
-    (re.compile(r"\b:(){ :\|:& };:", re.I), "fork bomb"),
+    (re.compile(r'\bmkfs\b', re.I), 'filesystem format'),
+    (re.compile(r'\bdd\s+.*\bof=/dev/', re.I), 'raw device write'),
+    (re.compile(r'\b:(){ :\|:& };:', re.I), 'fork bomb'),
     # Remote code execution / supply-chain attacks
-    (re.compile(r"\bcurl\b.*\|\s*(ba)?sh\b", re.I), "pipe remote script to shell"),
-    (re.compile(r"\bwget\b.*\|\s*(ba)?sh\b", re.I), "pipe remote download to shell"),
-    (re.compile(r"\bcurl\b.*\|\s*python", re.I), "pipe remote script to python"),
-    (re.compile(r"\bwget\b.*\|\s*python", re.I), "pipe remote download to python"),
+    (re.compile(r'\bcurl\b.*\|\s*(ba)?sh\b', re.I), 'pipe remote script to shell'),
+    (re.compile(r'\bwget\b.*\|\s*(ba)?sh\b', re.I), 'pipe remote download to shell'),
+    (re.compile(r'\bcurl\b.*\|\s*python', re.I), 'pipe remote script to python'),
+    (re.compile(r'\bwget\b.*\|\s*python', re.I), 'pipe remote download to python'),
     # Encoded payloads / obfuscation
-    (re.compile(r"\bbase64\b.*\|\s*(ba)?sh\b", re.I), "decoded payload piped to shell"),
-    (re.compile(r"\bbase64\b.*\|\s*python\b", re.I), "decoded payload piped to python"),
+    (re.compile(r'\bbase64\b.*\|\s*(ba)?sh\b', re.I), 'decoded payload piped to shell'),
+    (re.compile(r'\bbase64\b.*\|\s*python\b', re.I), 'decoded payload piped to python'),
     # Privilege escalation
     (
-        re.compile(r"\bsudo\s+(su|passwd|visudo|chmod\s+[0-7]*7[0-7]*\s+/)\b", re.I),
-        "privilege escalation",
+        re.compile(r'\bsudo\s+(su|passwd|visudo|chmod\s+[0-7]*7[0-7]*\s+/)\b', re.I),
+        'privilege escalation',
     ),
     # Windows equivalents
     (
-        re.compile(r"\bRemove-Item\b.*-Recurse.*-Force\b", re.I),
-        "recursive forced delete (PowerShell)",
+        re.compile(r'\bRemove-Item\b.*-Recurse.*-Force\b', re.I),
+        'recursive forced delete (PowerShell)',
     ),
     (
-        re.compile(r"\bRemove-Item\b.*-Force.*-Recurse\b", re.I),
-        "recursive forced delete (PowerShell)",
+        re.compile(r'\bRemove-Item\b.*-Force.*-Recurse\b', re.I),
+        'recursive forced delete (PowerShell)',
     ),
-    (re.compile(r"\bformat\s+[a-zA-Z]:\s*$", re.I), "drive format (Windows)"),
+    (re.compile(r'\bformat\s+[a-zA-Z]:\s*$', re.I), 'drive format (Windows)'),
     (
-        re.compile(r"\bdel\b.*(/s|/q).*(/s|/q)", re.I),
-        "recursive forced delete (cmd.exe)",
+        re.compile(r'\bdel\b.*(/s|/q).*(/s|/q)', re.I),
+        'recursive forced delete (cmd.exe)',
     ),
 ]
 
 _HIGH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # Dangerous but non-destructive
-    (re.compile(r"\bsudo\b", re.I), "sudo usage"),
+    (re.compile(r'\bsudo\b', re.I), 'sudo usage'),
     (
-        re.compile(r"\bdd\s+.*\bif=/dev/(?:zero|random|urandom)\b", re.I),
-        "potential device/output flooding via dd",
+        re.compile(r'\bdd\s+.*\bif=/dev/(?:zero|random|urandom)\b', re.I),
+        'potential device/output flooding via dd',
     ),
-    (re.compile(r"\bchmod\s+777\b", re.I), "world-writable permissions"),
-    (re.compile(r"\bchmod\s+[0-7]*7[0-7]*\b", re.I), "overly permissive chmod"),
-    (re.compile(r"\bchmod\s+(\+s|[ugoa]+\+s)\b", re.I), "setuid/setgid permission change"),
-    (re.compile(r"\bchown\s+-R\b", re.I), "recursive ownership change"),
-    (re.compile(r"\brm\s+-[a-zA-Z]*r\b", re.I), "recursive delete"),
-    (re.compile(r"\brm\s+-[a-zA-Z]*f\b", re.I), "forced delete"),
+    (re.compile(r'\bchmod\s+777\b', re.I), 'world-writable permissions'),
+    (re.compile(r'\bchmod\s+[0-7]*7[0-7]*\b', re.I), 'overly permissive chmod'),
+    (
+        re.compile(r'\bchmod\s+(\+s|[ugoa]+\+s)\b', re.I),
+        'setuid/setgid permission change',
+    ),
+    (re.compile(r'\bchown\s+-R\b', re.I), 'recursive ownership change'),
+    (re.compile(r'\brm\s+-[a-zA-Z]*r\b', re.I), 'recursive delete'),
+    (re.compile(r'\brm\s+-[a-zA-Z]*f\b', re.I), 'forced delete'),
     # Credential / env exfiltration
-    (re.compile(r"\benv\b|\bprintenv\b", re.I), "environment variable dump"),
+    (re.compile(r'\benv\b|\bprintenv\b', re.I), 'environment variable dump'),
     (
         re.compile(
-            r"\bcat\s+.*(/etc/passwd|/etc/shadow|\.ssh/|\.env|\.aws/credentials)", re.I
+            r'\bcat\s+.*(/etc/passwd|/etc/shadow|\.ssh/|\.env|\.aws/credentials)', re.I
         ),
-        "credential file read",
+        'credential file read',
     ),
     (
-        re.compile(r"\bexport\b.*(_KEY|_SECRET|_TOKEN|PASSWORD)\b", re.I),
-        "secret export",
+        re.compile(r'\bexport\b.*(_KEY|_SECRET|_TOKEN|PASSWORD)\b', re.I),
+        'secret export',
     ),
     # Network exfiltration
-    (re.compile(r"\bnc\s+-l\b|\bncat\b|\bnetcat\b", re.I), "netcat listener"),
-    (re.compile(r"\bcurl\b.*-d\s+@", re.I), "curl data exfiltration"),
-    (re.compile(r"\bscp\b|\brsync\b.*@", re.I), "remote file transfer"),
+    (re.compile(r'\bnc\s+-l\b|\bncat\b|\bnetcat\b', re.I), 'netcat listener'),
+    (re.compile(r'\bcurl\b.*-d\s+@', re.I), 'curl data exfiltration'),
+    (re.compile(r'\bscp\b|\brsync\b.*@', re.I), 'remote file transfer'),
     # System modification
-    (re.compile(r"\bsystemctl\s+(stop|disable|mask)\b", re.I), "service disruption"),
-    (re.compile(r"\biptables\b|\bnft\b", re.I), "firewall modification"),
-    (re.compile(r"\bcrontab\s+-[er]\b", re.I), "cron modification"),
+    (re.compile(r'\bsystemctl\s+(stop|disable|mask)\b', re.I), 'service disruption'),
+    (re.compile(r'\biptables\b|\bnft\b', re.I), 'firewall modification'),
+    (re.compile(r'\bcrontab\s+-[er]\b', re.I), 'cron modification'),
     # Windows
-    (re.compile(r"\bRemove-Item\b.*-Recurse\b", re.I), "recursive delete (PowerShell)"),
-    (re.compile(r"\bRemove-Item\b.*-Force\b", re.I), "forced delete (PowerShell)"),
+    (re.compile(r'\bRemove-Item\b.*-Recurse\b', re.I), 'recursive delete (PowerShell)'),
+    (re.compile(r'\bRemove-Item\b.*-Force\b', re.I), 'forced delete (PowerShell)'),
     (
-        re.compile(r"\bSet-ExecutionPolicy\s+Unrestricted\b", re.I),
-        "execution policy bypass",
+        re.compile(r'\bSet-ExecutionPolicy\s+Unrestricted\b', re.I),
+        'execution policy bypass',
     ),
-    (re.compile(r"\bReg\s+(Add|Delete)\b", re.I), "registry modification"),
-    (re.compile(r"\bdel\b.*(/s|/q)", re.I), "file deletion (cmd.exe)"),
+    (re.compile(r'\bReg\s+(Add|Delete)\b', re.I), 'registry modification'),
+    (re.compile(r'\bdel\b.*(/s|/q)', re.I), 'file deletion (cmd.exe)'),
 ]
 
 _MEDIUM_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"\bcurl\b|\bwget\b", re.I), "network download"),
-    (re.compile(r"\beval\b", re.I), "eval execution"),
+    (re.compile(r'\bcurl\b|\bwget\b', re.I), 'network download'),
+    (re.compile(r'\beval\b', re.I), 'eval execution'),
     # Package installation (supply-chain + network)
-    (re.compile(r"\bpython\s+-m\s+pip\s+install\b", re.I), "python -m pip install"),
-    (re.compile(r"\bpip(?:3)?\s+install\b", re.I), "pip install"),
-    (re.compile(r"\bnpm\s+install\b", re.I), "npm install"),
-    (re.compile(r"\bgit\s+push\b", re.I), "git push"),
-    (re.compile(r"\bgit\s+clone\b", re.I), "git clone"),
-    (re.compile(r"\bkill\b|\bkillall\b|\bpkill\b", re.I), "process termination"),
-    (re.compile(r"\bmv\s+.*\s+/", re.I), "move to system directory"),
-    (re.compile(r"\bchmod\b", re.I), "permission change"),
+    (re.compile(r'\bpython\s+-m\s+pip\s+install\b', re.I), 'python -m pip install'),
+    (re.compile(r'\bpip(?:3)?\s+install\b', re.I), 'pip install'),
+    (re.compile(r'\bnpm\s+install\b', re.I), 'npm install'),
+    (re.compile(r'\bgit\s+push\b', re.I), 'git push'),
+    (re.compile(r'\bgit\s+clone\b', re.I), 'git clone'),
+    (re.compile(r'\bkill\b|\bkillall\b|\bpkill\b', re.I), 'process termination'),
+    (re.compile(r'\bmv\s+.*\s+/', re.I), 'move to system directory'),
+    (re.compile(r'\bchmod\b', re.I), 'permission change'),
     (
-        re.compile(r"\bInstall-Module\b|\bInstall-Package\b", re.I),
-        "PowerShell package install",
+        re.compile(r'\bInstall-Module\b|\bInstall-Package\b', re.I),
+        'PowerShell package install',
     ),
 ]
 
@@ -184,30 +187,30 @@ class CommandAnalyzer:
 
     def __init__(self, config: dict[str, Any] | None = None) -> None:
         self.config: dict[str, Any] = config or {}
-        self._blocked: list[str] = self.config.get("blocked_commands") or self.config.get(
-            "blocked_prefixes", []
-        )
-        self._allowed: list[str] = self.config.get("allowed_commands") or self.config.get(
-            "allowed_exceptions", []
-        )
+        self._blocked: list[str] = self.config.get(
+            'blocked_commands'
+        ) or self.config.get('blocked_prefixes', [])
+        self._allowed: list[str] = self.config.get(
+            'allowed_commands'
+        ) or self.config.get('allowed_exceptions', [])
 
         # Regex-based policy rules (used by integration tests)
         self._blocked_regex: list[tuple[re.Pattern[str], str]] = []
-        for pat_str in self.config.get("blocked_patterns", []) or []:
+        for pat_str in self.config.get('blocked_patterns', []) or []:
             try:
                 self._blocked_regex.append((re.compile(pat_str, re.I), pat_str))
             except re.error as exc:
-                logger.warning("Invalid blocked_pattern %r: %s", pat_str, exc)
+                logger.warning('Invalid blocked_pattern %r: %s', pat_str, exc)
 
         # Compile any user-supplied extra patterns
         self._extra_critical: list[tuple[re.Pattern[str], str]] = []
-        for pat_str in self.config.get("extra_critical_patterns", []):
+        for pat_str in self.config.get('extra_critical_patterns', []):
             try:
                 self._extra_critical.append(
-                    (re.compile(pat_str, re.I), f"custom rule: {pat_str[:40]}")
+                    (re.compile(pat_str, re.I), f'custom rule: {pat_str[:40]}')
                 )
             except re.error as exc:
-                logger.warning("Invalid extra_critical_pattern %r: %s", pat_str, exc)
+                logger.warning('Invalid extra_critical_pattern %r: %s', pat_str, exc)
 
     # ------------------------------------------------------------------
     # Public API
@@ -221,15 +224,17 @@ class CommandAnalyzer:
             recommendation strings)``.
         """
         if not command or not command.strip():
-            return RiskCategory.NONE, "empty command", []
+            return RiskCategory.NONE, 'empty command', []
 
         cmd = command.strip()
 
-        blocked = _check_blocklist_allowlist(cmd, self._blocked_regex, self._blocked, self._allowed)
+        blocked = _check_blocklist_allowlist(
+            cmd, self._blocked_regex, self._blocked, self._allowed
+        )
         if blocked is not None:
             return blocked
 
-        has_chaining = bool(re.search(r"(?:;|&&|\|\||\||&|`|\$\()", cmd))
+        has_chaining = bool(re.search(r'(?:;|&&|\|\||\||&|`|\$\()', cmd))
         risk, reason, recs = self._match_tier(
             cmd, self._extra_critical + _CRITICAL_PATTERNS, RiskCategory.CRITICAL
         )
@@ -239,20 +244,28 @@ class CommandAnalyzer:
         risk, reason, recs = self._match_tier(cmd, _HIGH_PATTERNS, RiskCategory.HIGH)
         if risk == RiskCategory.HIGH:
             return _escalate_if_chaining(
-                risk, reason, recs, has_chaining,
+                risk,
+                reason,
+                recs,
+                has_chaining,
                 RiskCategory.CRITICAL,
-                "Command chaining with high-risk operations is critical.",
+                'Command chaining with high-risk operations is critical.',
             )
 
-        risk, reason, recs = self._match_tier(cmd, _MEDIUM_PATTERNS, RiskCategory.MEDIUM)
+        risk, reason, recs = self._match_tier(
+            cmd, _MEDIUM_PATTERNS, RiskCategory.MEDIUM
+        )
         if risk == RiskCategory.MEDIUM:
             return _escalate_if_chaining(
-                risk, reason, recs, has_chaining,
+                risk,
+                reason,
+                recs,
+                has_chaining,
                 RiskCategory.HIGH,
-                "Review chained commands for unintended side-effects.",
+                'Review chained commands for unintended side-effects.',
             )
 
-        return RiskCategory.LOW, "no risk: no known risk patterns", []
+        return RiskCategory.LOW, 'no risk: no known risk patterns', []
 
     def analyze_command(self, command: str) -> CommandAssessment:
         """Higher-level wrapper returning a :class:`CommandAssessment`.
@@ -263,14 +276,14 @@ class CommandAnalyzer:
         layers reason over the same argv splitting rules.
         """
         risk, reason, recs = self.analyze(command)
-        cmd = (command or "").strip()
+        cmd = (command or '').strip()
         tokens = [t.lower() for t in argv_tokens(cmd)]
         is_network = any(
-            tok in {"curl", "wget", "nc", "ncat", "netcat", "scp", "rsync"}
+            tok in {'curl', 'wget', 'nc', 'ncat', 'netcat', 'scp', 'rsync'}
             for tok in tokens
         )
-        is_encoded = any(tok in {"base64", "xxd"} for tok in tokens) or bool(
-            re.search(r"\b\\x[0-9a-f]", cmd, re.I)
+        is_encoded = any(tok in {'base64', 'xxd'} for tok in tokens) or bool(
+            re.search(r'\b\\x[0-9a-f]', cmd, re.I)
         )
 
         risk, reason = _escalate_encoded_risk(risk, reason, is_encoded)
@@ -295,7 +308,7 @@ class CommandAnalyzer:
             if pattern.search(cmd):
                 recs = _RECOMMENDATIONS.get(tier, [])
                 return tier, description, recs
-        return RiskCategory.NONE, "", []
+        return RiskCategory.NONE, '', []
 
 
 def _check_blocklist_allowlist(
@@ -309,19 +322,19 @@ def _check_blocklist_allowlist(
         if cregex.search(cmd):
             return (
                 RiskCategory.CRITICAL,
-                f"Custom blocked pattern: {raw}",
-                ["This command matched a custom blocked pattern."],
+                f'Custom blocked pattern: {raw}',
+                ['This command matched a custom blocked pattern.'],
             )
     for prefix in blocked:
         if cmd.startswith(prefix):
             return (
                 RiskCategory.CRITICAL,
-                f"blocked by policy: {prefix}",
-                ["This command is explicitly blocked by security policy."],
+                f'blocked by policy: {prefix}',
+                ['This command is explicitly blocked by security policy.'],
             )
     for prefix in allowed:
         if cmd.startswith(prefix):
-            return RiskCategory.LOW, f"Whitelisted: {prefix}", []
+            return RiskCategory.LOW, f'Whitelisted: {prefix}', []
     return None
 
 
@@ -338,7 +351,7 @@ def _escalate_if_chaining(
         return risk, reason, recs
     return (
         escalated_tier,
-        f"{reason} (escalated: command chaining detected)",
+        f'{reason} (escalated: command chaining detected)',
         recs + [extra_rec],
     )
 
@@ -349,7 +362,7 @@ def _escalate_encoded_risk(
     """Escalate risk to HIGH if encoded and not already CRITICAL/HIGH."""
     if not is_encoded or risk in (RiskCategory.CRITICAL, RiskCategory.HIGH):
         return risk, reason
-    return RiskCategory.HIGH, reason or "encoded payload"
+    return RiskCategory.HIGH, reason or 'encoded payload'
 
 
 def _enrich_reason_with_keywords(
@@ -357,16 +370,24 @@ def _enrich_reason_with_keywords(
 ) -> str:
     """Prepend integration-test keywords. Simplified with rule list."""
     rules: list[tuple[bool, str]] = [
-        (risk == RiskCategory.CRITICAL and not reason.startswith("Custom blocked pattern"), "critical"),
-        (risk == RiskCategory.HIGH, "high-risk"),
-        (risk in (RiskCategory.LOW, RiskCategory.NONE) and "no risk" not in reason.lower(), "no risk"),
-        (is_network and "network" not in reason.lower(), "network"),
-        (is_encoded and "obfuscated" not in reason.lower(), "obfuscated"),
+        (
+            risk == RiskCategory.CRITICAL
+            and not reason.startswith('Custom blocked pattern'),
+            'critical',
+        ),
+        (risk == RiskCategory.HIGH, 'high-risk'),
+        (
+            risk in (RiskCategory.LOW, RiskCategory.NONE)
+            and 'no risk' not in reason.lower(),
+            'no risk',
+        ),
+        (is_network and 'network' not in reason.lower(), 'network'),
+        (is_encoded and 'obfuscated' not in reason.lower(), 'obfuscated'),
     ]
     parts = [kw for cond, kw in rules if cond]
     if not parts:
         return reason
-    return f"{', '.join(parts)}: {reason}" if reason else ", ".join(parts)
+    return f'{", ".join(parts)}: {reason}' if reason else ', '.join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -374,15 +395,15 @@ def _enrich_reason_with_keywords(
 # ---------------------------------------------------------------------------
 _RECOMMENDATIONS: dict[RiskCategory, list[str]] = {
     RiskCategory.CRITICAL: [
-        "This command is extremely dangerous. Do NOT execute without explicit user approval.",
-        "Consider running in an isolated runtime environment.",
+        'This command is extremely dangerous. Do NOT execute without explicit user approval.',
+        'Consider running in an isolated runtime environment.',
     ],
     RiskCategory.HIGH: [
-        "Review this command carefully before execution.",
-        "Prefer running inside a container or restricted runtime.",
+        'Review this command carefully before execution.',
+        'Prefer running inside a container or restricted runtime.',
     ],
     RiskCategory.MEDIUM: [
-        "Monitor the output of this command for unexpected behaviour.",
+        'Monitor the output of this command for unexpected behaviour.',
     ],
 }
 
@@ -390,11 +411,11 @@ _RECOMMENDATIONS: dict[RiskCategory, list[str]] = {
 # behavior stays at least as strict as the old inline regex list while CRITICAL
 # covers most overlap (mkfs, many rm/dd variants, etc.).
 _REFLECTION_LEGACY_BLOCK_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"\brm\s+-rf\s+/", re.I), "recursive forced delete toward root path"),
-    (re.compile(r"\bdd\s+if=", re.I), "dd with explicit if="),
-    (re.compile(r"\bmkfs\s+", re.I), "filesystem format (mkfs)"),
-    (re.compile(r"\bformat\s+", re.I), "format-style disk operation"),
-    (re.compile(r">\s+/dev/", re.I), "shell redirect into /dev"),
+    (re.compile(r'\brm\s+-rf\s+/', re.I), 'recursive forced delete toward root path'),
+    (re.compile(r'\bdd\s+if=', re.I), 'dd with explicit if='),
+    (re.compile(r'\bmkfs\s+', re.I), 'filesystem format (mkfs)'),
+    (re.compile(r'\bformat\s+', re.I), 'format-style disk operation'),
+    (re.compile(r'>\s+/dev/', re.I), 'shell redirect into /dev'),
 ]
 
 
@@ -411,9 +432,9 @@ def reflection_precheck_should_block(
     Returns:
         ``(True, reason)`` to block, else ``(False, "")``.
     """
-    cmd = (command or "").strip()
+    cmd = (command or '').strip()
     if not cmd:
-        return False, ""
+        return False, ''
 
     inst = analyzer if analyzer is not None else CommandAnalyzer()
     risk, reason, _ = inst.analyze(cmd)
@@ -424,12 +445,12 @@ def reflection_precheck_should_block(
         if pattern.search(cmd):
             return True, description
 
-    return False, ""
+    return False, ''
 
 
 __all__ = [
-    "CommandAnalyzer",
-    "CommandAssessment",
-    "RiskCategory",
-    "reflection_precheck_should_block",
+    'CommandAnalyzer',
+    'CommandAssessment',
+    'RiskCategory',
+    'reflection_precheck_should_block',
 ]

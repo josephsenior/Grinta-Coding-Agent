@@ -12,15 +12,15 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 from backend.core.logger import app_logger as logger
+from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:
-    from backend.orchestration.tool_pipeline import ToolInvocationContext
     from backend.ledger.observation import Observation
+    from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
-_MANIFEST_PATH = os.path.join(".app", "file_manifest.json")
+_MANIFEST_PATH = os.path.join('.grinta', 'file_manifest.json')
 _MAX_TRACKED_FILES = 50
 
 
@@ -42,7 +42,7 @@ class FileStateTracker:
             return
         # Upgrade action priority: created > modified > read
         existing = self._files.get(path)
-        priority = {"read": 0, "modified": 1, "created": 2}
+        priority = {'read': 0, 'modified': 1, 'created': 2}
         if existing and priority.get(existing.action, 0) >= priority.get(action, 0):
             existing.timestamp = time.time()
             return
@@ -55,16 +55,18 @@ class FileStateTracker:
     def get_summary(self) -> str:
         """Return a compact summary of tracked files for injection into context."""
         if not self._files:
-            return ""
-        lines = ["<FILE_MANIFEST>"]
-        for entry in sorted(self._files.values(), key=lambda e: e.timestamp, reverse=True):
-            lines.append(f"  {entry.action}: {entry.path}")
-        lines.append("</FILE_MANIFEST>")
-        return "\n".join(lines)
+            return ''
+        lines = ['<FILE_MANIFEST>']
+        for entry in sorted(
+            self._files.values(), key=lambda e: e.timestamp, reverse=True
+        ):
+            lines.append(f'  {entry.action}: {entry.path}')
+        lines.append('</FILE_MANIFEST>')
+        return '\n'.join(lines)
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            path: {"action": e.action, "timestamp": e.timestamp}
+            path: {'action': e.action, 'timestamp': e.timestamp}
             for path, e in self._files.items()
         }
 
@@ -73,8 +75,8 @@ class FileStateTracker:
             if isinstance(info, dict):
                 self._files[path] = FileEntry(
                     path=path,
-                    action=info.get("action", "read"),
-                    timestamp=info.get("timestamp", 0),
+                    action=info.get('action', 'read'),
+                    timestamp=info.get('timestamp', 0),
                 )
 
 
@@ -95,20 +97,20 @@ class FileStateMiddleware(ToolInvocationMiddleware):
         action_cls = type(action).__name__
 
         try:
-            if action_cls == "FileEditAction":
-                path = getattr(action, "path", "")
-                command = getattr(action, "command", "")
-                if command == "create_file":
-                    self._tracker.record(path, "created")
-                elif command == "view_file":
-                    self._tracker.record(path, "read")
+            if action_cls == 'FileEditAction':
+                path = getattr(action, 'path', '')
+                command = getattr(action, 'command', '')
+                if command == 'create_file':
+                    self._tracker.record(path, 'created')
+                elif command == 'view_file':
+                    self._tracker.record(path, 'read')
                 else:
-                    self._tracker.record(path, "modified")
-            elif action_cls == "FileReadAction":
-                path = getattr(action, "path", "")
-                self._tracker.record(path, "read")
-            elif action_cls == "FileWriteAction":
-                path = getattr(action, "path", "")
-                self._tracker.record(path, "created")
+                    self._tracker.record(path, 'modified')
+            elif action_cls == 'FileReadAction':
+                path = getattr(action, 'path', '')
+                self._tracker.record(path, 'read')
+            elif action_cls == 'FileWriteAction':
+                path = getattr(action, 'path', '')
+                self._tracker.record(path, 'created')
         except Exception:
-            logger.debug("FileStateMiddleware: failed to record action", exc_info=True)
+            logger.debug('FileStateMiddleware: failed to record action', exc_info=True)

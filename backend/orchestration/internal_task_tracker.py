@@ -35,7 +35,7 @@ class InternalTaskTracker:
         self.tasks: list[Task] = []
         self.current_task_idx = 0
         self._task_counter = 0
-        logger.debug("InternalTaskTracker initialized")
+        logger.debug('InternalTaskTracker initialized')
 
     def add_task(self, description: str, parent_id: str | None = None) -> str:
         """Add a new task to track.
@@ -48,7 +48,7 @@ class InternalTaskTracker:
             The ID of the newly created task
 
         """
-        task_id = f"task_{self._task_counter}"
+        task_id = f'task_{self._task_counter}'
         self._task_counter += 1
 
         task = Task(
@@ -58,7 +58,7 @@ class InternalTaskTracker:
         )
 
         self.tasks.append(task)
-        logger.debug("Added task: %s (%s)", task_id, description)
+        logger.debug('Added task: %s (%s)', task_id, description)
         return task_id
 
     def start_task(self, task_id: str) -> None:
@@ -71,7 +71,7 @@ class InternalTaskTracker:
         for task in self.tasks:
             if task.id == task_id:
                 task.started = True
-                logger.debug("Started task: %s", task_id)
+                logger.debug('Started task: %s', task_id)
                 break
 
     def complete_task(self, task_id: str) -> None:
@@ -84,7 +84,7 @@ class InternalTaskTracker:
         for task in self.tasks:
             if task.id == task_id:
                 task.done = True
-                logger.debug("Completed task: %s", task_id)
+                logger.debug('Completed task: %s', task_id)
                 break
 
     def get_current_task(self) -> Task | None:
@@ -118,13 +118,13 @@ class InternalTaskTracker:
         current_task = self.get_current_task()
 
         return {
-            "total": len(self.tasks),
-            "completed": counts["completed"],
-            "in_progress": counts["in_progress"],
-            "pending": counts["pending"],
-            "current": current_task.description if current_task else None,
-            "completion_percentage": self._calculate_completion_percentage(
-                counts["completed"]
+            'total': len(self.tasks),
+            'completed': counts['completed'],
+            'in_progress': counts['in_progress'],
+            'pending': counts['pending'],
+            'current': current_task.description if current_task else None,
+            'completion_percentage': self._calculate_completion_percentage(
+                counts['completed']
             ),
         }
 
@@ -136,12 +136,12 @@ class InternalTaskTracker:
 
         """
         return {
-            "total": 0,
-            "completed": 0,
-            "in_progress": 0,
-            "pending": 0,
-            "current": None,
-            "completion_percentage": 0,
+            'total': 0,
+            'completed': 0,
+            'in_progress': 0,
+            'pending': 0,
+            'current': None,
+            'completion_percentage': 0,
         }
 
     def _count_task_statuses(self) -> dict[str, int]:
@@ -152,9 +152,9 @@ class InternalTaskTracker:
 
         """
         return {
-            "completed": sum(1 for t in self.tasks if t.done),
-            "in_progress": sum(1 for t in self.tasks if t.started and not t.done),
-            "pending": sum(1 for t in self.tasks if not t.started and not t.done),
+            'completed': sum(1 for t in self.tasks if t.done),
+            'in_progress': sum(1 for t in self.tasks if t.started and not t.done),
+            'pending': sum(1 for t in self.tasks if not t.started and not t.done),
         }
 
     def _calculate_completion_percentage(self, completed: int) -> int:
@@ -175,11 +175,11 @@ class InternalTaskTracker:
         """Log current progress for monitoring."""
         progress = self.get_progress()
         logger.info(
-            "Task Progress: %d/%d complete (%d%%) | Current: %s",
-            progress["completed"],
-            progress["total"],
-            progress["completion_percentage"],
-            progress["current"] or "None",
+            'Task Progress: %d/%d complete (%d%%) | Current: %s',
+            progress['completed'],
+            progress['total'],
+            progress['completion_percentage'],
+            progress['current'] or 'None',
         )
 
     def decompose_task(self, description: str, max_subtasks: int = 5) -> list[str]:
@@ -200,7 +200,7 @@ class InternalTaskTracker:
         # In future, this could use LLM to intelligently break down tasks
         task_id = self.add_task(description)
         logger.debug(
-            "Task decomposition: created task %s for: %s", task_id, description
+            'Task decomposition: created task %s for: %s', task_id, description
         )
         return [task_id]
 
@@ -209,4 +209,4 @@ class InternalTaskTracker:
         self.tasks = []
         self.current_task_idx = 0
         self._task_counter = 0
-        logger.debug("InternalTaskTracker reset")
+        logger.debug('InternalTaskTracker reset')

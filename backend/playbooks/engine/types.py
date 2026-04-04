@@ -13,9 +13,9 @@ from backend.core.config.mcp_config import MCPConfig
 class PlaybookType(str, Enum):
     """Type of playbook."""
 
-    KNOWLEDGE = "knowledge"
-    REPO_KNOWLEDGE = "repo"
-    TASK = "task"
+    KNOWLEDGE = 'knowledge'
+    REPO_KNOWLEDGE = 'repo'
+    TASK = 'task'
 
 
 class InputMetadata(BaseModel):
@@ -28,10 +28,10 @@ class InputMetadata(BaseModel):
 class PlaybookMetadata(BaseModel):
     """Metadata for all playbooks."""
 
-    name: str = "default"
+    name: str = 'default'
     type: PlaybookType = Field(default=PlaybookType.REPO_KNOWLEDGE)
-    version: str = Field(default="1.0.0")
-    agent: str = Field(default="Orchestrator")
+    version: str = Field(default='1.0.0')
+    agent: str = Field(default='Orchestrator')
     triggers: list[str] = []
     inputs: list[InputMetadata] = []
     mcp_tools: MCPConfig | None = None

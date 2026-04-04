@@ -20,8 +20,8 @@ class ExtendedConfig(RootModel[dict[str, Any]]):
     def __str__(self) -> str:
         """Return a human-readable representation of stored configuration."""
         root_dict: dict[str, Any] = model_dump_with_options(self)
-        attr_str = [f"{k}={v!r}" for k, v in root_dict.items()]
-        return f"ExtendedConfig({', '.join(attr_str)})"
+        attr_str = [f'{k}={v!r}' for k, v in root_dict.items()]
+        return f'ExtendedConfig({", ".join(attr_str)})'
 
     def __repr__(self) -> str:
         """Return the debug representation of the configuration."""

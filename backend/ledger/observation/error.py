@@ -22,7 +22,7 @@ class ErrorObservation(Observation):
     command failed, file errors, etc.) so the agent still sees actionable feedback.
     """
 
-    error_id: str = ""
+    error_id: str = ''
     notify_ui_only: bool = False
     observation: ClassVar[str] = ObservationType.ERROR
 
@@ -33,5 +33,4 @@ class ErrorObservation(Observation):
 
     def __str__(self) -> str:
         """Return a readable summary of the error message."""
-        return f"**ErrorObservation**\n{self.content}"
-
+        return f'**ErrorObservation**\n{self.content}'

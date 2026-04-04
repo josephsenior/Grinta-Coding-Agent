@@ -1,4 +1,4 @@
-﻿r"""App plugin system — lightweight hook-based extension API.
+r"""App plugin system — lightweight hook-based extension API.
 
 There are **two** plugin surfaces in App — this module provides the
 *core hook API* while :mod:`backend.execution.plugins` provides the
@@ -51,10 +51,10 @@ Example plugin implementation::
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -92,34 +92,34 @@ __plugin_contract_frozen__: bool = True
 class HookType(str, Enum):
     """Lifecycle hooks that plugins can tap into."""
 
-    ACTION_PRE = "action_pre"
+    ACTION_PRE = 'action_pre'
     """Called before an action is dispatched to the runtime."""
 
-    ACTION_POST = "action_post"
+    ACTION_POST = 'action_post'
     """Called after an action is executed, with its observation."""
 
-    EVENT_EMITTED = "event_emitted"
+    EVENT_EMITTED = 'event_emitted'
     """Called when any event is emitted to the event stream."""
 
-    SESSION_START = "session_start"
+    SESSION_START = 'session_start'
     """Called when a new agent session begins."""
 
-    SESSION_END = "session_end"
+    SESSION_END = 'session_end'
     """Called when an agent session ends."""
 
-    LLM_PRE = "llm_pre"
+    LLM_PRE = 'llm_pre'
     """Called before an LLM completion request is made."""
 
-    LLM_POST = "llm_post"
+    LLM_POST = 'llm_post'
     """Called after an LLM completion response is received."""
 
-    CONDENSE = "condense"
+    CONDENSE = 'condense'
     """Called when the conversation history is condensed."""
 
-    MEMORY_RECALL = "memory_recall"
+    MEMORY_RECALL = 'memory_recall'
     """Called when workspace/knowledge memory is recalled."""
 
-    TOOL_INVOKE = "tool_invoke"
+    TOOL_INVOKE = 'tool_invoke'
     """Called before a tool function is invoked."""
 
 
@@ -140,9 +140,9 @@ class AppPlugin(ABC):
     ``min_api_version`` exceeds the host version.
     """
 
-    name: str = "unnamed-plugin"
-    version: str = "0.0.0"
-    description: str = ""
+    name: str = 'unnamed-plugin'
+    version: str = '0.0.0'
+    description: str = ''
     min_api_version: tuple[int, int] = (1, 0)
 
     # ── Action hooks ─────────────────────────────────────
@@ -253,18 +253,18 @@ class AppPlugin(ABC):
         Override in subclasses to add custom validation.
         """
         warnings: list[str] = []
-        if self.name == "unnamed-plugin":
+        if self.name == 'unnamed-plugin':
             warnings.append("Plugin name is still the default 'unnamed-plugin'")
-        if self.version == "0.0.0":
+        if self.version == '0.0.0':
             warnings.append("Plugin version is still the default '0.0.0'")
         if not self.description:
-            warnings.append("Plugin has no description set")
+            warnings.append('Plugin has no description set')
         return warnings
 
     # ── Repr ─────────────────────────────────────────────
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(name={self.name!r}, v={self.version})"
+        return f'{self.__class__.__name__}(name={self.name!r}, v={self.version})'
 
 
 # ------------------------------------------------------------------
@@ -294,15 +294,15 @@ class PluginRegistry:
         """
         if plugin.name in self._plugins:
             logger.warning(
-                "Plugin %r already registered — skipping duplicate",
+                'Plugin %r already registered — skipping duplicate',
                 plugin.name,
             )
             return
         # Version gate — hard reject when the plugin requires a newer API
-        required = getattr(plugin, "min_api_version", (1, 0))
+        required = getattr(plugin, 'min_api_version', (1, 0))
         if required > PLUGIN_API_VERSION:
             logger.error(
-                "Plugin %r requires API v%s.%s but host provides v%s.%s — skipping",
+                'Plugin %r requires API v%s.%s but host provides v%s.%s — skipping',
                 plugin.name,
                 *required,
                 *PLUGIN_API_VERSION,
@@ -316,21 +316,21 @@ class PluginRegistry:
             import warnings
 
             msg = (
-                f"Plugin {plugin.name!r} targets API v{req_major}.{req_minor} "
-                f"which is at the edge of the compatibility window "
-                f"(current v{host_major}.{host_minor}, window={PLUGIN_COMPAT_WINDOW}). "
-                f"Update the plugin to a newer min_api_version before support is dropped."
+                f'Plugin {plugin.name!r} targets API v{req_major}.{req_minor} '
+                f'which is at the edge of the compatibility window '
+                f'(current v{host_major}.{host_minor}, window={PLUGIN_COMPAT_WINDOW}). '
+                f'Update the plugin to a newer min_api_version before support is dropped.'
             )
             warnings.warn(msg, DeprecationWarning, stacklevel=2)
             logger.warning(msg)
         self._plugins[plugin.name] = plugin
-        logger.info("Plugin registered: %s v%s", plugin.name, plugin.version)
+        logger.info('Plugin registered: %s v%s', plugin.name, plugin.version)
 
     def unregister(self, name: str) -> None:
         """Unregister a plugin by name."""
         removed = self._plugins.pop(name, None)
         if removed:
-            logger.info("Plugin unregistered: %s", name)
+            logger.info('Plugin unregistered: %s', name)
 
     @property
     def plugins(self) -> list[AppPlugin]:
@@ -349,7 +349,7 @@ class PluginRegistry:
             try:
                 action = await plugin.on_action_pre(action)
             except Exception:
-                logger.exception("Plugin %s.on_action_pre failed", plugin.name)
+                logger.exception('Plugin %s.on_action_pre failed', plugin.name)
         return action
 
     async def dispatch_action_post(
@@ -360,7 +360,7 @@ class PluginRegistry:
             try:
                 observation = await plugin.on_action_post(action, observation)
             except Exception:
-                logger.exception("Plugin %s.on_action_post failed", plugin.name)
+                logger.exception('Plugin %s.on_action_post failed', plugin.name)
         return observation
 
     async def dispatch_event(self, event: Event) -> None:
@@ -369,7 +369,7 @@ class PluginRegistry:
             try:
                 await plugin.on_event(event)
             except Exception:
-                logger.exception("Plugin %s.on_event failed", plugin.name)
+                logger.exception('Plugin %s.on_event failed', plugin.name)
 
     async def dispatch_session_start(
         self, session_id: str, metadata: dict[str, Any] | None = None
@@ -378,7 +378,7 @@ class PluginRegistry:
             try:
                 await plugin.on_session_start(session_id, metadata or {})
             except Exception:
-                logger.exception("Plugin %s.on_session_start failed", plugin.name)
+                logger.exception('Plugin %s.on_session_start failed', plugin.name)
 
     async def dispatch_session_end(
         self, session_id: str, metadata: dict[str, Any] | None = None
@@ -387,7 +387,7 @@ class PluginRegistry:
             try:
                 await plugin.on_session_end(session_id, metadata or {})
             except Exception:
-                logger.exception("Plugin %s.on_session_end failed", plugin.name)
+                logger.exception('Plugin %s.on_session_end failed', plugin.name)
 
     async def dispatch_llm_pre(
         self, messages: list[dict[str, Any]], **kwargs: Any
@@ -396,7 +396,7 @@ class PluginRegistry:
             try:
                 messages = await plugin.on_llm_pre(messages, **kwargs)
             except Exception:
-                logger.exception("Plugin %s.on_llm_pre failed", plugin.name)
+                logger.exception('Plugin %s.on_llm_pre failed', plugin.name)
         return messages
 
     async def dispatch_llm_post(self, response: Any) -> Any:
@@ -404,7 +404,7 @@ class PluginRegistry:
             try:
                 response = await plugin.on_llm_post(response)
             except Exception:
-                logger.exception("Plugin %s.on_llm_post failed", plugin.name)
+                logger.exception('Plugin %s.on_llm_post failed', plugin.name)
         return response
 
     async def dispatch_condense(
@@ -420,7 +420,7 @@ class PluginRegistry:
                     original_events, condensed_events, metadata or {}
                 )
             except Exception:
-                logger.exception("Plugin %s.on_condense failed", plugin.name)
+                logger.exception('Plugin %s.on_condense failed', plugin.name)
         return condensed_events
 
     async def dispatch_memory_recall(
@@ -433,7 +433,7 @@ class PluginRegistry:
             try:
                 content = await plugin.on_memory_recall(recall_type, content)
             except Exception:
-                logger.exception("Plugin %s.on_memory_recall failed", plugin.name)
+                logger.exception('Plugin %s.on_memory_recall failed', plugin.name)
         return content
 
     async def dispatch_tool_invoke(
@@ -446,7 +446,7 @@ class PluginRegistry:
             try:
                 tool_args = await plugin.on_tool_invoke(tool_name, tool_args)
             except Exception:
-                logger.exception("Plugin %s.on_tool_invoke failed", plugin.name)
+                logger.exception('Plugin %s.on_tool_invoke failed', plugin.name)
         return tool_args
 
     def validate_all(self) -> dict[str, list[str]]:
@@ -462,8 +462,8 @@ class PluginRegistry:
                 if warnings:
                     results[plugin.name] = warnings
             except Exception:
-                logger.exception("Plugin %s.validate failed", plugin.name)
-                results[plugin.name] = [f"validate() raised: {plugin.name}"]
+                logger.exception('Plugin %s.validate failed', plugin.name)
+                results[plugin.name] = [f'validate() raised: {plugin.name}']
         return results
 
 
@@ -491,22 +491,22 @@ def discover_plugins(registry: PluginRegistry | None = None) -> PluginRegistry:
 
     eps = entry_points()
     try:
-        group = eps.select(group="app.plugins")
+        group = eps.select(group='app.plugins')
     except AttributeError:
-        group = entry_points(group="app.plugins")
+        group = entry_points(group='app.plugins')
 
     for ep in group:
         try:
             register_fn = ep.load()
             if callable(register_fn):
                 register_fn(registry)
-                logger.debug("Loaded plugin entry point: %s", ep.name)
+                logger.debug('Loaded plugin entry point: %s', ep.name)
             else:
                 logger.warning(
-                    "Plugin entry point %s is not callable — skipping", ep.name
+                    'Plugin entry point %s is not callable — skipping', ep.name
                 )
         except Exception:
-            logger.exception("Failed to load plugin entry point: %s", ep.name)
+            logger.exception('Failed to load plugin entry point: %s', ep.name)
 
     return registry
 
@@ -523,12 +523,12 @@ def get_plugin_registry() -> PluginRegistry:
 
 
 __all__ = [
-    "AppPlugin",
-    "HookType",
-    "PLUGIN_API_VERSION",
-    "PLUGIN_COMPAT_WINDOW",
-    "PluginRegistry",
-    "__plugin_contract_frozen__",
-    "discover_plugins",
-    "get_plugin_registry",
+    'AppPlugin',
+    'HookType',
+    'PLUGIN_API_VERSION',
+    'PLUGIN_COMPAT_WINDOW',
+    'PluginRegistry',
+    '__plugin_contract_frozen__',
+    'discover_plugins',
+    'get_plugin_registry',
 ]

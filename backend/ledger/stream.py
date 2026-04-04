@@ -29,6 +29,7 @@ from backend.ledger.secret_masker import SecretMasker
 from backend.ledger.serialization.event import event_from_dict, event_to_dict
 from backend.persistence.locations import get_conversation_dir
 from backend.utils.async_utils import call_sync_from_async, run_or_schedule
+
 if TYPE_CHECKING:
     from backend.persistence import FileStore
 
@@ -36,13 +37,13 @@ if TYPE_CHECKING:
 class EventStreamSubscriber(str, Enum):
     """Lightweight wrapper attaching callbacks to event stream broadcast queue."""
 
-    AGENT_CONTROLLER = "agent_controller"
-    CLI = "cli"
-    SERVER = "server"
-    RUNTIME = "runtime"
-    MEMORY = "memory"
-    MAIN = "main"
-    TEST = "test"
+    AGENT_CONTROLLER = 'agent_controller'
+    CLI = 'cli'
+    SERVER = 'server'
+    RUNTIME = 'runtime'
+    MEMORY = 'memory'
+    MAIN = 'main'
+    TEST = 'test'
 
 
 async def session_exists(
@@ -78,13 +79,13 @@ def _warn_unclosed_stream(sid: str) -> None:
     # directly — if it is still usable.
     if sys.is_finalizing():
         return
-    stderr = getattr(sys, "stderr", None)
-    if stderr is None or getattr(stderr, "closed", True):
+    stderr = getattr(sys, 'stderr', None)
+    if stderr is None or getattr(stderr, 'closed', True):
         return
     try:
         stderr.write(
             f"WARNING: EventStream '{sid}' was GC'd without close(); "
-            "resources may leak.\n"
+            'resources may leak.\n'
         )
     except (ValueError, OSError):
         pass
@@ -170,9 +171,9 @@ class EventStream(EventStore):
         _async_write = str(
             async_write if async_write is not None else event_defaults.async_write
         ).lower() in (
-            "1",
-            "true",
-            "yes",
+            '1',
+            'true',
+            'yes',
         )
 
         self._persist = EventPersistence(
@@ -216,7 +217,7 @@ class EventStream(EventStore):
             EventStream._GLOBAL_STREAMS.add(self)
         except Exception:
             logger.warning(
-                "Failed to register EventStream for global metrics", exc_info=True
+                'Failed to register EventStream for global metrics', exc_info=True
             )
 
         # Safety finalizer — ensures close() is called if the stream is GC'd
@@ -238,13 +239,13 @@ class EventStream(EventStore):
             else None
         )
         # If WAL replay recovered events, reset cur_id from disk
-        if self._persist.stats.get("persist_failures", 0) == 0:
+        if self._persist.stats.get('persist_failures', 0) == 0:
             self._cur_id = None
 
     def close(self) -> None:
         """Close event stream, stopping queue processing and cleaning up subscribers."""
         # Detach safety finalizer — we're closing explicitly.
-        if hasattr(self, "_finalizer"):
+        if hasattr(self, '_finalizer'):
             self._finalizer.detach()
         self._stop_flag.set()
         if self._queue_loop and self._stop_event:
@@ -254,7 +255,7 @@ class EventStream(EventStore):
             try:
                 future.result(timeout=5)
             except Exception as exc:  # pragma: no cover - defensive
-                logger.debug("Error shutting down event queue: %s", exc)
+                logger.debug('Error shutting down event queue: %s', exc)
         if self._queue_thread.is_alive():
             # Never block forever during teardown; the thread is daemonized.
             self._queue_thread.join(timeout=5)
@@ -276,21 +277,21 @@ class EventStream(EventStore):
         # Merge persistence stats
         snapshot.update(self._persist.stats)
         snapshot.update(self._persist.get_health_snapshot())
-        snapshot["persist_failures_window_count"] = int(
+        snapshot['persist_failures_window_count'] = int(
             len(self._persist._recent_persist_failures)
         )
-        if snapshot.get("rate_window_seconds", 0) > 0:
-            rw = snapshot["rate_window_seconds"]
-            snapshot["persist_failures_per_minute"] = int(
+        if snapshot.get('rate_window_seconds', 0) > 0:
+            rw = snapshot['rate_window_seconds']
+            snapshot['persist_failures_per_minute'] = int(
                 round(len(self._persist._recent_persist_failures) * 60 / rw)
             )
         else:
-            snapshot["persist_failures_per_minute"] = 0
+            snapshot['persist_failures_per_minute'] = 0
         dw = self._persist.durable_writer
         if dw:
-            snapshot["durable_writer_drops"] = int(dw.drop_count)
-            snapshot["durable_writer_queue_depth"] = int(dw.queue_depth)
-            snapshot["durable_writer_errors"] = int(dw.error_count)
+            snapshot['durable_writer_drops'] = int(dw.drop_count)
+            snapshot['durable_writer_queue_depth'] = int(dw.queue_depth)
+            snapshot['durable_writer_errors'] = int(dw.error_count)
         return snapshot
 
     def get_stats(self) -> dict[str, int]:
@@ -305,16 +306,16 @@ class EventStream(EventStore):
         try:
             return list(cls._GLOBAL_STREAMS)
         except Exception as exc:  # pragma: no cover - defensive
-            logger.debug("iter_global_streams failed: %s", exc)
+            logger.debug('iter_global_streams failed: %s', exc)
             return []
 
     def _clean_up_subscriber(self, subscriber_id: str, callback_id: str) -> None:
         """Clean up a specific subscriber callback."""
         if subscriber_id not in self._subscribers:
-            logger.warning("Subscriber not found during cleanup: %s", subscriber_id)
+            logger.warning('Subscriber not found during cleanup: %s', subscriber_id)
             return
         if callback_id not in self._subscribers[subscriber_id]:
-            logger.warning("Callback not found during cleanup: %s", callback_id)
+            logger.warning('Callback not found during cleanup: %s', callback_id)
             return
 
         del self._subscribers[subscriber_id][callback_id]
@@ -341,7 +342,7 @@ class EventStream(EventStore):
         if subscriber_id not in self._subscribers:
             self._subscribers[subscriber_id] = {}
         if callback_id in self._subscribers[subscriber_id]:
-            msg = f"Callback ID on subscriber {subscriber_id} already exists: {callback_id}"
+            msg = f'Callback ID on subscriber {subscriber_id} already exists: {callback_id}'
             raise ValueError(msg)
         self._subscribers[subscriber_id][callback_id] = callback
 
@@ -356,10 +357,10 @@ class EventStream(EventStore):
 
         """
         if subscriber_id not in self._subscribers:
-            logger.warning("Subscriber not found during unsubscribe: %s", subscriber_id)
+            logger.warning('Subscriber not found during unsubscribe: %s', subscriber_id)
             return
         if callback_id not in self._subscribers[subscriber_id]:
-            logger.warning("Callback not found during unsubscribe: %s", callback_id)
+            logger.warning('Callback not found during unsubscribe: %s', callback_id)
             return
         self._clean_up_subscriber(subscriber_id, callback_id)
 
@@ -416,7 +417,7 @@ class EventStream(EventStore):
                     run_or_schedule(result)  # type: ignore[unreachable]
             except Exception as exc:  # pragma: no cover - defensive logging
                 logger.error(
-                    "Error in inline event callback %s for subscriber %s: %s",
+                    'Error in inline event callback %s for subscriber %s: %s',
                     callback_id,
                     subscriber_id,
                     exc,
@@ -426,20 +427,20 @@ class EventStream(EventStore):
         if not self._stop_flag.is_set():
             return False
         logger.debug(
-            "EventStream closed; dropping event id=%s from source=%s",
-            getattr(event, "id", None),
+            'EventStream closed; dropping event id=%s from source=%s',
+            getattr(event, 'id', None),
             source,
         )
         return True
 
     def _ensure_event_can_be_added(self, event: Event) -> None:
-        evt_id = getattr(event, "id", Event.INVALID_ID)
+        evt_id = getattr(event, 'id', Event.INVALID_ID)
         if not isinstance(evt_id, int):
             evt_id = Event.INVALID_ID
         if evt_id != Event.INVALID_ID:
             msg = (
-                f"Event already has an ID:{evt_id}. It was probably added back to the "
-                "EventStream from inside a handler, triggering a loop."
+                f'Event already has an ID:{evt_id}. It was probably added back to the '
+                'EventStream from inside a handler, triggering a loop.'
             )
             raise ValueError(msg)
 
@@ -462,9 +463,9 @@ class EventStream(EventStore):
 
         if isinstance(sanitized_event, ChangeAgentStateAction):
             logger.debug(
-                "Queued ChangeAgentStateAction id=%s state=%s source=%s",
+                'Queued ChangeAgentStateAction id=%s state=%s source=%s',
                 sanitized_event.id,
-                getattr(sanitized_event, "agent_state", None),
+                getattr(sanitized_event, 'agent_state', None),
                 sanitized_event.source,
             )
 
@@ -480,13 +481,13 @@ class EventStream(EventStore):
     def _enqueue_serialized_event(self, event: Event) -> None:
         if not self._queue_ready.wait(timeout=2):
             logger.warning(
-                "EventStream queue not ready; dropping event id=%s", event.id
+                'EventStream queue not ready; dropping event id=%s', event.id
             )
             return
 
         if not self._queue_loop or not self._async_queue:
             logger.warning(
-                "EventStream queue loop missing; dropping event id=%s", event.id
+                'EventStream queue loop missing; dropping event id=%s', event.id
             )
             return
 
@@ -496,12 +497,12 @@ class EventStream(EventStore):
             )
             future.result()
         except Exception as exc:  # pragma: no cover - defensive
-            logger.warning("Failed to enqueue event id=%s: %s", event.id, exc)
+            logger.warning('Failed to enqueue event id=%s: %s', event.id, exc)
 
     def add_activity_listener(self, callback: Callable[[str], None]) -> str:
         """Register a callback invoked whenever a new event is added."""
         with self._activity_listener_lock:
-            handle = f"listener-{self._activity_listener_seq}"
+            handle = f'listener-{self._activity_listener_seq}'
             self._activity_listener_seq += 1
             self._activity_listeners[handle] = callback
             return handle
@@ -517,7 +518,7 @@ class EventStream(EventStore):
             try:
                 callback(self.sid)
             except Exception as exc:
-                logger.debug("Activity listener raised: %s", exc)
+                logger.debug('Activity listener raised: %s', exc)
 
     def set_secrets(self, secrets: dict[str, str]) -> None:
         """Set secrets dictionary for masking sensitive values in events."""
@@ -570,7 +571,7 @@ class EventStream(EventStore):
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error("Error retrieving event from queue: %s", e)
+                logger.error('Error retrieving event from queue: %s', e)
                 continue
             if event is self._stop_sentinel:
                 queue.task_done()
@@ -579,7 +580,7 @@ class EventStream(EventStore):
                 if not self._stop_flag.is_set():
                     await self._dispatch_event(cast(Event, event))
             except Exception as e:
-                logger.error("Error dispatching event: %s", e)
+                logger.error('Error dispatching event: %s', e)
             finally:
                 queue.task_done()
                 self._bp.queue_size = queue.qsize()
@@ -618,7 +619,7 @@ class EventStream(EventStore):
                 asyncio.run(self._await_result(result))  # type: ignore[arg-type]
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error(
-                "Error in event callback %s for subscriber %s: %s",
+                'Error in event callback %s for subscriber %s: %s',
                 callback_id,
                 subscriber_id,
                 exc,
@@ -689,7 +690,7 @@ def get_aggregated_event_stream_stats() -> dict[str, int]:
 
 
 __all__ = [
-    "EventStream",
-    "EventStreamSubscriber",
-    "get_aggregated_event_stream_stats",
+    'EventStream',
+    'EventStreamSubscriber',
+    'get_aggregated_event_stream_stats',
 ]

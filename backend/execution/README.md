@@ -1,4 +1,4 @@
-# App Runtime
+# Grinta Runtime
 
 ## Introduction
 

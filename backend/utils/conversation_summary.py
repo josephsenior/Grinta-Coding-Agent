@@ -39,34 +39,34 @@ async def generate_conversation_title(
     if not message or not message.strip():
         return None
     if len(message) > 1000:
-        truncated_message = f"{message[:1000]}...(truncated)"
+        truncated_message = f'{message[:1000]}...(truncated)'
     else:
         truncated_message = message
     try:
         messages = [
             {
-                "role": "system",
-                "content": "You are a helpful assistant that generates concise, descriptive titles for conversations with app. App is a helpful AI agent that can interact with a computer to solve tasks using bash terminal, file editor, and browser. Given a user message (which may be truncated), generate a concise, descriptive title for the conversation. Return only the title, with no additional text, quotes, or explanations.",
+                'role': 'system',
+                'content': 'You are a helpful assistant that generates concise, descriptive titles for conversations with app. App is a helpful AI agent that can interact with a computer to solve tasks using bash terminal, file editor, and browser. Given a user message (which may be truncated), generate a concise, descriptive title for the conversation. Return only the title, with no additional text, quotes, or explanations.',
             },
             {
-                "role": "user",
-                "content": f"Generate a title (maximum {max_length} characters) for a conversation that starts with this message:\n\n{truncated_message}",
+                'role': 'user',
+                'content': f'Generate a title (maximum {max_length} characters) for a conversation that starts with this message:\n\n{truncated_message}',
             },
         ]
         title = await asyncio.wait_for(
             asyncio.to_thread(
                 llm_registry.request_extraneous_completion,
-                "conversation_title_creator",
+                'conversation_title_creator',
                 llm_config,
                 messages,
             ),
             timeout=60.0,
         )
         if len(title) > max_length:
-            title = f"{title[: max_length - 3]}..."
+            title = f'{title[: max_length - 3]}...'
         return title
     except Exception as e:
-        logger.error("Error generating conversation title: %s", e)
+        logger.error('Error generating conversation title: %s', e)
         return None
 
 
@@ -80,7 +80,7 @@ def get_default_conversation_title(conversation_id: str) -> str:
         A default title string
 
     """
-    return f"Conversation {conversation_id[:5]}"
+    return f'Conversation {conversation_id[:5]}'
 
 
 async def auto_generate_title(
@@ -94,7 +94,7 @@ async def auto_generate_title(
     # on that module are respected, avoiding duplicate-module pitfalls.
     from importlib import import_module
 
-    _mod = import_module("backend.utils.conversation_summary")
+    _mod = import_module('backend.utils.conversation_summary')
     return await _mod._auto_generate_title_impl(
         conversation_id, user_id, file_store, settings, llm_registry
     )
@@ -129,20 +129,20 @@ async def _auto_generate_title_impl(
     try:
         first_message = _get_first_user_message(conversation_id, user_id, file_store)
     except Exception as e:
-        logger.error("Error reading first message: %s", str(e))
+        logger.error('Error reading first message: %s', str(e))
         # If the file_store lacks the typical interface (e.g., in tests passing object()),
         # we optionally seed a benign first message to allow LLM/truncation to proceed
         # when an LLM model attribute exists. Otherwise, treat as no message and return empty.
-        if not hasattr(file_store, "list"):
-            if hasattr(settings, "llm_model"):
-                first_message = "Hello"
+        if not hasattr(file_store, 'list'):
+            if hasattr(settings, 'llm_model'):
+                first_message = 'Hello'
             else:
-                return ""
+                return ''
         else:
-            return ""
+            return ''
 
     if not first_message:
-        return ""
+        return ''
 
     # Try LLM-based generation first; isolate exceptions to LLM path only
     try:
@@ -153,8 +153,8 @@ async def _auto_generate_title_impl(
             return llm_title
     except Exception as e:
         # If LLM path raises unexpectedly, return empty title (explicit test expectation).
-        logger.error("Error using LLM for title generation: %s", str(e))
-        return ""
+        logger.error('Error using LLM for title generation: %s', str(e))
+        return ''
 
     # Fallback to simple truncation when LLM path returns no title
     return _generate_truncated_title(first_message)
@@ -182,8 +182,8 @@ def _get_first_user_message(
         (
             event.content
             for event in event_store.search_events()
-            if getattr(event, "source", None) == EventSource.USER
-            and hasattr(event, "content")
+            if getattr(event, 'source', None) == EventSource.USER
+            and hasattr(event, 'content')
             and isinstance(event.content, str)
             and event.content.strip()
         ),
@@ -219,13 +219,13 @@ async def _try_llm_title_generation(
 
         llm_title = await generate_conversation_title(message, llm_config, llm_registry)
         if isinstance(llm_title, str) and llm_title.strip():
-            logger.info("Generated title using LLM: %s", llm_title)
+            logger.info('Generated title using LLM: %s', llm_title)
             return llm_title
 
         return None
 
     except Exception as e:
-        logger.error("Error using LLM for title generation: %s", e)
+        logger.error('Error using LLM for title generation: %s', e)
         return None
 
 
@@ -244,7 +244,7 @@ def _generate_truncated_title(message: str, max_length: int = 30) -> str:
     title = message[:max_length]
 
     if len(message) > max_length:
-        title += "..."
+        title += '...'
 
-    logger.info("Generated title using truncation: %s", title)
+    logger.info('Generated title using truncation: %s', title)
     return title

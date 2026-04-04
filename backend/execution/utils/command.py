@@ -1,4 +1,4 @@
-﻿"""Helpers for constructing runtime startup commands and validating parameters."""
+"""Helpers for constructing runtime startup commands and validating parameters."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _build_plugin_args(plugins: list[PluginRequirement] | None) -> list[str]:
     """
     if not plugins:
         return []
-    return ["--plugins"] + [plugin.name for plugin in plugins]
+    return ['--plugins'] + [plugin.name for plugin in plugins]
 
 
 def _validate_and_get_username(
@@ -43,29 +43,29 @@ def _validate_and_get_username(
         Validated username
 
     """
-    default_username = "app" if run_as_runtime_user else "root"
+    default_username = 'app' if run_as_runtime_user else 'root'
     username = override_username or default_username
 
     # Validate username to prevent command injection
     dangerous_chars = [
-        ";",
-        "&",
-        "|",
-        "`",
-        "$",
-        "(",
-        ")",
-        "<",
-        ">",
+        ';',
+        '&',
+        '|',
+        '`',
+        '$',
+        '(',
+        ')',
+        '<',
+        '>',
         '"',
         "'",
-        "\\",
-        " ",
-        "\n",
-        "\t",
+        '\\',
+        ' ',
+        '\n',
+        '\t',
     ]
     if any(char in username for char in dangerous_chars):
-        logger.warning("Invalid characters in username, using default")
+        logger.warning('Invalid characters in username, using default')
         return default_username
 
     return username
@@ -83,21 +83,21 @@ def _validate_env_part(part: object) -> bool:
         return False
 
     dangerous_chars = [
-        ";",
-        "&",
-        "|",
-        "`",
-        "$",
-        "(",
-        ")",
-        "<",
-        ">",
+        ';',
+        '&',
+        '|',
+        '`',
+        '$',
+        '(',
+        ')',
+        '<',
+        '>',
         '"',
         "'",
-        "\\",
-        " ",
-        "\n",
-        "\t",
+        '\\',
+        ' ',
+        '\n',
+        '\t',
     ]
     if any(char in part for char in dangerous_chars):
         return False
@@ -112,7 +112,7 @@ def get_action_execution_server_startup_command(
     override_user_id: int | None = None,
     override_username: str | None = None,
     main_module: str = DEFAULT_MAIN_MODULE,
-    python_executable: str = "python",
+    python_executable: str = 'python',
 ) -> list[str]:
     """Generate the startup command for the action execution server.
 
@@ -131,9 +131,9 @@ def get_action_execution_server_startup_command(
 
     """
     runtime_config = app_config.runtime_config
-    logger.debug("app_config %s", vars(app_config))
-    logger.debug("runtime_config %s", vars(runtime_config))
-    logger.debug("override_user_id %s", override_user_id)
+    logger.debug('app_config %s', vars(app_config))
+    logger.debug('runtime_config %s', vars(runtime_config))
+    logger.debug('override_user_id %s', override_user_id)
 
     # Build command components
     plugin_args = _build_plugin_args(plugins)
@@ -149,22 +149,22 @@ def get_action_execution_server_startup_command(
     base_cmd = [
         *effective_prefix,
         python_executable,
-        "-u",
-        "-m",
+        '-u',
+        '-m',
         main_module,
         str(server_port),
-        "--working-dir",
+        '--working-dir',
         app_config.workspace_mount_path_in_runtime,
         *plugin_args,
-        "--username",
+        '--username',
         username,
-        "--user-id",
+        '--user-id',
         str(user_id),
     ]
 
     if not app_config.enable_browser:
-        base_cmd.append("--no-enable-browser")
+        base_cmd.append('--no-enable-browser')
 
-    logger.debug("get_action_execution_server_startup_command: %s", base_cmd)
+    logger.debug('get_action_execution_server_startup_command: %s', base_cmd)
     # Filter out None values to ensure return type is list[str]
     return [item for item in base_cmd if item is not None]

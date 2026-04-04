@@ -18,7 +18,7 @@ def attach_observation_cause(
     observation: Any,
     action_or_id: Any,
     *,
-    context: str = "",
+    context: str = '',
 ) -> None:
     """Set ``observation.cause`` from an :class:`Action` or explicit stream id.
 
@@ -30,7 +30,7 @@ def attach_observation_cause(
         return
 
     raw_id = (
-        getattr(action_or_id, "id", None)
+        getattr(action_or_id, 'id', None)
         if not isinstance(action_or_id, int)
         else action_or_id
     )
@@ -44,9 +44,9 @@ def attach_observation_cause(
             observation.cause = nid
             return
 
-    suffix = f" ({context})" if context else ""
+    suffix = f' ({context})' if context else ''
     logger.warning(
-        "attach_observation_cause: invalid action id %r%s; leaving cause unset",
+        'attach_observation_cause: invalid action id %r%s; leaving cause unset',
         raw_id,
         suffix,
     )

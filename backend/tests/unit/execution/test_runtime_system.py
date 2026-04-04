@@ -1,8 +1,7 @@
-﻿"""Tests for backend.execution.utils.system module."""
+"""Tests for backend.execution.utils.system module."""
 
 import socket
 from unittest.mock import patch
-
 
 from backend.execution.utils.system import (
     check_port_available,
@@ -16,7 +15,7 @@ class TestCheckPortAvailable:
         """A high random port should generally be available."""
         # Use port 0 trick to find a definitely-free port
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(("127.0.0.1", 0))
+        s.bind(('127.0.0.1', 0))
         port = s.getsockname()[1]
         s.close()
         assert check_port_available(port) is True
@@ -24,7 +23,7 @@ class TestCheckPortAvailable:
     def test_occupied_port(self):
         """Binding the same port twice should fail."""
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind(("127.0.0.1", 0))
+        s.bind(('127.0.0.1', 0))
         port = s.getsockname()[1]
         try:
             assert check_port_available(port) is False
@@ -40,14 +39,14 @@ class TestFindAvailableTcpPort:
     def test_no_available_ports(self):
         """If check_port_available always returns False, should return -1."""
         with patch(
-            "backend.execution.utils.system.check_port_available", return_value=False
+            'backend.execution.utils.system.check_port_available', return_value=False
         ):
             port = find_available_tcp_port(max_attempts=5)
             assert port == -1
 
     def test_small_range(self):
         with patch(
-            "backend.execution.utils.system.check_port_available", return_value=True
+            'backend.execution.utils.system.check_port_available', return_value=True
         ):
             port = find_available_tcp_port(
                 min_port=50000, max_port=50000, max_attempts=1
@@ -59,23 +58,23 @@ class TestDisplayNumberMatrix:
     def test_zero(self):
         result = display_number_matrix(0)
         assert result is not None
-        assert "###" in result
+        assert '###' in result
 
     def test_single_digit(self):
         result = display_number_matrix(1)
         assert result is not None
-        assert "#" in result
+        assert '#' in result
 
     def test_two_digits(self):
         result = display_number_matrix(42)
         assert result is not None
-        lines = result.strip().split("\n")
+        lines = result.strip().split('\n')
         assert len(lines) == 5
 
     def test_three_digits(self):
         result = display_number_matrix(999)
         assert result is not None
-        lines = result.strip().split("\n")
+        lines = result.strip().split('\n')
         assert len(lines) == 5
 
     def test_out_of_range_negative(self):
@@ -97,5 +96,5 @@ class TestDisplayNumberMatrix:
         for d in range(10):
             result = display_number_matrix(d)
             assert result is not None
-            lines = result.strip().split("\n")
+            lines = result.strip().split('\n')
             assert len(lines) == 5

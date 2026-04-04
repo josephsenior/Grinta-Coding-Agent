@@ -5,9 +5,7 @@ from __future__ import annotations
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
-
 from backend.persistence.secrets.file_secrets_store import FileSecretsStore
-
 
 # ── __init__ ──────────────────────────────────────────────────────────
 
@@ -16,25 +14,25 @@ class TestFileSecretsStoreInit:
     def test_default_path(self):
         fs = MagicMock()
         store = FileSecretsStore(fs)
-        assert store.path == "user_secrets.json"  # DEFAULT_SECRETS_FILENAME
+        assert store.path == 'user_secrets.json'  # DEFAULT_SECRETS_FILENAME
         assert store.file_store is fs
         assert store.user_id is None
 
     def test_custom_path(self):
         fs = MagicMock()
-        store = FileSecretsStore(fs, path="custom/secrets.json")
-        assert store.path == "custom/secrets.json"
+        store = FileSecretsStore(fs, path='custom/secrets.json')
+        assert store.path == 'custom/secrets.json'
 
     def test_user_id_path(self):
         fs = MagicMock()
-        store = FileSecretsStore(fs, user_id="user-42")
-        assert "user-42" in store.path
-        assert store.user_id == "user-42"
+        store = FileSecretsStore(fs, user_id='user-42')
+        assert 'user-42' in store.path
+        assert store.user_id == 'user-42'
 
     def test_explicit_path_overrides_user_id(self):
         fs = MagicMock()
-        store = FileSecretsStore(fs, path="override.json", user_id="user-42")
-        assert store.path == "override.json"
+        store = FileSecretsStore(fs, path='override.json', user_id='user-42')
+        assert store.path == 'override.json'
 
 
 # ── load ──────────────────────────────────────────────────────────────
@@ -46,7 +44,7 @@ class TestFileSecretsStoreLoad:
         store = FileSecretsStore(fs)
 
         with patch(
-            "backend.persistence.secrets.file_secrets_store.call_sync_from_async",
+            'backend.persistence.secrets.file_secrets_store.call_sync_from_async',
             new_callable=AsyncMock,
             side_effect=FileNotFoundError,
         ):
@@ -60,11 +58,11 @@ class TestFileSecretsStoreLoad:
         # UserSecrets uses provider_tokens and custom_secrets
         # ProviderType only has "enterprise_sso" as a valid enum value
         data = json.dumps(
-            {"provider_tokens": {"enterprise_sso": {"token": "tok_test"}}}
+            {'provider_tokens': {'enterprise_sso': {'token': 'tok_test'}}}
         )
 
         with patch(
-            "backend.persistence.secrets.file_secrets_store.call_sync_from_async",
+            'backend.persistence.secrets.file_secrets_store.call_sync_from_async',
             new_callable=AsyncMock,
             return_value=data,
         ):
@@ -75,7 +73,8 @@ class TestFileSecretsStoreLoad:
 
     async def test_load_normalizes_string_provider_tokens(self):
         """String token values get normalized to {"token": value} dicts
-        before being passed to UserSecrets constructor."""
+        before being passed to UserSecrets constructor.
+        """
         fs = MagicMock()
         store = FileSecretsStore(fs)
 
@@ -83,14 +82,14 @@ class TestFileSecretsStoreLoad:
         # Then UserSecrets._convert_provider_tokens converts to ProviderToken objects
         data = json.dumps(
             {
-                "provider_tokens": {
-                    "enterprise_sso": "tok_abc123",
+                'provider_tokens': {
+                    'enterprise_sso': 'tok_abc123',
                 }
             }
         )
 
         with patch(
-            "backend.persistence.secrets.file_secrets_store.call_sync_from_async",
+            'backend.persistence.secrets.file_secrets_store.call_sync_from_async',
             new_callable=AsyncMock,
             return_value=data,
         ):
@@ -109,14 +108,14 @@ class TestFileSecretsStoreLoad:
         # valid -> kept
         data = json.dumps(
             {
-                "provider_tokens": {
-                    "enterprise_sso": {"token": "tok-1"},
+                'provider_tokens': {
+                    'enterprise_sso': {'token': 'tok-1'},
                 }
             }
         )
 
         with patch(
-            "backend.persistence.secrets.file_secrets_store.call_sync_from_async",
+            'backend.persistence.secrets.file_secrets_store.call_sync_from_async',
             new_callable=AsyncMock,
             return_value=data,
         ):
@@ -131,15 +130,15 @@ class TestFileSecretsStoreLoad:
 
         data = json.dumps(
             {
-                "provider_tokens": {
-                    "empty_str": "",
-                    "empty_dict": {},
+                'provider_tokens': {
+                    'empty_str': '',
+                    'empty_dict': {},
                 }
             }
         )
 
         with patch(
-            "backend.persistence.secrets.file_secrets_store.call_sync_from_async",
+            'backend.persistence.secrets.file_secrets_store.call_sync_from_async',
             new_callable=AsyncMock,
             return_value=data,
         ):
@@ -155,7 +154,7 @@ class TestFileSecretsStoreLoad:
         store = FileSecretsStore(fs)
 
         with patch(
-            "backend.persistence.secrets.file_secrets_store.call_sync_from_async",
+            'backend.persistence.secrets.file_secrets_store.call_sync_from_async',
             new_callable=AsyncMock,
             return_value='"just a string"',
         ):
@@ -175,11 +174,11 @@ class TestFileSecretsStoreStore:
 
         with (
             patch(
-                "backend.persistence.secrets.file_secrets_store.model_dump_json",
+                'backend.persistence.secrets.file_secrets_store.model_dump_json',
                 return_value='{"llm_api_key": "test"}',
             ),
             patch(
-                "backend.persistence.secrets.file_secrets_store.call_sync_from_async",
+                'backend.persistence.secrets.file_secrets_store.call_sync_from_async',
                 new_callable=AsyncMock,
             ) as mock_write,
         ):
@@ -197,8 +196,8 @@ class TestFileSecretsStoreStore:
 class TestFileSecretsStoreGetInstance:
     async def test_creates_instance_with_file_store(self):
         mock_config = MagicMock()
-        mock_config.file_store = "local"
-        mock_config.local_data_root = "/tmp/test"
+        mock_config.file_store = 'local'
+        mock_config.local_data_root = '/tmp/test'
         mock_config.file_store_web_hook_url = None
         mock_config.file_store_web_hook_headers = None
         mock_config.file_store_web_hook_batch = False
@@ -206,24 +205,24 @@ class TestFileSecretsStoreGetInstance:
         mock_fs = MagicMock()
 
         with patch(
-            "backend.persistence.secrets.file_secrets_store.get_file_store",
+            'backend.persistence.secrets.file_secrets_store.get_file_store',
             return_value=mock_fs,
         ):
-            instance = await FileSecretsStore.get_instance(mock_config, "user-1")
+            instance = await FileSecretsStore.get_instance(mock_config, 'user-1')
             assert isinstance(instance, FileSecretsStore)
             assert instance.file_store is mock_fs
-            assert instance.user_id == "user-1"
+            assert instance.user_id == 'user-1'
 
     async def test_creates_instance_without_user(self):
         mock_config = MagicMock()
-        mock_config.file_store = "local"
-        mock_config.local_data_root = "/tmp/test"
+        mock_config.file_store = 'local'
+        mock_config.local_data_root = '/tmp/test'
         mock_config.file_store_web_hook_url = None
         mock_config.file_store_web_hook_headers = None
         mock_config.file_store_web_hook_batch = False
 
         with patch(
-            "backend.persistence.secrets.file_secrets_store.get_file_store",
+            'backend.persistence.secrets.file_secrets_store.get_file_store',
             return_value=MagicMock(),
         ):
             instance = await FileSecretsStore.get_instance(mock_config, None)

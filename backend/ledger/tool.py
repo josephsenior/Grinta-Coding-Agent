@@ -15,7 +15,7 @@ def build_tool_call_metadata(
     tool_call_id: str,
     response_obj: Any,
     total_calls_in_response: int,
-) -> "ToolCallMetadata":
+) -> 'ToolCallMetadata':
     """Unified helper to construct ToolCallMetadata across agent implementations.
 
     Builds a lightweight stable representation of the model response.
@@ -53,7 +53,7 @@ class ToolCallMetadata(ToolCallMetadataSchema):
         tool_call_id: str,
         response_obj: Any,
         total_calls_in_response: int,
-    ) -> "ToolCallMetadata":
+    ) -> 'ToolCallMetadata':
         lite = ModelResponseLite.from_sdk(response_obj)
         md = cls(
             function_name=function_name,

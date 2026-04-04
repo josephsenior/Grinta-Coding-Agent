@@ -32,16 +32,18 @@ def get_field_info(field: FieldInfo) -> dict[str, Any]:
         str(field_type)
         if field_type is None
         else field_type.__name__
-        if hasattr(field_type, "__name__")
+        if hasattr(field_type, '__name__')
         else str(field_type)
     )
     default = field.default
-    return {"type": type_name.lower(), "optional": optional, "default": default}
+    return {'type': type_name.lower(), 'optional': optional, 'default': default}
 
 
 def model_defaults_to_dict(model: BaseModel) -> dict[str, Any]:
-    """Serialize field information in a dict for the client, including type
-    hints, defaults, and whether it's optional."""
+    """Serialize field metadata for API clients.
+
+    Includes type hints, defaults, and whether each field is optional.
+    """
     result = {}
     for name, field in model.__class__.model_fields.items():
         field_value = getattr(model, name)
@@ -53,8 +55,8 @@ def model_defaults_to_dict(model: BaseModel) -> dict[str, Any]:
 
 
 __all__ = [
-    "DEFAULT_AGENT_NAME",
-    "DEFAULT_MAX_ITERATIONS",
-    "get_field_info",
-    "model_defaults_to_dict",
+    'DEFAULT_AGENT_NAME',
+    'DEFAULT_MAX_ITERATIONS',
+    'get_field_info',
+    'model_defaults_to_dict',
 ]

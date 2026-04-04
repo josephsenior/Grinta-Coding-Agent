@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-
 from backend.telemetry.cost_recording import record_llm_cost, register_cost_recorder
-
 
 # ── register_cost_recorder function ────────────────────────────────────
 
@@ -85,49 +83,49 @@ class TestRecordLLMCost:
     def test_no_op_when_no_recorder_registered(self):
         """Test is no-op when no cost recorder is registered."""
         # Should not raise even though no recorder is set
-        record_llm_cost("user:123", 0.05)
+        record_llm_cost('user:123', 0.05)
 
     def test_calls_registered_recorder(self):
         """Test calls registered recorder with user_key and cost."""
         recorder = MagicMock()
         register_cost_recorder(recorder)
 
-        record_llm_cost("user:123", 0.05)
+        record_llm_cost('user:123', 0.05)
 
-        recorder.assert_called_once_with("user:123", 0.05)
+        recorder.assert_called_once_with('user:123', 0.05)
 
     def test_records_multiple_costs(self):
         """Test can record multiple costs sequentially."""
         recorder = MagicMock()
         register_cost_recorder(recorder)
 
-        record_llm_cost("user:123", 0.05)
-        record_llm_cost("user:456", 0.10)
-        record_llm_cost("ip:127.0.0.1", 0.02)
+        record_llm_cost('user:123', 0.05)
+        record_llm_cost('user:456', 0.10)
+        record_llm_cost('ip:127.0.0.1', 0.02)
 
         assert recorder.call_count == 3
-        recorder.assert_any_call("user:123", 0.05)
-        recorder.assert_any_call("user:456", 0.10)
-        recorder.assert_any_call("ip:127.0.0.1", 0.02)
+        recorder.assert_any_call('user:123', 0.05)
+        recorder.assert_any_call('user:456', 0.10)
+        recorder.assert_any_call('ip:127.0.0.1', 0.02)
 
     def test_handles_recorder_exception_gracefully(self):
         """Test handles recorder exception without raising."""
-        recorder = MagicMock(side_effect=ValueError("Recorder failed"))
+        recorder = MagicMock(side_effect=ValueError('Recorder failed'))
         register_cost_recorder(recorder)
 
         # Should not raise even though recorder raises
-        record_llm_cost("user:123", 0.05)
+        record_llm_cost('user:123', 0.05)
 
     def test_continues_after_recorder_exception(self):
         """Test continues recording after a callback exception."""
         recorder = MagicMock()
-        recorder.side_effect = [ValueError("First call fails"), None, None]
+        recorder.side_effect = [ValueError('First call fails'), None, None]
         register_cost_recorder(recorder)
 
         # First call raises, but subsequent calls should still work
-        record_llm_cost("user:1", 0.01)  # fails
-        record_llm_cost("user:2", 0.02)  # succeeds
-        record_llm_cost("user:3", 0.03)  # succeeds
+        record_llm_cost('user:1', 0.01)  # fails
+        record_llm_cost('user:2', 0.02)  # succeeds
+        record_llm_cost('user:3', 0.03)  # succeeds
 
         assert recorder.call_count == 3
 
@@ -136,36 +134,36 @@ class TestRecordLLMCost:
         recorder = MagicMock()
         register_cost_recorder(recorder)
 
-        record_llm_cost("user:123", 0.0)
+        record_llm_cost('user:123', 0.0)
 
-        recorder.assert_called_once_with("user:123", 0.0)
+        recorder.assert_called_once_with('user:123', 0.0)
 
     def test_handles_large_cost(self):
         """Test handles large cost values."""
         recorder = MagicMock()
         register_cost_recorder(recorder)
 
-        record_llm_cost("user:123", 1000.50)
+        record_llm_cost('user:123', 1000.50)
 
-        recorder.assert_called_once_with("user:123", 1000.50)
+        recorder.assert_called_once_with('user:123', 1000.50)
 
     def test_handles_ip_based_user_key(self):
         """Test handles IP-based user keys."""
         recorder = MagicMock()
         register_cost_recorder(recorder)
 
-        record_llm_cost("ip:192.168.1.1", 0.03)
+        record_llm_cost('ip:192.168.1.1', 0.03)
 
-        recorder.assert_called_once_with("ip:192.168.1.1", 0.03)
+        recorder.assert_called_once_with('ip:192.168.1.1', 0.03)
 
     def test_handles_user_id_based_key(self):
         """Test handles user ID-based keys."""
         recorder = MagicMock()
         register_cost_recorder(recorder)
 
-        record_llm_cost("user:abc123", 0.07)
+        record_llm_cost('user:abc123', 0.07)
 
-        recorder.assert_called_once_with("user:abc123", 0.07)
+        recorder.assert_called_once_with('user:abc123', 0.07)
 
 
 # ── Global State Management ────────────────────────────────────────────
@@ -193,8 +191,8 @@ class TestGlobalState:
         recorder = MagicMock()
         register_cost_recorder(recorder)
 
-        record_llm_cost("user:1", 0.01)
-        record_llm_cost("user:2", 0.02)
+        record_llm_cost('user:1', 0.01)
+        record_llm_cost('user:2', 0.02)
 
         # Same recorder should be called both times
         assert recorder.call_count == 2
@@ -214,36 +212,36 @@ class TestIntegrationScenarios:
 
     def test_server_middleware_registration_pattern(self):
         """Test typical server middleware registration pattern."""
-        cost_accumulator = {"total": 0.0}
+        cost_accumulator = {'total': 0.0}
 
         def middleware_recorder(user_key: str, cost: float) -> None:
-            cost_accumulator["total"] += cost
+            cost_accumulator['total'] += cost
 
         # Server middleware registers itself
         register_cost_recorder(middleware_recorder)
 
         # Controller/models record costs
-        record_llm_cost("user:123", 0.05)
-        record_llm_cost("user:456", 0.10)
-        record_llm_cost("user:123", 0.03)
+        record_llm_cost('user:123', 0.05)
+        record_llm_cost('user:456', 0.10)
+        record_llm_cost('user:123', 0.03)
 
         # Verify costs accumulated
-        assert abs(cost_accumulator["total"] - 0.18) < 0.0001
+        assert abs(cost_accumulator['total'] - 0.18) < 0.0001
 
     def test_quota_disabled_scenario(self):
         """Test behavior when quota middleware is disabled (no recorder)."""
         # No recorder registered (quota disabled)
 
         # Should not raise errors
-        record_llm_cost("user:123", 0.05)
-        record_llm_cost("user:456", 0.10)
+        record_llm_cost('user:123', 0.05)
+        record_llm_cost('user:456', 0.10)
 
     def test_test_environment_scenario(self):
         """Test typical test environment (no recorder needed)."""
         # In tests, recorder often not registered
 
         # Should silently no-op
-        record_llm_cost("test_user", 0.01)
+        record_llm_cost('test_user', 0.01)
 
     def test_recorders_can_be_swapped(self):
         """Test swapping recorders (e.g., for different middleware)."""
@@ -257,12 +255,12 @@ class TestIntegrationScenarios:
             calls2.append((user_key, cost))
 
         register_cost_recorder(recorder1)
-        record_llm_cost("user:1", 0.01)
+        record_llm_cost('user:1', 0.01)
 
         register_cost_recorder(recorder2)
-        record_llm_cost("user:2", 0.02)
+        record_llm_cost('user:2', 0.02)
 
         assert len(calls1) == 1
         assert len(calls2) == 1
-        assert calls1[0] == ("user:1", 0.01)
-        assert calls2[0] == ("user:2", 0.02)
+        assert calls1[0] == ('user:1', 0.01)
+        assert calls2[0] == ('user:2', 0.02)

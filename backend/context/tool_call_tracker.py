@@ -24,8 +24,8 @@ def flush_resolved_tool_calls(tool_state: _ToolCallTracking) -> list[Message]:
     response_ids_to_remove: list[str] = []
     for response_id, pending_message in tool_state.pending_action_messages.items():
         assert pending_message.tool_calls is not None, (
-            "Tool calls should NOT be None when function calling is enabled &"
-            f" the message is considered pending tool call. Pending message: {pending_message}"
+            'Tool calls should NOT be None when function calling is enabled &'
+            f' the message is considered pending tool call. Pending message: {pending_message}'
         )
         if all(
             tool_call.id in tool_state.tool_call_messages
@@ -64,7 +64,7 @@ def collect_tool_call_ids(messages: list[Message]) -> set[str]:
         for message in messages
         if message.tool_calls
         for tool_call in message.tool_calls
-        if message.role == "assistant" and tool_call.id
+        if message.role == 'assistant' and tool_call.id
     }
 
 
@@ -73,7 +73,7 @@ def collect_tool_response_ids(messages: list[Message]) -> set[str]:
     return {
         message.tool_call_id
         for message in messages
-        if message.role == "tool" and message.tool_call_id
+        if message.role == 'tool' and message.tool_call_id
     }
 
 
@@ -83,9 +83,9 @@ def _should_include_message(
     tool_response_ids: set[str],
 ) -> bool:
     """Determine if a message should be included in the filtered results."""
-    if message.role == "tool" and message.tool_call_id:
+    if message.role == 'tool' and message.tool_call_id:
         return message.tool_call_id in tool_call_ids
-    if message.role == "assistant" and message.tool_calls:
+    if message.role == 'assistant' and message.tool_calls:
         return _all_tool_calls_match(message, tool_response_ids)
     return True
 
@@ -95,7 +95,7 @@ def _maybe_trim_tool_calls(
     tool_response_ids: set[str],
 ) -> Message:
     """Remove tool calls from message that lack corresponding responses."""
-    if message.role != "assistant" or not message.tool_calls:
+    if message.role != 'assistant' or not message.tool_calls:
         return message
 
     matched_calls = [

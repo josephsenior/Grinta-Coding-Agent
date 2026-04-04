@@ -25,7 +25,7 @@ class RuntimeCapabilities:
     """
 
     # -- platform -----------------------------------------------------------
-    platform: str = ""
+    platform: str = ''
     """``sys.platform`` at snapshot time (e.g. ``'win32'``, ``'linux'``)."""
 
     is_windows: bool = False
@@ -58,26 +58,26 @@ class RuntimeCapabilities:
 
 
 def _env_true(name: str) -> bool:
-    value = os.getenv(name, "").strip().lower()
-    return value in {"1", "true", "yes", "on"}
+    value = os.getenv(name, '').strip().lower()
+    return value in {'1', 'true', 'yes', 'on'}
 
 
 def _is_container_runtime() -> bool:
     """Best-effort container detection with env override support."""
-    if _env_true("APP_RUNTIME_IS_CONTAINER"):
+    if _env_true('APP_RUNTIME_IS_CONTAINER'):
         return True
-    if os.getenv("container", "").strip():
+    if os.getenv('container', '').strip():
         return True
-    return Path("/.dockerenv").exists() or Path("/run/.containerenv").exists()
+    return Path('/.dockerenv').exists() or Path('/run/.containerenv').exists()
 
 
 def _is_wsl_runtime(platform: str) -> bool:
-    if not platform.startswith("linux"):
+    if not platform.startswith('linux'):
         return False
-    if os.getenv("WSL_DISTRO_NAME") or os.getenv("WSL_INTEROP"):
+    if os.getenv('WSL_DISTRO_NAME') or os.getenv('WSL_INTEROP'):
         return True
     try:
-        return "microsoft" in Path("/proc/version").read_text(encoding="utf-8").lower()
+        return 'microsoft' in Path('/proc/version').read_text(encoding='utf-8').lower()
     except OSError:
         return False
 
@@ -94,13 +94,13 @@ def detect_capabilities(
     ``Runtime.connect()`` and the result stored on ``self.capabilities``.
     """
     platform = sys.platform
-    is_windows = platform == "win32"
+    is_windows = platform == 'win32'
     is_container = _is_container_runtime()
     is_wsl = _is_wsl_runtime(platform)
 
-    has_git = shutil.which("git") is not None
-    has_tmux = shutil.which("tmux") is not None
-    has_bash = shutil.which("bash") is not None
+    has_git = shutil.which('git') is not None
+    has_tmux = shutil.which('tmux') is not None
+    has_bash = shutil.which('bash') is not None
 
     # Browser interactions are provided via external tooling (e.g., MCP).
     # Do not depend on any specific browser automation library being installed.
@@ -114,10 +114,10 @@ def detect_capabilities(
     can_mcp = True
 
     # Collect missing tools for diagnostic logging
-    expected = {"git": has_git}
+    expected = {'git': has_git}
     if not is_windows:
-        expected["tmux"] = has_tmux
-        expected["bash"] = has_bash
+        expected['tmux'] = has_tmux
+        expected['bash'] = has_bash
     missing = tuple(name for name, found in expected.items() if not found)
 
     return RuntimeCapabilities(

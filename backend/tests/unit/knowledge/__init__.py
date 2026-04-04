@@ -1,1 +1,1 @@
-﻿"""Unit tests for backend.knowledge."""
+"""Unit tests for backend.knowledge."""

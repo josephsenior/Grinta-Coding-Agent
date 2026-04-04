@@ -20,11 +20,11 @@ from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action.agent import AgentThinkAction
 
-VERIFY_FILE_LINES_TOOL_NAME = "verify_file_lines"
+VERIFY_FILE_LINES_TOOL_NAME = 'verify_file_lines'
 
 _DESCRIPTION = (
-    "Validate file contents before editing by checking line assertions (line number + expected substring). "
-    "Returns PASS/FAIL per assertion. Use after condensation or many edits to catch stale-model errors."
+    'Validate file contents before editing by checking line assertions (line number + expected substring). '
+    'Returns PASS/FAIL per assertion. Use after condensation or many edits to catch stale-model errors.'
 )
 
 
@@ -34,30 +34,30 @@ def create_verify_file_lines_tool() -> ChatCompletionToolParam:
         name=VERIFY_FILE_LINES_TOOL_NAME,
         description=_DESCRIPTION,
         properties={
-            "path": {
-                "type": "string",
-                "description": "Path to the file to verify.",
+            'path': {
+                'type': 'string',
+                'description': 'Path to the file to verify.',
             },
-            "line_checks": {
-                "type": "string",
-                "description": (
+            'line_checks': {
+                'type': 'string',
+                'description': (
                     "Pipe-separated list of 'line_num:expected_substring' assertions. "
                     "Example: '42:def process_request|100:return response|1:import os'"
                 ),
             },
         },
-        required=["path", "line_checks"],
+        required=['path', 'line_checks'],
     )
 
 
 def _parse_verify_assertions(line_checks: str) -> list[tuple[int, str]]:
     """Parse line_checks into [(line_num, expected), ...]. Returns empty list on parse failure."""
     assertions = []
-    for check in line_checks.split("|"):
+    for check in line_checks.split('|'):
         check = check.strip()
-        if ":" not in check:
+        if ':' not in check:
             continue
-        parts = check.split(":", 1)
+        parts = check.split(':', 1)
         try:
             assertions.append((int(parts[0].strip()), parts[1].strip()))
         except (ValueError, IndexError):
@@ -65,26 +65,32 @@ def _parse_verify_assertions(line_checks: str) -> list[tuple[int, str]]:
     return assertions
 
 
-def _run_verify_assertions(lines: list[str], assertions: list[tuple[int, str]]) -> tuple[list[str], bool]:
+def _run_verify_assertions(
+    lines: list[str], assertions: list[tuple[int, str]]
+) -> tuple[list[str], bool]:
     """Run assertions. Returns (results, all_passed)."""
     results: list[str] = []
     all_passed = True
     for line_num, expected in assertions:
         if line_num < 1 or line_num > len(lines):
-            results.append(f"  FAIL line {line_num}: out of range (file has {len(lines)} lines)")
+            results.append(
+                f'  FAIL line {line_num}: out of range (file has {len(lines)} lines)'
+            )
             all_passed = False
-        elif expected in lines[line_num - 1].rstrip("\n\r"):
+        elif expected in lines[line_num - 1].rstrip('\n\r'):
             results.append(f"  PASS line {line_num}: contains '{expected}'")
         else:
-            results.append(f"  FAIL line {line_num}: expected '{expected}' but got: '{lines[line_num - 1][:120]}'")
+            results.append(
+                f"  FAIL line {line_num}: expected '{expected}' but got: '{lines[line_num - 1][:120]}'"
+            )
             all_passed = False
     return (results, all_passed)
 
 
 def build_verify_file_lines_action(arguments: dict) -> AgentThinkAction:
     """Execute verify_file_lines and return a think action with pass/fail results."""
-    path = arguments.get("path", "")
-    line_checks = arguments.get("line_checks", "")
+    path = arguments.get('path', '')
+    line_checks = arguments.get('line_checks', '')
 
     if not path:
         return AgentThinkAction(thought="[VERIFY_FILE_LINES] 'path' is required.")
@@ -93,13 +99,17 @@ def build_verify_file_lines_action(arguments: dict) -> AgentThinkAction:
             thought="[VERIFY_FILE_LINES] 'line_checks' is required (format: 'line:substring|line:substring')."
         )
     if not os.path.isfile(path):
-        return AgentThinkAction(thought=f"[VERIFY_FILE_LINES] FAIL — file not found: {path}")
+        return AgentThinkAction(
+            thought=f'[VERIFY_FILE_LINES] FAIL — file not found: {path}'
+        )
 
     try:
-        with open(path, encoding="utf-8", errors="replace") as f:
+        with open(path, encoding='utf-8', errors='replace') as f:
             lines = f.readlines()
     except OSError as exc:
-        return AgentThinkAction(thought=f"[VERIFY_FILE_LINES] FAIL — cannot read {path}: {exc}")
+        return AgentThinkAction(
+            thought=f'[VERIFY_FILE_LINES] FAIL — cannot read {path}: {exc}'
+        )
 
     assertions = _parse_verify_assertions(line_checks)
     if not assertions:
@@ -108,6 +118,6 @@ def build_verify_file_lines_action(arguments: dict) -> AgentThinkAction:
         )
 
     results, all_passed = _run_verify_assertions(lines, assertions)
-    status = "ALL PASSED" if all_passed else "SOME FAILED"
-    header = f"[VERIFY_FILE_LINES] {path} — {status} ({len(assertions)} checks)"
-    return AgentThinkAction(thought=f"{header}\n" + "\n".join(results))
+    status = 'ALL PASSED' if all_passed else 'SOME FAILED'
+    header = f'[VERIFY_FILE_LINES] {path} — {status} ({len(assertions)} checks)'
+    return AgentThinkAction(thought=f'{header}\n' + '\n'.join(results))

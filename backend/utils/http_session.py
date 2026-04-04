@@ -33,16 +33,16 @@ class HttpSession:
         """Raise if the session has already been closed."""
         if self._is_closed:
             logger.error(
-                "HttpSession used after close — raising SessionClosedError.",
+                'HttpSession used after close — raising SessionClosedError.',
                 stack_info=True,
             )
             raise SessionClosedError(
-                "This HttpSession has been closed. Create a new instance."
+                'This HttpSession has been closed. Create a new instance.'
             )
 
     def _merged_headers(self, kwargs: dict[str, Any]) -> dict[str, Any]:
-        headers = kwargs.get("headers") or {}
-        kwargs["headers"] = {**self.headers, **headers}
+        headers = kwargs.get('headers') or {}
+        kwargs['headers'] = {**self.headers, **headers}
         return kwargs
 
     def request(self, *args: Any, **kwargs: Any) -> httpx.Response:
@@ -59,31 +59,31 @@ class HttpSession:
 
     def get(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """Send GET request via wrapped client."""
-        return self.request("GET", *args, **kwargs)
+        return self.request('GET', *args, **kwargs)
 
     def post(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """Send POST request via wrapped client."""
-        return self.request("POST", *args, **kwargs)
+        return self.request('POST', *args, **kwargs)
 
     def patch(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """Send PATCH request via wrapped client."""
-        return self.request("PATCH", *args, **kwargs)
+        return self.request('PATCH', *args, **kwargs)
 
     def put(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """Send PUT request via wrapped client."""
-        return self.request("PUT", *args, **kwargs)
+        return self.request('PUT', *args, **kwargs)
 
     def delete(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """Send DELETE request via wrapped client."""
-        return self.request("DELETE", *args, **kwargs)
+        return self.request('DELETE', *args, **kwargs)
 
     def options(self, *args: Any, **kwargs: Any) -> httpx.Response:
         """Send OPTIONS request via wrapped client."""
-        return self.request("OPTIONS", *args, **kwargs)
+        return self.request('OPTIONS', *args, **kwargs)
 
     def close(self) -> None:
         """Mark session closed to detect unintended reuse."""
         self._is_closed = True
 
 
-__all__ = ["HttpSession", "SessionClosedError", "CLIENT"]
+__all__ = ['HttpSession', 'SessionClosedError', 'CLIENT']

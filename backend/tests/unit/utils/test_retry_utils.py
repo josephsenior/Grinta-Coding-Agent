@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 import pytest
 
 from backend.core.schemas import RetryConfig, RetryStrategy
@@ -13,22 +12,21 @@ from backend.utils.retry import (
     retry,
 )
 
-
 # ── RetryError / RetryExhaustedError ────────────────────────────────
 
 
 class TestRetryErrors:
     def test_retry_error(self):
-        e = RetryError("fail")
-        assert str(e) == "fail"
+        e = RetryError('fail')
+        assert str(e) == 'fail'
 
     def test_retry_exhausted_error(self):
-        inner = ValueError("boom")
+        inner = ValueError('boom')
         e = RetryExhaustedError(3, inner)
         assert e.attempts == 3
         assert e.last_exception is inner
-        assert "3 attempts" in str(e)
-        assert "boom" in str(e)
+        assert '3 attempts' in str(e)
+        assert 'boom' in str(e)
 
     def test_retry_exhausted_none_exception(self):
         e = RetryExhaustedError(1, None)
@@ -109,16 +107,16 @@ class TestRetrySync:
             nonlocal call_count
             call_count += 1
             if call_count < 3:
-                raise ValueError("not yet")
-            return "done"
+                raise ValueError('not yet')
+            return 'done'
 
-        assert flaky() == "done"
+        assert flaky() == 'done'
         assert call_count == 3
 
     def test_exhausted(self):
         @retry(max_attempts=2, base_delay=0.0)
         def always_fail():
-            raise ValueError("always")
+            raise ValueError('always')
 
         with pytest.raises(RetryExhaustedError) as exc_info:
             always_fail()
@@ -127,9 +125,9 @@ class TestRetrySync:
     def test_non_retryable_exception(self):
         @retry(max_attempts=3, base_delay=0.0, allowed_exceptions=(ValueError,))
         def raises_type():
-            raise TypeError("wrong type")
+            raise TypeError('wrong type')
 
-        with pytest.raises(TypeError, match="wrong type"):
+        with pytest.raises(TypeError, match='wrong type'):
             raises_type()
 
     def test_with_config(self):
@@ -137,7 +135,7 @@ class TestRetrySync:
 
         @retry(config=cfg)
         def fail():
-            raise ValueError("fail")
+            raise ValueError('fail')
 
         with pytest.raises(RetryExhaustedError):
             fail()
@@ -156,10 +154,10 @@ class TestRetrySync:
             nonlocal counter
             counter += 1
             if counter < 3:
-                raise ValueError("retry")
-            return "ok"
+                raise ValueError('retry')
+            return 'ok'
 
-        assert flaky() == "ok"
+        assert flaky() == 'ok'
         assert len(calls) == 2  # Called on attempt 1 and 2 failures
 
 
@@ -184,17 +182,17 @@ class TestRetryAsync:
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise ValueError("not yet")
-            return "async_done"
+                raise ValueError('not yet')
+            return 'async_done'
 
-        assert await flaky() == "async_done"
+        assert await flaky() == 'async_done'
         assert call_count == 2
 
     @pytest.mark.asyncio
     async def test_async_exhausted(self):
         @retry(max_attempts=2, base_delay=0.0)
         async def always_fail():
-            raise ValueError("async fail")
+            raise ValueError('async fail')
 
         with pytest.raises(RetryExhaustedError) as exc_info:
             await always_fail()
@@ -204,7 +202,7 @@ class TestRetryAsync:
     async def test_async_non_retryable(self):
         @retry(max_attempts=3, base_delay=0.0, allowed_exceptions=(ValueError,))
         async def raises_type():
-            raise TypeError("wrong")
+            raise TypeError('wrong')
 
         with pytest.raises(TypeError):
             await raises_type()

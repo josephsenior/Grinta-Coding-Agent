@@ -5,15 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.ledger.event import Event
     from backend.inference.metrics import Metrics, TokenUsage
+    from backend.ledger.event import Event
 
 
 def _get_tool_response_id(event: Event) -> str | None:
     """Extract tool response ID from event if available."""
     if not event.tool_call_metadata or not event.tool_call_metadata.model_response:
         return None
-    return event.tool_call_metadata.model_response.get("id")
+    return event.tool_call_metadata.model_response.get('id')
 
 
 def _find_usage_by_response_id(metrics: Metrics, response_id: str) -> TokenUsage | None:
@@ -39,7 +39,7 @@ def get_token_usage_for_event(
         if usage is not None:
             return usage
 
-    fallback_id = getattr(event, "response_id", None)
+    fallback_id = getattr(event, 'response_id', None)
     if fallback_id:
         usage = _find_usage_by_response_id(metrics, fallback_id)
         if usage is not None:

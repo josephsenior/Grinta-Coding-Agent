@@ -22,7 +22,7 @@ class FeatureUnavailableError(Exception):
         if message is None:
             message = (
                 f"Feature '{feature_name}' is not available in App Core. "
-                "This feature is part of the App Pro/Enterprise editions."
+                'This feature is part of the App Pro/Enterprise editions.'
             )
         super().__init__(message)
 
@@ -57,11 +57,11 @@ class FeatureFlags:
             Dictionary of feature flags with metadata
         """
         return {
-            "security_risk_assessment": {
-                "enabled": self.risk_assessment_enabled,
-                "coming_soon": True,
-                "tier": "pro",
-                "description": "Security risk assessment for agent actions",
+            'security_risk_assessment': {
+                'enabled': self.risk_assessment_enabled,
+                'coming_soon': True,
+                'tier': 'pro',
+                'description': 'Security risk assessment for agent actions',
             },
         }
 

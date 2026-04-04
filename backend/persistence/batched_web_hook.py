@@ -95,7 +95,7 @@ class BatchedWebHookFileStore(FileStore):
 
         """
         self.file_store.write(path, contents)
-        self._queue_update(path, "write", contents)
+        self._queue_update(path, 'write', contents)
 
     def read(self, path: str) -> str:
         """Read contents from a file.
@@ -129,7 +129,7 @@ class BatchedWebHookFileStore(FileStore):
 
         """
         self.file_store.delete(path)
-        self._queue_update(path, "delete", None)
+        self._queue_update(path, 'delete', None)
 
     def _queue_update(
         self, path: str, operation: str, contents: str | bytes | None
@@ -146,14 +146,14 @@ class BatchedWebHookFileStore(FileStore):
             content_size = 0
             if contents is not None:
                 if isinstance(contents, str):
-                    content_size = len(contents.encode("utf-8"))
+                    content_size = len(contents.encode('utf-8'))
                 else:
                     content_size = len(contents)
             if path in self._batch:
                 _prev_op, prev_contents = self._batch[path]
                 if prev_contents is not None:
                     if isinstance(prev_contents, str):
-                        self._batch_size -= len(prev_contents.encode("utf-8"))
+                        self._batch_size -= len(prev_contents.encode('utf-8'))
                     else:
                         self._batch_size -= len(prev_contents)
             self._batch_size += content_size
@@ -206,15 +206,15 @@ class BatchedWebHookFileStore(FileStore):
             try:
                 self._send_batch_request(batch_to_send)
             except Exception:
-                logger.exception("Error sending webhook batch")
+                logger.exception('Error sending webhook batch')
 
     @tenacity.retry(
         wait=tenacity.wait_fixed(1),
         stop=tenacity.stop_after_attempt(3),
         before_sleep=tenacity_before_sleep_factory(
-            "storage.batched_webhook.send_batch"
+            'storage.batched_webhook.send_batch'
         ),
-        after=tenacity_after_factory("storage.batched_webhook.send_batch"),
+        after=tenacity_after_factory('storage.batched_webhook.send_batch'),
     )
     def _send_batch_request(
         self, batch: dict[str, tuple[str, str | bytes | None]]
@@ -233,20 +233,20 @@ class BatchedWebHookFileStore(FileStore):
         batch_payload = []
         for path, (operation, contents) in batch.items():
             item = {
-                "method": "POST" if operation == "write" else "DELETE",
-                "path": path,
+                'method': 'POST' if operation == 'write' else 'DELETE',
+                'path': path,
             }
-            if operation == "write" and contents is not None:
+            if operation == 'write' and contents is not None:
                 if isinstance(contents, bytes):
                     try:
-                        item["content"] = contents.decode("utf-8")
+                        item['content'] = contents.decode('utf-8')
                     except UnicodeDecodeError:
                         import base64
 
-                        item["content"] = base64.b64encode(contents).decode("ascii")
-                        item["encoding"] = "base64"
+                        item['content'] = base64.b64encode(contents).decode('ascii')
+                        item['encoding'] = 'base64'
                 else:
-                    item["content"] = contents
+                    item['content'] = contents
             batch_payload.append(item)
         response = self.client.post(self.base_url, json=batch_payload)
         response.raise_for_status()

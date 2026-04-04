@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 from backend.core.logger import app_logger as logger
+from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:
+    from backend.ledger.observation import Observation
     from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.orchestration.tool_pipeline import ToolInvocationContext
-    from backend.ledger.observation import Observation
 
 
 class ContextWindowMiddleware(ToolInvocationMiddleware):
@@ -35,18 +35,18 @@ class ContextWindowMiddleware(ToolInvocationMiddleware):
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None
     ) -> None:
-        llm = getattr(self.controller.agent, "llm", None)
-        metrics = getattr(llm, "metrics", None)
+        llm = getattr(self.controller.agent, 'llm', None)
+        metrics = getattr(llm, 'metrics', None)
         if metrics is None:
             return
-        token_usages = getattr(metrics, "token_usages", [])
+        token_usages = getattr(metrics, 'token_usages', [])
         if not token_usages:
             return
         last = token_usages[-1]
-        context_window = getattr(last, "context_window", 0)
+        context_window = getattr(last, 'context_window', 0)
         if context_window <= 0:
             return
-        prompt_tokens = getattr(last, "prompt_tokens", 0)
+        prompt_tokens = getattr(last, 'prompt_tokens', 0)
         pct = prompt_tokens / context_window
         for threshold in self._THRESHOLDS:
             if pct >= threshold and threshold not in self._alerted_thresholds:
@@ -62,17 +62,17 @@ class ContextWindowMiddleware(ToolInvocationMiddleware):
     ) -> None:
         pct_int = int(threshold * 100)
         content = (
-            f"⚠️ Context window {pct_int}% full: "
-            f"{prompt_tokens:,}/{context_window:,} tokens used. "
-            "Call request_condensation() to free context space before overflow."
+            f'⚠️ Context window {pct_int}% full: '
+            f'{prompt_tokens:,}/{context_window:,} tokens used. '
+            'Call request_condensation() to free context space before overflow.'
         )
         logger.warning(
-            "Context window threshold %d%% crossed for session %s — %d/%d tokens",
+            'Context window threshold %d%% crossed for session %s — %d/%d tokens',
             pct_int,
             self.controller.id,
             prompt_tokens,
             context_window,
-            extra={"session_id": self.controller.id},
+            extra={'session_id': self.controller.id},
         )
         try:
             from backend.ledger.event import EventSource
@@ -80,18 +80,18 @@ class ContextWindowMiddleware(ToolInvocationMiddleware):
 
             obs = StatusObservation(
                 content=content,
-                status_type="context_window_alert",
+                status_type='context_window_alert',
                 extras={
-                    "threshold": threshold,
-                    "pct_used": round(pct, 4),
-                    "prompt_tokens": prompt_tokens,
-                    "context_window": context_window,
+                    'threshold': threshold,
+                    'pct_used': round(pct, 4),
+                    'prompt_tokens': prompt_tokens,
+                    'context_window': context_window,
                 },
             )
             self.controller.event_stream.add_event(obs, EventSource.ENVIRONMENT)
         except Exception:
             logger.debug(
-                "Failed to emit context window alert for session %s",
+                'Failed to emit context window alert for session %s',
                 self.controller.id,
                 exc_info=True,
             )

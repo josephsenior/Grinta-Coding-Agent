@@ -37,20 +37,20 @@ class SmartErrorHandler:
 
     # Common typos and corrections
     COMMON_TYPOS = {
-        "functino": "function",
-        "fucntion": "function",
-        "funciton": "function",
-        "calss": "class",
-        "classs": "class",
-        "clas": "class",
-        "defination": "definition",
-        "definiton": "definition",
-        "improt": "import",
-        "imoprt": "import",
-        "retrun": "return",
-        "reutrn": "return",
-        "variabel": "variable",
-        "variabl": "variable",
+        'functino': 'function',
+        'fucntion': 'function',
+        'funciton': 'function',
+        'calss': 'class',
+        'classs': 'class',
+        'clas': 'class',
+        'defination': 'definition',
+        'definiton': 'definition',
+        'improt': 'import',
+        'imoprt': 'import',
+        'retrun': 'return',
+        'reutrn': 'return',
+        'variabel': 'variable',
+        'variabl': 'variable',
     }
 
     @staticmethod
@@ -141,10 +141,10 @@ class SmartErrorHandler:
         """
         available_info = []
         if classes:
-            available_info.append(f"{len(classes)} classes")
+            available_info.append(f'{len(classes)} classes')
         if functions:
-            available_info.append(f"{len(functions)} functions")
-        return f" ({', '.join(available_info)} available)" if available_info else ""
+            available_info.append(f'{len(functions)} functions')
+        return f' ({", ".join(available_info)} available)' if available_info else ''
 
     @staticmethod
     def _build_symbol_list_message(
@@ -163,11 +163,11 @@ class SmartErrorHandler:
         """
         message = (
             f"Symbol '{symbol_name}' not found{context}. Available symbols:\n"
-            + "\n".join(f"  - {s}" for s in available_symbols[:10])
+            + '\n'.join(f'  - {s}' for s in available_symbols[:10])
         )
 
         if len(available_symbols) > 10:
-            message += f"\n  ... and {len(available_symbols) - 10} more"
+            message += f'\n  ... and {len(available_symbols) - 10} more'
 
         return message
 
@@ -242,9 +242,9 @@ class SmartErrorHandler:
     @staticmethod
     def _analyze_indent_error(error_lower: str) -> tuple[list[str], float]:
         """Analyze indentation errors."""
-        if "unexpected indent" in error_lower or "indentation" in error_lower:
+        if 'unexpected indent' in error_lower or 'indentation' in error_lower:
             return [
-                "Check your indentation - Python requires consistent spacing",
+                'Check your indentation - Python requires consistent spacing',
                 "Make sure you're using either tabs or spaces, not both",
             ], 0.8
         return [], 0.5
@@ -252,10 +252,10 @@ class SmartErrorHandler:
     @staticmethod
     def _analyze_string_error(error_lower: str) -> tuple[list[str], float]:
         """Analyze string termination errors."""
-        if "unterminated string" in error_lower:
+        if 'unterminated string' in error_lower:
             return [
-                "You have an unclosed string - check for missing quotes",
-                "Look for unescaped quotes inside your string",
+                'You have an unclosed string - check for missing quotes',
+                'Look for unescaped quotes inside your string',
             ], 0.9
         return [], 0.5
 
@@ -270,8 +270,8 @@ class SmartErrorHandler:
             Suggestion message or None
 
         """
-        if ":" in code_context:
-            return "Check for missing colons after if/for/def/class statements"
+        if ':' in code_context:
+            return 'Check for missing colons after if/for/def/class statements'
         return None
 
     @staticmethod
@@ -285,8 +285,8 @@ class SmartErrorHandler:
             Suggestion message or None
 
         """
-        if "(" in code_context and ")" not in code_context:
-            return "You might have unmatched parentheses"
+        if '(' in code_context and ')' not in code_context:
+            return 'You might have unmatched parentheses'
         return None
 
     @staticmethod
@@ -300,8 +300,8 @@ class SmartErrorHandler:
             Suggestion message or None
 
         """
-        if "[" in code_context and "]" not in code_context:
-            return "You might have unmatched brackets"
+        if '[' in code_context and ']' not in code_context:
+            return 'You might have unmatched brackets'
         return None
 
     @staticmethod
@@ -309,10 +309,10 @@ class SmartErrorHandler:
         error_lower: str, code_context: str | None
     ) -> tuple[list[str], float]:
         """Analyze invalid syntax errors."""
-        if "invalid syntax" not in error_lower:
+        if 'invalid syntax' not in error_lower:
             return [], 0.5
 
-        code_ctx = code_context or ""
+        code_ctx = code_context or ''
         suggestions = []
 
         if suggestion := SmartErrorHandler._check_missing_colon(code_ctx):
@@ -322,27 +322,27 @@ class SmartErrorHandler:
         if suggestion := SmartErrorHandler._check_unmatched_brackets(code_ctx):
             suggestions.append(suggestion)
 
-        suggestions.append("Double-check your syntax against language documentation")
+        suggestions.append('Double-check your syntax against language documentation')
 
         return suggestions, 0.6
 
     @staticmethod
     def _analyze_eof_error(error_lower: str) -> tuple[list[str], float]:
         """Analyze unexpected EOF errors."""
-        if "unexpected eof" in error_lower or "unexpected end" in error_lower:
+        if 'unexpected eof' in error_lower or 'unexpected end' in error_lower:
             return [
-                "File ends unexpectedly - check for unclosed brackets/braces",
-                "Make sure all functions and classes are complete",
+                'File ends unexpectedly - check for unclosed brackets/braces',
+                'Make sure all functions and classes are complete',
             ], 0.85
         return [], 0.5
 
     @staticmethod
     def _analyze_undefined_error(error_lower: str) -> tuple[list[str], float]:
         """Analyze undefined symbol errors."""
-        if "undefined" in error_lower or "not defined" in error_lower:
+        if 'undefined' in error_lower or 'not defined' in error_lower:
             return [
-                "This symbol is used before being defined",
-                "Check for typos in the variable/function name",
+                'This symbol is used before being defined',
+                'Check for typos in the variable/function name',
             ], 0.75
         return [], 0.5
 
@@ -354,20 +354,20 @@ class SmartErrorHandler:
         suggestions: list[str],
     ) -> str:
         """Build formatted error message."""
-        message_parts = [f"Syntax Error: {error_message}"]
+        message_parts = [f'Syntax Error: {error_message}']
 
         if line_number:
-            message_parts.append(f"at line {line_number}")
+            message_parts.append(f'at line {line_number}')
 
         if code_context:
-            message_parts.append(f"\nContext:\n{code_context}")
+            message_parts.append(f'\nContext:\n{code_context}')
 
         if suggestions:
-            message_parts.append("\nSuggestions:")
+            message_parts.append('\nSuggestions:')
             for i, suggestion in enumerate(suggestions, 1):
-                message_parts.append(f"  {i}. {suggestion}")
+                message_parts.append(f'  {i}. {suggestion}')
 
-        return "\n".join(message_parts)
+        return '\n'.join(message_parts)
 
     @staticmethod
     def syntax_error(
@@ -430,21 +430,19 @@ class SmartErrorHandler:
         """
         if not similar_files:
             return ErrorSuggestion(
-                message=f"File not found: {path}", suggestions=[], confidence=0.0
+                message=f'File not found: {path}', suggestions=[], confidence=0.0
             )
 
         # Fuzzy match file paths
-        close_matches = difflib.get_close_matches(
-            path, similar_files, n=5, cutoff=0.5
-        )
+        close_matches = difflib.get_close_matches(path, similar_files, n=5, cutoff=0.5)
 
         if close_matches:
             best_match = close_matches[0]
             similarity = difflib.SequenceMatcher(None, path, best_match).ratio()
 
-            message = f"File not found: {path}\n\nDid you mean one of these?"
+            message = f'File not found: {path}\n\nDid you mean one of these?'
             for match in close_matches[:3]:
-                message += f"\n  - {match}"
+                message += f'\n  - {match}'
 
             return ErrorSuggestion(
                 message=message,
@@ -455,7 +453,7 @@ class SmartErrorHandler:
             )
 
         return ErrorSuggestion(
-            message=f"File not found: {path}\n\nNo similar files found.",
+            message=f'File not found: {path}\n\nNo similar files found.',
             suggestions=[],
             confidence=0.0,
         )
@@ -475,24 +473,24 @@ class SmartErrorHandler:
             ErrorSuggestion with fix hints
 
         """
-        expected_type = "tabs" if "\t" in expected_indent else "spaces"
-        actual_type = "tabs" if "\t" in actual_indent else "spaces"
+        expected_type = 'tabs' if '\t' in expected_indent else 'spaces'
+        actual_type = 'tabs' if '\t' in actual_indent else 'spaces'
 
         if expected_type != actual_type:
             message = (
-                f"Indentation mismatch at line {line_number}:\n"
-                f"  Expected: {expected_type}\n"
-                f"  Found: {actual_type}\n\n"
-                f"This file uses {expected_type} for indentation. "
-                f"Please be consistent."
+                f'Indentation mismatch at line {line_number}:\n'
+                f'  Expected: {expected_type}\n'
+                f'  Found: {actual_type}\n\n'
+                f'This file uses {expected_type} for indentation. '
+                f'Please be consistent.'
             )
         else:
             expected_count = len(expected_indent)
             actual_count = len(actual_indent)
             message = (
-                f"Indentation error at line {line_number}:\n"
-                f"  Expected: {expected_count} {expected_type}\n"
-                f"  Found: {actual_count} {actual_type}\n\n"
+                f'Indentation error at line {line_number}:\n'
+                f'  Expected: {expected_count} {expected_type}\n'
+                f'  Found: {actual_count} {actual_type}\n\n'
                 f"Check your editor's tab/space settings."
             )
 
@@ -500,8 +498,8 @@ class SmartErrorHandler:
             message=message,
             suggestions=[
                 "Enable 'show whitespace' in your editor to see tabs vs. spaces",
-                "Configure your editor to use consistent indentation",
-                "Use an auto-formatter like Black (Python) or Prettier (JS)",
+                'Configure your editor to use consistent indentation',
+                'Use an auto-formatter like Black (Python) or Prettier (JS)',
             ],
             confidence=1.0,
             auto_fixable=True,
@@ -540,15 +538,15 @@ class SmartErrorHandler:
 
         """
         message = (
-            f"Edit conflict in {path}:\n\n"
-            f"Your edit: {your_edit}\n"
-            f"Conflicts with: {other_edit}\n\n"
-            f"These edits cannot be applied simultaneously."
+            f'Edit conflict in {path}:\n\n'
+            f'Your edit: {your_edit}\n'
+            f'Conflicts with: {other_edit}\n\n'
+            f'These edits cannot be applied simultaneously.'
         )
 
         suggestions = [
-            "Apply one edit at a time",
-            "Merge the edits manually",
+            'Apply one edit at a time',
+            'Merge the edits manually',
             "Use a different approach that doesn't conflict",
         ]
 
@@ -574,25 +572,25 @@ class SmartErrorHandler:
         # Check if edit actually changed something
         if original_code == new_code:
             return ErrorSuggestion(
-                message="Edit did not change anything. Verify your target location.",
+                message='Edit did not change anything. Verify your target location.',
                 suggestions=[
-                    "Double-check the symbol name",
-                    "Verify the file path",
-                    "Check if the code is already in the desired state",
+                    'Double-check the symbol name',
+                    'Verify the file path',
+                    'Check if the code is already in the desired state',
                 ],
                 confidence=0.9,
             )
 
         # Check for dramatic size changes (might indicate error)
-        original_lines = len(original_code.split("\n"))
-        new_lines = len(new_code.split("\n"))
+        original_lines = len(original_code.split('\n'))
+        new_lines = len(new_code.split('\n'))
 
         if original_lines > 100 and new_lines < original_lines * 0.1:
             return ErrorSuggestion(
-                message=f"Warning: File shrank dramatically ({original_lines} → {new_lines} lines). "
-                f"This might indicate an error.",
+                message=f'Warning: File shrank dramatically ({original_lines} → {new_lines} lines). '
+                f'This might indicate an error.',
                 suggestions=[
-                    "Review the changes carefully",
+                    'Review the changes carefully',
                     "Make sure you didn't accidentally delete important code",
                     "Consider rolling back if this wasn't intentional",
                 ],

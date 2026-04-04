@@ -14,19 +14,19 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 from backend.core.logger import app_logger as logger
+from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:
-    from backend.orchestration.tool_pipeline import ToolInvocationContext
     from backend.core.rollback.rollback_manager import RollbackManager
+    from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 # Action types that warrant a pre-execution checkpoint.
 _RISKY_ACTION_TYPES = frozenset(
     {
-        "FileEditAction",
-        "FileWriteAction",
-        "CmdRunAction",
+        'FileEditAction',
+        'FileWriteAction',
+        'CmdRunAction',
     }
 )
 
@@ -70,15 +70,15 @@ class RollbackMiddleware(ToolInvocationMiddleware):
             try:
                 runtime = ctx.controller.runtime
                 workspace = str(
-                    getattr(runtime, "workspace_dir", None)
-                    or getattr(runtime, "workspace_path", None)
-                    or ""
+                    getattr(runtime, 'workspace_dir', None)
+                    or getattr(runtime, 'workspace_path', None)
+                    or ''
                 )
             except Exception:
                 pass
 
         if not workspace or not os.path.isdir(workspace):
-            logger.debug("RollbackMiddleware: cannot resolve workspace path — disabled")
+            logger.debug('RollbackMiddleware: cannot resolve workspace path — disabled')
             self._enabled = False
             return None
 
@@ -91,11 +91,11 @@ class RollbackMiddleware(ToolInvocationMiddleware):
                 auto_cleanup=True,
             )
             logger.info(
-                "RollbackMiddleware: RollbackManager initialised at %s", workspace
+                'RollbackMiddleware: RollbackManager initialised at %s', workspace
             )
         except Exception:
             logger.warning(
-                "RollbackMiddleware: failed to create RollbackManager", exc_info=True
+                'RollbackMiddleware: failed to create RollbackManager', exc_info=True
             )
             self._enabled = False
 
@@ -117,24 +117,24 @@ class RollbackMiddleware(ToolInvocationMiddleware):
             return
 
         try:
-            description = f"auto: before {action_type}"
+            description = f'auto: before {action_type}'
             metadata = {
-                "action_type": action_type,
-                "session_id": getattr(ctx.state, "sid", "unknown"),
+                'action_type': action_type,
+                'session_id': getattr(ctx.state, 'sid', 'unknown'),
             }
             # Prefer lightweight file-based snapshots (skip git commit noise)
             checkpoint_id = manager.create_checkpoint(
                 description=description,
-                checkpoint_type="before_risky",
+                checkpoint_type='before_risky',
                 metadata=metadata,
                 use_git=False,
             )
-            ctx.metadata["rollback_checkpoint_id"] = checkpoint_id
-            ctx.metadata["rollback_available"] = True
-            logger.debug("Checkpoint %s created before %s", checkpoint_id, action_type)
+            ctx.metadata['rollback_checkpoint_id'] = checkpoint_id
+            ctx.metadata['rollback_available'] = True
+            logger.debug('Checkpoint %s created before %s', checkpoint_id, action_type)
         except Exception:
             logger.debug(
-                "Checkpoint creation failed — continuing without rollback",
+                'Checkpoint creation failed — continuing without rollback',
                 exc_info=True,
             )
 
@@ -142,19 +142,19 @@ class RollbackMiddleware(ToolInvocationMiddleware):
     # observe stage — retroactively update audit entry with snapshot info
     # ------------------------------------------------------------------
     async def observe(self, ctx: ToolInvocationContext, observation=None) -> None:
-        checkpoint_id = ctx.metadata.get("rollback_checkpoint_id")
-        audit_id = ctx.metadata.get("audit_id")
+        checkpoint_id = ctx.metadata.get('rollback_checkpoint_id')
+        audit_id = ctx.metadata.get('audit_id')
         if not checkpoint_id or not audit_id:
             return
 
         try:
-            validator = getattr(ctx.controller, "safety_validator", None)
+            validator = getattr(ctx.controller, 'safety_validator', None)
             audit_logger = (
-                getattr(validator, "telemetry_logger", None) if validator else None
+                getattr(validator, 'telemetry_logger', None) if validator else None
             )
             if audit_logger is None:
                 return
-            session_id = getattr(ctx.controller, "id", "unknown")
+            session_id = getattr(ctx.controller, 'id', 'unknown')
             await audit_logger.update_entry_snapshot(
                 session_id=session_id,
                 audit_id=audit_id,
@@ -162,10 +162,10 @@ class RollbackMiddleware(ToolInvocationMiddleware):
                 rollback_available=True,
             )
             logger.debug(
-                "Audit entry %s updated with checkpoint %s", audit_id, checkpoint_id
+                'Audit entry %s updated with checkpoint %s', audit_id, checkpoint_id
             )
         except Exception:
-            logger.debug("Failed to update audit entry with snapshot", exc_info=True)
+            logger.debug('Failed to update audit entry with snapshot', exc_info=True)
 
     # ------------------------------------------------------------------
     # Public helpers for programmatic rollback

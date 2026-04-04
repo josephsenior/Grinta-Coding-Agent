@@ -13,12 +13,13 @@ from backend.governance.suite_pass_critic import (
     _extract_touched_files,
 )
 
-
 # ── BudgetCritic ──────────────────────────────────────────────────────
 
 
 class TestBudgetCritic:
-    def _critic(self, max_budget: float = 10.0, actual_cost: float = 0.0) -> BudgetCritic:
+    def _critic(
+        self, max_budget: float = 10.0, actual_cost: float = 0.0
+    ) -> BudgetCritic:
         return BudgetCritic(max_budget=max_budget, actual_cost=actual_cost)
 
     def test_no_budget_configured(self):
@@ -56,7 +57,6 @@ class TestBudgetCritic:
 
     def test_message_shows_dollar_amounts(self):
         result = self._critic(max_budget=5.00, actual_cost=4.80).evaluate([])
-
 
     def test_zero_cost_full_budget(self):
         result = self._critic(max_budget=10.0, actual_cost=0.0).evaluate([])
@@ -106,71 +106,94 @@ class TestSuitePassCritic:
 
     def test_extract_touched_files_from_path_attr(self):
         e1 = MagicMock()
-        e1.path = "src/foo.py"
+        e1.path = 'src/foo.py'
         e2 = MagicMock()
-        e2.path = "src/bar.py"
+        e2.path = 'src/bar.py'
         e3 = MagicMock()
         del e3.path  # no .path
         touched = _extract_touched_files([e1, e2, e3])
-        assert "src/foo.py" in touched
-        assert "src/bar.py" in touched
+        assert 'src/foo.py' in touched
+        assert 'src/bar.py' in touched
         assert len(touched) == 2
 
     def test_extract_touched_files_deduplicates(self):
         e1, e2 = MagicMock(), MagicMock()
-        e1.path = "src/foo.py"
-        e2.path = "src/foo.py"
+        e1.path = 'src/foo.py'
+        e2.path = 'src/foo.py'
         assert len(_extract_touched_files([e1, e2])) == 1
 
     def test_collect_test_dirs_finds_test_file(self, tmp_path):
-        (tmp_path / "tests").mkdir()
-        test_file = tmp_path / "tests" / "test_foo.py"
-        test_file.write_text("")
-        dirs = _collect_test_dirs(["tests/test_foo.py"], str(tmp_path))
-        assert any("tests" in str(d) for d in dirs)
+        (tmp_path / 'tests').mkdir()
+        test_file = tmp_path / 'tests' / 'test_foo.py'
+        test_file.write_text('')
+        dirs = _collect_test_dirs(['tests/test_foo.py'], str(tmp_path))
+        assert any('tests' in str(d) for d in dirs)
 
     def test_collect_test_dirs_fallback_to_adjacent_tests_dir(self, tmp_path):
-        src_dir = tmp_path / "src"
+        src_dir = tmp_path / 'src'
         src_dir.mkdir()
-        (src_dir / "foo.py").write_text("")
-        tests_dir = src_dir / "tests"
+        (src_dir / 'foo.py').write_text('')
+        tests_dir = src_dir / 'tests'
         tests_dir.mkdir()
-        dirs = _collect_test_dirs(["src/foo.py"], str(tmp_path))
+        dirs = _collect_test_dirs(['src/foo.py'], str(tmp_path))
         assert tests_dir in dirs
 
     def test_all_tests_pass(self, tmp_path):
         critic = SuitePassCritic(workspace_root=str(tmp_path))
-        with patch("backend.governance.suite_pass_critic._run_pytest", return_value=(5, 0, "5 passed")):
-            with patch("backend.governance.suite_pass_critic._collect_test_dirs", return_value=[tmp_path]):
+        with patch(
+            'backend.governance.suite_pass_critic._run_pytest',
+            return_value=(5, 0, '5 passed'),
+        ):
+            with patch(
+                'backend.governance.suite_pass_critic._collect_test_dirs',
+                return_value=[tmp_path],
+            ):
                 e = MagicMock()
-                e.path = "src/foo.py"
+                e.path = 'src/foo.py'
                 result = critic.evaluate([e])
         assert result.score == 1.0
 
     def test_some_tests_fail(self, tmp_path):
         critic = SuitePassCritic(workspace_root=str(tmp_path))
-        with patch("backend.governance.suite_pass_critic._run_pytest", return_value=(3, 2, "3 passed, 2 failed")):
-            with patch("backend.governance.suite_pass_critic._collect_test_dirs", return_value=[tmp_path]):
+        with patch(
+            'backend.governance.suite_pass_critic._run_pytest',
+            return_value=(3, 2, '3 passed, 2 failed'),
+        ):
+            with patch(
+                'backend.governance.suite_pass_critic._collect_test_dirs',
+                return_value=[tmp_path],
+            ):
                 e = MagicMock()
-                e.path = "src/foo.py"
+                e.path = 'src/foo.py'
                 result = critic.evaluate([e])
         assert result.score == pytest.approx(0.6)
 
     def test_all_tests_fail(self, tmp_path):
         critic = SuitePassCritic(workspace_root=str(tmp_path))
-        with patch("backend.governance.suite_pass_critic._run_pytest", return_value=(0, 4, "4 failed")):
-            with patch("backend.governance.suite_pass_critic._collect_test_dirs", return_value=[tmp_path]):
+        with patch(
+            'backend.governance.suite_pass_critic._run_pytest',
+            return_value=(0, 4, '4 failed'),
+        ):
+            with patch(
+                'backend.governance.suite_pass_critic._collect_test_dirs',
+                return_value=[tmp_path],
+            ):
                 e = MagicMock()
-                e.path = "src/foo.py"
+                e.path = 'src/foo.py'
                 result = critic.evaluate([e])
         assert result.score == 0.0
 
     def test_pytest_returns_zero_results(self, tmp_path):
         critic = SuitePassCritic(workspace_root=str(tmp_path))
-        with patch("backend.governance.suite_pass_critic._run_pytest", return_value=(0, 0, "")):
-            with patch("backend.governance.suite_pass_critic._collect_test_dirs", return_value=[tmp_path]):
+        with patch(
+            'backend.governance.suite_pass_critic._run_pytest', return_value=(0, 0, '')
+        ):
+            with patch(
+                'backend.governance.suite_pass_critic._collect_test_dirs',
+                return_value=[tmp_path],
+            ):
                 e = MagicMock()
-                e.path = "src/foo.py"
+                e.path = 'src/foo.py'
                 result = critic.evaluate([e])
         # 0 total — treated as no results found
         assert result.score == 1.0

@@ -6,10 +6,9 @@ from typing import Any, cast
 
 import pytest
 
+from backend.context.view import View
 from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import CondensationAction, CondensationRequestAction
-from backend.context.view import View
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -18,7 +17,7 @@ from backend.context.view import View
 
 def _event(eid: int = 0):
     """Build a real Event with a specific id."""
-    e = MessageAction(content=f"msg-{eid}")
+    e = MessageAction(content=f'msg-{eid}')
     e._id = eid
     return e
 
@@ -64,8 +63,8 @@ class TestViewContainer:
 
     def test_getitem_invalid_type_raises(self):
         v = View(events=[_event(0)])
-        with pytest.raises(TypeError, match="Invalid key type"):
-            cast(Any, v)["bad"]
+        with pytest.raises(TypeError, match='Invalid key type'):
+            cast(Any, v)['bad']
 
     def test_getitem_out_of_bounds_raises(self):
         v = View(events=[_event(0)])
@@ -121,30 +120,30 @@ class TestFindSummaryInfo:
         ca = CondensationAction(
             pruned_events_start_id=1,
             pruned_events_end_id=3,
-            summary="Summary text",
+            summary='Summary text',
             summary_offset=1,
         )
         evts = [_event(0), ca, _event(4)]
         summary, offset = View._find_summary_info(evts)
-        assert summary == "Summary text"
+        assert summary == 'Summary text'
         assert offset == 1
 
     def test_returns_last_condensation_summary(self):
         ca1 = CondensationAction(
             pruned_events_start_id=1,
             pruned_events_end_id=2,
-            summary="Old",
+            summary='Old',
             summary_offset=0,
         )
         ca2 = CondensationAction(
             pruned_events_start_id=3,
             pruned_events_end_id=4,
-            summary="New",
+            summary='New',
             summary_offset=1,
         )
         evts: list[Any] = [ca1, ca2]
         summary, offset = View._find_summary_info(evts)
-        assert summary == "New"
+        assert summary == 'New'
 
 
 # ===================================================================

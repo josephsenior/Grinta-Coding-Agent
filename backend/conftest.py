@@ -47,7 +47,7 @@ def event_loop():
 def pytest_pyfunc_call(pyfuncitem):
     """Execute coroutine tests by driving them with an event loop."""
     if inspect.iscoroutinefunction(pyfuncitem.obj):
-        loop = pyfuncitem.funcargs.get("event_loop")  # type: ignore[attr-defined]
+        loop = pyfuncitem.funcargs.get('event_loop')  # type: ignore[attr-defined]
         owns_loop = False
         if loop is None:
             loop = asyncio.new_event_loop()
@@ -55,7 +55,7 @@ def pytest_pyfunc_call(pyfuncitem):
 
         try:
             asyncio.set_event_loop(loop)
-            fixture_names = getattr(pyfuncitem, "_fixtureinfo").argnames
+            fixture_names = getattr(pyfuncitem, '_fixtureinfo').argnames
             test_kwargs = {name: pyfuncitem.funcargs[name] for name in fixture_names}
             loop.run_until_complete(pyfuncitem.obj(**test_kwargs))
         finally:
@@ -76,15 +76,15 @@ def _has_pkg(name: str) -> bool:
 
 def pytest_configure(config):
     markers = [
-        "windows",
-        "optional",
-        "heavy",
-        "integration",
-        "stress",
-        "asyncio",
+        'windows',
+        'optional',
+        'heavy',
+        'integration',
+        'stress',
+        'asyncio',
     ]
     for m in markers:
-        config.addinivalue_line("markers", f"{m}: mark test as {m}")
+        config.addinivalue_line('markers', f'{m}: mark test as {m}')
 
 
 def _clear_app_modules() -> None:
@@ -98,15 +98,13 @@ def _clear_app_modules() -> None:
     # Avoid clearing modules that register global side effects (e.g., Prometheus metrics)
     # which cannot be re-registered safely across repeated imports during collection.
     EXCLUDE_PREFIXES = ()
-    TARGET_PACKAGES = (
-        "engine",
-    )
+    TARGET_PACKAGES = ('engine',)
     try:
         for name in list(sys.modules.keys()):
             if any(
-                name == pkg or name.startswith(pkg + ".") for pkg in TARGET_PACKAGES
+                name == pkg or name.startswith(pkg + '.') for pkg in TARGET_PACKAGES
             ):
-                if any(name == p or name.startswith(p + ".") for p in EXCLUDE_PREFIXES):
+                if any(name == p or name.startswith(p + '.') for p in EXCLUDE_PREFIXES):
                     continue
                 sys.modules.pop(name, None)
     except Exception:
@@ -128,24 +126,24 @@ def require_pkg(request):
 
     def _require(name: str):
         if not _has_pkg(name):
-            pytest.skip(f"skipping test, missing required package: {name}")
+            pytest.skip(f'skipping test, missing required package: {name}')
 
     return _require
 
 
 def _is_benchmark_test(parts):
     """Check if test is a benchmark test based on path parts."""
-    return "evaluation" in parts or "benchmarks" in parts or "benchmark" in parts
+    return 'evaluation' in parts or 'benchmarks' in parts or 'benchmark' in parts
 
 
 def _is_heavy_test(parts):
     """Check if test is a heavy test based on path parts."""
-    return "third_party" in parts or "external" in parts
+    return 'third_party' in parts or 'external' in parts
 
 
 def _is_integration_test(parts):
     """Check if test is an integration test based on path parts."""
-    return "tests" in parts and ("e2e" in parts or "integration" in parts)
+    return 'tests' in parts and ('e2e' in parts or 'integration' in parts)
 
 
 def _add_markers_to_item(item, parts):
@@ -165,8 +163,8 @@ def pytest_collection_modifyitems(config, items):
     """Modify test items by adding markers and applying skips."""
     _apply_path_markers(items)
     context = _CollectionContext(
-        is_windows=sys.platform.startswith("win"),
-        run_tty_tests=os.environ.get("APP_RUN_TTY_TESTS", "0") == "1",
+        is_windows=sys.platform.startswith('win'),
+        run_tty_tests=os.environ.get('APP_RUN_TTY_TESTS', '0') == '1',
     )
     _apply_skip_markers(items, context)
 
@@ -183,26 +181,26 @@ class _CollectionContext:
         self.run_tty_tests = run_tty_tests
 
 
-def _apply_skip_markers(items, context: "_CollectionContext") -> None:
+def _apply_skip_markers(items, context: '_CollectionContext') -> None:
     for item in items:
         for reason in _skip_reasons(item, context):
             item.add_marker(pytest.mark.skip(reason=reason))
 
 
-def _skip_reasons(item, context: "_CollectionContext") -> Iterator[str]:
-    if "windows" in item.keywords and not context.is_windows:
-        yield "windows-specific test (not running on non-windows host)"
-    if "tty" in item.keywords and not context.run_tty_tests:
-        yield "tty tests disabled; set APP_RUN_TTY_TESTS=1 to enable"
+def _skip_reasons(item, context: '_CollectionContext') -> Iterator[str]:
+    if 'windows' in item.keywords and not context.is_windows:
+        yield 'windows-specific test (not running on non-windows host)'
+    if 'tty' in item.keywords and not context.run_tty_tests:
+        yield 'tty tests disabled; set APP_RUN_TTY_TESTS=1 to enable'
     # Runtime tests are local-only in this branch.
     if _is_runtime_test(item):
-        test_runtime = os.environ.get("TEST_RUNTIME", "local").lower()
-        if test_runtime != "local":
-            yield "runtime tests skipped: only local runtime is supported in this branch"
+        test_runtime = os.environ.get('TEST_RUNTIME', 'local').lower()
+        if test_runtime != 'local':
+            yield 'runtime tests skipped: only local runtime is supported in this branch'
 
 
 def _is_runtime_test(item) -> bool:
-    return "runtime" in pathlib.Path(item.fspath).parts
+    return 'runtime' in pathlib.Path(item.fspath).parts
 
 
 @pytest.fixture(autouse=True)
@@ -231,8 +229,8 @@ def use_repo_root_cwd(tmp_path, monkeypatch):
 # Removed runtime test helpers that relied on stale non-local runtime logic.
 
 __all__ = [
-    "event_loop",
-    "pytest_pyfunc_call",
-    "require_pkg",
-    "use_repo_root_cwd",
+    'event_loop',
+    'pytest_pyfunc_call',
+    'require_pkg',
+    'use_repo_root_cwd',
 ]

@@ -19,5 +19,4 @@ class NullObservation(Observation):
     @property
     def message(self) -> str:
         """Get null observation message."""
-        return "No observation"
-
+        return 'No observation'

@@ -168,7 +168,7 @@ class TestRequestProcessShutdown:
         listener2.assert_not_called()
 
     def test_listener_exceptions_do_not_block_others(self):
-        failing = MagicMock(side_effect=RuntimeError("listener error"))
+        failing = MagicMock(side_effect=RuntimeError('listener error'))
         successful = MagicMock()
         add_shutdown_listener(failing)
         add_shutdown_listener(successful)
@@ -217,12 +217,12 @@ class TestShutdownListenerEdgeCases:
         import backend.utils.shutdown_listener as mod
 
         mod._should_exit = False
-        with patch("asyncio.sleep", new_callable=MagicMock) as mock_sleep:
+        with patch('asyncio.sleep', new_callable=MagicMock) as mock_sleep:
 
             async def mock_coro(_d):
                 return None
 
             mock_sleep.side_effect = mock_coro
-            with patch("time.time", side_effect=[10.0, 10.0, 11.5, 12.5]):
+            with patch('time.time', side_effect=[10.0, 10.0, 11.5, 12.5]):
                 await async_sleep_if_should_continue(2.0)
             mock_sleep.assert_any_call(1)

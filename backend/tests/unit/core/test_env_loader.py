@@ -19,7 +19,6 @@ from backend.core.config.env_loader import (
     restore_environment,
 )
 
-
 # ---------------------------------------------------------------------------
 # cast_value_to_type
 # ---------------------------------------------------------------------------
@@ -27,51 +26,51 @@ from backend.core.config.env_loader import (
 
 class TestCastValueToType:
     def test_bool_true(self):
-        assert cast_value_to_type("true", bool) is True
-        assert cast_value_to_type("1", bool) is True
+        assert cast_value_to_type('true', bool) is True
+        assert cast_value_to_type('1', bool) is True
 
     def test_bool_false(self):
-        assert cast_value_to_type("false", bool) is False
-        assert cast_value_to_type("0", bool) is False
-        assert cast_value_to_type("no", bool) is False
+        assert cast_value_to_type('false', bool) is False
+        assert cast_value_to_type('0', bool) is False
+        assert cast_value_to_type('no', bool) is False
 
     def test_int(self):
-        assert cast_value_to_type("42", int) == 42
+        assert cast_value_to_type('42', int) == 42
 
     def test_float(self):
-        assert cast_value_to_type("3.14", float) == pytest.approx(3.14)
+        assert cast_value_to_type('3.14', float) == pytest.approx(3.14)
 
     def test_str(self):
-        assert cast_value_to_type("hello", str) == "hello"
+        assert cast_value_to_type('hello', str) == 'hello'
 
     def test_secret_str(self):
-        result = cast_value_to_type("s3cret", SecretStr)
+        result = cast_value_to_type('s3cret', SecretStr)
         assert isinstance(result, SecretStr)
-        assert result.get_secret_value() == "s3cret"
+        assert result.get_secret_value() == 's3cret'
 
     def test_dict_literal(self):
         result = cast_value_to_type('{"a": 1}', dict)
-        assert result == {"a": 1}
+        assert result == {'a': 1}
 
     def test_list_literal(self):
-        result = cast_value_to_type("[1, 2, 3]", list)
+        result = cast_value_to_type('[1, 2, 3]', list)
         assert result == [1, 2, 3]
 
     def test_none_type_passthrough(self):
-        assert cast_value_to_type("hello", None) == "hello"
+        assert cast_value_to_type('hello', None) == 'hello'
 
     def test_optional_int(self):
-        result = cast_value_to_type("42", int | None)
+        result = cast_value_to_type('42', int | None)
         assert result == 42
 
     def test_typed_dict_literal(self):
         """Test casting to typed dict (with type hints)."""
         result = cast_value_to_type('{"key": "value"}', dict[str, str])
-        assert result == {"key": "value"}
+        assert result == {'key': 'value'}
 
     def test_typed_list_with_int(self):
         """Test casting to typed list of ints."""
-        result = cast_value_to_type("[1, 2, 3]", list[int])
+        result = cast_value_to_type('[1, 2, 3]', list[int])
         assert result == [1, 2, 3]
 
 
@@ -127,18 +126,18 @@ class TestRestoreEnvironment:
         import os
 
         original = dict(os.environ)
-        monkeypatch.setenv("APP_TEST_NEW_KEY", "val")
+        monkeypatch.setenv('APP_TEST_NEW_KEY', 'val')
         restore_environment(original)
-        assert "APP_TEST_NEW_KEY" not in os.environ
+        assert 'APP_TEST_NEW_KEY' not in os.environ
 
     def test_restores_changed_keys(self, monkeypatch):
         import os
 
         original = dict(os.environ)
-        original["APP_TEST_KEY"] = "original"
-        monkeypatch.setenv("APP_TEST_KEY", "changed")
+        original['APP_TEST_KEY'] = 'original'
+        monkeypatch.setenv('APP_TEST_KEY', 'changed')
         restore_environment(original)
-        assert os.environ.get("APP_TEST_KEY") == "original"
+        assert os.environ.get('APP_TEST_KEY') == 'original'
 
 
 # ---------------------------------------------------------------------------
@@ -159,7 +158,7 @@ class TestProcessListItems:
         class DummyModel(BaseModel):
             value: int
 
-        items = [{"value": 1}, {"value": 2}]
+        items = [{'value': 1}, {'value': 2}]
         result = _process_list_items(items, list[DummyModel])
         assert len(result) == 2
         assert all(isinstance(item, DummyModel) for item in result)
@@ -172,7 +171,7 @@ class TestProcessListItems:
         class DummyModel(BaseModel):
             value: int
 
-        items = [{"value": 1}, DummyModel(value=2)]
+        items = [{'value': 1}, DummyModel(value=2)]
         result = _process_list_items(items, list[DummyModel])
         assert len(result) == 2
 
@@ -190,8 +189,8 @@ class TestProcessFieldValue:
             count: int
 
         cfg = DummyConfig(count=0)
-        env_dict = {"COUNT": "42"}
-        _process_field_value(cfg, "count", int, "COUNT", env_dict)
+        env_dict = {'COUNT': '42'}
+        _process_field_value(cfg, 'count', int, 'COUNT', env_dict)
         assert cfg.count == 42
 
     def test_api_key_field_special_handling(self):
@@ -200,11 +199,11 @@ class TestProcessFieldValue:
         class DummyConfig(BaseModel):
             some_api_key: str
 
-        cfg = DummyConfig(some_api_key="")
-        env_dict = {"SOME_API_KEY": "secret123"}
-        _process_field_value(cfg, "some_api_key", str, "SOME_API_KEY", env_dict)
+        cfg = DummyConfig(some_api_key='')
+        env_dict = {'SOME_API_KEY': 'secret123'}
+        _process_field_value(cfg, 'some_api_key', str, 'SOME_API_KEY', env_dict)
         assert isinstance(cfg.some_api_key, SecretStr)
-        assert cfg.some_api_key.get_secret_value() == "secret123"
+        assert cfg.some_api_key.get_secret_value() == 'secret123'
 
     def test_empty_value_returns_early(self):
         """Test that empty env values don't set the field."""
@@ -213,8 +212,8 @@ class TestProcessFieldValue:
             count: int
 
         cfg = DummyConfig(count=0)
-        env_dict = {"COUNT": ""}
-        _process_field_value(cfg, "count", int, "COUNT", env_dict)
+        env_dict = {'COUNT': ''}
+        _process_field_value(cfg, 'count', int, 'COUNT', env_dict)
         assert cfg.count == 0  # Unchanged
 
     def test_invalid_type_casting_error(self):
@@ -224,9 +223,9 @@ class TestProcessFieldValue:
             count: int
 
         cfg = DummyConfig(count=0)
-        env_dict = {"COUNT": "not_a_number"}
+        env_dict = {'COUNT': 'not_a_number'}
         # Should not raise, just log
-        _process_field_value(cfg, "count", int, "COUNT", env_dict)
+        _process_field_value(cfg, 'count', int, 'COUNT', env_dict)
         # count should remain unchanged
         assert cfg.count == 0
 
@@ -234,35 +233,35 @@ class TestProcessFieldValue:
         """Test that api_key field syncs with api_key_manager."""
 
         class DummyConfig(BaseModel):
-            model: str = "gpt-4"
-            api_key: SecretStr = SecretStr("")
+            model: str = 'gpt-4'
+            api_key: SecretStr = SecretStr('')
 
         cfg = DummyConfig()
-        env_dict = {"API_KEY": "sk-test123"}
+        env_dict = {'API_KEY': 'sk-test123'}
 
         with patch(
-            "backend.core.config.api_key_manager.api_key_manager"
+            'backend.core.config.api_key_manager.api_key_manager'
         ) as mock_manager:
-            _process_field_value(cfg, "api_key", SecretStr, "API_KEY", env_dict)
+            _process_field_value(cfg, 'api_key', SecretStr, 'API_KEY', env_dict)
             # Should have called set_api_key and set_environment_variables
-            assert mock_manager.set_api_key.called or not hasattr(cfg, "model")
+            assert mock_manager.set_api_key.called or not hasattr(cfg, 'model')
 
     def test_api_key_field_with_model_attribute(self):
         """Test api_key field when config has model attribute - covers lines 107-108."""
 
         class DummyLLMConfig(BaseModel):
-            model: str = "gpt-4"
-            api_key: SecretStr = SecretStr("")
+            model: str = 'gpt-4'
+            api_key: SecretStr = SecretStr('')
 
         cfg = DummyLLMConfig()
-        env_dict = {"API_KEY": "sk-test123"}
+        env_dict = {'API_KEY': 'sk-test123'}
 
         with patch(
-            "backend.core.config.api_key_manager.api_key_manager"
+            'backend.core.config.api_key_manager.api_key_manager'
         ) as mock_manager:
-            _process_field_value(cfg, "api_key", SecretStr, "API_KEY", env_dict)
+            _process_field_value(cfg, 'api_key', SecretStr, 'API_KEY', env_dict)
             # Should have synced with manager
-            assert cfg.api_key.get_secret_value() == "sk-test123"
+            assert cfg.api_key.get_secret_value() == 'sk-test123'
             # Manager should have been called
             mock_manager.set_api_key.assert_called()
 
@@ -280,7 +279,7 @@ class TestSetAttrFromEnv:
             count: int = 0
 
         cfg = DummyConfig()
-        env_dict = {"COUNT": "100"}
+        env_dict = {'COUNT': '100'}
         _set_attr_from_env(cfg, env_dict)
         assert cfg.count == 100
 
@@ -294,7 +293,7 @@ class TestSetAttrFromEnv:
             nested: NestedConfig = NestedConfig()
 
         cfg = ParentConfig()
-        env_dict = {"NESTED_VALUE": "42"}
+        env_dict = {'NESTED_VALUE': '42'}
         _set_attr_from_env(cfg, env_dict)
         assert cfg.nested.value == 42
 
@@ -305,8 +304,8 @@ class TestSetAttrFromEnv:
             count: int = 0
 
         cfg = DummyConfig()
-        env_dict = {"LLM_COUNT": "50"}
-        _set_attr_from_env(cfg, env_dict, prefix="LLM_")
+        env_dict = {'LLM_COUNT': '50'}
+        _set_attr_from_env(cfg, env_dict, prefix='LLM_')
         assert cfg.count == 50
 
     def test_only_env_vars_are_set(self):
@@ -314,13 +313,13 @@ class TestSetAttrFromEnv:
 
         class DummyConfig(BaseModel):
             count: int = 0
-            value: str = "default"
+            value: str = 'default'
 
         cfg = DummyConfig()
-        env_dict = {"COUNT": "100"}  # Only COUNT, not VALUE
+        env_dict = {'COUNT': '100'}  # Only COUNT, not VALUE
         _set_attr_from_env(cfg, env_dict)
         assert cfg.count == 100
-        assert cfg.value == "default"  # Unchanged
+        assert cfg.value == 'default'  # Unchanged
 
 
 # ---------------------------------------------------------------------------
@@ -344,7 +343,7 @@ class TestLoadFromEnv:
         from backend.core.config.app_config import AppConfig
 
         cfg = AppConfig()
-        env_dict = {"DEBUG_LEVEL": "20"}  # Or any valid core var
+        env_dict = {'DEBUG_LEVEL': '20'}  # Or any valid core var
         load_from_env(cfg, env_dict)
         # Should complete successfully
 
@@ -353,9 +352,9 @@ class TestLoadFromEnv:
         from backend.core.config.app_config import AppConfig
 
         cfg = AppConfig()
-        env_dict = {"LLM_API_KEY": "sk-test123"}
+        env_dict = {'LLM_API_KEY': 'sk-test123'}
 
-        with patch("backend.core.config.llm_config.suppress_llm_env_export"):
+        with patch('backend.core.config.llm_config.suppress_llm_env_export'):
             load_from_env(cfg, env_dict)
             # Should have updated LLM config with API key
             new_llm = cfg.get_llm_config()
@@ -373,7 +372,7 @@ class TestExportLLMApiKeys:
         from backend.core.config.app_config import AppConfig
 
         cfg = AppConfig()
-        with patch("backend.core.config.api_key_manager.api_key_manager"):
+        with patch('backend.core.config.api_key_manager.api_key_manager'):
             export_llm_api_keys(cfg)
             # Should handle gracefully
 
@@ -382,7 +381,7 @@ class TestExportLLMApiKeys:
         from backend.core.config.app_config import AppConfig
 
         cfg = AppConfig()
-        with patch("backend.core.config.api_key_manager.api_key_manager"):
+        with patch('backend.core.config.api_key_manager.api_key_manager'):
             export_llm_api_keys(cfg)
             # Should have attempted to set keys
 
@@ -392,8 +391,8 @@ class TestExportLLMApiKeys:
 
         cfg = AppConfig()
         with patch(
-            "backend.core.config.api_key_manager.api_key_manager",
-            side_effect=Exception("Manager error"),
+            'backend.core.config.api_key_manager.api_key_manager',
+            side_effect=Exception('Manager error'),
         ):
             # Should not raise
             export_llm_api_keys(cfg)
@@ -405,10 +404,10 @@ class TestExportLLMApiKeys:
 
         cfg = AppConfig()
         # Set up an LLM config with API key
-        llm = LLMConfig(model="gpt-4", api_key=SecretStr("sk-test123"))
+        llm = LLMConfig(model='gpt-4', api_key=SecretStr('sk-test123'))
         cfg.set_llm_config(llm)
 
-        with patch("backend.core.config.api_key_manager.api_key_manager"):
+        with patch('backend.core.config.api_key_manager.api_key_manager'):
             export_llm_api_keys(cfg)
             # Manager methods should have been called if keys exist
             # Just verify it completes without error

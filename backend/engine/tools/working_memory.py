@@ -16,7 +16,6 @@ loses its cognitive workspace even after history compression.
 from __future__ import annotations
 
 import json
-import os
 import time
 from pathlib import Path
 
@@ -24,15 +23,22 @@ from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action.agent import AgentThinkAction
 
-WORKING_MEMORY_TOOL_NAME = "working_memory"
+WORKING_MEMORY_TOOL_NAME = 'working_memory'
 
-_VALID_SECTIONS = ("hypothesis", "findings", "blockers", "file_context", "decisions", "plan")
+_VALID_SECTIONS = (
+    'hypothesis',
+    'findings',
+    'blockers',
+    'file_context',
+    'decisions',
+    'plan',
+)
 
 _DESCRIPTION = (
-    "Structured cognitive workspace that survives context condensation. "
-    "Sections: hypothesis, findings, blockers, file_context, decisions, plan. "
+    'Structured cognitive workspace that survives context condensation. '
+    'Sections: hypothesis, findings, blockers, file_context, decisions, plan. '
     "Commands: update (append/replace section content), get (retrieve section or 'all'), "
-    "clear_section (reset a section). Auto-restored after condensation."
+    'clear_section (reset a section). Auto-restored after condensation.'
 )
 
 
@@ -42,35 +48,36 @@ def create_working_memory_tool() -> ChatCompletionToolParam:
         name=WORKING_MEMORY_TOOL_NAME,
         description=_DESCRIPTION,
         properties={
-            "command": {
-                "type": "string",
-                "enum": ["update", "get", "clear_section"],
-                "description": (
-                    "update: set/append content to a section. "
+            'command': {
+                'type': 'string',
+                'enum': ['update', 'get', 'clear_section'],
+                'description': (
+                    'update: set/append content to a section. '
                     "get: retrieve a section (or 'all'). "
-                    "clear_section: reset a section."
+                    'clear_section: reset a section.'
                 ),
             },
-            "section": {
-                "type": "string",
-                "enum": list(_VALID_SECTIONS),
-                "description": "The working memory section to operate on.",
+            'section': {
+                'type': 'string',
+                'enum': list(_VALID_SECTIONS),
+                'description': 'The working memory section to operate on.',
             },
-            "content": {
-                "type": "string",
-                "description": "For 'update': the content to store. Replaces existing content in the section.",
+            'content': {
+                'type': 'string',
+                'description': "For 'update': the content to store. Replaces existing content in the section.",
             },
         },
-        required=["command", "section"],
+        required=['command', 'section'],
     )
 
 
 # --- Persistence ---
 
+
 def _memory_path() -> Path:
     from backend.core.workspace_resolution import require_effective_workspace_root
 
-    return require_effective_workspace_root() / ".app" / "working_memory.json"
+    return require_effective_workspace_root() / '.grinta' / 'working_memory.json'
 
 
 def _load_memory() -> dict[str, str]:
@@ -78,7 +85,7 @@ def _load_memory() -> dict[str, str]:
     if not p.exists():
         return {}
     try:
-        data = json.loads(p.read_text(encoding="utf-8"))
+        data = json.loads(p.read_text(encoding='utf-8'))
         if isinstance(data, dict):
             return data
     except (json.JSONDecodeError, OSError):
@@ -89,20 +96,21 @@ def _load_memory() -> dict[str, str]:
 def _save_memory(data: dict[str, str]) -> None:
     p = _memory_path()
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    p.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')
 
 
 # --- Action builders ---
 
+
 def build_working_memory_action(arguments: dict) -> AgentThinkAction:
     """Execute a working_memory command and return a think action with results."""
-    command = arguments.get("command", "get")
-    section = arguments.get("section", "all")
-    content = arguments.get("content", "")
+    command = arguments.get('command', 'get')
+    section = arguments.get('section', 'all')
+    content = arguments.get('content', '')
 
-    if command == "update":
+    if command == 'update':
         return _update_section(section, content)
-    elif command == "clear_section":
+    elif command == 'clear_section':
         return _clear_section(section)
     else:
         return _get_section(section)
@@ -111,7 +119,7 @@ def build_working_memory_action(arguments: dict) -> AgentThinkAction:
 def _update_section(section: str, content: str) -> AgentThinkAction:
     if section not in _VALID_SECTIONS:
         return AgentThinkAction(
-            thought=f"[WORKING_MEMORY] Invalid section: {section}. Valid: {', '.join(_VALID_SECTIONS)}"
+            thought=f'[WORKING_MEMORY] Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}'
         )
     if not content:
         return AgentThinkAction(
@@ -119,57 +127,47 @@ def _update_section(section: str, content: str) -> AgentThinkAction:
         )
     memory = _load_memory()
     memory[section] = content
-    memory["_last_updated"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
     _save_memory(memory)
-    return AgentThinkAction(
-        thought=f"[WORKING_MEMORY] Updated '{section}' section."
-    )
+    return AgentThinkAction(thought=f"[WORKING_MEMORY] Updated '{section}' section.")
 
 
 def _get_section(section: str) -> AgentThinkAction:
     memory = _load_memory()
     if not memory:
-        return AgentThinkAction(
-            thought="[WORKING_MEMORY] Working memory is empty."
-        )
-    if section == "all":
-        parts = ["[WORKING_MEMORY] Full cognitive workspace:"]
+        return AgentThinkAction(thought='[WORKING_MEMORY] Working memory is empty.')
+    if section == 'all':
+        parts = ['[WORKING_MEMORY] Full cognitive workspace:']
         for sec in _VALID_SECTIONS:
-            val = memory.get(sec, "")
+            val = memory.get(sec, '')
             if val:
-                parts.append(f"\n## {sec.upper()}\n{val}")
+                parts.append(f'\n## {sec.upper()}\n{val}')
         if len(parts) == 1:
-            return AgentThinkAction(thought="[WORKING_MEMORY] All sections are empty.")
-        last = memory.get("_last_updated", "?")
-        parts.append(f"\n(last updated: {last})")
-        return AgentThinkAction(thought="\n".join(parts))
+            return AgentThinkAction(thought='[WORKING_MEMORY] All sections are empty.')
+        last = memory.get('_last_updated', '?')
+        parts.append(f'\n(last updated: {last})')
+        return AgentThinkAction(thought='\n'.join(parts))
 
     if section not in _VALID_SECTIONS:
         return AgentThinkAction(
-            thought=f"[WORKING_MEMORY] Invalid section: {section}. Valid: {', '.join(_VALID_SECTIONS)}"
+            thought=f'[WORKING_MEMORY] Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}'
         )
-    val = memory.get(section, "")
+    val = memory.get(section, '')
     if not val:
-        return AgentThinkAction(
-            thought=f"[WORKING_MEMORY] '{section}' is empty."
-        )
-    return AgentThinkAction(
-        thought=f"[WORKING_MEMORY] {section}:\n{val}"
-    )
+        return AgentThinkAction(thought=f"[WORKING_MEMORY] '{section}' is empty.")
+    return AgentThinkAction(thought=f'[WORKING_MEMORY] {section}:\n{val}')
 
 
 def _clear_section(section: str) -> AgentThinkAction:
     if section not in _VALID_SECTIONS:
         return AgentThinkAction(
-            thought=f"[WORKING_MEMORY] Invalid section: {section}. Valid: {', '.join(_VALID_SECTIONS)}"
+            thought=f'[WORKING_MEMORY] Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}'
         )
     memory = _load_memory()
     if section in memory:
         del memory[section]
         _save_memory(memory)
-    return AgentThinkAction(
-        thought=f"[WORKING_MEMORY] Cleared '{section}' section."
-    )
+    return AgentThinkAction(thought=f"[WORKING_MEMORY] Cleared '{section}' section.")
 
 
 def get_full_working_memory() -> str:
@@ -180,37 +178,37 @@ def get_full_working_memory() -> str:
     """
     memory = _load_memory()
     if not memory:
-        return ""
+        return ''
 
-    parts = ["<WORKING_MEMORY>"]
+    parts = ['<WORKING_MEMORY>']
     for sec in _VALID_SECTIONS:
-        val = memory.get(sec, "")
+        val = memory.get(sec, '')
         if val:
-            parts.append(f"[{sec.upper()}] {val}")
+            parts.append(f'[{sec.upper()}] {val}')
 
     if len(parts) == 1:
-        return ""
-    parts.append("</WORKING_MEMORY>")
-    return "\n".join(parts)
+        return ''
+    parts.append('</WORKING_MEMORY>')
+    return '\n'.join(parts)
 
 
 def get_working_memory_prompt_block(char_budget: int = 2000) -> str:
     """Return a bounded working-memory block for prompt or recovery injection."""
     memory = _load_memory()
     if not memory:
-        return ""
+        return ''
 
-    lines = ["<WORKING_MEMORY>", "Your structured working memory:"]
+    lines = ['<WORKING_MEMORY>', 'Your structured working memory:']
     for sec in _VALID_SECTIONS:
-        val = memory.get(sec, "")
+        val = memory.get(sec, '')
         if not val:
             continue
-        line = f"[{sec.upper()}] {val}"
-        if len("\n".join(lines + [line, "</WORKING_MEMORY>"])) > char_budget:
-            lines.append("... (additional working memory truncated)")
+        line = f'[{sec.upper()}] {val}'
+        if len('\n'.join(lines + [line, '</WORKING_MEMORY>'])) > char_budget:
+            lines.append('... (additional working memory truncated)')
             break
         lines.append(line)
     if len(lines) == 2:
-        return ""
-    lines.append("</WORKING_MEMORY>")
-    return "\n".join(lines)
+        return ''
+    lines.append('</WORKING_MEMORY>')
+    return '\n'.join(lines)

@@ -11,15 +11,14 @@ implementation.
 
 from __future__ import annotations
 
+# `StructureEditor` is orchestrator-specific and implemented in this package.
+from backend.engine.tools.structure_editor import (  # noqa: F401
+    StructureEditor,
+)
 from backend.utils.treesitter_editor import (  # noqa: F401
     LANGUAGE_EXTENSIONS,
     TREE_SITTER_AVAILABLE,
     EditResult,
     SymbolLocation,
     TreeSitterEditor,
-)
-
-# `StructureEditor` is orchestrator-specific and implemented in this package.
-from backend.engine.tools.structure_editor import (  # noqa: F401
-    StructureEditor,
 )

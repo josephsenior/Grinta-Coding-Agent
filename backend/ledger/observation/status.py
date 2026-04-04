@@ -24,7 +24,7 @@ class StatusObservation(Observation):
         extras: Arbitrary key-value metadata for the notification.
     """
 
-    status_type: str = ""
+    status_type: str = ''
     extras: dict[str, Any] = field(default_factory=dict)
     observation: ClassVar[str] = ObservationType.STATUS
 
@@ -32,4 +32,3 @@ class StatusObservation(Observation):
     def message(self) -> str:
         """Human-readable status message."""
         return self.content
-

@@ -5,28 +5,29 @@ Used by the analyze_project_structure tool to provide more accurate results than
 
 import sys
 from pathlib import Path
+
 from backend.engine.tools.structure_editor import StructureEditor
 
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python semantic_analyzer.py <command> <symbol> [path]")
+        print('Usage: python semantic_analyzer.py <command> <symbol> [path]')
         sys.exit(1)
 
     command = sys.argv[1]
     symbol = sys.argv[2]
-    root_path = sys.argv[3] if len(sys.argv) > 3 else "."
+    root_path = sys.argv[3] if len(sys.argv) > 3 else '.'
 
     editor = StructureEditor()
 
-    if command == "find_references":
+    if command == 'find_references':
         results = find_references(editor, symbol, root_path)
-        print(f"=== SEMANTIC REFERENCES FOR {symbol} ===")
+        print(f'=== SEMANTIC REFERENCES FOR {symbol} ===')
         if not results:
-            print("(no references found)")
+            print('(no references found)')
         for res in results:
-            print(f"{res['path']}:{res['line']}: {res['context']}")
-    elif command == "find_definition":
+            print(f'{res["path"]}:{res["line"]}: {res["context"]}')
+    elif command == 'find_definition':
         # definition search logic...
         pass
 
@@ -36,11 +37,11 @@ def find_references(editor, symbol, root_path):
     references = []
 
     # Simple semantic search: find the symbol in all files matching extensions
-    for ext in (".py", ".js", ".ts", ".go", ".rs"):
-        for path in root.rglob(f"*{ext}"):
+    for ext in ('.py', '.js', '.ts', '.go', '.rs'):
+        for path in root.rglob(f'*{ext}'):
             if any(
                 p in str(path)
-                for p in ("node_modules", ".git", "__pycache__", ".venv", "venv")
+                for p in ('node_modules', '.git', '__pycache__', '.venv', 'venv')
             ):
                 continue
 
@@ -57,7 +58,7 @@ def find_references(editor, symbol, root_path):
                 # We'll use a simple recursive visitor or query if possible
                 # For brevity in this tool, we'll do a simple scan but it's AST-backed
                 # (Future improvement: use tree-sitter queries for exact call sites)
-                content = file_bytes.decode("utf-8")
+                content = file_bytes.decode('utf-8')
                 lines = content.splitlines()
 
                 # Find all occurrences of the symbol name as an identifier
@@ -70,9 +71,9 @@ def find_references(editor, symbol, root_path):
                     if symbol in line:
                         references.append(
                             {
-                                "path": str(path),
-                                "line": i + 1,
-                                "context": line.strip(),
+                                'path': str(path),
+                                'line': i + 1,
+                                'context': line.strip(),
                             }
                         )
             except Exception:
@@ -81,5 +82,5 @@ def find_references(editor, symbol, root_path):
     return references
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

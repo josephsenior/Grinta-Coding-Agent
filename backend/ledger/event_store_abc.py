@@ -103,7 +103,7 @@ class EventStoreABC:
 
         """
         if limit < 1 or limit > 100:
-            msg = "Limit must be between 1 and 100"
+            msg = 'Limit must be between 1 and 100'
             raise ValueError(msg)
         events = self.search_events(
             start_id=start_id,

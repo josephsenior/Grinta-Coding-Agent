@@ -9,7 +9,9 @@ from backend.ledger.action import ActionConfirmationStatus
 from backend.ledger.observation import AgentStateChangedObservation
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
 
 
 # ── Valid state transitions ─────────────────────────────────────────────
@@ -131,7 +133,7 @@ class StateTransitionService:
     async def set_agent_state(self, new_state: AgentState) -> None:
         old_state = self._context.state.agent_state
         logger.info(
-            "Setting agent(%s) state from %s to %s",
+            'Setting agent(%s) state from %s to %s',
             self._context.controller_name,
             old_state,
             new_state,
@@ -144,7 +146,7 @@ class StateTransitionService:
         allowed = VALID_TRANSITIONS.get(old_state)
         if allowed is not None and new_state not in allowed:
             logger.warning(
-                "Rejected state transition %s → %s for agent %s.",
+                'Rejected state transition %s → %s for agent %s.',
                 old_state,
                 new_state,
                 self._context.controller_name,
@@ -157,16 +159,16 @@ class StateTransitionService:
 
         self._context.state.set_agent_state(
             new_state,
-            source="StateTransitionService.set_agent_state",
+            source='StateTransitionService.set_agent_state',
         )
 
         self._handle_state_reset(new_state)
         self._handle_error_recovery(old_state, new_state)
         self._handle_pending_action_confirmation(new_state)
 
-        reason = self._context.state.last_error if new_state == AgentState.ERROR else ""
+        reason = self._context.state.last_error if new_state == AgentState.ERROR else ''
         self._context.event_stream.add_event(
-            AgentStateChangedObservation("", self._context.state.agent_state, reason),
+            AgentStateChangedObservation('', self._context.state.agent_state, reason),
             EventSource.ENVIRONMENT,
         )
         self._context.save_state()
@@ -196,8 +198,8 @@ class StateTransitionService:
         ):
             return
 
-        if hasattr(pending_action, "thought"):
-            pending_action.thought = ""
+        if hasattr(pending_action, 'thought'):
+            pending_action.thought = ''
 
         pending_action.confirmation_state = (
             ActionConfirmationStatus.CONFIRMED

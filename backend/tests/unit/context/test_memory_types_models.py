@@ -12,31 +12,30 @@ from backend.context.memory_types import (
     MemoryTier,
 )
 
-
 # ── Enum tests ───────────────────────────────────────────────────────
 
 
 class TestDecisionType:
     def test_values(self):
-        assert DecisionType.ARCHITECTURAL.value == "architectural"
-        assert DecisionType.IMPLEMENTATION.value == "implementation"
-        assert DecisionType.TECHNICAL.value == "technical"
-        assert DecisionType.FUNCTIONAL.value == "functional"
-        assert DecisionType.CONSTRAINT.value == "constraint"
-        assert DecisionType.WORKFLOW.value == "workflow"
+        assert DecisionType.ARCHITECTURAL.value == 'architectural'
+        assert DecisionType.IMPLEMENTATION.value == 'implementation'
+        assert DecisionType.TECHNICAL.value == 'technical'
+        assert DecisionType.FUNCTIONAL.value == 'functional'
+        assert DecisionType.CONSTRAINT.value == 'constraint'
+        assert DecisionType.WORKFLOW.value == 'workflow'
 
     def test_count(self):
         assert len(DecisionType) == 6
 
     def test_from_value(self):
-        assert DecisionType("architectural") is DecisionType.ARCHITECTURAL
+        assert DecisionType('architectural') is DecisionType.ARCHITECTURAL
 
 
 class TestMemoryTier:
     def test_values(self):
-        assert MemoryTier.SHORT_TERM.value == "short_term"
-        assert MemoryTier.WORKING.value == "working"
-        assert MemoryTier.LONG_TERM.value == "long_term"
+        assert MemoryTier.SHORT_TERM.value == 'short_term'
+        assert MemoryTier.WORKING.value == 'working'
+        assert MemoryTier.LONG_TERM.value == 'long_term'
 
     def test_count(self):
         assert len(MemoryTier) == 3
@@ -48,12 +47,12 @@ class TestMemoryTier:
 class TestDecision:
     def _make(self, **overrides) -> Decision:
         defaults: dict[str, Any] = {
-            "decision_id": "d1",
-            "type": DecisionType.TECHNICAL,
-            "description": "Use Redis",
-            "rationale": "Fast caching",
-            "timestamp": datetime(2025, 1, 1, 12, 0, 0),
-            "context": "Discussing cache layer",
+            'decision_id': 'd1',
+            'type': DecisionType.TECHNICAL,
+            'description': 'Use Redis',
+            'rationale': 'Fast caching',
+            'timestamp': datetime(2025, 1, 1, 12, 0, 0),
+            'context': 'Discussing cache layer',
         }
         defaults.update(overrides)
         return Decision(**defaults)
@@ -67,12 +66,12 @@ class TestDecision:
 
     def test_custom(self):
         d = self._make(
-            alternatives_considered=["Memcached"],
+            alternatives_considered=['Memcached'],
             confidence=0.8,
             tier=MemoryTier.LONG_TERM,
             anchor=True,
         )
-        assert d.alternatives_considered == ["Memcached"]
+        assert d.alternatives_considered == ['Memcached']
         assert d.confidence == 0.8
         assert d.tier is MemoryTier.LONG_TERM
         assert d.anchor is True
@@ -80,15 +79,15 @@ class TestDecision:
     def test_to_dict(self):
         d = self._make()
         data = d.to_dict()
-        assert data["decision_id"] == "d1"
-        assert data["type"] == "technical"
-        assert data["timestamp"] == "2025-01-01T12:00:00"
-        assert data["tier"] == "working"
-        assert data["anchor"] is False
+        assert data['decision_id'] == 'd1'
+        assert data['type'] == 'technical'
+        assert data['timestamp'] == '2025-01-01T12:00:00'
+        assert data['tier'] == 'working'
+        assert data['anchor'] is False
 
     def test_from_dict_roundtrip(self):
         original = self._make(
-            alternatives_considered=["A", "B"], confidence=0.9, anchor=True
+            alternatives_considered=['A', 'B'], confidence=0.9, anchor=True
         )
         data = original.to_dict()
         restored = Decision.from_dict(data)
@@ -101,12 +100,12 @@ class TestDecision:
 
     def test_from_dict_defaults(self):
         data = {
-            "decision_id": "d2",
-            "type": "architectural",
-            "description": "Microservices",
-            "rationale": "Scalability",
-            "timestamp": "2025-06-15T09:30:00",
-            "context": "Design meeting",
+            'decision_id': 'd2',
+            'type': 'architectural',
+            'description': 'Microservices',
+            'rationale': 'Scalability',
+            'timestamp': '2025-06-15T09:30:00',
+            'context': 'Design meeting',
         }
         d = Decision.from_dict(data)
         assert d.alternatives_considered == []
@@ -121,12 +120,12 @@ class TestDecision:
 class TestContextAnchor:
     def _make(self, **overrides) -> ContextAnchor:
         defaults: dict[str, Any] = {
-            "anchor_id": "a1",
-            "content": "Must support 10k concurrent users",
-            "category": "requirement",
-            "importance": 0.95,
-            "timestamp": datetime(2025, 3, 1, 8, 0, 0),
-            "last_accessed": datetime(2025, 3, 2, 10, 0, 0),
+            'anchor_id': 'a1',
+            'content': 'Must support 10k concurrent users',
+            'category': 'requirement',
+            'importance': 0.95,
+            'timestamp': datetime(2025, 3, 1, 8, 0, 0),
+            'last_accessed': datetime(2025, 3, 2, 10, 0, 0),
         }
         defaults.update(overrides)
         return ContextAnchor(**defaults)
@@ -142,12 +141,12 @@ class TestContextAnchor:
     def test_to_dict(self):
         a = self._make(access_count=3)
         data = a.to_dict()
-        assert data["anchor_id"] == "a1"
-        assert data["category"] == "requirement"
-        assert data["importance"] == 0.95
-        assert data["access_count"] == 3
-        assert data["timestamp"] == "2025-03-01T08:00:00"
-        assert data["last_accessed"] == "2025-03-02T10:00:00"
+        assert data['anchor_id'] == 'a1'
+        assert data['category'] == 'requirement'
+        assert data['importance'] == 0.95
+        assert data['access_count'] == 3
+        assert data['timestamp'] == '2025-03-01T08:00:00'
+        assert data['last_accessed'] == '2025-03-02T10:00:00'
 
     def test_from_dict_roundtrip(self):
         original = self._make(access_count=7)
@@ -162,12 +161,12 @@ class TestContextAnchor:
 
     def test_from_dict_default_access_count(self):
         data = {
-            "anchor_id": "a2",
-            "content": "Must use PostgreSQL",
-            "category": "constraint",
-            "importance": 0.8,
-            "timestamp": "2025-01-01T00:00:00",
-            "last_accessed": "2025-01-01T00:00:00",
+            'anchor_id': 'a2',
+            'content': 'Must use PostgreSQL',
+            'category': 'constraint',
+            'importance': 0.8,
+            'timestamp': '2025-01-01T00:00:00',
+            'last_accessed': '2025-01-01T00:00:00',
         }
         a = ContextAnchor.from_dict(data)
         assert a.access_count == 0

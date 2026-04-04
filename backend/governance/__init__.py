@@ -6,9 +6,9 @@ from .finish_critic import AgentFinishedCritic
 from .suite_pass_critic import SuitePassCritic
 
 __all__ = [
-    "AgentFinishedCritic",
-    "BaseCritic",
-    "BudgetCritic",
-    "CriticResult",
-    "SuitePassCritic",
+    'AgentFinishedCritic',
+    'BaseCritic',
+    'BudgetCritic',
+    'CriticResult',
+    'SuitePassCritic',
 ]

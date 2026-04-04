@@ -9,7 +9,6 @@ import pytest
 
 from backend.orchestration.services.iteration_service import IterationService
 
-
 # ── helpers ──────────────────────────────────────────────────────────
 
 
@@ -74,7 +73,7 @@ class TestApplyIterationFlag:
         svc, ctx, config, state, iflag = _make_service()
         svc._apply_iteration_flag(iflag, config, 5.0, 270)
         state.adjust_iteration_limit.assert_called_once_with(
-            270, source="IterationService"
+            270, source='IterationService'
         )
 
     def test_respects_max_override(self):
@@ -104,7 +103,7 @@ class TestApplyDynamic:
         svc, ctx, config, state, iflag = _make_service()
         config.enable_dynamic_iterations = False
         tool_ctx = MagicMock()
-        tool_ctx.metadata = {"task_complexity": 5.0}
+        tool_ctx.metadata = {'task_complexity': 5.0}
         await svc.apply_dynamic_iterations(tool_ctx)
         state.adjust_iteration_limit.assert_not_called()
 
@@ -112,7 +111,7 @@ class TestApplyDynamic:
     async def test_adjusts_with_complexity(self):
         svc, ctx, config, state, iflag = _make_service()
         tool_ctx = MagicMock()
-        tool_ctx.metadata = {"task_complexity": 3.0}
+        tool_ctx.metadata = {'task_complexity': 3.0}
         ctx.agent.task_complexity_analyzer = None  # use fallback
         await svc.apply_dynamic_iterations(tool_ctx)
         state.adjust_iteration_limit.assert_called_once()

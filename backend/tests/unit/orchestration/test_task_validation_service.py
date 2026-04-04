@@ -9,13 +9,12 @@ import pytest
 
 from backend.orchestration.services.task_validation_service import TaskValidationService
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _make_context(has_validator: bool = True, initial_task: str | None = "Do X"):
+def _make_context(has_validator: bool = True, initial_task: str | None = 'Do X'):
     """Build a fake OrchestrationContext with a mock controller."""
     controller = MagicMock()
     controller._get_initial_task.return_value = initial_task
@@ -27,7 +26,7 @@ def _make_context(has_validator: bool = True, initial_task: str | None = "Do X")
         controller.task_validator = None
 
     state_mock = MagicMock()
-    state_mock.agent_state = "running"
+    state_mock.agent_state = 'running'
     controller.state = state_mock
     controller.set_agent_state_to = AsyncMock()
 
@@ -42,7 +41,7 @@ def _make_action(force_finish: bool = False):
 
 def _validation_result(
     passed: bool,
-    reason: str = "",
+    reason: str = '',
     confidence: float = 1.0,
     missing_items=None,
     suggestions=None,
@@ -107,7 +106,7 @@ class TestHandleFinish:
         ctx = _make_context(has_validator=True)
         controller = ctx.get_controller()
         controller.task_validator.validate_completion = AsyncMock(
-            return_value=_validation_result(passed=True, reason="All good")
+            return_value=_validation_result(passed=True, reason='All good')
         )
         svc = TaskValidationService(ctx)
         assert await svc.handle_finish(_make_action()) is True
@@ -119,9 +118,9 @@ class TestHandleFinish:
         controller.task_validator.validate_completion = AsyncMock(
             return_value=_validation_result(
                 passed=False,
-                reason="Tests not written",
+                reason='Tests not written',
                 confidence=0.4,
-                missing_items=["unit tests"],
+                missing_items=['unit tests'],
             )
         )
         svc = TaskValidationService(ctx)
@@ -147,35 +146,35 @@ class TestHandleFinish:
 
 class TestBuildFeedback:
     def test_basic_feedback(self):
-        val = _validation_result(passed=False, reason="Incomplete", confidence=0.3)
+        val = _validation_result(passed=False, reason='Incomplete', confidence=0.3)
         feedback = TaskValidationService._build_feedback(val)
-        assert "TASK NOT COMPLETE" in feedback
-        assert "Incomplete" in feedback
-        assert "30.0%" in feedback
+        assert 'TASK NOT COMPLETE' in feedback
+        assert 'Incomplete' in feedback
+        assert '30.0%' in feedback
 
     def test_with_missing_items(self):
         val = _validation_result(
             passed=False,
-            reason="Missing",
+            reason='Missing',
             confidence=0.5,
-            missing_items=["tests", "docs"],
+            missing_items=['tests', 'docs'],
         )
         feedback = TaskValidationService._build_feedback(val)
-        assert "- tests" in feedback
-        assert "- docs" in feedback
+        assert '- tests' in feedback
+        assert '- docs' in feedback
 
     def test_with_suggestions(self):
         val = _validation_result(
             passed=False,
-            reason="Needs work",
+            reason='Needs work',
             confidence=0.6,
-            suggestions=["Add error handling", "Refactor"],
+            suggestions=['Add error handling', 'Refactor'],
         )
         feedback = TaskValidationService._build_feedback(val)
-        assert "Add error handling" in feedback
-        assert "Refactor" in feedback
+        assert 'Add error handling' in feedback
+        assert 'Refactor' in feedback
 
     def test_ends_with_continue(self):
-        val = _validation_result(passed=False, reason="x", confidence=0.1)
+        val = _validation_result(passed=False, reason='x', confidence=0.1)
         feedback = TaskValidationService._build_feedback(val)
-        assert "continue working" in feedback
+        assert 'continue working' in feedback

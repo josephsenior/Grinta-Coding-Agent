@@ -1,4 +1,4 @@
-﻿"""Tests for backend.execution.utils.port_lock — PortLock and helpers."""
+"""Tests for backend.execution.utils.port_lock — PortLock and helpers."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from backend.execution.utils.port_lock import (
 
 @pytest.fixture
 def lock_dir(tmp_path):
-    return str(tmp_path / "port_locks")
+    return str(tmp_path / 'port_locks')
 
 
 # ===================================================================
@@ -29,8 +29,8 @@ class TestPortLockInit:
     def test_default_lock_dir(self):
         lock = PortLock(8080)
         assert lock.port == 8080
-        assert "app_port_locks" in lock.lock_dir
-        assert lock.lock_file_path.endswith("port_8080.lock")
+        assert 'app_port_locks' in lock.lock_dir
+        assert lock.lock_file_path.endswith('port_8080.lock')
         assert lock.is_locked is False
 
     def test_custom_lock_dir(self, lock_dir):
@@ -70,8 +70,8 @@ class TestPortLockAcquireRelease:
 
     def test_context_manager_acquire_fails(self, lock_dir):
         lock = PortLock(12349, lock_dir=lock_dir)
-        with patch.object(lock, "acquire", return_value=False):
-            with pytest.raises(OSError, match="Could not acquire lock"):
+        with patch.object(lock, 'acquire', return_value=False):
+            with pytest.raises(OSError, match='Could not acquire lock'):
                 lock.__enter__()
 
 
@@ -104,11 +104,11 @@ class TestCheckPortAvailable:
         import socket
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(("127.0.0.1", 0))
+        sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
         sock.close()
         # Port should be available right after closing
-        assert _check_port_available(port, "127.0.0.1") is True
+        assert _check_port_available(port, '127.0.0.1') is True
 
     def test_unavailable_port(self):
         """Bind on 0.0.0.0 and listen to truly occupy the port."""
@@ -116,13 +116,13 @@ class TestCheckPortAvailable:
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Do NOT set SO_REUSEADDR — we want the port truly exclusive
-        sock.bind(("0.0.0.0", 0))
+        sock.bind(('0.0.0.0', 0))
         sock.listen(1)
         port = sock.getsockname()[1]
         try:
             # The function also binds to 0.0.0.0 with SO_REUSEADDR, but
             # on Windows with an active listener, this still fails.
-            result = _check_port_available(port, "0.0.0.0")
+            result = _check_port_available(port, '0.0.0.0')
             # On some Windows configs SO_REUSEADDR lets the 2nd bind succeed.
             # Accept either result; just ensure the function doesn't crash.
             assert isinstance(result, bool)
@@ -138,31 +138,31 @@ class TestCheckPortAvailable:
 class TestCleanupStaleLocks:
     def test_no_lock_dir(self, tmp_path):
         """Returns 0 when directory doesn't exist."""
-        with patch("backend.execution.utils.port_lock.tempfile") as mock_tmp:
-            mock_tmp.gettempdir.return_value = str(tmp_path / "nonexistent")
+        with patch('backend.execution.utils.port_lock.tempfile') as mock_tmp:
+            mock_tmp.gettempdir.return_value = str(tmp_path / 'nonexistent')
             assert cleanup_stale_locks() == 0
 
     def test_cleans_old_files(self, tmp_path):
-        lock_dir = tmp_path / "app_port_locks"
+        lock_dir = tmp_path / 'app_port_locks'
         lock_dir.mkdir()
         # Create a stale lock file
-        stale = lock_dir / "port_1234.lock"
-        stale.write_text("1234")
+        stale = lock_dir / 'port_1234.lock'
+        stale.write_text('1234')
         # Backdate modification time by 600 seconds
         old_time = time.time() - 600
         os.utime(str(stale), (old_time, old_time))
-        with patch("backend.execution.utils.port_lock.tempfile") as mock_tmp:
+        with patch('backend.execution.utils.port_lock.tempfile') as mock_tmp:
             mock_tmp.gettempdir.return_value = str(tmp_path)
             result = cleanup_stale_locks(max_age_seconds=300)
         assert result == 1
         assert not stale.exists()
 
     def test_preserves_fresh_files(self, tmp_path):
-        lock_dir = tmp_path / "app_port_locks"
+        lock_dir = tmp_path / 'app_port_locks'
         lock_dir.mkdir()
-        fresh = lock_dir / "port_5678.lock"
-        fresh.write_text("5678")
-        with patch("backend.execution.utils.port_lock.tempfile") as mock_tmp:
+        fresh = lock_dir / 'port_5678.lock'
+        fresh.write_text('5678')
+        with patch('backend.execution.utils.port_lock.tempfile') as mock_tmp:
             mock_tmp.gettempdir.return_value = str(tmp_path)
             result = cleanup_stale_locks(max_age_seconds=300)
         assert result == 0

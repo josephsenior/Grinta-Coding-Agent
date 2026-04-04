@@ -13,7 +13,7 @@ def model_supports_prompt_cache_hints(model: str) -> bool:
     Otherwise we fall back to :func:`get_features` pattern matching (e.g. uncatalogued
     Claude 3.x ids, DeepSeek, Gemini).
     """
-    m = (model or "").strip()
+    m = (model or '').strip()
     if not m:
         return False
     entry = lookup(m)

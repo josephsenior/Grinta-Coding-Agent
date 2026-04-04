@@ -26,7 +26,7 @@ def register_cost_recorder(recorder: Callable[[str, float], None]) -> None:
     """
     global _cost_recorder
     _cost_recorder = recorder
-    logger.debug("Cost recorder registered")
+    logger.debug('Cost recorder registered')
 
 
 def record_llm_cost(user_key: str, cost: float) -> None:
@@ -48,4 +48,4 @@ def record_llm_cost(user_key: str, cost: float) -> None:
     try:
         _cost_recorder(user_key, cost)
     except Exception as exc:
-        logger.error("Cost recorder callback failed: %s", exc, exc_info=True)
+        logger.error('Cost recorder callback failed: %s', exc, exc_info=True)

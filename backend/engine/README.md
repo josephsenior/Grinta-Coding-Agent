@@ -266,7 +266,7 @@ tail -f logs/App.log | grep "Orchestrator"
 ### Add Custom Tools
 
 ```python
-# App/engines/orchestrator/tools.py
+# Grinta/engines/orchestrator/tools.py
 
 CUSTOM_TOOLS = [
     {
@@ -283,7 +283,7 @@ CUSTOM_TOOLS = [
 ### Custom Prompt
 
 ```python
-# App/engines/orchestrator/prompts.py
+# Grinta/engines/orchestrator/prompts.py
 
 CUSTOM_SYSTEM_PROMPT = """
 You are a specialized agent for...

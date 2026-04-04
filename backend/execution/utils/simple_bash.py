@@ -1,4 +1,4 @@
-﻿"""Simple Bash session using subprocess (no tmux required).
+"""Simple Bash session using subprocess (no tmux required).
 
 Provides Bash command execution without tmux dependency.
 Useful for systems that have Bash but not tmux installed.
@@ -34,22 +34,22 @@ class SimpleBashSession(BaseShellSession):
     def initialize(self) -> None:
         """Initialize the session."""
         logger.info(
-            "Initializing SimpleBashSession (no tmux). Work dir: %s",
+            'Initializing SimpleBashSession (no tmux). Work dir: %s',
             self.work_dir,
         )
         # Verify working directory exists
         if not os.path.isdir(self._cwd):
             os.makedirs(self._cwd, exist_ok=True)
-            logger.info("Created working directory: %s", self._cwd)
+            logger.info('Created working directory: %s', self._cwd)
 
         self._initialized = True
-        logger.info("SimpleBashSession initialized successfully")
+        logger.info('SimpleBashSession initialized successfully')
 
     def execute(self, action: CmdRunAction) -> CmdOutputObservation | ErrorObservation:
         """Execute a command in Bash."""
         if not self._initialized or self._closed:
             return ErrorObservation(
-                content="Bash session is not initialized or has been closed."
+                content='Bash session is not initialized or has been closed.'
             )
 
         command = action.command.strip()
@@ -57,8 +57,8 @@ class SimpleBashSession(BaseShellSession):
 
         if action.is_input:
             return ErrorObservation(
-                content="Interactive input not supported in SimpleBashSession. "
-                "Use tmux-based BashSession for interactive commands."
+                content='Interactive input not supported in SimpleBashSession. '
+                'Use tmux-based BashSession for interactive commands.'
             )
 
         # Handle background commands (ending with &)
@@ -82,25 +82,25 @@ class SimpleBashSession(BaseShellSession):
         self, command: str
     ) -> CmdOutputObservation | ErrorObservation:
         """Handle execution of background commands via nohup."""
-        bg_command = f"nohup {command} > /dev/null 2>&1 & echo $!"
+        bg_command = f'nohup {command} > /dev/null 2>&1 & echo $!'
         stdout, stderr, exit_code = self._run_command(bg_command, timeout=10)
 
         if exit_code == 0 and stdout.strip().isdigit():
             pid = stdout.strip()
-            logger.info("Background process started with PID: %s", pid)
+            logger.info('Background process started with PID: %s', pid)
             try:
                 self._cancellation.register_pid(int(pid))
             except Exception:
-                logger.debug("Failed to register background pid=%s", pid, exc_info=True)
+                logger.debug('Failed to register background pid=%s', pid, exc_info=True)
 
             metadata = CmdOutputMetadata(exit_code=0, working_dir=self._cwd)
             return CmdOutputObservation(
-                content=f"[{pid}]",
+                content=f'[{pid}]',
                 command=command,
                 metadata=metadata,
             )
 
-        logger.warning("Failed to start background process, running normally")
+        logger.warning('Failed to start background process, running normally')
         # Fallback to foreground execution if background start fails
         stdout, stderr, exit_code = self._run_command(command, timeout=60)
         return self._format_execution_observation(command, stdout, stderr, exit_code)  # type: ignore[return-value]
@@ -112,14 +112,14 @@ class SimpleBashSession(BaseShellSession):
     ) -> tuple[str, str, int]:
         """Run a Bash command via subprocess."""
         if self._closed:
-            raise RuntimeError("Bash session is closed")
+            raise RuntimeError('Bash session is closed')
 
         try:
             process = self._start_subprocess(command)
             stdout, stderr = process.communicate(timeout=timeout)
             return_code = process.returncode
 
-            if "cd " in command:
+            if 'cd ' in command:
                 self._update_cwd_if_needed()
 
             return (stdout, stderr, return_code)
@@ -127,16 +127,16 @@ class SimpleBashSession(BaseShellSession):
         except subprocess.TimeoutExpired:
             return self._handle_subprocess_timeout(command, timeout)
         except Exception as e:
-            logger.error("Error running Bash command: %s", e)
-            return ("", str(e), 1)
+            logger.error('Error running Bash command: %s', e)
+            return ('', str(e), 1)
         finally:
-            if "process" in locals() and process.pid:
+            if 'process' in locals() and process.pid:
                 self._cancellation.unregister_process(process.pid)
 
     def _start_subprocess(self, command: str) -> subprocess.Popen:
         """Initialize and register the subprocess."""
         process = subprocess.Popen(
-            ["bash", "-c", command],
+            ['bash', '-c', command],
             cwd=self._cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -147,25 +147,23 @@ class SimpleBashSession(BaseShellSession):
 
     def _update_cwd_if_needed(self) -> None:
         """Update current working directory by querying the shell."""
-        self._update_cwd_from_output(["bash", "-c", "pwd"])
+        self._update_cwd_from_output(['bash', '-c', 'pwd'])
 
     def _handle_subprocess_timeout(
         self, command: str, timeout: int | None
     ) -> tuple[str, str, int]:
         """Handle subprocess timeout and ensure cleanup."""
-        logger.warning("Command timed out after %s seconds: %s", timeout, command)
+        logger.warning('Command timed out after %s seconds: %s', timeout, command)
         # Process cleanup is handled by cancellation service if registered,
         # but we also attempt a direct kill here for safety.
-        return ("", f"Command timed out after {timeout} seconds", 124)
+        return ('', f'Command timed out after {timeout} seconds', 124)
 
     def read_output(self) -> str:
         """Read pending output from the shell session."""
         # Not supported as there is no persistent output buffer in simple bash
-        return ""
+        return ''
 
     def write_input(self, data: str, is_control: bool = False) -> None:
         """Write input to the shell session."""
         # Not supported as commands are executed via subprocess
-        logger.warning(
-            "Terminal input not supported in SimpleBashSession (no tmux)"
-        )
+        logger.warning('Terminal input not supported in SimpleBashSession (no tmux)')

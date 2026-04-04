@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 from typing import cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.orchestration.services.confirmation_service import ConfirmationService
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import ActionConfirmationStatus
 from backend.ledger.action.action import Action
+from backend.orchestration.services.confirmation_service import ConfirmationService
 
 
 def _make_context(**overrides) -> MagicMock:
@@ -21,7 +21,7 @@ def _make_context(**overrides) -> MagicMock:
     controller._replay_manager.should_replay.return_value = False
     controller._replay_manager.replay_mode = False
     controller.state = MagicMock()
-    controller.state.confirmation_mode = overrides.get("confirmation_mode", False)
+    controller.state.confirmation_mode = overrides.get('confirmation_mode', False)
     ctx = MagicMock()
     ctx.get_controller.return_value = controller
     ctx.set_agent_state = AsyncMock()
@@ -59,7 +59,7 @@ class TestGetNextAction:
         svc = ConfirmationService(ctx, _make_safety_service())
         svc.get_next_action()
         svc.get_next_action()
-        assert svc.action_counts["live_actions"] == 2
+        assert svc.action_counts['live_actions'] == 2
 
     def test_replay_action(self):
         ctx = _make_context()
@@ -71,7 +71,7 @@ class TestGetNextAction:
         svc = ConfirmationService(ctx, _make_safety_service())
         result = svc.get_next_action()
         assert result is replayed
-        assert svc.action_counts["replay_actions"] == 1
+        assert svc.action_counts['replay_actions'] == 1
 
 
 # ── is_replay_mode / replay_progress ─────────────────────────────────
@@ -175,5 +175,5 @@ class TestActionCounts:
     def test_initial_counts(self):
         svc = ConfirmationService(_make_context(), _make_safety_service())
         counts = svc.action_counts
-        assert counts["replay_actions"] == 0
-        assert counts["live_actions"] == 0
+        assert counts['replay_actions'] == 0
+        assert counts['live_actions'] == 0

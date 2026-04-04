@@ -483,7 +483,7 @@ class OrchestratorPlanner:
                 '2. Try a fundamentally different approach\n'
                 '3. If editing files, re-read the file first with view command\n'
                 '4. Do not repeat unchanged tracking updates\n'
-                '5. Optional: error_recovery_memory(query) to retrieve stored fixes for similar errors'
+                '5. Optional: think() to step back and re-analyze the problem from scratch'
             )
         if rep_score >= 0.45:
             return f'\n📊 Mild repetition detected (score={rep_score:.1f}/1.0). Consider varying your approach.'

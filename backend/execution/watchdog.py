@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import threading
@@ -12,9 +12,9 @@ from backend.execution.runtime_pool import call_async_disconnect
 from backend.execution.telemetry import RuntimeTelemetry, runtime_telemetry
 
 if TYPE_CHECKING:
-    from backend.ledger.stream import EventStream
     from backend.execution.base import Runtime
     from backend.execution.runtime_pool import RuntimePool
+    from backend.ledger.stream import EventStream
 
 
 def _env_float(name: str, default: float) -> float:
@@ -48,12 +48,12 @@ class RuntimeWatchdog:
         self._max_active_seconds = (
             max_active_seconds
             if max_active_seconds is not None
-            else _env_float("APP_RUNTIME_MAX_ACTIVE_SECONDS", 3600.0)
+            else _env_float('APP_RUNTIME_MAX_ACTIVE_SECONDS', 3600.0)
         )
         self._poll_interval = (
             poll_interval
             if poll_interval is not None
-            else _env_float("APP_RUNTIME_WATCHDOG_INTERVAL", 30.0)
+            else _env_float('APP_RUNTIME_WATCHDOG_INTERVAL', 30.0)
         )
         self._telemetry = telemetry or runtime_telemetry
         self._watched: dict[str, WatchedRuntime] = {}
@@ -62,7 +62,7 @@ class RuntimeWatchdog:
         self._stop_event = threading.Event()
         self._tick = threading.Event()
         self._thread = threading.Thread(
-            target=self._run, name="RuntimeWatchdog", daemon=True
+            target=self._run, name='RuntimeWatchdog', daemon=True
         )
         self._tick.set()
         self._thread.start()
@@ -80,7 +80,7 @@ class RuntimeWatchdog:
         self._tick.set()
 
     def set_idle_cleanup(self, pool: RuntimePool | None) -> None:
-        cleanup = getattr(pool, "cleanup_expired", None) if pool else None
+        cleanup = getattr(pool, 'cleanup_expired', None) if pool else None
         if callable(cleanup):
             self._cleanup_hook = cleanup
         else:
@@ -95,7 +95,7 @@ class RuntimeWatchdog:
     ) -> None:
         if self._max_active_seconds <= 0:
             return
-        event_stream = getattr(runtime, "event_stream", None)
+        event_stream = getattr(runtime, 'event_stream', None)
         if event_stream is None:
             return
         sid = runtime.sid
@@ -174,10 +174,10 @@ class RuntimeWatchdog:
                     removed = self._cleanup_hook()
                     if removed:
                         logger.debug(
-                            "Runtime pool cleanup removed %s runtimes", removed
+                            'Runtime pool cleanup removed %s runtimes', removed
                         )
                 except Exception as exc:  # pragma: no cover - defensive
-                    logger.debug("Runtime pool cleanup failed: %s", exc)
+                    logger.debug('Runtime pool cleanup failed: %s', exc)
 
     def _enforce_deadlines(self) -> None:
         if self._max_active_seconds <= 0:
@@ -191,11 +191,11 @@ class RuntimeWatchdog:
                     self._watched.pop(meta.runtime.sid, None)
         for meta in overdue:
             self._detach_listener(meta)
-            self._terminate(meta, reason="active_timeout")
+            self._terminate(meta, reason='active_timeout')
 
     def _terminate(self, meta: WatchedRuntime, *, reason: str) -> None:
         logger.warning(
-            "Runtime watchdog terminating runtime sid=%s key=%s reason=%s",
+            'Runtime watchdog terminating runtime sid=%s key=%s reason=%s',
             meta.runtime.sid,
             meta.key,
             reason,
@@ -214,4 +214,3 @@ class RuntimeWatchdog:
 
 
 runtime_watchdog = RuntimeWatchdog()
-

@@ -18,20 +18,20 @@ logger = logging.getLogger(__name__)
 
 
 class NodeType(str, Enum):
-    FILE = "file"
-    CLASS = "class"
-    FUNCTION = "function"
-    VARIABLE = "variable"
-    CONCEPT = "concept"
+    FILE = 'file'
+    CLASS = 'class'
+    FUNCTION = 'function'
+    VARIABLE = 'variable'
+    CONCEPT = 'concept'
 
 
 class EdgeType(str, Enum):
-    IMPORTS = "imports"
-    CALLS = "calls"
-    DEFINES = "defines"
-    INHERITS = "inherits"
-    REFERENCES = "references"
-    RELATED_TO = "related_to"
+    IMPORTS = 'imports'
+    CALLS = 'calls'
+    DEFINES = 'defines'
+    INHERITS = 'inherits'
+    REFERENCES = 'references'
+    RELATED_TO = 'related_to'
 
 
 class GraphMemoryStore:
@@ -81,16 +81,16 @@ class GraphMemoryStore:
 
             # Handle MultiDiGraph edge data structure (dict of edges)
             for data in edge_data.values():
-                if edge_type and data.get("type") != edge_type.value:
+                if edge_type and data.get('type') != edge_type.value:
                     continue
 
                 node_data = self.graph.nodes[neighbor_id]
                 neighbors.append(
                     {
-                        "id": neighbor_id,
-                        "type": node_data.get("type"),
-                        "relationship": data.get("type"),
-                        "attributes": node_data,
+                        'id': neighbor_id,
+                        'type': node_data.get('type'),
+                        'relationship': data.get('type'),
+                        'attributes': node_data,
                     }
                 )
 
@@ -128,11 +128,11 @@ class GraphMemoryStore:
         try:
             data = nx.node_link_data(self.graph)
             os.makedirs(os.path.dirname(self.persistence_path), exist_ok=True)
-            with open(self.persistence_path, "w", encoding="utf-8") as f:
+            with open(self.persistence_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
-            logger.debug("Graph saved to %s", self.persistence_path)
+            logger.debug('Graph saved to %s', self.persistence_path)
         except Exception as e:
-            logger.error("Failed to save graph: %s", e)
+            logger.error('Failed to save graph: %s', e)
 
     def load(self):
         """Load graph from disk."""
@@ -140,17 +140,17 @@ class GraphMemoryStore:
             return
 
         try:
-            with open(self.persistence_path, encoding="utf-8") as f:
+            with open(self.persistence_path, encoding='utf-8') as f:
                 data = json.load(f)
             loaded = nx.node_link_graph(data)
             self.graph = loaded
             logger.info(
-                "Graph loaded from %s (%s nodes)",
+                'Graph loaded from %s (%s nodes)',
                 self.persistence_path,
                 self.graph.number_of_nodes(),
             )
         except Exception as e:
-            logger.error("Failed to load graph: %s", e)
+            logger.error('Failed to load graph: %s', e)
             raise
 
     def _auto_save(self):
@@ -161,7 +161,7 @@ class GraphMemoryStore:
     def stats(self) -> dict:
         """Return graph statistics."""
         return {
-            "nodes": self.graph.number_of_nodes(),
-            "edges": self.graph.number_of_edges(),
-            "density": nx.density(self.graph),
+            'nodes': self.graph.number_of_nodes(),
+            'edges': self.graph.number_of_edges(),
+            'density': nx.density(self.graph),
         }

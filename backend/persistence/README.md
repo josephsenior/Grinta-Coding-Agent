@@ -1,6 +1,6 @@
-# App Storage Module
+# Grinta Storage Module
 
-The storage module provides different storage options for file operations in App, used for storing events, settings and other metadata. This module implements a common interface (`FileStore`) that allows for interchangeable storage backends.
+The storage module provides different storage options for file operations in Grinta, used for storing events, settings and other metadata. This module implements a common interface (`FileStore`) that allows for interchangeable storage backends.
 
 **Usage:**
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import ClassVar
 
 from backend.core.enums import ActionConfirmationStatus, ActionSecurityRisk, ActionType
@@ -20,13 +20,13 @@ class LspQueryAction(Action):
     - ``list_symbols``    – list top-level symbols defined in *file*
     """
 
-    file: str = ""
+    file: str = ''
     command: str = (
-        "find_definition"  # find_definition | find_references | hover | list_symbols
+        'find_definition'  # find_definition | find_references | hover | list_symbols
     )
     line: int = 1  # 1-based
     column: int = 1  # 1-based
-    symbol: str = ""  # Optional filter for list_symbols
+    symbol: str = ''  # Optional filter for list_symbols
 
     action: ClassVar[str] = ActionType.LSP_QUERY
     runnable: ClassVar[bool] = True
@@ -35,8 +35,7 @@ class LspQueryAction(Action):
 
     @property
     def message(self) -> str:
-        return f"LSP {self.command} on {self.file}:{self.line}:{self.column}"
+        return f'LSP {self.command} on {self.file}:{self.line}:{self.column}'
 
     def __str__(self) -> str:
-        return f"**LspQueryAction** command={self.command} file={self.file} line={self.line} col={self.column}"
-
+        return f'**LspQueryAction** command={self.command} file={self.file} line={self.line} col={self.column}'

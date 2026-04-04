@@ -28,9 +28,9 @@ from backend.inference.provider_resolver import discover_all_local_models
 
 def generate_quickstart_config(
     *,
-    api_key: str = "",
-    model: str = "gemini-2.5-flash",
-    base_url: str = "",
+    api_key: str = '',
+    model: str = 'gemini-2.5-flash',
+    base_url: str = '',
     max_budget: float = 5.0,
 ) -> str:
     """Return a minimal quick-start ``settings.json`` as a string.
@@ -45,54 +45,54 @@ def generate_quickstart_config(
         A JSON-formatted configuration string.
     """
     config = {
-        "project_root": "./workspace",
-        "max_budget_per_task": max_budget,
-        "llm_model": model,
-        "llm_api_key": api_key,
-        "llm_base_url": base_url or "",
+        'project_root': './workspace',
+        'max_budget_per_task': max_budget,
+        'llm_model': model,
+        'llm_api_key': api_key,
+        'llm_base_url': base_url or '',
     }
     return json.dumps(config, indent=2)
 
 
 def _interactive_init(dest: Path) -> None:
     """Walk the user through creating a minimal config file."""
-    print("\n🚀 App Quick-Start Configuration")
-    print("=" * 60)
+    print('\n🚀 App Quick-Start Configuration')
+    print('=' * 60)
 
     # 1. Detect local models
-    print("\n🔍 Scanning for local LLMs (Ollama, LM Studio, etc.)...")
+    print('\n🔍 Scanning for local LLMs (Ollama, LM Studio, etc.)...')
     local_models = discover_all_local_models()
-    suggested_model = "gemini-2.5-flash"
+    suggested_model = 'gemini-2.5-flash'
 
     found_any = False
     for provider, models in local_models.items():
         if models:
             if not found_any:
-                print("   ✨ Found local models!")
+                print('   ✨ Found local models!')
                 found_any = True
-            print(f"   📦 {provider}: {', '.join(models[:3])}...")
+            print(f'   📦 {provider}: {", ".join(models[:3])}...')
             # Suggest the first local model as a default if nothing else is picked
-            suggested_model = f"{provider}/{models[0]}"
+            suggested_model = f'{provider}/{models[0]}'
 
-    print(f"\n💡 Suggestion: {suggested_model}")
-    print("-" * 60)
+    print(f'\n💡 Suggestion: {suggested_model}')
+    print('-' * 60)
 
     if dest.exists():
         confirm = (
-            input(f"\n⚠️  {dest.name} already exists. Overwrite? [y/N]: ")
+            input(f'\n⚠️  {dest.name} already exists. Overwrite? [y/N]: ')
             .strip()
             .lower()
         )
-        if confirm != "y":
-            print("   Aborted.")
+        if confirm != 'y':
+            print('   Aborted.')
             return
 
-    model = input(f"   Model name [{suggested_model}]: ").strip() or suggested_model
-    api_key = ""
-    if "/" not in model:
-        api_key = input("   LLM API key (optional): ").strip()
+    model = input(f'   Model name [{suggested_model}]: ').strip() or suggested_model
+    api_key = ''
+    if '/' not in model:
+        api_key = input('   LLM API key (optional): ').strip()
 
-    budget_str = input("   Max budget per task (USD) [5.0]: ").strip()
+    budget_str = input('   Max budget per task (USD) [5.0]: ').strip()
     max_budget = float(budget_str) if budget_str else 5.0
 
     content = generate_quickstart_config(
@@ -101,14 +101,14 @@ def _interactive_init(dest: Path) -> None:
         max_budget=max_budget,
     )
 
-    dest.write_text(content, encoding="utf-8")
+    dest.write_text(content, encoding='utf-8')
 
     # Ensure workspace exists
-    (dest.parent / "workspace").mkdir(exist_ok=True)
+    (dest.parent / 'workspace').mkdir(exist_ok=True)
 
-    print(f"\n✅ Configuration saved to {dest}")
-    print(f"📁 Workspace initialized at {dest.parent}/workspace/")
-    print("\n👉 To start, run: uv run app serve\n")
+    print(f'\n✅ Configuration saved to {dest}')
+    print(f'📁 Workspace initialized at {dest.parent}/workspace/')
+    print('\n👉 To start, run: uv run python -m backend.cli.entry\n')
 
 
 # ------------------------------------------------------------------ #
@@ -119,10 +119,10 @@ def _interactive_init(dest: Path) -> None:
 def main() -> None:
     """CLI entry-point: ``python -m backend.core.config.quickstart``."""
     # Determine project root (where settings.json lives)
-    project_root = Path(os.environ.get("APP_PROJECT_ROOT", Path.cwd()))
-    dest = project_root / "settings.json"
+    project_root = Path(os.environ.get('APP_PROJECT_ROOT', Path.cwd()))
+    dest = project_root / 'settings.json'
     _interactive_init(dest)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import os
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
 from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -36,9 +36,7 @@ def _make_pending_service(action=None) -> MagicMock:
     return svc
 
 
-def _make_observation(
-    content: str = "result", cause: int | None = None
-) -> Any:
+def _make_observation(content: str = 'result', cause: int | None = None) -> Any:
     return cast(Any, SimpleNamespace(content=content, cause=cause))
 
 
@@ -99,20 +97,20 @@ class TestGetLogLevel:
         ctx = _make_context()
         svc = ObservationService(ctx, _make_pending_service())
         with patch.dict(os.environ, {}, clear=True):
-            os.environ.pop("LOG_ALL_EVENTS", None)
-            assert svc._get_log_level() == "debug"
+            os.environ.pop('LOG_ALL_EVENTS', None)
+            assert svc._get_log_level() == 'debug'
 
     def test_info_when_log_all_events_true(self):
         ctx = _make_context()
         svc = ObservationService(ctx, _make_pending_service())
-        with patch.dict(os.environ, {"LOG_ALL_EVENTS": "true"}):
-            assert svc._get_log_level() == "info"
+        with patch.dict(os.environ, {'LOG_ALL_EVENTS': 'true'}):
+            assert svc._get_log_level() == 'info'
 
     def test_info_when_log_all_events_1(self):
         ctx = _make_context()
         svc = ObservationService(ctx, _make_pending_service())
-        with patch.dict(os.environ, {"LOG_ALL_EVENTS": "1"}):
-            assert svc._get_log_level() == "info"
+        with patch.dict(os.environ, {'LOG_ALL_EVENTS': '1'}):
+            assert svc._get_log_level() == 'info'
 
 
 # ── ObservationService._prepare_observation_for_logging ──────────────
@@ -124,16 +122,16 @@ class TestPrepareObservation:
         controller = ctx.get_controller()
         controller.agent.llm.config.max_message_chars = 10
         svc = ObservationService(ctx, _make_pending_service())
-        obs = _make_observation(content="A" * 100)
+        obs = _make_observation(content='A' * 100)
         result = svc._prepare_observation_for_logging(obs)
         assert len(result.content) <= 100  # truncated from original
 
     def test_short_content_unchanged(self):
         ctx = _make_context()
         svc = ObservationService(ctx, _make_pending_service())
-        obs = _make_observation(content="short")
+        obs = _make_observation(content='short')
         result = svc._prepare_observation_for_logging(obs)
-        assert result.content == "short"
+        assert result.content == 'short'
 
 
 # ── ObservationService.handle_observation ────────────────────────────
@@ -146,7 +144,7 @@ class TestHandleObservation:
         controller = ctx.get_controller()
         pending_svc = _make_pending_service(action=None)
         svc = ObservationService(ctx, pending_svc)
-        obs = _make_observation(content="hello")
+        obs = _make_observation(content='hello')
         await svc.handle_observation(obs)
         controller.log.assert_called()
 
@@ -159,8 +157,8 @@ class TestHandleObservation:
         pending_action = SimpleNamespace(id=42)
         pending_svc = _make_pending_service(action=pending_action)
         svc = ObservationService(ctx, pending_svc)
-        obs = _make_observation(content="done", cause=42)
-        with patch("backend.core.plugin.get_plugin_registry") as mock_reg:
+        obs = _make_observation(content='done', cause=42)
+        with patch('backend.core.plugin.get_plugin_registry') as mock_reg:
             mock_reg.return_value.dispatch_action_post = AsyncMock(return_value=obs)
             await svc.handle_observation(obs)
         pending_svc.set.assert_called_with(None)
@@ -171,9 +169,11 @@ class TestHandleObservation:
         pending_action = SimpleNamespace(id=42)
         pending_svc = _make_pending_service(action=pending_action)
         svc = ObservationService(ctx, pending_svc)
-        obs = _make_observation(content="other", cause=99)  # different cause
+        obs = _make_observation(content='other', cause=99)  # different cause
         await svc.handle_observation(obs)
         pending_svc.set.assert_called_once_with(None)
-        ctx.discard_invocation_context_for_action.assert_called_once_with(pending_action)
+        ctx.discard_invocation_context_for_action.assert_called_once_with(
+            pending_action
+        )
         ctx.emit_event.assert_called_once()
         ctx.trigger_step.assert_called_once_with()

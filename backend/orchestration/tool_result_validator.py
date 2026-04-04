@@ -20,11 +20,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from backend.core.logger import app_logger as logger
 from backend.orchestration.tool_pipeline import (
     ToolInvocationContext,
     ToolInvocationMiddleware,
 )
-from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.observation import Observation
@@ -37,7 +37,7 @@ class ValidationRule:
     name: str
     check: Callable[[ToolInvocationContext, Observation], str | None]
     """Return an error message string if validation fails, ``None`` if OK."""
-    severity: str = "warning"  # "warning" | "error" | "block"
+    severity: str = 'warning'  # "warning" | "error" | "block"
 
 
 @dataclass
@@ -51,11 +51,11 @@ class ValidationResult:
     block_reason: str | None = None
 
     def add(self, message: str, severity: str) -> None:
-        if severity == "block":
+        if severity == 'block':
             self.blocked = True
             self.block_reason = message
             self.passed = False
-        elif severity == "error":
+        elif severity == 'error':
             self.errors.append(message)
             self.passed = False
         else:
@@ -84,7 +84,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
         name: str,
         check: Callable[[ToolInvocationContext, Observation], str | None],
         *,
-        severity: str = "warning",
+        severity: str = 'warning',
         action_type: str | None = None,
     ) -> None:
         """Register a validation rule.
@@ -127,10 +127,10 @@ class ToolResultValidator(ToolInvocationMiddleware):
                 if msg:
                     result.add(msg, rule.severity)
             except Exception:
-                logger.debug("Validation rule %s raised", rule.name, exc_info=True)
+                logger.debug('Validation rule %s raised', rule.name, exc_info=True)
 
         # Store result in context metadata for downstream consumers
-        ctx.metadata["validation_result"] = result
+        ctx.metadata['validation_result'] = result
 
         # Surface validation to the LLM by annotating the observation content.
         # This is intentionally compact and machine-parseable.
@@ -138,26 +138,26 @@ class ToolResultValidator(ToolInvocationMiddleware):
 
         if result.warnings:
             logger.info(
-                "Tool result validation warnings for %s: %s",
+                'Tool result validation warnings for %s: %s',
                 action_type,
-                "; ".join(result.warnings),
+                '; '.join(result.warnings),
             )
         if result.errors:
             logger.warning(
-                "Tool result validation errors for %s: %s",
+                'Tool result validation errors for %s: %s',
                 action_type,
-                "; ".join(result.errors),
+                '; '.join(result.errors),
             )
         if result.blocked:
             # Block downstream handling with a high-quality reason that can
             # be emitted as an ErrorObservation by the controller.
-            reason = result.block_reason or "Tool result failed validation"
+            reason = result.block_reason or 'Tool result failed validation'
             ctx.block(
                 reason=(
-                    "RESULT VALIDATION BLOCKED:\n"
-                    f"- action={type(ctx.action).__name__}\n"
-                    f"- reason={reason}\n"
-                    "Fix the tool call or re-run with adjusted parameters."
+                    'RESULT VALIDATION BLOCKED:\n'
+                    f'- action={type(ctx.action).__name__}\n'
+                    f'- reason={reason}\n'
+                    'Fix the tool call or re-run with adjusted parameters.'
                 )
             )
 
@@ -175,57 +175,61 @@ class ToolResultValidator(ToolInvocationMiddleware):
         def check_truncation_marker(
             ctx: ToolInvocationContext, obs: Observation
         ) -> str | None:
-            content = getattr(obs, "content", "")
+            content = getattr(obs, 'content', '')
             if not isinstance(content, str):
                 return None
-            if "Observation truncated:" in content:
+            if 'Observation truncated:' in content:
                 return (
-                    "Observation content was truncated — output may be incomplete; "
-                    "re-run with a narrower command or hidden=true"
+                    'Observation content was truncated — output may be incomplete; '
+                    're-run with a narrower command or hidden=true'
                 )
             return None
 
-        self.add_rule("output_truncated", check_truncation_marker, severity="warning")
+        self.add_rule('output_truncated', check_truncation_marker, severity='warning')
 
         # 2. Large output detection (even if not truncated)
-        def check_large_output(ctx: ToolInvocationContext, obs: Observation) -> str | None:
-            content = getattr(obs, "content", "")
+        def check_large_output(
+            ctx: ToolInvocationContext, obs: Observation
+        ) -> str | None:
+            content = getattr(obs, 'content', '')
             if isinstance(content, str) and len(content) > 100_000:
                 return (
-                    f"Large output ({len(content)} chars) — may be incomplete; "
-                    "consider narrowing"
+                    f'Large output ({len(content)} chars) — may be incomplete; '
+                    'consider narrowing'
                 )
             return None
 
         # Keep legacy rule name for existing tests/callers.
-        self.add_rule("output_size", check_large_output, severity="warning")
+        self.add_rule('output_size', check_large_output, severity='warning')
 
         # 3. Error observation passthrough (informational)
         def check_error_obs(ctx: ToolInvocationContext, obs: Observation) -> str | None:
             from backend.ledger.observation import ErrorObservation
 
             if isinstance(obs, ErrorObservation):
-                return f"Tool returned error: {getattr(obs, 'content', '')[:200]}"
+                return f'Tool returned error: {getattr(obs, "content", "")[:200]}'
             return None
 
-        self.add_rule("error_observation", check_error_obs, severity="warning")
+        self.add_rule('error_observation', check_error_obs, severity='warning')
 
         # 4. Empty result detection
         def check_empty(ctx: ToolInvocationContext, obs: Observation) -> str | None:
-            content = getattr(obs, "content", None)
+            content = getattr(obs, 'content', None)
             if content is not None and isinstance(content, str) and not content.strip():
-                return "Tool returned empty result"
+                return 'Tool returned empty result'
             return None
 
-        self.add_rule("empty_result", check_empty, severity="warning")
+        self.add_rule('empty_result', check_empty, severity='warning')
 
     @staticmethod
-    def _annotate_observation(observation: Observation, result: ValidationResult) -> None:
+    def _annotate_observation(
+        observation: Observation, result: ValidationResult
+    ) -> None:
         """Append validation information to the observation content.
 
         Keeps the annotation compact to reduce token overhead.
         """
-        content = getattr(observation, "content", None)
+        content = getattr(observation, 'content', None)
         if not isinstance(content, str):
             return
 
@@ -237,12 +241,12 @@ class ToolResultValidator(ToolInvocationMiddleware):
         errors = result.errors[:5]
         lines: list[str] = []
         if warnings:
-            lines.append("warnings: " + "; ".join(warnings))
+            lines.append('warnings: ' + '; '.join(warnings))
         if errors:
-            lines.append("errors: " + "; ".join(errors))
+            lines.append('errors: ' + '; '.join(errors))
         if result.blocked:
-            lines.append("blocked: true")
+            lines.append('blocked: true')
 
-        block = "\n".join(lines)[:1500]
-        annotation = f"\n\n<APP_RESULT_VALIDATION>\n{block}\n</APP_RESULT_VALIDATION>"
-        setattr(observation, "content", content + annotation)
+        block = '\n'.join(lines)[:1500]
+        annotation = f'\n\n<APP_RESULT_VALIDATION>\n{block}\n</APP_RESULT_VALIDATION>'
+        setattr(observation, 'content', content + annotation)

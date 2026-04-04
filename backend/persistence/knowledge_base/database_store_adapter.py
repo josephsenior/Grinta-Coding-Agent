@@ -43,7 +43,7 @@ class DatabaseStoreAdapter:
                     nest_asyncio.apply()
                     return loop.run_until_complete(coro)
                 except ImportError:
-                    logger.warning("nest_asyncio not available, creating new loop")
+                    logger.warning('nest_asyncio not available, creating new loop')
                     # Fall through to create new loop
             return loop.run_until_complete(coro)
         except RuntimeError:
@@ -110,14 +110,14 @@ class DatabaseStoreAdapter:
         # Database store doesn't have get_stats, so compute it
         # This is a simple implementation - could be optimized with a SQL query
         # Use user_id from db_store if available, otherwise fall back to "default"
-        user_id = getattr(self._db_store, 'user_id', None) or "default"
+        user_id = getattr(self._db_store, 'user_id', None) or 'default'
         collections = self.list_collections(user_id)
         total_docs = sum(c.document_count for c in collections)
         total_size = sum(c.total_size_bytes for c in collections)
 
         return {
-            "total_collections": len(collections),
-            "total_documents": total_docs,
-            "total_size_bytes": total_size,
-            "total_size_mb": round(total_size / (1024 * 1024), 2),
+            'total_collections': len(collections),
+            'total_documents': total_docs,
+            'total_size_bytes': total_size,
+            'total_size_mb': round(total_size / (1024 * 1024), 2),
         }

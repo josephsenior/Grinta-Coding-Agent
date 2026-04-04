@@ -21,5 +21,5 @@ def import_functions(
         if hasattr(module, name):
             target_globals[name] = getattr(module, name)
         else:
-            msg = f"Function {name} not found in {module.__name__}"
+            msg = f'Function {name} not found in {module.__name__}'
             raise ValueError(msg)

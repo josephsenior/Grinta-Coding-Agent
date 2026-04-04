@@ -16,16 +16,16 @@ class Blackboard:
     """Thread- and async-safe key-value store for sub-agent coordination."""
 
     def _save(self) -> None:
-        path = ".app/blackboard.json"
+        path = '.grinta/blackboard.json'
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(self._data, f)
 
     def _load(self) -> None:
-        path = ".app/blackboard.json"
+        path = '.grinta/blackboard.json'
         if os.path.exists(path):
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, 'r', encoding='utf-8') as f:
                     loaded_data = json.load(f)
                     self._data.update(loaded_data)
             except Exception:
@@ -39,9 +39,9 @@ class Blackboard:
     async def get(self, key: str | None = None) -> dict[str, str] | str:
         """Get one key's value, or all keys when key is None or 'all'."""
         async with self._lock:
-            if key is None or key == "" or key == "all":
+            if key is None or key == '' or key == 'all':
                 return dict(self._data)
-            return self._data.get(key, "")
+            return self._data.get(key, '')
 
     async def set(self, key: str, value: str) -> None:
         """Set a key to a string value."""

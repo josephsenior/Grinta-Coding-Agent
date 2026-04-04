@@ -94,7 +94,7 @@ class View(BaseModel):
             return self.events[start:stop:step]
         if isinstance(key, int):
             return self.events[key]
-        msg = f"Invalid key type: {type(key)}"
+        msg = f'Invalid key type: {type(key)}'
         raise TypeError(msg)
 
     @staticmethod
@@ -142,7 +142,7 @@ class View(BaseModel):
         # Find and insert summary if available
         summary, summary_offset = View._find_summary_info(events)
         if summary is not None and summary_offset is not None:
-            logger.info("Inserting summary at offset %s", summary_offset)
+            logger.info('Inserting summary at offset %s', summary_offset)
             kept_events.insert(
                 summary_offset, AgentCondensationObservation(content=summary)
             )

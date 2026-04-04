@@ -1,6 +1,6 @@
 # Backend
 
-This folder contains all backend-related code and resources for the App project.
+This folder contains all backend-related code and resources for the Grinta project.
 
 ## Structure
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
-from backend.core.logger import app_logger as logger
 from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
@@ -14,9 +13,7 @@ from backend.core.errors import (
     LLMNoActionError,
     LLMResponseError,
 )
-from backend.ledger import EventSource
-from backend.ledger.action.agent import CondensationRequestAction
-from backend.ledger.observation import ErrorObservation
+from backend.core.logger import app_logger as logger
 from backend.inference.exceptions import (
     BadRequestError,
     ContextWindowExceededError,
@@ -24,24 +21,29 @@ from backend.inference.exceptions import (
     Timeout,
     is_context_window_error,
 )
+from backend.ledger import EventSource
+from backend.ledger.action.agent import CondensationRequestAction
+from backend.ledger.observation import ErrorObservation
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
-    from backend.orchestration.tool_pipeline import ToolInvocationContext
     from backend.ledger.action import Action
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
+    from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
 def _resolve_operation_pipeline(context):
-    context_dict = getattr(context, "__dict__", {})
-    pipeline = context_dict.get("operation_pipeline")
+    context_dict = getattr(context, '__dict__', {})
+    pipeline = context_dict.get('operation_pipeline')
     if pipeline is None and not isinstance(context, Mock):
-        pipeline = getattr(context, "operation_pipeline", None)
+        pipeline = getattr(context, 'operation_pipeline', None)
     if pipeline is not None:
         return pipeline
-    pipeline = context_dict.get("tool_pipeline")
+    pipeline = context_dict.get('tool_pipeline')
     if pipeline is not None:
         return pipeline
-    return getattr(context, "tool_pipeline", None)
+    return getattr(context, 'tool_pipeline', None)
 
 
 def _resolve_llm_step_timeout_seconds(agent) -> float | None:
@@ -54,9 +56,9 @@ def _resolve_llm_step_timeout_seconds(agent) -> float | None:
     """
     from backend.core.llm_step_timeout import llm_step_timeout_seconds_from_env
 
-    cfg = getattr(agent, "config", None)
+    cfg = getattr(agent, 'config', None)
     if cfg is not None:
-        v = getattr(cfg, "llm_step_timeout_seconds", None)
+        v = getattr(cfg, 'llm_step_timeout_seconds', None)
         if isinstance(v, (int, float)) and not isinstance(v, bool):
             f = float(v)
             return None if f <= 0 else f
@@ -78,7 +80,7 @@ class ActionExecutionService:
             try:
                 confirmation = self._context.confirmation_service
                 controller = self._context.get_controller()
-                replay_mgr = getattr(controller, "_replay_manager", None)
+                replay_mgr = getattr(controller, '_replay_manager', None)
                 # ConfirmationService.get_next_action() uses synchronous agent.step()
                 # for live runs, which disables real token streaming (astep/async_execute).
                 # Only delegate there during trajectory replay; otherwise prefer astep.
@@ -95,12 +97,12 @@ class ActionExecutionService:
                     import asyncio as _asyncio
 
                     agent = self._context.agent
-                    astep = getattr(agent, "astep", None)
+                    astep = getattr(agent, 'astep', None)
                     if astep is not None and _asyncio.iscoroutinefunction(astep):
                         logger.info(
-                            "ActionExecutionService.get_next_action: invoking astep "
-                            "for agent=%s (attempt=%d)",
-                            getattr(agent, "name", agent.__class__.__name__),
+                            'ActionExecutionService.get_next_action: invoking astep '
+                            'for agent=%s (attempt=%d)',
+                            getattr(agent, 'name', agent.__class__.__name__),
                             attempt,
                         )
                         timeout = _resolve_llm_step_timeout_seconds(agent)
@@ -118,27 +120,27 @@ class ActionExecutionService:
                                 except _asyncio.TimeoutError as exc:
                                     if _timeout_attempt == 0:
                                         logger.warning(
-                                            "ActionExecutionService.get_next_action: "
-                                            "astep timed out after %s seconds, retrying once",
+                                            'ActionExecutionService.get_next_action: '
+                                            'astep timed out after %s seconds, retrying once',
                                             timeout,
                                         )
                                         continue
                                     model_name = None
                                     try:
-                                        llm = getattr(agent, "llm", None)
+                                        llm = getattr(agent, 'llm', None)
                                         model_name = getattr(
-                                            getattr(llm, "config", None), "model", None
+                                            getattr(llm, 'config', None), 'model', None
                                         )
                                     except Exception:
                                         pass
                                     logger.error(
-                                        "ActionExecutionService.get_next_action: astep timed out "
-                                        "after %s seconds for model=%s (after retry)",
+                                        'ActionExecutionService.get_next_action: astep timed out '
+                                        'after %s seconds for model=%s (after retry)',
                                         timeout,
                                         model_name,
                                     )
                                     raise Timeout(
-                                        f"LLM step timed out after {timeout} seconds",
+                                        f'LLM step timed out after {timeout} seconds',
                                         model=model_name,
                                     ) from exc
                     else:
@@ -146,10 +148,14 @@ class ActionExecutionService:
                 action.source = EventSource.AGENT
 
                 logger.info(
-                    "ActionExecutionService.get_next_action: obtained action=%s "
-                    "from agent=%s",
-                    getattr(action, "action", type(action).__name__),
-                    getattr(self._context.agent, "name", self._context.agent.__class__.__name__),
+                    'ActionExecutionService.get_next_action: obtained action=%s '
+                    'from agent=%s',
+                    getattr(action, 'action', type(action).__name__),
+                    getattr(
+                        self._context.agent,
+                        'name',
+                        self._context.agent.__class__.__name__,
+                    ),
                 )
                 return action
 
@@ -163,9 +169,9 @@ class ActionExecutionService:
                 # Create detailed error observation
                 error_msg = str(exc)
                 if isinstance(exc, FunctionCallValidationError):
-                    error_msg = f"Tool validation failed: {exc}\nPlease correct the tool arguments and try again."
+                    error_msg = f'Tool validation failed: {exc}\nPlease correct the tool arguments and try again.'
                 if isinstance(exc, FunctionCallNotExistsError):
-                    error_msg = f"Tool not found: {exc}\nPlease use an existing tool from the provided list."
+                    error_msg = f'Tool not found: {exc}\nPlease use an existing tool from the provided list.'
 
                 obs = ErrorObservation(content=error_msg)
                 if not error_logged:
@@ -181,17 +187,19 @@ class ActionExecutionService:
                     # Typically, event_stream.add_event triggers the subscribers.
                     # We yield control briefly to allow state update to propagate if async.
                     import asyncio
+
                     await asyncio.sleep(0.01)
                     continue
 
                 # If out of retries, transition to ERROR so the agent doesn't
                 # stay stuck in RUNNING state indefinitely.
                 from backend.core.schemas import AgentState as _AgentState
+
                 controller = self._context.get_controller()
                 if controller.get_agent_state() == _AgentState.RUNNING:
                     logger.error(
-                        "get_next_action exhausted %d repair attempts; "
-                        "transitioning to ERROR state",
+                        'get_next_action exhausted %d repair attempts; '
+                        'transitioning to ERROR state',
                         max_repair_attempts,
                     )
                     await controller.set_agent_state_to(_AgentState.ERROR)
@@ -212,7 +220,7 @@ class ActionExecutionService:
             action = await get_plugin_registry().dispatch_action_pre(action)
         except Exception as exc:
             logger.warning(
-                "ActionExecutionService action_pre hook failed for %s: %s",
+                'ActionExecutionService action_pre hook failed for %s: %s',
                 type(action).__name__,
                 exc,
                 exc_info=True,
@@ -227,7 +235,9 @@ class ActionExecutionService:
                 await pipeline.run_plan(ctx)
                 await self._context.iteration_service.apply_dynamic_iterations(ctx)
                 if ctx.blocked:
-                    self._context.telemetry_service.handle_blocked_invocation(action, ctx)
+                    self._context.telemetry_service.handle_blocked_invocation(
+                        action, ctx
+                    )
                     return
         await self._context.run_action(action, ctx)
 

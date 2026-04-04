@@ -1,11 +1,11 @@
 """Tests for ActionService."""
 
 import unittest
-from typing import cast, Any
-from unittest.mock import MagicMock, AsyncMock
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock
 
-from backend.orchestration.services.action_service import ActionService
 from backend.ledger.action import Action, NullAction
+from backend.orchestration.services.action_service import ActionService
 
 
 class TestActionService(unittest.IsolatedAsyncioTestCase):
@@ -46,7 +46,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
     async def test_run_non_action_type(self):
         """Test run raises TypeError for non-Action input."""
         with self.assertRaises(TypeError):
-            await self.service.run(cast(Any, "not an action"), None)
+            await self.service.run(cast(Any, 'not an action'), None)
 
     async def test_run_non_runnable_action(self):
         """Test run skips runnable handling for non-runnable actions."""
@@ -62,7 +62,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         """Test run processes runnable action through full pipeline."""
         mock_action = MagicMock(spec=Action)
         mock_action.runnable = True
-        mock_action.id = "action-123"
+        mock_action.id = 'action-123'
         mock_action.source = None
 
         mock_ctx = MagicMock()
@@ -291,8 +291,8 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         # Should log detailed metrics
         self.mock_controller.log.assert_called()
         call_args = self.mock_controller.log.call_args[0]
-        self.assertIn("200", call_args[1])  # prompt tokens
-        self.assertIn("150", call_args[1])  # completion tokens
+        self.assertIn('200', call_args[1])  # prompt tokens
+        self.assertIn('150', call_args[1])  # completion tokens
 
     def test_set_pending_action(self):
         """Test set_pending_action delegates to pending service."""
@@ -338,5 +338,5 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

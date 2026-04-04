@@ -43,17 +43,17 @@ class PythonFileOps:
         """
         path = Path(path)
 
-        if sys.platform == "win32":
+        if sys.platform == 'win32':
             # Windows: check FILE_ATTRIBUTE_HIDDEN
             try:
                 attrs = os.stat(path).st_file_attributes  # type: ignore
                 return bool(attrs & stat.FILE_ATTRIBUTE_HIDDEN)  # type: ignore
             except (AttributeError, OSError):
                 # Fallback: check if name starts with dot
-                return path.name.startswith(".")
+                return path.name.startswith('.')
         else:
             # Unix: files starting with dot are hidden
-            return path.name.startswith(".")
+            return path.name.startswith('.')
 
     @staticmethod
     def list_directory(
@@ -64,7 +64,7 @@ class PythonFileOps:
         """List files in directory (platform-aware)."""
         directory = Path(directory)
         if not directory.is_dir():
-            logger.warning("Not a directory: %s", directory)
+            logger.warning('Not a directory: %s', directory)
             return []
 
         try:
@@ -73,7 +73,7 @@ class PythonFileOps:
             else:
                 results = PythonFileOps._list_non_recursive(directory, include_hidden)
         except (PermissionError, OSError) as e:
-            logger.warning("Cannot list directory %s: %s", directory, e)
+            logger.warning('Cannot list directory %s: %s', directory, e)
             results = []
 
         return sorted(results)
@@ -109,8 +109,8 @@ class PythonFileOps:
     @staticmethod
     def safe_read_text(
         file_path: str | Path,
-        encoding: str = "utf-8",
-        errors: str = "ignore",
+        encoding: str = 'utf-8',
+        errors: str = 'ignore',
     ) -> str | None:
         """Safely read text file with fallback encoding.
 
@@ -127,14 +127,14 @@ class PythonFileOps:
         try:
             return file_path.read_text(encoding=encoding, errors=errors)
         except (PermissionError, OSError, UnicodeDecodeError) as e:
-            logger.debug("Cannot read file %s: %s", file_path, e)
+            logger.debug('Cannot read file %s: %s', file_path, e)
             return None
 
     @staticmethod
     def safe_write_text(
         file_path: str | Path,
         content: str,
-        encoding: str = "utf-8",
+        encoding: str = 'utf-8',
         create_dirs: bool = True,
     ) -> bool:
         """Safely write text to file.
@@ -157,7 +157,7 @@ class PythonFileOps:
             file_path.write_text(content, encoding=encoding)
             return True
         except (PermissionError, OSError, UnicodeEncodeError) as e:
-            logger.error("Cannot write file %s: %s", file_path, e)
+            logger.error('Cannot write file %s: %s', file_path, e)
             return False
 
     @staticmethod
@@ -187,7 +187,7 @@ class PythonFileOps:
         """
         file_path = Path(file_path)
 
-        if os.name == "nt":
+        if os.name == 'nt':
             # Windows: check extension
-            return file_path.suffix.lower() in (".exe", ".bat", ".cmd", ".ps1")
+            return file_path.suffix.lower() in ('.exe', '.bat', '.cmd', '.ps1')
         return bool(os.access(file_path, os.X_OK))

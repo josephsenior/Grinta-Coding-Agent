@@ -22,9 +22,9 @@ class StuckDetectionService:
 
     def is_stuck(self) -> bool:
         """Return True if the controller (or any delegate) appears stuck."""
-        delegate = getattr(self._controller, "delegate", None)
+        delegate = getattr(self._controller, 'delegate', None)
         if delegate is not None:
-            stuck_service = getattr(delegate, "stuck_service", None)
+            stuck_service = getattr(delegate, 'stuck_service', None)
             if stuck_service is not None:
                 result = stuck_service.is_stuck()
                 if result is True:
@@ -43,6 +43,8 @@ class StuckDetectionService:
         if not self._detector:
             return 0.0
         try:
-            return self._detector.compute_repetition_score(self._controller.headless_mode)
+            return self._detector.compute_repetition_score(
+                self._controller.headless_mode
+            )
         except Exception:
             return 0.0

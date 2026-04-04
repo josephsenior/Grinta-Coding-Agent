@@ -10,7 +10,7 @@ from threading import Lock
 
 @dataclass
 class _BreakerState:
-    state: str = "closed"  # closed | open | half_open
+    state: str = 'closed'  # closed | open | half_open
     failures: int = 0
     opened_at: float = 0.0
     open_seconds: float = 0.0
@@ -25,28 +25,28 @@ class CircuitBreaker:
         self.lock = asyncio.Lock()
         self.state = _BreakerState()
         # Config
-        self.failure_threshold = int(os.getenv("APP_CB_FAILURE_THRESHOLD", "3"))
-        self.base_open_seconds = float(os.getenv("APP_CB_BASE_OPEN_SECONDS", "2"))
-        self.max_open_seconds = float(os.getenv("APP_CB_MAX_OPEN_SECONDS", "60"))
-        self.half_open_probes = int(os.getenv("APP_CB_HALF_OPEN_PROBES", "1"))
+        self.failure_threshold = int(os.getenv('APP_CB_FAILURE_THRESHOLD', '3'))
+        self.base_open_seconds = float(os.getenv('APP_CB_BASE_OPEN_SECONDS', '2'))
+        self.max_open_seconds = float(os.getenv('APP_CB_MAX_OPEN_SECONDS', '60'))
+        self.half_open_probes = int(os.getenv('APP_CB_HALF_OPEN_PROBES', '1'))
 
     async def async_call(self, fn: Callable[[], Awaitable]):
         """Execute fn under breaker control."""
         async with self.lock:
             now = time.time()
-            if self.state.state == "open":
+            if self.state.state == 'open':
                 if now - self.state.opened_at >= self.state.open_seconds:
                     # Transition to half-open
-                    self.state.state = "half_open"
+                    self.state.state = 'half_open'
                     self.state.half_open_probes_left = max(1, self.half_open_probes)
                 else:
                     _CB_METRICS.on_blocked(self.key)
-                    raise RuntimeError(f"circuit_open:{self.key}")
+                    raise RuntimeError(f'circuit_open:{self.key}')
 
-            if self.state.state == "half_open":
+            if self.state.state == 'half_open':
                 if self.state.half_open_probes_left <= 0:
                     _CB_METRICS.on_blocked(self.key)
-                    raise RuntimeError(f"circuit_half_open_block:{self.key}")
+                    raise RuntimeError(f'circuit_half_open_block:{self.key}')
                 self.state.half_open_probes_left -= 1
                 _CB_METRICS.on_half_open_probe(self.key)
 
@@ -65,9 +65,9 @@ class CircuitBreaker:
     def _on_failure(self) -> None:
         st = self.state
         st.failures += 1
-        if st.state == "half_open":
+        if st.state == 'half_open':
             # Re-open with increased backoff
-            st.state = "open"
+            st.state = 'open'
             st.opened_at = time.time()
             st.open_seconds = min(
                 self.max_open_seconds,
@@ -78,8 +78,8 @@ class CircuitBreaker:
             )
             _CB_METRICS.on_open(self.key)
             return
-        if st.failures >= self.failure_threshold and st.state == "closed":
-            st.state = "open"
+        if st.failures >= self.failure_threshold and st.state == 'closed':
+            st.state = 'open'
             st.opened_at = time.time()
             st.open_seconds = max(
                 self.base_open_seconds, st.open_seconds or self.base_open_seconds
@@ -88,15 +88,15 @@ class CircuitBreaker:
 
     def _on_success(self) -> None:
         st = self.state
-        if st.state == "half_open":
+        if st.state == 'half_open':
             # Close and reset
-            st.state = "closed"
+            st.state = 'closed'
             st.failures = 0
             st.open_seconds = max(
                 self.base_open_seconds, st.open_seconds or self.base_open_seconds
             )
             _CB_METRICS.on_close_success(self.key)
-        elif st.state == "closed":
+        elif st.state == 'closed':
             # Healthy path; reset failures
             st.failures = 0
 
@@ -128,12 +128,12 @@ class CircuitBreakerManager:
         with self._lock:
             open_keys = []
             for k, br in self._breakers.items():
-                if br.state.state == "open":
+                if br.state.state == 'open':
                     open_keys.append(k)
             return {
-                "keys": list(self._breakers.keys()),
-                "open_keys": open_keys,
-                "open_count": len(open_keys),
+                'keys': list(self._breakers.keys()),
+                'open_keys': open_keys,
+                'open_count': len(open_keys),
             }
 
 
@@ -141,27 +141,27 @@ class _BreakerMetrics:
     def __init__(self) -> None:
         self._lock = Lock()
         self._data = {
-            "opens_total": 0,
-            "blocked_total": 0,
-            "half_open_probes_total": 0,
-            "close_success_total": 0,
+            'opens_total': 0,
+            'blocked_total': 0,
+            'half_open_probes_total': 0,
+            'close_success_total': 0,
         }
 
     def on_open(self, key: str) -> None:
         with self._lock:
-            self._data["opens_total"] += 1
+            self._data['opens_total'] += 1
 
     def on_blocked(self, key: str) -> None:
         with self._lock:
-            self._data["blocked_total"] += 1
+            self._data['blocked_total'] += 1
 
     def on_half_open_probe(self, key: str) -> None:
         with self._lock:
-            self._data["half_open_probes_total"] += 1
+            self._data['half_open_probes_total'] += 1
 
     def on_close_success(self, key: str) -> None:
         with self._lock:
-            self._data["close_success_total"] += 1
+            self._data['close_success_total'] += 1
 
     def snapshot(self) -> dict:
         with self._lock:
@@ -181,16 +181,16 @@ def get_circuit_breaker_metrics_snapshot() -> dict:
     mgr = _CB_MANAGER.snapshot()
     snap.update(
         {
-            "open_keys": mgr["open_keys"],
-            "open_count": mgr["open_count"],
+            'open_keys': mgr['open_keys'],
+            'open_count': mgr['open_count'],
         }
     )
     return snap
 
 
 __all__ = [
-    "CircuitBreaker",
-    "CircuitBreakerManager",
-    "get_circuit_breaker_manager",
-    "get_circuit_breaker_metrics_snapshot",
+    'CircuitBreaker',
+    'CircuitBreakerManager',
+    'get_circuit_breaker_manager',
+    'get_circuit_breaker_metrics_snapshot',
 ]

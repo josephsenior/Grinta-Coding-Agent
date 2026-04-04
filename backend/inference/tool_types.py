@@ -30,7 +30,7 @@ def make_function_chunk(**chunk_kwargs: Any) -> Any:
     return _Chunk(dict(chunk_kwargs.items()))
 
 
-def make_tool_param(function: Any, type: str = "function", **extras: Any) -> Any:
+def make_tool_param(function: Any, type: str = 'function', **extras: Any) -> Any:
     """Create a tool param dict fallback.
 
     Keeps interface consistent during tests.
@@ -46,7 +46,7 @@ def make_tool_param(function: Any, type: str = "function", **extras: Any) -> Any
         def __setattr__(self, key, value):
             self[key] = value
 
-    payload = {"type": type, "function": function}
+    payload = {'type': type, 'function': function}
     payload.update(extras)
     return _Tool(payload)
 
@@ -57,8 +57,8 @@ class PromptTokensDetails:
 
 
 __all__ = [
-    "FunctionChunkArgs",
-    "make_function_chunk",
-    "make_tool_param",
-    "PromptTokensDetails",
+    'FunctionChunkArgs',
+    'make_function_chunk',
+    'make_tool_param',
+    'PromptTokensDetails',
 ]

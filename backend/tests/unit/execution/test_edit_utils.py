@@ -1,12 +1,10 @@
-﻿"""Tests for pure functions in backend.execution.utils.edit — _extract_code, _validate_range."""
+"""Tests for pure functions in backend.execution.utils.edit — _extract_code, _validate_range."""
 
 from __future__ import annotations
-
 
 import pytest
 
 from backend.execution.utils.edit import _extract_code
-
 
 # --------------- _extract_code ---------------
 
@@ -17,30 +15,30 @@ class TestExtractCode:
         assert _extract_code(text) == "print('hello')"
 
     def test_no_tags_returns_none(self):
-        assert _extract_code("no code here") is None
+        assert _extract_code('no code here') is None
 
     def test_empty_tags_returns_empty(self):
-        assert _extract_code("<updated_code></updated_code>") == ""
+        assert _extract_code('<updated_code></updated_code>') == ''
 
     def test_multiline_extraction(self):
-        text = "<updated_code>line1\nline2\nline3</updated_code>"
+        text = '<updated_code>line1\nline2\nline3</updated_code>'
         result = _extract_code(text)
         assert result is not None
-        assert "line1" in result
-        assert "line3" in result
+        assert 'line1' in result
+        assert 'line3' in result
 
     def test_strips_edit_prefix(self):
-        text = "<updated_code>#EDIT: foo\nactual code</updated_code>"
+        text = '<updated_code>#EDIT: foo\nactual code</updated_code>'
         result = _extract_code(text)
-        assert result == "actual code"
+        assert result == 'actual code'
 
     def test_surrounding_text_ignored(self):
-        text = "Here is the result:\n<updated_code>code</updated_code>\nDone."
-        assert _extract_code(text) == "code"
+        text = 'Here is the result:\n<updated_code>code</updated_code>\nDone.'
+        assert _extract_code(text) == 'code'
 
     def test_first_match_returned(self):
-        text = "<updated_code>first</updated_code> <updated_code>second</updated_code>"
-        assert _extract_code(text) == "first"
+        text = '<updated_code>first</updated_code> <updated_code>second</updated_code>'
+        assert _extract_code(text) == 'first'
 
 
 # --------------- _validate_range (via FileEditRuntimeMixin) ---------------

@@ -22,23 +22,23 @@ def check_structure_editor_dependencies() -> tuple[bool, str]:
 
         # Test basic functionality
         try:
-            get_language("python")
-            parser = get_parser("python")
+            get_language('python')
+            parser = get_parser('python')
 
             # Quick parse test
-            code = b"def test(): pass"
+            code = b'def test(): pass'
             tree = parser.parse(code)
 
-            if tree.root_node.type == "module":
-                logger.info("✅ Ultimate Editor: Tree-sitter is READY")
-                logger.info("   - Structure-aware editing: ENABLED")
-                logger.info("   - Language support: 40+ languages")
-                return True, "Ultimate Editor fully operational"
+            if tree.root_node.type == 'module':
+                logger.info('✅ Ultimate Editor: Tree-sitter is READY')
+                logger.info('   - Structure-aware editing: ENABLED')
+                logger.info('   - Language support: 40+ languages')
+                return True, 'Ultimate Editor fully operational'
 
-            return False, "Tree-sitter parse test failed"
+            return False, 'Tree-sitter parse test failed'
 
         except Exception as e:
-            return False, f"Tree-sitter functionality test failed: {e}"
+            return False, f'Tree-sitter functionality test failed: {e}'
 
     except ImportError as e:
         error_msg = f"""
@@ -73,15 +73,15 @@ def check_atomic_refactor_dependencies() -> tuple[bool, str]:
         # Test basic instantiation
         AtomicRefactor()
 
-        logger.info("✅ Atomic Refactoring: READY")
-        logger.info("   - Multi-file transactions: ENABLED")
-        logger.info("   - Rollback system: ENABLED")
-        return True, "Atomic refactoring fully operational"
+        logger.info('✅ Atomic Refactoring: READY')
+        logger.info('   - Multi-file transactions: ENABLED')
+        logger.info('   - Rollback system: ENABLED')
+        return True, 'Atomic refactoring fully operational'
 
     except ImportError as e:
-        return False, f"Atomic refactoring not available: {e}"
+        return False, f'Atomic refactoring not available: {e}'
     except Exception as e:
-        return False, f"Atomic refactoring initialization failed: {e}"
+        return False, f'Atomic refactoring initialization failed: {e}'
 
 
 def run_production_health_check(raise_on_failure: bool = True) -> dict[str, Any]:
@@ -97,30 +97,30 @@ def run_production_health_check(raise_on_failure: bool = True) -> dict[str, Any]
         RuntimeError: If critical dependencies missing and raise_on_failure=True
 
     """
-    logger.info("=" * 60)
-    logger.info("🏥 APP PRODUCTION HEALTH CHECK")
-    logger.info("=" * 60)
+    logger.info('=' * 60)
+    logger.info('🏥 APP PRODUCTION HEALTH CHECK')
+    logger.info('=' * 60)
 
     results: dict[str, Any] = {
-        "ast_code_editor": None,
-        "atomic_refactor": None,
-        "overall_status": "UNKNOWN",
+        'ast_code_editor': None,
+        'atomic_refactor': None,
+        'overall_status': 'UNKNOWN',
     }
 
     # Check Structure Editor (CRITICAL)
     ue_success, ue_msg = check_structure_editor_dependencies()
-    results["ast_code_editor"] = {
-        "status": "PASS" if ue_success else "FAIL",
-        "message": ue_msg,
-        "critical": True,
+    results['ast_code_editor'] = {
+        'status': 'PASS' if ue_success else 'FAIL',
+        'message': ue_msg,
+        'critical': True,
     }
 
     # Check Atomic Refactor
     ar_success, ar_msg = check_atomic_refactor_dependencies()
-    results["atomic_refactor"] = {
-        "status": "PASS" if ar_success else "FAIL",
-        "message": ar_msg,
-        "critical": False,  # Less critical, can work without it
+    results['atomic_refactor'] = {
+        'status': 'PASS' if ar_success else 'FAIL',
+        'message': ar_msg,
+        'critical': False,  # Less critical, can work without it
     }
 
     health_components = {
@@ -131,45 +131,45 @@ def run_production_health_check(raise_on_failure: bool = True) -> dict[str, Any]
     critical_failures = [
         name
         for name, data in health_components.items()
-        if data.get("critical") and data.get("status") == "FAIL"
+        if data.get('critical') and data.get('status') == 'FAIL'
     ]
 
     if critical_failures:
-        results["overall_status"] = "CRITICAL_FAILURE"
-        logger.error("=" * 60)
-        logger.error("❌ HEALTH CHECK FAILED")
-        logger.error("   Critical failures: %s", ", ".join(critical_failures))
-        logger.error("=" * 60)
+        results['overall_status'] = 'CRITICAL_FAILURE'
+        logger.error('=' * 60)
+        logger.error('❌ HEALTH CHECK FAILED')
+        logger.error('   Critical failures: %s', ', '.join(critical_failures))
+        logger.error('=' * 60)
 
         if raise_on_failure:
             raise RuntimeError(
-                f"Production health check failed! Critical dependencies missing: {critical_failures}\n"
-                "App cannot operate without Ultimate Editor (Tree-sitter)."
+                f'Production health check failed! Critical dependencies missing: {critical_failures}\n'
+                'App cannot operate without Ultimate Editor (Tree-sitter).'
             )
     else:
-        results["overall_status"] = "HEALTHY"
-        logger.info("=" * 60)
-        logger.info("✅ HEALTH CHECK PASSED")
-        logger.info("   App is production-ready!")
-        logger.info("=" * 60)
+        results['overall_status'] = 'HEALTHY'
+        logger.info('=' * 60)
+        logger.info('✅ HEALTH CHECK PASSED')
+        logger.info('   App is production-ready!')
+        logger.info('=' * 60)
 
     return results
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     check_results = run_production_health_check(raise_on_failure=False)
 
-    print("\n📊 HEALTH CHECK RESULTS:")
+    print('\n📊 HEALTH CHECK RESULTS:')
     component_results = {
         component: data
         for component, data in check_results.items()
         if isinstance(data, dict)
     }
     for component, data in component_results.items():
-        status_emoji = "✅" if data["status"] == "PASS" else "❌"
-        critical_marker = " [CRITICAL]" if data.get("critical") else ""
-        print(f"  {status_emoji} {component}{critical_marker}: {data['status']}")
-        if data["status"] == "FAIL":
-            print(f"     └─ {data['message']}")
+        status_emoji = '✅' if data['status'] == 'PASS' else '❌'
+        critical_marker = ' [CRITICAL]' if data.get('critical') else ''
+        print(f'  {status_emoji} {component}{critical_marker}: {data["status"]}')
+        if data['status'] == 'FAIL':
+            print(f'     └─ {data["message"]}')
 
-    print(f"\n🎯 OVERALL: {check_results['overall_status']}")
+    print(f'\n🎯 OVERALL: {check_results["overall_status"]}')

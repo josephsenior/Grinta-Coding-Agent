@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.core.message import Message, TextContent
-from backend.ledger.observation.agent import AgentCondensationObservation
 from backend.context.compactor.compactor import BaseLLMCompactor, Compaction
 from backend.context.view import View
+from backend.core.message import Message, TextContent
+from backend.ledger.observation.agent import AgentCondensationObservation
 
 if TYPE_CHECKING:
     pass
@@ -85,7 +85,7 @@ class LLMSummarizingCompactor(BaseLLMCompactor):
 
         for event in head_events:
             if isinstance(event, MessageAction) and event.source == EventSource.USER:
-                content = getattr(event, "content", None)
+                content = getattr(event, 'content', None)
                 if content and isinstance(content, str) and content.strip():
                     return content.strip()
         return None
@@ -99,8 +99,9 @@ class LLMSummarizingCompactor(BaseLLMCompactor):
         has_summary = len(view) > self.keep_first
         summary_event = (
             view[self.keep_first]
-            if has_summary and isinstance(view[self.keep_first], AgentCondensationObservation)
-            else AgentCondensationObservation("No events summarized")
+            if has_summary
+            and isinstance(view[self.keep_first], AgentCondensationObservation)
+            else AgentCondensationObservation('No events summarized')
         )
         end_index = max(self.keep_first, len(view) - events_from_tail)
         pruned_events = [
@@ -108,38 +109,40 @@ class LLMSummarizingCompactor(BaseLLMCompactor):
             for event in view[self.keep_first : end_index]
             if not isinstance(event, AgentCondensationObservation)
         ]
-        
+
         if not pruned_events:
             return view
-        prompt = _SUMMARIZING_PROMPT + "\n\n"
+        prompt = _SUMMARIZING_PROMPT + '\n\n'
 
         # Inject the user's original objective so the LLM cannot hallucinate it
         user_objective = self._extract_user_objective(list(head))
         if user_objective:
             prompt += (
-                "<ORIGINAL_USER_OBJECTIVE>\n"
-                f"{self._truncate(user_objective)}\n"
-                "</ORIGINAL_USER_OBJECTIVE>\n"
-                "CRITICAL: The ORIGINAL_OBJECTIVE field in your summary MUST match the objective above verbatim. "
-                "Do NOT invent or substitute a different objective.\n\n"
+                '<ORIGINAL_USER_OBJECTIVE>\n'
+                f'{self._truncate(user_objective)}\n'
+                '</ORIGINAL_USER_OBJECTIVE>\n'
+                'CRITICAL: The ORIGINAL_OBJECTIVE field in your summary MUST match the objective above verbatim. '
+                'Do NOT invent or substitute a different objective.\n\n'
             )
 
-        summary_event_content = self._truncate(summary_event.message or "")
-        prompt += f"<PREVIOUS SUMMARY>\n{summary_event_content}\n</PREVIOUS SUMMARY>\n"
-        prompt += "\n\n"
+        summary_event_content = self._truncate(summary_event.message or '')
+        prompt += f'<PREVIOUS SUMMARY>\n{summary_event_content}\n</PREVIOUS SUMMARY>\n'
+        prompt += '\n\n'
         for pruned_event in pruned_events:
             event_content = self._truncate(str(pruned_event))
-            prompt += f"<EVENT id={pruned_event.id}>\n{event_content}\n</EVENT>\n"
-        prompt += "Now summarize the events using the rules above."
-        messages = [Message(role="user", content=[TextContent(text=prompt)])]
-        assert self.llm is not None, "LLM required for summarizing compactor"
+            prompt += f'<EVENT id={pruned_event.id}>\n{event_content}\n</EVENT>\n'
+        prompt += 'Now summarize the events using the rules above.'
+        messages = [Message(role='user', content=[TextContent(text=prompt)])]
+        assert self.llm is not None, 'LLM required for summarizing compactor'
         response = self.llm.completion(
             messages=self.llm.format_messages_for_llm(messages),
-            extra_body={"metadata": self.llm_metadata},
+            extra_body={'metadata': self.llm_metadata},
         )
-        choices = getattr(response, "choices", None)
+        choices = getattr(response, 'choices', None)
         if not choices or len(choices) == 0:
-            raise ValueError("LLM summarizing compactor received response with no choices")
+            raise ValueError(
+                'LLM summarizing compactor received response with no choices'
+            )
         summary = choices[0].message.content
 
         self._add_response_metadata(response)

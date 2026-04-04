@@ -23,7 +23,7 @@ class CanonicalModelMetaclass(ModelMetaclass):
         if super().__subclasscheck__(subclass):
             return True
         # Check if the class names match. This allows issubclass(reloaded_class, original_class) to be True.
-        return getattr(subclass, "__name__", None) == cls.__name__
+        return getattr(subclass, '__name__', None) == cls.__name__
 
 
 class CanonicalMeta(type):
@@ -38,16 +38,16 @@ class CanonicalMeta(type):
             return True
         # Check if the class names match.
         inst_type = type(instance)
-        if getattr(inst_type, "__name__", None) != getattr(cls, "__name__", None):
+        if getattr(inst_type, '__name__', None) != getattr(cls, '__name__', None):
             # Special case for base classes to allow subclasses from other reloads
-            if cls.__name__ in ("Action", "Observation", "Event"):
+            if cls.__name__ in ('Action', 'Observation', 'Event'):
                 return any(b.__name__ == cls.__name__ for b in inst_type.__mro__)
             return False
 
         # If it's an Action/Observation, we can also check the type attribute
-        cls_type = getattr(cls, "action", getattr(cls, "observation", None))
+        cls_type = getattr(cls, 'action', getattr(cls, 'observation', None))
         inst_type_attr = getattr(
-            instance, "action", getattr(instance, "observation", None)
+            instance, 'action', getattr(instance, 'observation', None)
         )
         if cls_type and inst_type_attr:
             return cls_type == inst_type_attr
@@ -58,4 +58,4 @@ class CanonicalMeta(type):
         if super().__subclasscheck__(subclass):
             return True
         # Check if the class names match.
-        return getattr(subclass, "__name__", None) == cls.__name__
+        return getattr(subclass, '__name__', None) == cls.__name__

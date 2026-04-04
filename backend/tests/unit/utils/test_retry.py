@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import unittest
 from unittest.mock import MagicMock
 
-import asyncio
 import pytest
 
 from backend.core.enums import RetryStrategy
@@ -16,7 +16,6 @@ from backend.utils.retry import (
     calculate_backoff,
     retry,
 )
-
 
 # ---------------------------------------------------------------------------
 # calculate_backoff
@@ -95,13 +94,13 @@ class TestCalculateBackoff:
 class TestRetryErrors:
     def test_retry_error(self):
         with pytest.raises(RetryError):
-            raise RetryError("boom")
+            raise RetryError('boom')
 
     def test_exhausted_error(self):
-        err = RetryExhaustedError(3, ValueError("fail"))
+        err = RetryExhaustedError(3, ValueError('fail'))
         assert err.attempts == 3
         assert isinstance(err.last_exception, ValueError)
-        assert "3 attempts" in str(err)
+        assert '3 attempts' in str(err)
 
     def test_exhausted_is_retry_error(self):
         assert issubclass(RetryExhaustedError, RetryError)
@@ -120,9 +119,9 @@ class TestRetrySyncDecorator:
         def good():
             nonlocal call_count
             call_count += 1
-            return "ok"
+            return 'ok'
 
-        assert good() == "ok"
+        assert good() == 'ok'
         assert call_count == 1
 
     def test_retries_then_succeeds(self):
@@ -139,10 +138,10 @@ class TestRetrySyncDecorator:
             nonlocal attempt
             attempt += 1
             if attempt < 3:
-                raise ValueError("not yet")
-            return "done"
+                raise ValueError('not yet')
+            return 'done'
 
-        assert flaky() == "done"
+        assert flaky() == 'done'
         assert attempt == 3
 
     def test_exhausts_raises(self):
@@ -154,7 +153,7 @@ class TestRetrySyncDecorator:
             )
         )
         def always_fail():
-            raise ValueError("boom")
+            raise ValueError('boom')
 
         with pytest.raises(RetryExhaustedError) as exc_info:
             always_fail()
@@ -170,9 +169,9 @@ class TestRetrySyncDecorator:
             )
         )
         def raise_type_error():
-            raise TypeError("wrong")
+            raise TypeError('wrong')
 
-        with pytest.raises(TypeError, match="wrong"):
+        with pytest.raises(TypeError, match='wrong'):
             raise_type_error()
 
     def test_on_retry_callback(self):
@@ -188,8 +187,8 @@ class TestRetrySyncDecorator:
         )
         def fail_once():
             if callback.call_count == 0:
-                raise ValueError("first fail")
-            return "ok"
+                raise ValueError('first fail')
+            return 'ok'
 
         # The callback is called with (attempt_number, exception)
         fail_once()
@@ -212,9 +211,9 @@ class TestRetryAsyncDecorator:
             )
         )
         async def async_good():
-            return "async ok"
+            return 'async ok'
 
-        assert await async_good() == "async ok"
+        assert await async_good() == 'async ok'
 
     @pytest.mark.asyncio
     async def test_async_retries(self):
@@ -231,10 +230,10 @@ class TestRetryAsyncDecorator:
             nonlocal attempt
             attempt += 1
             if attempt < 2:
-                raise ValueError("not yet")
-            return "done"
+                raise ValueError('not yet')
+            return 'done'
 
-        assert await async_flaky() == "done"
+        assert await async_flaky() == 'done'
         assert attempt == 2
 
     @pytest.mark.asyncio
@@ -247,7 +246,7 @@ class TestRetryAsyncDecorator:
             )
         )
         async def always_fail():
-            raise ValueError("fail")
+            raise ValueError('fail')
 
         with pytest.raises(RetryExhaustedError):
             await always_fail()
@@ -259,21 +258,21 @@ class TestRetryAsyncDecorator:
         @retry(
             config=RetryConfig(
                 max_attempts=2,
-                initial_delay=0.01, # Non-zero delay
+                initial_delay=0.01,  # Non-zero delay
                 strategy=RetryStrategy.FIXED,
-                jitter=False
+                jitter=False,
             )
         )
         def fail_once():
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise ValueError("fail")
-            return "ok"
+                raise ValueError('fail')
+            return 'ok'
 
         # We can mock time.sleep to verify it's called and avoid actually waiting
-        with unittest.mock.patch("time.sleep") as mock_sleep:
-            assert fail_once() == "ok"
+        with unittest.mock.patch('time.sleep') as mock_sleep:
+            assert fail_once() == 'ok'
             assert call_count == 2
             mock_sleep.assert_called_once_with(0.01)
 
@@ -287,40 +286,42 @@ class TestRetryAsyncDecorator:
                 max_attempts=2,
                 initial_delay=0.01,
                 strategy=RetryStrategy.FIXED,
-                jitter=False
+                jitter=False,
             )
         )
         async def async_fail_once():
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise ValueError("fail")
-            return "ok"
+                raise ValueError('fail')
+            return 'ok'
 
-        with unittest.mock.patch("asyncio.sleep") as mock_sleep:
+        with unittest.mock.patch('asyncio.sleep') as mock_sleep:
             # We must return a future/coro for patch with asyncio.sleep to work or use AsyncMock
             # In python 3.8+ AsyncMock is preferred
             mock_sleep.return_value = asyncio.Future()
             mock_sleep.return_value.set_result(None)
 
-            assert await async_fail_once() == "ok"
+            assert await async_fail_once() == 'ok'
             assert call_count == 2
             mock_sleep.assert_called_once_with(0.01)
 
     def test_direct_call_as_wrapper(self):
         """Test calling retry with func argument (not as decorator)."""
+
         def work():
-            return "done"
+            return 'done'
 
         # Line 260: return decorator(func)
         result = retry(work, max_attempts=3)
-        assert result() == "done"
+        assert result() == 'done'
 
     def test_sync_non_retryable_log_coverage(self):
         """Cover except Exception in sync_wrapper."""
+
         @retry(allowed_exceptions=(ValueError,))
         def raises_type_error():
-            raise TypeError("not retryable")
+            raise TypeError('not retryable')
 
         with pytest.raises(TypeError):
             raises_type_error()
@@ -328,9 +329,10 @@ class TestRetryAsyncDecorator:
     @pytest.mark.asyncio
     async def test_async_non_retryable_log_coverage(self):
         """Cover except Exception in async_wrapper."""
+
         @retry(allowed_exceptions=(ValueError,))
         async def raises_type_error():
-            raise TypeError("not retryable")
+            raise TypeError('not retryable')
 
         with pytest.raises(TypeError):
             await raises_type_error()

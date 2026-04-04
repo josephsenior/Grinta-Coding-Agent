@@ -10,7 +10,9 @@ from backend.ledger import EventSource  # noqa: E402
 from backend.ledger.action.agent import PlaybookFinishAction  # noqa: E402
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
 
 
 class TaskValidationService:
@@ -43,11 +45,11 @@ class TaskValidationService:
 
     async def _save_lessons_learned(self, action: PlaybookFinishAction) -> None:
         """Persist lessons learned to a repository-level memory file."""
-        outputs = getattr(action, "outputs", {})
+        outputs = getattr(action, 'outputs', {})
         if not outputs or not isinstance(outputs, dict):
             return
 
-        lesson = outputs.get("lessons_learned")
+        lesson = outputs.get('lessons_learned')
         if not lesson or not str(lesson).strip():
             return
 
@@ -56,27 +58,24 @@ class TaskValidationService:
 
         # Path to project-level session memory
         file_store = self._context.get_controller().config.file_store
-        project_root = file_store.root if file_store else "."
-        memories_path = os.path.join(project_root, ".app", "lessons.md")
+        project_root = file_store.root if file_store else '.'
+        memories_path = os.path.join(project_root, '.grinta', 'lessons.md')
 
         try:
             os.makedirs(os.path.dirname(memories_path), exist_ok=True)
 
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
             initial_task = self._context.get_controller()._get_initial_task()
-            summary = initial_task.description[:100] if initial_task else "Task"
+            summary = initial_task.description[:100] if initial_task else 'Task'
 
-            entry = (
-                f"\n## {timestamp} — {summary}\n"
-                f"{lesson}\n"
-            )
+            entry = f'\n## {timestamp} — {summary}\n{lesson}\n'
 
-            with open(memories_path, "a", encoding="utf-8") as f:
+            with open(memories_path, 'a', encoding='utf-8') as f:  # noqa: ASYNC230
                 f.write(entry)
 
-            logger.info("Saved lessons learned to %s", memories_path)
+            logger.info('Saved lessons learned to %s', memories_path)
         except Exception as e:
-            logger.warning("Failed to save lessons learned: %s", e)
+            logger.warning('Failed to save lessons learned: %s', e)
 
     async def _emit_finish_block(
         self,
@@ -93,7 +92,7 @@ class TaskValidationService:
         attach_observation_cause(
             error_obs,
             cause_action,
-            context="task_validation_service.finish_block",
+            context='task_validation_service.finish_block',
         )
         controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 
@@ -105,36 +104,36 @@ class TaskValidationService:
         self, action: PlaybookFinishAction
     ) -> bool:
         """Fail closed when completion validation is enabled but validator is missing."""
-        if getattr(action, "force_finish", False):
+        if getattr(action, 'force_finish', False):
             return True
 
         controller = self._context.get_controller()
-        validator = getattr(controller, "task_validator", None)
+        validator = getattr(controller, 'task_validator', None)
         if validator is not None:
             return True
 
-        agent = getattr(controller, "agent", None)
-        config = getattr(agent, "config", None) if agent else None
-        enabled_raw = getattr(config, "enable_completion_validation", False)
+        agent = getattr(controller, 'agent', None)
+        config = getattr(agent, 'config', None) if agent else None
+        enabled_raw = getattr(config, 'enable_completion_validation', False)
         completion_validation_enabled = isinstance(enabled_raw, bool) and enabled_raw
         if not completion_validation_enabled:
             return True
 
         logger.warning(
-            "Finish blocked: completion validation is enabled but no validator is configured"
+            'Finish blocked: completion validation is enabled but no validator is configured'
         )
         return await self._emit_finish_block(
-            "⚠️ FINISH BLOCKED: Completion validation is enabled but the validator is unavailable. "
-            "Please continue working or retry once validation is restored.",
-            error_id="TASK_VALIDATOR_UNAVAILABLE",
+            '⚠️ FINISH BLOCKED: Completion validation is enabled but the validator is unavailable. '
+            'Please continue working or retry once validation is restored.',
+            error_id='TASK_VALIDATOR_UNAVAILABLE',
             cause_action=action,
         )
 
     async def _should_validate(self, action: PlaybookFinishAction) -> bool:
         """Check if task completion should be validated."""
         controller = self._context.get_controller()
-        validator = getattr(controller, "task_validator", None)
-        return bool(validator) and not getattr(action, "force_finish", False)
+        validator = getattr(controller, 'task_validator', None)
+        return bool(validator) and not getattr(action, 'force_finish', False)
 
     async def _validate_and_handle(self, action: PlaybookFinishAction) -> bool:
         """Run the validator and handle the result.
@@ -146,18 +145,18 @@ class TaskValidationService:
         if not task:
             return True
 
-        validator = getattr(controller, "task_validator", None)
+        validator = getattr(controller, 'task_validator', None)
         if validator is None:
             return True
 
-        logger.info("Validating task completion before finishing...")
+        logger.info('Validating task completion before finishing...')
         validation = await validator.validate_completion(task, controller.state)
 
         if not validation.passed:
             await self._handle_failure(action, validation)
             return False
 
-        logger.info("Task completion validation passed: %s", validation.reason)
+        logger.info('Task completion validation passed: %s', validation.reason)
         return True
 
     async def _handle_failure(
@@ -168,17 +167,17 @@ class TaskValidationService:
         from backend.ledger.observation_cause import attach_observation_cause
 
         controller = self._context.get_controller()
-        logger.warning("Task completion validation failed: %s", validation.reason)
+        logger.warning('Task completion validation failed: %s', validation.reason)
 
         feedback = self._build_feedback(validation)
         error_obs = ErrorObservation(
             content=feedback,
-            error_id="TASK_VALIDATION_FAILED",
+            error_id='TASK_VALIDATION_FAILED',
         )
         attach_observation_cause(
             error_obs,
             action,
-            context="task_validation_service.validation_failed",
+            context='task_validation_service.validation_failed',
         )
         controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
 
@@ -188,17 +187,17 @@ class TaskValidationService:
     @staticmethod
     def _build_feedback(validation: Any) -> str:
         """Build a human-readable feedback message from a validation result."""
-        feedback = f"TASK NOT COMPLETE: {validation.reason}\n\nConfidence: {validation.confidence:.1%}\n"
+        feedback = f'TASK NOT COMPLETE: {validation.reason}\n\nConfidence: {validation.confidence:.1%}\n'
 
         if validation.missing_items:
-            feedback += "\nMissing items:\n" + "\n".join(
-                f"- {item}" for item in validation.missing_items
+            feedback += '\nMissing items:\n' + '\n'.join(
+                f'- {item}' for item in validation.missing_items
             )
 
         if validation.suggestions:
-            feedback += "\n\nSuggestions:\n" + "\n".join(
-                f"- {sug}" for sug in validation.suggestions
+            feedback += '\n\nSuggestions:\n' + '\n'.join(
+                f'- {sug}' for sug in validation.suggestions
             )
 
-        feedback += "\n\nPlease continue working to complete the task."
+        feedback += '\n\nPlease continue working to complete the task.'
         return feedback

@@ -1,11 +1,14 @@
 """Tests for StepGuardService covering repetition score and replan directives."""
 
 from __future__ import annotations
+
 import unittest
-from unittest.mock import MagicMock, AsyncMock
-from backend.orchestration.services.step_guard_service import StepGuardService
+from unittest.mock import MagicMock
+
 from backend.ledger import EventSource
 from backend.ledger.observation.error import ErrorObservation
+from backend.orchestration.services.step_guard_service import StepGuardService
+
 
 class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -58,7 +61,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.controller.event_stream.add_event.assert_called()
         args, kwargs = self.controller.event_stream.add_event.call_args
         self.assertIsInstance(args[0], ErrorObservation)
-        self.assertIn("STUCK LOOP DETECTED", args[0].content)
+        self.assertIn('STUCK LOOP DETECTED', args[0].content)
         self.assertEqual(args[1], EventSource.ENVIRONMENT)
 
     async def test_handle_stuck_detection_repeated_stuck_still_replans(self):

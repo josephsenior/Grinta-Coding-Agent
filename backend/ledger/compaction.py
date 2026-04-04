@@ -42,22 +42,22 @@ def _type_name(event: Event) -> str:
 
 
 def _is_null(event: Event) -> bool:
-    return _type_name(event) in {"NullAction", "NullObservation"}
+    return _type_name(event) in {'NullAction', 'NullObservation'}
 
 
 def _is_state_change(event: Event) -> bool:
     return _type_name(event) in {
-        "ChangeAgentStateAction",
-        "AgentStateChangedObservation",
+        'ChangeAgentStateAction',
+        'AgentStateChangedObservation',
     }
 
 
 def _is_file_edit(event: Event) -> bool:
-    return _type_name(event) == "FileEditAction"
+    return _type_name(event) == 'FileEditAction'
 
 
 def _edit_path(event: Event) -> str | None:
-    return getattr(event, "path", None)
+    return getattr(event, 'path', None)
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ class EventCompactor:
 
         removed = original_len - len(result)
         if removed > 0:
-            logger.debug("EventCompactor: removed %d/%d events", removed, original_len)
+            logger.debug('EventCompactor: removed %d/%d events', removed, original_len)
         return result
 
     # ------------------------------------------------------------------ #

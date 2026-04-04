@@ -5,17 +5,15 @@ from __future__ import annotations
 import time
 from unittest.mock import MagicMock
 
-
-from backend.ledger.coalescing import CoalescedBatch, EventCoalescer, _COALESCE_TYPES
+from backend.ledger.coalescing import _COALESCE_TYPES, CoalescedBatch, EventCoalescer
 from backend.ledger.event import Event, EventSource
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _event(type_name: str = "StreamingChunkAction") -> Event:
+def _event(type_name: str = 'StreamingChunkAction') -> Event:
     """Create a mock event whose class name is *type_name*."""
     ev = MagicMock(spec=Event)
     ev.source = EventSource.AGENT
@@ -33,7 +31,7 @@ class TestCoalescedBatch:
         ev = _event()
         batch = CoalescedBatch(ev)
         assert batch.size == 1
-        assert batch.event_type == "StreamingChunkAction"
+        assert batch.event_type == 'StreamingChunkAction'
         assert batch.age_ms >= 0
 
     def test_add(self):
@@ -61,12 +59,12 @@ class TestShouldCoalesce:
 
     def test_ineligible_type(self):
         c = EventCoalescer()
-        assert c.should_coalesce(_event("CmdRunAction")) is False
+        assert c.should_coalesce(_event('CmdRunAction')) is False
 
     def test_custom_types(self):
-        c = EventCoalescer(coalesce_types={"MyCustomEvent"})
-        assert c.should_coalesce(_event("MyCustomEvent")) is True
-        assert c.should_coalesce(_event("StreamingChunkAction")) is False
+        c = EventCoalescer(coalesce_types={'MyCustomEvent'})
+        assert c.should_coalesce(_event('MyCustomEvent')) is True
+        assert c.should_coalesce(_event('StreamingChunkAction')) is False
 
 
 # ---------------------------------------------------------------------------
@@ -104,8 +102,8 @@ class TestAbsorb:
 
     def test_different_types_separate_batches(self):
         c = EventCoalescer(window_ms=5000, max_batch=100)
-        c.absorb(_event("StreamingChunkAction"))
-        c.absorb(_event("NullObservation"))
+        c.absorb(_event('StreamingChunkAction'))
+        c.absorb(_event('NullObservation'))
         assert len(c._pending) == 2
 
 
@@ -117,8 +115,8 @@ class TestAbsorb:
 class TestFlush:
     def test_flush_all_empties_pending(self):
         c = EventCoalescer(window_ms=5000, max_batch=100)
-        c.absorb(_event("StreamingChunkAction"))
-        c.absorb(_event("NullObservation"))
+        c.absorb(_event('StreamingChunkAction'))
+        c.absorb(_event('NullObservation'))
         results = c.flush_all()
         assert len(results) == 2
         assert not c._pending
@@ -130,7 +128,7 @@ class TestFlush:
 
     def test_flush_expired_only(self):
         c = EventCoalescer(window_ms=0, max_batch=100)
-        c.absorb(_event("StreamingChunkAction"))
+        c.absorb(_event('StreamingChunkAction'))
         # With window_ms=0, everything is expired immediately
         results = c.flush_expired()
         assert len(results) == 1
@@ -156,13 +154,13 @@ class TestFlush:
 class TestFlushBatch:
     def test_nonexistent_type(self):
         c = EventCoalescer()
-        result = c._flush_batch("NoSuchType")
+        result = c._flush_batch('NoSuchType')
         assert result is None
 
     def test_streaming_merge_returns_last(self):
         c = EventCoalescer(window_ms=5000, max_batch=100)
-        ev1 = _event("StreamingChunkAction")
-        ev2 = _event("StreamingChunkAction")
+        ev1 = _event('StreamingChunkAction')
+        ev2 = _event('StreamingChunkAction')
         c.absorb(ev1)
         c.absorb(ev2)
         results = c.flush_all()
@@ -171,8 +169,8 @@ class TestFlushBatch:
 
     def test_non_streaming_returns_last(self):
         c = EventCoalescer(window_ms=5000, max_batch=100)
-        ev1 = _event("NullObservation")
-        ev2 = _event("NullObservation")
+        ev1 = _event('NullObservation')
+        ev2 = _event('NullObservation')
         c.absorb(ev1)
         c.absorb(ev2)
         results = c.flush_all()
@@ -188,18 +186,18 @@ class TestSnapshot:
     def test_snapshot_keys(self):
         c = EventCoalescer(window_ms=100, max_batch=20)
         snap = c.snapshot()
-        assert snap["pending_batches"] == 0
-        assert snap["pending_events"] == 0
-        assert snap["coalesced_total"] == 0
-        assert snap["flushed_total"] == 0
-        assert snap["window_ms"] == 100
-        assert snap["max_batch"] == 20
+        assert snap['pending_batches'] == 0
+        assert snap['pending_events'] == 0
+        assert snap['coalesced_total'] == 0
+        assert snap['flushed_total'] == 0
+        assert snap['window_ms'] == 100
+        assert snap['max_batch'] == 20
 
     def test_snapshot_after_absorb(self):
         c = EventCoalescer(window_ms=5000, max_batch=100)
         c.absorb(_event())
         c.absorb(_event())
         snap = c.snapshot()
-        assert snap["pending_batches"] == 1
-        assert snap["pending_events"] == 2
-        assert snap["coalesced_total"] == 1
+        assert snap['pending_batches'] == 1
+        assert snap['pending_events'] == 2
+        assert snap['coalesced_total'] == 1

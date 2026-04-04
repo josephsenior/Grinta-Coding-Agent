@@ -8,6 +8,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
 class _TracingState:
     """Internal state container for initialized tracing components."""
 
@@ -20,10 +21,9 @@ _state = _TracingState()
 
 
 def initialize_tracing(
-
-    service_name: str = "app",
-    service_version: str = "1.0.0",
-    exporter: str = "console",
+    service_name: str = 'app',
+    service_version: str = '1.0.0',
+    exporter: str = 'console',
     endpoint: str | None = None,
     sample_rate: float = 0.1,
     enabled: bool = True,
@@ -55,17 +55,17 @@ def initialize_tracing(
             service_name, service_version, exporter_type, sample_rate
         )
     except ImportError as exc:
-        logger.warning("OpenTelemetry not available: %s. Tracing disabled.", exc)
+        logger.warning('OpenTelemetry not available: %s. Tracing disabled.', exc)
     except Exception as exc:
-        logger.error("Failed to initialize tracing: %s", exc, exc_info=True)
+        logger.error('Failed to initialize tracing: %s', exc, exc_info=True)
 
 
 def _should_initialize(enabled: bool) -> bool:
     if not enabled:
-        logger.debug("Tracing disabled")
+        logger.debug('Tracing disabled')
         return False
     if _state.initialized:
-        logger.debug("Tracing already initialized")
+        logger.debug('Tracing already initialized')
         return False
     return True
 
@@ -77,9 +77,9 @@ def _setup_tracer_provider(service_name: str, service_version: str):
 
     resource = Resource.create(
         {
-            "service.name": service_name,
-            "service.version": service_version,
-            "service.instance.id": os.getenv("HOSTNAME", "app"),
+            'service.name': service_name,
+            'service.version': service_version,
+            'service.instance.id': os.getenv('HOSTNAME', 'app'),
         }
     )
     tracer_provider = TracerProvider(resource=resource)
@@ -89,15 +89,15 @@ def _setup_tracer_provider(service_name: str, service_version: str):
 
 def _configure_exporter(exporter: str, endpoint: str | None) -> tuple[Any | None, str]:
     exporter_type = exporter
-    if exporter == "jaeger":
+    if exporter == 'jaeger':
         exporter_instance = _configure_jaeger(endpoint)
-    elif exporter == "zipkin":
+    elif exporter == 'zipkin':
         exporter_instance = _configure_zipkin(endpoint)
-    elif exporter == "otlp":
+    elif exporter == 'otlp':
         exporter_instance = _configure_otlp(endpoint)
     else:
         exporter_instance = _configure_console()
-        exporter_type = "console"
+        exporter_type = 'console'
     return exporter_instance, exporter_type
 
 
@@ -108,12 +108,16 @@ def _try_jaeger_otlp(endpoint: str | None) -> Any | None:
             OTLPSpanExporter,
         )
     except ImportError:
-        logger.warning("OTLP exporter not available, falling back to Thrift")
+        logger.warning('OTLP exporter not available, falling back to Thrift')
         return None
-    otlp = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT") or endpoint or "http://localhost:4318/v1/traces"
-    if not otlp.endswith("/v1/traces"):
-        otlp = otlp.rstrip("/") + "/v1/traces"
-    logger.info("Jaeger OTLP exporter configured: %s", otlp)
+    otlp = (
+        os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT')
+        or endpoint
+        or 'http://localhost:4318/v1/traces'
+    )
+    if not otlp.endswith('/v1/traces'):
+        otlp = otlp.rstrip('/') + '/v1/traces'
+    logger.info('Jaeger OTLP exporter configured: %s', otlp)
     return OTLPSpanExporter(endpoint=otlp)
 
 
@@ -122,24 +126,24 @@ def _try_jaeger_thrift(endpoint: str | None) -> Any | None:
     try:
         from opentelemetry.exporter.jaeger.thrift import JaegerExporter
     except ImportError:
-        logger.warning("Jaeger Thrift exporter not available, falling back to console")
+        logger.warning('Jaeger Thrift exporter not available, falling back to console')
         return None
-    ep = endpoint or os.getenv("JAEGER_ENDPOINT", "http://localhost:14268/api/traces")
+    ep = endpoint or os.getenv('JAEGER_ENDPOINT', 'http://localhost:14268/api/traces')
     exporter = JaegerExporter(
-        agent_host_name=os.getenv("JAEGER_AGENT_HOST", "localhost"),
-        agent_port=int(os.getenv("JAEGER_AGENT_PORT", "6831")),
+        agent_host_name=os.getenv('JAEGER_AGENT_HOST', 'localhost'),
+        agent_port=int(os.getenv('JAEGER_AGENT_PORT', '6831')),
         endpoint=ep,
     )
-    logger.info("Jaeger Thrift exporter configured: %s", ep)
+    logger.info('Jaeger Thrift exporter configured: %s', ep)
     return exporter
 
 
 def _configure_jaeger(endpoint: str | None):
     """Configure Jaeger exporter with support for both OTLP and Thrift protocols."""
     try:
-        otlp_env = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+        otlp_env = os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT')
         use_otlp = otlp_env is not None or (
-            endpoint and ("4318" in endpoint or "/v1/traces" in endpoint)
+            endpoint and ('4318' in endpoint or '/v1/traces' in endpoint)
         )
         if use_otlp:
             exporter = _try_jaeger_otlp(otlp_env or endpoint)
@@ -148,7 +152,7 @@ def _configure_jaeger(endpoint: str | None):
         exporter = _try_jaeger_thrift(endpoint)
         return exporter if exporter is not None else _configure_console()
     except Exception as e:
-        logger.error("Failed to configure Jaeger exporter: %s", e, exc_info=True)
+        logger.error('Failed to configure Jaeger exporter: %s', e, exc_info=True)
         return _configure_console()
 
 
@@ -157,13 +161,13 @@ def _configure_zipkin(endpoint: str | None):
         from opentelemetry.exporter.zipkin.json import ZipkinExporter
 
         endpoint = endpoint or os.getenv(
-            "ZIPKIN_ENDPOINT", "http://localhost:9411/api/v2/spans"
+            'ZIPKIN_ENDPOINT', 'http://localhost:9411/api/v2/spans'
         )
         exporter = ZipkinExporter(endpoint=endpoint)
-        logger.info("Zipkin exporter configured: %s", endpoint)
+        logger.info('Zipkin exporter configured: %s', endpoint)
         return exporter
     except ImportError:
-        logger.warning("Zipkin exporter not available, falling back to console")
+        logger.warning('Zipkin exporter not available, falling back to console')
         return _configure_console()
 
 
@@ -174,20 +178,20 @@ def _configure_otlp(endpoint: str | None):
         )
 
         endpoint = endpoint or os.getenv(
-            "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"
+            'OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4317'
         )
         exporter = OTLPSpanExporter(endpoint=endpoint)
-        logger.info("OTLP exporter configured: %s", endpoint)
+        logger.info('OTLP exporter configured: %s', endpoint)
         return exporter
     except ImportError:
-        logger.warning("OTLP exporter not available, falling back to console")
+        logger.warning('OTLP exporter not available, falling back to console')
         return _configure_console()
 
 
 def _configure_console():
     from opentelemetry.sdk.trace.export import ConsoleSpanExporter
 
-    logger.info("Console exporter configured")
+    logger.info('Console exporter configured')
     return ConsoleSpanExporter()
 
 
@@ -215,7 +219,7 @@ def _log_tracing_initialized(
     service_name: str, service_version: str, exporter: str, sample_rate: float
 ) -> None:
     logger.info(
-        "Tracing initialized: service=%s, version=%s, exporter=%s, sample_rate=%s",
+        'Tracing initialized: service=%s, version=%s, exporter=%s, sample_rate=%s',
         service_name,
         service_version,
         exporter,
@@ -236,22 +240,22 @@ def get_tracer(name: str | None = None) -> Any:
     if not _state.initialized:
         # Auto-initialize with defaults
         initialize_tracing(
-            service_name=os.getenv("TRACING_SERVICE_NAME", "app"),
-            service_version=os.getenv("TRACING_SERVICE_VERSION", "1.0.0"),
-            exporter=os.getenv("TRACING_EXPORTER", "console"),
-            endpoint=os.getenv("TRACING_ENDPOINT"),
-            sample_rate=float(os.getenv("TRACING_SAMPLE_RATE", "0.1")),
-            enabled=os.getenv("TRACING_ENABLED", "true").lower() == "true",
+            service_name=os.getenv('TRACING_SERVICE_NAME', 'app'),
+            service_version=os.getenv('TRACING_SERVICE_VERSION', '1.0.0'),
+            exporter=os.getenv('TRACING_EXPORTER', 'console'),
+            endpoint=os.getenv('TRACING_ENDPOINT'),
+            sample_rate=float(os.getenv('TRACING_SAMPLE_RATE', '0.1')),
+            enabled=os.getenv('TRACING_ENABLED', 'true').lower() == 'true',
         )
 
     if _state.tracer is None:
         try:
             from opentelemetry import trace
 
-            service_name = os.getenv("TRACING_SERVICE_NAME", "app")
+            service_name = os.getenv('TRACING_SERVICE_NAME', 'app')
             _state.tracer = trace.get_tracer(name or service_name)
         except ImportError:
-            logger.warning("OpenTelemetry not available")
+            logger.warning('OpenTelemetry not available')
             return None
 
     return _state.tracer
@@ -262,21 +266,21 @@ def shutdown_tracing() -> None:
     if _state.trace_provider:
         try:
             _state.trace_provider.shutdown()
-            logger.info("Tracing shutdown")
+            logger.info('Tracing shutdown')
         except Exception as e:
-            logger.error("Error shutting down tracing: %s", e, exc_info=True)
+            logger.error('Error shutting down tracing: %s', e, exc_info=True)
         finally:
             _state.trace_provider = None
             _state.initialized = False
 
 
 # Auto-initialize tracing on module import if enabled
-if os.getenv("TRACING_ENABLED", "true").lower() == "true":
+if os.getenv('TRACING_ENABLED', 'true').lower() == 'true':
     initialize_tracing(
-        service_name=os.getenv("TRACING_SERVICE_NAME", "app"),
-        service_version=os.getenv("TRACING_SERVICE_VERSION", "1.0.0"),
-        exporter=os.getenv("TRACING_EXPORTER", "console"),
-        endpoint=os.getenv("TRACING_ENDPOINT"),
-        sample_rate=float(os.getenv("TRACING_SAMPLE_RATE", "0.1")),
+        service_name=os.getenv('TRACING_SERVICE_NAME', 'app'),
+        service_version=os.getenv('TRACING_SERVICE_VERSION', '1.0.0'),
+        exporter=os.getenv('TRACING_EXPORTER', 'console'),
+        endpoint=os.getenv('TRACING_ENDPOINT'),
+        sample_rate=float(os.getenv('TRACING_SAMPLE_RATE', '0.1')),
         enabled=True,
     )

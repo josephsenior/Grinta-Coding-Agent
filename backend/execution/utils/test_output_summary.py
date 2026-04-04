@@ -10,33 +10,33 @@ import re
 
 # (pattern, framework label) — used for "does this blob look like test output?"
 TEST_FRAMEWORK_PATTERNS: list[tuple[str, str]] = [
-    (r"=+\s*\d+\s+(passed|failed|error|skipped)", "pytest"),
-    (r"^Tests:\s+\d+\s+failed,\s+\d+\s+passed,\s+\d+\s+total", "jest"),
-    (r"^test result:\s+(ok|FAILED)\.", "cargo"),
-    (r"^(ok|FAIL)\s+\S+\s+\d+(\.\d+)?s$", "go"),
+    (r'=+\s*\d+\s+(passed|failed|error|skipped)', 'pytest'),
+    (r'^Tests:\s+\d+\s+failed,\s+\d+\s+passed,\s+\d+\s+total', 'jest'),
+    (r'^test result:\s+(ok|FAILED)\.', 'cargo'),
+    (r'^(ok|FAIL)\s+\S+\s+\d+(\.\d+)?s$', 'go'),
     # unittest: "Ran 42 tests in 1.234s"
-    (r"^Ran\s+\d+\s+tests?\s+in\s+\d+", "unittest"),
+    (r'^Ran\s+\d+\s+tests?\s+in\s+\d+', 'unittest'),
     # mocha: "3 passing (1s)" / "1 failing"
-    (r"^\s*\d+\s+passing\s*\(", "mocha"),
+    (r'^\s*\d+\s+passing\s*\(', 'mocha'),
     # RSpec: "10 examples, 2 failures"
-    (r"\d+\s+examples?,\s+\d+\s+failures?", "rspec"),
+    (r'\d+\s+examples?,\s+\d+\s+failures?', 'rspec'),
     # JUnit/Maven Surefire: "Tests run: 5, Failures: 1, Errors: 0"
-    (r"Tests run:\s*\d+,\s*Failures:\s*\d+", "junit"),
+    (r'Tests run:\s*\d+,\s*Failures:\s*\d+', 'junit'),
     # PHPUnit: "Tests: 12, Assertions: 30, Failures: 1"
-    (r"Tests:\s*\d+,\s*Assertions:\s*\d+", "phpunit"),
+    (r'Tests:\s*\d+,\s*Assertions:\s*\d+', 'phpunit'),
 ]
 
 _FAILURE_LINE_PATTERNS: list[str] = [
-    r"^FAILED\s+",
-    r"^--- FAIL:",
-    r"^FAIL\s+",
-    r"^[✕×]\s+",
-    r"^FAILED\[",
+    r'^FAILED\s+',
+    r'^--- FAIL:',
+    r'^FAIL\s+',
+    r'^[✕×]\s+',
+    r'^FAILED\[',
 ]
 
 # Pytest summary fragments (``-q`` / classic footer).
-_PYTEST_PASSED_RE = re.compile(r"(\d+)\s+passed", re.IGNORECASE)
-_PYTEST_FAILED_RE = re.compile(r"(\d+)\s+failed", re.IGNORECASE)
+_PYTEST_PASSED_RE = re.compile(r'(\d+)\s+passed', re.IGNORECASE)
+_PYTEST_FAILED_RE = re.compile(r'(\d+)\s+failed', re.IGNORECASE)
 
 
 def extract_test_summary(output: str) -> str | None:
@@ -64,37 +64,39 @@ def extract_test_summary(output: str) -> str | None:
             continue
 
         # --- Existing framework summary detection ---
-        if re.search(r"=+\s*\d+\s+(passed|failed|error|skipped)", stripped):
+        if re.search(r'=+\s*\d+\s+(passed|failed|error|skipped)', stripped):
             summary_lines.append(stripped)
-        elif re.search(r"^test result:\s+(ok|FAILED)\.", stripped):
+        elif re.search(r'^test result:\s+(ok|FAILED)\.', stripped):
             summary_lines.append(stripped)
         elif re.search(
-            r"^Tests:\s+\d+\s+failed,\s+\d+\s+passed,\s+\d+\s+total", stripped
+            r'^Tests:\s+\d+\s+failed,\s+\d+\s+passed,\s+\d+\s+total', stripped
         ):
             summary_lines.append(stripped)
-        elif re.search(r"^(ok|FAIL)\s+\S+\s+\d+(\.\d+)?s$", stripped):
+        elif re.search(r'^(ok|FAIL)\s+\S+\s+\d+(\.\d+)?s$', stripped):
             summary_lines.append(stripped)
         # --- New framework summary detection ---
-        elif re.search(r"^Ran\s+\d+\s+tests?\s+in\s+\d+", stripped):
+        elif re.search(r'^Ran\s+\d+\s+tests?\s+in\s+\d+', stripped):
             summary_lines.append(stripped)
-        elif re.search(r"^\s*\d+\s+passing\s*\(", stripped):
+        elif re.search(r'^\s*\d+\s+passing\s*\(', stripped):
             summary_lines.append(stripped)
-        elif re.search(r"\d+\s+examples?,\s+\d+\s+failures?", stripped):
+        elif re.search(r'\d+\s+examples?,\s+\d+\s+failures?', stripped):
             summary_lines.append(stripped)
-        elif re.search(r"Tests run:\s*\d+,\s*Failures:\s*\d+", stripped):
+        elif re.search(r'Tests run:\s*\d+,\s*Failures:\s*\d+', stripped):
             summary_lines.append(stripped)
-        elif re.search(r"Tests:\s*\d+,\s*Assertions:\s*\d+", stripped):
+        elif re.search(r'Tests:\s*\d+,\s*Assertions:\s*\d+', stripped):
             summary_lines.append(stripped)
         # --- unittest "FAILED (failures=N)" / "OK" ---
-        elif re.search(r"^(OK|FAILED)\s*\(", stripped):
+        elif re.search(r'^(OK|FAILED)\s*\(', stripped):
             summary_lines.append(stripped)
         # --- mocha "N failing" ---
-        elif re.search(r"^\s*\d+\s+failing", stripped):
+        elif re.search(r'^\s*\d+\s+failing', stripped):
             summary_lines.append(stripped)
 
-        if any(re.search(pat, stripped, re.IGNORECASE) for pat in _FAILURE_LINE_PATTERNS):
-            if re.search(r"^FAILED\s+\S+", stripped) or re.search(
-                r"^--- FAIL:", stripped
+        if any(
+            re.search(pat, stripped, re.IGNORECASE) for pat in _FAILURE_LINE_PATTERNS
+        ):
+            if re.search(r'^FAILED\s+\S+', stripped) or re.search(
+                r'^--- FAIL:', stripped
             ):
                 failure_lines.append(stripped)
 
@@ -104,7 +106,7 @@ def extract_test_summary(output: str) -> str | None:
     if not summary_lines and not failure_lines and not traceback_blocks:
         return None
 
-    parts = ["[TEST_SUMMARY]"]
+    parts = ['[TEST_SUMMARY]']
     if summary_lines:
         seen: set[str] = set()
         for sline in summary_lines:
@@ -112,14 +114,14 @@ def extract_test_summary(output: str) -> str | None:
                 parts.append(sline)
                 seen.add(sline)
     if failure_lines:
-        parts.append("[FAILURES]")
+        parts.append('[FAILURES]')
         for fl in failure_lines[:10]:
-            parts.append(f"  {fl}")
+            parts.append(f'  {fl}')
     if traceback_blocks:
-        parts.append("[TRACEBACKS]")
+        parts.append('[TRACEBACKS]')
         for tb in traceback_blocks:
             parts.append(tb)
-    return "\n".join(parts)
+    return '\n'.join(parts)
 
 
 def _extract_traceback_blocks(
@@ -135,7 +137,7 @@ def _extract_traceback_blocks(
     lines = output.splitlines()
     i = 0
     while i < len(lines) and len(blocks) < max_blocks:
-        if "Traceback (most recent call last):" in lines[i]:
+        if 'Traceback (most recent call last):' in lines[i]:
             tb_lines = [lines[i]]
             i += 1
             while i < len(lines) and len(tb_lines) < max_lines:
@@ -146,12 +148,12 @@ def _extract_traceback_blocks(
                 if (
                     len(tb_lines) > 2
                     and line.strip()
-                    and not line.startswith(" ")
-                    and not line.startswith("\t")
+                    and not line.startswith(' ')
+                    and not line.startswith('\t')
                 ):
                     break
                 i += 1
-            blocks.append("\n".join(tb_lines))
+            blocks.append('\n'.join(tb_lines))
         else:
             i += 1
     return blocks

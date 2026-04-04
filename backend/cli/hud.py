@@ -34,9 +34,10 @@ class HUDBar:
     ) -> RenderResult:
         width = options.max_width
         bar = self._format_compact() if width < 80 else self._format()
+
         pad = max(0, width - len(bar.plain))
         line = Text(' ') + bar + Text(' ' * pad)
-        line.stylize('on grey15')
+        line.stylize('on grey11')
         yield line
 
     def _format(self) -> Text:
@@ -48,18 +49,20 @@ class HUDBar:
         )
         # Show a clean placeholder before the first LLM call.
         if self.state.context_tokens == 0 and self.state.context_limit == 0:
-            token_display = '—'
+            token_display = '0 tkns'
+        elif self.state.context_limit == 0:
+            token_display = f'{ctx} tkns'
         else:
             token_display = f'{ctx}/{lim}'
         parts = [
-            (self.state.model, 'cyan'),
-            (' │ ', 'dim'),
-            (token_display, 'yellow'),
-            (' │ ', 'dim'),
-            (f'${self.state.cost_usd:.4f}', 'green'),
-            (' │ ', 'dim'),
-            (f'{self.state.llm_calls} calls', 'blue'),
-            (' │ ', 'dim'),
+            (self.state.model, 'bright_black'),
+            (' │ ', 'grey27'),
+            (token_display, 'bright_black'),
+            (' │ ', 'grey27'),
+            (f'${self.state.cost_usd:.4f}', 'bright_black'),
+            (' │ ', 'grey27'),
+            (f'{self.state.llm_calls} calls', 'bright_black'),
+            (' │ ', 'grey27'),
             (self.state.ledger_status, self._ledger_style()),
         ]
         txt = Text()
@@ -71,16 +74,21 @@ class HUDBar:
         """Compact format for narrow terminals (< 80 cols)."""
         ctx = self._format_tokens(self.state.context_tokens)
         if self.state.context_tokens == 0 and self.state.context_limit == 0:
-            token_display = '—'
+            token_display = '0t'
+        elif self.state.context_limit == 0:
+            token_display = f'{ctx}t'
         else:
             token_display = ctx
         parts = [
-            (self.state.model.split('/')[-1][:12], 'cyan'),  # last segment, truncated
-            (' ', 'dim'),
-            (token_display, 'yellow'),
-            (' ', 'dim'),
-            (f'${self.state.cost_usd:.3f}', 'green'),
-            (' ', 'dim'),
+            (
+                self.state.model.rsplit('/', maxsplit=1)[-1][:12],
+                'bright_black',
+            ),  # last segment, truncated
+            (' ', 'grey27'),
+            (token_display, 'bright_black'),
+            (' ', 'grey27'),
+            (f'${self.state.cost_usd:.3f}', 'bright_black'),
+            (' ', 'grey27'),
             (self._ledger_icon(), self._ledger_style()),
         ]
         txt = Text()
@@ -101,15 +109,13 @@ class HUDBar:
         return mapping.get(self.state.ledger_status, '?')
 
     def _ledger_style(self) -> str:
-        if self.state.ledger_status == 'Healthy':
-            return 'green'
-        if self.state.ledger_status in {'Ready', 'Idle'}:
-            return 'yellow'
+        if self.state.ledger_status in {'Healthy', 'Ready', 'Idle'}:
+            return 'bright_black'
         if self.state.ledger_status == 'Review':
-            return 'magenta'
+            return 'yellow'
         if self.state.ledger_status == 'Paused':
-            return 'cyan'
-        return 'red bold'
+            return 'bright_black'
+        return 'red'
 
     @staticmethod
     def _format_tokens(n: int) -> str:

@@ -1,33 +1,19 @@
-"""Helpers for adapting tool prompts to the current platform.
+"""Helpers for adapting tool prompts to the active terminal runtime."""
 
-The unit tests patch `app.engine.tools.prompt.sys.platform`.
-Importing `sys` here exposes the module attribute so that patching succeeds
-without raising `AttributeError`.
-"""
-
-import re
+import shutil
 import sys
 
 
-def refine_prompt(prompt: str):
-    """Refine the prompt based on the current platform.
+def uses_powershell_terminal() -> bool:
+    """Return True when the active terminal contract should be PowerShell."""
+    return sys.platform.lower().startswith('win') and not shutil.which('bash')
 
-    On Windows systems, replaces 'bash' with 'powershell' and 'execute_bash' with 'execute_powershell'
-    to ensure commands work correctly on the Windows platform.
 
-    Args:
-        prompt: The prompt text to refine
+def get_shell_name() -> str:
+    """Return the shell name that matches the runtime terminal contract."""
+    return 'powershell' if uses_powershell_terminal() else 'bash'
 
-    Returns:
-        The refined prompt text.
 
-    """
-    # Use sys.platform (not platform.system) so tests can monkeypatch
-    if sys.platform.lower().startswith("win"):
-        result = re.sub(
-            r"\bexecute_bash\b", "execute_powershell", prompt, flags=re.IGNORECASE
-        )
-        return re.sub(
-            r"(?<!execute_)(?<!_)\bbash\b", "powershell", result, flags=re.IGNORECASE
-        )
-    return prompt
+def get_terminal_tool_name() -> str:
+    """Return the terminal tool name that matches the runtime shell."""
+    return 'execute_powershell' if uses_powershell_terminal() else 'execute_bash'

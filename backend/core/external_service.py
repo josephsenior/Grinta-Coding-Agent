@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any
 from collections.abc import Callable, Coroutine
+from typing import Any
 from urllib.parse import ParseResult, urlparse
 
 import aiohttp
@@ -49,7 +49,7 @@ class ExternalServiceBase:
         Returns:
             Parsed URL result.
         """
-        return urlparse(self.endpoint or "")
+        return urlparse(self.endpoint or '')
 
     def _get_auth_headers(self, parsed_endpoint: ParseResult) -> dict[str, str]:
         """Build authentication headers based on the endpoint host.
@@ -60,19 +60,19 @@ class ExternalServiceBase:
         Returns:
             Dictionary of headers.
         """
-        headers = {"Content-Type": "application/json"}
+        headers = {'Content-Type': 'application/json'}
         if not self.api_key:
             return headers
 
         host = parsed_endpoint.netloc.lower()
-        if "pagerduty" in host:
-            headers["Authorization"] = f"Token token={self.api_key}"
-        elif "datadog" in host:
-            headers["DD-API-KEY"] = self.api_key
-        elif "logzio" in host:
-            headers["X-API-KEY"] = self.api_key
+        if 'pagerduty' in host:
+            headers['Authorization'] = f'Token token={self.api_key}'
+        elif 'datadog' in host:
+            headers['DD-API-KEY'] = self.api_key
+        elif 'logzio' in host:
+            headers['X-API-KEY'] = self.api_key
         else:
-            headers["Authorization"] = f"Bearer {self.api_key}"
+            headers['Authorization'] = f'Bearer {self.api_key}'
         return headers
 
     async def _prepare_request(
@@ -97,7 +97,7 @@ class ExternalServiceBase:
         execute_request: Callable[
             [aiohttp.ClientSession, Any, dict[str, str]], Coroutine[Any, Any, bool]
         ],
-        error_msg: str = "Error in external service request",
+        error_msg: str = 'Error in external service request',
     ) -> bool:
         """Common request execution pattern with preparation and error handling.
 
@@ -118,5 +118,5 @@ class ExternalServiceBase:
             payload = build_payload(parsed_endpoint)
             return await execute_request(session, payload, headers)
         except Exception as e:
-            logger.error("%s: %s", error_msg, e, exc_info=True)
+            logger.error('%s: %s', error_msg, e, exc_info=True)
             return False

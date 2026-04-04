@@ -20,7 +20,7 @@ def check_port_available(port: int) -> bool:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         # Bind to loopback to avoid exposing the port check on all interfaces
-        sock.bind(("127.0.0.1", port))
+        sock.bind(('127.0.0.1', port))
         return True
     except OSError:
         time.sleep(0.1)
@@ -64,18 +64,18 @@ def display_number_matrix(number: int) -> str | None:
     if not 0 <= number <= 999:
         return None
     digits = {
-        "0": ["###", "# #", "# #", "# #", "###"],
-        "1": ["  #", "  #", "  #", "  #", "  #"],
-        "2": ["###", "  #", "###", "#  ", "###"],
-        "3": ["###", "  #", "###", "  #", "###"],
-        "4": ["# #", "# #", "###", "  #", "  #"],
-        "5": ["###", "#  ", "###", "  #", "###"],
-        "6": ["###", "#  ", "###", "# #", "###"],
-        "7": ["###", "  #", "  #", "  #", "  #"],
-        "8": ["###", "# #", "###", "# #", "###"],
-        "9": ["###", "# #", "###", "  #", "###"],
+        '0': ['###', '# #', '# #', '# #', '###'],
+        '1': ['  #', '  #', '  #', '  #', '  #'],
+        '2': ['###', '  #', '###', '#  ', '###'],
+        '3': ['###', '  #', '###', '  #', '###'],
+        '4': ['# #', '# #', '###', '  #', '  #'],
+        '5': ['###', '#  ', '###', '  #', '###'],
+        '6': ['###', '#  ', '###', '# #', '###'],
+        '7': ['###', '  #', '  #', '  #', '  #'],
+        '8': ['###', '# #', '###', '# #', '###'],
+        '9': ['###', '# #', '###', '  #', '###'],
     }
     num_str = str(number)
-    result = [" ".join(digits[digit][row] for digit in num_str) for row in range(5)]
-    matrix_display = "\n".join(result)
-    return f"\n{matrix_display}\n"
+    result = [' '.join(digits[digit][row] for digit in num_str) for row in range(5)]
+    matrix_display = '\n'.join(result)
+    return f'\n{matrix_display}\n'

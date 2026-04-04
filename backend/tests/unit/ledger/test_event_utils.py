@@ -6,18 +6,17 @@ from typing import Any
 
 from backend.ledger.action.action import Action
 from backend.ledger.action.empty import NullAction
-from backend.ledger.observation import (
-    CmdOutputObservation,
-    NullObservation,
-    Observation,
-)
 from backend.ledger.event_utils import (
     _add_action_observation_pairs,
     _add_orphaned_observations,
     _build_action_and_observation_maps,
     get_pairs_from_events,
 )
-
+from backend.ledger.observation import (
+    CmdOutputObservation,
+    NullObservation,
+    Observation,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -31,16 +30,16 @@ def _action(event_id: int) -> Action:
 
 
 def _obs(cause: int | None) -> Observation:
-    o = NullObservation("")
+    o = NullObservation('')
     o._cause = cause
     return o
 
 
-def _cmd_obs(cause: int | None, content: str = "output") -> CmdOutputObservation:
+def _cmd_obs(cause: int | None, content: str = 'output') -> CmdOutputObservation:
     o = CmdOutputObservation(
         content=content,
         command_id=0,
-        command="cmd",
+        command='cmd',
         exit_code=0,
     )
     o._cause = cause
@@ -125,7 +124,7 @@ class TestOrphaned:
 
     def test_null_obs_orphan_skipped(self):
         a_map: dict[int, Any] = {}
-        o_map: dict[int, Any] = {99: NullObservation("")}
+        o_map: dict[int, Any] = {99: NullObservation('')}
         # Set cause
         o_map[99]._cause = 99
         pairs: list = []

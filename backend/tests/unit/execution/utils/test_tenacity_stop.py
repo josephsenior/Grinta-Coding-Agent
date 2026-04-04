@@ -1,4 +1,4 @@
-﻿"""Tests for backend/execution/utils/tenacity_stop.py."""
+"""Tests for backend/execution/utils/tenacity_stop.py."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ class TestStopIfShouldExit:
 
     def test_is_stop_base_subclass(self) -> None:
         from tenacity.stop import stop_base
+
         assert issubclass(stop_if_should_exit, stop_base)
 
     def test_can_be_instantiated(self) -> None:
@@ -23,7 +24,9 @@ class TestStopIfShouldExit:
     def test_returns_false_when_should_not_exit(self) -> None:
         stop = stop_if_should_exit()
         retry_state = MagicMock()
-        with patch("backend.execution.utils.tenacity_stop.should_exit", return_value=False):
+        with patch(
+            'backend.execution.utils.tenacity_stop.should_exit', return_value=False
+        ):
             result = stop(retry_state)
         assert result is False
 
@@ -32,7 +35,9 @@ class TestStopIfShouldExit:
     def test_returns_true_when_should_exit(self) -> None:
         stop = stop_if_should_exit()
         retry_state = MagicMock()
-        with patch("backend.execution.utils.tenacity_stop.should_exit", return_value=True):
+        with patch(
+            'backend.execution.utils.tenacity_stop.should_exit', return_value=True
+        ):
             result = stop(retry_state)
         assert result is True
 
@@ -40,7 +45,9 @@ class TestStopIfShouldExit:
 
     def test_retry_state_not_used(self) -> None:
         stop = stop_if_should_exit()
-        with patch("backend.execution.utils.tenacity_stop.should_exit", return_value=False):
+        with patch(
+            'backend.execution.utils.tenacity_stop.should_exit', return_value=False
+        ):
             # passing None should still work - retry_state is unused
             result = stop(None)  # type: ignore[arg-type]
         assert result is False
@@ -50,14 +57,20 @@ class TestStopIfShouldExit:
     def test_consistent_results_across_calls(self) -> None:
         stop = stop_if_should_exit()
         retry_state = MagicMock()
-        with patch("backend.execution.utils.tenacity_stop.should_exit", return_value=False):
+        with patch(
+            'backend.execution.utils.tenacity_stop.should_exit', return_value=False
+        ):
             assert stop(retry_state) is False
             assert stop(retry_state) is False
 
     def test_respects_changing_should_exit(self) -> None:
         stop = stop_if_should_exit()
         retry_state = MagicMock()
-        with patch("backend.execution.utils.tenacity_stop.should_exit", return_value=False):
+        with patch(
+            'backend.execution.utils.tenacity_stop.should_exit', return_value=False
+        ):
             assert stop(retry_state) is False
-        with patch("backend.execution.utils.tenacity_stop.should_exit", return_value=True):
+        with patch(
+            'backend.execution.utils.tenacity_stop.should_exit', return_value=True
+        ):
             assert stop(retry_state) is True

@@ -25,14 +25,14 @@ from backend.core.schemas.serialization import (
 # Helpers — build minimal valid dicts
 # ------------------------------------------------------------------
 def _action_dict(action_type: str, **extra) -> dict:
-    return {"action_type": action_type, "schema_version": "1.0.0", **extra}
+    return {'action_type': action_type, 'schema_version': '1.0.0', **extra}
 
 
 def _obs_dict(obs_type: str, **extra) -> dict:
     return {
-        "observation_type": obs_type,
-        "content": "ok",
-        "schema_version": "1.0.0",
+        'observation_type': obs_type,
+        'content': 'ok',
+        'schema_version': '1.0.0',
         **extra,
     }
 
@@ -48,15 +48,15 @@ class TestSerializeEvent:
         s = serialize_event(ev)
         assert isinstance(s, str)
         d = json.loads(s)
-        assert d["action_type"] == "null"
+        assert d['action_type'] == 'null'
 
     def test_round_trip_message(self):
         from backend.core.schemas.actions import MessageActionSchema
 
-        ev = MessageActionSchema(content="hello")
+        ev = MessageActionSchema(content='hello')
         s = serialize_event(ev)
         d = json.loads(s)
-        assert d["content"] == "hello"
+        assert d['content'] == 'hello'
 
     def test_raises_on_bad_event(self):
         """Non-serializable event should raise ValueError."""
@@ -71,62 +71,62 @@ class TestSerializeEvent:
 # ==================================================================
 class TestDeserializeAction:
     def test_null_action(self):
-        d = _action_dict("null")
+        d = _action_dict('null')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "NullActionSchema"
+        assert ev.__class__.__name__ == 'NullActionSchema'
 
     def test_message_action(self):
-        d = _action_dict("message", content="hi")
+        d = _action_dict('message', content='hi')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "MessageActionSchema"
+        assert ev.__class__.__name__ == 'MessageActionSchema'
 
     def test_cmd_run_action(self):
-        d = _action_dict("run", command="ls")
+        d = _action_dict('run', command='ls')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "CmdRunActionSchema"
+        assert ev.__class__.__name__ == 'CmdRunActionSchema'
 
     def test_file_read_action(self):
-        d = _action_dict("read", path="/tmp/x.py")
+        d = _action_dict('read', path='/tmp/x.py')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "FileReadActionSchema"
+        assert ev.__class__.__name__ == 'FileReadActionSchema'
 
     def test_file_write_action(self):
-        d = _action_dict("write", path="/tmp/x.py", content="code")
+        d = _action_dict('write', path='/tmp/x.py', content='code')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "FileWriteActionSchema"
+        assert ev.__class__.__name__ == 'FileWriteActionSchema'
 
     def test_file_edit_action(self):
-        d = _action_dict("edit", path="/tmp/x.py")
+        d = _action_dict('edit', path='/tmp/x.py')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "FileEditActionSchema"
+        assert ev.__class__.__name__ == 'FileEditActionSchema'
 
     def test_finish_action(self):
-        d = _action_dict("finish")
+        d = _action_dict('finish')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "PlaybookFinishActionSchema"
+        assert ev.__class__.__name__ == 'PlaybookFinishActionSchema'
 
     def test_reject_action(self):
-        d = _action_dict("reject")
+        d = _action_dict('reject')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "AgentRejectActionSchema"
+        assert ev.__class__.__name__ == 'AgentRejectActionSchema'
 
     def test_change_agent_state_action(self):
-        d = _action_dict("change_agent_state", state="running")
+        d = _action_dict('change_agent_state', state='running')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "ChangeAgentStateActionSchema"
+        assert ev.__class__.__name__ == 'ChangeAgentStateActionSchema'
 
     def test_system_message_action(self):
-        d = _action_dict("system", content="sys msg")
+        d = _action_dict('system', content='sys msg')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "SystemMessageActionSchema"
+        assert ev.__class__.__name__ == 'SystemMessageActionSchema'
 
     def test_unknown_action_type_raises(self):
-        with pytest.raises(ValueError, match="Unknown action type"):
-            deserialize_event(_action_dict("nonexistent"))
+        with pytest.raises(ValueError, match='Unknown action type'):
+            deserialize_event(_action_dict('nonexistent'))
 
     def test_missing_action_type_raises(self):
-        with pytest.raises(ValueError, match="action_type"):
-            _deserialize_action({"schema_version": "1.0.0"})
+        with pytest.raises(ValueError, match='action_type'):
+            _deserialize_action({'schema_version': '1.0.0'})
 
 
 # ==================================================================
@@ -134,42 +134,42 @@ class TestDeserializeAction:
 # ==================================================================
 class TestDeserializeObservation:
     def test_cmd_output(self):
-        d = _obs_dict("run", command="ls")
+        d = _obs_dict('run', command='ls')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "CmdOutputObservationSchema"
+        assert ev.__class__.__name__ == 'CmdOutputObservationSchema'
 
     def test_file_read_obs(self):
-        d = _obs_dict("read", path="/tmp/x.py")
+        d = _obs_dict('read', path='/tmp/x.py')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "FileReadObservationSchema"
+        assert ev.__class__.__name__ == 'FileReadObservationSchema'
 
     def test_file_edit_obs(self):
-        d = _obs_dict("edit", path="/tmp/x.py")
+        d = _obs_dict('edit', path='/tmp/x.py')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "FileEditObservationSchema"
+        assert ev.__class__.__name__ == 'FileEditObservationSchema'
 
     def test_error_obs(self):
-        d = _obs_dict("error")
+        d = _obs_dict('error')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "ErrorObservationSchema"
+        assert ev.__class__.__name__ == 'ErrorObservationSchema'
 
     def test_message_obs(self):
-        d = _obs_dict("message")
+        d = _obs_dict('message')
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "MessageObservationSchema"
+        assert ev.__class__.__name__ == 'MessageObservationSchema'
 
     def test_unknown_obs_type_raises(self):
-        with pytest.raises(ValueError, match="Unknown observation type"):
-            deserialize_event(_obs_dict("nonexistent"))
+        with pytest.raises(ValueError, match='Unknown observation type'):
+            deserialize_event(_obs_dict('nonexistent'))
 
     def test_missing_obs_type_raises(self):
-        with pytest.raises(ValueError, match="observation_type"):
-            _deserialize_observation({"content": "x", "schema_version": "1.0.0"})
+        with pytest.raises(ValueError, match='observation_type'):
+            _deserialize_observation({'content': 'x', 'schema_version': '1.0.0'})
 
     def test_cmd_output_with_cmd_metadata_dict(self):
-        d = _obs_dict("run", command="ls", cmd_metadata={"exit_code": 0})
+        d = _obs_dict('run', command='ls', cmd_metadata={'exit_code': 0})
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "CmdOutputObservationSchema"
+        assert ev.__class__.__name__ == 'CmdOutputObservationSchema'
 
 
 # ==================================================================
@@ -177,17 +177,17 @@ class TestDeserializeObservation:
 # ==================================================================
 class TestDeserializeFromJSON:
     def test_from_json_string(self):
-        s = json.dumps(_action_dict("null"))
+        s = json.dumps(_action_dict('null'))
         ev = deserialize_event(s)
-        assert ev.__class__.__name__ == "NullActionSchema"
+        assert ev.__class__.__name__ == 'NullActionSchema'
 
     def test_invalid_json_raises(self):
-        with pytest.raises(ValueError, match="Failed to parse JSON"):
-            deserialize_event("not json{{{")
+        with pytest.raises(ValueError, match='Failed to parse JSON'):
+            deserialize_event('not json{{{')
 
     def test_no_type_key_raises(self):
-        with pytest.raises(ValueError, match="action_type or observation_type"):
-            deserialize_event({"schema_version": "1.0.0"})
+        with pytest.raises(ValueError, match='action_type or observation_type'):
+            deserialize_event({'schema_version': '1.0.0'})
 
 
 # ==================================================================
@@ -195,20 +195,20 @@ class TestDeserializeFromJSON:
 # ==================================================================
 class TestDeserializeVersions:
     def test_explicit_v1_version(self):
-        d = _action_dict("null")
+        d = _action_dict('null')
         ev = deserialize_event(d, version=EventVersion.V1)
-        assert ev.__class__.__name__ == "NullActionSchema"
+        assert ev.__class__.__name__ == 'NullActionSchema'
 
     def test_unknown_version_string_raises(self):
-        d = _action_dict("null", schema_version="99.0.0")
-        with pytest.raises(ValueError, match="Failed to validate"):
+        d = _action_dict('null', schema_version='99.0.0')
+        with pytest.raises(ValueError, match='Failed to validate'):
             deserialize_event(d)
 
     def test_non_string_version_defaults_v1(self):
-        d = _action_dict("null")
-        d["schema_version"] = EventVersion.V1
+        d = _action_dict('null')
+        d['schema_version'] = EventVersion.V1
         ev = deserialize_event(d)
-        assert ev.__class__.__name__ == "NullActionSchema"
+        assert ev.__class__.__name__ == 'NullActionSchema'
 
 
 # ==================================================================
@@ -216,16 +216,16 @@ class TestDeserializeVersions:
 # ==================================================================
 class TestMigrateSchemaVersion:
     def test_same_version_noop(self):
-        d = {"action_type": "null"}
+        d = {'action_type': 'null'}
         result = migrate_schema_version(d, EventVersion.V1, EventVersion.V1)
         assert result == d
 
     def test_v1_to_v2_raises(self):
-        with pytest.raises(ValueError, match="not yet supported"):
+        with pytest.raises(ValueError, match='not yet supported'):
             migrate_schema_version({}, EventVersion.V1, EventVersion.V2)
 
     def test_v2_to_v1_returns_copy(self):
-        d = {"action_type": "null", "extra": "field"}
+        d = {'action_type': 'null', 'extra': 'field'}
         result = migrate_schema_version(d, EventVersion.V2, EventVersion.V1)
         assert result == d
         assert result is not d  # Should be a copy
@@ -243,10 +243,10 @@ class TestValidateEventSchema:
     def test_valid_message(self):
         from backend.core.schemas.actions import MessageActionSchema
 
-        assert validate_event_schema(MessageActionSchema(content="hi")) is True
+        assert validate_event_schema(MessageActionSchema(content='hi')) is True
 
     def test_valid_observation(self):
         from backend.core.schemas.observations import ErrorObservationSchema
 
-        ev = ErrorObservationSchema(content="err")
+        ev = ErrorObservationSchema(content='err')
         assert validate_event_schema(ev) is True

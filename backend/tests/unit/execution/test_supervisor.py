@@ -1,4 +1,4 @@
-﻿"""Unit tests for backend.execution.supervisor."""
+"""Unit tests for backend.execution.supervisor."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class TestRuntimeSupervisorConfig(IsolatedAsyncioTestCase):
         """Test that config is immutable (frozen dataclass)."""
         config = RuntimeSupervisorConfig()
         with self.assertRaises(AttributeError):
-            setattr(config, "connect_timeout_s", 100.0)
+            setattr(config, 'connect_timeout_s', 100.0)
 
 
 class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
@@ -76,7 +76,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         """Test ensure_connected when runtime has no connect method."""
         conversation = MagicMock()
         conversation.runtime = MagicMock(spec=[])  # No connect method
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
         # Should not raise an exception
         await self.supervisor.ensure_connected(conversation)
 
@@ -87,7 +87,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         runtime.connect = AsyncMock()
         runtime.runtime_initialized = True
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
         await self.supervisor.ensure_connected(conversation)
 
@@ -99,7 +99,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         runtime = MagicMock()
         runtime.connect = AsyncMock()
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
         # Simulate runtime initializing after 2 polls
         call_count = 0
@@ -126,25 +126,25 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
 
         runtime.connect = slow_connect
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
-        with patch("backend.execution.supervisor.logger") as mock_logger:
+        with patch('backend.execution.supervisor.logger') as mock_logger:
             await self.supervisor.ensure_connected(conversation)
             mock_logger.warning.assert_called_once()
-            self.assertIn("timed out", mock_logger.warning.call_args[0][0])
+            self.assertIn('timed out', mock_logger.warning.call_args[0][0])
 
     async def test_ensure_connected_exception_during_connect(self):
         """Test exception handling during connect."""
         conversation = MagicMock()
         runtime = MagicMock()
-        runtime.connect = AsyncMock(side_effect=ValueError("Connection failed"))
+        runtime.connect = AsyncMock(side_effect=ValueError('Connection failed'))
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
-        with patch("backend.execution.supervisor.logger") as mock_logger:
+        with patch('backend.execution.supervisor.logger') as mock_logger:
             await self.supervisor.ensure_connected(conversation)
             mock_logger.error.assert_called_once()
-            self.assertIn("connect failed", mock_logger.error.call_args[0][0])
+            self.assertIn('connect failed', mock_logger.error.call_args[0][0])
 
     async def test_ensure_connected_readiness_timeout(self):
         """Test readiness timeout when runtime never becomes ready."""
@@ -153,24 +153,24 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         runtime.connect = AsyncMock()
         runtime.runtime_initialized = False
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
-        with patch("backend.execution.supervisor.logger") as mock_logger:
+        with patch('backend.execution.supervisor.logger') as mock_logger:
             await self.supervisor.ensure_connected(conversation)
             mock_logger.warning.assert_called()
             # Should have warning about not initializing
             warning_calls = [call for call in mock_logger.warning.call_args_list]
             self.assertTrue(
-                any("did not initialize" in str(call) for call in warning_calls)
+                any('did not initialize' in str(call) for call in warning_calls)
             )
 
     async def test_ensure_connected_no_readiness_attribute(self):
         """Test when runtime has no runtime_initialized attribute."""
         conversation = MagicMock()
-        runtime = MagicMock(spec=["connect"])
+        runtime = MagicMock(spec=['connect'])
         runtime.connect = AsyncMock()
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
         # Should not raise, just skip readiness check
         await self.supervisor.ensure_connected(conversation)
@@ -191,11 +191,11 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
                 self._call_count += 1
                 if self._call_count == 1:
                     return False
-                raise RuntimeError("Readiness check failed")
+                raise RuntimeError('Readiness check failed')
 
         runtime = FaultyRuntime()
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
         # Should not raise — _wait_for_readiness catches the exception
         await self.supervisor.ensure_connected(conversation)
@@ -218,7 +218,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         """Test close when runtime has no close method."""
         conversation = MagicMock()
         conversation.runtime = MagicMock(spec=[])
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
         # Should not raise
         await self.supervisor.close(conversation)
 
@@ -228,7 +228,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         runtime = MagicMock()
         runtime.close = MagicMock(return_value=None)
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
         await self.supervisor.close(conversation)
         runtime.close.assert_called_once()
@@ -239,7 +239,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         runtime = MagicMock()
         runtime.close = AsyncMock()
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
         await self.supervisor.close(conversation)
         runtime.close.assert_called_once()
@@ -248,29 +248,29 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         """Test exception during close is logged but not raised."""
         conversation = MagicMock()
         runtime = MagicMock()
-        runtime.close = MagicMock(side_effect=ValueError("Close failed"))
+        runtime.close = MagicMock(side_effect=ValueError('Close failed'))
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
-        with patch("backend.execution.supervisor.logger") as mock_logger:
+        with patch('backend.execution.supervisor.logger') as mock_logger:
             # Should not raise
             await self.supervisor.close(conversation)
             mock_logger.debug.assert_called_once()
-            self.assertIn("close failed", mock_logger.debug.call_args[0][0])
+            self.assertIn('close failed', mock_logger.debug.call_args[0][0])
 
     async def test_close_async_exception_during_close(self):
         """Test exception during async close is logged but not raised."""
         conversation = MagicMock()
         runtime = MagicMock()
-        runtime.close = AsyncMock(side_effect=ValueError("Async close failed"))
+        runtime.close = AsyncMock(side_effect=ValueError('Async close failed'))
         conversation.runtime = runtime
-        conversation.sid = "test-sid"
+        conversation.sid = 'test-sid'
 
-        with patch("backend.execution.supervisor.logger") as mock_logger:
+        with patch('backend.execution.supervisor.logger') as mock_logger:
             # Should not raise
             await self.supervisor.close(conversation)
             mock_logger.debug.assert_called_once()
-            self.assertIn("close failed", mock_logger.debug.call_args[0][0])
+            self.assertIn('close failed', mock_logger.debug.call_args[0][0])
 
     async def test_wait_for_readiness_immediate(self):
         """Test _wait_for_readiness when already ready."""
@@ -278,7 +278,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
         runtime.runtime_initialized = True
 
         # Should return immediately
-        await self.supervisor._wait_for_readiness(runtime, "test-sid")
+        await self.supervisor._wait_for_readiness(runtime, 'test-sid')
 
     async def test_wait_for_readiness_becomes_ready(self):
         """Test _wait_for_readiness when runtime becomes ready."""
@@ -292,7 +292,7 @@ class TestRuntimeSupervisor(IsolatedAsyncioTestCase):
 
         type(runtime).runtime_initialized = property(lambda self: get_initialized())
 
-        await self.supervisor._wait_for_readiness(runtime, "test-sid")
+        await self.supervisor._wait_for_readiness(runtime, 'test-sid')
         self.assertGreater(call_count, 1)
 
     async def test_global_runtime_supervisor_singleton(self):

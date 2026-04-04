@@ -36,19 +36,19 @@ class NestedEventStore(EventStoreABC):
     ) -> dict[str, int | bool]:
         """Build search parameters for the API request."""
         search_params: dict[str, int | bool] = {
-            "start_id": start_cursor,
-            "reverse": reverse,
+            'start_id': start_cursor,
+            'reverse': reverse,
         }
         if reverse and end_cursor is not None:
-            search_params["end_id"] = end_cursor
+            search_params['end_id'] = end_cursor
         if limit is not None:
-            search_params["limit"] = min(100, limit)
+            search_params['limit'] = min(100, limit)
         return search_params
 
     def _make_api_request(self, search_params: dict[str, int | bool]) -> dict | None:
         """Make API request and return parsed response."""
         search_str = urlencode(search_params)
-        url = f"{self.base_url}/events?{search_str}"
+        url = f'{self.base_url}/events?{search_str}'
         response = httpx.get(url)
         if response.status_code == status.HTTP_404_NOT_FOUND:
             return None
@@ -116,7 +116,7 @@ class NestedEventStore(EventStoreABC):
             page_min_id: int | None = None
             forward_next_start = start_cursor
 
-            for result in result_set["events"]:
+            for result in result_set['events']:
                 event = event_from_dict(result)
 
                 # Update cursors based on direction
@@ -144,7 +144,7 @@ class NestedEventStore(EventStoreABC):
             )
 
             # Check if there are more pages
-            if not result_set["has_more"]:
+            if not result_set['has_more']:
                 return
 
     def get_event(self, id: int) -> Event:
@@ -162,7 +162,7 @@ class NestedEventStore(EventStoreABC):
         """
         if events := list(self.search_events(start_id=id, limit=1)):
             return events[0]
-        msg = "no_event"
+        msg = 'no_event'
         raise FileNotFoundError(msg)
 
     def get_latest_event(self) -> Event:
@@ -177,7 +177,7 @@ class NestedEventStore(EventStoreABC):
         """
         if events := list(self.search_events(reverse=True, limit=1)):
             return events[0]
-        msg = "no_event"
+        msg = 'no_event'
         raise FileNotFoundError(msg)
 
     def get_latest_event_id(self) -> int:
@@ -189,4 +189,3 @@ class NestedEventStore(EventStoreABC):
         """
         event = self.get_latest_event()
         return event.id
-

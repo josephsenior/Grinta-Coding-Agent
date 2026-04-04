@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from backend.core.config.compactor_config import NoOpCompactorConfig
     from backend.inference.llm_registry import LLMRegistry
 
 from backend.context.compactor.compactor import Compaction, Compactor
@@ -20,9 +19,7 @@ class NoOpCompactor(Compactor):
         return view
 
     @classmethod
-    def from_config(
-        cls, config: Any, llm_registry: LLMRegistry
-    ) -> NoOpCompactor:
+    def from_config(cls, config: Any, llm_registry: LLMRegistry) -> NoOpCompactor:
         """Return a new no-op compactor regardless of configuration."""
         return NoOpCompactor()
 

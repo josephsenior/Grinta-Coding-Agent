@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from backend._canonical import CanonicalMeta, CanonicalModelMetaclass
 
-
 # ── CanonicalModelMetaclass ──────────────────────────────────────────
 
 
@@ -33,7 +32,7 @@ class TestCanonicalModelMetaclass:
             def __init__(self, x: int = 2) -> None:
                 self.x = x
 
-        Reloaded.__name__ = "Original"
+        Reloaded.__name__ = 'Original'
         obj = Reloaded(x=42)
         # CanonicalModelMetaclass.__instancecheck__ matches by name
         assert isinstance(obj, Original)
@@ -59,7 +58,7 @@ class TestCanonicalModelMetaclass:
         class Other:
             x: int = 2
 
-        Other.__name__ = "Base"
+        Other.__name__ = 'Base'
         assert issubclass(Other, Base)
 
     def test_subclasscheck_different_name(self):
@@ -92,7 +91,7 @@ class TestCanonicalMeta:
         class Reloaded:
             pass
 
-        Reloaded.__name__ = "Original"
+        Reloaded.__name__ = 'Original'
         obj = Reloaded()
         assert isinstance(obj, Original)
 
@@ -113,7 +112,7 @@ class TestCanonicalMeta:
         class Other:
             pass
 
-        Other.__name__ = "Base"
+        Other.__name__ = 'Base'
         assert issubclass(Other, Base)
 
     def test_subclasscheck_different_name(self):
@@ -139,7 +138,7 @@ class TestCanonicalMeta:
         class FakeBase:
             pass
 
-        FakeBase.__name__ = "Action"
+        FakeBase.__name__ = 'Action'
 
         class SubAction(FakeBase):
             pass
@@ -151,12 +150,12 @@ class TestCanonicalMeta:
         """When both cls and instance have action/observation attr, compare them."""
 
         class MyAction(metaclass=CanonicalMeta):
-            action = "run"
+            action = 'run'
 
         class Reloaded:
-            action = "run"
+            action = 'run'
 
-        Reloaded.__name__ = "MyAction"
+        Reloaded.__name__ = 'MyAction'
         obj = Reloaded()
         assert isinstance(obj, MyAction)
 
@@ -164,11 +163,11 @@ class TestCanonicalMeta:
         """Different action type attributes → not instance."""
 
         class MyAction(metaclass=CanonicalMeta):
-            action = "run"
+            action = 'run'
 
         class Reloaded:
-            action = "browse"
+            action = 'browse'
 
-        Reloaded.__name__ = "MyAction"
+        Reloaded.__name__ = 'MyAction'
         obj = Reloaded()
         assert not isinstance(obj, MyAction)

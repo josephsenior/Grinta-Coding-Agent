@@ -27,22 +27,22 @@ _CMD_RISK_MAP: dict[RiskCategory, ActionSecurityRisk] = {
 
 # Suspicious file-path patterns (write operations)
 _SENSITIVE_WRITE_PATHS: list[str] = [
-    "/etc/",
-    "/usr/",
-    "/bin/",
-    "/sbin/",
-    "/boot/",
-    "/proc/",
-    "/sys/",
-    "C:\\Windows\\",
-    "C:\\Program Files",
-    ".ssh/",
-    ".env",
-    ".aws/",
-    ".gitconfig",
-    ".bashrc",
-    ".zshrc",
-    ".profile",
+    '/etc/',
+    '/usr/',
+    '/bin/',
+    '/sbin/',
+    '/boot/',
+    '/proc/',
+    '/sys/',
+    'C:\\Windows\\',
+    'C:\\Program Files',
+    '.ssh/',
+    '.env',
+    '.aws/',
+    '.gitconfig',
+    '.bashrc',
+    '.zshrc',
+    '.profile',
 ]
 
 
@@ -80,22 +80,22 @@ class SecurityAnalyzer:
         risk = ActionSecurityRisk.LOW
 
         # 1. Sensitive path check
-        path_lower = (action.path or "").lower().replace("\\", "/")
+        path_lower = (action.path or '').lower().replace('\\', '/')
         for sensitive in _SENSITIVE_WRITE_PATHS:
-            if sensitive.lower().replace("\\", "/") in path_lower:
-                logger.warning("Security: write to sensitive path %s", action.path)
+            if sensitive.lower().replace('\\', '/') in path_lower:
+                logger.warning('Security: write to sensitive path %s', action.path)
                 risk = max(risk, ActionSecurityRisk.MEDIUM)
                 break
 
         # 2. Python syntax validation
-        if action.path.endswith(".py"):
+        if action.path.endswith('.py'):
             try:
                 ast.parse(action.content)
             except SyntaxError:
-                logger.warning("Security: syntax error in Python file %s", action.path)
+                logger.warning('Security: syntax error in Python file %s', action.path)
                 risk = max(risk, ActionSecurityRisk.HIGH)
             except Exception as exc:
-                logger.warning("Security: could not parse %s: %s", action.path, exc)
+                logger.warning('Security: could not parse %s: %s', action.path, exc)
                 risk = max(risk, ActionSecurityRisk.MEDIUM)
 
         return risk
@@ -112,7 +112,7 @@ class SecurityAnalyzer:
 
         if mapped >= ActionSecurityRisk.MEDIUM:
             logger.info(
-                "Security: command risk=%s reason=%r cmd=%s",
+                'Security: command risk=%s reason=%r cmd=%s',
                 category.value,
                 reason,
                 action.command[:120],
@@ -121,4 +121,4 @@ class SecurityAnalyzer:
         return mapped
 
 
-__all__ = ["SecurityAnalyzer"]
+__all__ = ['SecurityAnalyzer']

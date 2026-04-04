@@ -1,4 +1,4 @@
-﻿"""Runtime plugin registration and convenience exports.
+"""Runtime plugin registration and convenience exports.
 
 .. note:: **Two plugin systems exist in App:**
 
@@ -43,14 +43,14 @@ from backend.execution.plugins.agent_skills import (
 from backend.execution.plugins.requirement import Plugin, PluginRequirement
 
 __all__ = [
-    "AgentSkillsPlugin",
-    "AgentSkillsRequirement",
-    "Plugin",
-    "PluginRequirement",
-    "ALL_PLUGINS",
-    "__runtime_plugin_contract_frozen__",
-    "discover_plugins",
-    "filter_plugins_by_config",
+    'AgentSkillsPlugin',
+    'AgentSkillsRequirement',
+    'Plugin',
+    'PluginRequirement',
+    'ALL_PLUGINS',
+    '__runtime_plugin_contract_frozen__',
+    'discover_plugins',
+    'filter_plugins_by_config',
 ]
 
 # Contract stability — the ``Plugin`` / ``PluginRequirement`` ABCs
@@ -62,14 +62,14 @@ __runtime_plugin_contract_frozen__: bool = True
 # Built-in plugin registry
 # ------------------------------------------------------------------
 ALL_PLUGINS: dict[str, Callable[[], Plugin]] = {
-    "agent_skills": AgentSkillsPlugin,
+    'agent_skills': AgentSkillsPlugin,
 }
 
 
 # ------------------------------------------------------------------
 # Entry-point auto-discovery
 # ------------------------------------------------------------------
-_EP_GROUP = "app.runtime_plugins"
+_EP_GROUP = 'app.runtime_plugins'
 
 
 def discover_plugins() -> dict[str, Callable[[], Plugin]]:
@@ -85,7 +85,7 @@ def discover_plugins() -> dict[str, Callable[[], Plugin]]:
         for ep in eps:
             if ep.name in merged:
                 logger.debug(
-                    "Plugin %r already registered (built-in); ignoring entry-point from %s",
+                    'Plugin %r already registered (built-in); ignoring entry-point from %s',
                     ep.name,
                     ep.value,
                 )
@@ -93,17 +93,17 @@ def discover_plugins() -> dict[str, Callable[[], Plugin]]:
             try:
                 merged[ep.name] = ep.load()
                 logger.info(
-                    "Discovered plugin %r via entry-point: %s", ep.name, ep.value
+                    'Discovered plugin %r via entry-point: %s', ep.name, ep.value
                 )
             except Exception:
                 logger.warning(
-                    "Failed to load plugin entry-point %r (%s)",
+                    'Failed to load plugin entry-point %r (%s)',
                     ep.name,
                     ep.value,
                     exc_info=True,
                 )
     except Exception:
-        logger.debug("Entry-point discovery unavailable", exc_info=True)
+        logger.debug('Entry-point discovery unavailable', exc_info=True)
     return merged
 
 
@@ -121,16 +121,16 @@ def filter_plugins_by_config(
     Otherwise, only plugins whose ``name`` appears in the comma-separated
     allowlist are kept.
     """
-    raw = os.getenv("APP_PLUGINS", "").strip()
+    raw = os.getenv('APP_PLUGINS', '').strip()
     if not raw:
         return plugins  # no filter — all enabled
 
-    allowed = {n.strip().lower() for n in raw.split(",") if n.strip()}
+    allowed = {n.strip().lower() for n in raw.split(',') if n.strip()}
     filtered = [p for p in plugins if p.name.lower() in allowed]
     disabled = [p.name for p in plugins if p.name.lower() not in allowed]
     if disabled:
         logger.info(
-            "Plugins disabled by APP_PLUGINS allowlist: %s",
-            ", ".join(disabled),
+            'Plugins disabled by APP_PLUGINS allowlist: %s',
+            ', '.join(disabled),
         )
     return filtered

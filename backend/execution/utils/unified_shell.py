@@ -1,4 +1,4 @@
-﻿"""Unified shell session abstraction for cross-platform runtime.
+"""Unified shell session abstraction for cross-platform runtime.
 
 Provides a consistent interface for shell operations across different platforms
 and shell types (Bash, PowerShell, etc.).
@@ -14,9 +14,9 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
+    from backend.execution.utils.process_registry import TaskCancellationService
     from backend.ledger.action import CmdRunAction
     from backend.ledger.observation import Observation
-    from backend.execution.utils.process_registry import TaskCancellationService
 
 
 class ShellToolRegistryLike(Protocol):
@@ -98,7 +98,7 @@ class BaseShellSession(UnifiedShellSession, ABC):
         from backend.execution.utils.process_registry import TaskCancellationService
 
         self._cancellation = cancellation_service or TaskCancellationService(
-            label="runtime"
+            label='runtime'
         )
 
     @property
@@ -126,7 +126,7 @@ class BaseShellSession(UnifiedShellSession, ABC):
         """
         command = command.strip()
         run_in_background = False
-        if command.endswith("&"):
+        if command.endswith('&'):
             run_in_background = True
             command = command[:-1].strip()
             logger.info("Detected background command: '%s'", command)
@@ -145,7 +145,7 @@ class BaseShellSession(UnifiedShellSession, ABC):
 
         Subclasses with interactive shell support should override this.
         """
-        msg = f"{self.__class__.__name__} does not implement read_output()"
+        msg = f'{self.__class__.__name__} does not implement read_output()'
         raise NotImplementedError(msg)
 
     def write_input(self, data: str, is_control: bool = False) -> None:
@@ -153,13 +153,13 @@ class BaseShellSession(UnifiedShellSession, ABC):
 
         Subclasses with interactive shell support should override this.
         """
-        msg = f"{self.__class__.__name__} does not implement write_input()"
+        msg = f'{self.__class__.__name__} does not implement write_input()'
         raise NotImplementedError(msg)
 
     def close(self) -> None:
         """Close the shell session and clean up resources."""
         self._closed = True
-        logger.info("Shell session closed: %s", self.__class__.__name__)
+        logger.info('Shell session closed: %s', self.__class__.__name__)
 
     def _format_execution_observation(
         self, command: str, stdout: str, stderr: str, exit_code: int
@@ -207,7 +207,7 @@ class BaseShellSession(UnifiedShellSession, ABC):
                 if os.path.isdir(new_cwd):
                     self._cwd = new_cwd
         except Exception as e:
-            logger.debug("Failed to update CWD: %s", e)
+            logger.debug('Failed to update CWD: %s', e)
 
 
 def create_shell_session(
@@ -226,6 +226,7 @@ def create_shell_session(
         username: Optional username for the session
         no_change_timeout_seconds: Timeout for no output change
         max_memory_mb: Optional memory limit
+        cancellation_service: Optional hook to cancel in-flight shell work
 
     Returns:
         Appropriate shell session implementation
@@ -241,35 +242,35 @@ def create_shell_session(
     if cancellation_service is None:
         from backend.execution.utils.process_registry import TaskCancellationService
 
-        cancellation_service = TaskCancellationService(label="runtime")
+        cancellation_service = TaskCancellationService(label='runtime')
 
-    logger.info("Creating shell session for platform: %s", sys.platform)
-    logger.info("Detected shell: %s", resolved_tools.shell_type)
-    logger.info("Has tmux: %s", resolved_tools.has_tmux)
+    logger.info('Creating shell session for platform: %s', sys.platform)
+    logger.info('Detected shell: %s', resolved_tools.shell_type)
+    logger.info('Has tmux: %s', resolved_tools.has_tmux)
     logger.info(
-        "Runtime context: container=%s wsl=%s",
-        getattr(resolved_tools, "is_container_runtime", False),
-        getattr(resolved_tools, "is_wsl_runtime", False),
+        'Runtime context: container=%s wsl=%s',
+        getattr(resolved_tools, 'is_container_runtime', False),
+        getattr(resolved_tools, 'is_wsl_runtime', False),
     )
 
     # Common session arguments
     session_kwargs: dict[str, Any] = {
-        "work_dir": work_dir,
-        "username": username,
-        "no_change_timeout_seconds": no_change_timeout_seconds,
-        "max_memory_mb": max_memory_mb,
-        "cancellation_service": cancellation_service,
+        'work_dir': work_dir,
+        'username': username,
+        'no_change_timeout_seconds': no_change_timeout_seconds,
+        'max_memory_mb': max_memory_mb,
+        'cancellation_service': cancellation_service,
     }
 
     # Windows: Prefer Git Bash (SimpleBashSession) when available.
     # LLMs generate bash commands natively; running them in bash eliminates
     # the need for fragile PowerShell translation regexes.
-    if os.name == "nt":
+    if os.name == 'nt':
         if resolved_tools.has_bash:
             from backend.execution.utils.simple_bash import SimpleBashSession
 
             logger.info(
-                "Using SimpleBashSession (Linux-style command path via Git Bash on Windows)"
+                'Using SimpleBashSession (Linux-style command path via Git Bash on Windows)'
             )
             return SimpleBashSession(**session_kwargs)
 
@@ -277,8 +278,8 @@ def create_shell_session(
         from backend.execution.utils.windows_bash import WindowsPowershellSession
 
         logger.warning(
-            "Bash unavailable on Windows; falling back to PowerShell session. "
-            "For full Linux runtime behavior (tmux/interactivity), use Docker or WSL."
+            'Bash unavailable on Windows; falling back to PowerShell session. '
+            'For full Linux runtime behavior (tmux/interactivity), use Docker or WSL.'
         )
         return WindowsPowershellSession(
             **session_kwargs,  # type: ignore[arg-type]
@@ -291,17 +292,17 @@ def create_shell_session(
     if resolved_tools.has_tmux and resolved_tools.has_bash:
         from backend.execution.utils.bash import BashSession
 
-        logger.info("Using BashSession with tmux")
+        logger.info('Using BashSession with tmux')
         return BashSession(**session_kwargs)
 
     # Unix without tmux: Use simple Bash session
     if resolved_tools.has_bash:
         from backend.execution.utils.simple_bash import SimpleBashSession
 
-        logger.info("Using SimpleBashSession (no tmux)")
+        logger.info('Using SimpleBashSession (no tmux)')
         return SimpleBashSession(**session_kwargs)
 
     # Fallback: Should not happen if tools are detected correctly
     raise RuntimeError(
-        f"No suitable shell found for platform {sys.platform}. Detected shell: {resolved_tools.shell_type}"
+        f'No suitable shell found for platform {sys.platform}. Detected shell: {resolved_tools.shell_type}'
     )

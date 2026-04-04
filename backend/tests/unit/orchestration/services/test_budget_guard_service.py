@@ -4,8 +4,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from backend.orchestration.services.budget_guard_service import (
-    BudgetGuardService,
     _BUDGET_THRESHOLDS,
+    BudgetGuardService,
 )
 
 
@@ -15,7 +15,7 @@ class TestBudgetGuardService(unittest.TestCase):
     def setUp(self):
         """Create mock context for testing."""
         self.mock_context = MagicMock()
-        self.mock_context.id = "test-session-123"
+        self.mock_context.id = 'test-session-123'
         self.mock_context.state_tracker = MagicMock()
         self.service = BudgetGuardService(self.mock_context)
 
@@ -87,7 +87,7 @@ class TestBudgetGuardService(unittest.TestCase):
 
         self.assertEqual(len(self.service._alerted_thresholds), 0)
 
-    @patch("backend.orchestration.services.budget_guard_service.logger")
+    @patch('backend.orchestration.services.budget_guard_service.logger')
     def test_check_budget_thresholds_50_percent(self, mock_logger):
         """Test budget alert at 50% threshold."""
         budget_flag = MagicMock()
@@ -97,7 +97,7 @@ class TestBudgetGuardService(unittest.TestCase):
         self.mock_context.state = MagicMock()
         self.mock_context.state.budget_flag = budget_flag
 
-        with patch.object(self.service, "_emit_budget_alert") as mock_emit:
+        with patch.object(self.service, '_emit_budget_alert') as mock_emit:
             self.service._check_budget_thresholds()
 
             mock_emit.assert_called_once()
@@ -109,7 +109,7 @@ class TestBudgetGuardService(unittest.TestCase):
 
         self.assertIn(0.50, self.service._alerted_thresholds)
 
-    @patch("backend.orchestration.services.budget_guard_service.logger")
+    @patch('backend.orchestration.services.budget_guard_service.logger')
     def test_check_budget_thresholds_80_percent(self, mock_logger):
         """Test budget alert at 80% threshold."""
         budget_flag = MagicMock()
@@ -119,7 +119,7 @@ class TestBudgetGuardService(unittest.TestCase):
         self.mock_context.state = MagicMock()
         self.mock_context.state.budget_flag = budget_flag
 
-        with patch.object(self.service, "_emit_budget_alert") as mock_emit:
+        with patch.object(self.service, '_emit_budget_alert') as mock_emit:
             self.service._check_budget_thresholds()
 
             # Should emit for both 50% and 80%
@@ -128,7 +128,7 @@ class TestBudgetGuardService(unittest.TestCase):
         self.assertIn(0.50, self.service._alerted_thresholds)
         self.assertIn(0.80, self.service._alerted_thresholds)
 
-    @patch("backend.orchestration.services.budget_guard_service.logger")
+    @patch('backend.orchestration.services.budget_guard_service.logger')
     def test_check_budget_thresholds_90_percent(self, mock_logger):
         """Test budget alert at 90% threshold."""
         budget_flag = MagicMock()
@@ -138,7 +138,7 @@ class TestBudgetGuardService(unittest.TestCase):
         self.mock_context.state = MagicMock()
         self.mock_context.state.budget_flag = budget_flag
 
-        with patch.object(self.service, "_emit_budget_alert") as mock_emit:
+        with patch.object(self.service, '_emit_budget_alert') as mock_emit:
             self.service._check_budget_thresholds()
 
             # Should emit for all three thresholds
@@ -146,7 +146,7 @@ class TestBudgetGuardService(unittest.TestCase):
 
         self.assertEqual(self.service._alerted_thresholds, {0.50, 0.80, 0.90})
 
-    @patch("backend.orchestration.services.budget_guard_service.logger")
+    @patch('backend.orchestration.services.budget_guard_service.logger')
     def test_check_budget_thresholds_no_duplicate_alerts(self, mock_logger):
         """Test threshold alerts only fire once."""
         budget_flag = MagicMock()
@@ -156,7 +156,7 @@ class TestBudgetGuardService(unittest.TestCase):
         self.mock_context.state = MagicMock()
         self.mock_context.state.budget_flag = budget_flag
 
-        with patch.object(self.service, "_emit_budget_alert") as mock_emit:
+        with patch.object(self.service, '_emit_budget_alert') as mock_emit:
             # First check at 60%
             self.service._check_budget_thresholds()
             self.assertEqual(mock_emit.call_count, 1)
@@ -171,11 +171,11 @@ class TestBudgetGuardService(unittest.TestCase):
             # Should emit one more for 80% threshold
             self.assertEqual(mock_emit.call_count, 2)
 
-    @patch("backend.orchestration.services.budget_guard_service.logger")
+    @patch('backend.orchestration.services.budget_guard_service.logger')
     def test_emit_budget_alert_creates_status_observation(self, mock_logger):
         """Test _emit_budget_alert creates and emits StatusObservation."""
         with patch(
-            "backend.orchestration.services.budget_guard_service.StatusObservation"
+            'backend.orchestration.services.budget_guard_service.StatusObservation'
         ) as mock_obs_class:
             mock_obs = MagicMock()
             mock_obs_class.return_value = mock_obs
@@ -186,22 +186,22 @@ class TestBudgetGuardService(unittest.TestCase):
             mock_obs_class.assert_called_once()
             call_kwargs = mock_obs_class.call_args[1]
 
-            self.assertIn("50%", call_kwargs["content"])
-            self.assertIn("$100.00", call_kwargs["content"])
-            self.assertEqual(call_kwargs["status_type"], "budget_alert")
-            self.assertEqual(call_kwargs["extras"]["threshold"], 0.50)
-            self.assertEqual(call_kwargs["extras"]["pct_used"], 0.5)
-            self.assertEqual(call_kwargs["extras"]["current_cost"], 50.0)
-            self.assertEqual(call_kwargs["extras"]["max_budget"], 100.0)
+            self.assertIn('50%', call_kwargs['content'])
+            self.assertIn('$100.00', call_kwargs['content'])
+            self.assertEqual(call_kwargs['status_type'], 'budget_alert')
+            self.assertEqual(call_kwargs['extras']['threshold'], 0.50)
+            self.assertEqual(call_kwargs['extras']['pct_used'], 0.5)
+            self.assertEqual(call_kwargs['extras']['current_cost'], 50.0)
+            self.assertEqual(call_kwargs['extras']['max_budget'], 100.0)
 
             # Check event was emitted
             self.mock_context.emit_event.assert_called_once()
 
-    @patch("backend.orchestration.services.budget_guard_service.logger")
+    @patch('backend.orchestration.services.budget_guard_service.logger')
     def test_emit_budget_alert_logs_warning(self, mock_logger):
         """Test _emit_budget_alert logs warning message."""
         with patch(
-            "backend.orchestration.services.budget_guard_service.StatusObservation"
+            'backend.orchestration.services.budget_guard_service.StatusObservation'
         ):
             self.service._emit_budget_alert(0.80, 80.0, 100.0, 0.8)
 
@@ -209,14 +209,14 @@ class TestBudgetGuardService(unittest.TestCase):
             log_call = mock_logger.warning.call_args
             # Check that 80 (the percentage value) is in the args
             self.assertEqual(log_call[0][1], 80)  # level_pct argument
-            self.assertIn("threshold", log_call[0][0])  # format string
+            self.assertIn('threshold', log_call[0][0])  # format string
 
-    @patch("backend.orchestration.services.budget_guard_service.logger")
+    @patch('backend.orchestration.services.budget_guard_service.logger')
     def test_emit_budget_alert_handles_exception(self, mock_logger):
         """Test _emit_budget_alert handles exception gracefully."""
         with patch(
-            "backend.orchestration.services.budget_guard_service.StatusObservation",
-            side_effect=Exception("Test error"),
+            'backend.orchestration.services.budget_guard_service.StatusObservation',
+            side_effect=Exception('Test error'),
         ):
             # Should not raise exception
             self.service._emit_budget_alert(0.50, 50.0, 100.0, 0.5)
@@ -229,7 +229,7 @@ class TestBudgetGuardService(unittest.TestCase):
         self.assertEqual(_BUDGET_THRESHOLDS, (0.50, 0.80, 0.90))
         self.assertEqual(len(_BUDGET_THRESHOLDS), 3)
 
-    @patch("backend.orchestration.services.budget_guard_service.logger")
+    @patch('backend.orchestration.services.budget_guard_service.logger')
     def test_sync_with_metrics_integration(self, mock_logger):
         """Test full sync_with_metrics integration."""
         budget_flag = MagicMock()
@@ -240,7 +240,7 @@ class TestBudgetGuardService(unittest.TestCase):
         self.mock_context.state.budget_flag = budget_flag
 
         with patch(
-            "backend.orchestration.services.budget_guard_service.StatusObservation"
+            'backend.orchestration.services.budget_guard_service.StatusObservation'
         ):
             self.service.sync_with_metrics()
 
@@ -260,7 +260,7 @@ class TestBudgetGuardService(unittest.TestCase):
         self.mock_context.state = MagicMock()
         self.mock_context.state.budget_flag = budget_flag
 
-        with patch.object(self.service, "_emit_budget_alert") as mock_emit:
+        with patch.object(self.service, '_emit_budget_alert') as mock_emit:
             self.service._check_budget_thresholds()
 
             # Should trigger 50% threshold (50.456789 / 100.789 = 50.06%)
@@ -268,5 +268,5 @@ class TestBudgetGuardService(unittest.TestCase):
             self.assertIn(0.50, self.service._alerted_thresholds)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

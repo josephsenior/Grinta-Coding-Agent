@@ -16,10 +16,10 @@ from backend.ledger.action import NullAction
 from backend.ledger.action.files import FileEditAction
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _verifier(verification_enabled: bool = True) -> ActionVerifier:
     runtime = MagicMock()
@@ -28,7 +28,7 @@ def _verifier(verification_enabled: bool = True) -> ActionVerifier:
     return v
 
 
-def _file_edit_action(path: str = "foo.py") -> FileEditAction:
+def _file_edit_action(path: str = 'foo.py') -> FileEditAction:
     action = MagicMock(spec=FileEditAction)
     action.path = path
     return action
@@ -44,6 +44,7 @@ def _cmd_output(content: str) -> CmdOutputObservation:
 # __init__
 # ---------------------------------------------------------------------------
 
+
 class TestInit:
     def test_stores_runtime(self):
         rt = MagicMock()
@@ -58,6 +59,7 @@ class TestInit:
 # ---------------------------------------------------------------------------
 # should_verify
 # ---------------------------------------------------------------------------
+
 
 class TestShouldVerify:
     def test_file_edit_action_is_verified(self):
@@ -80,19 +82,21 @@ class TestShouldVerify:
 # verify_action — disabled
 # ---------------------------------------------------------------------------
 
+
 class TestVerifyActionDisabled:
     @pytest.mark.asyncio
     async def test_disabled_returns_success(self):
         v = _verifier(verification_enabled=False)
         ok, msg, obs = await v.verify_action(_file_edit_action())
         assert ok is True
-        assert "disabled" in msg.lower()
+        assert 'disabled' in msg.lower()
         assert obs is None
 
 
 # ---------------------------------------------------------------------------
 # verify_action — non-file actions
 # ---------------------------------------------------------------------------
+
 
 class TestVerifyActionNonFile:
     @pytest.mark.asyncio
@@ -107,6 +111,7 @@ class TestVerifyActionNonFile:
 # verify_action — FileEditAction success
 # ---------------------------------------------------------------------------
 
+
 class TestVerifyActionFileSuccess:
     @pytest.mark.asyncio
     async def test_file_exists_returns_success(self):
@@ -119,15 +124,15 @@ class TestVerifyActionFileSuccess:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return _cmd_output("FILE_EXISTS")
-            return _cmd_output("42 lines, 1024 bytes")
+                return _cmd_output('FILE_EXISTS')
+            return _cmd_output('42 lines, 1024 bytes')
 
-        with patch.object(v, "_run_runtime_action", side_effect=fake_run_action):
-            ok, msg, obs = await v.verify_action(_file_edit_action("main.py"))
+        with patch.object(v, '_run_runtime_action', side_effect=fake_run_action):
+            ok, msg, obs = await v.verify_action(_file_edit_action('main.py'))
 
         assert ok is True
-        assert "main.py" in msg
-        assert "42" in msg
+        assert 'main.py' in msg
+        assert '42' in msg
 
     @pytest.mark.asyncio
     async def test_file_exists_but_empty_returns_warning(self):
@@ -138,19 +143,20 @@ class TestVerifyActionFileSuccess:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return _cmd_output("FILE_EXISTS")
-            return _cmd_output("0 lines, 0 bytes")
+                return _cmd_output('FILE_EXISTS')
+            return _cmd_output('0 lines, 0 bytes')
 
-        with patch.object(v, "_run_runtime_action", side_effect=fake_run_action):
-            ok, msg, obs = await v.verify_action(_file_edit_action("empty.py"))
+        with patch.object(v, '_run_runtime_action', side_effect=fake_run_action):
+            ok, msg, obs = await v.verify_action(_file_edit_action('empty.py'))
 
         assert ok is True  # still ok, just a warning
-        assert "empty" in msg.lower() or "0" in msg
+        assert 'empty' in msg.lower() or '0' in msg
 
 
 # ---------------------------------------------------------------------------
 # verify_action — FileEditAction failure
 # ---------------------------------------------------------------------------
+
 
 class TestVerifyActionFileMissing:
     @pytest.mark.asyncio
@@ -158,23 +164,23 @@ class TestVerifyActionFileMissing:
         v = _verifier()
 
         async def fake_run_action(action):
-            return _cmd_output("FILE_MISSING")
+            return _cmd_output('FILE_MISSING')
 
-        with patch.object(v, "_run_runtime_action", side_effect=fake_run_action):
-            ok, msg, obs = await v.verify_action(_file_edit_action("gone.py"))
+        with patch.object(v, '_run_runtime_action', side_effect=fake_run_action):
+            ok, msg, obs = await v.verify_action(_file_edit_action('gone.py'))
 
         assert ok is False
-        assert "gone.py" in msg
+        assert 'gone.py' in msg
 
     @pytest.mark.asyncio
     async def test_unexpected_obs_type_returns_failure(self):
         v = _verifier()
 
         async def fake_run_action(action):
-            return ErrorObservation("unexpected")
+            return ErrorObservation('unexpected')
 
-        with patch.object(v, "_run_runtime_action", side_effect=fake_run_action):
-            ok, msg, obs = await v.verify_action(_file_edit_action("mystery.py"))
+        with patch.object(v, '_run_runtime_action', side_effect=fake_run_action):
+            ok, msg, obs = await v.verify_action(_file_edit_action('mystery.py'))
 
         assert ok is False
 
@@ -183,13 +189,13 @@ class TestVerifyActionFileMissing:
         v = _verifier()
 
         async def fake_run_action(action):
-            raise OSError("disk error")
+            raise OSError('disk error')
 
-        with patch.object(v, "_run_runtime_action", side_effect=fake_run_action):
-            ok, msg, obs = await v.verify_action(_file_edit_action("err.py"))
+        with patch.object(v, '_run_runtime_action', side_effect=fake_run_action):
+            ok, msg, obs = await v.verify_action(_file_edit_action('err.py'))
 
         assert ok is False
-        assert "error" in msg.lower()
+        assert 'error' in msg.lower()
 
     @pytest.mark.asyncio
     async def test_content_check_with_unexpected_obs_reports_exists(self):
@@ -201,10 +207,10 @@ class TestVerifyActionFileMissing:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return _cmd_output("FILE_EXISTS")
+                return _cmd_output('FILE_EXISTS')
             return MagicMock()  # not a CmdOutputObservation
 
-        with patch.object(v, "_run_runtime_action", side_effect=fake_run_action):
-            ok, msg, obs = await v.verify_action(_file_edit_action("partial.py"))
+        with patch.object(v, '_run_runtime_action', side_effect=fake_run_action):
+            ok, msg, obs = await v.verify_action(_file_edit_action('partial.py'))
 
         assert ok is True

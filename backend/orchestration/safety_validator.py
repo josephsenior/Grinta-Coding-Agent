@@ -64,9 +64,9 @@ class SafetyValidator:
         self.config = config
         self.analyzer = CommandAnalyzer(
             {
-                "blocked_commands": config.blocked_patterns,
-                "allowed_commands": config.allowed_exceptions,
-                "risk_threshold": config.risk_threshold,
+                'blocked_commands': config.blocked_patterns,
+                'allowed_commands': config.allowed_exceptions,
+                'risk_threshold': config.risk_threshold,
             },
         )
 
@@ -78,12 +78,12 @@ class SafetyValidator:
 
                 self.telemetry_logger = AuditLogger(config.audit_log_path)
             except ImportError:
-                logger.warning("AuditLogger not available, audit logging disabled")
+                logger.warning('AuditLogger not available, audit logging disabled')
 
         logger.info(
-            "SafetyValidator initialized: environment=%s, "
-            "risk_threshold=%s, "
-            "mandatory_validation=%s",
+            'SafetyValidator initialized: environment=%s, '
+            'risk_threshold=%s, '
+            'mandatory_validation=%s',
             config.environment,
             config.risk_threshold,
             config.enable_mandatory_validation,
@@ -107,7 +107,7 @@ class SafetyValidator:
         """
         # Analyze the action
         # CommandAnalyzer.analyze takes a command string, not an action
-        command = action.command if hasattr(action, "command") else str(action)
+        command = action.command if hasattr(action, 'command') else str(action)
         raw_assessment = self.analyzer.analyze(command)
 
         # raw_assessment is a tuple: (RiskCategory, str, list[str])
@@ -115,11 +115,11 @@ class SafetyValidator:
         # Convert RiskCategory to ActionSecurityRisk
 
         risk_level_map = {
-            "none": ActionSecurityRisk.LOW,
-            "low": ActionSecurityRisk.LOW,
-            "medium": ActionSecurityRisk.MEDIUM,
-            "high": ActionSecurityRisk.HIGH,
-            "critical": ActionSecurityRisk.HIGH,
+            'none': ActionSecurityRisk.LOW,
+            'low': ActionSecurityRisk.LOW,
+            'medium': ActionSecurityRisk.MEDIUM,
+            'high': ActionSecurityRisk.HIGH,
+            'critical': ActionSecurityRisk.HIGH,
         }
         risk_level = risk_level_map.get(
             risk_category.value.lower(), ActionSecurityRisk.UNKNOWN
@@ -175,7 +175,7 @@ class SafetyValidator:
         # Always block CRITICAL risks
         if assessment.risk_category == RiskCategory.CRITICAL:
             logger.error(
-                "CRITICAL risk action blocked: %s (session=%s, iteration=%s)",
+                'CRITICAL risk action blocked: %s (session=%s, iteration=%s)',
                 assessment.reason,
                 context.session_id,
                 context.iteration,
@@ -185,11 +185,11 @@ class SafetyValidator:
         # Block HIGH risks in production
         if (
             assessment.risk_level == ActionSecurityRisk.HIGH
-            and self.config.environment == "production"
+            and self.config.environment == 'production'
             and self.config.block_in_production
         ):
             logger.warning(
-                "HIGH risk action blocked in production: %s (session=%s)",
+                'HIGH risk action blocked in production: %s (session=%s)',
                 assessment.reason,
                 context.session_id,
             )
@@ -200,10 +200,10 @@ class SafetyValidator:
             assessment.risk_level == ActionSecurityRisk.HIGH
             and self.config.enable_mandatory_validation
             and context.is_autonomous
-            and self.config.risk_threshold in ["critical", "high"]
+            and self.config.risk_threshold in ['critical', 'high']
         ):
             logger.warning(
-                "HIGH risk action blocked in autonomous mode: %s",
+                'HIGH risk action blocked in autonomous mode: %s',
                 assessment.reason,
             )
             return True
@@ -237,15 +237,15 @@ class SafetyValidator:
         """
         if assessment.risk_category == RiskCategory.CRITICAL:
             return (
-                f"CRITICAL RISK DETECTED: {assessment.reason}\n"
-                f"This action could cause system damage or data loss.\n"
-                f"Matched patterns: {', '.join(assessment.matched_patterns)}"
+                f'CRITICAL RISK DETECTED: {assessment.reason}\n'
+                f'This action could cause system damage or data loss.\n'
+                f'Matched patterns: {", ".join(assessment.matched_patterns)}'
             )
         if assessment.risk_level == ActionSecurityRisk.HIGH:
             return (
-                f"HIGH RISK DETECTED: {assessment.reason}\n"
-                f"This action is blocked in {self.config.environment} environment.\n"
-                f"Matched patterns: {', '.join(assessment.matched_patterns)}"
+                f'HIGH RISK DETECTED: {assessment.reason}\n'
+                f'This action is blocked in {self.config.environment} environment.\n'
+                f'Matched patterns: {", ".join(assessment.matched_patterns)}'
             )
         return assessment.reason
 
@@ -267,7 +267,7 @@ class SafetyValidator:
 
         """
         if not self.telemetry_logger:
-            return "audit_disabled"
+            return 'audit_disabled'
 
         try:
             return await self.telemetry_logger.log_action(
@@ -278,8 +278,8 @@ class SafetyValidator:
                 timestamp=datetime.now(),
             )
         except Exception as e:
-            logger.error("Failed to log to audit trail: %s", e)
-            return "audit_error"
+            logger.error('Failed to log to audit trail: %s', e)
+            return 'audit_error'
 
     async def _send_alert(
         self,
@@ -299,7 +299,7 @@ class SafetyValidator:
             return
 
         alert_message = self._format_alert_message(action, context, result)
-        logger.warning("SECURITY ALERT: %s", alert_message)
+        logger.warning('SECURITY ALERT: %s', alert_message)
 
         # Send webhook alert if configured
         if self.config.alert_webhook_url:
@@ -307,7 +307,7 @@ class SafetyValidator:
 
             create_tracked_task(
                 self._send_webhook_alert(alert_message),
-                name="safety-webhook-alert",
+                name='safety-webhook-alert',
             )
 
     def _format_alert_message(
@@ -327,14 +327,14 @@ class SafetyValidator:
             Formatted alert message
 
         """
-        status = "BLOCKED" if not result.allowed else "HIGH RISK"
+        status = 'BLOCKED' if not result.allowed else 'HIGH RISK'
         return (
-            f"{status}: {result.reason}\n"
-            f"Session: {context.session_id}\n"
-            f"Iteration: {context.iteration}\n"
-            f"Action: {type(action).__name__}\n"
-            f"Risk Level: {result.risk_level.name}\n"
-            f"Environment: {self.config.environment}"
+            f'{status}: {result.reason}\n'
+            f'Session: {context.session_id}\n'
+            f'Iteration: {context.iteration}\n'
+            f'Action: {type(action).__name__}\n'
+            f'Risk Level: {result.risk_level.name}\n'
+            f'Environment: {self.config.environment}'
         )
 
     async def _send_webhook_alert(self, message: str) -> None:
@@ -344,16 +344,16 @@ class SafetyValidator:
             message: Alert message to send
 
         """
-        url = getattr(self.config, "alert_webhook_url", None)
+        url = getattr(self.config, 'alert_webhook_url', None)
         if not url:
-            logger.debug("No alert webhook URL configured; skipping webhook alert.")
+            logger.debug('No alert webhook URL configured; skipping webhook alert.')
             return
 
         try:
             import aiohttp
 
             async with aiohttp.ClientSession() as session:
-                payload = {"text": message, "username": "App Security"}
+                payload = {'text': message, 'username': 'App Security'}
                 async with session.post(
                     url,
                     json=payload,
@@ -361,7 +361,7 @@ class SafetyValidator:
                 ) as response:
                     if response.status != 200:
                         logger.error(
-                            "Failed to send webhook alert: %s", response.status
+                            'Failed to send webhook alert: %s', response.status
                         )
         except Exception as e:
-            logger.error("Error sending webhook alert: %s", e)
+            logger.error('Error sending webhook alert: %s', e)

@@ -1,12 +1,12 @@
 """Definition of the Orchestrator finish tool for signalling task completion."""
 
-from backend.engine.tools.common import create_tool_definition
 from backend.engine.contracts import ChatCompletionToolParam
+from backend.engine.tools.common import create_tool_definition
 from backend.inference.tool_names import FINISH_TOOL_NAME
 
 _FINISH_DESCRIPTION = (
-    "Signal task completion. Include a summary of actions taken, results, and any next steps. "
-    "Use when the task is done or you cannot proceed further."
+    'Signal task completion. Include a summary of actions taken, results, and any next steps. '
+    'Use when the task is done or you cannot proceed further.'
 )
 
 
@@ -16,35 +16,35 @@ def create_finish_tool() -> ChatCompletionToolParam:
         name=FINISH_TOOL_NAME,
         description=_FINISH_DESCRIPTION,
         properties={
-            "message": {
-                "type": "string",
-                "description": "Final message to send to the user",
+            'message': {
+                'type': 'string',
+                'description': 'Final message to send to the user',
             },
-            "completed": {
-                "type": "array",
-                "description": "List of tasks or steps that were completed during this session",
-                "items": {"type": "string"},
+            'completed': {
+                'type': 'array',
+                'description': 'List of tasks or steps that were completed during this session',
+                'items': {'type': 'string'},
             },
-            "blocked_by": {
-                "type": "string",
-                "description": (
-                    "If you were unable to fully complete the task, describe what is "
-                    "blocking progress (missing info, permissions, external dependency, etc.)"
+            'blocked_by': {
+                'type': 'string',
+                'description': (
+                    'If you were unable to fully complete the task, describe what is '
+                    'blocking progress (missing info, permissions, external dependency, etc.)'
                 ),
             },
-            "next_steps": {
-                "type": "array",
-                "description": "Concrete next steps the user should take to continue",
-                "items": {"type": "string"},
+            'next_steps': {
+                'type': 'array',
+                'description': 'Concrete next steps the user should take to continue',
+                'items': {'type': 'string'},
             },
-            "lessons_learned": {
-                "type": "string",
-                "description": (
-                    "Internal reflection on what you learned during this task. "
-                    "Identify recurring patterns, mistakes you made, or verified "
-                    "solutions that should be remembered for future sessions."
+            'lessons_learned': {
+                'type': 'string',
+                'description': (
+                    'Internal reflection on what you learned during this task. '
+                    'Identify recurring patterns, mistakes you made, or verified '
+                    'solutions that should be remembered for future sessions.'
                 ),
             },
         },
-        required=["message"],
+        required=['message'],
     )

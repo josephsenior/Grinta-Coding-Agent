@@ -1,4 +1,4 @@
-﻿"""Pre-execution diff preview middleware.
+"""Pre-execution diff preview middleware.
 
 Generates a unified diff showing what a FileEditAction or FileWriteAction
 *will* change **before** it runs, and attaches it to the tool-invocation
@@ -51,19 +51,21 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
     # observe stage — append diff summary to observation content
     # -----------------------------------------------------------------
     async def observe(self, ctx: ToolInvocationContext, observation=None) -> None:
-        diff = ctx.metadata.get("pre_exec_diff")
+        diff = ctx.metadata.get('pre_exec_diff')
         if not diff or observation is None:
             return
 
         # Append a concise diff to the observation so the LLM sees what changed
-        content = getattr(observation, "content", None)
+        content = getattr(observation, 'content', None)
         if content is None or not isinstance(content, str):
             return
 
         # Limit diff size to avoid bloating context
-        diff_preview = diff if len(diff) <= 2000 else diff[:2000] + "\n... (diff truncated)"
+        diff_preview = (
+            diff if len(diff) <= 2000 else diff[:2000] + '\n... (diff truncated)'
+        )
         observation.content = (
-            content + "\n\n<DIFF_PREVIEW>\n" + diff_preview + "\n</DIFF_PREVIEW>"
+            content + '\n\n<DIFF_PREVIEW>\n' + diff_preview + '\n</DIFF_PREVIEW>'
         )
 
     # -----------------------------------------------------------------
@@ -89,37 +91,37 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
 
             diff = get_diff(old_content, new_content, path=action.path)
             if diff:
-                ctx.metadata["pre_exec_diff"] = diff
+                ctx.metadata['pre_exec_diff'] = diff
                 logger.debug(
-                    "Pre-exec diff generated for %s (%d chars)",
+                    'Pre-exec diff generated for %s (%d chars)',
                     action.path,
                     len(diff),
                 )
         except Exception:
-            logger.debug("Pre-exec diff skipped for FileEditAction", exc_info=True)
+            logger.debug('Pre-exec diff skipped for FileEditAction', exc_info=True)
 
     def _simulate_edit(self, old_content: str, action) -> str | None:
         """Simulate the edit on old content based on action command."""
-        if action.command == "replace_text" and action.old_str:
-            return old_content.replace(action.old_str, action.new_str or "", 1)
-        if action.command == "create_file":
-            return action.file_text or ""
-        if action.command == "insert_text" and action.insert_line is not None:
+        if action.command == 'replace_text' and action.old_str:
+            return old_content.replace(action.old_str, action.new_str or '', 1)
+        if action.command == 'create_file':
+            return action.file_text or ''
+        if action.command == 'insert_text' and action.insert_line is not None:
             lines = old_content.splitlines(keepends=True)
             insert_idx = max(0, min(action.insert_line, len(lines)))
-            lines.insert(insert_idx, (action.new_str or "") + "\n")
-            return "".join(lines)
+            lines.insert(insert_idx, (action.new_str or '') + '\n')
+            return ''.join(lines)
         return None  # view or unknown — nothing to diff
 
     async def _diff_for_write(self, ctx: ToolInvocationContext, action) -> None:
         """Compute the diff that a FileWriteAction will produce."""
         try:
             path = self._resolve_path(action.path, ctx)
-            old_content = ""
+            old_content = ''
             if path and os.path.isfile(path):
-                old_content = self._read_file(path) or ""
+                old_content = self._read_file(path) or ''
 
-            new_content = action.content if hasattr(action, "content") else ""
+            new_content = action.content if hasattr(action, 'content') else ''
             if old_content == new_content:
                 return
 
@@ -127,14 +129,14 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
 
             diff = get_diff(old_content, new_content, path=action.path)
             if diff:
-                ctx.metadata["pre_exec_diff"] = diff
+                ctx.metadata['pre_exec_diff'] = diff
                 logger.debug(
-                    "Pre-exec diff generated for %s (%d chars)",
+                    'Pre-exec diff generated for %s (%d chars)',
                     action.path,
                     len(diff),
                 )
         except Exception:
-            logger.debug("Pre-exec diff skipped for FileWriteAction", exc_info=True)
+            logger.debug('Pre-exec diff skipped for FileWriteAction', exc_info=True)
 
     @staticmethod
     def _resolve_path(rel_path: str, ctx: ToolInvocationContext) -> str | None:
@@ -144,8 +146,8 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
         # Try extracting workspace root from the controller's runtime
         try:
             runtime = ctx.controller.runtime
-            workspace = getattr(runtime, "workspace_dir", None) or getattr(
-                runtime, "workspace_path", None
+            workspace = getattr(runtime, 'workspace_dir', None) or getattr(
+                runtime, 'workspace_path', None
             )
             if workspace:
                 return os.path.join(str(workspace), rel_path)
@@ -159,7 +161,7 @@ class PreExecDiffMiddleware(ToolInvocationMiddleware):
         try:
             if os.path.getsize(path) > max_bytes:
                 return None
-            with open(path, encoding="utf-8", errors="replace") as fh:
+            with open(path, encoding='utf-8', errors='replace') as fh:
                 return fh.read()
         except Exception:
             return None

@@ -32,83 +32,83 @@ def get_subparser(parser: ArgumentParser, name: str) -> ArgumentParser:
 def add_common_arguments(parser: argparse.ArgumentParser) -> None:
     """Add common arguments shared between CLI and headless modes."""
     parser.add_argument(
-        "--config-file",
+        '--config-file',
         type=str,
         default=DEFAULT_CONFIG_FILE,
-        help=f"Path to the config file (default: {DEFAULT_CONFIG_FILE} in the current directory)",
+        help=f'Path to the config file (default: {DEFAULT_CONFIG_FILE} in the current directory)',
     )
     parser.add_argument(
-        "-t", "--task", type=str, default="", help="The task for the agent to perform"
+        '-t', '--task', type=str, default='', help='The task for the agent to perform'
     )
     parser.add_argument(
-        "-f",
-        "--file",
+        '-f',
+        '--file',
         type=str,
-        help="Path to a file containing the task. Overrides -t if both are provided.",
+        help='Path to a file containing the task. Overrides -t if both are provided.',
     )
-    parser.add_argument("-n", "--name", help="Session name", type=str, default="")
-    parser.add_argument("--log-level", help="Set the log level", type=str, default=None)
+    parser.add_argument('-n', '--name', help='Session name', type=str, default='')
+    parser.add_argument('--log-level', help='Set the log level', type=str, default=None)
     parser.add_argument(
-        "-l",
-        "--llm-config",
+        '-l',
+        '--llm-config',
         default=None,
         type=str,
         help=(
-            "Replace default LLM config with the specified LLM config, "
+            'Replace default LLM config with the specified LLM config, '
             "e.g. 'llama3' for llm.llama3 section in settings.json"
         ),
     )
     parser.add_argument(
-        "--agent-config",
+        '--agent-config',
         default=None,
         type=str,
         help=(
-            "Replace default Agent config with the specified Agent config, "
+            'Replace default Agent config with the specified Agent config, '
             "e.g. 'Orchestrator' for agent.Orchestrator section in settings.json"
         ),
     )
     parser.add_argument(
-        "-v", "--version", action="store_true", help="Show version information"
+        '-v', '--version', action='store_true', help='Show version information'
     )
 
 
 def add_headless_specific_arguments(parser: argparse.ArgumentParser) -> None:
     """Add arguments specific to headless mode (full evaluation suite)."""
     parser.add_argument(
-        "-d", "--directory", type=str, help="The working directory for the agent"
+        '-d', '--directory', type=str, help='The working directory for the agent'
     )
     parser.add_argument(
-        "-c",
-        "--agent-cls",
+        '-c',
+        '--agent-cls',
         default=None,
         type=str,
-        help="Name of the default agent to use",
+        help='Name of the default agent to use',
     )
     parser.add_argument(
-        "-i",
-        "--max-iterations",
+        '-i',
+        '--max-iterations',
         default=None,
         type=int,
-        help="The maximum number of iterations to run the agent",
+        help='The maximum number of iterations to run the agent',
     )
     parser.add_argument(
-        "-b",
-        "--max-budget-per-task",
+        '-b',
+        '--max-budget-per-task',
         type=float,
-        help="The maximum budget allowed per task, beyond which the agent will stop.",
+        help='The maximum budget allowed per task, beyond which the agent will stop.',
     )
     parser.add_argument(
-        "--no-auto-continue",
+        '--no-auto-continue',
         help=(
-            "Disable auto-continue responses in headless mode (i.e. headless "
-            "will read from stdin instead of auto-continuing)"
+            'Disable auto-continue responses in headless mode (i.e. headless '
+            'will read from stdin instead of auto-continuing)'
         ),
-        action="store_true",
+        action='store_true',
         default=False,
     )
     parser.add_argument(
-        "--selected-repo",
-        help="GitHub repository to clone (format: owner/repo)",
+        '--selected-repo',
+        help='GitHub repository to clone (format: owner/repo)',
         type=str,
         default=None,
     )
@@ -117,45 +117,45 @@ def add_headless_specific_arguments(parser: argparse.ArgumentParser) -> None:
 def get_cli_parser() -> argparse.ArgumentParser:
     """Create argument parser for App."""
     description = (
-        "Welcome to App: Code Less, Make More\n\n"
+        'Welcome to App: Code Less, Make More\n\n'
         "App is now a GUI-only application. Use 'app serve' to launch "
-        "the web interface."
+        'the web interface.'
     )
     parser = argparse.ArgumentParser(
         description=description,
-        prog="app",
+        prog='app',
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(
-        dest="command",
-        title="commands",
-        metavar="COMMAND",
+        dest='command',
+        title='commands',
+        metavar='COMMAND',
     )
-    subparsers.add_parser("serve", help="Launch the App GUI server (web interface)")
+    subparsers.add_parser('serve', help='Launch the App GUI server (web interface)')
 
     subparsers.add_parser(
-        "health", help="Run production health checks for critical dependencies"
+        'health', help='Run production health checks for critical dependencies'
     )
 
-    init_parser = subparsers.add_parser("init", help="Initialize a new App project")
+    init_parser = subparsers.add_parser('init', help='Initialize a new App project')
     init_parser.add_argument(
-        "project_name",
-        nargs="?",
-        help="Name of the project (defaults to current directory)",
+        'project_name',
+        nargs='?',
+        help='Name of the project (defaults to current directory)',
     )
     init_parser.add_argument(
-        "--template", default="basic", help="Project template to use"
+        '--template', default='basic', help='Project template to use'
     )
 
     parser.add_argument(
-        "--conversation", help="The conversation id to continue", type=str, default=None
+        '--conversation', help='The conversation id to continue', type=str, default=None
     )
     return parser
 
 
 def get_headless_parser() -> argparse.ArgumentParser:
     """Create argument parser for headless mode with full argument set."""
-    parser = argparse.ArgumentParser(description="Run the agent via CLI")
+    parser = argparse.ArgumentParser(description='Run the agent via CLI')
     add_common_arguments(parser)
     add_headless_specific_arguments(parser)
     return parser

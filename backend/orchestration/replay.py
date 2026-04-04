@@ -58,12 +58,12 @@ class ReplayManager:
                 continue
             replay_events.append(event)
         if replay_events:
-            logger.info("Replay events loaded, events length = %s", len(replay_events))
+            logger.info('Replay events loaded, events length = %s', len(replay_events))
             for index in range(len(replay_events) - 1):
                 event = replay_events[index]
                 if isinstance(event, MessageAction) and event.wait_for_response:
                     logger.info(
-                        "Replay events contains wait_for_response message action, ignoring wait_for_response"
+                        'Replay events contains wait_for_response message action, ignoring wait_for_response'
                     )
                     event.wait_for_response = False
         self.replay_events = replay_events
@@ -116,7 +116,7 @@ class ReplayManager:
         event = self.replay_events[self.replay_index]
         if not isinstance(event, Action):
             raise RuntimeError(
-                f"Unexpected non-action event in replay at index {self.replay_index}: {type(event).__name__}"
+                f'Unexpected non-action event in replay at index {self.replay_index}: {type(event).__name__}'
             )
         self.replay_index += 1
         return event
@@ -144,15 +144,15 @@ class ReplayManager:
             action_type = (
                 type(self.replay_events[action_idx]).__name__
                 if 0 <= action_idx < len(self.replay_events)
-                else "unknown"
+                else 'unknown'
             )
             divergence = ReplayDivergence(
                 index=action_idx,
                 action_type=action_type,
                 expected_hash=expected_hash,
                 actual_hash=actual_hash,
-                message=f"Replay divergence at index {action_idx}: "
-                f"expected hash {expected_hash[:8]}, got {actual_hash[:8]}",
+                message=f'Replay divergence at index {action_idx}: '
+                f'expected hash {expected_hash[:8]}, got {actual_hash[:8]}',
             )
             self._divergences.append(divergence)
             logger.warning(divergence.message)
@@ -163,11 +163,11 @@ class ReplayManager:
     def snapshot(self) -> dict[str, Any]:
         """Diagnostic snapshot for debug endpoints."""
         return {
-            "replay_mode": self.replay_mode,
-            "replay_index": self.replay_index,
-            "total_events": len(self.replay_events) if self.replay_events else 0,
-            "divergence_count": len(self._divergences),
-            "is_deterministic": self.is_deterministic,
+            'replay_mode': self.replay_mode,
+            'replay_index': self.replay_index,
+            'total_events': len(self.replay_events) if self.replay_events else 0,
+            'divergence_count': len(self._divergences),
+            'is_deterministic': self.is_deterministic,
         }
 
     # ------------------------------------------------------------------ #
@@ -190,10 +190,10 @@ class ReplayManager:
     def _content_hash(event: Event | None) -> str:
         """Hash the content of an event for comparison."""
         if event is None:
-            return "none"
-        content = getattr(event, "content", "")
+            return 'none'
+        content = getattr(event, 'content', '')
         if content is None:
-            content = ""
+            content = ''
         return hashlib.sha256(str(content).encode()).hexdigest()
 
     @staticmethod

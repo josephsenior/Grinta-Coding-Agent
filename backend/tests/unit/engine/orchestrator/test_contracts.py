@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock
 
-
 from backend.engine.contracts import (
     ChatCompletionToolParam,
     ExecutionResultProtocol,
@@ -18,35 +17,35 @@ class TestChatCompletionToolParam:
     def test_create_tool_param(self):
         """Test creating ChatCompletionToolParam."""
         tool: ChatCompletionToolParam = {
-            "type": "function",
-            "function": {"name": "test_tool", "description": "Test"},
+            'type': 'function',
+            'function': {'name': 'test_tool', 'description': 'Test'},
         }
-        assert tool["type"] == "function"
-        assert tool["function"]["name"] == "test_tool"
+        assert tool['type'] == 'function'
+        assert tool['function']['name'] == 'test_tool'
 
     def test_tool_param_type_field(self):
         """Test type field is string."""
-        tool: ChatCompletionToolParam = {"type": "function"}
-        assert isinstance(tool["type"], str)
+        tool: ChatCompletionToolParam = {'type': 'function'}
+        assert isinstance(tool['type'], str)
 
     def test_tool_param_function_field(self):
         """Test function field is dict."""
-        tool: ChatCompletionToolParam = {"function": {"name": "test", "parameters": {}}}
-        assert isinstance(tool["function"], dict)
+        tool: ChatCompletionToolParam = {'function': {'name': 'test', 'parameters': {}}}
+        assert isinstance(tool['function'], dict)
 
     def test_tool_param_with_all_fields(self):
         """Test tool param with all common fields."""
         tool: ChatCompletionToolParam = {
-            "type": "function",
-            "function": {
-                "name": "my_function",
-                "description": "Does something",
-                "parameters": {"type": "object", "properties": {}},
+            'type': 'function',
+            'function': {
+                'name': 'my_function',
+                'description': 'Does something',
+                'parameters': {'type': 'object', 'properties': {}},
             },
         }
-        assert "name" in tool["function"]
-        assert "description" in tool["function"]
-        assert "parameters" in tool["function"]
+        assert 'name' in tool['function']
+        assert 'description' in tool['function']
+        assert 'parameters' in tool['function']
 
 
 class TestPlannerProtocol:
@@ -54,11 +53,11 @@ class TestPlannerProtocol:
 
     def test_has_build_toolset_method(self):
         """Test protocol has build_toolset method."""
-        assert hasattr(PlannerProtocol, "build_toolset")
+        assert hasattr(PlannerProtocol, 'build_toolset')
 
     def test_has_build_llm_params_method(self):
         """Test protocol has build_llm_params method."""
-        assert hasattr(PlannerProtocol, "build_llm_params")
+        assert hasattr(PlannerProtocol, 'build_llm_params')
 
     def test_isinstance_check_with_mock(self):
         """Test protocol isinstance check with mock object."""
@@ -77,8 +76,8 @@ class TestPlannerProtocol:
 
         planner = ValidPlanner()
         # Runtime check
-        assert hasattr(planner, "build_toolset")
-        assert hasattr(planner, "build_llm_params")
+        assert hasattr(planner, 'build_toolset')
+        assert hasattr(planner, 'build_llm_params')
 
     def test_build_toolset_returns_list(self):
         """Test build_toolset should return list."""
@@ -87,8 +86,8 @@ class TestPlannerProtocol:
             def build_toolset(self):
                 return [
                     {
-                        "type": "function",
-                        "function": {"name": "test"},
+                        'type': 'function',
+                        'function': {'name': 'test'},
                     }
                 ]
 
@@ -107,7 +106,7 @@ class TestPlannerProtocol:
                 return []
 
             def build_llm_params(self, messages, state, tools):
-                return {"model": "gpt-4", "messages": messages}
+                return {'model': 'gpt-4', 'messages': messages}
 
         planner = TestPlanner()
         params = planner.build_llm_params([], MagicMock(), [])
@@ -131,10 +130,10 @@ class TestExecutionResultProtocol:
 
         result = ValidResult()
         # If it has these, it satisfies the protocol
-        assert hasattr(result, "actions")
-        assert hasattr(result, "response")
-        assert hasattr(result, "execution_time")
-        assert hasattr(result, "error")
+        assert hasattr(result, 'actions')
+        assert hasattr(result, 'response')
+        assert hasattr(result, 'execution_time')
+        assert hasattr(result, 'error')
 
     def test_isinstance_check_with_mock(self):
         """Test protocol isinstance check with mock."""
@@ -152,10 +151,10 @@ class TestExecutionResultProtocol:
                 self.error = None
 
         result = ValidResult()
-        assert hasattr(result, "actions")
-        assert hasattr(result, "response")
-        assert hasattr(result, "execution_time")
-        assert hasattr(result, "error")
+        assert hasattr(result, 'actions')
+        assert hasattr(result, 'response')
+        assert hasattr(result, 'execution_time')
+        assert hasattr(result, 'error')
 
 
 class TestExecutorProtocol:
@@ -163,7 +162,7 @@ class TestExecutorProtocol:
 
     def test_has_execute_method(self):
         """Test protocol has execute method."""
-        assert hasattr(ExecutorProtocol, "execute")
+        assert hasattr(ExecutorProtocol, 'execute')
 
     def test_isinstance_check_with_mock(self):
         """Test protocol isinstance check with mock."""
@@ -185,7 +184,7 @@ class TestExecutorProtocol:
 
         executor = ValidExecutor()
         result = executor.execute({}, None)
-        assert hasattr(result, "actions")
+        assert hasattr(result, 'actions')
 
     def test_execute_accepts_params(self):
         """Test execute accepts params dict."""
@@ -201,8 +200,8 @@ class TestExecutorProtocol:
                 return Result()
 
         executor = TestExecutor()
-        result = executor.execute({"model": "gpt-4"}, None)
-        assert result.response == {"model": "gpt-4"}
+        result = executor.execute({'model': 'gpt-4'}, None)
+        assert result.response == {'model': 'gpt-4'}
 
     def test_execute_accepts_event_stream(self):
         """Test execute accepts optional event_stream."""
@@ -228,11 +227,11 @@ class TestSafetyManagerProtocol:
 
     def test_has_should_enforce_tools_method(self):
         """Test protocol has should_enforce_tools method."""
-        assert hasattr(SafetyManagerProtocol, "should_enforce_tools")
+        assert hasattr(SafetyManagerProtocol, 'should_enforce_tools')
 
     def test_has_apply_method(self):
         """Test protocol has apply method."""
-        assert hasattr(SafetyManagerProtocol, "apply")
+        assert hasattr(SafetyManagerProtocol, 'apply')
 
     def test_isinstance_check_with_mock(self):
         """Test protocol isinstance check with mock."""
@@ -250,21 +249,21 @@ class TestSafetyManagerProtocol:
                 return (True, actions)
 
         safety = ValidSafetyManager()
-        assert hasattr(safety, "should_enforce_tools")
-        assert hasattr(safety, "apply")
+        assert hasattr(safety, 'should_enforce_tools')
+        assert hasattr(safety, 'apply')
 
     def test_should_enforce_tools_returns_string(self):
         """Test should_enforce_tools returns string."""
 
         class TestSafety:
             def should_enforce_tools(self, last_user_message, state, default):
-                return "auto"
+                return 'auto'
 
             def apply(self, response_text, actions):
                 return (True, actions)
 
         safety = TestSafety()
-        result = safety.should_enforce_tools("message", MagicMock(), "auto")
+        result = safety.should_enforce_tools('message', MagicMock(), 'auto')
         assert isinstance(result, str)
 
     def test_apply_returns_tuple(self):
@@ -278,7 +277,7 @@ class TestSafetyManagerProtocol:
                 return (False, [])
 
         safety = TestSafety()
-        continue_flag, updated_actions = safety.apply("text", [])
+        continue_flag, updated_actions = safety.apply('text', [])
         assert isinstance(continue_flag, bool)
         assert isinstance(updated_actions, list)
 
@@ -295,5 +294,5 @@ class TestSafetyManagerProtocol:
 
         safety = TestSafety()
         original_actions = [MagicMock(), None, MagicMock()]
-        continue_flag, filtered = safety.apply("", original_actions)
+        continue_flag, filtered = safety.apply('', original_actions)
         assert len(filtered) == 2

@@ -5,10 +5,8 @@ from __future__ import annotations
 import time
 from unittest.mock import MagicMock
 
-
-from backend.orchestration.tool_telemetry import ToolTelemetry
 from backend.orchestration.tool_pipeline import ToolInvocationContext
-
+from backend.orchestration.tool_telemetry import ToolTelemetry
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -27,7 +25,7 @@ def _fresh_telemetry() -> ToolTelemetry:
     return t
 
 
-def _make_ctx(action_name: str = "CmdRunAction") -> ToolInvocationContext:
+def _make_ctx(action_name: str = 'CmdRunAction') -> ToolInvocationContext:
     action = MagicMock()
     type(action).__name__ = action_name
     action.action = action_name
@@ -65,28 +63,28 @@ class TestLifecycleHooks:
         t = _fresh_telemetry()
         ctx = _make_ctx()
         t.on_plan(ctx)
-        tel = ctx.metadata["telemetry"]
-        assert "start_time" in tel
-        assert tel["tool_name"] == "CmdRunAction"
+        tel = ctx.metadata['telemetry']
+        assert 'start_time' in tel
+        assert tel['tool_name'] == 'CmdRunAction'
 
     def test_on_execute_sets_execute_time(self):
         t = _fresh_telemetry()
         ctx = _make_ctx()
         t.on_plan(ctx)
         t.on_execute(ctx)
-        assert "execute_time" in ctx.metadata["telemetry"]
+        assert 'execute_time' in ctx.metadata['telemetry']
 
     def test_on_observe_records_event(self):
         t = _fresh_telemetry()
         ctx = _make_ctx()
         t.on_plan(ctx)
         obs = MagicMock()
-        obs.__class__ = type("CmdOutputObservation", (), {})
+        obs.__class__ = type('CmdOutputObservation', (), {})
         t.on_observe(ctx, obs)
         events = t.recent_events()
         assert len(events) == 1
-        assert events[0]["tool"] == "CmdRunAction"
-        assert events[0]["outcome"] == "success"
+        assert events[0]['tool'] == 'CmdRunAction'
+        assert events[0]['outcome'] == 'success'
 
     def test_on_observe_error_observation(self):
         t = _fresh_telemetry()
@@ -94,10 +92,10 @@ class TestLifecycleHooks:
         t.on_plan(ctx)
         from backend.ledger.observation import ErrorObservation
 
-        obs = ErrorObservation(content="fail")
+        obs = ErrorObservation(content='fail')
         t.on_observe(ctx, obs)
         events = t.recent_events()
-        assert events[0]["outcome"] == "failure"
+        assert events[0]['outcome'] == 'failure'
 
     def test_on_observe_none_observation(self):
         t = _fresh_telemetry()
@@ -105,16 +103,16 @@ class TestLifecycleHooks:
         t.on_plan(ctx)
         t.on_observe(ctx, None)
         events = t.recent_events()
-        assert events[0]["outcome"] == "success"
+        assert events[0]['outcome'] == 'success'
 
     def test_on_blocked(self):
         t = _fresh_telemetry()
         ctx = _make_ctx()
         t.on_plan(ctx)
-        t.on_blocked(ctx, reason="security")
+        t.on_blocked(ctx, reason='security')
         events = t.recent_events()
         assert len(events) == 1
-        assert "blocked" in events[0]["outcome"]
+        assert 'blocked' in events[0]['outcome']
 
 
 # ---------------------------------------------------------------------------
@@ -125,15 +123,15 @@ class TestLifecycleHooks:
 class TestInternalHelpers:
     def test_determine_outcome_success(self):
         t = _fresh_telemetry()
-        assert t._determine_outcome(None) == "success"
-        assert t._determine_outcome(MagicMock()) == "success"
+        assert t._determine_outcome(None) == 'success'
+        assert t._determine_outcome(MagicMock()) == 'success'
 
     def test_determine_outcome_failure(self):
         from backend.ledger.observation import ErrorObservation
 
         t = _fresh_telemetry()
-        obs = ErrorObservation(content="err")
-        assert t._determine_outcome(obs) == "failure"
+        obs = ErrorObservation(content='err')
+        assert t._determine_outcome(obs) == 'failure'
 
     def test_elapsed_since_none(self):
         t = _fresh_telemetry()
@@ -141,19 +139,19 @@ class TestInternalHelpers:
 
     def test_elapsed_since_with_start(self):
         t = _fresh_telemetry()
-        tel = {"start_time": time.monotonic() - 1.0}
+        tel = {'start_time': time.monotonic() - 1.0}
         elapsed = t._elapsed_since(tel)
         assert elapsed >= 0.9
 
     def test_record_ring_buffer_limit(self):
         t = _fresh_telemetry()
         for i in range(250):
-            t._record(f"tool_{i}", "success", 0.1)
+            t._record(f'tool_{i}', 'success', 0.1)
         assert len(t.recent_events()) == 200
 
     def test_reset_for_test(self):
         t = _fresh_telemetry()
-        t._record("tool", "success", 0.1)
+        t._record('tool', 'success', 0.1)
         assert len(t.recent_events()) == 1
         t.reset_for_test()
         assert len(t.recent_events()) == 0
@@ -167,8 +165,8 @@ class TestInternalHelpers:
 class TestActionToDict:
     def test_basic_action(self):
         action = MagicMock()
-        action.action = "run"
-        action.command = "echo hello"
+        action.action = 'run'
+        action.command = 'echo hello'
         action.runnable = True
         action.path = None
         action.content = None
@@ -176,15 +174,15 @@ class TestActionToDict:
         action.message = None
         action.thought = None
         d = ToolTelemetry.action_to_dict(action)
-        assert d["action_type"] == "run"
-        assert d["command"] == "echo hello"
-        assert d["runnable"] is True
+        assert d['action_type'] == 'run'
+        assert d['command'] == 'echo hello'
+        assert d['runnable'] is True
 
     def test_action_without_action_attr(self):
         action = MagicMock(spec=[])
-        type(action).__name__ = "CustomAction"
+        type(action).__name__ = 'CustomAction'
         d = ToolTelemetry.action_to_dict(action)
-        assert d["action_type"] == "CustomAction"
+        assert d['action_type'] == 'CustomAction'
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +201,7 @@ class TestConcurrentSafety:
         def record_many():
             try:
                 for i in range(50):
-                    t._record("tool", "success", 0.01)
+                    t._record('tool', 'success', 0.01)
             except Exception as e:
                 errors.append(e)
 

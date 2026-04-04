@@ -6,9 +6,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.orchestration.services.recovery_service import RecoveryService
-from backend.ledger.observation import ErrorObservation
+from backend.core.schemas import AgentState
 from backend.inference.exceptions import AuthenticationError, Timeout
+from backend.ledger.observation import ErrorObservation
+from backend.orchestration.services.recovery_service import RecoveryService
 
 
 @pytest.fixture()
@@ -17,6 +18,7 @@ def mock_context():
     ctx.get_controller.return_value = MagicMock()
     ctx.discard_invocation_context_for_action = MagicMock()
     ctx.emit_event = MagicMock()
+    ctx.set_agent_state = AsyncMock()
     ctx.trigger_step = MagicMock()
     return ctx
 
@@ -24,7 +26,7 @@ def mock_context():
 @pytest.fixture()
 def ctrl(mock_context):
     c = mock_context.get_controller.return_value
-    c.id = "sid-1"
+    c.id = 'sid-1'
     c.circuit_breaker_service = MagicMock()
     c.pending_action_service = MagicMock()
     c.pending_action_service.get.return_value = None
@@ -35,18 +37,23 @@ def ctrl(mock_context):
 
 class TestRecoveryService:
     @pytest.mark.asyncio
-    async def test_emits_error_and_triggers_step(self, mock_context, ctrl):
+    async def test_emits_error_and_transitions_to_awaiting_input(
+        self, mock_context, ctrl
+    ):
         svc = RecoveryService(mock_context)
-        await svc.react_to_exception(Timeout("slow"))
+        await svc.react_to_exception(Timeout('slow'))
 
         ctrl.circuit_breaker_service.record_error.assert_called_once()
         mock_context.emit_event.assert_called_once()
         err_obs, source = mock_context.emit_event.call_args[0]
         assert isinstance(err_obs, ErrorObservation)
-        assert err_obs.error_id == "LLM_TIMEOUT"
-        assert "Timeout" in err_obs.content
+        assert err_obs.error_id == 'LLM_TIMEOUT'
+        assert 'Timeout' in err_obs.content
         ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
-        mock_context.trigger_step.assert_called_once_with()
+        mock_context.set_agent_state.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+        mock_context.trigger_step.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_clears_pending_and_discards_context(self, mock_context, ctrl):
@@ -55,7 +62,7 @@ class TestRecoveryService:
         ctrl.pending_action_service.get.return_value = pending
 
         svc = RecoveryService(mock_context)
-        await svc.react_to_exception(RuntimeError("x"))
+        await svc.react_to_exception(RuntimeError('x'))
 
         mock_context.discard_invocation_context_for_action.assert_called_once_with(
             pending
@@ -63,29 +70,36 @@ class TestRecoveryService:
         ctrl.pending_action_service.set.assert_called_once_with(None)
 
     @pytest.mark.asyncio
-    async def test_no_step_when_retry_scheduled(self, mock_context, ctrl):
+    async def test_retry_scheduled_still_transitions_to_awaiting_input(
+        self, mock_context, ctrl
+    ):
         ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
 
         svc = RecoveryService(mock_context)
-        await svc.react_to_exception(Timeout("slow"))
+        await svc.react_to_exception(Timeout('slow'))
 
+        mock_context.set_agent_state.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
         mock_context.trigger_step.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_authentication_sets_notify_ui_only(self, mock_context, ctrl):
         svc = RecoveryService(mock_context)
-        await svc.react_to_exception(AuthenticationError("bad key"))
+        await svc.react_to_exception(AuthenticationError('bad key'))
 
         err_obs = mock_context.emit_event.call_args[0][0]
         assert err_obs.notify_ui_only is True
 
     @pytest.mark.asyncio
-    async def test_timeout_with_recent_mcp_validation_error_sets_directive(self, mock_context, ctrl):
+    async def test_timeout_with_recent_mcp_validation_error_sets_directive(
+        self, mock_context, ctrl
+    ):
         state = MagicMock()
         state.turn_signals = MagicMock(planning_directive=None)
         state.history = [
             MagicMock(
-                observation="mcp",
+                observation='mcp',
                 content='{"error_code":"MCP_TOOL_VALIDATION_ERROR","error":"MCP error -32602"}',
             )
         ]
@@ -93,7 +107,7 @@ class TestRecoveryService:
         ctrl.state = state
 
         svc = RecoveryService(mock_context)
-        await svc.react_to_exception(Timeout("slow"))
+        await svc.react_to_exception(Timeout('slow'))
 
         state.set_planning_directive.assert_called_once()
 
@@ -105,7 +119,7 @@ class TestRecoveryService:
         state.turn_signals = MagicMock(planning_directive=None)
         state.history = [
             MagicMock(
-                observation="mcp",
+                observation='mcp',
                 content='{"error_code":"MCP_TOOL_ERROR","error":"random server error"}',
             )
         ]
@@ -113,6 +127,6 @@ class TestRecoveryService:
         ctrl.state = state
 
         svc = RecoveryService(mock_context)
-        await svc.react_to_exception(Timeout("slow"))
+        await svc.react_to_exception(Timeout('slow'))
 
         state.set_planning_directive.assert_not_called()

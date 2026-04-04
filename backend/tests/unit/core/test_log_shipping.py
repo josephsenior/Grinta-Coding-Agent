@@ -13,7 +13,6 @@ import pytest
 
 from backend.core.log_shipping import LogShipper, LogShippingHandler
 
-
 # ---------------------------------------------------------------------------
 # LogShipper — basic queue & config
 # ---------------------------------------------------------------------------
@@ -21,13 +20,13 @@ from backend.core.log_shipping import LogShipper, LogShippingHandler
 
 class TestLogShipper:
     def test_disabled_enqueue_is_noop(self):
-        shipper = LogShipper(endpoint="http://x", enabled=False)
-        shipper.enqueue({"message": "hello"})
+        shipper = LogShipper(endpoint='http://x', enabled=False)
+        shipper.enqueue({'message': 'hello'})
         assert not shipper._log_queue
 
     def test_enabled_enqueue_adds(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
-        shipper.enqueue({"message": "hello"})
+        shipper = LogShipper(endpoint='http://x', enabled=True)
+        shipper.enqueue({'message': 'hello'})
         assert len(shipper._log_queue) == 1
 
     def test_batch_size_default(self):
@@ -47,33 +46,33 @@ class TestLogShipper:
         assert shipper.retry_delay == 2.0
 
     def test_dequeue_batch(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True, batch_size=10)
+        shipper = LogShipper(endpoint='http://x', enabled=True, batch_size=10)
         # Directly append to queue to avoid triggering create_task
         for i in range(5):
-            shipper._log_queue.append({"i": i})
+            shipper._log_queue.append({'i': i})
         batch = shipper._dequeue_batch()
         # batch_size=10 so all 5 should be dequeued
         assert len(batch) == 5
         assert not shipper._log_queue
 
     def test_dequeue_batch_empty(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
+        shipper = LogShipper(endpoint='http://x', enabled=True)
         assert shipper._dequeue_batch() == []
 
     def test_datadog_payload(self):
         shipper = LogShipper()
-        logs = [{"message": "test"}]
+        logs = [{'message': 'test'}]
         payload = shipper._datadog_payload(logs)
-        assert "logs" in payload
-        assert len(payload["logs"]) == 1
-        assert payload["logs"][0]["ddsource"] == "app"
+        assert 'logs' in payload
+        assert len(payload['logs']) == 1
+        assert payload['logs'][0]['ddsource'] == 'app'
 
     async def test_flush_disabled(self):
         shipper = LogShipper(enabled=False)
         await shipper.flush()  # should not raise
 
     async def test_flush_empty_queue(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
+        shipper = LogShipper(endpoint='http://x', enabled=True)
         await shipper.flush()  # should not raise
 
     async def test_start_disabled(self):
@@ -87,28 +86,28 @@ class TestLogShipper:
 
     def test_build_payload_datadog(self):
         shipper = LogShipper()
-        logs = [{"message": "x"}]
-        parsed = urlparse("https://http-intake.logs.datadoghq.com/api/v2/logs")
+        logs = [{'message': 'x'}]
+        parsed = urlparse('https://http-intake.logs.datadoghq.com/api/v2/logs')
         payload = shipper._build_payload(parsed, logs)
-        assert "logs" in payload
-        assert payload["logs"][0]["ddsource"] == "app"
+        assert 'logs' in payload
+        assert payload['logs'][0]['ddsource'] == 'app'
 
     def test_build_payload_default(self):
         shipper = LogShipper()
-        logs = [{"message": "x"}]
-        parsed = urlparse("https://example.com/logs")
+        logs = [{'message': 'x'}]
+        parsed = urlparse('https://example.com/logs')
         payload = shipper._build_payload(parsed, logs)
-        assert payload == {"logs": logs}
+        assert payload == {'logs': logs}
 
     @pytest.mark.asyncio
     async def test_post_payload_success(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
+        shipper = LogShipper(endpoint='http://x', enabled=True)
 
         class FakeResponse:
             status = 200
 
             async def text(self):
-                return "ok"
+                return 'ok'
 
         class FakeContext:
             def __init__(self, response):
@@ -124,18 +123,20 @@ class TestLogShipper:
             def post(self, *args, **kwargs):
                 return FakeContext(FakeResponse())
 
-        result = await shipper._post_payload(cast(Any, FakeSession()), {"logs": []}, {"X": "Y"}, 1)
+        result = await shipper._post_payload(
+            cast(Any, FakeSession()), {'logs': []}, {'X': 'Y'}, 1
+        )
         assert result is True
 
     @pytest.mark.asyncio
     async def test_post_payload_failure(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
+        shipper = LogShipper(endpoint='http://x', enabled=True)
 
         class FakeResponse:
             status = 500
 
             async def text(self):
-                return "fail"
+                return 'fail'
 
         class FakeContext:
             def __init__(self, response):
@@ -151,16 +152,18 @@ class TestLogShipper:
             def post(self, *args, **kwargs):
                 return FakeContext(FakeResponse())
 
-        result = await shipper._post_payload(cast(Any, FakeSession()), {"logs": []}, {"X": "Y"}, 1)
+        result = await shipper._post_payload(
+            cast(Any, FakeSession()), {'logs': []}, {'X': 'Y'}, 1
+        )
         assert result is False
 
     @pytest.mark.asyncio
     async def test_ship_logs_calls_send_request(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
-        logs = [{"message": "x"}]
+        shipper = LogShipper(endpoint='http://x', enabled=True)
+        logs = [{'message': 'x'}]
 
         with patch.object(
-            shipper, "_send_request", new=AsyncMock(return_value=True)
+            shipper, '_send_request', new=AsyncMock(return_value=True)
         ) as send_mock:
             result = await shipper._ship_logs(logs)
 
@@ -169,25 +172,25 @@ class TestLogShipper:
 
     @pytest.mark.asyncio
     async def test_wait_for_batch_window_timeout(self, monkeypatch):
-        shipper = LogShipper(endpoint="http://x", enabled=True, batch_timeout=0.01)
+        shipper = LogShipper(endpoint='http://x', enabled=True, batch_timeout=0.01)
 
         async def fake_wait_for(*_args, **_kwargs):
             raise TimeoutError
 
-        monkeypatch.setattr("backend.core.log_shipping.asyncio.wait_for", fake_wait_for)
+        monkeypatch.setattr('backend.core.log_shipping.asyncio.wait_for', fake_wait_for)
         result = await shipper._wait_for_batch_window()
         assert result is False
 
     @pytest.mark.asyncio
     async def test_wait_for_batch_window_shutdown(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True, batch_timeout=0.01)
+        shipper = LogShipper(endpoint='http://x', enabled=True, batch_timeout=0.01)
         shipper._shutdown_event.set()
         result = await shipper._wait_for_batch_window()
         assert result is True
 
     @pytest.mark.asyncio
     async def test_ship_batch_breaks_on_shutdown(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
+        shipper = LogShipper(endpoint='http://x', enabled=True)
         cast(Any, shipper)._wait_for_batch_window = AsyncMock(return_value=True)
         cast(Any, shipper)._ship_available_logs = AsyncMock()
 
@@ -197,7 +200,7 @@ class TestLogShipper:
 
     @pytest.mark.asyncio
     async def test_ship_batch_runs_available_logs(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
+        shipper = LogShipper(endpoint='http://x', enabled=True)
         cast(Any, shipper)._wait_for_batch_window = AsyncMock(side_effect=[False, True])
         cast(Any, shipper)._ship_available_logs = AsyncMock()
 
@@ -208,13 +211,13 @@ class TestLogShipper:
     @pytest.mark.asyncio
     async def test_attempt_ship_with_retries(self):
         shipper = LogShipper(
-            endpoint="http://x", enabled=True, max_retries=3, retry_delay=0.01
+            endpoint='http://x', enabled=True, max_retries=3, retry_delay=0.01
         )
-        logs = [{"message": "x"}]
+        logs = [{'message': 'x'}]
 
         cast(Any, shipper)._ship_logs = AsyncMock(side_effect=[False, True])
         with patch(
-            "backend.core.log_shipping.asyncio.sleep", new=AsyncMock()
+            'backend.core.log_shipping.asyncio.sleep', new=AsyncMock()
         ) as sleep_mock:
             result = await shipper._attempt_ship_with_retries(logs)
 
@@ -223,8 +226,8 @@ class TestLogShipper:
 
     @pytest.mark.asyncio
     async def test_ship_available_logs_failure(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
-        shipper._log_queue.append({"message": "x"})
+        shipper = LogShipper(endpoint='http://x', enabled=True)
+        shipper._log_queue.append({'message': 'x'})
 
         cast(Any, shipper)._attempt_ship_with_retries = AsyncMock(return_value=False)
         await shipper._ship_available_logs()
@@ -232,23 +235,23 @@ class TestLogShipper:
         cast(Any, shipper)._attempt_ship_with_retries.assert_awaited_once()
 
     def test_enqueue_triggers_background_task(self, monkeypatch):
-        shipper = LogShipper(endpoint="http://x", enabled=True, batch_size=1)
+        shipper = LogShipper(endpoint='http://x', enabled=True, batch_size=1)
 
         def fake_create_task(coro):
             coro.close()
             return MagicMock()
 
         monkeypatch.setattr(
-            "backend.core.log_shipping.asyncio.create_task", fake_create_task
+            'backend.core.log_shipping.asyncio.create_task', fake_create_task
         )
 
-        shipper.enqueue({"message": "x"})
+        shipper.enqueue({'message': 'x'})
         assert shipper._ship_task is not None
 
     @pytest.mark.asyncio
     async def test_flush_sends_logs(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
-        shipper._log_queue.append({"message": "x"})
+        shipper = LogShipper(endpoint='http://x', enabled=True)
+        shipper._log_queue.append({'message': 'x'})
 
         cast(Any, shipper)._ship_logs = AsyncMock(return_value=True)
         await shipper.flush()
@@ -258,14 +261,14 @@ class TestLogShipper:
 
     @pytest.mark.asyncio
     async def test_start_creates_task(self, monkeypatch):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
+        shipper = LogShipper(endpoint='http://x', enabled=True)
 
         def fake_create_task(coro):
             coro.close()
             return MagicMock()
 
         monkeypatch.setattr(
-            "backend.core.log_shipping.asyncio.create_task", fake_create_task
+            'backend.core.log_shipping.asyncio.create_task', fake_create_task
         )
 
         await shipper.start()
@@ -273,7 +276,7 @@ class TestLogShipper:
 
     @pytest.mark.asyncio
     async def test_stop_closes_session_and_flushes(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
+        shipper = LogShipper(endpoint='http://x', enabled=True)
         future: asyncio.Future[Any] = asyncio.get_event_loop().create_future()
         future.set_result(None)
         cast(Any, shipper)._ship_task = future
@@ -283,15 +286,15 @@ class TestLogShipper:
         shipper._session.close = AsyncMock()
 
         cast(Any, shipper)._ship_logs = AsyncMock(return_value=True)
-        shipper._log_queue.append({"message": "x"})
+        shipper._log_queue.append({'message': 'x'})
 
         await shipper.stop()
         shipper._session.close.assert_awaited_once()
 
     def test_get_log_shipper_configured(self, monkeypatch):
-        monkeypatch.setenv("LOG_SHIPPING_ENDPOINT", "http://x")
-        monkeypatch.setenv("LOG_SHIPPING_API_KEY", "abc")
-        monkeypatch.setenv("LOG_SHIPPING_ENABLED", "true")
+        monkeypatch.setenv('LOG_SHIPPING_ENDPOINT', 'http://x')
+        monkeypatch.setenv('LOG_SHIPPING_API_KEY', 'abc')
+        monkeypatch.setenv('LOG_SHIPPING_ENABLED', 'true')
 
         import backend.core.log_shipping as log_shipping
 
@@ -301,8 +304,8 @@ class TestLogShipper:
         assert shipper.enabled is True
 
     def test_get_log_shipper_disabled(self, monkeypatch):
-        monkeypatch.delenv("LOG_SHIPPING_ENDPOINT", raising=False)
-        monkeypatch.setenv("LOG_SHIPPING_ENABLED", "false")
+        monkeypatch.delenv('LOG_SHIPPING_ENDPOINT', raising=False)
+        monkeypatch.setenv('LOG_SHIPPING_ENABLED', 'false')
 
         import backend.core.log_shipping as log_shipping
 
@@ -320,11 +323,11 @@ class TestLogShippingHandler:
     def test_no_shipper(self):
         handler = LogShippingHandler(shipper=None)
         record = logging.LogRecord(
-            name="test",
+            name='test',
             level=logging.INFO,
-            pathname="",
+            pathname='',
             lineno=0,
-            msg="hello",
+            msg='hello',
             args=(),
             exc_info=None,
         )
@@ -334,11 +337,11 @@ class TestLogShippingHandler:
         shipper = LogShipper(enabled=False)
         handler = LogShippingHandler(shipper=shipper)
         record = logging.LogRecord(
-            name="test",
+            name='test',
             level=logging.INFO,
-            pathname="",
+            pathname='',
             lineno=0,
-            msg="hello",
+            msg='hello',
             args=(),
             exc_info=None,
         )
@@ -346,36 +349,36 @@ class TestLogShippingHandler:
         assert not shipper._log_queue
 
     def test_enabled_shipper_enqueues(self):
-        shipper = LogShipper(endpoint="http://x", enabled=True)
+        shipper = LogShipper(endpoint='http://x', enabled=True)
         handler = LogShippingHandler(shipper=shipper)
         record = logging.LogRecord(
-            name="test",
+            name='test',
             level=logging.WARNING,
-            pathname="/p",
+            pathname='/p',
             lineno=42,
-            msg="warn msg",
+            msg='warn msg',
             args=(),
             exc_info=None,
         )
         handler.emit(record)
         assert len(shipper._log_queue) == 1
         entry = shipper._log_queue[0]
-        assert entry["level"] == "WARNING"
-        assert entry["message"] == "warn msg"
-        assert entry["line"] == 42
+        assert entry['level'] == 'WARNING'
+        assert entry['message'] == 'warn msg'
+        assert entry['line'] == 42
 
     def test_exception_in_emit_does_not_raise(self):
         """Even if enqueue fails, the handler should not propagate."""
         shipper = MagicMock()
         shipper.enabled = True
-        shipper.enqueue.side_effect = RuntimeError("fail")
+        shipper.enqueue.side_effect = RuntimeError('fail')
         handler = LogShippingHandler(shipper=shipper)
         record = logging.LogRecord(
-            name="test",
+            name='test',
             level=logging.INFO,
-            pathname="",
+            pathname='',
             lineno=0,
-            msg="x",
+            msg='x',
             args=(),
             exc_info=None,
         )
@@ -388,24 +391,24 @@ class TestLogShippingHandler:
         exc_info = None
 
         try:
-            raise ValueError("boom")
+            raise ValueError('boom')
         except ValueError:
             exc_info = sys.exc_info()
 
         record = logging.LogRecord(
-            name="test",
+            name='test',
             level=logging.ERROR,
-            pathname="/p",
+            pathname='/p',
             lineno=5,
-            msg="err",
+            msg='err',
             args=(),
             exc_info=exc_info,
         )
-        record.custom_field = "custom"
+        record.custom_field = 'custom'
 
         handler.emit(record)
 
         args, _ = shipper.enqueue.call_args
         entry = args[0]
-        assert entry["custom_field"] == "custom"
-        assert "exception" in entry
+        assert entry['custom_field'] == 'custom'
+        assert 'exception' in entry

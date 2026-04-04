@@ -5,9 +5,7 @@ from __future__ import annotations
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-
 from backend.ledger.persistence import EventPersistence, _truncate_payload
-
 
 # ── Helper to build a persistence instance with file-store mock ───────
 
@@ -15,16 +13,16 @@ from backend.ledger.persistence import EventPersistence, _truncate_payload
 def _make_persistence(**overrides) -> tuple[EventPersistence, MagicMock]:
     file_store = MagicMock()
     defaults = {
-        "sid": "test-session",
-        "file_store": file_store,
-        "user_id": None,
-        "async_write": False,
-        "get_filename_for_id": lambda eid, uid: f"events/{eid}.json",
-        "get_filename_for_cache": lambda s, e: f"cache/{s}_{e}.json",
-        "cache_size": 3,
+        'sid': 'test-session',
+        'file_store': file_store,
+        'user_id': None,
+        'async_write': False,
+        'get_filename_for_id': lambda eid, uid: f'events/{eid}.json',
+        'get_filename_for_cache': lambda s, e: f'cache/{s}_{e}.json',
+        'cache_size': 3,
     }
     defaults.update(overrides)
-    with patch.dict("os.environ", {"APP_SQLITE_EVENTS": "false"}):
+    with patch.dict('os.environ', {'APP_SQLITE_EVENTS': 'false'}):
         p = EventPersistence(**cast(Any, defaults))
     return p, file_store
 
@@ -34,15 +32,15 @@ def _make_persistence(**overrides) -> tuple[EventPersistence, MagicMock]:
 
 class TestIsCriticalEventPersist:
     def test_critical_action(self):
-        event = MagicMock(action="finish", observation=None)
+        event = MagicMock(action='finish', observation=None)
         assert EventPersistence.is_critical_event(event) is True
 
     def test_critical_observation(self):
-        event = MagicMock(action=None, observation="error")
+        event = MagicMock(action=None, observation='error')
         assert EventPersistence.is_critical_event(event) is True
 
     def test_non_critical(self):
-        event = MagicMock(action="run", observation=None)
+        event = MagicMock(action='run', observation=None)
         assert EventPersistence.is_critical_event(event) is False
 
     def test_no_action_or_observation(self):
@@ -50,9 +48,9 @@ class TestIsCriticalEventPersist:
         assert EventPersistence.is_critical_event(event) is False
 
     def test_critical_payload(self):
-        assert EventPersistence.is_critical_payload({"action": "finish"}) is True
-        assert EventPersistence.is_critical_payload({"observation": "error"}) is True
-        assert EventPersistence.is_critical_payload({"action": "run"}) is False
+        assert EventPersistence.is_critical_payload({'action': 'finish'}) is True
+        assert EventPersistence.is_critical_payload({'observation': 'error'}) is True
+        assert EventPersistence.is_critical_payload({'action': 'run'}) is False
         assert EventPersistence.is_critical_payload({}) is False
 
 
@@ -62,49 +60,49 @@ class TestIsCriticalEventPersist:
 class TestPersistSyncPath:
     def test_writes_with_wal_markers(self):
         p, fs = _make_persistence()
-        payload = {"id": 1, "action": "run"}
+        payload = {'id': 1, 'action': 'run'}
         p.persist_event(payload, event_id=1, cache_payload=None)
 
         calls = fs.write.call_args_list
-        assert any("pending" in str(c) for c in calls)
-        assert any("events/1.json" in str(c) for c in calls)
+        assert any('pending' in str(c) for c in calls)
+        assert any('events/1.json' in str(c) for c in calls)
         fs.delete.assert_called_once()
 
     def test_critical_event_always_sync(self):
         p, _ = _make_persistence()
-        payload = {"id": 2, "action": "finish"}
+        payload = {'id': 2, 'action': 'finish'}
         p.persist_event(payload, event_id=2, cache_payload=None)
-        assert p.stats["critical_sync_persistence"] == 1
+        assert p.stats['critical_sync_persistence'] == 1
 
     def test_writes_cache_payload(self):
         p, fs = _make_persistence()
-        payload = {"id": 3, "action": "run"}
-        cache = ("cache/0_3.json", '[{"id":0},{"id":1},{"id":2}]')
+        payload = {'id': 3, 'action': 'run'}
+        cache = ('cache/0_3.json', '[{"id":0},{"id":1},{"id":2}]')
         p.persist_event(payload, event_id=3, cache_payload=cache)
 
         write_calls = [str(c) for c in fs.write.call_args_list]
-        assert any("cache/0_3.json" in w for w in write_calls)
+        assert any('cache/0_3.json' in w for w in write_calls)
 
     def test_health_snapshot_tracks_confirmed_critical_event(self):
         p, _ = _make_persistence()
 
-        p.persist_event({"id": 7, "action": "finish"}, event_id=7, cache_payload=None)
+        p.persist_event({'id': 7, 'action': 'finish'}, event_id=7, cache_payload=None)
 
         health = p.get_health_snapshot()
-        assert health["persistence_health"] == "healthy"
-        assert health["last_confirmed_event_id"] == 7
-        assert health["last_confirmed_critical_event_id"] == 7
-        assert health["last_persistence_mode"] == "sync"
+        assert health['persistence_health'] == 'healthy'
+        assert health['last_confirmed_event_id'] == 7
+        assert health['last_confirmed_critical_event_id'] == 7
+        assert health['last_persistence_mode'] == 'sync'
 
     def test_health_snapshot_degrades_after_persist_failure(self):
         p, fs = _make_persistence()
-        fs.write.side_effect = OSError("disk full")
+        fs.write.side_effect = OSError('disk full')
 
-        p.persist_event({"id": 9, "action": "run"}, event_id=9, cache_payload=None)
+        p.persist_event({'id': 9, 'action': 'run'}, event_id=9, cache_payload=None)
 
         health = p.get_health_snapshot()
-        assert health["persistence_health"] == "degraded"
-        assert health["last_confirmed_event_id"] is None
+        assert health['persistence_health'] == 'degraded'
+        assert health['last_confirmed_event_id'] is None
 
 
 # ── build_cache_payload ───────────────────────────────────────────────
@@ -113,16 +111,16 @@ class TestPersistSyncPath:
 class TestBuildCachePayloadPersist:
     def test_returns_none_when_not_full(self):
         p, _ = _make_persistence(cache_size=3)
-        page = [{"id": 0}, {"id": 1}]
+        page = [{'id': 0}, {'id': 1}]
         assert p.build_cache_payload(page) is None
 
     def test_returns_payload_when_full(self):
         p, _ = _make_persistence(cache_size=3)
-        page = [{"id": 0}, {"id": 1}, {"id": 2}]
+        page = [{'id': 0}, {'id': 1}, {'id': 2}]
         result = p.build_cache_payload(page)
         assert result is not None
         filename, _contents = result
-        assert "cache/" in filename
+        assert 'cache/' in filename
 
     def test_returns_none_for_empty(self):
         p, _ = _make_persistence()
@@ -135,20 +133,20 @@ class TestBuildCachePayloadPersist:
 
 class TestNormalizeEventPathPersist:
     def test_adds_prefix_when_missing(self):
-        result = EventPersistence._normalize_event_path("5.json.pending", "events/dir/")
-        assert result == "events/dir/5.json.pending"
+        result = EventPersistence._normalize_event_path('5.json.pending', 'events/dir/')
+        assert result == 'events/dir/5.json.pending'
 
     def test_preserves_existing_prefix(self):
         result = EventPersistence._normalize_event_path(
-            "events/dir/5.json.pending", "events/dir/"
+            'events/dir/5.json.pending', 'events/dir/'
         )
-        assert result == "events/dir/5.json.pending"
+        assert result == 'events/dir/5.json.pending'
 
     def test_normalizes_backslashes(self):
         result = EventPersistence._normalize_event_path(
-            "events\\dir\\5.json", "events/dir/"
+            'events\\dir\\5.json', 'events/dir/'
         )
-        assert result == "events/dir/5.json"
+        assert result == 'events/dir/5.json'
 
 
 # ── replay_pending_events ─────────────────────────────────────────────
@@ -157,23 +155,23 @@ class TestNormalizeEventPathPersist:
 class TestReplayPendingEventsPersist:
     def test_no_pending_files_is_noop(self):
         p, fs = _make_persistence()
-        fs.list.return_value = ["1.json", "2.json"]
+        fs.list.return_value = ['1.json', '2.json']
         p.replay_pending_events()
         fs.read.assert_not_called()
 
     def test_stale_marker_cleaned_up(self):
         p, fs = _make_persistence()
-        fs.list.return_value = ["1.json.pending"]
+        fs.list.return_value = ['1.json.pending']
         fs.read.side_effect = lambda path: '{"id":1}'
         p.replay_pending_events()
         fs.delete.assert_called()
 
     def test_recovers_missing_event(self):
         p, fs = _make_persistence()
-        fs.list.return_value = ["1.json.pending"]
+        fs.list.return_value = ['1.json.pending']
 
         def _read_side_effect(path):
-            if path.endswith(".pending"):
+            if path.endswith('.pending'):
                 return '{"id": 1}'
             raise FileNotFoundError
 
@@ -208,20 +206,20 @@ class TestClosePersist:
 
 class TestTruncatePayloadPersist:
     def test_truncates_large_string_field(self):
-        big_value = "x" * 100_000
-        payload = {"content": big_value, "id": 1}
+        big_value = 'x' * 100_000
+        payload = {'content': big_value, 'id': 1}
         _truncate_payload(payload, max_bytes=10_000)
-        assert len(cast(str, payload["content"])) < 100_000
-        assert "truncated by App" in cast(str, payload["content"])
+        assert len(cast(str, payload['content'])) < 100_000
+        assert 'truncated by App' in cast(str, payload['content'])
 
     def test_leaves_small_payloads_untouched(self):
-        payload = {"content": "small", "id": 1}
+        payload = {'content': 'small', 'id': 1}
         _truncate_payload(payload, max_bytes=1_000_000)
-        assert payload["content"] == "small"
+        assert payload['content'] == 'small'
 
     def test_handles_nested_dicts(self):
-        big_value = "y" * 100_000
-        payload = {"nested": {"content": big_value}, "id": 1}
+        big_value = 'y' * 100_000
+        payload = {'nested': {'content': big_value}, 'id': 1}
         _truncate_payload(payload, max_bytes=10_000)
-        nested = cast(dict[str, Any], payload["nested"])
-        assert len(cast(str, nested["content"])) < 100_000
+        nested = cast(dict[str, Any], payload['nested'])
+        assert len(cast(str, nested['content'])) < 100_000

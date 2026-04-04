@@ -3,15 +3,14 @@
 from typing import Any
 from unittest.mock import MagicMock
 
-
+from backend.ledger.action.empty import NullAction
 from backend.ledger.event_utils import (
-    _build_action_and_observation_maps,
     _add_action_observation_pairs,
     _add_orphaned_observations,
+    _build_action_and_observation_maps,
     get_pairs_from_events,
 )
-from backend.ledger.action.empty import NullAction
-from backend.ledger.observation import NullObservation, CmdOutputObservation
+from backend.ledger.observation import CmdOutputObservation, NullObservation
 
 
 class TestBuildActionAndObservationMaps:

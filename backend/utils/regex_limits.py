@@ -17,7 +17,7 @@ def try_compile_user_regex(
         ``(compiled, None)`` on success, else ``(None, short error reason)``.
     """
     if len(pattern) > MAX_USER_REGEX_PATTERN_CHARS:
-        return None, "pattern exceeds maximum length"
+        return None, 'pattern exceeds maximum length'
     try:
         return re.compile(pattern, flags), None
     except re.error as e:

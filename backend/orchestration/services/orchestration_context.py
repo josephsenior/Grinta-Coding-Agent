@@ -6,16 +6,16 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from backend.core.schemas import AgentState
+    from backend.ledger import EventSource
+    from backend.ledger.action import Action
+    from backend.ledger.event import Event
     from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.orchestration.state.state_tracker import StateTracker
     from backend.orchestration.tool_pipeline import (
         ToolInvocationContext,
         ToolInvocationPipeline,
     )
-    from backend.core.schemas import AgentState
-    from backend.ledger import EventSource
-    from backend.ledger.action import Action
-    from backend.ledger.event import Event
 
 
 @dataclass(slots=True)
@@ -32,64 +32,66 @@ class OrchestrationContext:
     @property
     def agent(self):
         """Return the controller's agent instance, if available."""
-        return getattr(self._controller, "agent", None)
+        return getattr(self._controller, 'agent', None)
 
     @property
     def agent_config(self):
         """Return the agent configuration when present."""
         agent = self.agent
-        return getattr(agent, "config", None) if agent else None
+        return getattr(agent, 'config', None) if agent else None
 
     @property
     def id(self) -> str | None:
         """Return controller identifier if available."""
-        return getattr(self._controller, "id", None)
+        return getattr(self._controller, 'id', None)
 
     @property
     def state(self):
         """Expose the controller state for read/write operations."""
-        return getattr(self._controller, "state", None)
+        return getattr(self._controller, 'state', None)
 
     @property
     def conversation_stats(self):
-        return getattr(self._controller, "conversation_stats", None)
+        return getattr(self._controller, 'conversation_stats', None)
 
     @property
     def headless_mode(self) -> bool:
-        return bool(getattr(self._controller, "headless_mode", False))
+        return bool(getattr(self._controller, 'headless_mode', False))
 
     @property
     def controller_name(self) -> str:
         agent = self.agent
-        return getattr(agent, "name", "unknown") if agent else "unknown"
+        return getattr(agent, 'name', 'unknown') if agent else 'unknown'
 
     @property
     def state_tracker(self) -> StateTracker | None:
-        return getattr(self._controller, "state_tracker", None)
+        return getattr(self._controller, 'state_tracker', None)
 
     @property
     def event_stream(self):
         """Expose the controller's event stream."""
-        return getattr(self._controller, "event_stream", None)
+        return getattr(self._controller, 'event_stream', None)
 
     @property
     def pending_action(self):
         """Return currently pending action."""
-        services = getattr(self._controller, "services", None)
-        pending_service = getattr(services, "pending_action", None) if services else None
+        services = getattr(self._controller, 'services', None)
+        pending_service = (
+            getattr(services, 'pending_action', None) if services else None
+        )
         if pending_service:
             return pending_service.get()
-        action_service = getattr(self._controller, "action_service", None)
+        action_service = getattr(self._controller, 'action_service', None)
         if action_service:
             return action_service.get_pending_action()
-        return getattr(self._controller, "_pending_action", None)
+        return getattr(self._controller, '_pending_action', None)
 
     def set_pending_action(self, action: Action | None) -> None:
-        action_service = getattr(self._controller, "action_service", None)
+        action_service = getattr(self._controller, 'action_service', None)
         if action_service:
             action_service.set_pending_action(action)
         else:
-            setattr(self._controller, "_pending_action", action)
+            setattr(self._controller, '_pending_action', action)
 
     def initialize_operation_pipeline(
         self, middlewares: Sequence[Any]
@@ -101,10 +103,10 @@ class OrchestrationContext:
         from backend.orchestration.tool_pipeline import ToolInvocationPipeline
 
         pipeline = ToolInvocationPipeline(self._controller, list(middlewares))
-        setattr(self._controller, "tool_pipeline", pipeline)
-        setattr(self._controller, "operation_pipeline", pipeline)
-        setattr(self._controller, "_action_contexts_by_object", {})
-        setattr(self._controller, "_action_contexts_by_event_id", {})
+        setattr(self._controller, 'tool_pipeline', pipeline)
+        setattr(self._controller, 'operation_pipeline', pipeline)
+        setattr(self._controller, '_action_contexts_by_object', {})
+        setattr(self._controller, '_action_contexts_by_event_id', {})
         return pipeline
 
     def cleanup_action_context(
@@ -133,7 +135,7 @@ class OrchestrationContext:
         self._controller._reset()
 
     def pop_action_context(self, event_id: int):
-        mapping = getattr(self._controller, "_action_contexts_by_event_id", None)
+        mapping = getattr(self._controller, '_action_contexts_by_event_id', None)
         if mapping is None:
             return None
         return mapping.pop(event_id, None)
@@ -141,14 +143,14 @@ class OrchestrationContext:
     def discard_invocation_context_for_action(self, action: Any) -> None:
         """Remove tool invocation bookkeeping for *action*'s event id (int or opaque key)."""
         ctrl = self._controller
-        aid = getattr(action, "id", None)
+        aid = getattr(action, 'id', None)
         if aid is None:
             return
         ctx = None
         with contextlib.suppress(TypeError, ValueError):
             ctx = self.pop_action_context(int(aid))
         if ctx is None:
-            mapping = getattr(ctrl, "_action_contexts_by_event_id", None)
+            mapping = getattr(ctrl, '_action_contexts_by_event_id', None)
             if mapping is not None and aid in mapping:
                 ctx = mapping.pop(aid, None)
         if ctx is not None:
@@ -164,50 +166,50 @@ class OrchestrationContext:
 
     @property
     def autonomy_controller(self):
-        return getattr(self._controller, "autonomy_controller", None)
+        return getattr(self._controller, 'autonomy_controller', None)
 
     @property
     def confirmation_mode(self) -> bool:
-        return bool(getattr(self._controller, "confirmation_mode", False))
+        return bool(getattr(self._controller, 'confirmation_mode', False))
 
     @property
     def security_analyzer(self):
-        return getattr(self._controller, "security_analyzer", None)
+        return getattr(self._controller, 'security_analyzer', None)
 
     @property
     def confirmation_service(self):
-        return getattr(self._controller, "confirmation_service", None)
+        return getattr(self._controller, 'confirmation_service', None)
 
     @property
     def tool_pipeline(self):
-        return getattr(self._controller, "tool_pipeline", None)
+        return getattr(self._controller, 'tool_pipeline', None)
 
     @property
     def operation_pipeline(self):
-        controller_dict = getattr(self._controller, "__dict__", {})
-        pipeline = controller_dict.get("operation_pipeline")
+        controller_dict = getattr(self._controller, '__dict__', {})
+        pipeline = controller_dict.get('operation_pipeline')
         if pipeline is None:
-            pipeline = getattr(self._controller, "operation_pipeline", None)
+            pipeline = getattr(self._controller, 'operation_pipeline', None)
         if pipeline is not None:
             return pipeline
-        pipeline = controller_dict.get("tool_pipeline")
+        pipeline = controller_dict.get('tool_pipeline')
         if pipeline is not None:
             return pipeline
-        return getattr(self._controller, "tool_pipeline", None)
+        return getattr(self._controller, 'tool_pipeline', None)
 
     @property
     def iteration_service(self):
-        return getattr(self._controller, "iteration_service", None)
+        return getattr(self._controller, 'iteration_service', None)
 
     @property
     def telemetry_service(self):
-        return getattr(self._controller, "telemetry_service", None)
+        return getattr(self._controller, 'telemetry_service', None)
 
     @property
     def metrics_service(self):
         """Access agent performance metrics service."""
-        services = getattr(self._controller, "services", None)
-        return getattr(services, "metrics", None) if services else None
+        services = getattr(self._controller, 'services', None)
+        return getattr(services, 'metrics', None) if services else None
 
     def register_action_context(
         self, action: Action, ctx: ToolInvocationContext

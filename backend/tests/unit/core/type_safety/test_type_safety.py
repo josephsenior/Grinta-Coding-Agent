@@ -17,40 +17,40 @@ class TestNonEmptyString:
 
     def test_validate_valid_string(self):
         """Test validating a valid non-empty string."""
-        result = NonEmptyString.validate("hello")
-        assert result == "hello"
+        result = NonEmptyString.validate('hello')
+        assert result == 'hello'
         assert isinstance(result, NonEmptyString)
 
     def test_validate_empty_string_raises(self):
         """Test validating empty string raises ValueError."""
-        with pytest.raises(ValueError, match="non-empty string"):
-            NonEmptyString.validate("")
+        with pytest.raises(ValueError, match='non-empty string'):
+            NonEmptyString.validate('')
 
     def test_validate_whitespace_only_raises(self):
         """Test validating whitespace-only string raises ValueError."""
-        with pytest.raises(ValueError, match="whitespace-only"):
-            NonEmptyString.validate("   ")
+        with pytest.raises(ValueError, match='whitespace-only'):
+            NonEmptyString.validate('   ')
 
     def test_validate_non_string_raises(self):
         """Test validating non-string raises ValueError."""
-        with pytest.raises(ValueError, match="non-empty string"):
+        with pytest.raises(ValueError, match='non-empty string'):
             NonEmptyString.validate(123)  # type: ignore
 
     def test_validate_none_raises(self):
         """Test validating None raises ValueError."""
-        with pytest.raises(ValueError, match="non-empty string"):
+        with pytest.raises(ValueError, match='non-empty string'):
             NonEmptyString.validate(None)  # type: ignore
 
     def test_str_conversion(self):
         """Test converting NonEmptyString to str."""
-        result = NonEmptyString.validate("test")
-        assert str(result) == "test"
+        result = NonEmptyString.validate('test')
+        assert str(result) == 'test'
 
     def test_string_operations(self):
         """Test NonEmptyString supports string operations."""
-        result = NonEmptyString.validate("hello")
-        assert result.upper() == "HELLO"
-        assert result + " world" == "hello world"
+        result = NonEmptyString.validate('hello')
+        assert result.upper() == 'HELLO'
+        assert result + ' world' == 'hello world'
 
 
 class TestPositiveInt:
@@ -74,18 +74,18 @@ class TestPositiveInt:
 
     def test_validate_zero_raises(self):
         """Test validating zero raises ValueError."""
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ValueError, match='must be positive'):
             PositiveInt.validate(0)
 
     def test_validate_negative_raises(self):
         """Test validating negative integer raises ValueError."""
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ValueError, match='must be positive'):
             PositiveInt.validate(-1)
 
     def test_validate_non_integer_raises(self):
         """Test validating non-integer raises ValueError."""
-        with pytest.raises(ValueError, match="must be an integer"):
-            PositiveInt.validate("5")  # type: ignore
+        with pytest.raises(ValueError, match='must be an integer'):
+            PositiveInt.validate('5')  # type: ignore
 
     def test_int_conversion(self):
         """Test converting PositiveInt to int."""
@@ -176,47 +176,47 @@ class TestSafeDict:
 
     def test_create_safe_dict(self):
         """Test creating SafeDict."""
-        safe_dict = SafeDict({"key": "value"})
+        safe_dict = SafeDict({'key': 'value'})
         assert len(safe_dict) == 1
-        assert safe_dict["key"] == "value"
+        assert safe_dict['key'] == 'value'
 
     def test_safe_get_existing_key(self):
         """Test safe_get with existing key."""
-        safe_dict = SafeDict({"key": "value"})
-        result = safe_dict.safe_get("key")
-        assert result == "value"
+        safe_dict = SafeDict({'key': 'value'})
+        result = safe_dict.safe_get('key')
+        assert result == 'value'
 
     def test_safe_get_missing_key_returns_none(self):
         """Test safe_get with missing key returns None."""
-        safe_dict = SafeDict({"key": "value"})
-        result = safe_dict.safe_get("missing")
+        safe_dict = SafeDict({'key': 'value'})
+        result = safe_dict.safe_get('missing')
         assert result is None
 
     def test_safe_get_with_default(self):
         """Test safe_get with custom default."""
-        safe_dict = SafeDict({"key": "value"})
-        result = safe_dict.safe_get("missing", default="default")
-        assert result == "default"
+        safe_dict = SafeDict({'key': 'value'})
+        result = safe_dict.safe_get('missing', default='default')
+        assert result == 'default'
 
     def test_require_existing_key(self):
         """Test require with existing key."""
-        safe_dict = SafeDict({"key": "value"})
-        result = safe_dict.require("key")
-        assert result == "value"
+        safe_dict = SafeDict({'key': 'value'})
+        result = safe_dict.require('key')
+        assert result == 'value'
 
     def test_require_missing_key_raises(self):
         """Test require with missing key raises KeyError."""
-        safe_dict = SafeDict({"key": "value"})
-        with pytest.raises(KeyError, match="Required key missing: missing"):
-            safe_dict.require("missing")
+        safe_dict = SafeDict({'key': 'value'})
+        with pytest.raises(KeyError, match='Required key missing: missing'):
+            safe_dict.require('missing')
 
     def test_dict_operations(self):
         """Test SafeDict supports standard dict operations."""
-        safe_dict = SafeDict({"a": 1})
-        safe_dict["b"] = 2
+        safe_dict = SafeDict({'a': 1})
+        safe_dict['b'] = 2
         assert len(safe_dict) == 2
-        assert "a" in safe_dict
-        assert "c" not in safe_dict
+        assert 'a' in safe_dict
+        assert 'c' not in safe_dict
 
 
 class TestValidateNonEmptyString:
@@ -224,38 +224,38 @@ class TestValidateNonEmptyString:
 
     def test_validate_valid_string(self):
         """Test validating a valid string."""
-        result = validate_non_empty_string("hello")
-        assert result == "hello"
+        result = validate_non_empty_string('hello')
+        assert result == 'hello'
 
     def test_validate_empty_string_raises(self):
         """Test validating empty string raises ValueError."""
-        with pytest.raises(ValueError, match="must be a non-empty string"):
-            validate_non_empty_string("")
+        with pytest.raises(ValueError, match='must be a non-empty string'):
+            validate_non_empty_string('')
 
     def test_validate_whitespace_only_raises(self):
         """Test validating whitespace-only string raises ValueError."""
-        with pytest.raises(ValueError, match="whitespace-only"):
-            validate_non_empty_string("   ")
+        with pytest.raises(ValueError, match='whitespace-only'):
+            validate_non_empty_string('   ')
 
     def test_validate_non_string_raises(self):
         """Test validating non-string raises ValueError."""
-        with pytest.raises(ValueError, match="must be a non-empty string"):
+        with pytest.raises(ValueError, match='must be a non-empty string'):
             validate_non_empty_string(123)  # type: ignore
 
     def test_validate_none_raises(self):
         """Test validating None raises ValueError."""
-        with pytest.raises(ValueError, match="must be a non-empty string"):
+        with pytest.raises(ValueError, match='must be a non-empty string'):
             validate_non_empty_string(None)  # type: ignore
 
     def test_custom_name_in_error(self):
         """Test custom parameter name appears in error message."""
-        with pytest.raises(ValueError, match="username must be a non-empty string"):
-            validate_non_empty_string("", name="username")
+        with pytest.raises(ValueError, match='username must be a non-empty string'):
+            validate_non_empty_string('', name='username')
 
     def test_custom_name_whitespace_error(self):
         """Test custom name in whitespace error."""
-        with pytest.raises(ValueError, match="password cannot be empty"):
-            validate_non_empty_string("   ", name="password")
+        with pytest.raises(ValueError, match='password cannot be empty'):
+            validate_non_empty_string('   ', name='password')
 
 
 class TestValidatePositiveInt:
@@ -278,25 +278,25 @@ class TestValidatePositiveInt:
 
     def test_validate_zero_raises(self):
         """Test validating zero raises ValueError."""
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ValueError, match='must be positive'):
             validate_positive_int(0)
 
     def test_validate_negative_raises(self):
         """Test validating negative integer raises ValueError."""
-        with pytest.raises(ValueError, match="must be positive"):
+        with pytest.raises(ValueError, match='must be positive'):
             validate_positive_int(-5)
 
     def test_validate_non_integer_raises(self):
         """Test validating non-integer raises ValueError."""
-        with pytest.raises(ValueError, match="must be an integer"):
+        with pytest.raises(ValueError, match='must be an integer'):
             validate_positive_int(3.14)  # type: ignore
 
     def test_custom_name_in_error(self):
         """Test custom parameter name appears in error message."""
-        with pytest.raises(ValueError, match="count must be an integer"):
-            validate_positive_int("not an int", name="count")  # type: ignore
+        with pytest.raises(ValueError, match='count must be an integer'):
+            validate_positive_int('not an int', name='count')  # type: ignore
 
     def test_custom_name_positive_error(self):
         """Test custom name in positive error."""
-        with pytest.raises(ValueError, match="timeout must be positive"):
-            validate_positive_int(-1, name="timeout")
+        with pytest.raises(ValueError, match='timeout must be positive'):
+            validate_positive_int(-1, name='timeout')

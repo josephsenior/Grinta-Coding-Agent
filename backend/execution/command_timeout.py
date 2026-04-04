@@ -8,10 +8,7 @@ A generous safety-net hard timeout prevents truly pathological hangs.
 
 from __future__ import annotations
 
-import time
 from typing import TYPE_CHECKING, Any
-
-from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
     from backend.ledger.action import Action
@@ -52,6 +49,4 @@ class CommandTimeoutMixin:
         if isinstance(event, CmdRunAction):
             event.set_hard_timeout(_SAFETY_NET_TIMEOUT, blocking=False)
         else:
-            event.set_hard_timeout(
-                self.config.runtime_config.timeout, blocking=False
-            )
+            event.set_hard_timeout(self.config.runtime_config.timeout, blocking=False)

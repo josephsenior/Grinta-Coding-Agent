@@ -8,9 +8,7 @@ from types import MethodType
 from typing import Any, cast
 from unittest.mock import MagicMock
 
-
 from backend.ledger.durable_writer import DurableEventWriter, PersistedEvent
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -27,8 +25,8 @@ def _make_file_store():
 def _make_event(eid: int = 1) -> PersistedEvent:
     return PersistedEvent(
         event_id=eid,
-        payload={"id": eid, "type": "test"},
-        filename=f"event_{eid}.json",
+        payload={'id': eid, 'type': 'test'},
+        filename=f'event_{eid}.json',
     )
 
 
@@ -41,17 +39,17 @@ class TestPersistedEvent:
     def test_fields(self):
         pe = PersistedEvent(
             event_id=5,
-            payload={"x": 1},
-            filename="ev.json",
-            cache_filename="cache.json",
+            payload={'x': 1},
+            filename='ev.json',
+            cache_filename='cache.json',
             cache_contents='{"x":1}',
         )
         assert pe.event_id == 5
-        assert pe.filename == "ev.json"
-        assert pe.cache_filename == "cache.json"
+        assert pe.filename == 'ev.json'
+        assert pe.cache_filename == 'cache.json'
 
     def test_defaults(self):
-        pe = PersistedEvent(event_id=1, payload={}, filename="f.json")
+        pe = PersistedEvent(event_id=1, payload={}, filename='f.json')
         assert pe.cache_filename is None
         assert pe.cache_contents is None
 
@@ -113,10 +111,10 @@ class TestEnqueueAndFlush:
             store.write.assert_called()
             # First arg of first call is the filename
             call_args = store.write.call_args_list[0]
-            assert call_args[0][0] == "event_42.json"
+            assert call_args[0][0] == 'event_42.json'
             # Second arg is JSON serialized payload
             parsed = json.loads(call_args[0][1])
-            assert parsed["id"] == 42
+            assert parsed['id'] == 42
         finally:
             writer.stop(timeout=2.0)
 
@@ -127,9 +125,9 @@ class TestEnqueueAndFlush:
         try:
             ev = PersistedEvent(
                 event_id=1,
-                payload={"a": 1},
-                filename="ev.json",
-                cache_filename="cache.json",
+                payload={'a': 1},
+                filename='ev.json',
+                cache_filename='cache.json',
                 cache_contents='{"cached": true}',
             )
             writer.enqueue(ev)
@@ -137,7 +135,7 @@ class TestEnqueueAndFlush:
             # Should have been called twice: main + cache
             assert store.write.call_count >= 2
             filenames = [c[0][0] for c in store.write.call_args_list]
-            assert "cache.json" in filenames
+            assert 'cache.json' in filenames
         finally:
             writer.stop(timeout=2.0)
 
@@ -181,7 +179,7 @@ class TestErrorHandling:
             nonlocal call_count
             call_count += 1
             if call_count <= 2:
-                raise OSError("disk error")
+                raise OSError('disk error')
 
         store.write.side_effect = failing_write
         writer = DurableEventWriter(store, max_queue_size=10)
@@ -197,7 +195,7 @@ class TestErrorHandling:
 
     def test_permanent_error_logged(self):
         store = _make_file_store()
-        store.write.side_effect = OSError("permanent failure")
+        store.write.side_effect = OSError('permanent failure')
         writer = DurableEventWriter(store, max_queue_size=10)
         writer.start()
         try:
@@ -250,7 +248,7 @@ class TestBatchFlush:
             # All events should be persisted
             filenames = {c[0][0] for c in store.write.call_args_list}
             for i in range(n):
-                assert f"event_{i}.json" in filenames
+                assert f'event_{i}.json' in filenames
         finally:
             writer.stop(timeout=2.0)
 
@@ -289,4 +287,4 @@ class TestBatchFlush:
         writer.stop(timeout=5.0)
         filenames = {c[0][0] for c in store.write.call_args_list}
         for i in range(5):
-            assert f"event_{i}.json" in filenames
+            assert f'event_{i}.json' in filenames

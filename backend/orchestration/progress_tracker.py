@@ -31,7 +31,7 @@ class Milestone:
     name: str
     iteration: int
     timestamp: datetime
-    description: str = ""
+    description: str = ''
 
 
 @dataclass
@@ -77,7 +77,7 @@ class ProgressTracker:
         self.consecutive_errors = 0
 
         logger.info(
-            "ProgressTracker initialized with max_iterations=%s", max_iterations
+            'ProgressTracker initialized with max_iterations=%s', max_iterations
         )
 
     def update(self, state: State) -> ProgressMetrics:
@@ -154,7 +154,7 @@ class ProgressTracker:
             if isinstance(event, CmdRunAction):
                 if any(
                     test_cmd in event.command.lower()
-                    for test_cmd in ["pytest", "npm test", "jest"]
+                    for test_cmd in ['pytest', 'npm test', 'jest']
                 ):
                     # Look for observation
                     for j in range(i + 1, min(i + 5, len(recent_history))):
@@ -179,14 +179,14 @@ class ProgressTracker:
         for event in recent_history:
             # Test passing milestone
             if isinstance(event, CmdOutputObservation):
-                if "pytest" in event.command and event.exit_code == 0:
-                    if not any(m.name == "tests_passing" for m in self.milestones):
+                if 'pytest' in event.command and event.exit_code == 0:
+                    if not any(m.name == 'tests_passing' for m in self.milestones):
                         self.milestones.append(
                             Milestone(
-                                name="tests_passing",
+                                name='tests_passing',
                                 iteration=current_iteration,
                                 timestamp=datetime.now(),
-                                description="All tests passing",
+                                description='All tests passing',
                             ),
                         )
                         self.last_progress_iteration = current_iteration
@@ -203,16 +203,16 @@ class ProgressTracker:
         """
         # Weighted factors
         factors = {
-            "iteration_progress": (
+            'iteration_progress': (
                 state.iteration_flag.current_value / self.max_iterations
             )
             * 0.3,
-            "files_modified": min(len(self.files_modified) / 5.0, 1.0)
+            'files_modified': min(len(self.files_modified) / 5.0, 1.0)
             * 0.2,  # Cap at 5 files
-            "tests_passing": (self.tests_passed / max(self.tests_run, 1)) * 0.3
+            'tests_passing': (self.tests_passed / max(self.tests_run, 1)) * 0.3
             if self.tests_run > 0
             else 0.0,
-            "milestones": (len(self.milestones) / 5.0) * 0.2,  # Cap at 5 milestones
+            'milestones': (len(self.milestones) / 5.0) * 0.2,  # Cap at 5 milestones
         }
 
         total = sum(factors.values())
@@ -270,7 +270,7 @@ class ProgressTracker:
         remaining_pct = 1.0 - completion_pct
         remaining_iterations = self.max_iterations * remaining_pct
         minutes_remaining = (
-            remaining_iterations / velocity if velocity > 0 else float("inf")
+            remaining_iterations / velocity if velocity > 0 else float('inf')
         )
 
         if minutes_remaining > 10000:  # More than a week

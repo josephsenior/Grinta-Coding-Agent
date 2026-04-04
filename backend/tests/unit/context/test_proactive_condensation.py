@@ -6,15 +6,13 @@ import unittest
 from typing import Any, cast
 from unittest.mock import MagicMock
 
-from backend.ledger.action.agent import CondensationAction
-from backend.ledger.action.files import FileEditAction, FileWriteAction
-from backend.ledger.action.message import MessageAction, SystemMessageAction
-from backend.ledger.event import EventSource
-from backend.ledger.observation import Observation
 from backend.context.compactor.strategies.conversation_window_compactor import (
     ConversationWindowCompactor,
 )
 from backend.context.view import View
+from backend.ledger.action.files import FileWriteAction
+from backend.ledger.action.message import MessageAction, SystemMessageAction
+from backend.ledger.event import EventSource
 
 
 def _make_event(eid: int, cls=MessageAction, source=EventSource.AGENT, **kwargs):
@@ -22,7 +20,7 @@ def _make_event(eid: int, cls=MessageAction, source=EventSource.AGENT, **kwargs)
     ev = MagicMock(spec=cls)
     ev.id = eid
     ev.source = source
-    ev.content = kwargs.get("content", f"event-{eid}")
+    ev.content = kwargs.get('content', f'event-{eid}')
     # Make isinstance checks work
     ev.__class__ = cls
     return ev
@@ -82,7 +80,9 @@ class TestProactiveCondensation(unittest.TestCase):
 class TestFileEventsPreserved(unittest.TestCase):
     """File events are now preserved directly (not via manifest summary)."""
 
-    def _build_real_events(self, n_total: int, file_actions: dict[int, str] | None = None):
+    def _build_real_events(
+        self, n_total: int, file_actions: dict[int, str] | None = None
+    ):
         """Build a realistic event list with system msg, user msg, and file actions."""
         events = []
         sys_msg = MagicMock(spec=SystemMessageAction)
@@ -94,7 +94,7 @@ class TestFileEventsPreserved(unittest.TestCase):
         user_msg = MagicMock(spec=MessageAction)
         user_msg.id = 1
         user_msg.source = EventSource.USER
-        user_msg.content = "Create a Next.js app"
+        user_msg.content = 'Create a Next.js app'
         user_msg.__class__ = cast(Any, MessageAction)
         events.append(user_msg)
 
@@ -105,14 +105,14 @@ class TestFileEventsPreserved(unittest.TestCase):
                 fa.source = EventSource.AGENT
                 fa.path = file_actions[i]
                 fa.__class__ = cast(Any, FileWriteAction)
-                fa.content = f"content-{i}"
+                fa.content = f'content-{i}'
                 fa.cause = None
                 events.append(fa)
             else:
                 ev = MagicMock(spec=MessageAction)
                 ev.id = i
                 ev.source = EventSource.AGENT
-                ev.content = f"action-{i}"
+                ev.content = f'action-{i}'
                 ev.__class__ = cast(Any, MessageAction)
                 ev.cause = None
                 events.append(ev)
@@ -121,7 +121,7 @@ class TestFileEventsPreserved(unittest.TestCase):
 
     def test_file_events_not_pruned(self):
         """File action events are kept, so no manifest needed."""
-        file_actions = {3: "src/app/page.tsx", 5: "src/app/layout.tsx"}
+        file_actions = {3: 'src/app/page.tsx', 5: 'src/app/layout.tsx'}
         events = self._build_real_events(20, file_actions)
 
         condenser = ConversationWindowCompactor(max_events=10)
@@ -130,17 +130,22 @@ class TestFileEventsPreserved(unittest.TestCase):
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
-        if action.pruned_events_start_id is not None and action.pruned_events_end_id is not None:
-            pruned = set(range(
-                action.pruned_events_start_id,
-                action.pruned_events_end_id + 1,
-            ))
+        if (
+            action.pruned_events_start_id is not None
+            and action.pruned_events_end_id is not None
+        ):
+            pruned = set(
+                range(
+                    action.pruned_events_start_id,
+                    action.pruned_events_end_id + 1,
+                )
+            )
         self.assertNotIn(3, pruned)
         self.assertNotIn(5, pruned)
 
     def test_no_summary_generated(self):
         """Summary/manifest is no longer generated (events preserved directly)."""
-        file_actions = {3: "b.tsx", 4: "a.tsx"}
+        file_actions = {3: 'b.tsx', 4: 'a.tsx'}
         events = self._build_real_events(20, file_actions)
         condenser = ConversationWindowCompactor(max_events=10)
         view = _make_view(events, unhandled=True)
@@ -199,5 +204,5 @@ class TestFromConfig(unittest.TestCase):
         self.assertEqual(condenser._max_events, 100)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

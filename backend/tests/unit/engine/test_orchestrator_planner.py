@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from collections import deque
 from unittest.mock import MagicMock, patch
 
 from backend.core.enums import ActionSecurityRisk
 from backend.engine.orchestrator import Orchestrator
 from backend.engine.planner import OrchestratorPlanner, _maybe_log_prompt_metrics
+from backend.ledger.action.agent import CondensationAction
 from backend.ledger.action.files import FileEditAction, FileWriteAction
 from backend.ledger.observation import ErrorObservation
 
@@ -19,18 +21,23 @@ def _make_planner():
 
 class TestPromptMetricsLogging:
     def test_logs_when_app_debug_prompt_metrics_enabled(self):
-        with patch.dict(
-            "os.environ",
-            {"APP_DEBUG_PROMPT_METRICS": "1"},
-            clear=False,
-        ), patch("backend.engine.planner.logger") as mock_logger:
-            _maybe_log_prompt_metrics([
-                {"role": "system", "content": "hello"},
-                {"role": "user", "content": "world"},
-            ])
+        with (
+            patch.dict(
+                'os.environ',
+                {'APP_DEBUG_PROMPT_METRICS': '1'},
+                clear=False,
+            ),
+            patch('backend.engine.planner.logger') as mock_logger,
+        ):
+            _maybe_log_prompt_metrics(
+                [
+                    {'role': 'system', 'content': 'hello'},
+                    {'role': 'user', 'content': 'world'},
+                ]
+            )
 
         mock_logger.info.assert_called_once_with(
-            "APP_DEBUG_PROMPT_METRICS: system_messages=%s chars_each=%s chars_total=%s",
+            'APP_DEBUG_PROMPT_METRICS: system_messages=%s chars_each=%s chars_total=%s',
             1,
             [5],
             5,
@@ -41,15 +48,15 @@ class TestGetLastUserMessage:
     def test_finds_last_user_message(self):
         p = _make_planner()
         messages = [
-            {"role": "user", "content": "First"},
-            {"role": "assistant", "content": "Response"},
-            {"role": "user", "content": "Second"},
+            {'role': 'user', 'content': 'First'},
+            {'role': 'assistant', 'content': 'Response'},
+            {'role': 'user', 'content': 'Second'},
         ]
-        assert p._get_last_user_message(messages) == "Second"
+        assert p._get_last_user_message(messages) == 'Second'
 
     def test_no_user_message(self):
         p = _make_planner()
-        messages = [{"role": "assistant", "content": "Hi"}]
+        messages = [{'role': 'assistant', 'content': 'Hi'}]
         assert p._get_last_user_message(messages) is None
 
     def test_empty_messages(self):
@@ -58,39 +65,76 @@ class TestGetLastUserMessage:
 
     def test_user_with_empty_content(self):
         p = _make_planner()
-        messages = [{"role": "user"}]
-        assert p._get_last_user_message(messages) == ""
+        messages = [{'role': 'user'}]
+        assert p._get_last_user_message(messages) == ''
 
 
 class TestOrchestratorPromptTierFromHistory:
     def test_debug_when_error_observation_in_window(self):
         orch = Orchestrator.__new__(Orchestrator)
         mock_pm = MagicMock()
-        object.__setattr__(orch, "_prompt_manager", mock_pm)
+        object.__setattr__(orch, '_prompt_manager', mock_pm)
         state = MagicMock()
         state.history = [
-            FileEditAction(path="a.py", security_risk=ActionSecurityRisk.LOW),
-            ErrorObservation(content="tool blew up"),
+            FileEditAction(path='a.py', security_risk=ActionSecurityRisk.LOW),
+            ErrorObservation(content='tool blew up'),
         ]
         orch._set_prompt_tier_from_recent_history(state)
-        mock_pm.set_prompt_tier.assert_called_with("debug")
+        mock_pm.set_prompt_tier.assert_called_with('debug')
+
+
+class TestCondensationRecoveryHandling:
+    def test_noop_condensation_does_not_queue_recovery(self):
+        orch = Orchestrator.__new__(Orchestrator)
+        orch.pending_actions = deque()
+        state = MagicMock()
+        state.history = []
+        condensed = MagicMock()
+        condensed.pending_action = CondensationAction(pruned_event_ids=[])
+
+        result = orch._handle_pending_action_from_condensation(state, condensed)
+
+        assert result is condensed.pending_action
+        assert list(orch.pending_actions) == []
+
+    def test_real_condensation_queues_recovery(self):
+        orch = Orchestrator.__new__(Orchestrator)
+        orch.pending_actions = deque()
+        orch.memory_manager = MagicMock()
+        orch.memory_manager.get_initial_user_message.return_value = MagicMock(
+            content='finish the task'
+        )
+        state = MagicMock()
+        state.history = []
+        action = CondensationAction(pruned_event_ids=[3, 4])
+        condensed = MagicMock()
+        condensed.pending_action = action
+
+        result = orch._handle_pending_action_from_condensation(state, condensed)
+
+        assert result is action
+        assert len(orch.pending_actions) == 1
 
     def test_base_when_only_low_risk_file_edit(self):
         orch = Orchestrator.__new__(Orchestrator)
         mock_pm = MagicMock()
-        object.__setattr__(orch, "_prompt_manager", mock_pm)
+        object.__setattr__(orch, '_prompt_manager', mock_pm)
         state = MagicMock()
-        state.history = [FileEditAction(path="a.py", security_risk=ActionSecurityRisk.LOW)]
+        state.history = [
+            FileEditAction(path='a.py', security_risk=ActionSecurityRisk.LOW)
+        ]
         orch._set_prompt_tier_from_recent_history(state)
-        mock_pm.set_prompt_tier.assert_called_with("base")
+        mock_pm.set_prompt_tier.assert_called_with('base')
 
     def test_debug_when_file_write_high_security_risk(self):
         orch = Orchestrator.__new__(Orchestrator)
         mock_pm = MagicMock()
-        object.__setattr__(orch, "_prompt_manager", mock_pm)
+        object.__setattr__(orch, '_prompt_manager', mock_pm)
         state = MagicMock()
         state.history = [
-            FileWriteAction(path="x.sh", content="", security_risk=ActionSecurityRisk.HIGH),
+            FileWriteAction(
+                path='x.sh', content='', security_risk=ActionSecurityRisk.HIGH
+            ),
         ]
         orch._set_prompt_tier_from_recent_history(state)
-        mock_pm.set_prompt_tier.assert_called_with("debug")
+        mock_pm.set_prompt_tier.assert_called_with('debug')

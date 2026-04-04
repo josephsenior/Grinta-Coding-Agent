@@ -1,4 +1,4 @@
-﻿"""Browser environment initialization for the action execution server."""
+"""Browser environment initialization for the action execution server."""
 
 from __future__ import annotations
 
@@ -23,12 +23,12 @@ async def init_browser(enable_browser: bool) -> BrowserEnv | None:
         return None
 
     try:
-        logger.info("Initializing browser environment...")
+        logger.info('Initializing browser environment...')
         from backend.execution.browser.browser_env import BrowserEnv
 
         browser = BrowserEnv()
-        logger.info("Browser environment initialized successfully")
+        logger.info('Browser environment initialized successfully')
         return browser
     except Exception as e:
-        logger.error("Failed to initialize browser: %s", e)
+        logger.error('Failed to initialize browser: %s', e)
         return None

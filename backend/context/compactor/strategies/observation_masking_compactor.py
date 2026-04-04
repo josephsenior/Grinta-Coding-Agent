@@ -5,15 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from backend.core.config.compactor_config import ObservationMaskingCompactorConfig
-from backend.ledger.observation import Observation
-from backend.ledger.observation.agent import AgentCondensationObservation
+    pass
 from backend.context.compactor.compactor import Compaction, Compactor
 from backend.context.view import View
+from backend.ledger.observation import Observation
+from backend.ledger.observation.agent import AgentCondensationObservation
 
 if TYPE_CHECKING:
-    from backend.ledger.event import Event
     from backend.inference.llm_registry import LLMRegistry
+    from backend.ledger.event import Event
 
 
 class ObservationMaskingCompactor(Compactor):
@@ -59,7 +59,7 @@ class ObservationMaskingCompactor(Compactor):
         results: list[Event] = []
         for i, event in enumerate(view):
             if isinstance(event, Observation) and i < len(view) - self.attention_window:
-                results.append(AgentCondensationObservation("<MASKED>"))
+                results.append(AgentCondensationObservation('<MASKED>'))
             else:
                 results.append(event)
         return View(events=results)
@@ -74,7 +74,7 @@ class ObservationMaskingCompactor(Compactor):
         from backend.core.pydantic_compat import model_dump_with_options
 
         return ObservationMaskingCompactor(
-            **model_dump_with_options(config, exclude={"type"})
+            **model_dump_with_options(config, exclude={'type'})
         )
 
 

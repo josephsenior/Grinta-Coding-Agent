@@ -1,4 +1,4 @@
-﻿"""File editor module - Production implementation.
+"""File editor module - Production implementation.
 
 Provides file editing capabilities using the production-grade FileEditor.
 """
@@ -17,4 +17,4 @@ def file_editor(*args, **kwargs):
     return _file_editor_instance(*args, **kwargs)
 
 
-__all__ = ["file_editor", "FileEditor"]
+__all__ = ['file_editor', 'FileEditor']

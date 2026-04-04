@@ -5,14 +5,14 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock
 
-from backend.ledger.action.files import FileEditAction, FileWriteAction
-from backend.ledger.action.message import MessageAction, SystemMessageAction
-from backend.ledger.event import EventSource
-from backend.ledger.observation import Observation
 from backend.context.compactor.strategies.conversation_window_compactor import (
     ConversationWindowCompactor,
 )
 from backend.context.view import View
+from backend.ledger.action.files import FileEditAction, FileWriteAction
+from backend.ledger.action.message import MessageAction, SystemMessageAction
+from backend.ledger.event import EventSource
+from backend.ledger.observation import Observation
 
 
 def _ev(eid, cls=MessageAction, source=EventSource.AGENT, **kwargs):
@@ -20,10 +20,10 @@ def _ev(eid, cls=MessageAction, source=EventSource.AGENT, **kwargs):
     ev = MagicMock(spec=cls)
     ev.id = eid
     ev.source = source
-    ev.content = kwargs.get("content", f"event-{eid}")
+    ev.content = kwargs.get('content', f'event-{eid}')
     ev.__class__ = cls  # type: ignore[assignment]
     # Default: no cause
-    ev.cause = kwargs.get("cause", None)
+    ev.cause = kwargs.get('cause', None)
     return ev
 
 
@@ -32,7 +32,7 @@ def _obs(eid, cause_id):
     ob = MagicMock(spec=Observation)
     ob.id = eid
     ob.source = EventSource.ENVIRONMENT
-    ob.content = f"obs-{eid}"
+    ob.content = f'obs-{eid}'
     ob.__class__ = Observation  # type: ignore[assignment]
     ob.cause = cause_id
     return ob
@@ -63,7 +63,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         events.append(sys_msg)
 
         # 1: first user message
-        user_msg = _ev(1, MessageAction, EventSource.USER, content="Create app")
+        user_msg = _ev(1, MessageAction, EventSource.USER, content='Create app')
         events.append(user_msg)
 
         for i in range(2, n_total):
@@ -83,7 +83,7 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
     def test_file_write_events_preserved(self):
         """FileWriteAction events in the pruned region should be kept."""
         # Create 30 events with a file write at index 5 (early, would normally be pruned).
-        events = self._build_events(30, file_indices={5: "src/page.tsx"})
+        events = self._build_events(30, file_indices={5: 'src/page.tsx'})
 
         condenser = ConversationWindowCompactor(max_events=20)
         view = _view(events, unhandled=True)
@@ -92,19 +92,24 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
 
         # Event 5 should NOT be pruned.
         pruned = set(action.pruned_event_ids or [])
-        if action.pruned_events_start_id is not None and action.pruned_events_end_id is not None:
-            pruned = set(range(
-                action.pruned_events_start_id,
-                action.pruned_events_end_id + 1,
-            ))
-        self.assertNotIn(5, pruned, "FileWriteAction at id=5 should be preserved")
+        if (
+            action.pruned_events_start_id is not None
+            and action.pruned_events_end_id is not None
+        ):
+            pruned = set(
+                range(
+                    action.pruned_events_start_id,
+                    action.pruned_events_end_id + 1,
+                )
+            )
+        self.assertNotIn(5, pruned, 'FileWriteAction at id=5 should be preserved')
 
     def test_file_edit_events_preserved(self):
         """FileEditAction events should also be preserved."""
         events = self._build_events(30)
         # Replace event at index 4 with a FileEditAction
         fa = _ev(4, FileEditAction, EventSource.AGENT)
-        fa.path = "src/layout.tsx"
+        fa.path = 'src/layout.tsx'
         events[4] = fa
 
         condenser = ConversationWindowCompactor(max_events=20)
@@ -113,18 +118,23 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
-        if action.pruned_events_start_id is not None and action.pruned_events_end_id is not None:
-            pruned = set(range(
-                action.pruned_events_start_id,
-                action.pruned_events_end_id + 1,
-            ))
-        self.assertNotIn(4, pruned, "FileEditAction at id=4 should be preserved")
+        if (
+            action.pruned_events_start_id is not None
+            and action.pruned_events_end_id is not None
+        ):
+            pruned = set(
+                range(
+                    action.pruned_events_start_id,
+                    action.pruned_events_end_id + 1,
+                )
+            )
+        self.assertNotIn(4, pruned, 'FileEditAction at id=4 should be preserved')
 
     def test_paired_observation_preserved(self):
         """Observation paired to a preserved file action should also be kept."""
         events = self._build_events(
             30,
-            file_indices={5: "src/page.tsx"},
+            file_indices={5: 'src/page.tsx'},
             obs_for={5: 6},
         )
 
@@ -134,17 +144,22 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
-        if action.pruned_events_start_id is not None and action.pruned_events_end_id is not None:
-            pruned = set(range(
-                action.pruned_events_start_id,
-                action.pruned_events_end_id + 1,
-            ))
-        self.assertNotIn(5, pruned, "FileWriteAction should be preserved")
-        self.assertNotIn(6, pruned, "Paired observation should be preserved")
+        if (
+            action.pruned_events_start_id is not None
+            and action.pruned_events_end_id is not None
+        ):
+            pruned = set(
+                range(
+                    action.pruned_events_start_id,
+                    action.pruned_events_end_id + 1,
+                )
+            )
+        self.assertNotIn(5, pruned, 'FileWriteAction should be preserved')
+        self.assertNotIn(6, pruned, 'Paired observation should be preserved')
 
     def test_multiple_file_actions_preserved(self):
         """All file action events should be preserved, not just one."""
-        file_indices = {3: "a.tsx", 5: "b.tsx", 7: "c.tsx", 9: "d.tsx"}
+        file_indices = {3: 'a.tsx', 5: 'b.tsx', 7: 'c.tsx', 9: 'd.tsx'}
         events = self._build_events(30, file_indices=file_indices)
 
         condenser = ConversationWindowCompactor(max_events=20)
@@ -153,17 +168,24 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
-        if action.pruned_events_start_id is not None and action.pruned_events_end_id is not None:
-            pruned = set(range(
-                action.pruned_events_start_id,
-                action.pruned_events_end_id + 1,
-            ))
+        if (
+            action.pruned_events_start_id is not None
+            and action.pruned_events_end_id is not None
+        ):
+            pruned = set(
+                range(
+                    action.pruned_events_start_id,
+                    action.pruned_events_end_id + 1,
+                )
+            )
         for eid in file_indices:
-            self.assertNotIn(eid, pruned, f"File action at id={eid} should be preserved")
+            self.assertNotIn(
+                eid, pruned, f'File action at id={eid} should be preserved'
+            )
 
     def test_non_file_events_still_pruned(self):
         """Regular MessageAction events in the pruned region should still be dropped."""
-        events = self._build_events(30, file_indices={5: "page.tsx"})
+        events = self._build_events(30, file_indices={5: 'page.tsx'})
 
         condenser = ConversationWindowCompactor(max_events=20)
         view = _view(events, unhandled=True)
@@ -171,18 +193,26 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
-        if action.pruned_events_start_id is not None and action.pruned_events_end_id is not None:
-            pruned = set(range(
-                action.pruned_events_start_id,
-                action.pruned_events_end_id + 1,
-            ))
+        if (
+            action.pruned_events_start_id is not None
+            and action.pruned_events_end_id is not None
+        ):
+            pruned = set(
+                range(
+                    action.pruned_events_start_id,
+                    action.pruned_events_end_id + 1,
+                )
+            )
         # Some non-file, non-essential events should be pruned.
-        non_essential_non_file = {e.id for e in events
-                                  if e.id not in {0, 1, 5}
-                                  and not isinstance(e, (FileWriteAction, FileEditAction))}
+        non_essential_non_file = {
+            e.id
+            for e in events
+            if e.id not in {0, 1, 5}
+            and not isinstance(e, (FileWriteAction, FileEditAction))
+        }
         self.assertTrue(
             pruned & non_essential_non_file,
-            "Some regular events should be pruned",
+            'Some regular events should be pruned',
         )
 
     def test_no_file_actions_no_change(self):
@@ -194,14 +224,19 @@ class TestImportanceWeightedCondensation(unittest.TestCase):
         action = condensation.action
 
         pruned = set(action.pruned_event_ids or [])
-        if action.pruned_events_start_id is not None and action.pruned_events_end_id is not None:
-            pruned = set(range(
-                action.pruned_events_start_id,
-                action.pruned_events_end_id + 1,
-            ))
+        if (
+            action.pruned_events_start_id is not None
+            and action.pruned_events_end_id is not None
+        ):
+            pruned = set(
+                range(
+                    action.pruned_events_start_id,
+                    action.pruned_events_end_id + 1,
+                )
+            )
         # Some events should be pruned (half the non-essential ones).
-        self.assertTrue(len(pruned) > 0, "Should prune some events")
+        self.assertTrue(len(pruned) > 0, 'Should prune some events')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

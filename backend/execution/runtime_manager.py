@@ -155,8 +155,8 @@ class RuntimeManager:
             warm_counter = Counter(record.kind for record in self._warm)
             running_counter = Counter(record.kind for record in self._running.values())
         return {
-            "warm": dict(warm_counter),
-            "running": dict(running_counter),
+            'warm': dict(warm_counter),
+            'running': dict(running_counter),
         }
 
     def heartbeat(self, session_id: str) -> None:
@@ -184,7 +184,7 @@ class RuntimeManager:
 runtime_manager = RuntimeManager()
 
 __all__ = [
-    "RuntimeManager",
-    "RuntimeServerInfo",
-    "runtime_manager",
+    'RuntimeManager',
+    'RuntimeServerInfo',
+    'runtime_manager',
 ]

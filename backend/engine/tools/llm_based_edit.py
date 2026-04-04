@@ -1,11 +1,11 @@
 """LLM-assisted file editing tool configuration for Orchestrator."""
 
+from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import (
     create_tool_definition,
     get_path_param,
     get_security_risk_param,
 )
-from backend.engine.contracts import ChatCompletionToolParam
 
 _FILE_EDIT_DESCRIPTION = """Edit a file in plain-text format.
 * The assistant can edit files by specifying the file path and providing a draft of the new file content.
@@ -125,23 +125,23 @@ print(MyClass().y)
 def create_llm_based_edit_tool() -> ChatCompletionToolParam:
     """Create the LLM-based file editing tool for the Orchestrator agent."""
     return create_tool_definition(
-        name="edit_file",
+        name='edit_file',
         description=_FILE_EDIT_DESCRIPTION,
         properties={
-            "path": get_path_param("The absolute path to the file to be edited."),
-            "content": {
-                "type": "string",
-                "description": "A draft of the new content for the file being edited. Note that the assistant may skip unchanged lines.",
+            'path': get_path_param('The absolute path to the file to be edited.'),
+            'content': {
+                'type': 'string',
+                'description': 'A draft of the new content for the file being edited. Note that the assistant may skip unchanged lines.',
             },
-            "start": {
-                "type": "integer",
-                "description": "The starting line number for the edit (1-indexed, inclusive). Default is 1.",
+            'start': {
+                'type': 'integer',
+                'description': 'The starting line number for the edit (1-indexed, inclusive). Default is 1.',
             },
-            "end": {
-                "type": "integer",
-                "description": "The ending line number for the edit (1-indexed, inclusive). Default is -1 (end of file).",
+            'end': {
+                'type': 'integer',
+                'description': 'The ending line number for the edit (1-indexed, inclusive). Default is -1 (end of file).',
             },
-            "security_risk": get_security_risk_param(),
+            'security_risk': get_security_risk_param(),
         },
-        required=["path", "content"],
+        required=['path', 'content'],
     )

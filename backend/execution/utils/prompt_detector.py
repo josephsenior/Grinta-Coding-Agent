@@ -24,15 +24,15 @@ from backend.core.logger import app_logger as logger
 class PromptType(Enum):
     """Types of interactive prompts we can detect and handle."""
 
-    YES_NO_CONFIRMATION = "yes_no"  # (y/n), (Y/n), yes/no prompts
-    OK_PROCEED = "ok_proceed"  # "Ok to proceed?", "Continue?"
-    PASSWORD = "password"  # Password prompts
-    SELECTION = "selection"  # Menu selections (1, 2, 3...)
-    PRESS_KEY = "press_key"  # "Press any key to continue"
-    OVERWRITE = "overwrite"  # File overwrite confirmations
-    SUDO_PASSWORD = "sudo_password"  # sudo password prompts
-    LICENSE_AGREEMENT = "license"  # License acceptance
-    UNKNOWN = "unknown"
+    YES_NO_CONFIRMATION = 'yes_no'  # (y/n), (Y/n), yes/no prompts
+    OK_PROCEED = 'ok_proceed'  # "Ok to proceed?", "Continue?"
+    PASSWORD = 'password'  # Password prompts
+    SELECTION = 'selection'  # Menu selections (1, 2, 3...)
+    PRESS_KEY = 'press_key'  # "Press any key to continue"
+    OVERWRITE = 'overwrite'  # File overwrite confirmations
+    SUDO_PASSWORD = 'sudo_password'  # sudo password prompts
+    LICENSE_AGREEMENT = 'license'  # License acceptance
+    UNKNOWN = 'unknown'
 
 
 @dataclass
@@ -54,104 +54,104 @@ class PromptPattern:
 PROMPT_PATTERNS = [
     # npm/npx package installation prompts
     PromptPattern(
-        pattern=r"Ok to proceed\?\s*\(y\)",
+        pattern=r'Ok to proceed\?\s*\(y\)',
         prompt_type=PromptType.OK_PROCEED,
-        response="y\n",
-        description="npm/npx package installation confirmation",
+        response='y\n',
+        description='npm/npx package installation confirmation',
         confidence=1.0,
     ),
     # Generic yes/no confirmations
     PromptPattern(
-        pattern=r"\(y/n\)\s*[\?\:]?\s*$",
+        pattern=r'\(y/n\)\s*[\?\:]?\s*$',
         prompt_type=PromptType.YES_NO_CONFIRMATION,
-        response="y\n",
-        description="Generic yes/no confirmation",
+        response='y\n',
+        description='Generic yes/no confirmation',
         confidence=0.9,
     ),
     PromptPattern(
-        pattern=r"\(Y/n\)\s*[\?\:]?\s*$",
+        pattern=r'\(Y/n\)\s*[\?\:]?\s*$',
         prompt_type=PromptType.YES_NO_CONFIRMATION,
-        response="Y\n",
-        description="Yes (default) confirmation",
+        response='Y\n',
+        description='Yes (default) confirmation',
         confidence=0.9,
     ),
     PromptPattern(
-        pattern=r"\[y/N\]\s*[\?\:]?\s*$",
+        pattern=r'\[y/N\]\s*[\?\:]?\s*$',
         prompt_type=PromptType.YES_NO_CONFIRMATION,
-        response="y\n",
-        description="Yes/No (default) confirmation",
+        response='y\n',
+        description='Yes/No (default) confirmation',
         confidence=0.9,
     ),
     # "Continue?" prompts
     PromptPattern(
-        pattern=r"(Continue|Proceed|Do you want to continue)\?",
+        pattern=r'(Continue|Proceed|Do you want to continue)\?',
         prompt_type=PromptType.OK_PROCEED,
-        response="y\n",
-        description="Continue/Proceed confirmation",
+        response='y\n',
+        description='Continue/Proceed confirmation',
         confidence=0.85,
     ),
     # apt/apt-get prompts
     PromptPattern(
-        pattern=r"Do you want to continue\?\s*\[Y/n\]",
+        pattern=r'Do you want to continue\?\s*\[Y/n\]',
         prompt_type=PromptType.YES_NO_CONFIRMATION,
-        response="Y\n",
-        description="apt-get installation confirmation",
+        response='Y\n',
+        description='apt-get installation confirmation',
         confidence=1.0,
     ),
     # File overwrite confirmations
     PromptPattern(
-        pattern=r"(overwrite|replace)\s+.*\?\s*\(y/n\)",
+        pattern=r'(overwrite|replace)\s+.*\?\s*\(y/n\)',
         prompt_type=PromptType.OVERWRITE,
-        response="y\n",
-        description="File overwrite confirmation",
+        response='y\n',
+        description='File overwrite confirmation',
         confidence=0.9,
     ),
     # Press any key to continue
     PromptPattern(
-        pattern=r"Press\s+(any\s+)?key\s+to\s+continue",
+        pattern=r'Press\s+(any\s+)?key\s+to\s+continue',
         prompt_type=PromptType.PRESS_KEY,
-        response="\n",
-        description="Press key to continue",
+        response='\n',
+        description='Press key to continue',
         confidence=1.0,
     ),
     # License agreements
     PromptPattern(
-        pattern=r"Do you accept the license (terms|agreement)\?",
+        pattern=r'Do you accept the license (terms|agreement)\?',
         prompt_type=PromptType.LICENSE_AGREEMENT,
-        response="yes\n",
-        description="License acceptance",
+        response='yes\n',
+        description='License acceptance',
         confidence=0.95,
     ),
     # Git prompts
     PromptPattern(
-        pattern=r"Are you sure you want to continue connecting.*\(yes/no(/\[fingerprint\])?\)\?",
+        pattern=r'Are you sure you want to continue connecting.*\(yes/no(/\[fingerprint\])?\)\?',
         prompt_type=PromptType.YES_NO_CONFIRMATION,
-        response="yes\n",
-        description="SSH fingerprint confirmation",
+        response='yes\n',
+        description='SSH fingerprint confirmation',
         confidence=1.0,
     ),
     # Generic confirmation prompts
     PromptPattern(
-        pattern=r"Are you sure you want to.*\?\s*\[y/N\]",
+        pattern=r'Are you sure you want to.*\?\s*\[y/N\]',
         prompt_type=PromptType.YES_NO_CONFIRMATION,
-        response="y\n",
-        description="Command confirmation",
+        response='y\n',
+        description='Command confirmation',
         confidence=0.85,
     ),
     # Python pip prompts
     PromptPattern(
-        pattern=r"Proceed\s+\(y/n\)\?",
+        pattern=r'Proceed\s+\(y/n\)\?',
         prompt_type=PromptType.OK_PROCEED,
-        response="y\n",
-        description="pip installation confirmation",
+        response='y\n',
+        description='pip installation confirmation',
         confidence=0.9,
     ),
     # Homebrew prompts
     PromptPattern(
-        pattern=r"Press RETURN to continue or any other key to abort",
+        pattern=r'Press RETURN to continue or any other key to abort',
         prompt_type=PromptType.PRESS_KEY,
-        response="\n",
-        description="Homebrew installation continue",
+        response='\n',
+        description='Homebrew installation continue',
         confidence=1.0,
     ),
 ]
@@ -200,8 +200,8 @@ class InteractivePromptDetector:
         output = ansi_escape.sub('', output)
 
         # Focus on the last N lines where prompts typically appear
-        lines = output.split("\n")
-        recent_output = "\n".join(lines[-last_n_lines:])
+        lines = output.split('\n')
+        recent_output = '\n'.join(lines[-last_n_lines:])
 
         # Try to match against known patterns
         for pattern in self.patterns:
@@ -209,7 +209,7 @@ class InteractivePromptDetector:
                 recent_output
             ):
                 logger.info(
-                    "🤖 Auto-detected interactive prompt: %s (confidence: %s)",
+                    '🤖 Auto-detected interactive prompt: %s (confidence: %s)',
                     pattern.description,
                     pattern.confidence,
                 )
@@ -224,13 +224,13 @@ class InteractivePromptDetector:
         we don't have a specific pattern for it.
         """
         prompt_indicators = [
-            r"[\?\:]\s*$",  # Ends with ? or :
-            r"\[.*\]\s*$",  # Ends with [options]
-            r"\(.*\)\s*[\?\:]?\s*$",  # Ends with (options)?
-            r"(enter|type|press|input|select|choose)\s+",  # Action verbs
+            r'[\?\:]\s*$',  # Ends with ? or :
+            r'\[.*\]\s*$',  # Ends with [options]
+            r'\(.*\)\s*[\?\:]?\s*$',  # Ends with (options)?
+            r'(enter|type|press|input|select|choose)\s+',  # Action verbs
         ]
 
-        last_line = text.strip().split("\n")[-1].strip()
+        last_line = text.strip().split('\n')[-1].strip()
         return any(
             re.search(indicator, last_line, re.IGNORECASE)
             for indicator in prompt_indicators
@@ -252,7 +252,7 @@ class InteractivePromptDetector:
         # Don't auto-respond to password prompts (security risk)
         if pattern.prompt_type in [PromptType.PASSWORD, PromptType.SUDO_PASSWORD]:
             logger.warning(
-                "🔒 Password prompt detected - auto-response disabled for security"
+                '🔒 Password prompt detected - auto-response disabled for security'
             )
             return False
 
@@ -294,13 +294,13 @@ def detect_interactive_prompt(output: str) -> tuple[bool, str | None]:
 # Common command modifications to prefer non-interactive mode
 NONINTERACTIVE_COMMAND_TRANSFORMS = {
     # npm/npx commands
-    r"^npx\s+": "npx --yes ",
-    r"^npm\s+install": "npm install --yes",
+    r'^npx\s+': 'npx --yes ',
+    r'^npm\s+install': 'npm install --yes',
     # apt/apt-get commands
-    r"^apt\s+install": "apt install -y",
-    r"^apt-get\s+install": "apt-get install -y",
-    r"^apt\s+upgrade": "apt upgrade -y",
-    r"^apt-get\s+upgrade": "apt-get upgrade -y",
+    r'^apt\s+install': 'apt install -y',
+    r'^apt-get\s+install': 'apt-get install -y',
+    r'^apt\s+upgrade': 'apt upgrade -y',
+    r'^apt-get\s+upgrade': 'apt-get upgrade -y',
 }
 
 
@@ -320,16 +320,16 @@ def suggest_noninteractive_command(command: str) -> str | None:
         if re.match(pattern, command):
             # Check if non-interactive flag already present
             if (
-                "--yes" in command
-                or "-y" in command
-                or "--force" in command
-                or "-f" in command
+                '--yes' in command
+                or '-y' in command
+                or '--force' in command
+                or '-f' in command
             ):
                 return None  # Already non-interactive
 
             modified = re.sub(pattern, replacement, command)
             if modified != command:
-                logger.info("💡 Suggested non-interactive command: %s", modified)
+                logger.info('💡 Suggested non-interactive command: %s', modified)
                 return modified
 
     return None

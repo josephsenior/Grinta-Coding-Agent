@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
-
 from backend.orchestration.services.pending_action_service import PendingActionService
 
 
@@ -97,7 +96,7 @@ class TestTimeout:
         svc.get()  # triggers timeout
         controller.event_stream.add_event.assert_called_once()
         obs = controller.event_stream.add_event.call_args[0][0]
-        assert "timed out" in obs.content.lower()
+        assert 'timed out' in obs.content.lower()
 
     def test_timeout_sets_cause_from_action_id(self):
         ctx = _make_context()
@@ -114,7 +113,7 @@ class TestTimeout:
         ctx = _make_context()
         controller = ctx.get_controller()
         svc = PendingActionService(ctx, timeout=5.0)
-        action = SimpleNamespace(id="not-an-int")
+        action = SimpleNamespace(id='not-an-int')
         svc.set(cast(Any, action))
         svc._pending = cast(Any, (action, time.time() - 10.0))
         svc.get()
@@ -136,12 +135,12 @@ class TestSlowPendingLogging:
         # Patch the stored timestamp to 90s ago and make elapsed divisible by 30
         svc._pending = cast(Any, (action, time.time() - 90.0))
         with patch(
-            "backend.orchestration.services.pending_action_service.time"
+            'backend.orchestration.services.pending_action_service.time'
         ) as mock_time:
             pending = svc._pending
             assert pending is not None
             mock_time.time.return_value = pending[1] + 90.0
             svc.get()
         # controller.log should have been called for the slow warning
-        calls = [c for c in controller.log.call_args_list if "active for" in str(c)]
+        calls = [c for c in controller.log.call_args_list if 'active for' in str(c)]
         assert calls

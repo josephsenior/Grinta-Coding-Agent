@@ -32,13 +32,13 @@ class TestFileSettingsStoreInit:
     def test_default_path(self):
         fs = MagicMock()
         store = FileSettingsStore(file_store=fs)
-        assert store.path == "settings.json"
+        assert store.path == 'settings.json'
         assert store.file_store is fs
 
     def test_custom_path(self):
         fs = MagicMock()
-        store = FileSettingsStore(file_store=fs, path="custom/settings.json")
-        assert store.path == "custom/settings.json"
+        store = FileSettingsStore(file_store=fs, path='custom/settings.json')
+        assert store.path == 'custom/settings.json'
 
 
 # ── load ──────────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ class TestFileSettingsStoreLoad:
         store = FileSettingsStore(file_store=fs)
 
         with patch(
-            "backend.persistence.settings.file_settings_store.call_sync_from_async",
+            'backend.persistence.settings.file_settings_store.call_sync_from_async',
             new_callable=AsyncMock,
             side_effect=FileNotFoundError,
         ):
@@ -61,10 +61,10 @@ class TestFileSettingsStoreLoad:
         fs = MagicMock()
         store = FileSettingsStore(file_store=fs)
 
-        data = json.dumps({"language": "python", "agent": "Orchestrator"})
+        data = json.dumps({'language': 'python', 'agent': 'Orchestrator'})
 
         with patch(
-            "backend.persistence.settings.file_settings_store.call_sync_from_async",
+            'backend.persistence.settings.file_settings_store.call_sync_from_async',
             new_callable=AsyncMock,
             return_value=data,
         ):
@@ -74,10 +74,10 @@ class TestFileSettingsStoreLoad:
     async def test_load_caches_result(self):
         fs = MagicMock()
         store = FileSettingsStore(file_store=fs)
-        data = json.dumps({"language": "python"})
+        data = json.dumps({'language': 'python'})
 
         with patch(
-            "backend.persistence.settings.file_settings_store.call_sync_from_async",
+            'backend.persistence.settings.file_settings_store.call_sync_from_async',
             new_callable=AsyncMock,
             return_value=data,
         ) as mock_read:
@@ -94,7 +94,7 @@ class TestFileSettingsStoreLoad:
         store = FileSettingsStore(file_store=fs)
 
         with patch(
-            "backend.persistence.settings.file_settings_store.call_sync_from_async",
+            'backend.persistence.settings.file_settings_store.call_sync_from_async',
             new_callable=AsyncMock,
             side_effect=FileNotFoundError,
         ) as mock_read:
@@ -107,10 +107,10 @@ class TestFileSettingsStoreLoad:
     async def test_cache_expires_after_ttl(self):
         fs = MagicMock()
         store = FileSettingsStore(file_store=fs)
-        data = json.dumps({"language": "python"})
+        data = json.dumps({'language': 'python'})
 
         with patch(
-            "backend.persistence.settings.file_settings_store.call_sync_from_async",
+            'backend.persistence.settings.file_settings_store.call_sync_from_async',
             new_callable=AsyncMock,
             return_value=data,
         ) as mock_read:
@@ -140,16 +140,16 @@ class TestFileSettingsStoreStore:
 
         with (
             patch(
-                "backend.persistence.settings.file_settings_store.model_dump_with_options",
+                'backend.persistence.settings.file_settings_store.model_dump_with_options',
                 return_value={
-                    "llm_model": None,
-                    "llm_api_key": None,
-                    "llm_base_url": None,
-                    "mcp_config": None,
+                    'llm_model': None,
+                    'llm_api_key': None,
+                    'llm_base_url': None,
+                    'mcp_config': None,
                 },
             ),
             patch(
-                "backend.persistence.settings.file_settings_store.call_sync_from_async",
+                'backend.persistence.settings.file_settings_store.call_sync_from_async',
                 new_callable=AsyncMock,
             ) as mock_write,
         ):
@@ -165,15 +165,15 @@ class TestFileSettingsStoreStore:
 class TestFileSettingsStoreGetInstance:
     async def test_creates_instance(self):
         mock_config = MagicMock()
-        mock_config.file_store = "local"
-        mock_config.local_data_root = "/tmp/test"
+        mock_config.file_store = 'local'
+        mock_config.local_data_root = '/tmp/test'
         mock_config.file_store_web_hook_url = None
         mock_config.file_store_web_hook_headers = None
         mock_config.file_store_web_hook_batch = False
 
         with patch(
-            "backend.persistence.settings.file_settings_store.get_file_store",
+            'backend.persistence.settings.file_settings_store.get_file_store',
             return_value=MagicMock(),
         ):
-            instance = await FileSettingsStore.get_instance(mock_config, "user-1")
+            instance = await FileSettingsStore.get_instance(mock_config, 'user-1')
             assert isinstance(instance, FileSettingsStore)

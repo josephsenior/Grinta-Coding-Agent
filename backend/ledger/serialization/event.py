@@ -10,40 +10,40 @@ from typing import Any
 from pydantic import BaseModel
 
 from backend.core.pydantic_compat import model_dump_with_options
+from backend.inference.metrics import Cost, Metrics, ResponseLatency, TokenUsage
 from backend.ledger.event import Event, EventSource
 from backend.ledger.serialization.action import action_from_dict
 from backend.ledger.serialization.observation import observation_from_dict
 from backend.ledger.serialization.serialization_utils import remove_fields
 from backend.ledger.tool import ToolCallMetadata
-from backend.inference.metrics import Cost, Metrics, ResponseLatency, TokenUsage
 
 TOP_KEYS = [
-    "id",
-    "sequence",
-    "timestamp",
-    "source",
-    "message",
-    "cause",
-    "action",
-    "observation",
-    "tool_call_metadata",
-    "tool_result",
-    "llm_metrics",
+    'id',
+    'sequence',
+    'timestamp',
+    'source',
+    'message',
+    'cause',
+    'action',
+    'observation',
+    'tool_call_metadata',
+    'tool_result',
+    'llm_metrics',
 ]
 from backend.ledger.serialization.common import UNDERSCORE_KEYS  # noqa: E402
 
 DELETE_FROM_TRAJECTORY_EXTRAS = {
-    "dom_object",
-    "axtree_object",
-    "active_page_index",
-    "last_browser_action",
-    "last_browser_action_error",
-    "focused_element_bid",
-    "extra_element_properties",
+    'dom_object',
+    'axtree_object',
+    'active_page_index',
+    'last_browser_action',
+    'last_browser_action_error',
+    'focused_element_bid',
+    'extra_element_properties',
 }
 DELETE_FROM_TRAJECTORY_EXTRAS_AND_SCREENSHOTS = DELETE_FROM_TRAJECTORY_EXTRAS | {
-    "screenshot",
-    "set_of_marks",
+    'screenshot',
+    'set_of_marks',
 }
 
 
@@ -56,11 +56,11 @@ def event_from_dict(data: dict[str, Any]) -> Event:
 
 def _create_event_from_data(data: dict[str, Any]) -> Event:
     """Create event from data based on type."""
-    if "action" in data:
+    if 'action' in data:
         return action_from_dict(data)
-    if "observation" in data:
+    if 'observation' in data:
         return observation_from_dict(data)
-    msg = f"Unknown event type: {data}"
+    msg = f'Unknown event type: {data}'
     raise ValueError(msg)
 
 
@@ -69,20 +69,20 @@ def _process_underscore_keys(evt: Event, data: dict[str, Any]) -> None:
     for key in UNDERSCORE_KEYS:
         if key in data:
             value = _process_key_value(key, data[key])
-            setattr(evt, f"_{key}", value)
+            setattr(evt, f'_{key}', value)
 
 
 def _process_key_value(key: str, value: Any) -> Any:
     """Process a key-value pair based on the key type."""
-    if key == "timestamp" and isinstance(value, datetime):
+    if key == 'timestamp' and isinstance(value, datetime):
         return value.isoformat()
-    if key == "source":
+    if key == 'source':
         return EventSource(value)
-    if key == "tool_call_metadata":
+    if key == 'tool_call_metadata':
         return _process_tool_call_metadata(value)
-    if key == "tool_result":
+    if key == 'tool_result':
         return value if isinstance(value, dict) else None
-    if key == "llm_metrics":
+    if key == 'llm_metrics':
         return _process_llm_metrics(value)
     return value
 
@@ -107,37 +107,37 @@ def _process_llm_metrics(value: Any) -> Metrics:
 
 def _populate_metrics_from_dict(metrics: Metrics, value: dict) -> None:
     """Populate metrics object from dictionary."""
-    metrics.accumulated_cost = value.get("accumulated_cost", 0.0)
-    metrics.max_budget_per_task = value.get("max_budget_per_task")
+    metrics.accumulated_cost = value.get('accumulated_cost', 0.0)
+    metrics.max_budget_per_task = value.get('max_budget_per_task')
 
     # Process costs
-    for cost in value.get("costs", []):
+    for cost in value.get('costs', []):
         if not isinstance(cost, dict):
             continue
         cost_kwargs: dict[str, Any] = {}
-        cost_kwargs["cost"] = cost.get("cost", 0.0)
-        cost_kwargs["model"] = cost.get(
-            "model", metrics.model_name if hasattr(metrics, "model_name") else ""
+        cost_kwargs['cost'] = cost.get('cost', 0.0)
+        cost_kwargs['model'] = cost.get(
+            'model', metrics.model_name if hasattr(metrics, 'model_name') else ''
         )
-        if "prompt_tokens" in cost:
-            cost_kwargs["prompt_tokens"] = cost["prompt_tokens"]
-        if "timestamp" in cost:
-            cost_kwargs["timestamp"] = cost["timestamp"]
+        if 'prompt_tokens' in cost:
+            cost_kwargs['prompt_tokens'] = cost['prompt_tokens']
+        if 'timestamp' in cost:
+            cost_kwargs['timestamp'] = cost['timestamp']
         metrics._costs.append(Cost(**cost_kwargs))
 
     # Process response latencies
     metrics.response_latencies = [
-        ResponseLatency(**latency) for latency in value.get("response_latencies", [])
+        ResponseLatency(**latency) for latency in value.get('response_latencies', [])
     ]
 
     # Process token usages
     metrics.token_usages = [
-        TokenUsage(**usage) for usage in value.get("token_usages", [])
+        TokenUsage(**usage) for usage in value.get('token_usages', [])
     ]
 
     # Process accumulated token usage
-    if "accumulated_token_usage" in value:
-        accumulated = value.get("accumulated_token_usage", {})
+    if 'accumulated_token_usage' in value:
+        accumulated = value.get('accumulated_token_usage', {})
         if isinstance(accumulated, dict):
             metrics._accumulated_token_usage = TokenUsage(**accumulated)
 
@@ -185,7 +185,7 @@ def _extract_key_value(event: Event, key: str) -> Any:
         return getattr(event, key)
 
     # Check private attribute
-    private_key = f"_{key}"
+    private_key = f'_{key}'
     if hasattr(event, private_key) and getattr(event, private_key) is not None:
         return getattr(event, private_key)
 
@@ -194,62 +194,62 @@ def _extract_key_value(event: Event, key: str) -> Any:
 
 def _apply_key_transformations(d: dict, key: str) -> None:
     """Apply key-specific transformations to the dictionary."""
-    if key == "id":
+    if key == 'id':
         _transform_id_key(d)
-    elif key == "sequence":
+    elif key == 'sequence':
         _transform_sequence_key(d)
-    elif key == "timestamp":
+    elif key == 'timestamp':
         _transform_timestamp_key(d)
-    elif key == "source":
+    elif key == 'source':
         _transform_source_key(d)
-    elif key == "recall_type":
+    elif key == 'recall_type':
         _transform_recall_type_key(d)
-    elif key == "tool_call_metadata":
+    elif key == 'tool_call_metadata':
         _transform_tool_call_metadata_key(d)
-    elif key == "llm_metrics":
+    elif key == 'llm_metrics':
         _transform_llm_metrics_key(d)
 
 
 def _transform_id_key(d: dict) -> None:
     """Transform ID key by removing invalid values."""
-    if d.get("id") == -1:
-        d.pop("id", None)
+    if d.get('id') == -1:
+        d.pop('id', None)
 
 
 def _transform_sequence_key(d: dict) -> None:
     """Transform sequence key by removing invalid values."""
-    if d.get("sequence") == -1:
-        d.pop("sequence", None)
+    if d.get('sequence') == -1:
+        d.pop('sequence', None)
 
 
 def _transform_timestamp_key(d: dict) -> None:
     """Transform timestamp key to ISO format."""
-    if "timestamp" in d and isinstance(d["timestamp"], datetime):
-        d["timestamp"] = d["timestamp"].isoformat()
+    if 'timestamp' in d and isinstance(d['timestamp'], datetime):
+        d['timestamp'] = d['timestamp'].isoformat()
 
 
 def _transform_source_key(d: dict) -> None:
     """Transform source key to its value."""
-    if "source" in d:
-        d["source"] = d["source"].value
+    if 'source' in d:
+        d['source'] = d['source'].value
 
 
 def _transform_recall_type_key(d: dict) -> None:
     """Transform recall_type key to its value."""
-    if "recall_type" in d:
-        d["recall_type"] = d["recall_type"].value
+    if 'recall_type' in d:
+        d['recall_type'] = d['recall_type'].value
 
 
 def _transform_tool_call_metadata_key(d: dict) -> None:
     """Transform tool_call_metadata key using model dump."""
-    if "tool_call_metadata" in d:
-        d["tool_call_metadata"] = model_dump_with_options(d["tool_call_metadata"])
+    if 'tool_call_metadata' in d:
+        d['tool_call_metadata'] = model_dump_with_options(d['tool_call_metadata'])
 
 
 def _transform_llm_metrics_key(d: dict) -> None:
     """Transform llm_metrics key by calling get method."""
-    if "llm_metrics" in d:
-        d["llm_metrics"] = d["llm_metrics"].get()
+    if 'llm_metrics' in d:
+        d['llm_metrics'] = d['llm_metrics'].get()
 
 
 def event_to_dict(event: Event) -> dict[str, Any]:
@@ -265,29 +265,29 @@ def event_to_dict(event: Event) -> dict[str, Any]:
         return _create_minimal_event_dict(event)
 
     # Handle action events
-    if "action" in d:
+    if 'action' in d:
         return _process_action_event(event, d, props)
 
     # Handle observation events
-    if "observation" in d:
+    if 'observation' in d:
         return _process_observation_event(event, d, props)
 
-    msg = f"Event must be either action or observation. has: {event}"
+    msg = f'Event must be either action or observation. has: {event}'
     raise ValueError(msg)
 
 
 def _clean_none_values(props: dict[str, Any]) -> None:
     """Remove None values from props."""
-    if "security_risk" in props and props["security_risk"] is None:
-        props.pop("security_risk")
-    if "task_completed" in props and props["task_completed"] is None:
-        props.pop("task_completed")
+    if 'security_risk' in props and props['security_risk'] is None:
+        props.pop('security_risk')
+    if 'task_completed' in props and props['task_completed'] is None:
+        props.pop('task_completed')
 
 
 def _create_minimal_event_dict(event: Event) -> dict[str, Any]:
     """Create minimal dictionary for non-dataclass events."""
     raise TypeError(
-        f"Attempted to serialize unsupported non-dataclass event of type {type(event).__name__}."
+        f'Attempted to serialize unsupported non-dataclass event of type {type(event).__name__}.'
     )
 
 
@@ -296,14 +296,14 @@ def _process_action_event(
 ) -> dict[str, Any]:
     """Process action event dictionary."""
     # Handle security risk
-    if "security_risk" in props:
-        props["security_risk"] = props["security_risk"].value
+    if 'security_risk' in props:
+        props['security_risk'] = props['security_risk'].value
 
-    d["args"] = props
+    d['args'] = props
 
     # Add timeout if available
     if event.timeout is not None:
-        d["timeout"] = event.timeout
+        d['timeout'] = event.timeout
 
     return d
 
@@ -313,17 +313,17 @@ def _process_observation_event(
 ) -> dict[str, Any]:
     """Process observation event dictionary."""
     # Add content
-    d["content"] = props.pop("content", "")
+    d['content'] = props.pop('content', '')
 
     # Remove sequence from persisted observation payload
-    d.pop("sequence", None)
+    d.pop('sequence', None)
 
     # Convert extras safely
-    d["extras"] = _convert_extras_safely(props)
+    d['extras'] = _convert_extras_safely(props)
 
     # Add success if available
-    if hasattr(event, "success"):
-        d["success"] = event.success
+    if hasattr(event, 'success'):
+        d['success'] = event.success
 
     return d
 
@@ -357,24 +357,24 @@ def event_to_trajectory(
 
     """
     d = event_to_dict(event)
-    if d.get("action") == "null" or d.get("observation") == "null":
+    if d.get('action') == 'null' or d.get('observation') == 'null':
         return None
-    if "extras" in d:
+    if 'extras' in d:
         remove_fields(
-            d["extras"],
+            d['extras'],
             DELETE_FROM_TRAJECTORY_EXTRAS
             if include_screenshots
             else DELETE_FROM_TRAJECTORY_EXTRAS_AND_SCREENSHOTS,
         )
         # set_of_marks can be very large; exclude regardless of screenshot preference
-        d["extras"].pop("set_of_marks", None)
+        d['extras'].pop('set_of_marks', None)
     return d
 
 
 def truncate_content(
     content: str,
     max_chars: int | None = None,
-    strategy: str = "tail_heavy",
+    strategy: str = 'tail_heavy',
 ) -> str:
     """Truncate long content using a context-appropriate strategy.
 
@@ -390,12 +390,14 @@ def truncate_content(
         return content
     original_len = len(content)
 
-    min_head = min(max_chars // 5, 200) if max_chars < 1000 else max(200, max_chars // 8)
+    min_head = (
+        min(max_chars // 5, 200) if max_chars < 1000 else max(200, max_chars // 8)
+    )
 
-    if strategy == "head_heavy":
+    if strategy == 'head_heavy':
         tail = min_head  # give the tail the minimum
         head = max(0, max_chars - tail)
-    elif strategy == "balanced":
+    elif strategy == 'balanced':
         head = max_chars // 2
         tail = max_chars - head
     else:  # tail_heavy (default)
@@ -404,7 +406,7 @@ def truncate_content(
 
     retained = head + tail
     pct = round(retained / original_len * 100)
-    banner = f"\n[... Observation truncated: {original_len} chars → {retained} chars ({pct}% retained) ...]\n"
+    banner = f'\n[... Observation truncated: {original_len} chars → {retained} chars ({pct}% retained) ...]\n'
     if tail > 0:
         return content[:head] + banner + content[-tail:]
     return content[:head] + banner

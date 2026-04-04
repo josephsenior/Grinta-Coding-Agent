@@ -63,9 +63,9 @@ def convert_observation_to_message(
 
 def _get_observation_content(obs: Observation) -> str:
     """Extract content string from observation."""
-    if hasattr(obs, "content") and isinstance(obs.content, str):
+    if hasattr(obs, 'content') and isinstance(obs.content, str):
         return obs.content
-    if hasattr(obs, "message") and isinstance(obs.message, str):
+    if hasattr(obs, 'message') and isinstance(obs.message, str):
         return obs.message
     return str(obs)
 
@@ -84,8 +84,8 @@ def _is_valid_image_url(url: object) -> bool:
 def _handle_simple_observation(
     obs: Observation,
     max_message_chars: int | None,
-    prefix: str = "",
-    suffix: str = "",
+    prefix: str = '',
+    suffix: str = '',
 ) -> Message:
     """Handle simple/generic observations."""
     content_str = _get_observation_content(obs)
@@ -94,18 +94,19 @@ def _handle_simple_observation(
         text = prefix + text
     if suffix:
         text += suffix
-    return Message(role="user", content=[TextContent(text=text)])
+    return Message(role='user', content=[TextContent(text=text)])
 
 
 _CONDENSATION_BANNER = (
-    "\u26a1 CONTEXT CONDENSED — older conversation events were replaced by the summary below.\n"
-    + "─" * 60 + "\n"
+    '\u26a1 CONTEXT CONDENSED — older conversation events were replaced by the summary below.\n'
+    + '─' * 60
+    + '\n'
 )
 
 _POST_CONDENSATION_RECOVERY = (
-    "\n" + "─" * 60 + "\n"
-    "Context was condensed. Continue working from where you left off.\n"
-    "Do NOT re-read files you already created — trust your prior writes.\n"
+    '\n' + '─' * 60 + '\n'
+    'Context was condensed. Continue working from where you left off.\n'
+    'Do NOT re-read files you already created — trust your prior writes.\n'
 )
 
 
@@ -118,18 +119,16 @@ def _load_scratchpad_snapshot() -> str:
     """
     try:
         from backend.engine.tools.note import _load_notes
+
         notes = _load_notes()
         if not notes:
-            return ""
+            return ''
         import json
+
         body = json.dumps(notes, indent=2, ensure_ascii=False)
-        return (
-            "\n" + "─" * 60 + "\n"
-            "📋 SCRATCHPAD (auto-restored):\n"
-            f"{body}\n"
-        )
+        return '\n' + '─' * 60 + f'\n📋 SCRATCHPAD (auto-restored):\n{body}\n'
     except Exception:
-        return ""
+        return ''
 
 
 def _load_working_memory_snapshot() -> str:
@@ -141,17 +140,17 @@ def _load_working_memory_snapshot() -> str:
 
         block = get_working_memory_prompt_block()
         if not block:
-            return ""
-        return "\n" + "─" * 60 + "\n" + f"{block}\n"
+            return ''
+        return '\n' + '─' * 60 + '\n' + f'{block}\n'
     except Exception:
-        return ""
+        return ''
 
 
 def _handle_condensation_observation(
     obs: AgentCondensationObservation, max_message_chars: int | None
 ) -> Message:
     """Handle AgentCondensationObservation with an explicit visibility banner."""
-    summary = obs.content or "(no summary provided)"
+    summary = obs.content or '(no summary provided)'
     scratchpad = _load_scratchpad_snapshot()
     working_memory = _load_working_memory_snapshot()
     text = truncate_content(
@@ -162,51 +161,49 @@ def _handle_condensation_observation(
         + _POST_CONDENSATION_RECOVERY,
         max_message_chars,
     )
-    return Message(role="user", content=[TextContent(text=text)])
+    return Message(role='user', content=[TextContent(text=text)])
 
 
 def _handle_file_read_observation(
     obs: FileReadObservation, max_message_chars: int | None
 ) -> Message:
-    path = getattr(obs, "path", "unknown")
-    text = truncate_content(obs.content, max_message_chars, strategy="head_heavy")
-    text = f"[FILE_READ path={path}]\n{text}"
-    return Message(
-        role="user", content=[TextContent(text=text)]
-    )
+    path = getattr(obs, 'path', 'unknown')
+    text = truncate_content(obs.content, max_message_chars, strategy='head_heavy')
+    text = f'[FILE_READ path={path}]\n{text}'
+    return Message(role='user', content=[TextContent(text=text)])
 
 
 def _handle_file_edit_observation(
     obs: FileEditObservation, max_message_chars: int | None
 ) -> Message:
     content_str = str(obs)
-    text = truncate_content(content_str, max_message_chars, strategy="balanced")
-    path = getattr(obs, "path", "unknown")
-    text = f"[FILE_EDIT path={path}]\n{text}"
-    return Message(role="user", content=[TextContent(text=text)])
+    text = truncate_content(content_str, max_message_chars, strategy='balanced')
+    path = getattr(obs, 'path', 'unknown')
+    text = f'[FILE_EDIT path={path}]\n{text}'
+    return Message(role='user', content=[TextContent(text=text)])
 
 
 _ERROR_CLASSIFIERS: list[tuple[str, list[str]]] = [
-    ("PYTHON_IMPORT_ERROR", ["ModuleNotFoundError", "ImportError", "No module named"]),
-    ("PYTHON_SYNTAX_ERROR", ["SyntaxError:", "IndentationError:", "TabError:"]),
-    ("PYTHON_TYPE_ERROR", ["TypeError:"]),
-    ("PYTHON_NAME_ERROR", ["NameError:", "is not defined"]),
-    ("PYTHON_ATTRIBUTE_ERROR", ["AttributeError:", "has no attribute"]),
-    ("PYTHON_VALUE_ERROR", ["ValueError:"]),
-    ("PYTHON_KEY_ERROR", ["KeyError:"]),
-    ("PYTHON_INDEX_ERROR", ["IndexError:"]),
-    ("FILE_NOT_FOUND", ["FileNotFoundError", "No such file or directory", "ENOENT"]),
-    ("PERMISSION_DENIED", ["PermissionError", "Permission denied", "EACCES"]),
-    ("TIMEOUT_ERROR", ["TimeoutError", "timed out", "ETIMEDOUT"]),
-    ("CONNECTION_ERROR", ["ConnectionError", "ConnectionRefused", "ECONNREFUSED"]),
-    ("RUNTIME_ERROR", ["RuntimeError:"]),
-    ("ASSERTION_ERROR", ["AssertionError:", "assert "]),
-    ("TEST_FAILURE", ["FAILED", "failures=", "tests failed", "ERRORS"]),
-    ("COMMAND_NOT_FOUND", ["command not found", "not recognized as"]),
-    ("NPM_ERROR", ["npm ERR!", "npm error"]),
-    ("GIT_ERROR", ["fatal:", "error: failed to"]),
-    ("MEMORY_ERROR", ["MemoryError", "OutOfMemoryError", "OOM"]),
-    ("DISK_ERROR", ["No space left on device", "ENOSPC"]),
+    ('PYTHON_IMPORT_ERROR', ['ModuleNotFoundError', 'ImportError', 'No module named']),
+    ('PYTHON_SYNTAX_ERROR', ['SyntaxError:', 'IndentationError:', 'TabError:']),
+    ('PYTHON_TYPE_ERROR', ['TypeError:']),
+    ('PYTHON_NAME_ERROR', ['NameError:', 'is not defined']),
+    ('PYTHON_ATTRIBUTE_ERROR', ['AttributeError:', 'has no attribute']),
+    ('PYTHON_VALUE_ERROR', ['ValueError:']),
+    ('PYTHON_KEY_ERROR', ['KeyError:']),
+    ('PYTHON_INDEX_ERROR', ['IndexError:']),
+    ('FILE_NOT_FOUND', ['FileNotFoundError', 'No such file or directory', 'ENOENT']),
+    ('PERMISSION_DENIED', ['PermissionError', 'Permission denied', 'EACCES']),
+    ('TIMEOUT_ERROR', ['TimeoutError', 'timed out', 'ETIMEDOUT']),
+    ('CONNECTION_ERROR', ['ConnectionError', 'ConnectionRefused', 'ECONNREFUSED']),
+    ('RUNTIME_ERROR', ['RuntimeError:']),
+    ('ASSERTION_ERROR', ['AssertionError:', 'assert ']),
+    ('TEST_FAILURE', ['FAILED', 'failures=', 'tests failed', 'ERRORS']),
+    ('COMMAND_NOT_FOUND', ['command not found', 'not recognized as']),
+    ('NPM_ERROR', ['npm ERR!', 'npm error']),
+    ('GIT_ERROR', ['fatal:', 'error: failed to']),
+    ('MEMORY_ERROR', ['MemoryError', 'OutOfMemoryError', 'OOM']),
+    ('DISK_ERROR', ['No space left on device', 'ENOSPC']),
 ]
 
 
@@ -225,40 +222,46 @@ def _classify_cmd_error(content: str) -> str | None:
 def _handle_cmd_output_observation(
     obs: CmdOutputObservation, max_message_chars: int | None
 ) -> Message:
-    exit_code = getattr(obs, "exit_code", None)
-    exit_tag = f" exit={exit_code}" if exit_code is not None else ""
+    exit_code = getattr(obs, 'exit_code', None)
+    exit_tag = f' exit={exit_code}' if exit_code is not None else ''
 
-    error_type_tag = ""
+    error_type_tag = ''
     if exit_code is not None and exit_code != 0:
         classified = _classify_cmd_error(obs.content)
         if classified:
-            error_type_tag = f" error_type={classified}"
+            error_type_tag = f' error_type={classified}'
 
-    tag = f"[CMD_OUTPUT{exit_tag}{error_type_tag}]"
+    tag = f'[CMD_OUTPUT{exit_tag}{error_type_tag}]'
     # Use tail_heavy for errors (traceback at end), balanced otherwise
-    cmd_strategy = getattr(obs, "truncation_strategy", None)
+    cmd_strategy = getattr(obs, 'truncation_strategy', None)
     if not cmd_strategy:
-        cmd_strategy = "tail_heavy" if (exit_code is not None and exit_code != 0) else "balanced"
+        cmd_strategy = (
+            'tail_heavy' if (exit_code is not None and exit_code != 0) else 'balanced'
+        )
     if obs.tool_call_metadata is None:
         text = truncate_content(
-            f"{tag}\nObserved result of command executed by user:\n{obs.to_agent_observation()}",
+            f'{tag}\nObserved result of command executed by user:\n{obs.to_agent_observation()}',
             max_message_chars,
             strategy=cmd_strategy,
         )
     else:
-        text = truncate_content(f"{tag}\n{obs.to_agent_observation()}", max_message_chars, strategy=cmd_strategy)
-    return Message(role="user", content=[TextContent(text=text)])
+        text = truncate_content(
+            f'{tag}\n{obs.to_agent_observation()}',
+            max_message_chars,
+            strategy=cmd_strategy,
+        )
+    return Message(role='user', content=[TextContent(text=text)])
 
 
 def _handle_error_observation(
     obs: ErrorObservation, max_message_chars: int | None
 ) -> Message:
-    error_id = getattr(obs, "error_id", "UNKNOWN")
+    error_id = getattr(obs, 'error_id', 'UNKNOWN')
     return _handle_simple_observation(
         obs,
         max_message_chars,
-        prefix=f"[ERROR type={error_id}]\n",
-        suffix="\n[Error occurred in processing last action]",
+        prefix=f'[ERROR type={error_id}]\n',
+        suffix='\n[Error occurred in processing last action]',
     )
 
 
@@ -268,8 +271,8 @@ def _handle_user_reject_observation(
     return _handle_simple_observation(
         obs,
         max_message_chars,
-        prefix="OBSERVATION:\n",
-        suffix="\n[Last action has been rejected by the user]",
+        prefix='OBSERVATION:\n',
+        suffix='\n[Last action has been rejected by the user]',
     )
 
 
@@ -282,6 +285,10 @@ def _handle_file_download_observation(
 def _handle_mcp_observation(
     obs: MCPObservation, max_message_chars: int | None
 ) -> Message:
-    tool_name = getattr(obs, "name", "unknown")
-    text = truncate_content(f"[MCP_RESULT tool={tool_name}]\n{obs.content}", max_message_chars, strategy="balanced")
-    return Message(role="user", content=[TextContent(text=text)])
+    tool_name = getattr(obs, 'name', 'unknown')
+    text = truncate_content(
+        f'[MCP_RESULT tool={tool_name}]\n{obs.content}',
+        max_message_chars,
+        strategy='balanced',
+    )
+    return Message(role='user', content=[TextContent(text=text)])

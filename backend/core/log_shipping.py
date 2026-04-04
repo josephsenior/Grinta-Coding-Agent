@@ -68,27 +68,27 @@ class LogShipper(ExternalServiceBase):
         return await self._send_request(
             build_payload=build_payload,
             execute_request=execute_request,
-            error_msg=f"Error shipping logs to {self.endpoint}",
+            error_msg=f'Error shipping logs to {self.endpoint}',
         )
 
     def _build_payload(
         self, parsed_endpoint: ParseResult, logs: list[dict[str, Any]]
     ) -> dict[str, Any]:
-        if "datadog" in parsed_endpoint.netloc.lower():
+        if 'datadog' in parsed_endpoint.netloc.lower():
             return self._datadog_payload(logs)
-        return {"logs": logs}
+        return {'logs': logs}
 
     def _datadog_payload(self, logs: list[dict[str, Any]]) -> dict[str, Any]:
-        env = os.getenv("ENV", "production")
-        hostname = os.getenv("HOSTNAME", "app")
-        service = os.getenv("SERVICE_NAME", "app")
+        env = os.getenv('ENV', 'production')
+        hostname = os.getenv('HOSTNAME', 'app')
+        service = os.getenv('SERVICE_NAME', 'app')
         return {
-            "logs": [
+            'logs': [
                 {
-                    "ddsource": "app",
-                    "ddtags": f"env:{env}",
-                    "hostname": hostname,
-                    "service": service,
+                    'ddsource': 'app',
+                    'ddtags': f'env:{env}',
+                    'hostname': hostname,
+                    'service': service,
                     **log,
                 }
                 for log in logs
@@ -107,11 +107,11 @@ class LogShipper(ExternalServiceBase):
             self.endpoint, json=payload, headers=headers
         ) as response:
             if response.status in (200, 201):
-                logger.debug("Shipped %s logs to %s", log_count, self.endpoint)
+                logger.debug('Shipped %s logs to %s', log_count, self.endpoint)
                 return True
             error_text = await response.text()
             logger.warning(
-                "Failed to ship logs to %s: %s - %s",
+                'Failed to ship logs to %s: %s - %s',
                 self.endpoint,
                 response.status,
                 error_text,
@@ -140,7 +140,7 @@ class LogShipper(ExternalServiceBase):
             return
         if not await self._attempt_ship_with_retries(logs_to_ship):
             logger.error(
-                "Failed to ship %s logs after %s attempts",
+                'Failed to ship %s logs after %s attempts',
                 len(logs_to_ship),
                 self.max_retries,
             )
@@ -196,7 +196,7 @@ class LogShipper(ExternalServiceBase):
 
         self._shutdown_event.clear()
         self._ship_task = asyncio.create_task(self._ship_batch())
-        logger.info("Log shipping started for %s", self.endpoint)
+        logger.info('Log shipping started for %s', self.endpoint)
 
     async def stop(self) -> None:
         """Stop log shipping and flush remaining logs."""
@@ -211,7 +211,7 @@ class LogShipper(ExternalServiceBase):
         if self._session and not self._session.closed:
             await self._session.close()
 
-        logger.info("Log shipping stopped")
+        logger.info('Log shipping stopped')
 
 
 # Global log shipper instance
@@ -222,23 +222,23 @@ def get_log_shipper() -> LogShipper | None:
     """Get or create global log shipper instance."""
     global _log_shipper
     if _log_shipper is None:
-        endpoint = os.getenv("LOG_SHIPPING_ENDPOINT")
-        api_key = os.getenv("LOG_SHIPPING_API_KEY")
-        enabled = os.getenv("LOG_SHIPPING_ENABLED", "false").lower() == "true"
+        endpoint = os.getenv('LOG_SHIPPING_ENDPOINT')
+        api_key = os.getenv('LOG_SHIPPING_API_KEY')
+        enabled = os.getenv('LOG_SHIPPING_ENABLED', 'false').lower() == 'true'
 
         if enabled and endpoint:
             _log_shipper = LogShipper(
                 endpoint=endpoint,
                 api_key=api_key,
-                batch_size=int(os.getenv("LOG_SHIPPING_BATCH_SIZE", "100")),
-                batch_timeout=float(os.getenv("LOG_SHIPPING_BATCH_TIMEOUT", "5.0")),
-                max_retries=int(os.getenv("LOG_SHIPPING_MAX_RETRIES", "3")),
-                retry_delay=float(os.getenv("LOG_SHIPPING_RETRY_DELAY", "1.0")),
+                batch_size=int(os.getenv('LOG_SHIPPING_BATCH_SIZE', '100')),
+                batch_timeout=float(os.getenv('LOG_SHIPPING_BATCH_TIMEOUT', '5.0')),
+                max_retries=int(os.getenv('LOG_SHIPPING_MAX_RETRIES', '3')),
+                retry_delay=float(os.getenv('LOG_SHIPPING_RETRY_DELAY', '1.0')),
                 enabled=True,
             )
-            logger.info("Log shipper initialized for %s", endpoint)
+            logger.info('Log shipper initialized for %s', endpoint)
         else:
-            logger.debug("Log shipping not configured")
+            logger.debug('Log shipping not configured')
 
     return _log_shipper
 
@@ -269,40 +269,40 @@ class LogShippingHandler(logging.Handler):
         try:
             # Convert log record to dictionary
             log_entry = {
-                "timestamp": record.created,
-                "level": record.levelname,
-                "message": record.getMessage(),
-                "logger": record.name,
-                "module": record.module,
-                "function": record.funcName,
-                "line": record.lineno,
-                "path": record.pathname,
+                'timestamp': record.created,
+                'level': record.levelname,
+                'message': record.getMessage(),
+                'logger': record.name,
+                'module': record.module,
+                'function': record.funcName,
+                'line': record.lineno,
+                'path': record.pathname,
             }
 
             # Add extra fields
             for key, value in record.__dict__.items():
                 if key not in (
-                    "name",
-                    "msg",
-                    "args",
-                    "created",
-                    "filename",
-                    "funcName",
-                    "levelname",
-                    "levelno",
-                    "lineno",
-                    "module",
-                    "msecs",
-                    "message",
-                    "pathname",
-                    "process",
-                    "processName",
-                    "relativeCreated",
-                    "thread",
-                    "threadName",
-                    "exc_info",
-                    "exc_text",
-                    "stack_info",
+                    'name',
+                    'msg',
+                    'args',
+                    'created',
+                    'filename',
+                    'funcName',
+                    'levelname',
+                    'levelno',
+                    'lineno',
+                    'module',
+                    'msecs',
+                    'message',
+                    'pathname',
+                    'process',
+                    'processName',
+                    'relativeCreated',
+                    'thread',
+                    'threadName',
+                    'exc_info',
+                    'exc_text',
+                    'stack_info',
                 ):
                     log_entry[key] = value
 
@@ -310,11 +310,11 @@ class LogShippingHandler(logging.Handler):
             if record.exc_info:
                 import traceback
 
-                log_entry["exception"] = traceback.format_exception(*record.exc_info)
+                log_entry['exception'] = traceback.format_exception(*record.exc_info)
 
             # Enqueue for shipping
             self.shipper.enqueue(log_entry)
 
         except Exception as e:
             # Don't let log shipping errors break logging
-            logger.error("Error in log shipping handler: %s", e, exc_info=True)
+            logger.error('Error in log shipping handler: %s', e, exc_info=True)

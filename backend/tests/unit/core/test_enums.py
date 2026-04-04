@@ -26,7 +26,7 @@ class TestQuotaPlan:
 
     def test_enum_value(self):
         """Test QuotaPlan has UNLIMITED value."""
-        assert QuotaPlan.UNLIMITED.value == "unlimited"
+        assert QuotaPlan.UNLIMITED.value == 'unlimited'
 
     def test_enum_count(self):
         """Test QuotaPlan has exactly 1 value."""
@@ -40,7 +40,7 @@ class TestQuotaPlan:
         """Test QuotaPlan enum membership."""
         assert QuotaPlan.UNLIMITED in QuotaPlan
         # String values ARE in str enums
-        assert "unlimited" in QuotaPlan
+        assert 'unlimited' in QuotaPlan
 
 
 class TestCircuitState:
@@ -48,9 +48,9 @@ class TestCircuitState:
 
     def test_enum_values(self):
         """Test CircuitState has expected values."""
-        assert CircuitState.CLOSED.value == "closed"
-        assert CircuitState.OPEN.value == "open"
-        assert CircuitState.HALF_OPEN.value == "half_open"
+        assert CircuitState.CLOSED.value == 'closed'
+        assert CircuitState.OPEN.value == 'open'
+        assert CircuitState.HALF_OPEN.value == 'half_open'
 
     def test_enum_count(self):
         """Test CircuitState has exactly 3 values."""
@@ -69,10 +69,10 @@ class TestErrorSeverity:
 
     def test_enum_values(self):
         """Test ErrorSeverity has expected values."""
-        assert ErrorSeverity.INFO.value == "info"
-        assert ErrorSeverity.WARNING.value == "warning"
-        assert ErrorSeverity.ERROR.value == "error"
-        assert ErrorSeverity.CRITICAL.value == "critical"
+        assert ErrorSeverity.INFO.value == 'info'
+        assert ErrorSeverity.WARNING.value == 'warning'
+        assert ErrorSeverity.ERROR.value == 'error'
+        assert ErrorSeverity.CRITICAL.value == 'critical'
 
     def test_enum_count(self):
         """Test ErrorSeverity has exactly 4 values."""
@@ -89,13 +89,13 @@ class TestErrorCategory:
 
     def test_enum_values(self):
         """Test ErrorCategory has expected values."""
-        assert ErrorCategory.USER_INPUT.value == "user_input"
-        assert ErrorCategory.SYSTEM.value == "system"
-        assert ErrorCategory.RATE_LIMIT.value == "rate_limit"
-        assert ErrorCategory.AUTHENTICATION.value == "authentication"
-        assert ErrorCategory.NETWORK.value == "network"
-        assert ErrorCategory.AI_MODEL.value == "ai_model"
-        assert ErrorCategory.CONFIGURATION.value == "configuration"
+        assert ErrorCategory.USER_INPUT.value == 'user_input'
+        assert ErrorCategory.SYSTEM.value == 'system'
+        assert ErrorCategory.RATE_LIMIT.value == 'rate_limit'
+        assert ErrorCategory.AUTHENTICATION.value == 'authentication'
+        assert ErrorCategory.NETWORK.value == 'network'
+        assert ErrorCategory.AI_MODEL.value == 'ai_model'
+        assert ErrorCategory.CONFIGURATION.value == 'configuration'
 
     def test_enum_count(self):
         """Test ErrorCategory has exactly 7 values."""
@@ -103,7 +103,7 @@ class TestErrorCategory:
 
     def test_enum_string_conversion(self):
         """Test ErrorCategory string conversion."""
-        assert str(ErrorCategory.USER_INPUT) == "ErrorCategory.USER_INPUT"
+        assert str(ErrorCategory.USER_INPUT) == 'ErrorCategory.USER_INPUT'
 
 
 class TestContentType:
@@ -111,8 +111,8 @@ class TestContentType:
 
     def test_enum_values(self):
         """Test ContentType has expected values."""
-        assert ContentType.TEXT.value == "text"
-        assert ContentType.IMAGE_URL.value == "image_url"
+        assert ContentType.TEXT.value == 'text'
+        assert ContentType.IMAGE_URL.value == 'image_url'
 
     def test_enum_count(self):
         """Test ContentType has exactly 2 values."""
@@ -124,24 +124,24 @@ class TestActionType:
 
     def test_core_action_types(self):
         """Test ActionType has core action values."""
-        assert ActionType.MESSAGE.value == "message"
-        assert ActionType.START.value == "start"
-        assert ActionType.READ.value == "read"
-        assert ActionType.WRITE.value == "write"
-        assert ActionType.EDIT.value == "edit"
-        assert ActionType.FINISH.value == "finish"
+        assert ActionType.MESSAGE.value == 'message'
+        assert ActionType.START.value == 'start'
+        assert ActionType.READ.value == 'read'
+        assert ActionType.WRITE.value == 'write'
+        assert ActionType.EDIT.value == 'edit'
+        assert ActionType.FINISH.value == 'finish'
 
     def test_control_action_types(self):
         """Test ActionType has control action values."""
-        assert ActionType.PAUSE.value == "pause"
-        assert ActionType.RESUME.value == "resume"
-        assert ActionType.STOP.value == "stop"
+        assert ActionType.PAUSE.value == 'pause'
+        assert ActionType.RESUME.value == 'resume'
+        assert ActionType.STOP.value == 'stop'
 
     def test_special_action_types(self):
         """Test ActionType has special action values."""
-        assert ActionType.THINK.value == "think"
-        assert ActionType.NULL.value == "null"
-        assert ActionType.REJECT.value == "reject"
+        assert ActionType.THINK.value == 'think'
+        assert ActionType.NULL.value == 'null'
+        assert ActionType.REJECT.value == 'reject'
 
     def test_enum_minimum_count(self):
         """Test ActionType has at least 15 action types."""
@@ -153,15 +153,15 @@ class TestObservationType:
 
     def test_core_observation_types(self):
         """Test ObservationType has core observation values."""
-        assert ObservationType.READ.value == "read"
-        assert ObservationType.WRITE.value == "write"
-        assert ObservationType.ERROR.value == "error"
-        assert ObservationType.NULL.value == "null"
+        assert ObservationType.READ.value == 'read'
+        assert ObservationType.WRITE.value == 'write'
+        assert ObservationType.ERROR.value == 'error'
+        assert ObservationType.NULL.value == 'null'
 
     def test_context_observation_types(self):
         """Test ObservationType has context observation values."""
-        assert ObservationType.MESSAGE.value == "message"
-        assert ObservationType.SUCCESS.value == "success"
+        assert ObservationType.MESSAGE.value == 'message'
+        assert ObservationType.SUCCESS.value == 'success'
 
     def test_enum_minimum_count(self):
         """Test ObservationType has at least 10 observation types."""
@@ -173,20 +173,20 @@ class TestAgentState:
 
     def test_lifecycle_states(self):
         """Test AgentState lifecycle values."""
-        assert AgentState.LOADING.value == "loading"
-        assert AgentState.RUNNING.value == "running"
-        assert AgentState.STOPPED.value == "stopped"
-        assert AgentState.FINISHED.value == "finished"
-        assert AgentState.ERROR.value == "error"
+        assert AgentState.LOADING.value == 'loading'
+        assert AgentState.RUNNING.value == 'running'
+        assert AgentState.STOPPED.value == 'stopped'
+        assert AgentState.FINISHED.value == 'finished'
+        assert AgentState.ERROR.value == 'error'
 
     def test_user_interaction_states(self):
         """Test AgentState user interaction values."""
-        assert AgentState.AWAITING_USER_INPUT.value == "awaiting_user_input"
+        assert AgentState.AWAITING_USER_INPUT.value == 'awaiting_user_input'
         assert (
-            AgentState.AWAITING_USER_CONFIRMATION.value == "awaiting_user_confirmation"
+            AgentState.AWAITING_USER_CONFIRMATION.value == 'awaiting_user_confirmation'
         )
-        assert AgentState.USER_CONFIRMED.value == "user_confirmed"
-        assert AgentState.USER_REJECTED.value == "user_rejected"
+        assert AgentState.USER_CONFIRMED.value == 'user_confirmed'
+        assert AgentState.USER_REJECTED.value == 'user_rejected'
 
     def test_enum_count(self):
         """Test AgentState has at least 10 values."""
@@ -204,10 +204,10 @@ class TestLifecyclePhase:
 
     def test_enum_values(self):
         """Test LifecyclePhase has expected values."""
-        assert LifecyclePhase.INITIALIZING.value == "initializing"
-        assert LifecyclePhase.ACTIVE.value == "active"
-        assert LifecyclePhase.CLOSING.value == "closing"
-        assert LifecyclePhase.CLOSED.value == "closed"
+        assert LifecyclePhase.INITIALIZING.value == 'initializing'
+        assert LifecyclePhase.ACTIVE.value == 'active'
+        assert LifecyclePhase.CLOSING.value == 'closing'
+        assert LifecyclePhase.CLOSED.value == 'closed'
 
     def test_enum_count(self):
         """Test LifecyclePhase has exactly 4 values."""
@@ -219,11 +219,11 @@ class TestActionConfirmationStatus:
 
     def test_enum_values(self):
         """Test ActionConfirmationStatus has expected values."""
-        assert ActionConfirmationStatus.CONFIRMED.value == "confirmed"
-        assert ActionConfirmationStatus.REJECTED.value == "rejected"
+        assert ActionConfirmationStatus.CONFIRMED.value == 'confirmed'
+        assert ActionConfirmationStatus.REJECTED.value == 'rejected'
         assert (
             ActionConfirmationStatus.AWAITING_CONFIRMATION.value
-            == "awaiting_confirmation"
+            == 'awaiting_confirmation'
         )
 
     def test_enum_count(self):
@@ -262,10 +262,10 @@ class TestRetryStrategy:
 
     def test_enum_values(self):
         """Test RetryStrategy has expected values."""
-        assert RetryStrategy.EXPONENTIAL.value == "exponential"
-        assert RetryStrategy.LINEAR.value == "linear"
-        assert RetryStrategy.FIXED.value == "fixed"
-        assert RetryStrategy.IMMEDIATE.value == "immediate"
+        assert RetryStrategy.EXPONENTIAL.value == 'exponential'
+        assert RetryStrategy.LINEAR.value == 'linear'
+        assert RetryStrategy.FIXED.value == 'fixed'
+        assert RetryStrategy.IMMEDIATE.value == 'immediate'
 
     def test_enum_count(self):
         """Test RetryStrategy has exactly 4 values."""
@@ -277,26 +277,26 @@ class TestRuntimeStatus:
 
     def test_lifecycle_statuses(self):
         """Test RuntimeStatus has lifecycle values."""
-        assert RuntimeStatus.UNKNOWN.value == "UNKNOWN"
-        assert RuntimeStatus.STOPPED.value == "STATUS$STOPPED"
-        assert RuntimeStatus.READY.value == "STATUS$READY"
-        assert RuntimeStatus.ERROR.value == "STATUS$ERROR"
+        assert RuntimeStatus.UNKNOWN.value == 'UNKNOWN'
+        assert RuntimeStatus.STOPPED.value == 'STATUS$STOPPED'
+        assert RuntimeStatus.READY.value == 'STATUS$READY'
+        assert RuntimeStatus.ERROR.value == 'STATUS$ERROR'
 
     def test_startup_statuses(self):
         """Test RuntimeStatus has startup values."""
-        assert RuntimeStatus.BUILDING_RUNTIME.value == "STATUS$BUILDING_RUNTIME"
-        assert RuntimeStatus.STARTING_RUNTIME.value == "STATUS$STARTING_RUNTIME"
-        assert RuntimeStatus.RUNTIME_STARTED.value == "STATUS$RUNTIME_STARTED"
+        assert RuntimeStatus.BUILDING_RUNTIME.value == 'STATUS$BUILDING_RUNTIME'
+        assert RuntimeStatus.STARTING_RUNTIME.value == 'STATUS$STARTING_RUNTIME'
+        assert RuntimeStatus.RUNTIME_STARTED.value == 'STATUS$RUNTIME_STARTED'
 
     def test_error_statuses(self):
         """Test RuntimeStatus has error values."""
         assert (
             RuntimeStatus.ERROR_RUNTIME_DISCONNECTED.value
-            == "STATUS$ERROR_RUNTIME_DISCONNECTED"
+            == 'STATUS$ERROR_RUNTIME_DISCONNECTED'
         )
         assert (
             RuntimeStatus.ERROR_LLM_AUTHENTICATION.value
-            == "STATUS$ERROR_LLM_AUTHENTICATION"
+            == 'STATUS$ERROR_LLM_AUTHENTICATION'
         )
 
     def test_enum_minimum_count(self):
@@ -309,9 +309,9 @@ class TestExitReason:
 
     def test_enum_values(self):
         """Test ExitReason has expected values."""
-        assert ExitReason.INTENTIONAL.value == "intentional"
-        assert ExitReason.INTERRUPTED.value == "interrupted"
-        assert ExitReason.ERROR.value == "error"
+        assert ExitReason.INTENTIONAL.value == 'intentional'
+        assert ExitReason.INTERRUPTED.value == 'interrupted'
+        assert ExitReason.ERROR.value == 'error'
 
     def test_enum_count(self):
         """Test ExitReason has exactly 3 values."""
@@ -323,9 +323,9 @@ class TestEventSource:
 
     def test_enum_values(self):
         """Test EventSource has expected values."""
-        assert EventSource.AGENT.value == "agent"
-        assert EventSource.USER.value == "user"
-        assert EventSource.ENVIRONMENT.value == "environment"
+        assert EventSource.AGENT.value == 'agent'
+        assert EventSource.USER.value == 'user'
+        assert EventSource.ENVIRONMENT.value == 'environment'
 
     def test_enum_count(self):
         """Test EventSource has exactly 3 values."""
@@ -343,29 +343,29 @@ class TestEnumUsagePatterns:
 
     def test_enum_from_string(self):
         """Test creating enum from string value."""
-        state = CircuitState("closed")
+        state = CircuitState('closed')
         assert state == CircuitState.CLOSED
 
     def test_enum_name_attribute(self):
         """Test enum name attribute."""
-        assert QuotaPlan.UNLIMITED.name == "UNLIMITED"
-        assert CircuitState.CLOSED.name == "CLOSED"
+        assert QuotaPlan.UNLIMITED.name == 'UNLIMITED'
+        assert CircuitState.CLOSED.name == 'CLOSED'
 
     def test_enum_value_attribute(self):
         """Test enum value attribute."""
-        assert QuotaPlan.UNLIMITED.value == "unlimited"
-        assert ErrorSeverity.ERROR.value == "error"
+        assert QuotaPlan.UNLIMITED.value == 'unlimited'
+        assert ErrorSeverity.ERROR.value == 'error'
 
     def test_enum_invalid_value(self):
         """Test creating enum from invalid value raises error."""
         with pytest.raises(ValueError):
-            CircuitState("INVALID")
+            CircuitState('INVALID')
 
     def test_multiple_enum_namespaces(self):
         """Test different enums have separate namespaces."""
         # ERROR exists in both ErrorSeverity and AgentState
-        assert ErrorSeverity.ERROR.value == "error"
-        assert AgentState.ERROR.value == "error"
+        assert ErrorSeverity.ERROR.value == 'error'
+        assert AgentState.ERROR.value == 'error'
         # Both are str enums with same value, so they're equal
         # But they're different types
         assert type(ErrorSeverity.ERROR) is not type(AgentState.ERROR)

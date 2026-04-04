@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import logging
 import sys
@@ -12,8 +12,8 @@ from backend.execution.utils.system_stats import update_last_execution_time
 
 if TYPE_CHECKING:
     from backend.core.config import AppConfig
-    from backend.ledger import EventStream
     from backend.inference.llm_registry import LLMRegistry
+    from backend.ledger import EventStream
 
 
 logger = logging.getLogger(__name__)
@@ -46,23 +46,23 @@ class ActionExecutionClient(Runtime):
     # Actions that are always dispatched to the server
     _SERVER_ACTIONS: frozenset[str] = frozenset(
         {
-            "run",
-            "terminal_run",
-            "terminal_input",
-            "terminal_read",
-            "read",
-            "write",
-            "edit",
-            "think",
-            "null",
-            "finish_playbook",
+            'run',
+            'terminal_run',
+            'terminal_input',
+            'terminal_read',
+            'read',
+            'write',
+            'edit',
+            'think',
+            'null',
+            'finish_playbook',
         }
     )
 
     # Actions restricted on Windows
     _WINDOWS_UNSUPPORTED: frozenset[str] = frozenset(
         {
-            "call_tool_mcp",
+            'call_tool_mcp',
         }
     )
 
@@ -71,7 +71,7 @@ class ActionExecutionClient(Runtime):
         config: AppConfig,
         event_stream: EventStream | None,
         llm_registry: LLMRegistry,
-        sid: str = "default",
+        sid: str = 'default',
         plugins: list[Any] | None = None,
         env_vars: dict[str, str] | None = None,
         status_callback: Any | None = None,
@@ -103,28 +103,28 @@ class ActionExecutionClient(Runtime):
         pass
 
     def get_mcp_config(self, extra_servers: list[Any] | None = None) -> Any:
-        if sys.platform == "win32":
+        if sys.platform == 'win32':
             from backend.core.config.mcp_config import MCPConfig
 
             return MCPConfig()
 
-        resp = self._send_action_server_request("GET", "/mcp_config")  # type: ignore[unreachable]
+        resp = self._send_action_server_request('GET', '/mcp_config')  # type: ignore[unreachable]
         data = resp.json()
 
         from backend.core.config.mcp_config import MCPConfig, MCPServerConfig
 
         config = MCPConfig(
-            servers=[MCPServerConfig(**s) for s in data.get("servers", [])]
+            servers=[MCPServerConfig(**s) for s in data.get('servers', [])]
         )
 
         # Add default SSE server if none from server
         if not config.servers:
             config.servers.append(
                 MCPServerConfig(
-                    name="default",
-                    type="sse",
-                    url=f"{getattr(self, 'action_execution_server_url', '')}/mcp",
-                    transport="sse",
+                    name='default',
+                    type='sse',
+                    url=f'{getattr(self, "action_execution_server_url", "")}/mcp',
+                    transport='sse',
                 )
             )
 
@@ -132,9 +132,9 @@ class ActionExecutionClient(Runtime):
             config.servers.extend(extra_servers)
             # Update server if needed
             self._send_action_server_request(
-                "POST",
-                "/mcp_config",
-                json={"servers": [s.model_dump() for s in config.servers]},
+                'POST',
+                '/mcp_config',
+                json={'servers': [s.model_dump() for s in config.servers]},
             )
             self._last_updated_mcp_stdio_servers = extra_servers
 
@@ -169,20 +169,20 @@ class ActionExecutionClient(Runtime):
         from zipfile import ZipFile
 
         if not os.path.exists(host_src):
-            raise FileNotFoundError(f"Source path {host_src} does not exist")
+            raise FileNotFoundError(f'Source path {host_src} does not exist')
 
         if recursive:
-            fd, tmp_path = tempfile.mkstemp(suffix=".zip")
+            fd, tmp_path = tempfile.mkstemp(suffix='.zip')
             os.close(fd)
             try:
-                with ZipFile(tmp_path, "w") as zipf:
+                with ZipFile(tmp_path, 'w') as zipf:
                     for root, _, files in os.walk(host_src):
                         for file in files:
                             full_path = os.path.join(root, file)
                             arcname = os.path.relpath(full_path, host_src)
                             zipf.write(full_path, arcname)
 
-                with open(tmp_path, "rb") as f:
+                with open(tmp_path, 'rb') as f:
                     self._upload_file_to_runtime(f, runtime_dest, recursive, host_src)
             finally:
                 try:
@@ -190,43 +190,43 @@ class ActionExecutionClient(Runtime):
                 except OSError:
                     pass
         else:
-            with open(host_src, "rb") as f:
+            with open(host_src, 'rb') as f:
                 self._upload_file_to_runtime(f, runtime_dest, recursive, host_src)
 
     def copy_from(self, path: str) -> Any:
         raise UnsupportedActionError(
-            "copy_from is not implemented in ActionExecutionClient. "
-            "Override in a subclass (e.g. LocalRuntimeInProcess) to provide "
-            "runtime-to-host file transfer."
+            'copy_from is not implemented in ActionExecutionClient. '
+            'Override in a subclass (e.g. LocalRuntimeInProcess) to provide '
+            'runtime-to-host file transfer.'
         )
 
     def list_files(self, path: str | None = None, recursive: bool = False) -> list[str]:
         resp = self._send_action_server_request(
-            "GET", "/list_files", params={"path": path, "recursive": recursive}
+            'GET', '/list_files', params={'path': path, 'recursive': recursive}
         )
         return resp.json()
 
     async def call_tool_mcp(self, action: Any) -> Any:
         """Call an MCP tool.  Not available on Windows."""
-        if sys.platform == "win32":
+        if sys.platform == 'win32':
             from backend.ledger.observation import ErrorObservation
 
             return ErrorObservation(
                 content=(
-                    "MCP tools are not supported on Windows. "
-                    "To use MCP, run App on Linux or macOS, or "
-                    "use App in a Linux/macOS environment."
+                    'MCP tools are not supported on Windows. '
+                    'To use MCP, run App on Linux or macOS, or '
+                    'use App in a Linux/macOS environment.'
                 )
             )
 
         raise UnsupportedActionError(
-            "call_tool_mcp requires the action-execution server to have "
-            "an MCP endpoint configured.  Ensure the runtime supports MCP "
-            "or override this method in your runtime subclass."
+            'call_tool_mcp requires the action-execution server to have '
+            'an MCP endpoint configured.  Ensure the runtime supports MCP '
+            'or override this method in your runtime subclass.'
         )
 
     def check_if_alive(self) -> None:
-        self._send_action_server_request("GET", "/ping")
+        self._send_action_server_request('GET', '/ping')
 
     def think(self, action: Any) -> Any:
         return self._execute_action_on_server(action)
@@ -247,50 +247,50 @@ class ActionExecutionClient(Runtime):
 
             return ErrorObservation(content=str(e))
 
-        if not getattr(action, "runnable", True):
+        if not getattr(action, 'runnable', True):
             from backend.ledger.observation import NullObservation
 
-            return NullObservation(content="")
+            return NullObservation(content='')
 
         update_last_execution_time()
         try:
             return self._execute_action_on_server(action)
         except (httpx.TimeoutException, TimeoutError):
-            raise AgentRuntimeTimeoutError("Action execution timed out")
+            raise AgentRuntimeTimeoutError('Action execution timed out')
 
     def get_vscode_token(self) -> str:
-        if not getattr(self, "_vscode_enabled", False):
-            return ""
-        if not hasattr(self, "_vscode_token") or self._vscode_token is None:
-            resp = self._send_action_server_request("GET", "/vscode/token")
-            self._vscode_token = resp.json().get("token")
+        if not getattr(self, '_vscode_enabled', False):
+            return ''
+        if not hasattr(self, '_vscode_token') or self._vscode_token is None:
+            resp = self._send_action_server_request('GET', '/vscode/token')
+            self._vscode_token = resp.json().get('token')
         return self._vscode_token
 
     def _execute_action_on_server(self, action: Any) -> Any:
         from backend.ledger.serialization import event_to_dict, observation_from_dict
 
         data = event_to_dict(action)
-        resp = self._send_action_server_request("POST", "/execute", json=data)
+        resp = self._send_action_server_request('POST', '/execute', json=data)
         return observation_from_dict(resp.json())
 
     def _validate_action_type(self, action: Any) -> None:
-        action_name = getattr(action, "action", None)
+        action_name = getattr(action, 'action', None)
         if not action_name or not hasattr(self, action_name):
-            raise ValueError(f"Action type {action_name} does not exist")
+            raise ValueError(f'Action type {action_name} does not exist')
 
     def _send_action_server_request(self, method: str, path: str, **kwargs) -> Any:
-        url = f"{getattr(self, 'action_execution_server_url', '')}{path}"
+        url = f'{getattr(self, "action_execution_server_url", "")}{path}'
         try:
             return send_request(None, method, url, **kwargs)  # type: ignore[arg-type]
         except httpx.TimeoutException:
-            raise TimeoutError(f"Request to action server timed out: {method} {path}")
+            raise TimeoutError(f'Request to action server timed out: {method} {path}')
 
     def _upload_file_to_runtime(
         self, file_handle: Any, runtime_dest: str, recursive: bool, host_src: str
     ) -> None:
         raise UnsupportedActionError(
-            "_upload_file_to_runtime is not implemented in the base "
-            "ActionExecutionClient.  Use LocalRuntimeInProcess.copy_to() "
-            "for in-process file transfer, or implement a subclass that "
-            "uploads to the action-execution server."
+            '_upload_file_to_runtime is not implemented in the base '
+            'ActionExecutionClient.  Use LocalRuntimeInProcess.copy_to() '
+            'for in-process file transfer, or implement a subclass that '
+            'uploads to the action-execution server.'
         )

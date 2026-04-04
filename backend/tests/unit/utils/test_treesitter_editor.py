@@ -16,7 +16,7 @@ from backend.utils.treesitter_editor import (
 
 # All tests require tree-sitter to be available
 pytestmark = pytest.mark.skipif(
-    not TREE_SITTER_AVAILABLE, reason="tree-sitter not installed"
+    not TREE_SITTER_AVAILABLE, reason='tree-sitter not installed'
 )
 
 
@@ -51,8 +51,8 @@ def py_file(tmp_path):
                     raise ValueError("Division by zero")
                 return x / y
     """)
-    f = tmp_path / "sample.py"
-    f.write_text(content, encoding="utf-8")
+    f = tmp_path / 'sample.py'
+    f.write_text(content, encoding='utf-8')
     return str(f)
 
 
@@ -68,8 +68,8 @@ def js_file(tmp_path):
             return a + b;
         }
     """)
-    f = tmp_path / "sample.js"
-    f.write_text(content, encoding="utf-8")
+    f = tmp_path / 'sample.js'
+    f.write_text(content, encoding='utf-8')
     return str(f)
 
 
@@ -80,30 +80,30 @@ def js_file(tmp_path):
 
 class TestEditResult:
     def test_success_defaults(self):
-        r = EditResult(success=True, message="ok")
+        r = EditResult(success=True, message='ok')
         assert r.success is True
-        assert r.message == "ok"
+        assert r.message == 'ok'
         assert r.modified_code is None
         assert r.lines_changed == 0
         assert r.syntax_valid is True
         assert r.original_code is None
 
     def test_failure_result(self):
-        r = EditResult(success=False, message="failed", syntax_valid=False)
+        r = EditResult(success=False, message='failed', syntax_valid=False)
         assert r.success is False
         assert r.syntax_valid is False
 
     def test_full_result(self):
         r = EditResult(
             success=True,
-            message="done",
-            modified_code="x = 1",
+            message='done',
+            modified_code='x = 1',
             lines_changed=3,
-            original_code="x = 0",
+            original_code='x = 0',
         )
-        assert r.modified_code == "x = 1"
+        assert r.modified_code == 'x = 1'
         assert r.lines_changed == 3
-        assert r.original_code == "x = 0"
+        assert r.original_code == 'x = 0'
 
 
 # ---------------------------------------------------------------------------
@@ -114,32 +114,32 @@ class TestEditResult:
 class TestSymbolLocation:
     def test_basic_location(self):
         loc = SymbolLocation(
-            file_path="a.py",
+            file_path='a.py',
             line_start=1,
             line_end=3,
             byte_start=0,
             byte_end=50,
-            node_type="function_definition",
-            symbol_name="greet",
+            node_type='function_definition',
+            symbol_name='greet',
         )
-        assert loc.file_path == "a.py"
+        assert loc.file_path == 'a.py'
         assert loc.line_start == 1
         assert loc.line_end == 3
-        assert loc.symbol_name == "greet"
+        assert loc.symbol_name == 'greet'
         assert loc.parent_name is None
 
     def test_method_location_with_parent(self):
         loc = SymbolLocation(
-            file_path="b.py",
+            file_path='b.py',
             line_start=5,
             line_end=7,
             byte_start=100,
             byte_end=200,
-            node_type="function_definition",
-            symbol_name="multiply",
-            parent_name="Calculator",
+            node_type='function_definition',
+            symbol_name='multiply',
+            parent_name='Calculator',
         )
-        assert loc.parent_name == "Calculator"
+        assert loc.parent_name == 'Calculator'
 
 
 # ---------------------------------------------------------------------------
@@ -149,51 +149,51 @@ class TestSymbolLocation:
 
 class TestLanguageExtensions:
     def test_python_extension(self):
-        assert LANGUAGE_EXTENSIONS[".py"] == "python"
+        assert LANGUAGE_EXTENSIONS['.py'] == 'python'
 
     def test_javascript_extension(self):
-        assert LANGUAGE_EXTENSIONS[".js"] == "javascript"
+        assert LANGUAGE_EXTENSIONS['.js'] == 'javascript'
 
     def test_typescript_extension(self):
-        assert LANGUAGE_EXTENSIONS[".ts"] == "typescript"
+        assert LANGUAGE_EXTENSIONS['.ts'] == 'typescript'
 
     def test_go_extension(self):
-        assert LANGUAGE_EXTENSIONS[".go"] == "go"
+        assert LANGUAGE_EXTENSIONS['.go'] == 'go'
 
     def test_rust_extension(self):
-        assert LANGUAGE_EXTENSIONS[".rs"] == "rust"
+        assert LANGUAGE_EXTENSIONS['.rs'] == 'rust'
 
     def test_java_extension(self):
-        assert LANGUAGE_EXTENSIONS[".java"] == "java"
+        assert LANGUAGE_EXTENSIONS['.java'] == 'java'
 
     def test_yaml_extension(self):
-        assert LANGUAGE_EXTENSIONS[".yml"] == "yaml"
-        assert LANGUAGE_EXTENSIONS[".yaml"] == "yaml"
+        assert LANGUAGE_EXTENSIONS['.yml'] == 'yaml'
+        assert LANGUAGE_EXTENSIONS['.yaml'] == 'yaml'
 
     def test_json_extension(self):
-        assert LANGUAGE_EXTENSIONS[".json"] == "json"
+        assert LANGUAGE_EXTENSIONS['.json'] == 'json'
 
     def test_cpp_extensions(self):
-        assert LANGUAGE_EXTENSIONS[".cpp"] == "cpp"
-        assert LANGUAGE_EXTENSIONS[".cc"] == "cpp"
-        assert LANGUAGE_EXTENSIONS[".cxx"] == "cpp"
+        assert LANGUAGE_EXTENSIONS['.cpp'] == 'cpp'
+        assert LANGUAGE_EXTENSIONS['.cc'] == 'cpp'
+        assert LANGUAGE_EXTENSIONS['.cxx'] == 'cpp'
 
     def test_c_extension(self):
-        assert LANGUAGE_EXTENSIONS[".c"] == "c"
-        assert LANGUAGE_EXTENSIONS[".h"] == "c"
+        assert LANGUAGE_EXTENSIONS['.c'] == 'c'
+        assert LANGUAGE_EXTENSIONS['.h'] == 'c'
 
     def test_tsx_extension(self):
-        assert LANGUAGE_EXTENSIONS[".tsx"] == "tsx"
+        assert LANGUAGE_EXTENSIONS['.tsx'] == 'tsx'
 
     def test_bash_extensions(self):
-        assert LANGUAGE_EXTENSIONS[".sh"] == "bash"
-        assert LANGUAGE_EXTENSIONS[".bash"] == "bash"
+        assert LANGUAGE_EXTENSIONS['.sh'] == 'bash'
+        assert LANGUAGE_EXTENSIONS['.bash'] == 'bash'
 
     def test_sql_extension(self):
-        assert LANGUAGE_EXTENSIONS[".sql"] == "sql"
+        assert LANGUAGE_EXTENSIONS['.sql'] == 'sql'
 
     def test_markdown_extension(self):
-        assert LANGUAGE_EXTENSIONS[".md"] == "markdown"
+        assert LANGUAGE_EXTENSIONS['.md'] == 'markdown'
 
     def test_has_many_extensions(self):
         # At least 40+ languages
@@ -224,38 +224,38 @@ class TestEditorInit:
 
 class TestDetectLanguage:
     def test_python_file(self, editor):
-        assert editor.detect_language("script.py") == "python"
+        assert editor.detect_language('script.py') == 'python'
 
     def test_javascript_file(self, editor):
-        assert editor.detect_language("app.js") == "javascript"
+        assert editor.detect_language('app.js') == 'javascript'
 
     def test_typescript_file(self, editor):
-        assert editor.detect_language("main.ts") == "typescript"
+        assert editor.detect_language('main.ts') == 'typescript'
 
     def test_go_file(self, editor):
-        assert editor.detect_language("main.go") == "go"
+        assert editor.detect_language('main.go') == 'go'
 
     def test_rust_file(self, editor):
-        assert editor.detect_language("lib.rs") == "rust"
+        assert editor.detect_language('lib.rs') == 'rust'
 
     def test_yaml_file(self, editor):
-        assert editor.detect_language("config.yaml") == "yaml"
-        assert editor.detect_language("config.yml") == "yaml"
+        assert editor.detect_language('config.yaml') == 'yaml'
+        assert editor.detect_language('config.yml') == 'yaml'
 
     def test_unknown_extension_returns_none(self, editor):
-        assert editor.detect_language("file.xyz_unknown") is None
+        assert editor.detect_language('file.xyz_unknown') is None
 
     def test_no_extension_returns_none(self, editor):
-        assert editor.detect_language("Makefile") is None
+        assert editor.detect_language('Makefile') is None
 
     def test_case_insensitive_extension(self, editor):
         # Extensions are lowercased before lookup
-        result = editor.detect_language("Script.PY")
+        result = editor.detect_language('Script.PY')
         # lowercase via Path().suffix.lower()
-        assert result == "python"
+        assert result == 'python'
 
     def test_path_with_directory(self, editor):
-        assert editor.detect_language("/some/path/module.js") == "javascript"
+        assert editor.detect_language('/some/path/module.js') == 'javascript'
 
 
 # ---------------------------------------------------------------------------
@@ -269,10 +269,10 @@ class TestGetSupportedLanguages:
         assert isinstance(langs, list)
 
     def test_contains_python(self, editor):
-        assert "python" in editor.get_supported_languages()
+        assert 'python' in editor.get_supported_languages()
 
     def test_contains_javascript(self, editor):
-        assert "javascript" in editor.get_supported_languages()
+        assert 'javascript' in editor.get_supported_languages()
 
     def test_contains_many_languages(self, editor):
         assert len(editor.get_supported_languages()) >= 15
@@ -289,20 +289,20 @@ class TestGetSupportedLanguages:
 
 class TestGetParser:
     def test_python_parser(self, editor):
-        parser = editor.get_parser("python")
+        parser = editor.get_parser('python')
         assert parser is not None
 
     def test_javascript_parser(self, editor):
-        parser = editor.get_parser("javascript")
+        parser = editor.get_parser('javascript')
         assert parser is not None
 
     def test_cached_parser(self, editor):
-        parser1 = editor.get_parser("python")
-        parser2 = editor.get_parser("python")
+        parser1 = editor.get_parser('python')
+        parser2 = editor.get_parser('python')
         assert parser1 is parser2
 
     def test_unknown_language_returns_none(self, editor):
-        result = editor.get_parser("nonexistent_lang_xyz")
+        result = editor.get_parser('nonexistent_lang_xyz')
         assert result is None
 
 
@@ -316,23 +316,23 @@ class TestParseFile:
         result = editor.parse_file(py_file)
         assert result is not None
         tree, file_bytes, language = result
-        assert language == "python"
+        assert language == 'python'
         assert isinstance(file_bytes, bytes)
-        assert b"def greet" in file_bytes
+        assert b'def greet' in file_bytes
 
     def test_parse_javascript_file(self, editor, js_file):
         result = editor.parse_file(js_file)
         assert result is not None
         tree, file_bytes, language = result
-        assert language == "javascript"
+        assert language == 'javascript'
 
     def test_parse_unknown_extension_returns_none(self, editor, tmp_path):
-        f = tmp_path / "file.zzz"
-        f.write_text("content")
+        f = tmp_path / 'file.zzz'
+        f.write_text('content')
         assert editor.parse_file(str(f)) is None
 
     def test_parse_nonexistent_file_returns_none(self, editor):
-        assert editor.parse_file("/nonexistent/path/file.py") is None
+        assert editor.parse_file('/nonexistent/path/file.py') is None
 
     def test_parse_uses_cache(self, editor, py_file):
         result1 = editor.parse_file(py_file, use_cache=True)
@@ -356,40 +356,40 @@ class TestParseFile:
 
 class TestFindSymbol:
     def test_find_function(self, editor, py_file):
-        loc = editor.find_symbol(py_file, "greet")
+        loc = editor.find_symbol(py_file, 'greet')
         assert loc is not None
-        assert loc.symbol_name == "greet"
+        assert loc.symbol_name == 'greet'
         assert loc.line_start >= 1
 
     def test_find_class(self, editor, py_file):
-        loc = editor.find_symbol(py_file, "Calculator")
+        loc = editor.find_symbol(py_file, 'Calculator')
         assert loc is not None
-        assert loc.symbol_name == "Calculator"
+        assert loc.symbol_name == 'Calculator'
 
     def test_find_method_dot_notation(self, editor, py_file):
-        loc = editor.find_symbol(py_file, "Calculator.multiply")
+        loc = editor.find_symbol(py_file, 'Calculator.multiply')
         assert loc is not None
-        assert loc.symbol_name == "multiply"
-        assert loc.parent_name == "Calculator"
+        assert loc.symbol_name == 'multiply'
+        assert loc.parent_name == 'Calculator'
 
     def test_find_nonexistent_symbol_returns_none(self, editor, py_file):
-        assert editor.find_symbol(py_file, "nonexistent_xyz") is None
+        assert editor.find_symbol(py_file, 'nonexistent_xyz') is None
 
     def test_find_with_function_type_filter(self, editor, py_file):
-        loc = editor.find_symbol(py_file, "greet", symbol_type="function")
+        loc = editor.find_symbol(py_file, 'greet', symbol_type='function')
         assert loc is not None
 
     def test_find_with_class_type_filter(self, editor, py_file):
-        loc = editor.find_symbol(py_file, "Calculator", symbol_type="class")
+        loc = editor.find_symbol(py_file, 'Calculator', symbol_type='class')
         assert loc is not None
 
     def test_find_function_with_wrong_type_returns_none(self, editor, py_file):
         # greet is a function, not a class
-        loc = editor.find_symbol(py_file, "greet", symbol_type="class")
+        loc = editor.find_symbol(py_file, 'greet', symbol_type='class')
         assert loc is None
 
     def test_find_in_nonexistent_file_returns_none(self, editor):
-        assert editor.find_symbol("/nonexistent.py", "func") is None
+        assert editor.find_symbol('/nonexistent.py', 'func') is None
 
 
 # ---------------------------------------------------------------------------
@@ -399,38 +399,38 @@ class TestFindSymbol:
 
 class TestEditFunction:
     def test_edit_existing_function(self, editor, py_file):
-        result = editor.edit_function(py_file, "greet", '    return f"Hi, {name}!"')
+        result = editor.edit_function(py_file, 'greet', '    return f"Hi, {name}!"')
         assert result.success is True
-        assert "greet" in result.message
+        assert 'greet' in result.message
         # Verify changes were written
-        content = open(py_file, encoding="utf-8").read()
-        assert "Hi, " in content
+        content = open(py_file, encoding='utf-8').read()
+        assert 'Hi, ' in content
 
     def test_edit_nonexistent_function(self, editor, py_file):
-        result = editor.edit_function(py_file, "nonexistent_func", "    pass")
+        result = editor.edit_function(py_file, 'nonexistent_func', '    pass')
         assert result.success is False
-        assert "not found" in result.message.lower()
+        assert 'not found' in result.message.lower()
 
     def test_edit_function_in_nonexistent_file(self, editor):
-        result = editor.edit_function("/no/such/file.py", "func", "    pass")
+        result = editor.edit_function('/no/such/file.py', 'func', '    pass')
         assert result.success is False
 
     def test_edit_clears_cache(self, editor, py_file):
         editor.parse_file(py_file)  # populate cache
         assert py_file in editor.tree_cache
-        editor.edit_function(py_file, "greet", '    return "hello"')
+        editor.edit_function(py_file, 'greet', '    return "hello"')
         assert py_file not in editor.tree_cache
 
     def test_edit_preserves_other_functions(self, editor, py_file):
-        editor.edit_function(py_file, "greet", '    return "modified"')
-        content = open(py_file, encoding="utf-8").read()
+        editor.edit_function(py_file, 'greet', '    return "modified"')
+        content = open(py_file, encoding='utf-8').read()
         # add function should still exist
-        assert "def add" in content
+        assert 'def add' in content
 
     def test_edit_function_unknown_extension(self, editor, tmp_path):
-        f = tmp_path / "file.zzz"
-        f.write_text("content")
-        result = editor.edit_function(str(f), "func", "body")
+        f = tmp_path / 'file.zzz'
+        f.write_text('content')
+        result = editor.edit_function(str(f), 'func', 'body')
         assert result.success is False
 
 
@@ -441,28 +441,28 @@ class TestEditFunction:
 
 class TestRenameSymbol:
     def test_rename_function(self, editor, py_file):
-        result = editor.rename_symbol(py_file, "greet", "welcome")
+        result = editor.rename_symbol(py_file, 'greet', 'welcome')
         assert result.success is True
-        content = open(py_file, encoding="utf-8").read()
-        assert "def welcome" in content
-        assert "def greet" not in content
+        content = open(py_file, encoding='utf-8').read()
+        assert 'def welcome' in content
+        assert 'def greet' not in content
 
     def test_rename_nonexistent_symbol(self, editor, py_file):
-        result = editor.rename_symbol(py_file, "no_such_sym", "new_name")
+        result = editor.rename_symbol(py_file, 'no_such_sym', 'new_name')
         assert result.success is False
-        assert "not found" in result.message.lower()
+        assert 'not found' in result.message.lower()
 
     def test_rename_in_nonexistent_file(self, editor):
-        result = editor.rename_symbol("/no/file.py", "old", "new")
+        result = editor.rename_symbol('/no/file.py', 'old', 'new')
         assert result.success is False
 
     def test_rename_clears_cache(self, editor, py_file):
         editor.parse_file(py_file)
-        editor.rename_symbol(py_file, "add", "sum_values")
+        editor.rename_symbol(py_file, 'add', 'sum_values')
         assert py_file not in editor.tree_cache
 
     def test_rename_returns_occurrence_count(self, editor, py_file):
-        result = editor.rename_symbol(py_file, "greet", "helloo")
+        result = editor.rename_symbol(py_file, 'greet', 'helloo')
         assert result.success is True
         # lines_changed is the count of occurrences
         assert result.lines_changed >= 1
@@ -475,19 +475,19 @@ class TestRenameSymbol:
 
 class TestValidateSyntax:
     def test_valid_python(self, editor):
-        code = "def foo():\n    return 1\n"
-        is_valid, msg = editor._validate_syntax(code, "f.py", "python")
+        code = 'def foo():\n    return 1\n'
+        is_valid, msg = editor._validate_syntax(code, 'f.py', 'python')
         assert is_valid is True
 
     def test_invalid_python(self, editor):
-        code = "def foo(\n    return 1\n"  # syntax error
-        is_valid, msg = editor._validate_syntax(code, "f.py", "python")
+        code = 'def foo(\n    return 1\n'  # syntax error
+        is_valid, msg = editor._validate_syntax(code, 'f.py', 'python')
         # may report invalid or skip validation
         assert isinstance(is_valid, bool)
 
     def test_no_parser_for_unknown_language(self, editor):
-        code = "some code"
-        is_valid, msg = editor._validate_syntax(code, "f.zzz", "unknown_xyz")
+        code = 'some code'
+        is_valid, msg = editor._validate_syntax(code, 'f.zzz', 'unknown_xyz')
         # no parser => validation skipped, returns True
         assert is_valid is True
 
@@ -534,7 +534,7 @@ class TestFindAllSymbolOccurrences:
         assert result is not None
         tree, file_bytes, _ = result
         occurrences = editor._find_all_symbol_occurrences(
-            tree, file_bytes, "greet", "python"
+            tree, file_bytes, 'greet', 'python'
         )
         # "greet" appears in def statement
         assert occurrences
@@ -544,7 +544,7 @@ class TestFindAllSymbolOccurrences:
         assert result is not None
         tree, file_bytes, _ = result
         occurrences = editor._find_all_symbol_occurrences(
-            tree, file_bytes, "no_such_name_xyz", "python"
+            tree, file_bytes, 'no_such_name_xyz', 'python'
         )
         assert occurrences == []
 
@@ -557,50 +557,52 @@ class TestFindAllSymbolOccurrences:
 class TestCoverageGaps:
     def test_get_name_node_recursion(self, editor, tmp_path):
         """Test recursive name node extraction (e.g. in C)."""
-        content = "int foo() { return 1; }"
-        f = tmp_path / "test.c"
-        f.write_text(content, encoding="utf-8")
+        content = 'int foo() { return 1; }'
+        f = tmp_path / 'test.c'
+        f.write_text(content, encoding='utf-8')
         # In C, function name is inside a function_declarator
-        loc = editor.find_symbol(str(f), "foo")
+        loc = editor.find_symbol(str(f), 'foo')
         assert loc is not None
-        assert loc.symbol_name == "foo"
+        assert loc.symbol_name == 'foo'
 
     def test_edit_function_syntax_error(self, editor, py_file):
         """Test edit_function when result has syntax error."""
         # Providing invalid python code
-        result = editor.edit_function(py_file, "greet", "    def invalid syntax:")
+        result = editor.edit_function(py_file, 'greet', '    def invalid syntax:')
         assert result.success is False
-        assert "Syntax error" in result.message
+        assert 'Syntax error' in result.message
         assert result.syntax_valid is False
 
     def test_rename_symbol_syntax_error(self, editor, py_file):
         """Test rename_symbol when result has syntax error (e.g. renaming to invalid identifier)."""
         # Renaming to something that breaks syntax
-        result = editor.rename_symbol(py_file, "greet", "123invalid")
+        result = editor.rename_symbol(py_file, 'greet', '123invalid')
         assert result.success is False
-        assert "Rename created syntax error" in result.message or not result.success
+        assert 'Rename created syntax error' in result.message or not result.success
 
     def test_validate_syntax_exception(self, editor):
         """Test _validate_syntax when an exception occurs during parsing."""
         import pytest
+
         with pytest.MonkeyPatch.context() as mp:
             # Mock get_parser to raise an exception
             def raise_exc(lang):
-                raise Exception("test exception")
-            mp.setattr(editor, "get_parser", raise_exc)
-            is_valid, msg = editor._validate_syntax("code", "f.py", "python")
+                raise Exception('test exception')
+
+            mp.setattr(editor, 'get_parser', raise_exc)
+            is_valid, msg = editor._validate_syntax('code', 'f.py', 'python')
             # Should skip validation and return True on exception
             assert is_valid is True
-            assert "Validation skipped" in msg
+            assert 'Validation skipped' in msg
 
     def test_find_method_in_class_node_not_found(self, editor, py_file):
         """Test method search when method doesn't exist in class."""
-        loc = editor.find_symbol(py_file, "Calculator.nonexistent")
+        loc = editor.find_symbol(py_file, 'Calculator.nonexistent')
         assert loc is None
 
     def test_find_method_in_nonexistent_class(self, editor, py_file):
         """Test method search when class doesn't exist."""
-        loc = editor.find_symbol(py_file, "NonexistentClass.method")
+        loc = editor.find_symbol(py_file, 'NonexistentClass.method')
         assert loc is None
 
     def test_search_tree_for_symbol_not_found(self, editor, py_file):
@@ -609,7 +611,9 @@ class TestCoverageGaps:
         result = editor.parse_file(py_file)
         assert result is not None
         tree, file_bytes, lang = result
-        loc = editor._search_tree_for_symbol(tree, file_bytes, "notfound", py_file, lang)
+        loc = editor._search_tree_for_symbol(
+            tree, file_bytes, 'notfound', py_file, lang
+        )
         assert loc is None
 
     def test_get_function_body_node_not_found(self, editor, py_file):
@@ -626,33 +630,34 @@ class TestCoverageGaps:
     def test_get_parser_none_pack(self, editor):
         """Test get_parser when language pack is missing."""
         import backend.utils.treesitter_editor as tse
+
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(tse, "_get_language", None)
-            assert editor.get_parser("python") is None
+            mp.setattr(tse, '_get_language', None)
+            assert editor.get_parser('python') is None
 
     def test_parse_file_no_language(self, editor, tmp_path):
         """Test parse_file when language detection fails."""
-        f = tmp_path / "no_ext"
-        f.write_text("content", encoding="utf-8")
+        f = tmp_path / 'no_ext'
+        f.write_text('content', encoding='utf-8')
         assert editor.parse_file(str(f)) is None
 
     def test_find_symbol_invalid_dot_notation(self, editor, py_file):
         """Test find_symbol with deep dot notation (unsupported)."""
         # Only Class.method (2 parts) is supported
-        assert editor.find_symbol(py_file, "A.B.C") is None
+        assert editor.find_symbol(py_file, 'A.B.C') is None
 
     def test_edit_function_parse_failure(self, editor, py_file):
         """Test edit_function when parsing fails."""
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(editor, "parse_file", lambda *args, **kwargs: None)
-            result = editor.edit_function(py_file, "func", "body")
+            mp.setattr(editor, 'parse_file', lambda *args, **kwargs: None)
+            result = editor.edit_function(py_file, 'func', 'body')
             assert result.success is False
 
     def test_rename_symbol_parse_failure(self, editor, py_file):
         """Test rename_symbol when parsing fails."""
         with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(editor, "parse_file", lambda *args, **kwargs: None)
-            result = editor.rename_symbol(py_file, "old", "new")
+            mp.setattr(editor, 'parse_file', lambda *args, **kwargs: None)
+            result = editor.rename_symbol(py_file, 'old', 'new')
             assert result.success is False
 
     def test_find_function_node_default_types(self, editor, py_file):
@@ -661,6 +666,6 @@ class TestCoverageGaps:
         assert result is not None
         tree, file_bytes, _ = result
         # "unknown" language uses default ["function_definition", "function_declaration"]
-        node = editor._find_function_node(tree, file_bytes, "greet", "unknown")
+        node = editor._find_function_node(tree, file_bytes, 'greet', 'unknown')
         assert node is not None
-        assert node.type == "function_definition"
+        assert node.type == 'function_definition'

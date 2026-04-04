@@ -6,11 +6,10 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 
-
-from backend.orchestration.tool_telemetry import ToolTelemetry
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
+from backend.orchestration.tool_telemetry import ToolTelemetry
 
 
 # ---------------------------------------------------------------------------
@@ -44,20 +43,20 @@ class TestToolTelemetrySingleton:
 class TestToolTelemetryInit:
     def test_init_sets_recent_events(self):
         tt = ToolTelemetry()
-        assert hasattr(tt, "_recent_events")
+        assert hasattr(tt, '_recent_events')
         assert isinstance(tt._recent_events, list)
 
     def test_init_sets_lock(self):
         tt = ToolTelemetry()
-        assert hasattr(tt, "_recent_lock")
+        assert hasattr(tt, '_recent_lock')
         # Lock is an instance check would fail since threading.Lock is a factory
         assert tt._recent_lock is not None
 
     def test_prometheus_metrics_available(self):
         tt = ToolTelemetry()
         # May be None if prometheus_client not installed, but should have attributes
-        assert hasattr(tt, "_invocations")
-        assert hasattr(tt, "_latency")
+        assert hasattr(tt, '_invocations')
+        assert hasattr(tt, '_latency')
 
     def test_setup_prometheus_uses_app_metric_names(self):
         counter = MagicMock()
@@ -71,26 +70,25 @@ class TestToolTelemetryInit:
         ToolTelemetry._shared_latency = None
         try:
             with patch(
-                "backend.orchestration.tool_telemetry.importlib.import_module",
+                'backend.orchestration.tool_telemetry.importlib.import_module',
                 return_value=fake_prometheus,
             ):
                 ToolTelemetry()
 
             counter.assert_called_once_with(
-                "app_tool_invocations_total",
-                "Number of tool invocations processed by the agent controller",
-                labelnames=("tool", "outcome"),
+                'app_tool_invocations_total',
+                'Number of tool invocations processed by the agent controller',
+                labelnames=('tool', 'outcome'),
             )
             histogram.assert_called_once_with(
-                "app_tool_latency_seconds",
-                "Duration of tool invocations executed by the agent controller",
-                labelnames=("tool", "outcome"),
-                buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, float("inf")),
+                'app_tool_latency_seconds',
+                'Duration of tool invocations executed by the agent controller',
+                labelnames=('tool', 'outcome'),
+                buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, float('inf')),
             )
         finally:
             ToolTelemetry._shared_invocations = None
             ToolTelemetry._shared_latency = None
-
 
 
 # ---------------------------------------------------------------------------
@@ -101,36 +99,36 @@ class TestOnPlan:
         tt = ToolTelemetry()
         ctx = MagicMock()
         ctx.metadata = {}
-        ctx.action = CmdRunAction(command="ls")
+        ctx.action = CmdRunAction(command='ls')
 
         tt.on_plan(ctx)
 
-        assert "telemetry" in ctx.metadata
-        assert "start_time" in ctx.metadata["telemetry"]
-        assert isinstance(ctx.metadata["telemetry"]["start_time"], float)
+        assert 'telemetry' in ctx.metadata
+        assert 'start_time' in ctx.metadata['telemetry']
+        assert isinstance(ctx.metadata['telemetry']['start_time'], float)
 
     def test_sets_tool_name(self):
         tt = ToolTelemetry()
         ctx = MagicMock()
         ctx.metadata = {}
-        ctx.action = CmdRunAction(command="ls")
-        ctx.action.action = "run_command"
+        ctx.action = CmdRunAction(command='ls')
+        ctx.action.action = 'run_command'
 
         tt.on_plan(ctx)
 
-        assert "tool_name" in ctx.metadata["telemetry"]
-        assert ctx.metadata["telemetry"]["tool_name"] == "run_command"
+        assert 'tool_name' in ctx.metadata['telemetry']
+        assert ctx.metadata['telemetry']['tool_name'] == 'run_command'
 
     def test_converts_action_to_schema(self):
         tt = ToolTelemetry()
         ctx = MagicMock()
         ctx.metadata = {}
-        ctx.action = CmdRunAction(command="ls")
+        ctx.action = CmdRunAction(command='ls')
 
-        with patch.object(tt, "_action_to_schema", return_value=None):
+        with patch.object(tt, '_action_to_schema', return_value=None):
             tt.on_plan(ctx)
             # Should not crash even if conversion fails
-            assert "telemetry" in ctx.metadata
+            assert 'telemetry' in ctx.metadata
 
 
 # ---------------------------------------------------------------------------
@@ -144,9 +142,9 @@ class TestOnExecute:
 
         tt.on_execute(ctx)
 
-        assert "telemetry" in ctx.metadata
-        assert "execute_time" in ctx.metadata["telemetry"]
-        assert isinstance(ctx.metadata["telemetry"]["execute_time"], float)
+        assert 'telemetry' in ctx.metadata
+        assert 'execute_time' in ctx.metadata['telemetry']
+        assert isinstance(ctx.metadata['telemetry']['execute_time'], float)
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +156,7 @@ class TestOnObserve:
         ctx = MagicMock()
         ctx.metadata = {}
         obs = CmdOutputObservation(
-            command="ls", command_id=1, exit_code=0, content="output"
+            command='ls', command_id=1, exit_code=0, content='output'
         )
 
         # Should not crash
@@ -168,20 +166,20 @@ class TestOnObserve:
         tt = ToolTelemetry()
         ctx = MagicMock()
         ctx.metadata = {
-            "telemetry": {
-                "start_time": time.monotonic() - 1.0,
-                "tool_name": "test_tool",
+            'telemetry': {
+                'start_time': time.monotonic() - 1.0,
+                'tool_name': 'test_tool',
             }
         }
         ctx.action = MagicMock()
-        ctx.action.action = "test_action"
+        ctx.action.action = 'test_action'
         obs = CmdOutputObservation(
-            command="ls", command_id=1, exit_code=0, content="output"
+            command='ls', command_id=1, exit_code=0, content='output'
         )
 
-        with patch.object(tt, "_determine_outcome", return_value="success"):
-            with patch.object(tt, "_elapsed_since", return_value=1.5):
-                with patch.object(tt, "_record"):
+        with patch.object(tt, '_determine_outcome', return_value='success'):
+            with patch.object(tt, '_elapsed_since', return_value=1.5):
+                with patch.object(tt, '_record'):
                     tt.on_observe(ctx, obs)
                     # Should call _record
                     assert True  # If no crash, test passes
@@ -193,23 +191,23 @@ class TestOnObserve:
 class TestDetermineOutcome:
     def test_error_observation_returns_failure(self):
         tt = ToolTelemetry()
-        obs = ErrorObservation(content="Error occurred")
+        obs = ErrorObservation(content='Error occurred')
         result = tt._determine_outcome(obs)
-        assert result == "failure"
+        assert result == 'failure'
 
     def test_success_observation_returns_success(self):
         tt = ToolTelemetry()
         obs = CmdOutputObservation(
-            command="ls", command_id=1, exit_code=0, content="output"
+            command='ls', command_id=1, exit_code=0, content='output'
         )
         result = tt._determine_outcome(obs)
-        assert result == "success"
+        assert result == 'success'
 
 
 class TestElapsedSince:
     def test_calculates_duration(self):
         tt = ToolTelemetry()
-        telemetry = {"start_time": time.monotonic() - 2.0}
+        telemetry = {'start_time': time.monotonic() - 2.0}
         duration = tt._elapsed_since(telemetry)
         assert duration >= 2.0
 
@@ -227,9 +225,9 @@ class TestRecord:
         tt._invocations = mock_counter
         tt._latency = MagicMock()
 
-        tt._record("test_tool", "success", 1.5)
+        tt._record('test_tool', 'success', 1.5)
 
-        mock_counter.labels.assert_called_with(tool="test_tool", outcome="success")
+        mock_counter.labels.assert_called_with(tool='test_tool', outcome='success')
 
     def test_records_without_prometheus(self):
         tt = ToolTelemetry()
@@ -237,20 +235,20 @@ class TestRecord:
         tt._latency = None
 
         # Should not crash
-        tt._record("test_tool", "success", 1.5)
+        tt._record('test_tool', 'success', 1.5)
 
     def test_appends_to_recent_events(self):
         tt = ToolTelemetry()
-        tt._record("test_tool", "success", 1.0)
+        tt._record('test_tool', 'success', 1.0)
 
         assert len(tt._recent_events) == 1
-        assert tt._recent_events[0]["tool"] == "test_tool"
+        assert tt._recent_events[0]['tool'] == 'test_tool'
 
     def test_limits_buffer_to_200(self):
         tt = ToolTelemetry()
 
         for i in range(250):
-            tt._record(f"test{i}", "success", 1.0)
+            tt._record(f'test{i}', 'success', 1.0)
 
         # Should only keep the most recent 200
         assert len(tt._recent_events) == 200
@@ -259,7 +257,7 @@ class TestRecord:
 class TestRecentEvents:
     def test_returns_copy_of_events(self):
         tt = ToolTelemetry()
-        tt._record("test", "success", 1.0)
+        tt._record('test', 'success', 1.0)
 
         events = tt.recent_events()
         assert isinstance(events, list)

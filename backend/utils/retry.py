@@ -21,7 +21,7 @@ from backend.core.logger import app_logger as logger
 from backend.core.schemas import RetryConfig, RetryStrategy
 from backend.utils.metrics_labels import sanitize_operation_label
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 
 class RetryError(Exception):
@@ -35,7 +35,7 @@ class RetryExhaustedError(RetryError):
         self.attempts = attempts
         self.last_exception = last_exception
         super().__init__(
-            f"Retry exhausted after {attempts} attempts. Last error: {last_exception}"
+            f'Retry exhausted after {attempts} attempts. Last error: {last_exception}'
         )
 
 
@@ -52,10 +52,10 @@ def _record_attempt_metrics(op_name: str, attempt: int, max_attempts: int) -> No
     with contextlib.suppress(Exception):
         _record_metrics_event(
             {
-                "status": "attempt",
-                "operation": op_name,
-                "attempt_index": attempt,
-                "max_attempts": max_attempts,
+                'status': 'attempt',
+                'operation': op_name,
+                'attempt_index': attempt,
+                'max_attempts': max_attempts,
             },
         )
 
@@ -65,10 +65,10 @@ def _record_success_metrics(op_name: str, attempt: int, max_attempts: int) -> No
     with contextlib.suppress(Exception):
         _record_metrics_event(
             {
-                "status": "retry_success",
-                "operation": op_name,
-                "attempts": attempt,
-                "max_attempts": max_attempts,
+                'status': 'retry_success',
+                'operation': op_name,
+                'attempts': attempt,
+                'max_attempts': max_attempts,
             },
         )
 
@@ -80,11 +80,11 @@ def _record_error_metrics(
     with contextlib.suppress(Exception):
         _record_metrics_event(
             {
-                "status": "attempt",
-                "operation": op_name,
-                "attempt_index": attempt,
-                "max_attempts": max_attempts,
-                "error": str(error)[:300],
+                'status': 'attempt',
+                'operation': op_name,
+                'attempt_index': attempt,
+                'max_attempts': max_attempts,
+                'error': str(error)[:300],
             },
         )
 
@@ -181,7 +181,7 @@ def retry[T](
                     try:
                         result = await f(*args, **kwargs)
                         if attempt > 0:
-                            logger.info("Retry succeeded on attempt %d", attempt + 1)
+                            logger.info('Retry succeeded on attempt %d', attempt + 1)
                         _record_success_metrics(
                             op_name, attempt + 1, config.max_attempts
                         )
@@ -201,7 +201,7 @@ def retry[T](
                                 config.on_retry(attempt + 1, e)
 
                         logger.warning(
-                            "Retry attempt %d/%d after %.2fs. Error: %s",
+                            'Retry attempt %d/%d after %.2fs. Error: %s',
                             attempt + 1,
                             config.max_attempts,
                             delay,
@@ -209,7 +209,7 @@ def retry[T](
                         )
                         await asyncio.sleep(delay)
                     except Exception as e:
-                        logger.error("Non-retryable exception in %s: %s", op_name, e)
+                        logger.error('Non-retryable exception in %s: %s', op_name, e)
                         raise
 
                 raise RetryExhaustedError(config.max_attempts, last_error)
@@ -224,7 +224,7 @@ def retry[T](
                 try:
                     result = f(*args, **kwargs)
                     if attempt > 0:
-                        logger.info("Retry succeeded on attempt %d", attempt + 1)
+                        logger.info('Retry succeeded on attempt %d', attempt + 1)
                     _record_success_metrics(op_name, attempt + 1, config.max_attempts)
                     return result
                 except retryable_exceptions as e:
@@ -240,7 +240,7 @@ def retry[T](
                             config.on_retry(attempt + 1, e)
 
                     logger.warning(
-                        "Retry attempt %d/%d after %.2fs. Error: %s",
+                        'Retry attempt %d/%d after %.2fs. Error: %s',
                         attempt + 1,
                         config.max_attempts,
                         delay,
@@ -248,7 +248,7 @@ def retry[T](
                     )
                     time.sleep(delay)
                 except Exception as e:
-                    logger.error("Non-retryable exception in %s: %s", op_name, e)
+                    logger.error('Non-retryable exception in %s: %s', op_name, e)
                     raise
 
             raise RetryExhaustedError(config.max_attempts, last_error)

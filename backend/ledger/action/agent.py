@@ -5,24 +5,23 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
+from backend.core.enums import RecallType
 from backend.core.schemas import ActionType, AgentState
 from backend.ledger.action.action import Action
-from backend.core.enums import RecallType
 
 
 @dataclass
 class ChangeAgentStateAction(Action):
     """Fake action, just to notify the client that a task state has changed."""
 
-    agent_state: AgentState | str = ""
-    thought: str = ""
+    agent_state: AgentState | str = ''
+    thought: str = ''
     action: ClassVar[str] = ActionType.CHANGE_AGENT_STATE
 
     @property
     def message(self) -> str:
         """Get human-readable message for state change."""
-        return f"Agent state changed to {self.agent_state}"
-
+        return f'Agent state changed to {self.agent_state}'
 
 
 @dataclass
@@ -37,19 +36,18 @@ class PlaybookFinishAction(Action):
 
     """
 
-    final_thought: str = ""
+    final_thought: str = ''
     outputs: dict[str, Any] = field(default_factory=dict)
-    thought: str = ""
+    thought: str = ''
     force_finish: bool = False
     action: ClassVar[str] = ActionType.FINISH
 
     @property
     def message(self) -> str:
         """Get completion message for user."""
-        if self.thought != "":
+        if self.thought != '':
             return self.thought
         return "All done! What's next on the agenda?"
-
 
 
 @dataclass
@@ -62,14 +60,13 @@ class AgentThinkAction(Action):
 
     """
 
-    thought: str = ""
+    thought: str = ''
     action: ClassVar[str] = ActionType.THINK
 
     @property
     def message(self) -> str:
         """Get formatted thinking message."""
-        return f"I am thinking...: {self.thought}"
-
+        return f'I am thinking...: {self.thought}'
 
 
 @dataclass
@@ -77,17 +74,16 @@ class AgentRejectAction(Action):
     """An action where the agent rejects the task."""
 
     outputs: dict[str, Any] = field(default_factory=dict)
-    thought: str = ""
+    thought: str = ''
     action: ClassVar[str] = ActionType.REJECT
 
     @property
     def message(self) -> str:
         """Get rejection message with optional reason."""
-        msg: str = "Task is rejected by the agent."
-        if "reason" in self.outputs:
-            msg += " Reason: " + self.outputs["reason"]
+        msg: str = 'Task is rejected by the agent.'
+        if 'reason' in self.outputs:
+            msg += ' Reason: ' + self.outputs['reason']
         return msg
-
 
 
 @dataclass
@@ -95,21 +91,20 @@ class RecallAction(Action):
     """This action is used for retrieving content, e.g., from the global directory or user workspace."""
 
     recall_type: RecallType = RecallType.WORKSPACE_CONTEXT
-    query: str = ""
-    thought: str = ""
+    query: str = ''
+    thought: str = ''
     action: ClassVar[str] = ActionType.RECALL
 
     @property
     def message(self) -> str:
         """Get recall query message."""
-        return f"Retrieving content for: {self.query[:50]}"
+        return f'Retrieving content for: {self.query[:50]}'
 
     def __str__(self) -> str:
         """Return a concise representation showing the recall query."""
-        ret = "**RecallAction**\n"
-        ret += f"QUERY: {self.query[:50]}"
+        ret = '**RecallAction**\n'
+        ret += f'QUERY: {self.query[:50]}'
         return ret
-
 
 
 @dataclass
@@ -129,15 +124,15 @@ class CondensationAction(Action):
 
     action: ClassVar[str] = ActionType.CONDENSATION
     pruned_event_ids: list[int] | None = None
-    "The IDs of the events that are being pruned (removed from the `View` given to the LLM)."
+    'The IDs of the events that are being pruned (removed from the `View` given to the LLM).'
     pruned_events_start_id: int | None = None
-    "The ID of the first event to be pruned in a range of events."
+    'The ID of the first event to be pruned in a range of events.'
     pruned_events_end_id: int | None = None
-    "The ID of the last event to be pruned in a range of events."
+    'The ID of the last event to be pruned in a range of events.'
     summary: str | None = None
-    "An optional summary of the events being pruned."
+    'An optional summary of the events being pruned.'
     summary_offset: int | None = None
-    "An optional offset to the start of the resulting view indicating where the summary should be inserted."
+    'An optional offset to the start of the resulting view indicating where the summary should be inserted.'
 
     def _validate_field_polymorphism(self) -> bool:
         """Check if the optional fields are instantiated in a valid configuration."""
@@ -155,29 +150,27 @@ class CondensationAction(Action):
     def __post_init__(self):
         """Validate that the provided fields describe exactly one pruning strategy."""
         if not self._validate_field_polymorphism():
-            msg = "Invalid configuration of the optional fields."
+            msg = 'Invalid configuration of the optional fields.'
             raise ValueError(msg)
 
     @property
     def pruned(self) -> list[int]:
         """The list of event IDs that should be pruned."""
         if not self._validate_field_polymorphism():
-            msg = "Invalid configuration of the optional fields."
+            msg = 'Invalid configuration of the optional fields.'
             raise ValueError(msg)
         if self.pruned_event_ids is not None:
             return self.pruned_event_ids
         assert self.pruned_events_start_id is not None
         assert self.pruned_events_end_id is not None
-        return list(
-            range(self.pruned_events_start_id, self.pruned_events_end_id + 1)
-        )
+        return list(range(self.pruned_events_start_id, self.pruned_events_end_id + 1))
 
     @property
     def message(self) -> str:
         """Get condensation summary or event list message."""
         if self.summary:
-            return f"Summary: {self.summary}"
-        return f"Compactor is dropping the events: {self.pruned}."
+            return f'Summary: {self.summary}'
+        return f'Compactor is dropping the events: {self.pruned}.'
 
 
 @dataclass
@@ -194,7 +187,7 @@ class CondensationRequestAction(Action):
     @property
     def message(self) -> str:
         """Get condensation request message."""
-        return "Requesting a condensation of the conversation history."
+        return 'Requesting a condensation of the conversation history.'
 
 
 @dataclass
@@ -208,9 +201,9 @@ class TaskTrackingAction(Action):
 
     """
 
-    command: str = "view"
+    command: str = 'view'
     task_list: list[dict[str, Any]] = field(default_factory=list)
-    thought: str = ""
+    thought: str = ''
     action: ClassVar[str] = ActionType.TASK_TRACKING
 
     @property
@@ -218,10 +211,10 @@ class TaskTrackingAction(Action):
         """Get task tracking message with count."""
         num_tasks = len(self.task_list)
         if num_tasks == 0:
-            return "Clearing the task list."
+            return 'Clearing the task list.'
         if num_tasks == 1:
-            return "Managing 1 task item."
-        return f"Managing {num_tasks} task items."
+            return 'Managing 1 task item.'
+        return f'Managing {num_tasks} task items.'
 
 
 # ============================================================================
@@ -247,22 +240,21 @@ class UncertaintyAction(Action):
 
     uncertainty_level: float = 0.5
     specific_concerns: list[str] = field(default_factory=list)
-    requested_information: str = ""
-    thought: str = ""
+    requested_information: str = ''
+    thought: str = ''
     action: ClassVar[str] = ActionType.UNCERTAINTY
 
     @property
     def message(self) -> str:
         """Get uncertainty expression message."""
         if self.thought:
-            return f"Expressing uncertainty: {self.thought}"
+            return f'Expressing uncertainty: {self.thought}'
         concerns = (
-            ", ".join(self.specific_concerns)
+            ', '.join(self.specific_concerns)
             if self.specific_concerns
-            else "general uncertainty"
+            else 'general uncertainty'
         )
-        return f"Uncertainty ({self.uncertainty_level:.0%} confidence): {concerns}"
-
+        return f'Uncertainty ({self.uncertainty_level:.0%} confidence): {concerns}'
 
 
 @dataclass
@@ -283,17 +275,16 @@ class ProposalAction(Action):
 
     options: list[dict[str, Any]] = field(default_factory=list)
     recommended: int = 0
-    rationale: str = ""
-    thought: str = ""
+    rationale: str = ''
+    thought: str = ''
     action: ClassVar[str] = ActionType.PROPOSAL
 
     @property
     def message(self) -> str:
         """Get proposal message."""
         if self.rationale:
-            return f"Proposing options: {self.rationale}"
-        return f"Proposing {len(self.options)} options for consideration"
-
+            return f'Proposing options: {self.rationale}'
+        return f'Proposing {len(self.options)} options for consideration'
 
 
 @dataclass
@@ -312,17 +303,16 @@ class ClarificationRequestAction(Action):
 
     """
 
-    question: str = ""
+    question: str = ''
     options: list[str] = field(default_factory=list)
-    context: str = ""
-    thought: str = ""
+    context: str = ''
+    thought: str = ''
     action: ClassVar[str] = ActionType.CLARIFICATION
 
     @property
     def message(self) -> str:
         """Get clarification request message."""
-        return f"Requesting clarification: {self.question}"
-
+        return f'Requesting clarification: {self.question}'
 
 
 @dataclass
@@ -341,17 +331,16 @@ class EscalateToHumanAction(Action):
 
     """
 
-    reason: str = ""
+    reason: str = ''
     attempts_made: list[str] = field(default_factory=list)
-    specific_help_needed: str = ""
-    thought: str = ""
+    specific_help_needed: str = ''
+    thought: str = ''
     action: ClassVar[str] = ActionType.ESCALATE
 
     @property
     def message(self) -> str:
         """Get escalation message."""
-        return f"Requesting human assistance: {self.reason}"
-
+        return f'Requesting human assistance: {self.reason}'
 
 
 @dataclass
@@ -366,7 +355,7 @@ class DelegateTaskAction(Action):
             When present, task_description/files on the parent action are ignored.
     """
 
-    task_description: str = ""
+    task_description: str = ''
     files: list[str] = field(default_factory=list)
     parallel_tasks: list[dict] = field(default_factory=list)
     run_in_background: bool = False
@@ -375,8 +364,7 @@ class DelegateTaskAction(Action):
     @property
     def message(self) -> str:
         """Get delegation message."""
-        return f"Delegating task: {self.task_description[:50]}..."
-
+        return f'Delegating task: {self.task_description[:50]}...'
 
 
 @dataclass
@@ -387,31 +375,18 @@ class BlackboardAction(Action):
     is a sub-agent; the blackboard is shared across parallel workers.
     """
 
-    command: str = "get"  # get | set | keys
-    key: str = ""
-    value: str = ""
+    command: str = 'get'  # get | set | keys
+    key: str = ''
+    value: str = ''
     action: ClassVar[str] = ActionType.BLACKBOARD
     runnable: ClassVar[bool] = True
 
     @property
     def message(self) -> str:
         """Get human-readable message."""
-        if self.command == "set":
-            return f"Blackboard set {self.key}"
-        if self.command == "keys":
-            return "Blackboard keys"
-        return f"Blackboard get {self.key or 'all'}"
-
-
-
-@dataclass
-class SearchAvailableToolsAction(Action):
-    """An action where the agent queries the full registry of tools based on semantic tags or keywords."""
-    capability_query: str = ""
-    action: ClassVar[str] = ActionType.SEARCH_AVAILABLE_TOOLS
-    runnable: ClassVar[bool] = False
-
-    @property
-    def message(self) -> str:
-        return f"Querying toolbox for: {self.capability_query}"
+        if self.command == 'set':
+            return f'Blackboard set {self.key}'
+        if self.command == 'keys':
+            return 'Blackboard keys'
+        return f'Blackboard get {self.key or "all"}'
 

@@ -4,22 +4,20 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-
-from backend.ledger.action.agent import CondensationAction, RecallAction
-from backend.ledger.action.message import MessageAction, SystemMessageAction
-from backend.ledger.event import EventSource
-from backend.ledger.observation.empty import NullObservation
 from backend.context.compactor.compactor import Compaction
 from backend.context.compactor.strategies.conversation_window_compactor import (
     ConversationWindowCompactor,
 )
-
+from backend.ledger.action.agent import CondensationAction, RecallAction
+from backend.ledger.action.message import MessageAction, SystemMessageAction
+from backend.ledger.event import EventSource
+from backend.ledger.observation.empty import NullObservation
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
 
 def _msg(
-    eid: int, source: EventSource = EventSource.USER, content: str = "hi"
+    eid: int, source: EventSource = EventSource.USER, content: str = 'hi'
 ) -> MessageAction:
     m = MessageAction(content=content, wait_for_response=False)
     m.id = eid
@@ -28,19 +26,19 @@ def _msg(
 
 
 def _sys_msg(eid: int) -> SystemMessageAction:
-    s = SystemMessageAction(content="system prompt")
+    s = SystemMessageAction(content='system prompt')
     s.id = eid
     return s
 
 
-def _recall(eid: int, query: str = "hi") -> RecallAction:
+def _recall(eid: int, query: str = 'hi') -> RecallAction:
     r = RecallAction(query=query)
     r.id = eid
     return r
 
 
 def _obs(eid: int, cause: int | None = None) -> NullObservation:
-    o = NullObservation(content="obs")
+    o = NullObservation(content='obs')
     o.id = eid
     if cause is not None:
         o._cause = cause  # type: ignore[attr-defined]
@@ -62,7 +60,7 @@ class TestFindEssentialEvents:
         cond = ConversationWindowCompactor()
         sys = _sys_msg(0)
         user = _msg(1, EventSource.USER)
-        agent = _msg(2, EventSource.AGENT, content="reply")
+        agent = _msg(2, EventSource.AGENT, content='reply')
         events = [sys, user, agent]
 
         sm, fm, ra, ro = cond._find_essential_events(events)
@@ -205,9 +203,9 @@ class TestGetCompaction:
 
     def test_condenses_large_history(self):
         cond = ConversationWindowCompactor()
-        events = [_sys_msg(0), _msg(1, EventSource.USER, "task")]
+        events = [_sys_msg(0), _msg(1, EventSource.USER, 'task')]
         for i in range(2, 20):
-            events.append(_msg(i, EventSource.AGENT, f"step {i}"))
+            events.append(_msg(i, EventSource.AGENT, f'step {i}'))
         view = _view(events)
         result = cond.get_compaction(view)
         assert isinstance(result, Compaction)
@@ -219,10 +217,10 @@ class TestGetCompaction:
 
     def test_preserves_essential_first_events(self):
         cond = ConversationWindowCompactor()
-        events = [_sys_msg(0), _msg(1, EventSource.USER, "hello")]
+        events = [_sys_msg(0), _msg(1, EventSource.USER, 'hello')]
         for i in range(2, 30):
             src = EventSource.AGENT if i % 2 == 0 else EventSource.USER
-            events.append(_msg(i, src, f"msg-{i}"))
+            events.append(_msg(i, src, f'msg-{i}'))
         view = _view(events)
         result = cond.get_compaction(view)
         pruned = set(result.action.pruned_event_ids or [])
@@ -253,24 +251,24 @@ class TestShouldCondense:
 class TestFindRecallAndObservation:
     def test_finds_matching_recall(self):
         cond = ConversationWindowCompactor()
-        recall = _recall(5, query="find bug")
+        recall = _recall(5, query='find bug')
         obs = _obs(6, cause=5)
         events = [_msg(0, EventSource.USER), recall, obs]
-        ra, ro = cond._find_recall_and_observation(events, "find bug", 1)
+        ra, ro = cond._find_recall_and_observation(events, 'find bug', 1)
         assert ra is recall
         assert ro is obs
 
     def test_no_matching_recall(self):
         cond = ConversationWindowCompactor()
         events = [_msg(0, EventSource.USER)]
-        ra, ro = cond._find_recall_and_observation(events, "nonexistent", 0)
+        ra, ro = cond._find_recall_and_observation(events, 'nonexistent', 0)
         assert ra is None
         assert ro is None
 
     def test_recall_without_observation(self):
         cond = ConversationWindowCompactor()
-        recall = _recall(5, query="search")
+        recall = _recall(5, query='search')
         events = [_msg(0, EventSource.USER), recall]
-        ra, ro = cond._find_recall_and_observation(events, "search", 1)
+        ra, ro = cond._find_recall_and_observation(events, 'search', 1)
         assert ra is recall
         assert ro is None

@@ -3,8 +3,8 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.orchestration.services.confirmation_service import ConfirmationService
 from backend.ledger.action import ActionConfirmationStatus
+from backend.orchestration.services.confirmation_service import ConfirmationService
 
 
 class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
@@ -44,10 +44,9 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
 
     def test_get_next_action_from_replay(self):
         """Test get_next_action returns action from replay manager."""
-
         self.mock_controller._replay_manager.should_replay.return_value = True
         mock_action = MagicMock()
-        mock_action.id = "action-123"
+        mock_action.id = 'action-123'
         self.mock_controller._replay_manager.step.return_value = mock_action
         self.mock_controller._replay_manager.replay_index = 5
 
@@ -83,7 +82,7 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
             False,
         ]
         mock_replay_action = MagicMock()
-        mock_replay_action.id = "replay-1"
+        mock_replay_action.id = 'replay-1'
         mock_live_action = MagicMock()
 
         self.mock_controller._replay_manager.step.return_value = mock_replay_action
@@ -117,13 +116,13 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller._replay_manager.replay_mode = True
         self.mock_controller._replay_manager.replay_index = 5
         self.mock_controller._replay_manager.replay_events = [
-            "e1",
-            "e2",
-            "e3",
-            "e4",
-            "e5",
-            "e6",
-            "e7",
+            'e1',
+            'e2',
+            'e3',
+            'e4',
+            'e5',
+            'e6',
+            'e7',
         ]
 
         progress = self.service.replay_progress
@@ -158,8 +157,8 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             counts,
             {
-                "replay_actions": 5,
-                "live_actions": 3,
+                'replay_actions': 5,
+                'live_actions': 3,
             },
         )
 
@@ -266,7 +265,7 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
         mock_ctx = MagicMock()
 
         with patch(
-            "backend.orchestration.services.observation_service.transition_agent_state_logic",
+            'backend.orchestration.services.observation_service.transition_agent_state_logic',
             new_callable=AsyncMock,
         ) as mock_transition:
             await self.service.handle_observation_for_pending_action(
@@ -284,7 +283,7 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
         mock_observation = MagicMock()
 
         with patch(
-            "backend.orchestration.services.observation_service.transition_agent_state_logic",
+            'backend.orchestration.services.observation_service.transition_agent_state_logic',
             new_callable=AsyncMock,
         ) as mock_transition:
             await self.service.handle_observation_for_pending_action(
@@ -301,16 +300,16 @@ class TestConfirmationService(unittest.IsolatedAsyncioTestCase):
         """Test get_next_action logs action type in extra metadata."""
         self.mock_controller._replay_manager.should_replay.return_value = False
         mock_action = MagicMock()
-        mock_action.__class__.__name__ = "TestAction"
+        mock_action.__class__.__name__ = 'TestAction'
         self.mock_controller.agent.step.return_value = mock_action
 
         self.service.get_next_action()
 
         # Check log was called with action_type in extra
         call_kwargs = self.mock_controller.log.call_args[1]
-        self.assertEqual(call_kwargs["extra"]["action_type"], "TestAction")
-        self.assertEqual(call_kwargs["extra"]["msg_type"], "LIVE_ACTION")
+        self.assertEqual(call_kwargs['extra']['action_type'], 'TestAction')
+        self.assertEqual(call_kwargs['extra']['msg_type'], 'LIVE_ACTION')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

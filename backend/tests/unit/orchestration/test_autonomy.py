@@ -10,14 +10,13 @@ Tests cover:
 
 from unittest.mock import MagicMock
 
-
-from backend.orchestration.autonomy import AutonomyController, AutonomyLevel
 from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
     FileReadAction,
     FileWriteAction,
 )
+from backend.orchestration.autonomy import AutonomyController, AutonomyLevel
 
 
 class TestAutonomyLevel:
@@ -25,9 +24,9 @@ class TestAutonomyLevel:
 
     def test_autonomy_level_values(self):
         """AutonomyLevel should have three levels."""
-        assert AutonomyLevel.SUPERVISED.value == "supervised"
-        assert AutonomyLevel.BALANCED.value == "balanced"
-        assert AutonomyLevel.FULL.value == "full"
+        assert AutonomyLevel.SUPERVISED.value == 'supervised'
+        assert AutonomyLevel.BALANCED.value == 'balanced'
+        assert AutonomyLevel.FULL.value == 'full'
 
     def test_autonomy_level_is_string_enum(self):
         """AutonomyLevel should be a string enum."""
@@ -42,7 +41,7 @@ class TestAutonomyControllerInit:
     def test_init_with_defaults(self):
         """Should initialize with default BALANCED level."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         config.auto_retry_on_error = False
         config.max_autonomous_iterations = 0
         config.stuck_detection_enabled = False
@@ -50,7 +49,7 @@ class TestAutonomyControllerInit:
 
         controller = AutonomyController(config)
 
-        assert controller.autonomy_level == "balanced"
+        assert controller.autonomy_level == 'balanced'
         assert controller.auto_retry is False
         assert controller.max_iterations == 0
         assert controller.stuck_detection is False
@@ -59,7 +58,7 @@ class TestAutonomyControllerInit:
     def test_init_with_full_autonomy(self):
         """Should initialize with FULL autonomy level."""
         config = MagicMock()
-        config.autonomy_level = "full"
+        config.autonomy_level = 'full'
         config.auto_retry_on_error = True
         config.max_autonomous_iterations = 10
         config.stuck_detection_enabled = True
@@ -67,7 +66,7 @@ class TestAutonomyControllerInit:
 
         controller = AutonomyController(config)
 
-        assert controller.autonomy_level == "full"
+        assert controller.autonomy_level == 'full'
         assert controller.auto_retry is True
         assert controller.max_iterations == 10
         assert controller.stuck_detection is True
@@ -76,7 +75,7 @@ class TestAutonomyControllerInit:
     def test_init_with_supervised_mode(self):
         """Should initialize with SUPERVISED level."""
         config = MagicMock()
-        config.autonomy_level = "supervised"
+        config.autonomy_level = 'supervised'
         config.auto_retry_on_error = False
         config.max_autonomous_iterations = 1
         config.stuck_detection_enabled = False
@@ -84,7 +83,7 @@ class TestAutonomyControllerInit:
 
         controller = AutonomyController(config)
 
-        assert controller.autonomy_level == "supervised"
+        assert controller.autonomy_level == 'supervised'
         assert controller.max_iterations == 1
 
     def test_init_uses_getattr_with_defaults(self):
@@ -94,7 +93,7 @@ class TestAutonomyControllerInit:
         controller = AutonomyController(config)
 
         # Should fall back to balanced and default values
-        assert controller.autonomy_level == "balanced"
+        assert controller.autonomy_level == 'balanced'
         assert controller.auto_retry is False
 
 
@@ -104,43 +103,43 @@ class TestShouldRequestConfirmation:
     def test_full_autonomy_never_asks(self):
         """FULL autonomy should never request confirmation."""
         config = MagicMock()
-        config.autonomy_level = "full"
+        config.autonomy_level = 'full'
         controller = AutonomyController(config)
 
         # High-risk action
-        action = CmdRunAction(command="rm -rf /tmp/test")
+        action = CmdRunAction(command='rm -rf /tmp/test')
         assert controller.should_request_confirmation(action) is False
 
         # Safe action
-        safe_action = FileReadAction(path="/tmp/file.txt")
+        safe_action = FileReadAction(path='/tmp/file.txt')
         assert controller.should_request_confirmation(safe_action) is False
 
     def test_supervised_always_asks(self):
         """SUPERVISED mode should always request confirmation."""
         config = MagicMock()
-        config.autonomy_level = "supervised"
+        config.autonomy_level = 'supervised'
         controller = AutonomyController(config)
 
         # High-risk action
-        action = CmdRunAction(command="rm -rf /tmp/test")
+        action = CmdRunAction(command='rm -rf /tmp/test')
         assert controller.should_request_confirmation(action) is True
 
         # Safe action
-        safe_action = FileReadAction(path="/tmp/file.txt")
+        safe_action = FileReadAction(path='/tmp/file.txt')
         assert controller.should_request_confirmation(safe_action) is True
 
     def test_balanced_asks_for_high_risk_only(self):
         """BALANCED mode should ask only for high-risk actions."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
         # High-risk action
-        risky_action = CmdRunAction(command="rm -rf /tmp/test")
+        risky_action = CmdRunAction(command='rm -rf /tmp/test')
         assert controller.should_request_confirmation(risky_action) is True
 
         # Safe action
-        safe_action = FileReadAction(path="/tmp/file.txt")
+        safe_action = FileReadAction(path='/tmp/file.txt')
         assert controller.should_request_confirmation(safe_action) is False
 
 
@@ -150,113 +149,113 @@ class TestHighRiskDetection:
     def test_detects_rm_rf_command(self):
         """Should detect 'rm -rf' as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command="rm -rf /tmp/dangerous")
+        action = CmdRunAction(command='rm -rf /tmp/dangerous')
         assert controller._is_high_risk_action(action) is True
 
     def test_detects_dd_command(self):
         """Should detect 'dd if=' as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command="dd if=/dev/zero of=/dev/sda")
+        action = CmdRunAction(command='dd if=/dev/zero of=/dev/sda')
         assert controller._is_high_risk_action(action) is True
 
     def test_detects_mkfs_command(self):
         """Should detect 'mkfs' as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command="mkfs.ext4 /dev/sdb1")
+        action = CmdRunAction(command='mkfs.ext4 /dev/sdb1')
         assert controller._is_high_risk_action(action) is True
 
     def test_detects_fork_bomb(self):
         """Should detect fork bomb pattern as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command=":(){:|:&};:")
+        action = CmdRunAction(command=':(){:|:&};:')
         assert controller._is_high_risk_action(action) is True
 
     def test_detects_dev_redirect(self):
         """Should detect redirect to /dev/ as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command="echo test > /dev/sda")
+        action = CmdRunAction(command='echo test > /dev/sda')
         assert controller._is_high_risk_action(action) is True
 
     def test_detects_dangerous_chmod(self):
         """Should detect 'chmod -r 777' as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command="chmod -r 777 /")
+        action = CmdRunAction(command='chmod -r 777 /')
         assert controller._is_high_risk_action(action) is True
 
     def test_detects_chown_recursive(self):
         """Should detect 'chown -r' as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command="chown -r nobody:nobody /etc")
+        action = CmdRunAction(command='chown -r nobody:nobody /etc')
         assert controller._is_high_risk_action(action) is True
 
     def test_detects_reboot_command(self):
         """Should detect 'reboot' as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command="reboot now")
+        action = CmdRunAction(command='reboot now')
         assert controller._is_high_risk_action(action) is True
 
     def test_detects_shutdown_command(self):
         """Should detect 'shutdown' as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command="shutdown -h now")
+        action = CmdRunAction(command='shutdown -h now')
         assert controller._is_high_risk_action(action) is True
 
     def test_detects_systemctl_command(self):
         """Should detect 'systemctl' as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command="systemctl stop nginx")
+        action = CmdRunAction(command='systemctl stop nginx')
         assert controller._is_high_risk_action(action) is True
 
     def test_case_insensitive_detection(self):
         """Risk detection should be case-insensitive."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = CmdRunAction(command="RM -RF /tmp/test")
+        action = CmdRunAction(command='RM -RF /tmp/test')
         assert controller._is_high_risk_action(action) is True
 
     def test_safe_command_not_high_risk(self):
         """Safe commands should not be flagged as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
         safe_commands = [
-            CmdRunAction(command="ls -la"),
-            CmdRunAction(command="cat file.txt"),
-            CmdRunAction(command="echo hello"),
-            CmdRunAction(command="python script.py"),
+            CmdRunAction(command='ls -la'),
+            CmdRunAction(command='cat file.txt'),
+            CmdRunAction(command='echo hello'),
+            CmdRunAction(command='python script.py'),
         ]
 
         for action in safe_commands:
@@ -265,28 +264,28 @@ class TestHighRiskDetection:
     def test_file_write_not_high_risk(self):
         """FileWriteAction should not be flagged as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = FileWriteAction(path="/tmp/test.txt", content="test")
+        action = FileWriteAction(path='/tmp/test.txt', content='test')
         assert controller._is_high_risk_action(action) is False
 
     def test_file_edit_not_high_risk(self):
         """FileEditAction should not be flagged as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = FileEditAction(path="/tmp/test.txt", old_str="old", new_str="new")
+        action = FileEditAction(path='/tmp/test.txt', old_str='old', new_str='new')
         assert controller._is_high_risk_action(action) is False
 
     def test_file_read_not_high_risk(self):
         """FileReadAction should not be flagged as high-risk."""
         config = MagicMock()
-        config.autonomy_level = "balanced"
+        config.autonomy_level = 'balanced'
         controller = AutonomyController(config)
 
-        action = FileReadAction(path="/tmp/test.txt")
+        action = FileReadAction(path='/tmp/test.txt')
         assert controller._is_high_risk_action(action) is False
 
 
@@ -345,10 +344,10 @@ class TestShouldRetryOnError:
         controller = AutonomyController(config)
 
         errors = [
-            ValueError("Invalid value"),
-            RuntimeError("Runtime error"),
-            KeyError("Missing key"),
-            AttributeError("No attribute"),
+            ValueError('Invalid value'),
+            RuntimeError('Runtime error'),
+            KeyError('Missing key'),
+            AttributeError('No attribute'),
         ]
 
         for error in errors:

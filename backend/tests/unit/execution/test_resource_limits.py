@@ -1,4 +1,4 @@
-﻿"""Tests for backend.execution.utils.resource_limits — ResourceLimiter."""
+"""Tests for backend.execution.utils.resource_limits — ResourceLimiter."""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ from backend.execution.utils.resource_limits import (
     ResourceLimits,
     ResourceStats,
 )
-
 
 # ===================================================================
 # Dataclasses
@@ -79,7 +78,7 @@ class TestCheckLimits:
         )
         limiter = ResourceLimiter(limits=limits)
         with patch.object(
-            limiter, "get_resource_stats", return_value=self._mock_stats()
+            limiter, 'get_resource_stats', return_value=self._mock_stats()
         ):
             limiter.check_limits()  # Should not raise
 
@@ -89,9 +88,9 @@ class TestCheckLimits:
         )
         limiter = ResourceLimiter(limits=limits)
         with patch.object(
-            limiter, "get_resource_stats", return_value=self._mock_stats(memory_mb=200)
+            limiter, 'get_resource_stats', return_value=self._mock_stats(memory_mb=200)
         ):
-            with pytest.raises(ResourceLimitExceededError, match="Memory limit"):
+            with pytest.raises(ResourceLimitExceededError, match='Memory limit'):
                 limiter.check_limits()
 
     def test_disk_exceeded_raises(self):
@@ -100,9 +99,9 @@ class TestCheckLimits:
         )
         limiter = ResourceLimiter(limits=limits)
         with patch.object(
-            limiter, "get_resource_stats", return_value=self._mock_stats(disk_gb=5)
+            limiter, 'get_resource_stats', return_value=self._mock_stats(disk_gb=5)
         ):
-            with pytest.raises(ResourceLimitExceededError, match="Disk limit"):
+            with pytest.raises(ResourceLimitExceededError, match='Disk limit'):
                 limiter.check_limits()
 
     def test_file_count_exceeded_raises(self):
@@ -111,9 +110,9 @@ class TestCheckLimits:
         )
         limiter = ResourceLimiter(limits=limits)
         with patch.object(
-            limiter, "get_resource_stats", return_value=self._mock_stats(file_count=50)
+            limiter, 'get_resource_stats', return_value=self._mock_stats(file_count=50)
         ):
-            with pytest.raises(ResourceLimitExceededError, match="File count"):
+            with pytest.raises(ResourceLimitExceededError, match='File count'):
                 limiter.check_limits()
 
     def test_cpu_exceeded_only_warns(self):
@@ -126,6 +125,6 @@ class TestCheckLimits:
         )
         limiter = ResourceLimiter(limits=limits)
         with patch.object(
-            limiter, "get_resource_stats", return_value=self._mock_stats(cpu_percent=99)
+            limiter, 'get_resource_stats', return_value=self._mock_stats(cpu_percent=99)
         ):
             limiter.check_limits()  # Should not raise

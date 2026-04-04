@@ -92,7 +92,7 @@ class RollbackManager:
         self.checkpoints_dir = (
             Path(checkpoints_dir)
             if checkpoints_dir
-            else self.workspace_path / ".app" / "checkpoints"
+            else self.workspace_path / '.grinta' / 'checkpoints'
         )
         self.max_checkpoints = max_checkpoints
         self.auto_cleanup = auto_cleanup
@@ -117,7 +117,7 @@ class RollbackManager:
         """Check if git is available and workspace is a git repo."""
         try:
             result = subprocess.run(
-                ["git", "rev-parse", "--git-dir"],
+                ['git', 'rev-parse', '--git-dir'],
                 check=False,
                 cwd=self.workspace_path,
                 capture_output=True,
@@ -131,37 +131,37 @@ class RollbackManager:
     def _load_checkpoints(self) -> list[Checkpoint]:
         """Load existing checkpoints from disk."""
         checkpoints = []
-        manifest_file = self.checkpoints_dir / "manifest.json"
+        manifest_file = self.checkpoints_dir / 'manifest.json'
 
         if manifest_file.exists():
             try:
-                with open(manifest_file, encoding="utf-8") as f:
+                with open(manifest_file, encoding='utf-8') as f:
                     data = json.load(f)
                     checkpoints = [
-                        Checkpoint.from_dict(cp) for cp in data.get("checkpoints", [])
+                        Checkpoint.from_dict(cp) for cp in data.get('checkpoints', [])
                     ]
             except Exception as e:
-                logger.warning("Failed to load checkpoints manifest: %s", e)
+                logger.warning('Failed to load checkpoints manifest: %s', e)
 
         return checkpoints
 
     def _save_checkpoints(self) -> None:
         """Save checkpoints manifest to disk."""
-        manifest_file = self.checkpoints_dir / "manifest.json"
+        manifest_file = self.checkpoints_dir / 'manifest.json'
 
         try:
             data = {
-                "checkpoints": [cp.to_dict() for cp in self.checkpoints],
-                "last_updated": time.time(),
+                'checkpoints': [cp.to_dict() for cp in self.checkpoints],
+                'last_updated': time.time(),
             }
-            with open(manifest_file, "w", encoding="utf-8") as f:
+            with open(manifest_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            logger.error("Failed to save checkpoints manifest: %s", e)
+            logger.error('Failed to save checkpoints manifest: %s', e)
 
     def _generate_checkpoint_id(self) -> str:
         """Generate a unique checkpoint ID."""
-        return f"cp_{int(time.time() * 1000)}_{os.urandom(4).hex()}"
+        return f'cp_{int(time.time() * 1000)}_{os.urandom(4).hex()}'
 
     def _create_git_snapshot(self) -> str | None:
         """Create a git commit snapshot and return the SHA.
@@ -176,7 +176,7 @@ class RollbackManager:
         try:
             # Create a temporary commit
             subprocess.run(
-                ["git", "add", "-A"],
+                ['git', 'add', '-A'],
                 check=False,
                 cwd=self.workspace_path,
                 capture_output=True,
@@ -185,11 +185,11 @@ class RollbackManager:
 
             result = subprocess.run(
                 [
-                    "git",
-                    "commit",
-                    "-m",
-                    "[App Checkpoint] Auto-snapshot",
-                    "--allow-empty",
+                    'git',
+                    'commit',
+                    '-m',
+                    '[App Checkpoint] Auto-snapshot',
+                    '--allow-empty',
                 ],
                 check=False,
                 cwd=self.workspace_path,
@@ -201,7 +201,7 @@ class RollbackManager:
             if result.returncode == 0:
                 # Get the commit SHA
                 sha_result = subprocess.run(
-                    ["git", "rev-parse", "HEAD"],
+                    ['git', 'rev-parse', 'HEAD'],
                     check=False,
                     cwd=self.workspace_path,
                     capture_output=True,
@@ -210,7 +210,7 @@ class RollbackManager:
                 )
                 return sha_result.stdout.strip() if sha_result.returncode == 0 else None
         except Exception as e:
-            logger.warning("Failed to create git snapshot: %s", e)
+            logger.warning('Failed to create git snapshot: %s', e)
 
         return None
 
@@ -231,10 +231,10 @@ class RollbackManager:
 
         try:
             # Copy workspace files to checkpoint directory
-            for file_path in self.workspace_path.rglob("*"):
+            for file_path in self.workspace_path.rglob('*'):
                 if file_path.is_file():
-                    # Skip .app directory and .git
-                    if ".app" in file_path.parts or ".git" in file_path.parts:
+                    # Skip .grinta directory and .git
+                    if '.grinta' in file_path.parts or '.git' in file_path.parts:
                         continue
 
                     rel_path = file_path.relative_to(self.workspace_path)
@@ -242,16 +242,16 @@ class RollbackManager:
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
 
                     shutil.copy2(file_path, dest_path)
-                    file_snapshots[str(rel_path)] = "saved"
+                    file_snapshots[str(rel_path)] = 'saved'
         except Exception as e:
-            logger.error("Failed to create file snapshot: %s", e)
+            logger.error('Failed to create file snapshot: %s', e)
 
         return file_snapshots
 
     def create_checkpoint(
         self,
         description: str,
-        checkpoint_type: str = "manual",
+        checkpoint_type: str = 'manual',
         metadata: dict[str, Any] | None = None,
         use_git: bool = True,
     ) -> str:
@@ -274,7 +274,7 @@ class RollbackManager:
             checkpoint_ts = self._last_checkpoint_ts + 1e-6
         self._last_checkpoint_ts = checkpoint_ts
 
-        logger.info("Creating checkpoint: %s (ID: %s)", description, checkpoint_id)
+        logger.info('Creating checkpoint: %s (ID: %s)', description, checkpoint_id)
 
         # Create git snapshot if available
         git_commit_sha = None
@@ -306,7 +306,7 @@ class RollbackManager:
         if self.auto_cleanup:
             self._cleanup_old_checkpoints()
 
-        logger.info("Checkpoint created successfully: %s", checkpoint_id)
+        logger.info('Checkpoint created successfully: %s', checkpoint_id)
 
         return checkpoint_id
 
@@ -325,7 +325,7 @@ class RollbackManager:
             return False
 
         logger.info(
-            "Rolling back to checkpoint: %s (%s)", checkpoint.description, checkpoint_id
+            'Rolling back to checkpoint: %s (%s)', checkpoint.description, checkpoint_id
         )
 
         try:
@@ -337,7 +337,7 @@ class RollbackManager:
             return self._try_file_based_rollback(checkpoint_id)
 
         except Exception as e:
-            logger.error("Rollback failed: %s", e)
+            logger.error('Rollback failed: %s', e)
             return False
 
     def _find_checkpoint(self, checkpoint_id: str) -> Checkpoint | None:
@@ -354,7 +354,7 @@ class RollbackManager:
             (cp for cp in self.checkpoints if cp.id == checkpoint_id), None
         )
         if not checkpoint:
-            logger.error("Checkpoint not found: %s", checkpoint_id)
+            logger.error('Checkpoint not found: %s', checkpoint_id)
         return checkpoint
 
     def _try_git_rollback(self, checkpoint: Checkpoint) -> bool:
@@ -371,7 +371,7 @@ class RollbackManager:
             return False
 
         result = subprocess.run(
-            ["git", "reset", "--hard", checkpoint.git_commit_sha],
+            ['git', 'reset', '--hard', checkpoint.git_commit_sha],
             check=False,
             cwd=self.workspace_path,
             capture_output=True,
@@ -380,9 +380,9 @@ class RollbackManager:
         )
 
         if result.returncode == 0:
-            logger.info("Git rollback successful to %s", checkpoint.git_commit_sha)
+            logger.info('Git rollback successful to %s', checkpoint.git_commit_sha)
             return True
-        logger.warning("Git rollback failed: %s", result.stderr)
+        logger.warning('Git rollback failed: %s', result.stderr)
         return False
 
     def _try_file_based_rollback(self, checkpoint_id: str) -> bool:
@@ -398,19 +398,19 @@ class RollbackManager:
         snapshot_dir = self.checkpoints_dir / checkpoint_id
 
         if not snapshot_dir.exists():
-            logger.error("Checkpoint snapshot directory not found: %s", snapshot_dir)
+            logger.error('Checkpoint snapshot directory not found: %s', snapshot_dir)
             return False
 
         self._clear_workspace()
         self._restore_snapshot(snapshot_dir)
 
-        logger.info("File-based rollback successful")
+        logger.info('File-based rollback successful')
         return True
 
     def _clear_workspace(self) -> None:
-        """Clear workspace directory (except .app and .git)."""
+        """Clear workspace directory (except .grinta and .git)."""
         for item in self.workspace_path.iterdir():
-            if item.name not in [".app", ".git"]:
+            if item.name not in ['.grinta', '.git']:
                 if item.is_dir():
                     shutil.rmtree(item)
                 else:
@@ -423,7 +423,7 @@ class RollbackManager:
             snapshot_dir: Directory containing snapshot files
 
         """
-        for file_path in snapshot_dir.rglob("*"):
+        for file_path in snapshot_dir.rglob('*'):
             if file_path.is_file():
                 rel_path = file_path.relative_to(snapshot_dir)
                 dest_path = self.workspace_path / rel_path
@@ -439,13 +439,13 @@ class RollbackManager:
         """
         return [
             {
-                "id": cp.id,
-                "description": cp.description,
-                "timestamp": cp.timestamp,
-                "datetime": datetime.fromtimestamp(cp.timestamp).isoformat(),
-                "type": cp.checkpoint_type,
-                "has_git_snapshot": cp.git_commit_sha is not None,
-                "file_count": len(cp.file_snapshots),
+                'id': cp.id,
+                'description': cp.description,
+                'timestamp': cp.timestamp,
+                'datetime': datetime.fromtimestamp(cp.timestamp).isoformat(),
+                'type': cp.checkpoint_type,
+                'has_git_snapshot': cp.git_commit_sha is not None,
+                'file_count': len(cp.file_snapshots),
             }
             for cp in sorted(self.checkpoints, key=lambda x: x.timestamp, reverse=True)
         ]
@@ -488,7 +488,7 @@ class RollbackManager:
         # Save manifest
         self._save_checkpoints()
 
-        logger.info("Checkpoint deleted: %s", checkpoint_id)
+        logger.info('Checkpoint deleted: %s', checkpoint_id)
 
         return True
 
@@ -506,7 +506,7 @@ class RollbackManager:
         for checkpoint in to_delete:
             self.delete_checkpoint(checkpoint.id)
 
-        logger.info("Cleaned up %s old checkpoints", len(to_delete))
+        logger.info('Cleaned up %s old checkpoints', len(to_delete))
 
     def get_latest_checkpoint(self) -> Checkpoint | None:
         """Get the most recent checkpoint.

@@ -8,7 +8,9 @@ from backend.core.logger import app_logger as logger
 from backend.ledger.observation.status import StatusObservation
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
 
 # Thresholds at which budget warnings are emitted (ascending order).
 _BUDGET_THRESHOLDS: tuple[float, ...] = (0.50, 0.80, 0.90)
@@ -30,7 +32,7 @@ class BudgetGuardService:
     def sync_with_metrics(self) -> None:
         """Update budget control flag and emit threshold alerts."""
         state_tracker = self._context.state_tracker
-        if state_tracker and hasattr(state_tracker, "sync_budget_flag_with_metrics"):
+        if state_tracker and hasattr(state_tracker, 'sync_budget_flag_with_metrics'):
             state_tracker.sync_budget_flag_with_metrics()
 
         self._check_budget_thresholds()
@@ -45,7 +47,7 @@ class BudgetGuardService:
         if state is None:
             return
 
-        budget_flag = getattr(state, "budget_flag", None)
+        budget_flag = getattr(state, 'budget_flag', None)
         if budget_flag is None:
             return
 
@@ -77,17 +79,17 @@ class BudgetGuardService:
 
         level_pct = int(threshold * 100)
         content = (
-            f"⚠️ Budget alert: {level_pct}% of ${max_value:.2f} budget used "
-            f"(${current:.4f} spent, {pct * 100:.1f}% consumed)"
+            f'⚠️ Budget alert: {level_pct}% of ${max_value:.2f} budget used '
+            f'(${current:.4f} spent, {pct * 100:.1f}% consumed)'
         )
 
         logger.warning(
-            "Budget threshold %d%% crossed for session %s — $%.4f / $%.2f",
+            'Budget threshold %d%% crossed for session %s — $%.4f / $%.2f',
             level_pct,
             self._context.id,
             current,
             max_value,
-            extra={"session_id": self._context.id},
+            extra={'session_id': self._context.id},
         )
 
         # Use a lightweight status observation so the WebSocket pushes this
@@ -95,18 +97,18 @@ class BudgetGuardService:
         try:
             obs = StatusObservation(
                 content=content,
-                status_type="budget_alert",
+                status_type='budget_alert',
                 extras={
-                    "threshold": threshold,
-                    "pct_used": round(pct, 4),
-                    "current_cost": round(current, 4),
-                    "max_budget": round(max_value, 2),
+                    'threshold': threshold,
+                    'pct_used': round(pct, 4),
+                    'current_cost': round(current, 4),
+                    'max_budget': round(max_value, 2),
                 },
             )
             self._context.emit_event(obs, EventSource.ENVIRONMENT)
         except Exception:
             logger.debug(
-                "Failed to emit budget alert for session %s",
+                'Failed to emit budget alert for session %s',
                 self._context.id,
                 exc_info=True,
             )

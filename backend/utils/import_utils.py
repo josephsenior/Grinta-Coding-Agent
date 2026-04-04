@@ -6,7 +6,7 @@ import importlib
 from functools import lru_cache
 from typing import Any, NoReturn, TypeVar
 
-T = TypeVar("T")
+T = TypeVar('T')
 
 
 def import_from(qual_name: str) -> Any:
@@ -28,8 +28,8 @@ def import_from(qual_name: str) -> Any:
         >>> auth = UserAuth()
 
     """
-    parts = qual_name.split(".")
-    module_name = ".".join(parts[:-1])
+    parts = qual_name.split('.')
+    module_name = '.'.join(parts[:-1])
     module = importlib.import_module(module_name)
     return getattr(module, parts[-1])
 
@@ -87,12 +87,12 @@ def _impl_matches_base(cls: type[T], impl_class: type[T]) -> bool:
 
 
 def _matches_qualified_name_in_mro(base_cls: type[T], impl_class: type[T]) -> bool:
-    base_mod = getattr(base_cls, "__module__", None)
-    base_name = getattr(base_cls, "__name__", None)
-    for candidate in getattr(impl_class, "__mro__", ()):
+    base_mod = getattr(base_cls, '__module__', None)
+    base_name = getattr(base_cls, '__name__', None)
+    for candidate in getattr(impl_class, '__mro__', ()):
         if (
-            getattr(candidate, "__module__", None) == base_mod
-            and getattr(candidate, "__name__", None) == base_name
+            getattr(candidate, '__module__', None) == base_mod
+            and getattr(candidate, '__name__', None) == base_name
         ):
             return True
     return False
@@ -100,7 +100,7 @@ def _matches_qualified_name_in_mro(base_cls: type[T], impl_class: type[T]) -> bo
 
 def _reimport_base_class(base_mod: str, base_name: str) -> type[Any] | None:
     try:
-        imported_base = import_from(f"{base_mod}.{base_name}")
+        imported_base = import_from(f'{base_mod}.{base_name}')
         if isinstance(imported_base, type):
             return imported_base
     except Exception:
@@ -109,8 +109,8 @@ def _reimport_base_class(base_mod: str, base_name: str) -> type[Any] | None:
 
 
 def _matches_reimported_base(cls: type[T], impl_class: type[T]) -> bool:
-    base_mod = getattr(cls, "__module__", None)
-    base_name = getattr(cls, "__name__", None)
+    base_mod = getattr(cls, '__module__', None)
+    base_name = getattr(cls, '__name__', None)
     if not (base_mod and base_name):
         return False
     imported_base = _reimport_base_class(base_mod, base_name)
@@ -118,11 +118,11 @@ def _matches_reimported_base(cls: type[T], impl_class: type[T]) -> bool:
 
 
 def _raise_invalid_impl(cls: type[T], impl_class: type[T]) -> NoReturn:
-    base_mod = getattr(cls, "__module__", None)
-    base_name = getattr(cls, "__name__", None)
-    impl_mod = getattr(impl_class, "__module__", None)
-    impl_name = getattr(impl_class, "__name__", None)
+    base_mod = getattr(cls, '__module__', None)
+    base_name = getattr(cls, '__name__', None)
+    impl_mod = getattr(impl_class, '__module__', None)
+    impl_name = getattr(impl_class, '__name__', None)
     raise AssertionError(
-        "Implementation class is not a subclass of the base class. "
-        f"base={base_mod}.{base_name}, impl={impl_mod}.{impl_name}"
+        'Implementation class is not a subclass of the base class. '
+        f'base={base_mod}.{base_name}, impl={impl_mod}.{impl_name}'
     )

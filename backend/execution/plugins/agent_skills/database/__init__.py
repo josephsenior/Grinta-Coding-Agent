@@ -40,22 +40,25 @@ async def connect_postgresql(env_prefix: str, connection_name: str) -> dict[str,
     try:
         import asyncpg  # type: ignore[import-not-found, import-untyped]
     except ImportError as exc:
-        msg = "asyncpg not installed. Run: pip install asyncpg"
+        msg = (
+            'asyncpg not installed. Run: uv sync --extra database or '
+            "pip install 'grinta-ai[database]'"
+        )
         raise ImportError(msg) from exc
 
     # Get connection parameters from environment
-    host = os.getenv(f"{env_prefix}_HOST")
-    port = int(os.getenv(f"{env_prefix}_PORT", "5432"))
-    database = os.getenv(f"{env_prefix}_DATABASE")
-    user = os.getenv(f"{env_prefix}_USER")
-    password = os.getenv(f"{env_prefix}_PASSWORD")
-    ssl = os.getenv(f"{env_prefix}_SSL", "prefer")
+    host = os.getenv(f'{env_prefix}_HOST')
+    port = int(os.getenv(f'{env_prefix}_PORT', '5432'))
+    database = os.getenv(f'{env_prefix}_DATABASE')
+    user = os.getenv(f'{env_prefix}_USER')
+    password = os.getenv(f'{env_prefix}_PASSWORD')
+    ssl = os.getenv(f'{env_prefix}_SSL', 'prefer')
 
     # Validate required variables
     if not all([host, database, user, password]):
         msg = (
-            f"Missing required environment variables. Need: {env_prefix}_HOST, "
-            f"{env_prefix}_DATABASE, {env_prefix}_USER, {env_prefix}_PASSWORD"
+            f'Missing required environment variables. Need: {env_prefix}_HOST, '
+            f'{env_prefix}_DATABASE, {env_prefix}_USER, {env_prefix}_PASSWORD'
         )
         raise ValueError(
             msg,
@@ -74,17 +77,17 @@ async def connect_postgresql(env_prefix: str, connection_name: str) -> dict[str,
 
     # Store connection
     _connections[connection_name] = {
-        "type": "postgresql",
-        "conn": conn,
-        "env_prefix": env_prefix,
+        'type': 'postgresql',
+        'conn': conn,
+        'env_prefix': env_prefix,
     }
 
     return {
-        "success": True,
-        "connection_name": connection_name,
-        "db_type": "postgresql",
-        "host": host,
-        "database": database,
+        'success': True,
+        'connection_name': connection_name,
+        'db_type': 'postgresql',
+        'host': host,
+        'database': database,
     }
 
 
@@ -114,50 +117,50 @@ async def connect_mongodb(env_prefix: str, connection_name: str) -> dict[str, An
             AsyncIOMotorClient,  # type: ignore[import-not-found, import-untyped]
         )
     except ImportError as exc:
-        msg = "motor not installed. Run: pip install motor"
+        msg = 'motor not installed. Run: pip install motor'
         raise ImportError(msg) from exc
 
     # Try connection string first
-    conn_str = os.getenv(f"{env_prefix}_CONNECTION_STRING")
+    conn_str = os.getenv(f'{env_prefix}_CONNECTION_STRING')
 
     if conn_str:
         client: Any = AsyncIOMotorClient(conn_str, serverSelectionTimeoutMS=10000)
     else:
         # Build from individual params
-        host = os.getenv(f"{env_prefix}_HOST", "localhost")
-        port = int(os.getenv(f"{env_prefix}_PORT", "27017"))
-        database = os.getenv(f"{env_prefix}_DATABASE")
-        user = os.getenv(f"{env_prefix}_USER")
-        password = os.getenv(f"{env_prefix}_PASSWORD")
+        host = os.getenv(f'{env_prefix}_HOST', 'localhost')
+        port = int(os.getenv(f'{env_prefix}_PORT', '27017'))
+        database = os.getenv(f'{env_prefix}_DATABASE')
+        user = os.getenv(f'{env_prefix}_USER')
+        password = os.getenv(f'{env_prefix}_PASSWORD')
 
         if not database:
-            msg = f"Missing {env_prefix}_DATABASE environment variable"
+            msg = f'Missing {env_prefix}_DATABASE environment variable'
             raise ValueError(msg)
 
         if user and password:
-            conn_str = f"mongodb://{user}:{password}@{host}:{port}/{database}"
+            conn_str = f'mongodb://{user}:{password}@{host}:{port}/{database}'
         else:
-            conn_str = f"mongodb://{host}:{port}/{database}"
+            conn_str = f'mongodb://{host}:{port}/{database}'
 
         client = AsyncIOMotorClient(conn_str, serverSelectionTimeoutMS=10000)
 
     # Test connection
-    await client.admin.command("ping")
+    await client.admin.command('ping')
 
     # Store connection
-    db_name = os.getenv(f"{env_prefix}_DATABASE") or client.get_default_database().name
+    db_name = os.getenv(f'{env_prefix}_DATABASE') or client.get_default_database().name
     _connections[connection_name] = {
-        "type": "mongodb",
-        "client": client,
-        "db": client[db_name],
-        "env_prefix": env_prefix,
+        'type': 'mongodb',
+        'client': client,
+        'db': client[db_name],
+        'env_prefix': env_prefix,
     }
 
     return {
-        "success": True,
-        "connection_name": connection_name,
-        "db_type": "mongodb",
-        "database": db_name,
+        'success': True,
+        'connection_name': connection_name,
+        'db_type': 'mongodb',
+        'database': db_name,
     }
 
 
@@ -180,12 +183,15 @@ async def connect_redis(env_prefix: str, connection_name: str) -> dict[str, Any]
     try:
         import redis.asyncio as redis  # type: ignore[import-not-found, import-untyped]
     except ImportError as exc:
-        msg = "redis not installed. Run: pip install redis"
+        msg = (
+            'redis not installed. Run: uv sync --extra redis or '
+            "pip install 'grinta-ai[redis]'"
+        )
         raise ImportError(msg) from exc
 
-    host = os.getenv(f"{env_prefix}_HOST", "localhost")
-    port = int(os.getenv(f"{env_prefix}_PORT", "6379"))
-    password = os.getenv(f"{env_prefix}_PASSWORD")
+    host = os.getenv(f'{env_prefix}_HOST', 'localhost')
+    port = int(os.getenv(f'{env_prefix}_PORT', '6379'))
+    password = os.getenv(f'{env_prefix}_PASSWORD')
 
     # Connect
     client = redis.Redis(
@@ -201,17 +207,17 @@ async def connect_redis(env_prefix: str, connection_name: str) -> dict[str, Any]
 
     # Store connection
     _connections[connection_name] = {
-        "type": "redis",
-        "client": client,
-        "env_prefix": env_prefix,
+        'type': 'redis',
+        'client': client,
+        'env_prefix': env_prefix,
     }
 
     return {
-        "success": True,
-        "connection_name": connection_name,
-        "db_type": "redis",
-        "host": host,
-        "port": port,
+        'success': True,
+        'connection_name': connection_name,
+        'db_type': 'redis',
+        'host': host,
+        'port': port,
     }
 
 
@@ -230,15 +236,15 @@ async def get_schema(connection_name: str) -> dict[str, Any]:
         raise ValueError(msg)
 
     conn_info = _connections[connection_name]
-    db_type = conn_info["type"]
+    db_type = conn_info['type']
 
-    if db_type == "postgresql":
-        return await _get_postgresql_schema(conn_info["conn"])
-    if db_type == "mongodb":
-        return await _get_mongodb_schema(conn_info["db"])
-    if db_type == "redis":
-        return await _get_redis_schema(conn_info["client"])
-    msg = f"Unsupported database type: {db_type}"
+    if db_type == 'postgresql':
+        return await _get_postgresql_schema(conn_info['conn'])
+    if db_type == 'mongodb':
+        return await _get_mongodb_schema(conn_info['db'])
+    if db_type == 'redis':
+        return await _get_redis_schema(conn_info['client'])
+    msg = f'Unsupported database type: {db_type}'
     raise ValueError(msg)
 
 
@@ -263,31 +269,31 @@ async def execute_query(
         raise ValueError(msg)
 
     conn_info = _connections[connection_name]
-    db_type = conn_info["type"]
+    db_type = conn_info['type']
 
     start_time = time.time()
 
     try:
-        if db_type == "postgresql":
-            result = await _execute_postgresql_query(conn_info["conn"], query, limit)
-        elif db_type == "mongodb":
-            result = await _execute_mongodb_query(conn_info["db"], query, limit)
-        elif db_type == "redis":
-            result = await _execute_redis_command(conn_info["client"], query)
+        if db_type == 'postgresql':
+            result = await _execute_postgresql_query(conn_info['conn'], query, limit)
+        elif db_type == 'mongodb':
+            result = await _execute_mongodb_query(conn_info['db'], query, limit)
+        elif db_type == 'redis':
+            result = await _execute_redis_command(conn_info['client'], query)
         else:
-            msg = f"Unsupported database type: {db_type}"
+            msg = f'Unsupported database type: {db_type}'
             raise ValueError(msg)
 
         execution_time = round((time.time() - start_time) * 1000, 2)  # ms
-        result["execution_time_ms"] = execution_time
+        result['execution_time_ms'] = execution_time
 
         return result
 
     except Exception as e:
         return {
-            "success": False,
-            "error": str(e),
-            "execution_time_ms": round((time.time() - start_time) * 1000, 2),
+            'success': False,
+            'error': str(e),
+            'execution_time_ms': round((time.time() - start_time) * 1000, 2),
         }
 
 
@@ -305,7 +311,7 @@ async def _get_postgresql_schema(conn) -> dict[str, Any]:
 
     tables = []
     for table_row in tables_result:
-        table_name = table_row["table_name"]
+        table_name = table_row['table_name']
 
         # Fetch columns
         columns_query = """
@@ -324,27 +330,27 @@ async def _get_postgresql_schema(conn) -> dict[str, Any]:
 
         tables.append(
             {
-                "name": table_name,
-                "columns": [
+                'name': table_name,
+                'columns': [
                     {
-                        "name": c["column_name"],
-                        "type": c["data_type"],
-                        "nullable": c["is_nullable"] == "YES",
+                        'name': c['column_name'],
+                        'type': c['data_type'],
+                        'nullable': c['is_nullable'] == 'YES',
                     }
                     for c in columns_result
                 ],
-                "row_count": count,
+                'row_count': count,
             },
         )
 
-    return {"tables": tables}
+    return {'tables': tables}
 
 
 async def _execute_postgresql_query(conn, query: str, limit: int) -> dict[str, Any]:
     """Execute PostgreSQL query."""
     # Add LIMIT if SELECT and no LIMIT specified
-    if "SELECT" in query.upper() and "LIMIT" not in query.upper():
-        query = f"{query.rstrip(';')} LIMIT {limit}"
+    if 'SELECT' in query.upper() and 'LIMIT' not in query.upper():
+        query = f'{query.rstrip(";")} LIMIT {limit}'
 
     rows = await conn.fetch(query)
 
@@ -359,17 +365,17 @@ async def _execute_postgresql_query(conn, query: str, limit: int) -> dict[str, A
                     row[key] = str(value)
 
         return {
-            "success": True,
-            "data": data,
-            "columns": list(data[0].keys()),
-            "row_count": len(data),
+            'success': True,
+            'data': data,
+            'columns': list(data[0].keys()),
+            'row_count': len(data),
         }
     return {
-        "success": True,
-        "data": [],
-        "columns": [],
-        "row_count": 0,
-        "message": "Query executed successfully (no rows returned)",
+        'success': True,
+        'data': [],
+        'columns': [],
+        'row_count': 0,
+        'message': 'Query executed successfully (no rows returned)',
     }
 
 
@@ -386,21 +392,21 @@ async def _get_mongodb_schema(db) -> dict[str, Any]:
         try:
             count = await collection.count_documents({})
             sample = await collection.find_one()
-            if sample and "_id" in sample:
-                sample["_id"] = str(sample["_id"])
+            if sample and '_id' in sample:
+                sample['_id'] = str(sample['_id'])
         except Exception:
             count = None
             sample = None
 
         collections.append(
             {
-                "name": coll_name,
-                "document_count": count,
-                "sample_document": sample,
+                'name': coll_name,
+                'document_count': count,
+                'sample_document': sample,
             },
         )
 
-    return {"collections": collections}
+    return {'collections': collections}
 
 
 async def _execute_mongodb_query(db, query: str, limit: int) -> dict[str, Any]:
@@ -409,18 +415,18 @@ async def _execute_mongodb_query(db, query: str, limit: int) -> dict[str, Any]:
         query_obj = json.loads(query)
     except json.JSONDecodeError:
         return {
-            "success": False,
-            "error": 'Invalid JSON query. Use: {"collection": "users", "filter": {}, "limit": 10}',
+            'success': False,
+            'error': 'Invalid JSON query. Use: {"collection": "users", "filter": {}, "limit": 10}',
         }
 
-    collection_name = query_obj.get("collection")
-    filter_obj = query_obj.get("filter", {})
-    query_limit = query_obj.get("limit", limit)
+    collection_name = query_obj.get('collection')
+    filter_obj = query_obj.get('filter', {})
+    query_limit = query_obj.get('limit', limit)
 
     if not collection_name:
         return {
-            "success": False,
-            "error": 'Query must include "collection" field',
+            'success': False,
+            'error': 'Query must include "collection" field',
         }
 
     collection = db[collection_name]
@@ -429,14 +435,14 @@ async def _execute_mongodb_query(db, query: str, limit: int) -> dict[str, Any]:
 
     # Convert ObjectId to string
     for doc in documents:
-        if "_id" in doc:
-            doc["_id"] = str(doc["_id"])
+        if '_id' in doc:
+            doc['_id'] = str(doc['_id'])
 
     return {
-        "success": True,
-        "data": documents,
-        "columns": list(documents[0].keys()) if documents else [],
-        "row_count": len(documents),
+        'success': True,
+        'data': documents,
+        'columns': list(documents[0].keys()) if documents else [],
+        'row_count': len(documents),
     }
 
 
@@ -460,9 +466,9 @@ async def _get_redis_schema(client) -> dict[str, Any]:
 
             keys_list.append(
                 {
-                    "key": key,
-                    "type": key_type,
-                    "ttl": ttl,
+                    'key': key,
+                    'type': key_type,
+                    'ttl': ttl,
                 },
             )
             count += 1
@@ -470,7 +476,7 @@ async def _get_redis_schema(client) -> dict[str, Any]:
         if cursor == 0:
             break
 
-    return {"keys": keys_list}
+    return {'keys': keys_list}
 
 
 async def _execute_redis_command(client, command: str) -> dict[str, Any]:
@@ -478,8 +484,8 @@ async def _execute_redis_command(client, command: str) -> dict[str, Any]:
     parts = command.strip().split()
     if not parts:
         return {
-            "success": False,
-            "error": "Empty command",
+            'success': False,
+            'error': 'Empty command',
         }
 
     cmd = parts[0].upper()
@@ -489,19 +495,19 @@ async def _execute_redis_command(client, command: str) -> dict[str, Any]:
 
     # Format result
     if result is None:
-        data = [{"result": "nil"}]
+        data = [{'result': 'nil'}]
     elif isinstance(result, list | tuple):
-        data = [{"index": str(i), "value": str(v)} for i, v in enumerate(result)]
+        data = [{'index': str(i), 'value': str(v)} for i, v in enumerate(result)]
     elif isinstance(result, dict):
-        data = [{"key": k, "value": str(v)} for k, v in result.items()]
+        data = [{'key': k, 'value': str(v)} for k, v in result.items()]
     else:
-        data = [{"result": str(result)}]
+        data = [{'result': str(result)}]
 
     return {
-        "success": True,
-        "data": data,
-        "columns": list(data[0].keys()) if data else [],
-        "row_count": len(data),
+        'success': True,
+        'data': data,
+        'columns': list(data[0].keys()) if data else [],
+        'row_count': len(data),
     }
 
 
@@ -525,12 +531,12 @@ async def close_connection(connection_name: str) -> None:
 
     conn_info = _connections[connection_name]
 
-    if conn_info["type"] == "postgresql":
-        await conn_info["conn"].close()
-    elif conn_info["type"] == "mongodb":
-        conn_info["client"].close()
-    elif conn_info["type"] == "redis":
-        await conn_info["client"].close()
+    if conn_info['type'] == 'postgresql':
+        await conn_info['conn'].close()
+    elif conn_info['type'] == 'mongodb':
+        conn_info['client'].close()
+    elif conn_info['type'] == 'redis':
+        await conn_info['client'].close()
 
     del _connections[connection_name]
 

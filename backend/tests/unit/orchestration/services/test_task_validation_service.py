@@ -1,11 +1,11 @@
 """Tests for TaskValidationService."""
 
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.orchestration.services.task_validation_service import TaskValidationService
 from backend.core.schemas import AgentState
 from backend.ledger.action.agent import PlaybookFinishAction
+from backend.orchestration.services.task_validation_service import TaskValidationService
 
 
 class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
@@ -58,14 +58,14 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
 
         mock_validation = MagicMock()
         mock_validation.passed = True
-        mock_validation.reason = "All requirements met"
+        mock_validation.reason = 'All requirements met'
 
         mock_validator = MagicMock()
         mock_validator.validate_completion = AsyncMock(return_value=mock_validation)
         self.mock_controller.task_validator = mock_validator
 
         with patch(
-            "backend.orchestration.services.task_validation_service.logger"
+            'backend.orchestration.services.task_validation_service.logger'
         ) as mock_logger:
             result = await self.service.handle_finish(action)
 
@@ -89,16 +89,16 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
 
         mock_validation = MagicMock()
         mock_validation.passed = False
-        mock_validation.reason = "Missing documentation"
+        mock_validation.reason = 'Missing documentation'
         mock_validation.confidence = 0.85
-        mock_validation.missing_items = ["README.md", "tests"]
-        mock_validation.suggestions = ["Add README", "Write tests"]
+        mock_validation.missing_items = ['README.md', 'tests']
+        mock_validation.suggestions = ['Add README', 'Write tests']
 
         mock_validator = MagicMock()
         mock_validator.validate_completion = AsyncMock(return_value=mock_validation)
         self.mock_controller.task_validator = mock_validator
 
-        with patch("backend.orchestration.services.task_validation_service.logger"):
+        with patch('backend.orchestration.services.task_validation_service.logger'):
             result = await self.service.handle_finish(action)
 
         # Should return False to prevent finish
@@ -110,10 +110,10 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         # Check observation content
         call_args = self.mock_controller.event_stream.add_event.call_args[0]
         observation = call_args[0]
-        self.assertEqual(observation.error_id, "TASK_VALIDATION_FAILED")
-        self.assertIn("Missing documentation", observation.content)
-        self.assertIn("README.md", observation.content)
-        self.assertIn("Add README", observation.content)
+        self.assertEqual(observation.error_id, 'TASK_VALIDATION_FAILED')
+        self.assertIn('Missing documentation', observation.content)
+        self.assertIn('README.md', observation.content)
+        self.assertIn('Add README', observation.content)
 
     async def test_handle_finish_validation_failed_resumes_agent(self):
         """Test handle_finish resumes agent when validation fails."""
@@ -124,7 +124,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
 
         mock_validation = MagicMock()
         mock_validation.passed = False
-        mock_validation.reason = "Incomplete"
+        mock_validation.reason = 'Incomplete'
         mock_validation.confidence = 0.9
         mock_validation.missing_items = []
         mock_validation.suggestions = []
@@ -135,7 +135,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
 
         self.mock_controller.state.agent_state = AgentState.PAUSED
 
-        with patch("backend.orchestration.services.task_validation_service.logger"):
+        with patch('backend.orchestration.services.task_validation_service.logger'):
             await self.service.handle_finish(action)
 
         # Should resume agent
@@ -152,7 +152,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
 
         mock_validation = MagicMock()
         mock_validation.passed = False
-        mock_validation.reason = "Failed"
+        mock_validation.reason = 'Failed'
         mock_validation.confidence = 0.7
         mock_validation.missing_items = []
         mock_validation.suggestions = []
@@ -163,7 +163,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
 
         self.mock_controller.state.agent_state = AgentState.RUNNING
 
-        with patch("backend.orchestration.services.task_validation_service.logger"):
+        with patch('backend.orchestration.services.task_validation_service.logger'):
             await self.service.handle_finish(action)
 
         # Should not change state
@@ -184,7 +184,9 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result)
         mock_validator.validate_completion.assert_not_called()
 
-    async def test_handle_finish_blocks_when_completion_validation_enabled_without_validator(self):
+    async def test_handle_finish_blocks_when_completion_validation_enabled_without_validator(
+        self,
+    ):
         """Test finish is blocked when completion validation is enabled but validator is missing."""
         action = PlaybookFinishAction(outputs={})
         self.mock_controller.task_validator = None
@@ -200,55 +202,55 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
     async def test_build_feedback_complete(self):
         """Test _build_feedback includes all validation details."""
         mock_validation = MagicMock()
-        mock_validation.reason = "Incomplete implementation"
+        mock_validation.reason = 'Incomplete implementation'
         mock_validation.confidence = 0.75
-        mock_validation.missing_items = ["feature A", "feature B"]
-        mock_validation.suggestions = ["Implement A", "Implement B"]
+        mock_validation.missing_items = ['feature A', 'feature B']
+        mock_validation.suggestions = ['Implement A', 'Implement B']
 
         feedback = self.service._build_feedback(mock_validation)
 
         # Should include all components
-        self.assertIn("TASK NOT COMPLETE", feedback)
-        self.assertIn("Incomplete implementation", feedback)
-        self.assertIn("75.0%", feedback)
-        self.assertIn("feature A", feedback)
-        self.assertIn("feature B", feedback)
-        self.assertIn("Implement A", feedback)
-        self.assertIn("Implement B", feedback)
-        self.assertIn("continue working", feedback)
+        self.assertIn('TASK NOT COMPLETE', feedback)
+        self.assertIn('Incomplete implementation', feedback)
+        self.assertIn('75.0%', feedback)
+        self.assertIn('feature A', feedback)
+        self.assertIn('feature B', feedback)
+        self.assertIn('Implement A', feedback)
+        self.assertIn('Implement B', feedback)
+        self.assertIn('continue working', feedback)
 
     async def test_build_feedback_no_missing_items(self):
         """Test _build_feedback without missing items."""
         mock_validation = MagicMock()
-        mock_validation.reason = "Quality issue"
+        mock_validation.reason = 'Quality issue'
         mock_validation.confidence = 0.5
         mock_validation.missing_items = []
-        mock_validation.suggestions = ["Improve quality"]
+        mock_validation.suggestions = ['Improve quality']
 
         feedback = self.service._build_feedback(mock_validation)
 
         # Should not include missing items section
-        self.assertNotIn("Missing items:", feedback)
-        self.assertIn("Suggestions:", feedback)
+        self.assertNotIn('Missing items:', feedback)
+        self.assertIn('Suggestions:', feedback)
 
     async def test_build_feedback_no_suggestions(self):
         """Test _build_feedback without suggestions."""
         mock_validation = MagicMock()
-        mock_validation.reason = "Failed"
+        mock_validation.reason = 'Failed'
         mock_validation.confidence = 0.6
-        mock_validation.missing_items = ["item"]
+        mock_validation.missing_items = ['item']
         mock_validation.suggestions = []
 
         feedback = self.service._build_feedback(mock_validation)
 
         # Should not include suggestions section
-        self.assertNotIn("Suggestions:", feedback)
-        self.assertIn("Missing items:", feedback)
+        self.assertNotIn('Suggestions:', feedback)
+        self.assertIn('Missing items:', feedback)
 
     async def test_build_feedback_minimal(self):
         """Test _build_feedback with minimal validation result."""
         mock_validation = MagicMock()
-        mock_validation.reason = "Unknown"
+        mock_validation.reason = 'Unknown'
         mock_validation.confidence = 0.0
         mock_validation.missing_items = []
         mock_validation.suggestions = []
@@ -256,10 +258,10 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         feedback = self.service._build_feedback(mock_validation)
 
         # Should include base information
-        self.assertIn("TASK NOT COMPLETE", feedback)
-        self.assertIn("Unknown", feedback)
-        self.assertIn("0.0%", feedback)
+        self.assertIn('TASK NOT COMPLETE', feedback)
+        self.assertIn('Unknown', feedback)
+        self.assertIn('0.0%', feedback)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

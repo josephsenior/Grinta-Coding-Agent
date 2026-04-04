@@ -68,20 +68,20 @@ class ResourceLimiter:
             limits = ResourceLimits(
                 max_memory_mb=int(
                     os.getenv(
-                        "RUNTIME_MAX_MEMORY_MB", str(DEFAULT_RUNTIME_MAX_MEMORY_MB)
+                        'RUNTIME_MAX_MEMORY_MB', str(DEFAULT_RUNTIME_MAX_MEMORY_MB)
                     )
                 ),
                 max_cpu_percent=float(
                     os.getenv(
-                        "RUNTIME_MAX_CPU_PERCENT", str(DEFAULT_RUNTIME_MAX_CPU_PERCENT)
+                        'RUNTIME_MAX_CPU_PERCENT', str(DEFAULT_RUNTIME_MAX_CPU_PERCENT)
                     )
                 ),
                 max_disk_gb=int(
-                    os.getenv("RUNTIME_MAX_DISK_GB", str(DEFAULT_RUNTIME_MAX_DISK_GB))
+                    os.getenv('RUNTIME_MAX_DISK_GB', str(DEFAULT_RUNTIME_MAX_DISK_GB))
                 ),
                 max_file_count=int(
                     os.getenv(
-                        "RUNTIME_MAX_FILE_COUNT", str(DEFAULT_RUNTIME_MAX_FILE_COUNT)
+                        'RUNTIME_MAX_FILE_COUNT', str(DEFAULT_RUNTIME_MAX_FILE_COUNT)
                     )
                 ),
             )
@@ -117,7 +117,7 @@ class ResourceLimiter:
                     len(files) for _, _, files in os.walk(str(self.workspace_path))
                 )
             except Exception as e:
-                logger.warning("Error calculating disk/file stats: %s", e)
+                logger.warning('Error calculating disk/file stats: %s', e)
 
         return ResourceStats(
             memory_mb=memory_mb,
@@ -132,26 +132,26 @@ class ResourceLimiter:
 
         # Check memory
         if stats.memory_mb > self.limits.max_memory_mb:
-            error_msg = f"Memory limit exceeded: {stats.memory_mb:.1f}MB > {self.limits.max_memory_mb}MB"
+            error_msg = f'Memory limit exceeded: {stats.memory_mb:.1f}MB > {self.limits.max_memory_mb}MB'
             logger.warning(error_msg)
             raise ResourceLimitExceededError(error_msg)
 
         # Check CPU (only warn, don't raise as CPU spikes are common)
         if stats.cpu_percent > self.limits.max_cpu_percent:
             logger.warning(
-                "CPU usage high: %.1f%% > %s%%",
+                'CPU usage high: %.1f%% > %s%%',
                 stats.cpu_percent,
                 self.limits.max_cpu_percent,
             )
 
         # Check disk
         if stats.disk_gb > self.limits.max_disk_gb:
-            error_msg = f"Disk limit exceeded: {stats.disk_gb:.1f}GB > {self.limits.max_disk_gb}GB"
+            error_msg = f'Disk limit exceeded: {stats.disk_gb:.1f}GB > {self.limits.max_disk_gb}GB'
             logger.warning(error_msg)
             raise ResourceLimitExceededError(error_msg)
 
         # Check file count
         if stats.file_count > self.limits.max_file_count:
-            error_msg = f"File count limit exceeded: {stats.file_count} > {self.limits.max_file_count}"
+            error_msg = f'File count limit exceeded: {stats.file_count} > {self.limits.max_file_count}'
             logger.warning(error_msg)
             raise ResourceLimitExceededError(error_msg)

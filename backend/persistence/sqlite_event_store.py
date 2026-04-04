@@ -17,6 +17,7 @@ in ``EventStream._persist_event()``.
 """
 
 from __future__ import annotations
+
 import sqlite3
 import threading
 from pathlib import Path
@@ -71,9 +72,9 @@ class SQLiteEventStore:
                 check_same_thread=False,
                 timeout=10.0,
             )
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA synchronous=NORMAL")
-            self._conn.execute("PRAGMA busy_timeout=5000")
+            self._conn.execute('PRAGMA journal_mode=WAL')
+            self._conn.execute('PRAGMA synchronous=NORMAL')
+            self._conn.execute('PRAGMA busy_timeout=5000')
             self._conn.row_factory = sqlite3.Row
         return self._conn
 
@@ -83,8 +84,8 @@ class SQLiteEventStore:
             conn.executescript(_CREATE_SQL)
             # Record schema version
             conn.execute(
-                "INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)",
-                ("schema_version", str(_SCHEMA_VERSION)),
+                'INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)',
+                ('schema_version', str(_SCHEMA_VERSION)),
             )
             conn.commit()
 
@@ -109,14 +110,14 @@ class SQLiteEventStore:
         import time as _time
 
         payload = json.dumps(event_dict, ensure_ascii=False)
-        timestamp = event_dict.get("timestamp", _time.time())
-        event_type = event_dict.get("action", event_dict.get("observation", "unknown"))
-        source = event_dict.get("source")
+        timestamp = event_dict.get('timestamp', _time.time())
+        event_type = event_dict.get('action', event_dict.get('observation', 'unknown'))
+        source = event_dict.get('source')
 
         with self._lock:
             conn = self._get_conn()
             conn.execute(
-                "INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)",
+                'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
                 (event_id, timestamp, event_type, source, payload),
             )
             conn.commit()
@@ -133,13 +134,13 @@ class SQLiteEventStore:
             conn = self._get_conn()
             for event_id, event_dict in events:
                 payload = json.dumps(event_dict, ensure_ascii=False)
-                timestamp = event_dict.get("timestamp", _time.time())
+                timestamp = event_dict.get('timestamp', _time.time())
                 event_type = event_dict.get(
-                    "action", event_dict.get("observation", "unknown")
+                    'action', event_dict.get('observation', 'unknown')
                 )
-                source = event_dict.get("source", None)
+                source = event_dict.get('source', None)
                 conn.execute(
-                    "INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)",
+                    'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
                     (event_id, timestamp, event_type, source, payload),
                 )
             conn.commit()
@@ -157,11 +158,11 @@ class SQLiteEventStore:
         with self._lock:
             conn = self._get_conn()
             row = conn.execute(
-                "SELECT payload FROM events WHERE id = ?", (event_id,)
+                'SELECT payload FROM events WHERE id = ?', (event_id,)
             ).fetchone()
         if row is None:
             return None
-        return json.loads(row["payload"])
+        return json.loads(row['payload'])
 
     def list_events(
         self,
@@ -183,43 +184,43 @@ class SQLiteEventStore:
         Returns:
             List of parsed event dicts ordered by ID.
         """
-        clauses: list[str] = ["id >= ?"]
+        clauses: list[str] = ['id >= ?']
         params: list[Any] = [start_id]
 
         if end_id is not None:
-            clauses.append("id < ?")
+            clauses.append('id < ?')
             params.append(end_id)
         if event_type is not None:
-            clauses.append("event_type = ?")
+            clauses.append('event_type = ?')
             params.append(event_type)
         if source is not None:
-            clauses.append("source = ?")
+            clauses.append('source = ?')
             params.append(source)
 
-        sql = f"SELECT payload FROM events WHERE {' AND '.join(clauses)} ORDER BY id"
+        sql = f'SELECT payload FROM events WHERE {" AND ".join(clauses)} ORDER BY id'
         if limit is not None:
-            sql += " LIMIT ?"
+            sql += ' LIMIT ?'
             params.append(limit)
 
         with self._lock:
             conn = self._get_conn()
             rows = conn.execute(sql, params).fetchall()
 
-        return [json.loads(r["payload"]) for r in rows]
+        return [json.loads(r['payload']) for r in rows]
 
     def count(self) -> int:
         """Return the total number of persisted events."""
         with self._lock:
             conn = self._get_conn()
-            row = conn.execute("SELECT COUNT(*) AS cnt FROM events").fetchone()
-        return row["cnt"] if row else 0
+            row = conn.execute('SELECT COUNT(*) AS cnt FROM events').fetchone()
+        return row['cnt'] if row else 0
 
     def max_id(self) -> int:
         """Return the highest event ID, or -1 if empty."""
         with self._lock:
             conn = self._get_conn()
-            row = conn.execute("SELECT MAX(id) AS m FROM events").fetchone()
-        val = row["m"] if row else None
+            row = conn.execute('SELECT MAX(id) AS m FROM events').fetchone()
+        val = row['m'] if row else None
         return val if val is not None else -1
 
     # ------------------------------------------------------------------
@@ -230,7 +231,7 @@ class SQLiteEventStore:
         """Delete a single event."""
         with self._lock:
             conn = self._get_conn()
-            conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+            conn.execute('DELETE FROM events WHERE id = ?', (event_id,))
             conn.commit()
 
     def delete_from(self, start_id: int) -> int:
@@ -241,7 +242,7 @@ class SQLiteEventStore:
         """
         with self._lock:
             conn = self._get_conn()
-            cursor = conn.execute("DELETE FROM events WHERE id >= ?", (start_id,))
+            cursor = conn.execute('DELETE FROM events WHERE id >= ?', (start_id,))
             conn.commit()
             return cursor.rowcount
 
@@ -250,7 +251,7 @@ class SQLiteEventStore:
     # ------------------------------------------------------------------
 
     def __repr__(self) -> str:
-        return f"SQLiteEventStore(db_path={self._db_path!r})"
+        return f'SQLiteEventStore(db_path={self._db_path!r})'
 
 
-__all__ = ["SQLiteEventStore"]
+__all__ = ['SQLiteEventStore']

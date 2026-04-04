@@ -11,7 +11,7 @@ from backend.ledger.observation.observation import Observation
 class MCPObservation(Observation):
     """This data class represents the result of a MCP Server operation."""
 
-    name: str = ""
+    name: str = ''
     arguments: dict[str, Any] = field(default_factory=dict)
     observation: ClassVar[str] = ObservationType.MCP
 
@@ -19,4 +19,3 @@ class MCPObservation(Observation):
     def message(self) -> str:
         """Get MCP operation result message."""
         return self.content
-

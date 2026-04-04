@@ -13,19 +13,19 @@ from backend.core.features import (
 
 class TestFeatureUnavailableError:
     def test_default_message(self):
-        err = FeatureUnavailableError("turbo_mode")
-        assert err.feature_name == "turbo_mode"
-        assert "turbo_mode" in str(err)
-        assert "App Pro" in str(err) or "Enterprise" in str(err)
+        err = FeatureUnavailableError('turbo_mode')
+        assert err.feature_name == 'turbo_mode'
+        assert 'turbo_mode' in str(err)
+        assert 'App Pro' in str(err) or 'Enterprise' in str(err)
 
     def test_custom_message(self):
-        err = FeatureUnavailableError("x", message="nope")
-        assert str(err) == "nope"
-        assert err.feature_name == "x"
+        err = FeatureUnavailableError('x', message='nope')
+        assert str(err) == 'nope'
+        assert err.feature_name == 'x'
 
     def test_is_exception(self):
         with pytest.raises(FeatureUnavailableError):
-            raise FeatureUnavailableError("f")
+            raise FeatureUnavailableError('f')
 
 
 class TestFeatureFlags:
@@ -40,12 +40,12 @@ class TestFeatureFlags:
     def test_get_flags_for_ui_structure(self):
         flags = FeatureFlags()
         ui = flags.get_flags_for_ui()
-        assert "security_risk_assessment" in ui
-        entry = ui["security_risk_assessment"]
-        assert entry["enabled"] is False
-        assert entry["coming_soon"] is True
-        assert entry["tier"] == "pro"
-        assert isinstance(entry["description"], str)
+        assert 'security_risk_assessment' in ui
+        entry = ui['security_risk_assessment']
+        assert entry['enabled'] is False
+        assert entry['coming_soon'] is True
+        assert entry['tier'] == 'pro'
+        assert isinstance(entry['description'], str)
 
     def test_with_config(self):
         sentinel = object()

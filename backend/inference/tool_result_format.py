@@ -8,18 +8,18 @@ from __future__ import annotations
 
 from backend.core import json_compat as json
 
-TOOL_RESULT_BLOCK_PREFIX = "<app_tool_result_json>"
-TOOL_RESULT_BLOCK_SUFFIX = "</app_tool_result_json>"
+TOOL_RESULT_BLOCK_PREFIX = '<app_tool_result_json>'
+TOOL_RESULT_BLOCK_SUFFIX = '</app_tool_result_json>'
 
 
 def encode_tool_result_payload(tool_name: str, content: object) -> str:
     """Encode a tool result into the canonical structured text envelope."""
     payload = json.dumps(
-        {"tool_name": tool_name, "content": content},
+        {'tool_name': tool_name, 'content': content},
         ensure_ascii=False,
-        separators=(",", ":"),
+        separators=(',', ':'),
     )
-    return f"{TOOL_RESULT_BLOCK_PREFIX}{payload}{TOOL_RESULT_BLOCK_SUFFIX}"
+    return f'{TOOL_RESULT_BLOCK_PREFIX}{payload}{TOOL_RESULT_BLOCK_SUFFIX}'
 
 
 def decode_tool_result_payload(text: str) -> tuple[str, object] | None:
@@ -28,7 +28,7 @@ def decode_tool_result_payload(text: str) -> tuple[str, object] | None:
     Returns ``(tool_name, content)`` only when *text* is exactly one encoded
     payload block (ignoring leading/trailing whitespace).
     """
-    stripped = (text or "").strip()
+    stripped = (text or '').strip()
     if not (
         stripped.startswith(TOOL_RESULT_BLOCK_PREFIX)
         and stripped.endswith(TOOL_RESULT_BLOCK_SUFFIX)
@@ -44,7 +44,7 @@ def decode_tool_result_payload(text: str) -> tuple[str, object] | None:
         return None
     if not isinstance(parsed, dict):
         return None
-    tool_name = parsed.get("tool_name")
+    tool_name = parsed.get('tool_name')
     if not isinstance(tool_name, str) or not tool_name:
         return None
-    return tool_name, parsed.get("content")
+    return tool_name, parsed.get('content')

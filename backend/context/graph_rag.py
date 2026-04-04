@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 # TreeSitter is optional; fall back gracefully if unavailable
 _TREESITTER_AVAILABLE = False
 from backend.utils.treesitter_editor import (  # noqa: E402
-    TreeSitterEditor,
     TREE_SITTER_AVAILABLE,
+    TreeSitterEditor,
 )
 
 _TREESITTER_AVAILABLE = TREE_SITTER_AVAILABLE
@@ -62,11 +62,11 @@ class GraphRAG:
             # Try to find a graph node ID in metadata
             # This mapping strategy depends on how we index data
             # For now, let's assume 'file_path' or 'function_name' might be keys
-            metadata = result.get("metadata", {})
-            if "file_path" in metadata:
-                seed_node_ids.append(metadata["file_path"])
-            if "function_name" in metadata:
-                seed_node_ids.append(metadata["function_name"])
+            metadata = result.get('metadata', {})
+            if 'file_path' in metadata:
+                seed_node_ids.append(metadata['file_path'])
+            if 'function_name' in metadata:
+                seed_node_ids.append(metadata['function_name'])
 
         # 2. Graph Expansion
         graph_context = []
@@ -76,17 +76,17 @@ class GraphRAG:
 
             # Convert subgraph to readable context
             for u, v, data in subgraph.edges(data=True):
-                edge_type = data.get("type", "related_to")
-                graph_context.append(f"{u} {edge_type} {v}")
+                edge_type = data.get('type', 'related_to')
+                graph_context.append(f'{u} {edge_type} {v}')
 
         return {
-            "semantic_results": semantic_context,
-            "graph_context": graph_context,
-            "seed_nodes": seed_node_ids,
-            "stats": {
-                "vector_hits": len(vector_results),
-                "graph_nodes": len(seed_node_ids),
-                "graph_edges": len(graph_context),
+            'semantic_results': semantic_context,
+            'graph_context': graph_context,
+            'seed_nodes': seed_node_ids,
+            'stats': {
+                'vector_hits': len(vector_results),
+                'graph_nodes': len(seed_node_ids),
+                'graph_edges': len(graph_context),
             },
         }
 
@@ -112,7 +112,7 @@ class GraphRAG:
                 return
             except Exception as exc:
                 logger.debug(
-                    "TreeSitter indexing failed for %s: %s — falling back to naive parser",
+                    'TreeSitter indexing failed for %s: %s — falling back to naive parser',
                     file_path,
                     exc,
                 )
@@ -127,7 +127,7 @@ class GraphRAG:
         if parse_result is None:
             # File type not supported by TreeSitter — fall through to naive
             raise ValueError(
-                f"TreeSitter cannot parse {os.path.splitext(file_path)[1]}"
+                f'TreeSitter cannot parse {os.path.splitext(file_path)[1]}'
             )
 
         tree, file_bytes, language = parse_result
@@ -137,7 +137,7 @@ class GraphRAG:
 
         def _node_text(node) -> str:  # type: ignore[return]
             return file_bytes[node.start_byte : node.end_byte].decode(
-                "utf-8", errors="replace"
+                'utf-8', errors='replace'
             )
 
         def _walk(node, parent_class: str | None = None) -> None:
@@ -147,13 +147,13 @@ class GraphRAG:
             # Function / method definitions
             # ----------------------------------------------------------------
             if nt in (
-                "function_definition",  # Python, Ruby
-                "function_declaration",  # JS/TS/Go/C/C++/Java
-                "method_definition",  # JS/TS
-                "method_declaration",  # Java, C#, Go
-                "func_literal",  # Go
-                "arrow_function",  # JS/TS
-                "function_item",  # Rust
+                'function_definition',  # Python, Ruby
+                'function_declaration',  # JS/TS/Go/C/C++/Java
+                'method_definition',  # JS/TS
+                'method_declaration',  # Java, C#, Go
+                'func_literal',  # Go
+                'arrow_function',  # JS/TS
+                'function_item',  # Rust
             ):
                 name_node = editor._get_name_node(node)
                 if name_node:
@@ -161,7 +161,7 @@ class GraphRAG:
                     line_start = node.start_point[0] + 1
                     line_end = node.end_point[0] + 1
                     if parent_class:
-                        qual = f"{parent_class}.{sym}"
+                        qual = f'{parent_class}.{sym}'
                         self.graph_store.add_node(
                             qual,
                             NodeType.FUNCTION,
@@ -186,12 +186,12 @@ class GraphRAG:
             # Class definitions
             # ----------------------------------------------------------------
             elif nt in (
-                "class_definition",  # Python
-                "class_declaration",  # JS/TS/Java/C#
-                "struct_item",  # Rust
-                "impl_item",  # Rust
-                "type_declaration",  # Go
-                "interface_declaration",  # Java, TS
+                'class_definition',  # Python
+                'class_declaration',  # JS/TS/Java/C#
+                'struct_item',  # Rust
+                'impl_item',  # Rust
+                'type_declaration',  # Go
+                'interface_declaration',  # Java, TS
             ):
                 name_node = editor._get_name_node(node)
                 if name_node:
@@ -217,21 +217,21 @@ class GraphRAG:
             # by language; leaf text extraction is good enough here.
             # ----------------------------------------------------------------
             elif nt in (
-                "import_statement",
-                "import_from_statement",
-                "use_declaration",
-                "import_declaration",
-                "extern_crate",
+                'import_statement',
+                'import_from_statement',
+                'use_declaration',
+                'import_declaration',
+                'extern_crate',
             ):
                 # Grab first meaningful identifier as the module name
                 for child in node.children:
                     if child.type in (
-                        "dotted_name",
-                        "identifier",
-                        "module_path",
-                        "scoped_identifier",
+                        'dotted_name',
+                        'identifier',
+                        'module_path',
+                        'scoped_identifier',
                     ):
-                        module_name = _node_text(child).split(".")[0]
+                        module_name = _node_text(child).split('.')[0]
                         if module_name:
                             self.graph_store.add_node(module_name, NodeType.FILE)
                             self.graph_store.add_edge(
@@ -245,7 +245,7 @@ class GraphRAG:
 
         _walk(tree.root_node)
         logger.debug(
-            "TreeSitter indexed %s: classes=%s",
+            'TreeSitter indexed %s: classes=%s',
             file_path,
             classes_found,
         )
@@ -254,10 +254,10 @@ class GraphRAG:
         """Naive import-line heuristic (original fallback)."""
         for line in content.splitlines():
             stripped = line.strip()
-            if stripped.startswith(("import ", "from ")):
+            if stripped.startswith(('import ', 'from ')):
                 parts = stripped.split()
                 if len(parts) > 1:
-                    imported_module = parts[1].split(".")[0]
+                    imported_module = parts[1].split('.')[0]
                     if imported_module:
                         self.graph_store.add_node(imported_module, NodeType.FILE)
                         self.graph_store.add_edge(
@@ -266,16 +266,16 @@ class GraphRAG:
 
     def format_context(self, retrieval_result: dict) -> str:
         """Format retrieval results into a prompt-friendly string."""
-        lines = ["### Semantic Matches"]
-        for res in retrieval_result["semantic_results"]:
-            content = res.get("content") or ""
-            lines.append(f"- {content[:200]}...")
+        lines = ['### Semantic Matches']
+        for res in retrieval_result['semantic_results']:
+            content = res.get('content') or ''
+            lines.append(f'- {content[:200]}...')
 
-        lines.append("\n### Structural Context (Graph)")
-        if retrieval_result["graph_context"]:
-            for edge in retrieval_result["graph_context"]:
-                lines.append(f"- {edge}")
+        lines.append('\n### Structural Context (Graph)')
+        if retrieval_result['graph_context']:
+            for edge in retrieval_result['graph_context']:
+                lines.append(f'- {edge}')
         else:
-            lines.append("(No structural relationships found)")
+            lines.append('(No structural relationships found)')
 
-        return "\n".join(lines)
+        return '\n'.join(lines)

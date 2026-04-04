@@ -22,7 +22,7 @@ def _get_openai_api_key() -> str:
         - Empty string indicates misconfiguration (will cause API errors)
 
     """
-    return os.getenv("OPENAI_API_KEY", os.getenv("RUNTIME_ENV_OPENAI_API_KEY", ""))
+    return os.getenv('OPENAI_API_KEY', os.getenv('RUNTIME_ENV_OPENAI_API_KEY', ''))
 
 
 def _get_openai_base_url() -> str:
@@ -41,7 +41,7 @@ def _get_openai_base_url() -> str:
         - Must include protocol (https://) and version path (/v1)
 
     """
-    return os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    return os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
 
 
 def _get_openai_model() -> str:
@@ -58,7 +58,7 @@ def _get_openai_model() -> str:
         - Affects cost and capability of LLM operations
 
     """
-    return os.getenv("OPENAI_MODEL", "gpt-4o")
+    return os.getenv('OPENAI_MODEL', 'gpt-4o')
 
 
 def _get_max_token() -> int:
@@ -78,7 +78,7 @@ def _get_max_token() -> int:
         - Must be within model's max_tokens limit
 
     """
-    return int(os.getenv("MAX_TOKEN", "500"))
+    return int(os.getenv('MAX_TOKEN', '500'))
 
 
 def _get_openai_client() -> OpenAI:

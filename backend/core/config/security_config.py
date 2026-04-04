@@ -30,23 +30,23 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     security_analyzer: str | None = Field(default=None)
     enforce_security: bool = Field(
         default=True,
-        description="When True, HIGH-risk actions are blocked or require confirmation. "
-        "When False, the analyzer only logs classifications.",
+        description='When True, HIGH-risk actions are blocked or require confirmation. '
+        'When False, the analyzer only logs classifications.',
     )
     block_high_risk: bool = Field(
         default=False,
-        description="When True, HIGH-risk actions are rejected outright. When False, they require user confirmation.",
+        description='When True, HIGH-risk actions are rejected outright. When False, they require user confirmation.',
     )
-    validation_mode: Literal["permissive", "strict"] = Field(
-        default="permissive",
+    validation_mode: Literal['permissive', 'strict'] = Field(
+        default='permissive',
         description=(
-            "Conversation access validation strictness. "
+            'Conversation access validation strictness. '
             "'permissive' skips ownership checks (single-user default). "
             "'strict' enforces conversation ownership and rejects anonymous access."
         ),
     )
-    execution_profile: Literal["standard", "hardened_local"] = Field(
-        default="standard",
+    execution_profile: Literal['standard', 'hardened_local'] = Field(
+        default='standard',
         description=(
             "Runtime execution profile. 'standard' preserves current local behavior. "
             "'hardened_local' adds stricter local policy gates for commands and file access."
@@ -56,14 +56,14 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=False,
         description=(
             "When execution_profile='hardened_local', allow network-capable shell commands "
-            "such as curl, wget, scp, rsync, and netcat."
+            'such as curl, wget, scp, rsync, and netcat.'
         ),
     )
     allow_package_installs: bool = Field(
         default=False,
         description=(
             "When execution_profile='hardened_local', allow package installation commands "
-            "such as pip install, npm install, and Install-Module."
+            'such as pip install, npm install, and Install-Module.'
         ),
     )
     allow_background_processes: bool = Field(
@@ -76,22 +76,22 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=False,
         description=(
             "When execution_profile='hardened_local', allow read/write access to sensitive "
-            "workspace files such as .env, .ssh, and credential stores."
+            'workspace files such as .env, .ssh, and credential stores.'
         ),
     )
     hardened_local_git_allowlist: list[str] = Field(
         default_factory=lambda: [
-            "status",
-            "diff",
-            "log",
-            "show",
-            "branch",
-            "rev-parse",
-            "ls-files",
+            'status',
+            'diff',
+            'log',
+            'show',
+            'branch',
+            'rev-parse',
+            'ls-files',
         ],
         description=(
             "When execution_profile='hardened_local', git subcommands allowed to run "
-            "inside the workspace without broad git write/network permission."
+            'inside the workspace without broad git write/network permission.'
         ),
     )
     hardened_local_package_allowlist: list[str] = Field(
@@ -108,7 +108,7 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "allowed inside the workspace, e.g. ['curl', 'invoke-webrequest']."
         ),
     )
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra='ignore')
 
     @classmethod
     def from_toml_section(cls, data: dict) -> dict[str, SecurityConfig]:
@@ -122,8 +122,8 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         """
         security_mapping: dict[str, SecurityConfig] = {}
         try:
-            security_mapping["security"] = cls.model_validate(data)
+            security_mapping['security'] = cls.model_validate(data)
         except ValidationError as e:
-            msg = f"Invalid security configuration: {e}"
+            msg = f'Invalid security configuration: {e}'
             raise ValueError(msg) from e
         return security_mapping

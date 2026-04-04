@@ -8,12 +8,12 @@ from enum import Enum
 class ConversationStatus(str, Enum):
     """Enumerate high-level lifecycle states for a conversation."""
 
-    STARTING = "starting"
-    RUNNING = "running"
-    STOPPED = "stopped"
-    PAUSED = "paused"
-    ARCHIVED = "archived"
-    UNKNOWN = "unknown"
+    STARTING = 'starting'
+    RUNNING = 'running'
+    STOPPED = 'stopped'
+    PAUSED = 'paused'
+    ARCHIVED = 'archived'
+    UNKNOWN = 'unknown'
 
     @classmethod
     def from_runtime_status(cls, status: str | None) -> ConversationStatus:
@@ -30,14 +30,14 @@ class ConversationStatus(str, Enum):
             return cls.UNKNOWN
 
         normalized = status.lower()
-        if normalized in {cls.STARTING.value, "starting"}:
+        if normalized in {cls.STARTING.value, 'starting'}:
             return cls.STARTING
-        if normalized in {cls.RUNNING.value, "active", "started"}:
+        if normalized in {cls.RUNNING.value, 'active', 'started'}:
             return cls.RUNNING
-        if normalized in {cls.STOPPED.value, "stopped", "stopping"}:
+        if normalized in {cls.STOPPED.value, 'stopped', 'stopping'}:
             return cls.STOPPED
-        if normalized in {cls.PAUSED.value, "paused", "pause"}:
+        if normalized in {cls.PAUSED.value, 'paused', 'pause'}:
             return cls.PAUSED
-        if normalized in {cls.ARCHIVED.value, "archived", "deleted"}:
+        if normalized in {cls.ARCHIVED.value, 'archived', 'deleted'}:
             return cls.ARCHIVED
         return cls.UNKNOWN

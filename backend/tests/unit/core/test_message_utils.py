@@ -1,8 +1,7 @@
 """Tests for backend.core.message_utils — event token usage metadata helpers."""
 
-from typing import Any, cast
+from typing import Any
 from unittest.mock import MagicMock
-
 
 from backend.core.message_utils import (
     _find_event_index_by_id,
@@ -34,14 +33,14 @@ class TestGetToolResponseId:
         """Test event with model_response containing id."""
         event = MagicMock()
         event.tool_call_metadata = MagicMock()
-        event.tool_call_metadata.model_response = {"id": "resp_123"}
-        assert _get_tool_response_id(event) == "resp_123"
+        event.tool_call_metadata.model_response = {'id': 'resp_123'}
+        assert _get_tool_response_id(event) == 'resp_123'
 
     def test_missing_id_key(self):
         """Test model_response without id key returns None."""
         event = MagicMock()
         event.tool_call_metadata = MagicMock()
-        event.tool_call_metadata.model_response = {"other": "value"}
+        event.tool_call_metadata.model_response = {'other': 'value'}
         assert _get_tool_response_id(event) is None
 
 
@@ -52,47 +51,47 @@ class TestFindUsageByResponseId:
         """Test with empty token_usages list."""
         metrics = MagicMock()
         metrics.token_usages = []
-        assert _find_usage_by_response_id(metrics, "resp_123") is None
+        assert _find_usage_by_response_id(metrics, 'resp_123') is None
 
     def test_matching_response_id(self):
         """Test finding usage with matching response_id."""
         usage1 = MagicMock()
-        usage1.response_id = "resp_100"
+        usage1.response_id = 'resp_100'
         usage2 = MagicMock()
-        usage2.response_id = "resp_123"
+        usage2.response_id = 'resp_123'
         usage3 = MagicMock()
-        usage3.response_id = "resp_456"
+        usage3.response_id = 'resp_456'
 
         metrics = MagicMock()
         metrics.token_usages = [usage1, usage2, usage3]
 
-        result = _find_usage_by_response_id(metrics, "resp_123")
+        result = _find_usage_by_response_id(metrics, 'resp_123')
         assert result is usage2
 
     def test_no_matching_response_id(self):
         """Test when no usage matches the response_id."""
         usage1 = MagicMock()
-        usage1.response_id = "resp_100"
+        usage1.response_id = 'resp_100'
         usage2 = MagicMock()
-        usage2.response_id = "resp_200"
+        usage2.response_id = 'resp_200'
 
         metrics = MagicMock()
         metrics.token_usages = [usage1, usage2]
 
-        result = _find_usage_by_response_id(metrics, "resp_999")
+        result = _find_usage_by_response_id(metrics, 'resp_999')
         assert result is None
 
     def test_returns_first_match(self):
         """Test returns first matching usage when multiple exist."""
         usage1 = MagicMock()
-        usage1.response_id = "resp_123"
+        usage1.response_id = 'resp_123'
         usage2 = MagicMock()
-        usage2.response_id = "resp_123"
+        usage2.response_id = 'resp_123'
 
         metrics = MagicMock()
         metrics.token_usages = [usage1, usage2]
 
-        result = _find_usage_by_response_id(metrics, "resp_123")
+        result = _find_usage_by_response_id(metrics, 'resp_123')
         assert result is usage1
 
 
@@ -116,12 +115,12 @@ class TestGetTokenUsageForEvent:
     def test_finds_by_tool_response_id(self):
         """Test finds usage by tool_call_metadata response id."""
         usage = MagicMock()
-        usage.response_id = "resp_tool_123"
+        usage.response_id = 'resp_tool_123'
 
         event = MagicMock()
         event.tool_call_metadata = MagicMock()
-        event.tool_call_metadata.model_response = {"id": "resp_tool_123"}
-        event.response_id = "resp_fallback"
+        event.tool_call_metadata.model_response = {'id': 'resp_tool_123'}
+        event.response_id = 'resp_fallback'
 
         metrics = MagicMock()
         metrics.token_usages = [usage]
@@ -132,12 +131,12 @@ class TestGetTokenUsageForEvent:
     def test_fallback_to_event_response_id(self):
         """Test falls back to event.response_id when tool response id not found."""
         usage = MagicMock()
-        usage.response_id = "resp_event_456"
+        usage.response_id = 'resp_event_456'
 
         event = MagicMock()
         event.tool_call_metadata = MagicMock()
-        event.tool_call_metadata.model_response = {"id": "resp_not_found"}
-        event.response_id = "resp_event_456"
+        event.tool_call_metadata.model_response = {'id': 'resp_not_found'}
+        event.response_id = 'resp_event_456'
 
         metrics = MagicMock()
         metrics.token_usages = [usage]
@@ -148,11 +147,11 @@ class TestGetTokenUsageForEvent:
     def test_no_match_returns_none(self):
         """Test returns None when no matching usage found."""
         usage = MagicMock()
-        usage.response_id = "resp_other"
+        usage.response_id = 'resp_other'
 
         event = MagicMock()
         event.tool_call_metadata = None
-        event.response_id = "resp_not_found"
+        event.response_id = 'resp_not_found'
 
         metrics = MagicMock()
         metrics.token_usages = [usage]
@@ -174,14 +173,14 @@ class TestGetTokenUsageForEvent:
     def test_prefers_tool_response_over_event_response(self):
         """Test tool response id is preferred over event response id."""
         usage_tool = MagicMock()
-        usage_tool.response_id = "resp_tool"
+        usage_tool.response_id = 'resp_tool'
         usage_event = MagicMock()
-        usage_event.response_id = "resp_event"
+        usage_event.response_id = 'resp_event'
 
         event = MagicMock()
         event.tool_call_metadata = MagicMock()
-        event.tool_call_metadata.model_response = {"id": "resp_tool"}
-        event.response_id = "resp_event"
+        event.tool_call_metadata.model_response = {'id': 'resp_tool'}
+        event.response_id = 'resp_event'
 
         metrics = MagicMock()
         metrics.token_usages = [usage_tool, usage_event]
@@ -241,11 +240,11 @@ class TestSearchBackwardsForTokenUsage:
     def test_finds_usage_at_start_index(self):
         """Test finding usage at the starting index."""
         usage = MagicMock()
-        usage.response_id = "resp_123"
+        usage.response_id = 'resp_123'
 
         event = MagicMock()
         event.tool_call_metadata = MagicMock()
-        event.tool_call_metadata.model_response = {"id": "resp_123"}
+        event.tool_call_metadata.model_response = {'id': 'resp_123'}
 
         metrics = MagicMock()
         metrics.token_usages = [usage]
@@ -257,11 +256,11 @@ class TestSearchBackwardsForTokenUsage:
     def test_searches_backwards(self):
         """Test searches backwards from start_idx."""
         usage = MagicMock()
-        usage.response_id = "resp_100"
+        usage.response_id = 'resp_100'
 
         event0 = MagicMock()
         event0.tool_call_metadata = MagicMock()
-        event0.tool_call_metadata.model_response = {"id": "resp_100"}
+        event0.tool_call_metadata.model_response = {'id': 'resp_100'}
 
         event1 = MagicMock()
         event1.tool_call_metadata = None
@@ -281,11 +280,11 @@ class TestSearchBackwardsForTokenUsage:
         """Test returns None when no usage found."""
         event1 = MagicMock()
         event1.tool_call_metadata = None
-        event1.response_id = "resp_not_found"
+        event1.response_id = 'resp_not_found'
 
         event2 = MagicMock()
         event2.tool_call_metadata = None
-        event2.response_id = "resp_other"
+        event2.response_id = 'resp_other'
 
         metrics = MagicMock()
         metrics.token_usages = []
@@ -331,7 +330,7 @@ class TestGetTokenUsageForEventId:
     def test_finds_usage_for_target_event(self):
         """Test finds usage for the target event."""
         usage = MagicMock()
-        usage.response_id = "resp_200"
+        usage.response_id = 'resp_200'
 
         event1 = MagicMock()
         event1.id = 100
@@ -340,7 +339,7 @@ class TestGetTokenUsageForEventId:
         event2 = MagicMock()
         event2.id = 200
         event2.tool_call_metadata = MagicMock()
-        event2.tool_call_metadata.model_response = {"id": "resp_200"}
+        event2.tool_call_metadata.model_response = {'id': 'resp_200'}
 
         metrics = MagicMock()
         metrics.token_usages = [usage]
@@ -352,12 +351,12 @@ class TestGetTokenUsageForEventId:
     def test_searches_backwards_from_target(self):
         """Test searches backwards from target event."""
         usage = MagicMock()
-        usage.response_id = "resp_100"
+        usage.response_id = 'resp_100'
 
         event1 = MagicMock()
         event1.id = 100
         event1.tool_call_metadata = MagicMock()
-        event1.tool_call_metadata.model_response = {"id": "resp_100"}
+        event1.tool_call_metadata.model_response = {'id': 'resp_100'}
 
         event2 = MagicMock()
         event2.id = 200
@@ -384,14 +383,14 @@ class TestGetTokenUsageForEventId:
     def test_integration_full_workflow(self):
         """Test full workflow with multiple events."""
         usage1 = MagicMock()
-        usage1.response_id = "resp_100"
+        usage1.response_id = 'resp_100'
         usage2 = MagicMock()
-        usage2.response_id = "resp_300"
+        usage2.response_id = 'resp_300'
 
         event1 = MagicMock()
         event1.id = 100
         event1.tool_call_metadata = MagicMock()
-        event1.tool_call_metadata.model_response = {"id": "resp_100"}
+        event1.tool_call_metadata.model_response = {'id': 'resp_100'}
 
         event2 = MagicMock()
         event2.id = 200
@@ -400,7 +399,7 @@ class TestGetTokenUsageForEventId:
         event3 = MagicMock()
         event3.id = 300
         event3.tool_call_metadata = MagicMock()
-        event3.tool_call_metadata.model_response = {"id": "resp_300"}
+        event3.tool_call_metadata.model_response = {'id': 'resp_300'}
 
         event4 = MagicMock()
         event4.id = 400

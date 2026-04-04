@@ -15,7 +15,7 @@ from backend.core.pydantic_compat import model_dump_with_options
 class Cost:
     """Track request cost metrics in both prompt/output tokens and currency."""
 
-    model: str = ""
+    model: str = ''
     cost: float = 0.0
     prompt_tokens: int = 0
     timestamp: float = field(default_factory=time.time)
@@ -32,14 +32,14 @@ class ResponseLatency(BaseModel):
 class TokenUsage(BaseModel):
     """Metric tracking detailed token usage per completion call."""
 
-    model: str = Field(default="")
+    model: str = Field(default='')
     prompt_tokens: int = Field(default=0)
     completion_tokens: int = Field(default=0)
     cache_read_tokens: int = Field(default=0)
     cache_write_tokens: int = Field(default=0)
     context_window: int = Field(default=0)
     per_turn_token: int = Field(default=0)
-    response_id: str = Field(default="")
+    response_id: str = Field(default='')
 
     def __add__(self, other: TokenUsage) -> TokenUsage:
         """Add two TokenUsage instances together."""
@@ -65,7 +65,7 @@ class Metrics:
       - A list of TokenUsage (one per call).
     """
 
-    def __init__(self, model_name: str = "default") -> None:
+    def __init__(self, model_name: str = 'default') -> None:
         """Initialize empty tracking structures for the provided model name."""
         self._reset_internal_state(model_name)
 
@@ -84,7 +84,7 @@ class Metrics:
             cache_read_tokens=0,
             cache_write_tokens=0,
             context_window=0,
-            response_id="",
+            response_id='',
         )
 
     @property
@@ -96,7 +96,7 @@ class Metrics:
     def accumulated_cost(self, value: float) -> None:
         """Set accumulated cost (must be non-negative)."""
         if value < 0:
-            msg = "Total cost cannot be negative."
+            msg = 'Total cost cannot be negative.'
             raise ValueError(msg)
         self._accumulated_cost = value
 
@@ -118,7 +118,7 @@ class Metrics:
     @property
     def response_latencies(self) -> list[ResponseLatency]:
         """Get list of response latency measurements."""
-        if not hasattr(self, "_response_latencies"):
+        if not hasattr(self, '_response_latencies'):
             self._response_latencies = []
         return self._response_latencies
 
@@ -130,7 +130,7 @@ class Metrics:
     @property
     def token_usages(self) -> list[TokenUsage]:
         """Get list of token usage records."""
-        if not hasattr(self, "_token_usages"):
+        if not hasattr(self, '_token_usages'):
             self._token_usages = []
         return self._token_usages
 
@@ -142,7 +142,7 @@ class Metrics:
     @property
     def accumulated_token_usage(self) -> TokenUsage:
         """Get the accumulated token usage, initializing it if it doesn't exist."""
-        if not hasattr(self, "_accumulated_token_usage"):
+        if not hasattr(self, '_accumulated_token_usage'):
             self._accumulated_token_usage = TokenUsage(
                 model=self.model_name,
                 prompt_tokens=0,
@@ -150,7 +150,7 @@ class Metrics:
                 cache_read_tokens=0,
                 cache_write_tokens=0,
                 context_window=0,
-                response_id="",
+                response_id='',
             )
         return self._accumulated_token_usage
 
@@ -166,7 +166,7 @@ class Metrics:
         """
         try:
             if value < 0:
-                msg = "Added cost cannot be negative."
+                msg = 'Added cost cannot be negative.'
                 raise ValueError(msg)
         except TypeError:
             # Handle MagicMock in tests
@@ -218,7 +218,7 @@ class Metrics:
             cache_write_tokens=cache_write_tokens,
             context_window=context_window,
             per_turn_token=per_turn_token,
-            response_id="",
+            response_id='',
         )
 
     def merge(self, other: Metrics) -> None:
@@ -236,16 +236,16 @@ class Metrics:
     def get(self) -> dict:
         """Return the metrics in a dictionary."""
         return {
-            "accumulated_cost": self._accumulated_cost,
-            "max_budget_per_task": self._max_budget_per_task,
-            "accumulated_token_usage": model_dump_with_options(
+            'accumulated_cost': self._accumulated_cost,
+            'max_budget_per_task': self._max_budget_per_task,
+            'accumulated_token_usage': model_dump_with_options(
                 self.accumulated_token_usage
             ),
-            "costs": [asdict(cost) for cost in self._costs],
-            "response_latencies": [
+            'costs': [asdict(cost) for cost in self._costs],
+            'response_latencies': [
                 model_dump_with_options(latency) for latency in self._response_latencies
             ],
-            "token_usages": [
+            'token_usages': [
                 model_dump_with_options(usage) for usage in self._token_usages
             ],
         }
@@ -253,7 +253,7 @@ class Metrics:
     def log(self) -> str:
         """Log the metrics."""
         metrics = self.get()
-        return "".join((f"{key}: {value}\n" for key, value in metrics.items()))
+        return ''.join((f'{key}: {value}\n' for key, value in metrics.items()))
 
     def copy(self) -> Metrics:
         """Create a deep copy of the Metrics object."""
@@ -297,13 +297,13 @@ class Metrics:
             - base_usage.cache_write_tokens,
             context_window=current_usage.context_window,
             per_turn_token=0,
-            response_id="",
+            response_id='',
         )
         return result
 
     def __repr__(self) -> str:
         """Return a concise dictionary-style representation of tracked metrics."""
-        return f"Metrics({self.get()})"
+        return f'Metrics({self.get()})'
 
     def __getstate__(self) -> dict:
         """Return a plain-serializable state for pickling.
@@ -319,22 +319,22 @@ class Metrics:
 
         __getstate__.
         """
-        model = state.get("accumulated_token_usage", {}).get("model", "default")
+        model = state.get('accumulated_token_usage', {}).get('model', 'default')
         self._reset_internal_state(model_name=model)
-        self._accumulated_cost = state.get("accumulated_cost", 0.0)
-        self._max_budget_per_task = state.get("max_budget_per_task")
+        self._accumulated_cost = state.get('accumulated_cost', 0.0)
+        self._max_budget_per_task = state.get('max_budget_per_task')
         self._costs = [
-            Cost(**c) if isinstance(c, dict) else c for c in state.get("costs", [])
+            Cost(**c) if isinstance(c, dict) else c for c in state.get('costs', [])
         ]
         self._response_latencies = [
             ResponseLatency.model_validate(r) if isinstance(r, dict) else r
-            for r in state.get("response_latencies", [])
+            for r in state.get('response_latencies', [])
         ]
         self._token_usages = [
             TokenUsage.model_validate(t) if isinstance(t, dict) else t
-            for t in state.get("token_usages", [])
+            for t in state.get('token_usages', [])
         ]
-        atu = state.get("accumulated_token_usage", {})
+        atu = state.get('accumulated_token_usage', {})
         if isinstance(atu, dict):
             self._accumulated_token_usage = TokenUsage.model_validate(atu)
 

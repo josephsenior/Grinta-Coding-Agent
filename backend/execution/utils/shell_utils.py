@@ -33,21 +33,21 @@ def format_shell_output(
     if stdout:
         content_parts.append(stdout)
     if stderr:
-        content_parts.append("[ERROR STREAM]\n" + stderr)
+        content_parts.append('[ERROR STREAM]\n' + stderr)
 
-    final_content = "\n".join(content_parts).strip()
+    final_content = '\n'.join(content_parts).strip()
 
     # Normalize working directory for Windows if needed
     normalized_cwd = (
-        working_dir.replace("\\", "\\\\") if "\\" in working_dir else working_dir
+        working_dir.replace('\\', '\\\\') if '\\' in working_dir else working_dir
     )
 
     metadata = CmdOutputMetadata(
         exit_code=exit_code,
         working_dir=normalized_cwd,
     )
-    metadata.prefix = "[Below is the output of the previous command.]\n"
-    metadata.suffix = f"\n[The command completed with exit code {exit_code}.]"
+    metadata.prefix = '[Below is the output of the previous command.]\n'
+    metadata.suffix = f'\n[The command completed with exit code {exit_code}.]'
 
     return CmdOutputObservation(
         content=final_content,

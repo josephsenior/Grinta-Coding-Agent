@@ -21,12 +21,12 @@ class ServerReadyObservation(Observation):
 
     port: int
     url: str
-    protocol: str = "http"
-    health_status: str = "unknown"
+    protocol: str = 'http'
+    health_status: str = 'unknown'
     observation: ClassVar[str] = ObservationType.SERVER_READY
 
     @property
     def message(self) -> str:
         """Human-readable message about the server."""
-        status_emoji = "✅" if self.health_status == "healthy" else "🔄"
-        return f"{status_emoji} Server detected and ready at {self.url}"
+        status_emoji = '✅' if self.health_status == 'healthy' else '🔄'
+        return f'{status_emoji} Server detected and ready at {self.url}'

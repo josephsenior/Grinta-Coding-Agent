@@ -11,7 +11,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 from backend.utils.search_utils import iterate, offset_to_page_id, page_id_to_offset
 
-
 # ---------------------------------------------------------------------------
 # search_utils
 # ---------------------------------------------------------------------------
@@ -37,7 +36,7 @@ class TestOffsetToPageId(unittest.TestCase):
 
 class TestPageIdToOffset(unittest.TestCase):
     def test_valid_page_id(self):
-        pid = base64.b64encode(b"100").decode()
+        pid = base64.b64encode(b'100').decode()
         self.assertEqual(page_id_to_offset(pid), 100)
 
     def test_none_returns_zero(self):
@@ -69,15 +68,15 @@ class TestIterate(unittest.IsolatedAsyncioTestCase):
             results: list
             next_page_id: str | None = None
 
-        page_id = base64.b64encode(b"10").decode()
+        page_id = base64.b64encode(b'10').decode()
         mock_fn = AsyncMock(
             side_effect=[
-                ResultSet(results=["a", "b"], next_page_id=page_id),
-                ResultSet(results=["c"], next_page_id=None),
+                ResultSet(results=['a', 'b'], next_page_id=page_id),
+                ResultSet(results=['c'], next_page_id=None),
             ]
         )
         items = [item async for item in iterate(mock_fn)]
-        self.assertEqual(items, ["a", "b", "c"])
+        self.assertEqual(items, ['a', 'b', 'c'])
         self.assertEqual(mock_fn.await_count, 2)
 
     async def test_empty_first_page(self):
@@ -129,7 +128,7 @@ class TestCreateTrackedTask(unittest.IsolatedAsyncioTestCase):
         async def noop():
             pass
 
-        task = create_tracked_task(noop(), name="test-task")
+        task = create_tracked_task(noop(), name='test-task')
         await task
 
 
@@ -145,10 +144,10 @@ class TestCallSyncFromAsync(unittest.IsolatedAsyncioTestCase):
 class TestCallAsyncFromSync(unittest.TestCase):
     def test_valid_coroutine(self):
         async def greet(name):
-            return f"hello {name}"
+            return f'hello {name}'
 
-        result = call_async_from_sync(greet, timeout=5, name="world")
-        self.assertEqual(result, "hello world")
+        result = call_async_from_sync(greet, timeout=5, name='world')
+        self.assertEqual(result, 'hello world')
 
     def test_none_raises(self):
         with self.assertRaises(ValueError):
@@ -173,7 +172,7 @@ class TestWaitAll(unittest.IsolatedAsyncioTestCase):
 
     async def test_single_error_raises(self):
         async def fail():
-            raise RuntimeError("boom")
+            raise RuntimeError('boom')
 
         with self.assertRaises(RuntimeError):
             await wait_all([fail()])
@@ -183,16 +182,16 @@ class TestWaitAll(unittest.IsolatedAsyncioTestCase):
             raise RuntimeError(msg)
 
         with self.assertRaises(AsyncException):
-            await wait_all([fail("a"), fail("b")])
+            await wait_all([fail('a'), fail('b')])
 
 
 class TestAsyncException(unittest.TestCase):
     def test_str(self):
-        exc = AsyncException([ValueError("x"), TypeError("y")])
-        self.assertEqual(str(exc), "x\ny")
+        exc = AsyncException([ValueError('x'), TypeError('y')])
+        self.assertEqual(str(exc), 'x\ny')
 
     def test_exceptions_attr(self):
-        errs = [ValueError("a")]
+        errs = [ValueError('a')]
         exc = AsyncException(errs)
         self.assertIs(exc.exceptions, errs)
 
@@ -236,10 +235,10 @@ class TestRunOrSchedule(unittest.IsolatedAsyncioTestCase):
 class TestHandlePendingTasks(unittest.TestCase):
     def test_cancels_pending(self):
         task = MagicMock()
-        task.get_coro.return_value = MagicMock(__name__="slow_task")
+        task.get_coro.return_value = MagicMock(__name__='slow_task')
         _handle_pending_tasks(done=set(), pending={task})
         task.cancel.assert_called_once()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

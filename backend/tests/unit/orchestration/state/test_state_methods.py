@@ -1,44 +1,43 @@
 """Tests for State mutation methods and helpers."""
 
 import json
-from unittest.mock import MagicMock
 from typing import cast
+from unittest.mock import MagicMock
 
-
+from backend.core.schemas import AgentState
 from backend.orchestration.state.control_flags import (
     IterationControlFlag,
 )
 from backend.orchestration.state.state import State
-from backend.core.schemas import AgentState
 
 
 class TestStateMutationMethods:
     def test_set_last_error_without_source(self):
         """Test setting last error without source."""
         state = State()
-        state.set_last_error("Something went wrong")
+        state.set_last_error('Something went wrong')
 
-        assert state.last_error == "Something went wrong"
+        assert state.last_error == 'Something went wrong'
 
     def test_set_last_error_with_source(self):
         """Test setting last error with source."""
         state = State()
-        state.set_last_error("Error occurred", source="test_service")
+        state.set_last_error('Error occurred', source='test_service')
 
-        assert state.last_error == "Error occurred"
+        assert state.last_error == 'Error occurred'
 
     def test_set_last_error_empty(self):
         """Test setting empty last error."""
         state = State()
-        state.last_error = "Previous error"
-        state.set_last_error("")
+        state.last_error = 'Previous error'
+        state.set_last_error('')
 
-        assert state.last_error == ""
+        assert state.last_error == ''
 
     def test_set_outputs_without_source(self):
         """Test setting outputs without source."""
         state = State()
-        outputs = {"result": "success", "data": [1, 2, 3]}
+        outputs = {'result': 'success', 'data': [1, 2, 3]}
         state.set_outputs(outputs)
 
         assert state.outputs == outputs
@@ -46,52 +45,52 @@ class TestStateMutationMethods:
     def test_set_outputs_with_source(self):
         """Test setting outputs with source."""
         state = State()
-        outputs = {"key": "value"}
-        state.set_outputs(outputs, source="controller")
+        outputs = {'key': 'value'}
+        state.set_outputs(outputs, source='controller')
 
         assert state.outputs == outputs
 
     def test_set_outputs_replaces_existing(self):
         """Test that set_outputs replaces existing outputs."""
         state = State()
-        state.outputs = {"old": "data"}
-        state.set_outputs({"new": "data"})
+        state.outputs = {'old': 'data'}
+        state.set_outputs({'new': 'data'})
 
-        assert state.outputs == {"new": "data"}
-        assert "old" not in state.outputs
+        assert state.outputs == {'new': 'data'}
+        assert 'old' not in state.outputs
 
     def test_set_extra_without_source(self):
         """Test setting extra data without source."""
         state = State()
-        state.set_extra("custom_key", "custom_value")
+        state.set_extra('custom_key', 'custom_value')
 
-        assert state.extra_data["custom_key"] == "custom_value"
+        assert state.extra_data['custom_key'] == 'custom_value'
 
     def test_set_extra_with_source(self):
         """Test setting extra data with source."""
         state = State()
-        state.set_extra("flag", True, source="monitor")
+        state.set_extra('flag', True, source='monitor')
 
-        assert state.extra_data["flag"] is True
+        assert state.extra_data['flag'] is True
 
     def test_set_extra_multiple_keys(self):
         """Test setting multiple extra data keys."""
         state = State()
-        state.set_extra("key1", "value1")
-        state.set_extra("key2", "value2")
-        state.set_extra("key3", "value3")
+        state.set_extra('key1', 'value1')
+        state.set_extra('key2', 'value2')
+        state.set_extra('key3', 'value3')
 
-        assert state.extra_data["key1"] == "value1"
-        assert state.extra_data["key2"] == "value2"
-        assert state.extra_data["key3"] == "value3"
+        assert state.extra_data['key1'] == 'value1'
+        assert state.extra_data['key2'] == 'value2'
+        assert state.extra_data['key3'] == 'value3'
 
     def test_set_extra_overwrites_existing(self):
         """Test that set_extra overwrites existing key."""
         state = State()
-        state.extra_data["key"] = "old"
-        state.set_extra("key", "new")
+        state.extra_data['key'] = 'old'
+        state.set_extra('key', 'new')
 
-        assert state.extra_data["key"] == "new"
+        assert state.extra_data['key'] == 'new'
 
     def test_adjust_iteration_limit_without_source(self):
         """Test adjusting iteration limit without source."""
@@ -109,7 +108,7 @@ class TestStateMutationMethods:
         state.iteration_flag = IterationControlFlag(
             limit_increase_amount=50, current_value=10, max_value=50
         )
-        state.adjust_iteration_limit(100, source="user_input")
+        state.adjust_iteration_limit(100, source='user_input')
 
         assert state.iteration_flag.max_value == 100
 
@@ -133,7 +132,7 @@ class TestStateMutationMethods:
     def test_set_agent_state_with_source(self):
         """Test setting agent state with source."""
         state = State()
-        state.set_agent_state(AgentState.PAUSED, source="pause_handler")
+        state.set_agent_state(AgentState.PAUSED, source='pause_handler')
 
         assert state.agent_state == AgentState.PAUSED
 
@@ -159,30 +158,30 @@ class TestStateMutationMethods:
 class TestStateCheckpointHelpers:
     def test_checkpoint_dir_without_user_id(self):
         """Test checkpoint directory path without user ID."""
-        result = State._checkpoint_dir("session123", None)
+        result = State._checkpoint_dir('session123', None)
 
-        assert "session123" in result
-        assert result.endswith("state_checkpoints/")
+        assert 'session123' in result
+        assert result.endswith('state_checkpoints/')
 
     def test_checkpoint_dir_with_user_id(self):
         """Test checkpoint directory path with user ID."""
-        result = State._checkpoint_dir("session456", "user789")
+        result = State._checkpoint_dir('session456', 'user789')
 
-        assert "session456" in result
-        assert "user789" in result
-        assert result.endswith("state_checkpoints/")
+        assert 'session456' in result
+        assert 'user789' in result
+        assert result.endswith('state_checkpoints/')
 
     def test_write_checkpoint_success(self):
         """Test successful checkpoint write."""
         mock_store = MagicMock()
         encoded = '{"version": 1, "data": "test"}'
 
-        State._write_checkpoint(mock_store, "sess1", None, encoded)
+        State._write_checkpoint(mock_store, 'sess1', None, encoded)
 
         # Verify checkpoint was written
         assert mock_store.write.called
         call_args = mock_store.write.call_args
-        assert "state_checkpoints/" in call_args[0][0]
+        assert 'state_checkpoints/' in call_args[0][0]
         assert call_args[0][1] == encoded
 
     def test_write_checkpoint_and_prune(self):
@@ -190,15 +189,15 @@ class TestStateCheckpointHelpers:
         mock_store = MagicMock()
         # Simulate existing checkpoints
         mock_store.list.return_value = [
-            "1000.json",
-            "2000.json",
-            "3000.json",
-            "4000.json",
-            "5000.json",
+            '1000.json',
+            '2000.json',
+            '3000.json',
+            '4000.json',
+            '5000.json',
         ]
 
         encoded = '{"test": "data"}'
-        State._write_checkpoint(mock_store, "sess1", None, encoded)
+        State._write_checkpoint(mock_store, 'sess1', None, encoded)
 
         # Should list directory to check for pruning
         assert mock_store.list.called
@@ -206,11 +205,11 @@ class TestStateCheckpointHelpers:
     def test_write_checkpoint_list_failure(self):
         """Test checkpoint write when listing fails."""
         mock_store = MagicMock()
-        mock_store.list.side_effect = Exception("Directory not found")
+        mock_store.list.side_effect = Exception('Directory not found')
         encoded = '{"test": "data"}'
 
         # Should not raise exception
-        State._write_checkpoint(mock_store, "sess1", None, encoded)
+        State._write_checkpoint(mock_store, 'sess1', None, encoded)
 
         # Write should still succeed
         assert mock_store.write.called
@@ -218,11 +217,11 @@ class TestStateCheckpointHelpers:
     def test_write_checkpoint_write_failure(self):
         """Test checkpoint write failure."""
         mock_store = MagicMock()
-        mock_store.write.side_effect = Exception("Write failed")
+        mock_store.write.side_effect = Exception('Write failed')
         encoded = '{"test": "data"}'
 
         # Should not raise exception
-        State._write_checkpoint(mock_store, "sess1", None, encoded)
+        State._write_checkpoint(mock_store, 'sess1', None, encoded)
 
         # Should not try to list/prune if write failed
         assert not mock_store.list.called
@@ -233,7 +232,7 @@ class TestStateInitialization:
         """Test State with default values."""
         state = State()
 
-        assert state.session_id == ""
+        assert state.session_id == ''
         assert state.user_id is None
         assert state.agent_state == AgentState.LOADING
         assert state.confirmation_mode is False
@@ -241,20 +240,20 @@ class TestStateInitialization:
         assert state.inputs == {}
         assert state.outputs == {}
         assert state.extra_data == {}
-        assert state.last_error == ""
+        assert state.last_error == ''
         assert state.delegate_level == 0
 
     def test_initialization_with_values(self):
         """Test State initialization with custom values."""
         state = State(
-            session_id="test123",
-            user_id="user456",
+            session_id='test123',
+            user_id='user456',
             confirmation_mode=True,
             delegate_level=2,
         )
 
-        assert state.session_id == "test123"
-        assert state.user_id == "user456"
+        assert state.session_id == 'test123'
+        assert state.user_id == 'user456'
         assert state.confirmation_mode is True
         assert state.delegate_level == 2
 
@@ -272,24 +271,24 @@ class TestStateInitialization:
         state = State()
 
         assert state.metrics is not None
-        assert hasattr(state.metrics, "model_name")
+        assert hasattr(state.metrics, 'model_name')
 
 
 class TestStateSaveToSession:
     def test_save_to_session_basic(self):
         """Test basic save to session."""
         mock_store = MagicMock()
-        state = State(session_id="sess1", user_id=None)
-        state.set_extra("key", "value")
+        state = State(session_id='sess1', user_id=None)
+        state.set_extra('key', 'value')
 
-        state.save_to_session("sess1", mock_store, None)
+        state.save_to_session('sess1', mock_store, None)
 
         # Verify write was called (may write checkpoint first, then primary)
         assert mock_store.write.called
         # Check that at least one call was to agent_state.json or checkpoint
         all_filenames = [call[0][0] for call in mock_store.write.call_args_list]
         has_primary_or_checkpoint = any(
-            "agent_state.json" in f or "state_checkpoints" in f for f in all_filenames
+            'agent_state.json' in f or 'state_checkpoints' in f for f in all_filenames
         )
         assert has_primary_or_checkpoint
 
@@ -297,19 +296,19 @@ class TestStateSaveToSession:
         content = mock_store.write.call_args_list[0][0][1]
         assert isinstance(content, str)
         data = json.loads(content)
-        assert "_schema_version" in data
+        assert '_schema_version' in data
 
     def test_save_to_session_with_user_id(self):
         """Test save to session with user ID."""
         mock_store = MagicMock()
-        state = State(session_id="sess2", user_id="user123")
+        state = State(session_id='sess2', user_id='user123')
 
-        state.save_to_session("sess2", mock_store, "user123")
+        state.save_to_session('sess2', mock_store, 'user123')
 
         assert mock_store.write.called
         # Should write to user-specific location
         filename = mock_store.write.call_args[0][0]
-        assert "user123" in filename or "sess2" in filename
+        assert 'user123' in filename or 'sess2' in filename
 
     def test_save_clears_conversation_stats(self):
         """Test that conversation_stats is cleared during save."""
@@ -318,7 +317,7 @@ class TestStateSaveToSession:
         state = State()
         state.conversation_stats = mock_stats
 
-        state.save_to_session("sess1", mock_store, None)
+        state.save_to_session('sess1', mock_store, None)
 
         # conversation_stats should be None during serialization
         # but restored after
@@ -329,7 +328,7 @@ class TestStateSaveToSession:
         mock_store = MagicMock()
         state = State()
 
-        state.save_to_session("sess1", mock_store, None)
+        state.save_to_session('sess1', mock_store, None)
 
         # Should write primary file + checkpoint
         # (at least 2 write calls)
@@ -340,7 +339,7 @@ class TestStateSaveToSession:
         mock_store = MagicMock()
         state = State()
 
-        state.save_to_session("sess1", mock_store, "user123")
+        state.save_to_session('sess1', mock_store, 'user123')
 
         # Should attempt to delete legacy file
         # (may or may not be called depending on file existence)
@@ -376,6 +375,6 @@ class TestTrafficControlState:
         """Test TrafficControlState constants."""
         from backend.orchestration.state.state import TrafficControlState
 
-        assert TrafficControlState.NORMAL == "normal"
-        assert TrafficControlState.THROTTLING == "throttling"
-        assert TrafficControlState.PAUSED == "paused"
+        assert TrafficControlState.NORMAL == 'normal'
+        assert TrafficControlState.THROTTLING == 'throttling'
+        assert TrafficControlState.PAUSED == 'paused'

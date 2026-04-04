@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from backend.core.config.agent_config import AgentConfig
+from backend.core.config.compactor_config import AutoCompactorConfig
 from backend.core.constants import DEFAULT_AGENT_NAME
 
 
@@ -32,11 +33,19 @@ class TestAgentConfigDefaults:
 
     def test_default_compactor_config(self):
         cfg = AgentConfig()
-        assert cfg.compactor_config is not None
+        assert isinstance(cfg.compactor_config, AutoCompactorConfig)
+
+    def test_default_lsp_query_enabled(self):
+        cfg = AgentConfig()
+        assert cfg.enable_lsp_query is True
+
+    def test_default_swarming_enabled(self):
+        cfg = AgentConfig()
+        assert cfg.enable_swarming is True
 
     def test_default_autonomy_level(self):
         cfg = AgentConfig()
-        assert cfg.autonomy_level in {"supervised", "balanced", "full"}
+        assert cfg.autonomy_level in {'supervised', 'balanced', 'full'}
 
     def test_default_circuit_breaker(self):
         cfg = AgentConfig()
@@ -50,15 +59,15 @@ class TestAgentConfigDefaults:
 class TestAgentConfigValidation:
     def test_empty_name_rejected(self):
         with pytest.raises(ValidationError):
-            AgentConfig(name="")
+            AgentConfig(name='')
 
     def test_empty_autonomy_rejected(self):
         with pytest.raises(ValidationError):
-            AgentConfig(autonomy_level="")
+            AgentConfig(autonomy_level='')
 
     def test_empty_system_prompt_rejected(self):
         with pytest.raises(ValidationError):
-            AgentConfig(system_prompt_filename="")
+            AgentConfig(system_prompt_filename='')
 
     def test_memory_max_threads_min(self):
         with pytest.raises(ValidationError):
@@ -66,33 +75,33 @@ class TestAgentConfigValidation:
 
     def test_extra_fields_rejected(self):
         with pytest.raises(ValidationError):
-            AgentConfig(**{"nonexistent_field": "value"})
+            AgentConfig(**{'nonexistent_field': 'value'})
 
     def test_legacy_enable_prompt_caching_input_dropped(self):
-        cfg = AgentConfig.model_validate({"enable_prompt_caching": False})
-        assert not hasattr(cfg, "enable_prompt_caching")
+        cfg = AgentConfig.model_validate({'enable_prompt_caching': False})
+        assert not hasattr(cfg, 'enable_prompt_caching')
 
     def test_legacy_enable_prompt_caching_in_model_validate_dropped(self):
-        cfg = AgentConfig.model_validate({"enable_prompt_caching": True})
-        assert not hasattr(cfg, "enable_prompt_caching")
+        cfg = AgentConfig.model_validate({'enable_prompt_caching': True})
+        assert not hasattr(cfg, 'enable_prompt_caching')
 
     def test_legacy_condenser_config_kwarg_rejected(self):
         with pytest.raises(ValidationError):
-            AgentConfig.model_validate({"condenser_config": {"type": "noop"}})
+            AgentConfig.model_validate({'condenser_config': {'type': 'noop'}})
 
 
 class TestAgentConfigCustom:
     def test_custom_name(self):
-        cfg = AgentConfig(name="Navigator")
-        assert cfg.name == "Navigator"
+        cfg = AgentConfig(name='Navigator')
+        assert cfg.name == 'Navigator'
 
     def test_custom_autonomy(self):
-        cfg = AgentConfig(autonomy_level="full")
-        assert cfg.autonomy_level == "full"
+        cfg = AgentConfig(autonomy_level='full')
+        assert cfg.autonomy_level == 'full'
 
     def test_disabled_playbooks(self):
-        cfg = AgentConfig(disabled_playbooks=["playbook1"])
-        assert "playbook1" in cfg.disabled_playbooks
+        cfg = AgentConfig(disabled_playbooks=['playbook1'])
+        assert 'playbook1' in cfg.disabled_playbooks
 
     def test_max_iterations_override(self):
         cfg = AgentConfig(max_iterations_override=50)
@@ -119,56 +128,56 @@ class TestGetLlmConfig:
 class TestResolvedSystemPromptFilename:
     def test_default(self):
         cfg = AgentConfig()
-        assert cfg.resolved_system_prompt_filename.endswith(".j2")
+        assert cfg.resolved_system_prompt_filename == 'system_prompt'
 
     def test_custom(self):
-        cfg = AgentConfig(system_prompt_filename="custom.j2")
-        assert cfg.resolved_system_prompt_filename == "custom.j2"
+        cfg = AgentConfig(system_prompt_filename='custom.j2')
+        assert cfg.resolved_system_prompt_filename == 'custom.j2'
 
     def test_none_filename_uses_default(self):
         """Test that None filename falls back to default."""
         cfg = AgentConfig()
         # Bypass validation by setting directly
-        object.__setattr__(cfg, "system_prompt_filename", None)
-        assert cfg.resolved_system_prompt_filename == "system_prompt.j2"
+        object.__setattr__(cfg, 'system_prompt_filename', None)
+        assert cfg.resolved_system_prompt_filename == 'system_prompt'
 
     def test_non_string_filename_uses_default(self):
         """Test that non-string filename falls back to default."""
         cfg = AgentConfig()
         # Bypass validation by setting directly
-        object.__setattr__(cfg, "system_prompt_filename", 123)
-        assert cfg.resolved_system_prompt_filename == "system_prompt.j2"
+        object.__setattr__(cfg, 'system_prompt_filename', 123)
+        assert cfg.resolved_system_prompt_filename == 'system_prompt'
 
 
 class TestSeparateBaseAndCustomSections:
     def test_simple(self):
         data = {
-            "name": "test",
-            "enable_cmd": True,
-            "Navigator": {"name": "nav", "enable_cmd": False},
+            'name': 'test',
+            'enable_cmd': True,
+            'Navigator': {'name': 'nav', 'enable_cmd': False},
         }
         base, custom = AgentConfig._separate_base_and_custom_sections(data)
-        assert base["name"] == "test"
-        assert base["enable_cmd"] is True
-        assert "Navigator" in custom
-        assert custom["Navigator"]["enable_cmd"] is False
+        assert base['name'] == 'test'
+        assert base['enable_cmd'] is True
+        assert 'Navigator' in custom
+        assert custom['Navigator']['enable_cmd'] is False
 
     def test_llm_config_not_custom(self):
         """llm_config dict should stay in base, not be treated as custom section."""
-        data = {"llm_config": {"model": "gpt-4"}}
+        data = {'llm_config': {'model': 'gpt-4'}}
         base, custom = AgentConfig._separate_base_and_custom_sections(data)
-        assert "llm_config" in base
+        assert 'llm_config' in base
         assert not custom
 
 
 class TestCreateBaseConfig:
     def test_valid(self):
-        cfg = AgentConfig._create_base_config({"name": "test_agent"})
-        assert cfg.name == "test_agent"
+        cfg = AgentConfig._create_base_config({'name': 'test_agent'})
+        assert cfg.name == 'test_agent'
 
     def test_unknown_fields_ignored(self):
-        cfg = AgentConfig._create_base_config({"name": "agent", "bogus_field": 123})
-        assert cfg.name == "agent"
+        cfg = AgentConfig._create_base_config({'name': 'agent', 'bogus_field': 123})
+        assert cfg.name == 'agent'
 
     def test_empty_gives_defaults(self):
         cfg = AgentConfig._create_base_config({})
@@ -179,20 +188,20 @@ class TestCreateBaseConfig:
         # Pass invalid value for memory_max_threads (must be >= 1)
         cfg = AgentConfig._create_base_config(
             {
-                "name": "test",
-                "memory_max_threads": -5,  # Invalid: must be >= 1
+                'name': 'test',
+                'memory_max_threads': -5,  # Invalid: must be >= 1
             }
         )
         # Should fall back to default
-        assert cfg.name == "test"
+        assert cfg.name == 'test'
         assert cfg.memory_max_threads >= 1
 
     def test_multiple_invalid_fields_recovery(self):
         """Test recovery with multiple invalid field values."""
         cfg = AgentConfig._create_base_config(
             {
-                "name": "",  # Invalid: non-empty string required
-                "memory_max_threads": 0,  # Invalid: must be >= 1
+                'name': '',  # Invalid: non-empty string required
+                'memory_max_threads': 0,  # Invalid: must be >= 1
             }
         )
         # Should use defaults for invalid fields
@@ -204,68 +213,68 @@ class TestCreateCustomConfig:
     def test_override_fields(self):
         base = AgentConfig()
         custom = AgentConfig._create_custom_config(
-            "MyAgent", base, {"enable_cmd": False}
+            'MyAgent', base, {'enable_cmd': False}
         )
-        assert custom.name == "MyAgent"
+        assert custom.name == 'MyAgent'
         assert custom.enable_cmd is False
 
     def test_unknown_overrides_ignored(self):
         base = AgentConfig()
-        custom = AgentConfig._create_custom_config("MyAgent", base, {"unknown_key": 42})
-        assert custom.name == "MyAgent"
+        custom = AgentConfig._create_custom_config('MyAgent', base, {'unknown_key': 42})
+        assert custom.name == 'MyAgent'
 
     def test_invalid_override_values(self):
         """Test that invalid override values are skipped."""
         base = AgentConfig()
         custom = AgentConfig._create_custom_config(
-            "MyAgent",
+            'MyAgent',
             base,
-            {"memory_max_threads": -10},  # Invalid value
+            {'memory_max_threads': -10},  # Invalid value
         )
-        assert custom.name == "MyAgent"
+        assert custom.name == 'MyAgent'
         # Should use base value, not invalid override
         assert custom.memory_max_threads == base.memory_max_threads
 
 
 class TestFromTomlSection:
     def test_simple_section(self):
-        data = {"name": "default_agent", "enable_cmd": True}
+        data = {'name': 'default_agent', 'enable_cmd': True}
         mapping = AgentConfig.from_toml_section(data)
-        assert "agent" in mapping
-        assert mapping["agent"].enable_cmd is True
+        assert 'agent' in mapping
+        assert mapping['agent'].enable_cmd is True
 
     def test_with_custom_agent(self):
         data = {
-            "name": "base",
-            "CustomBot": {"enable_browsing": True},
+            'name': 'base',
+            'CustomBot': {'enable_browsing': True},
         }
         mapping = AgentConfig.from_toml_section(data)
-        assert "agent" in mapping
-        assert "CustomBot" in mapping
-        assert mapping["CustomBot"].name == "CustomBot"
-        assert mapping["CustomBot"].enable_browsing is True
+        assert 'agent' in mapping
+        assert 'CustomBot' in mapping
+        assert mapping['CustomBot'].name == 'CustomBot'
+        assert mapping['CustomBot'].enable_browsing is True
 
     def test_schema_version_accepted(self):
-        data = {"schema_version": "1", "name": "v_agent"}
+        data = {'schema_version': '1', 'name': 'v_agent'}
         mapping = AgentConfig.from_toml_section(data)
-        assert mapping["agent"].name == "v_agent"
+        assert mapping['agent'].name == 'v_agent'
 
     def test_invalid_custom_agent_raises_error(self):
         """Test that invalid custom agent configurations raise ValueError."""
         from unittest.mock import patch
 
         data = {
-            "name": "base",
-            "BadAgent": {"enable_browsing": True},
+            'name': 'base',
+            'BadAgent': {'enable_browsing': True},
         }
 
         # Mock _create_custom_config to raise an exception
         with patch.object(
             AgentConfig,
-            "_create_custom_config",
-            side_effect=ValidationError.from_exception_data("test", []),
+            '_create_custom_config',
+            side_effect=ValidationError.from_exception_data('test', []),
         ):
-            with pytest.raises(ValueError, match="Invalid custom agent configuration"):
+            with pytest.raises(ValueError, match='Invalid custom agent configuration'):
                 AgentConfig.from_toml_section(data)
 
     def test_multiple_invalid_custom_agents_combined_error(self):
@@ -273,14 +282,14 @@ class TestFromTomlSection:
         from unittest.mock import patch
 
         data = {
-            "name": "base",
-            "BadAgent1": {"enable_browsing": True},
-            "BadAgent2": {"enable_cmd": False},
+            'name': 'base',
+            'BadAgent1': {'enable_browsing': True},
+            'BadAgent2': {'enable_cmd': False},
         }
 
         # Mock to raise for both custom agents
         with patch.object(
-            AgentConfig, "_create_custom_config", side_effect=ValueError("Config error")
+            AgentConfig, '_create_custom_config', side_effect=ValueError('Config error')
         ):
-            with pytest.raises(ValueError, match="Invalid custom agent configuration"):
+            with pytest.raises(ValueError, match='Invalid custom agent configuration'):
                 AgentConfig.from_toml_section(data)

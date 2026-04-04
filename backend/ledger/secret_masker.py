@@ -24,11 +24,11 @@ class SecretMasker:
 
     """
 
-    PLACEHOLDER = "<secret_hidden>"
+    PLACEHOLDER = '<secret_hidden>'
     # Top-level event fields that must never be masked so the event
     # structure (type, id, source, etc.) stays intact.
     TOP_LEVEL_PROTECTED_FIELDS = frozenset(
-        {"timestamp", "id", "source", "cause", "action", "observation", "message"}
+        {'timestamp', 'id', 'source', 'cause', 'action', 'observation', 'message'}
     )
 
     def __init__(self) -> None:
@@ -71,9 +71,9 @@ class SecretMasker:
         unique = sorted(set(tokens), key=len, reverse=True)
         if unique:
             self._secret_pattern = re.compile(
-                "|".join(re.escape(t) for t in unique), flags=re.IGNORECASE
+                '|'.join(re.escape(t) for t in unique), flags=re.IGNORECASE
             )
-            self._secret_bytes = [t.encode("utf-8") for t in unique]
+            self._secret_bytes = [t.encode('utf-8') for t in unique]
         else:
             self._secret_pattern = None
             self._secret_bytes = []
@@ -102,5 +102,5 @@ class SecretMasker:
         masked = value
         for token in self._secret_bytes:
             if token:
-                masked = masked.replace(token, self.PLACEHOLDER.encode("utf-8"))
+                masked = masked.replace(token, self.PLACEHOLDER.encode('utf-8'))
         return masked

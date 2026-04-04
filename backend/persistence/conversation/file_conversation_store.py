@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -18,6 +19,7 @@ from backend.persistence.data_models.conversation_metadata_result_set import (
 from backend.persistence.locations import (
     CONVERSATION_BASE_DIR,
     get_conversation_dir,
+    get_local_data_root,
     get_conversation_metadata_filename,
 )
 from backend.utils.async_utils import call_sync_from_async
@@ -48,13 +50,9 @@ class FileConversationStore(ConversationStore):
         self.file_store = file_store
         self.user_id = user_id
 
-        from backend.core.app_paths import get_app_settings_root
-
-        wb = (self.config.project_root or "").strip()
-        conv_root = Path(wb).expanduser().resolve() if wb else Path(get_app_settings_root())
-        base_path = conv_root / ".app" / "conversations"
-        if user_id:
-            base_path = base_path / user_id
+        base_path = Path(os.path.expanduser(get_local_data_root(self.config))) / Path(
+            self.get_conversation_metadata_dir()
+        )
         base_path.mkdir(parents=True, exist_ok=True)
         self._local_conversations_dir = base_path
 
@@ -71,10 +69,10 @@ class FileConversationStore(ConversationStore):
             await call_sync_from_async(self.file_store.write, path, json_str)
         except OSError as e:
             logger.warning(
-                "Could not save conversation metadata for %s: %s",
+                'Could not save conversation metadata for %s: %s',
                 metadata.conversation_id,
                 e,
-                extra={"conversation_id": metadata.conversation_id},
+                extra={'conversation_id': metadata.conversation_id},
             )
 
     async def get_metadata(
@@ -99,13 +97,13 @@ class FileConversationStore(ConversationStore):
         path = self.get_conversation_metadata_filename(conversation_id)
         try:
             json_str = await call_sync_from_async(self.file_store.read, path)
-            if not json_str or json_str.strip() == "":
-                raise FileNotFoundError(f"Empty conversation metadata file: {path}")
+            if not json_str or json_str.strip() == '':
+                raise FileNotFoundError(f'Empty conversation metadata file: {path}')
             json_obj = json.loads(json_str)
-            if "created_at" not in json_obj:
-                raise FileNotFoundError(f"Invalid conversation metadata file: {path}")
-            if "github_user_id" in json_obj:
-                json_obj.pop("github_user_id")
+            if 'created_at' not in json_obj:
+                raise FileNotFoundError(f'Invalid conversation metadata file: {path}')
+            if 'github_user_id' in json_obj:
+                json_obj.pop('github_user_id')
             return conversation_metadata_type_adapter.validate_python(json_obj)
         except (json.JSONDecodeError, FileNotFoundError):
             if not create_if_missing:
@@ -117,8 +115,8 @@ class FileConversationStore(ConversationStore):
                 conversation_id=conversation_id,
                 selected_repository=None,
                 created_at=datetime.now(),
-                title="New Conversation",
-                user_id="dev-user",
+                title='New Conversation',
+                user_id='dev-user',
             )
             await self.save_metadata(metadata)
             return metadata
@@ -140,7 +138,7 @@ class FileConversationStore(ConversationStore):
             conversation_ids = [
                 Path(path).name
                 for path in self.file_store.list(metadata_dir)
-                if not Path(path).name.startswith(".")
+                if not Path(path).name.startswith('.')
             ]
         except FileNotFoundError:
             return
@@ -184,7 +182,7 @@ class FileConversationStore(ConversationStore):
             conversation_ids = [
                 Path(path).name
                 for path in self.file_store.list(metadata_dir)
-                if not Path(path).name.startswith(".")
+                if not Path(path).name.startswith('.')
             ]
         except FileNotFoundError:
             return ConversationMetadataResultSet([])
@@ -202,7 +200,7 @@ class FileConversationStore(ConversationStore):
                 )
             except Exception:
                 logger.warning(
-                    "Could not load conversation metadata: %s", conversation_id
+                    'Could not load conversation metadata: %s', conversation_id
                 )
         conversations.sort(key=_sort_key, reverse=True)
         conversations = conversations[start:end]
@@ -217,7 +215,7 @@ class FileConversationStore(ConversationStore):
 
         """
         if self.user_id:
-            return f"users/{self.user_id}/conversations"
+            return f'users/{self.user_id}/conversations'
         return CONVERSATION_BASE_DIR
 
     def get_conversation_metadata_filename(self, conversation_id: str) -> str:
@@ -259,4 +257,4 @@ class FileConversationStore(ConversationStore):
 def _sort_key(conversation: ConversationMetadata) -> str:
     if created_at := conversation.created_at:
         return created_at.isoformat()
-    return ""
+    return ''

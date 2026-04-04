@@ -14,12 +14,12 @@ from backend.ledger.stream import (
 class TestEventStreamSubscriber:
     def test_enum_values(self):
         """Test EventStreamSubscriber enum values."""
-        assert EventStreamSubscriber.AGENT_CONTROLLER.value == "agent_controller"
-        assert EventStreamSubscriber.SERVER.value == "server"
-        assert EventStreamSubscriber.RUNTIME.value == "runtime"
-        assert EventStreamSubscriber.MEMORY.value == "memory"
-        assert EventStreamSubscriber.MAIN.value == "main"
-        assert EventStreamSubscriber.TEST.value == "test"
+        assert EventStreamSubscriber.AGENT_CONTROLLER.value == 'agent_controller'
+        assert EventStreamSubscriber.SERVER.value == 'server'
+        assert EventStreamSubscriber.RUNTIME.value == 'runtime'
+        assert EventStreamSubscriber.MEMORY.value == 'memory'
+        assert EventStreamSubscriber.MAIN.value == 'main'
+        assert EventStreamSubscriber.TEST.value == 'test'
 
     def test_enum_is_string(self):
         """Test that EventStreamSubscriber extends str."""
@@ -28,9 +28,9 @@ class TestEventStreamSubscriber:
 
     def test_enum_equality(self):
         """Test enum value equality."""
-        assert EventStreamSubscriber.AGENT_CONTROLLER.value == "agent_controller"
+        assert EventStreamSubscriber.AGENT_CONTROLLER.value == 'agent_controller'
         # str() returns full enum name, not just value
-        assert EventStreamSubscriber.SERVER.value == "server"
+        assert EventStreamSubscriber.SERVER.value == 'server'
 
 
 class TestWarnUnclosedStream:
@@ -39,11 +39,14 @@ class TestWarnUnclosedStream:
         import io
 
         fake_stderr = io.StringIO()
-        with patch("sys.stderr", fake_stderr), patch("sys.is_finalizing", return_value=False):
-            _warn_unclosed_stream("session123")
+        with (
+            patch('sys.stderr', fake_stderr),
+            patch('sys.is_finalizing', return_value=False),
+        ):
+            _warn_unclosed_stream('session123')
 
         output = fake_stderr.getvalue()
-        assert "session123" in output
+        assert 'session123' in output
         assert "GC'd without close" in output
 
     def test_warn_unclosed_stream_message_format(self):
@@ -51,26 +54,32 @@ class TestWarnUnclosedStream:
         import io
 
         fake_stderr = io.StringIO()
-        with patch("sys.stderr", fake_stderr), patch("sys.is_finalizing", return_value=False):
-            _warn_unclosed_stream("test-sid")
+        with (
+            patch('sys.stderr', fake_stderr),
+            patch('sys.is_finalizing', return_value=False),
+        ):
+            _warn_unclosed_stream('test-sid')
 
         output = fake_stderr.getvalue()
-        assert "EventStream" in output
-        assert "test-sid" in output
-        assert "resources may leak" in output
+        assert 'EventStream' in output
+        assert 'test-sid' in output
+        assert 'resources may leak' in output
 
     def test_warn_unclosed_stream_different_sids(self):
         """Test warning with different session IDs."""
         import io
 
         fake_stderr = io.StringIO()
-        with patch("sys.stderr", fake_stderr), patch("sys.is_finalizing", return_value=False):
-            _warn_unclosed_stream("sid-1")
-            _warn_unclosed_stream("sid-2")
+        with (
+            patch('sys.stderr', fake_stderr),
+            patch('sys.is_finalizing', return_value=False),
+        ):
+            _warn_unclosed_stream('sid-1')
+            _warn_unclosed_stream('sid-2')
 
         output = fake_stderr.getvalue()
-        assert "sid-1" in output
-        assert "sid-2" in output
+        assert 'sid-1' in output
+        assert 'sid-2' in output
 
 
 class TestSessionExists:
@@ -80,10 +89,10 @@ class TestSessionExists:
         mock_store = MagicMock()
         # Mock successful list call
         with patch(
-            "backend.ledger.stream.call_sync_from_async",
-            return_value=["file1.json", "file2.json"],
+            'backend.ledger.stream.call_sync_from_async',
+            return_value=['file1.json', 'file2.json'],
         ):
-            result = await session_exists("sess123", mock_store, None)
+            result = await session_exists('sess123', mock_store, None)
 
         assert result is True
 
@@ -93,10 +102,10 @@ class TestSessionExists:
         mock_store = MagicMock()
         # Mock FileNotFoundError
         with patch(
-            "backend.ledger.stream.call_sync_from_async",
-            side_effect=FileNotFoundError("Not found"),
+            'backend.ledger.stream.call_sync_from_async',
+            side_effect=FileNotFoundError('Not found'),
         ):
-            result = await session_exists("sess456", mock_store, None)
+            result = await session_exists('sess456', mock_store, None)
 
         assert result is False
 
@@ -105,10 +114,10 @@ class TestSessionExists:
         """Test session_exists with user ID."""
         mock_store = MagicMock()
         with patch(
-            "backend.ledger.stream.call_sync_from_async",
-            return_value=["state.json"],
+            'backend.ledger.stream.call_sync_from_async',
+            return_value=['state.json'],
         ) as mock_call:
-            result = await session_exists("sess789", mock_store, "user123")
+            result = await session_exists('sess789', mock_store, 'user123')
 
         assert result is True
         # Verify get_conversation_dir was called with user_id
@@ -119,10 +128,10 @@ class TestSessionExists:
         """Test session_exists with empty existing directory."""
         mock_store = MagicMock()
         with patch(
-            "backend.ledger.stream.call_sync_from_async",
+            'backend.ledger.stream.call_sync_from_async',
             return_value=[],
         ):
-            result = await session_exists("sess-empty", mock_store, None)
+            result = await session_exists('sess-empty', mock_store, None)
 
         # Empty directory means session exists
         assert result is True
@@ -131,13 +140,13 @@ class TestSessionExists:
     async def test_session_exists_calls_file_store_list(self):
         """Test that session_exists calls file_store.list correctly."""
         mock_store = MagicMock()
-        mock_store.list = MagicMock(return_value=["file.json"])
+        mock_store.list = MagicMock(return_value=['file.json'])
 
         with patch(
-            "backend.ledger.stream.call_sync_from_async",
+            'backend.ledger.stream.call_sync_from_async',
             wraps=lambda fn, *args: fn(*args),
         ):
-            await session_exists("sid", mock_store, None)
+            await session_exists('sid', mock_store, None)
 
         # Verify list was called
         mock_store.list.assert_called_once()
@@ -148,8 +157,8 @@ class TestSessionExists:
         mock_store = MagicMock()
         # Other exceptions should propagate
         with patch(
-            "backend.ledger.stream.call_sync_from_async",
-            side_effect=ValueError("Unexpected error"),
+            'backend.ledger.stream.call_sync_from_async',
+            side_effect=ValueError('Unexpected error'),
         ):
-            with pytest.raises(ValueError, match="Unexpected error"):
-                await session_exists("bad-sid", mock_store, None)
+            with pytest.raises(ValueError, match='Unexpected error'):
+                await session_exists('bad-sid', mock_store, None)

@@ -9,7 +9,6 @@ import pytest
 
 from backend.ledger.event_store_abc import EventStoreABC
 
-
 # ── Concrete stub ─────────────────────────────────────────────────────
 
 
@@ -17,7 +16,7 @@ class _StubStore(EventStoreABC):
     """Minimal concrete implementation for testing base-class helpers."""
 
     def __init__(self, events: list | None = None):
-        self.sid = "test-sid"
+        self.sid = 'test-sid'
         self.user_id = None
         self._events = events or []
 
@@ -34,7 +33,7 @@ class _StubStore(EventStoreABC):
 
     def get_event(self, id: int):
         if id < 0 or id >= len(self._events):
-            raise FileNotFoundError(f"Event {id} not found")
+            raise FileNotFoundError(f'Event {id} not found')
         return self._events[id]
 
     def get_latest_event(self):
@@ -47,7 +46,7 @@ class _StubStore(EventStoreABC):
 # ── Helpers ───────────────────────────────────────────────────────────
 
 
-def _make_event(source="agent", hidden=False, timestamp=None):
+def _make_event(source='agent', hidden=False, timestamp=None):
     ev = MagicMock()
     ev.source = MagicMock()
     ev.source.value = source
@@ -81,7 +80,7 @@ class TestGetEvents:
         e1 = _make_event()
         e2 = MagicMock(spec=str)  # Different type
         e2.source = MagicMock()
-        e2.source.value = "agent"
+        e2.source.value = 'agent'
         e2.hidden = False
         e2.timestamp = None
 
@@ -106,13 +105,13 @@ class TestGetEvents:
 
 class TestFilteredEventsBySource:
     def test_filters_by_source(self):
-        e1 = _make_event(source="agent")
-        e2 = _make_event(source="user")
-        e3 = _make_event(source="agent")
+        e1 = _make_event(source='agent')
+        e2 = _make_event(source='user')
+        e3 = _make_event(source='agent')
         store = _StubStore([e1, e2, e3])
-        result = list(store.filtered_events_by_source(cast(Any, "agent")))
+        result = list(store.filtered_events_by_source(cast(Any, 'agent')))
         assert len(result) == 2
-        assert all(getattr(ev.source, "value", None) == "agent" for ev in result)
+        assert all(getattr(ev.source, 'value', None) == 'agent' for ev in result)
 
 
 # ── get_matching_events ───────────────────────────────────────────────
@@ -133,12 +132,12 @@ class TestGetMatchingEvents:
 
     def test_limit_too_low_raises(self):
         store = _StubStore([])
-        with pytest.raises(ValueError, match="Limit must be between 1 and 100"):
+        with pytest.raises(ValueError, match='Limit must be between 1 and 100'):
             store.get_matching_events(limit=0)
 
     def test_limit_too_high_raises(self):
         store = _StubStore([])
-        with pytest.raises(ValueError, match="Limit must be between 1 and 100"):
+        with pytest.raises(ValueError, match='Limit must be between 1 and 100'):
             store.get_matching_events(limit=101)
 
     def test_reverse_order(self):
@@ -148,12 +147,12 @@ class TestGetMatchingEvents:
         assert result == [e3, e2, e1]
 
     def test_source_filter(self):
-        e1 = _make_event(source="agent")
-        e2 = _make_event(source="user")
+        e1 = _make_event(source='agent')
+        e2 = _make_event(source='user')
         store = _StubStore([e1, e2])
-        result = store.get_matching_events(source=cast(Any, "user"))
+        result = store.get_matching_events(source=cast(Any, 'user'))
         assert len(result) == 1
-        assert getattr(result[0].source, "value", None) == "user"
+        assert getattr(result[0].source, 'value', None) == 'user'
 
     def test_start_id(self):
         events = [_make_event() for _ in range(5)]

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-
 from backend.core.enums import EventSource, EventVersion
 from backend.core.schemas.base import (
     BaseEventSchema,
     EventMetadata,
     EventSchemaV1,
 )
-
 
 # ── EventMetadata ────────────────────────────────────────────────────
 
@@ -48,14 +46,14 @@ class TestBaseEventSchema:
     def test_defaults(self):
         schema = BaseEventSchema()
         assert (
-            schema.schema_version == EventVersion.V1 or schema.schema_version == "1.0.0"
+            schema.schema_version == EventVersion.V1 or schema.schema_version == '1.0.0'
         )
 
     def test_to_dict(self):
         schema = BaseEventSchema()
         d = schema.to_dict()
         assert isinstance(d, dict)
-        assert "schema_version" in d
+        assert 'schema_version' in d
 
     def test_from_dict_roundtrip(self):
         original = BaseEventSchema()
@@ -67,15 +65,15 @@ class TestBaseEventSchema:
         schema = BaseEventSchema()
         d = schema.to_dict()
         # metadata fields that are None should be excluded
-        meta = d.get("metadata", {})
-        assert "event_id" not in meta
+        meta = d.get('metadata', {})
+        assert 'event_id' not in meta
 
     def test_with_metadata(self):
         m = EventMetadata(event_id=42, hidden=True)
         schema = BaseEventSchema(metadata=m)
         d = schema.to_dict()
-        assert d["metadata"]["event_id"] == 42
-        assert d["metadata"]["hidden"] is True
+        assert d['metadata']['event_id'] == 42
+        assert d['metadata']['hidden'] is True
 
 
 # ── EventSchemaV1 ────────────────────────────────────────────────────
@@ -85,13 +83,13 @@ class TestEventSchemaV1:
     def test_version_is_v1(self):
         schema = EventSchemaV1()
         assert (
-            schema.schema_version == EventVersion.V1 or schema.schema_version == "1.0.0"
+            schema.schema_version == EventVersion.V1 or schema.schema_version == '1.0.0'
         )
 
     def test_validate_version_from_string(self):
-        schema = EventSchemaV1.model_validate({"schema_version": "1.0.0"})
+        schema = EventSchemaV1.model_validate({'schema_version': '1.0.0'})
         assert (
-            schema.schema_version == EventVersion.V1 or schema.schema_version == "1.0.0"
+            schema.schema_version == EventVersion.V1 or schema.schema_version == '1.0.0'
         )
 
     def test_roundtrip(self):

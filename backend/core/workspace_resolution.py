@@ -113,15 +113,17 @@ def resolve_existing_directory(path_str: str) -> Path:
 
 
 def apply_workspace_to_config(config, root: Path) -> str:
-    """Set project workspace on config; same path is used for conversation file store."""
+    """Set project workspace on config and pin project-local persistent storage."""
     if is_reserved_user_app_data_dir(root):
         msg = (
             'That folder is reserved for app data. Choose a project directory instead.'
         )
         raise ValueError(msg)
+    from backend.persistence.locations import get_project_local_data_root
+
     s = str(root)
     config.project_root = s
-    config.local_data_root = s
+    config.local_data_root = get_project_local_data_root(root)
     return s
 
 

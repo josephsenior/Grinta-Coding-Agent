@@ -1,4 +1,4 @@
-﻿"""Protocol defining the executor interface for runtime drivers.
+"""Protocol defining the executor interface for runtime drivers.
 
 This decouples runtime drivers (e.g. ``LocalRuntimeInProcess``) from the
 concrete ``RuntimeExecutor`` class. Drivers should depend on

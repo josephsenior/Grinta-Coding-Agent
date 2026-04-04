@@ -58,13 +58,13 @@ def is_context_window_error(error_str: str, exc: Exception) -> bool:
     """
     lowered = error_str.lower() if error_str != error_str.lower() else error_str
     return (
-        "contextwindowexceedederror" in lowered
-        or "prompt is too long" in lowered
-        or "input length and `max_tokens` exceed context limit" in lowered
-        or "please reduce the length of either one" in lowered
-        or "the request exceeds the available context size" in lowered
-        or "context length exceeded" in lowered
-        or ("sambanovaexception" in lowered and "maximum context length" in lowered)
+        'contextwindowexceedederror' in lowered
+        or 'prompt is too long' in lowered
+        or 'input length and `max_tokens` exceed context limit' in lowered
+        or 'please reduce the length of either one' in lowered
+        or 'the request exceeds the available context size' in lowered
+        or 'context length exceeded' in lowered
+        or ('sambanovaexception' in lowered and 'maximum context length' in lowered)
         or isinstance(exc, ContextWindowExceededError)
     )
 
@@ -94,18 +94,18 @@ class OpenAIError(LLMError):
 
 
 __all__ = [
-    "LLMError",
-    "APIConnectionError",
-    "APIError",
-    "AuthenticationError",
-    "BadRequestError",
-    "ContentPolicyViolationError",
-    "ContextWindowExceededError",
-    "InternalServerError",
-    "NotFoundError",
-    "OpenAIError",
-    "RateLimitError",
-    "ServiceUnavailableError",
-    "Timeout",
-    "is_context_window_error",
+    'LLMError',
+    'APIConnectionError',
+    'APIError',
+    'AuthenticationError',
+    'BadRequestError',
+    'ContentPolicyViolationError',
+    'ContextWindowExceededError',
+    'InternalServerError',
+    'NotFoundError',
+    'OpenAIError',
+    'RateLimitError',
+    'ServiceUnavailableError',
+    'Timeout',
+    'is_context_window_error',
 ]

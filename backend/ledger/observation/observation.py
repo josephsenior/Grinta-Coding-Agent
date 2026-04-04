@@ -22,14 +22,14 @@ class Observation(Event, metaclass=CanonicalMeta):
     """
 
     content: str
-    observation: ClassVar[str] = ""
+    observation: ClassVar[str] = ''
     truncation_strategy: str | None = field(default=None, kw_only=True)
     __test__: ClassVar[bool] = False
 
     @property
     def exit_code(self) -> int | None:
         """Return generic exit code when available."""
-        if hasattr(self, "_exit_code"):
+        if hasattr(self, '_exit_code'):
             exit_val = self._exit_code
             return int(exit_val) if exit_val is not None else None
         return None
@@ -40,4 +40,4 @@ class Observation(Event, metaclass=CanonicalMeta):
         self._exit_code = value
 
 
-__all__ = ["Observation"]
+__all__ = ['Observation']

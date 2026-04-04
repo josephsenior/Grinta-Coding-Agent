@@ -1,20 +1,20 @@
 """Tests for StepDecisionService."""
 
 import unittest
-from unittest.mock import MagicMock
 from typing import Any, cast
+from unittest.mock import MagicMock
 
-from backend.orchestration.services.step_decision_service import StepDecisionService
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import Action, MessageAction
 from backend.ledger.action.agent import CondensationAction, CondensationRequestAction
 from backend.ledger.observation import (
-    Observation,
-    NullObservation,
     AgentStateChangedObservation,
+    NullObservation,
+    Observation,
 )
 from backend.ledger.observation.agent import RecallObservation
+from backend.orchestration.services.step_decision_service import StepDecisionService
 
 
 class TestStepDecisionService(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_should_step_message_from_user(self):
         """Test should_step returns True for user messages."""
-        action = MessageAction(content="Hello")
+        action = MessageAction(content='Hello')
         action.source = EventSource.USER
 
         result = self.service.should_step(action)
@@ -40,7 +40,7 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_should_step_message_from_agent_running(self):
         """Test should_step returns True for agent message when running."""
-        action = MessageAction(content="Response")
+        action = MessageAction(content='Response')
         action.source = EventSource.AGENT
         self.mock_controller.get_agent_state.return_value = AgentState.RUNNING
 
@@ -50,7 +50,7 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_should_step_message_from_agent_awaiting_input(self):
         """Test should_step returns False for agent message when awaiting input."""
-        action = MessageAction(content="Question")
+        action = MessageAction(content='Question')
         action.source = EventSource.AGENT
         self.mock_controller.get_agent_state.return_value = (
             AgentState.AWAITING_USER_INPUT
@@ -62,7 +62,7 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_should_step_message_from_agent_paused(self):
         """Test should_step returns True for agent message when paused."""
-        action = MessageAction(content="Info")
+        action = MessageAction(content='Info')
         action.source = EventSource.AGENT
         self.mock_controller.get_agent_state.return_value = AgentState.PAUSED
 
@@ -96,7 +96,7 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_should_step_null_observation_with_cause(self):
         """Test should_step returns True for NullObservation with cause."""
-        observation = NullObservation(content="")
+        observation = NullObservation(content='')
         observation.cause = 123
 
         result = self.service.should_step(observation)
@@ -105,7 +105,7 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_should_step_null_observation_without_cause(self):
         """Test should_step returns False for NullObservation without cause."""
-        observation = NullObservation(content="")
+        observation = NullObservation(content='')
         observation.cause = None
 
         result = self.service.should_step(observation)
@@ -114,7 +114,7 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_should_step_null_observation_empty_cause(self):
         """Test should_step returns False for NullObservation with empty cause."""
-        observation = NullObservation(content="")
+        observation = NullObservation(content='')
         observation.cause = 0
 
         result = self.service.should_step(observation)
@@ -124,7 +124,7 @@ class TestStepDecisionService(unittest.TestCase):
     def test_should_step_agent_state_changed_observation(self):
         """Test should_step returns False for AgentStateChangedObservation."""
         observation = AgentStateChangedObservation(
-            content="State changed", agent_state=AgentState.RUNNING, reason=""
+            content='State changed', agent_state=AgentState.RUNNING, reason=''
         )
 
         result = self.service.should_step(observation)
@@ -149,7 +149,7 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_should_step_non_event(self):
         """Test should_step returns False for non-event objects."""
-        result = self.service.should_step(cast(Any, "not an event"))
+        result = self.service.should_step(cast(Any, 'not an event'))
 
         self.assertFalse(result)
 
@@ -161,7 +161,7 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_for_action_delegation(self):
         """Test _for_action delegates to specific handlers."""
-        action = MessageAction(content="Test")
+        action = MessageAction(content='Test')
         action.source = EventSource.USER
 
         # Should delegate to message handler
@@ -170,7 +170,7 @@ class TestStepDecisionService(unittest.TestCase):
 
     def test_for_message_action_user_always_steps(self):
         """Test _for_message_action always steps for user messages."""
-        action = MessageAction(content="Test")
+        action = MessageAction(content='Test')
         action.source = EventSource.USER
 
         # Should always return True regardless of state
@@ -192,10 +192,10 @@ class TestStepDecisionService(unittest.TestCase):
 
         # StateChanged observation
         state_obs = AgentStateChangedObservation(
-            content="", agent_state=AgentState.RUNNING, reason=""
+            content='', agent_state=AgentState.RUNNING, reason=''
         )
         self.assertFalse(self.service._for_observation(state_obs))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

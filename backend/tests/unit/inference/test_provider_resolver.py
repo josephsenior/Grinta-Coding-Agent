@@ -33,205 +33,203 @@ class TestProviderResolver(TestCase):
 
     def test_resolve_provider_from_catalog(self):
         """Test resolve_provider uses catalog lookup."""
-        with patch("backend.inference.provider_resolver.lookup") as mock_lookup:
+        with patch('backend.inference.provider_resolver.lookup') as mock_lookup:
             mock_entry = MagicMock()
-            mock_entry.provider = "openai"
+            mock_entry.provider = 'openai'
             mock_lookup.return_value = mock_entry
 
-            result = self.resolver.resolve_provider("gpt-4o")
+            result = self.resolver.resolve_provider('gpt-4o')
 
-            mock_lookup.assert_called_once_with("gpt-4o")
-            self.assertEqual(result, "openai")
+            mock_lookup.assert_called_once_with('gpt-4o')
+            self.assertEqual(result, 'openai')
 
     def test_resolve_provider_requires_explicit_or_catalog_entry(self):
         """Bare family names no longer trigger heuristic provider guessing."""
-        with patch("backend.inference.provider_resolver.lookup", return_value=None):
+        with patch('backend.inference.provider_resolver.lookup', return_value=None):
             with self.assertRaises(ValueError):
-                self.resolver.resolve_provider("claude-3-7-sonnet")
+                self.resolver.resolve_provider('claude-3-7-sonnet')
             with self.assertRaises(ValueError):
-                self.resolver.resolve_provider("anthropic-model")
+                self.resolver.resolve_provider('anthropic-model')
 
     def test_resolve_provider_prefixed_google_model(self):
         """Explicit provider prefixes remain valid."""
         self.assertEqual(
-            self.resolver.resolve_provider("google/gemini-2.0-flash"), "google"
+            self.resolver.resolve_provider('google/gemini-2.0-flash'), 'google'
         )
 
     def test_resolve_provider_prefixed_gemini_model_raises(self):
         """Legacy provider aliases are no longer accepted as prefixes."""
         with self.assertRaises(ValueError):
-            self.resolver.resolve_provider("gemini/gemini-2.0-flash")
+            self.resolver.resolve_provider('gemini/gemini-2.0-flash')
 
     def test_resolve_provider_catalog_entry_xai(self):
         """Exact catalog entries remain valid without heuristics."""
-        self.assertEqual(self.resolver.resolve_provider("grok-3"), "xai")
+        self.assertEqual(self.resolver.resolve_provider('grok-3'), 'xai')
 
     def test_resolve_provider_prefixed_ollama_model(self):
         """Prefixed local models resolve by prefix."""
-        self.assertEqual(self.resolver.resolve_provider("ollama/llama3.2"), "ollama")
+        self.assertEqual(self.resolver.resolve_provider('ollama/llama3.2'), 'ollama')
 
-    def test_resolve_provider_prefixed_openhands_model(self):
-        """Prefixed OpenHands models resolve by prefix."""
+    def test_resolve_provider_prefixed_lightning_model(self):
+        """Prefixed Lightning models resolve by prefix."""
         self.assertEqual(
-            self.resolver.resolve_provider("openhands/claude-sonnet-4-5-20250929"),
-            "openhands",
+            self.resolver.resolve_provider('lightning/claude-sonnet-4-20250514'),
+            'lightning',
         )
 
     def test_resolve_provider_catalog_entry_deepseek(self):
         """Exact DeepSeek catalog entries remain valid."""
-        self.assertEqual(self.resolver.resolve_provider("deepseek-chat"), "deepseek")
+        self.assertEqual(self.resolver.resolve_provider('deepseek-chat'), 'deepseek')
 
     def test_resolve_provider_catalog_entry_mistral(self):
         """Exact Mistral catalog entries remain valid."""
-        self.assertEqual(
-            self.resolver.resolve_provider("codestral-latest"), "mistral"
-        )
+        self.assertEqual(self.resolver.resolve_provider('codestral-latest'), 'mistral')
 
     def test_resolve_provider_unknown_model_raises(self):
         """Unknown models must be prefixed explicitly."""
-        with patch("backend.inference.provider_resolver.lookup", return_value=None):
+        with patch('backend.inference.provider_resolver.lookup', return_value=None):
             with self.assertRaises(ValueError):
-                self.resolver.resolve_provider("unknown-model")
+                self.resolver.resolve_provider('unknown-model')
 
     def test_resolve_provider_prefixed_model_takes_priority(self):
-        with patch("backend.inference.provider_resolver.lookup", return_value=None):
+        with patch('backend.inference.provider_resolver.lookup', return_value=None):
             self.assertEqual(
-                self.resolver.resolve_provider("groq/meta-llama/llama-4-scout"),
-                "groq",
+                self.resolver.resolve_provider('groq/meta-llama/llama-4-scout'),
+                'groq',
             )
 
     def test_is_local_model_true(self):
         """Test is_local_model identifies local models."""
-        self.assertTrue(self.resolver.is_local_model("ollama/llama3.2"))
-        self.assertTrue(self.resolver.is_local_model("lm_studio/qwen"))
-        self.assertTrue(self.resolver.is_local_model("vllm/mistral"))
-        self.assertTrue(self.resolver.is_local_model("local-model"))
+        self.assertTrue(self.resolver.is_local_model('ollama/llama3.2'))
+        self.assertTrue(self.resolver.is_local_model('lm_studio/qwen'))
+        self.assertTrue(self.resolver.is_local_model('vllm/mistral'))
+        self.assertTrue(self.resolver.is_local_model('local-model'))
 
     def test_is_local_model_false(self):
         """Test is_local_model returns False for cloud models."""
-        self.assertFalse(self.resolver.is_local_model("gpt-4o"))
-        self.assertFalse(self.resolver.is_local_model("claude-3-7-sonnet"))
-        self.assertFalse(self.resolver.is_local_model("gemini-2.0-flash"))
-        self.assertFalse(self.resolver.is_local_model("lmstudio/model"))
-        self.assertFalse(self.resolver.is_local_model("lm-studio/qwen"))
+        self.assertFalse(self.resolver.is_local_model('gpt-4o'))
+        self.assertFalse(self.resolver.is_local_model('claude-3-7-sonnet'))
+        self.assertFalse(self.resolver.is_local_model('gemini-2.0-flash'))
+        self.assertFalse(self.resolver.is_local_model('lmstudio/model'))
+        self.assertFalse(self.resolver.is_local_model('lm-studio/qwen'))
 
     def test_resolve_base_url_explicit(self):
         """Test resolve_base_url returns explicit URL if provided."""
         result = self.resolver.resolve_base_url(
-            "any-model", explicit_base_url="https://custom.api"
+            'any-model', explicit_base_url='https://custom.api'
         )
-        self.assertEqual(result, "https://custom.api")
+        self.assertEqual(result, 'https://custom.api')
 
     def test_resolve_base_url_xai_catalog_entry(self):
         """Catalog-backed models still resolve provider defaults."""
-        result = self.resolver.resolve_base_url("grok-3")
-        self.assertEqual(result, "https://api.x.ai/v1")
+        result = self.resolver.resolve_base_url('grok-3')
+        self.assertEqual(result, 'https://api.x.ai/v1')
 
     def test_resolve_base_url_deepseek_catalog_entry(self):
         """Catalog-backed models still resolve provider defaults."""
-        result = self.resolver.resolve_base_url("deepseek-chat")
-        self.assertEqual(result, "https://api.deepseek.com/v1")
+        result = self.resolver.resolve_base_url('deepseek-chat')
+        self.assertEqual(result, 'https://api.deepseek.com/v1')
 
     def test_resolve_base_url_cloud_providers(self):
         """Test resolve_base_url returns None for cloud providers."""
-        self.assertIsNone(self.resolver.resolve_base_url("gpt-4o"))
+        self.assertIsNone(self.resolver.resolve_base_url('gpt-4o'))
         self.assertIsNone(
-            self.resolver.resolve_base_url("anthropic/claude-sonnet-4-20250514")
+            self.resolver.resolve_base_url('anthropic/claude-sonnet-4-20250514')
         )
-        self.assertIsNone(self.resolver.resolve_base_url("google/gemini-2.0-flash"))
+        self.assertIsNone(self.resolver.resolve_base_url('google/gemini-2.0-flash'))
 
-    def test_resolve_base_url_openhands_provider(self):
-        """OpenHands models use the hosted LiteLLM proxy."""
-        result = self.resolver.resolve_base_url("openhands/claude-sonnet-4-5-20250929")
-        self.assertEqual(result, "https://llm-proxy.app.all-hands.dev/v1")
+    def test_resolve_base_url_lightning_provider(self):
+        """Lightning models use the hosted OpenAI-compatible proxy."""
+        result = self.resolver.resolve_base_url('lightning/claude-sonnet-4-20250514')
+        self.assertEqual(result, 'https://lightning.ai/api/v1')
 
     def test_resolve_base_url_ollama_from_env(self):
         """Test resolve_base_url uses OLLAMA_HOST environment variable."""
-        with patch("backend.inference.provider_resolver.lookup", return_value=None):
-            with patch.dict("os.environ", {"OLLAMA_HOST": "http://custom:11434"}):
-                result = self.resolver.resolve_base_url("ollama/llama3.2")
-                self.assertEqual(result, "http://custom:11434/v1")
+        with patch('backend.inference.provider_resolver.lookup', return_value=None):
+            with patch.dict('os.environ', {'OLLAMA_HOST': 'http://custom:11434'}):
+                result = self.resolver.resolve_base_url('ollama/llama3.2')
+                self.assertEqual(result, 'http://custom:11434/v1')
 
     def test_resolve_base_url_ollama_env_with_v1(self):
         """Test resolve_base_url preserves /v1 if already in env var."""
-        with patch("backend.inference.provider_resolver.lookup", return_value=None):
-            with patch.dict("os.environ", {"OLLAMA_HOST": "http://custom:11434/v1"}):
-                result = self.resolver.resolve_base_url("ollama/llama3.2")
-                self.assertEqual(result, "http://custom:11434/v1")
+        with patch('backend.inference.provider_resolver.lookup', return_value=None):
+            with patch.dict('os.environ', {'OLLAMA_HOST': 'http://custom:11434/v1'}):
+                result = self.resolver.resolve_base_url('ollama/llama3.2')
+                self.assertEqual(result, 'http://custom:11434/v1')
 
     def test_resolve_base_url_ollama_auto_discover(self):
         """Test resolve_base_url auto-discovers Ollama endpoint."""
-        with patch("backend.inference.provider_resolver.lookup", return_value=None):
+        with patch('backend.inference.provider_resolver.lookup', return_value=None):
             with patch.object(
                 self.resolver,
-                "discover_local_endpoint",
-                return_value="http://localhost:11434/v1",
+                'discover_local_endpoint',
+                return_value='http://localhost:11434/v1',
             ) as mock_discover:
-                result = self.resolver.resolve_base_url("ollama/llama3.2")
-                mock_discover.assert_called_once_with("ollama")
-                self.assertEqual(result, "http://localhost:11434/v1")
+                result = self.resolver.resolve_base_url('ollama/llama3.2')
+                mock_discover.assert_called_once_with('ollama')
+                self.assertEqual(result, 'http://localhost:11434/v1')
 
     def test_discover_local_endpoint_cached(self):
         """Test discover_local_endpoint returns cached result within TTL."""
         import time as _time
 
-        self.resolver._discovered_endpoints["ollama"] = "http://localhost:11434"
+        self.resolver._discovered_endpoints['ollama'] = 'http://localhost:11434'
         self.resolver._last_discovery = _time.monotonic()  # recent
 
-        result = self.resolver.discover_local_endpoint("ollama")
+        result = self.resolver.discover_local_endpoint('ollama')
 
-        self.assertEqual(result, "http://localhost:11434")
+        self.assertEqual(result, 'http://localhost:11434')
 
     def test_discover_local_endpoint_probes_endpoints(self):
         """Test discover_local_endpoint probes configured endpoints."""
         with patch.object(
-            self.resolver, "_probe_endpoint", return_value=True
+            self.resolver, '_probe_endpoint', return_value=True
         ) as mock_probe:
-            result = self.resolver.discover_local_endpoint("ollama")
+            result = self.resolver.discover_local_endpoint('ollama')
 
             mock_probe.assert_called()
-            self.assertEqual(result, LOCAL_ENDPOINTS["ollama"][0])
+            self.assertEqual(result, LOCAL_ENDPOINTS['ollama'][0])
 
     def test_discover_local_endpoint_not_found(self):
         """Test discover_local_endpoint returns None when not found."""
-        with patch.object(self.resolver, "_probe_endpoint", return_value=False):
-            result = self.resolver.discover_local_endpoint("ollama")
+        with patch.object(self.resolver, '_probe_endpoint', return_value=False):
+            result = self.resolver.discover_local_endpoint('ollama')
             self.assertIsNone(result)
 
     def test_discover_local_endpoint_unknown_provider(self):
         """Test discover_local_endpoint handles unknown provider."""
-        result = self.resolver.discover_local_endpoint("unknown-provider")
+        result = self.resolver.discover_local_endpoint('unknown-provider')
         self.assertIsNone(result)
 
     def test_probe_endpoint_success(self):
         """Test _probe_endpoint returns True when endpoint is reachable."""
-        with patch.object(socket, "socket") as mock_socket:
+        with patch.object(socket, 'socket') as mock_socket:
             mock_sock = MagicMock()
             mock_sock.connect_ex.return_value = 0
             mock_socket.return_value = mock_sock
 
             with patch.object(
-                self.resolver, "_verify_llm_endpoint", return_value=True
+                self.resolver, '_verify_llm_endpoint', return_value=True
             ) as mock_verify:
-                result = self.resolver._probe_endpoint("http://localhost:11434")
+                result = self.resolver._probe_endpoint('http://localhost:11434')
 
                 self.assertTrue(result)
                 mock_verify.assert_called_once()
 
     def test_probe_endpoint_port_closed(self):
         """Test _probe_endpoint returns False when port is closed."""
-        with patch.object(socket, "socket") as mock_socket:
+        with patch.object(socket, 'socket') as mock_socket:
             mock_sock = MagicMock()
             mock_sock.connect_ex.return_value = 1  # Connection refused
             mock_socket.return_value = mock_sock
 
-            result = self.resolver._probe_endpoint("http://localhost:11434")
+            result = self.resolver._probe_endpoint('http://localhost:11434')
 
             self.assertFalse(result)
 
     def test_probe_endpoint_invalid_url(self):
         """Test _probe_endpoint handles invalid URLs gracefully."""
-        result = self.resolver._probe_endpoint("invalid-url")
+        result = self.resolver._probe_endpoint('invalid-url')
         self.assertFalse(result)
 
     def test_verify_llm_endpoint_success(self):
@@ -239,14 +237,14 @@ class TestProviderResolver(TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 200
 
-        with patch.object(httpx, "Client") as mock_client_class:
+        with patch.object(httpx, 'Client') as mock_client_class:
             mock_client = MagicMock()
             mock_client.get.return_value = mock_response
             mock_client.__enter__ = MagicMock(return_value=mock_client)
             mock_client.__exit__ = MagicMock(return_value=False)
             mock_client_class.return_value = mock_client
 
-            result = self.resolver._verify_llm_endpoint("http://localhost:11434")
+            result = self.resolver._verify_llm_endpoint('http://localhost:11434')
 
             self.assertTrue(result)
 
@@ -255,14 +253,14 @@ class TestProviderResolver(TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 401
 
-        with patch.object(httpx, "Client") as mock_client_class:
+        with patch.object(httpx, 'Client') as mock_client_class:
             mock_client = MagicMock()
             mock_client.get.return_value = mock_response
             mock_client.__enter__ = MagicMock(return_value=mock_client)
             mock_client.__exit__ = MagicMock(return_value=False)
             mock_client_class.return_value = mock_client
 
-            result = self.resolver._verify_llm_endpoint("http://localhost:11434")
+            result = self.resolver._verify_llm_endpoint('http://localhost:11434')
 
             self.assertTrue(result)
 
@@ -271,23 +269,23 @@ class TestProviderResolver(TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 404
 
-        with patch.object(httpx, "Client") as mock_client_class:
+        with patch.object(httpx, 'Client') as mock_client_class:
             mock_client = MagicMock()
             mock_client.get.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            result = self.resolver._verify_llm_endpoint("http://localhost:11434")
+            result = self.resolver._verify_llm_endpoint('http://localhost:11434')
 
             self.assertFalse(result)
 
     def test_verify_llm_endpoint_connection_error(self):
         """Test _verify_llm_endpoint handles connection errors."""
-        with patch.object(httpx, "Client") as mock_client_class:
+        with patch.object(httpx, 'Client') as mock_client_class:
             mock_client = MagicMock()
-            mock_client.get.side_effect = httpx.ConnectError("Connection failed")
+            mock_client.get.side_effect = httpx.ConnectError('Connection failed')
             mock_client_class.return_value = mock_client
 
-            result = self.resolver._verify_llm_endpoint("http://localhost:11434")
+            result = self.resolver._verify_llm_endpoint('http://localhost:11434')
 
             self.assertFalse(result)
 
@@ -296,110 +294,110 @@ class TestProviderResolver(TestCase):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "models": [{"name": "llama3.2"}, {"name": "codellama"}]
+            'models': [{'name': 'llama3.2'}, {'name': 'codellama'}]
         }
 
         with patch.object(
             self.resolver,
-            "discover_local_endpoint",
-            return_value="http://localhost:11434/v1",
+            'discover_local_endpoint',
+            return_value='http://localhost:11434/v1',
         ):
-            with patch.object(httpx, "Client") as mock_client_class:
+            with patch.object(httpx, 'Client') as mock_client_class:
                 mock_client = MagicMock()
                 mock_client.get.return_value = mock_response
                 mock_client.__enter__ = MagicMock(return_value=mock_client)
                 mock_client.__exit__ = MagicMock(return_value=False)
                 mock_client_class.return_value = mock_client
 
-                result = self.resolver.get_available_local_models("ollama")
+                result = self.resolver.get_available_local_models('ollama')
 
-                self.assertEqual(result, ["llama3.2", "codellama"])
+                self.assertEqual(result, ['llama3.2', 'codellama'])
 
     def test_get_available_local_models_openai_compatible(self):
         """Test get_available_local_models for OpenAI-compatible endpoints."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"data": [{"id": "model1"}, {"id": "model2"}]}
+        mock_response.json.return_value = {'data': [{'id': 'model1'}, {'id': 'model2'}]}
 
         with patch.object(
             self.resolver,
-            "discover_local_endpoint",
-            return_value="http://localhost:1234/v1",
+            'discover_local_endpoint',
+            return_value='http://localhost:1234/v1',
         ):
-            with patch.object(httpx, "Client") as mock_client_class:
+            with patch.object(httpx, 'Client') as mock_client_class:
                 mock_client = MagicMock()
                 mock_client.get.return_value = mock_response
                 mock_client.__enter__ = MagicMock(return_value=mock_client)
                 mock_client.__exit__ = MagicMock(return_value=False)
                 mock_client_class.return_value = mock_client
 
-                result = self.resolver.get_available_local_models("lm_studio")
+                result = self.resolver.get_available_local_models('lm_studio')
 
-                self.assertEqual(result, ["model1", "model2"])
+                self.assertEqual(result, ['model1', 'model2'])
 
     def test_get_available_local_models_no_endpoint(self):
         """Test get_available_local_models returns empty list when no endpoint."""
-        with patch.object(self.resolver, "discover_local_endpoint", return_value=None):
-            result = self.resolver.get_available_local_models("ollama")
+        with patch.object(self.resolver, 'discover_local_endpoint', return_value=None):
+            result = self.resolver.get_available_local_models('ollama')
             self.assertEqual(result, [])
 
     def test_get_available_local_models_error(self):
         """Test get_available_local_models handles errors gracefully."""
         with patch.object(
             self.resolver,
-            "discover_local_endpoint",
-            return_value="http://localhost:11434/v1",
+            'discover_local_endpoint',
+            return_value='http://localhost:11434/v1',
         ):
-            with patch.object(httpx, "Client") as mock_client_class:
+            with patch.object(httpx, 'Client') as mock_client_class:
                 mock_client = MagicMock()
-                mock_client.get.side_effect = httpx.ConnectError("Failed")
+                mock_client.get.side_effect = httpx.ConnectError('Failed')
                 mock_client_class.return_value = mock_client
 
-                result = self.resolver.get_available_local_models("ollama")
+                result = self.resolver.get_available_local_models('ollama')
 
                 self.assertEqual(result, [])
 
     def test_strip_provider_prefix_with_known_prefix(self):
         """Test strip_provider_prefix removes known provider prefixes."""
         self.assertEqual(
-            self.resolver.strip_provider_prefix("ollama/llama3.2"), "llama3.2"
+            self.resolver.strip_provider_prefix('ollama/llama3.2'), 'llama3.2'
         )
         self.assertEqual(
-            self.resolver.strip_provider_prefix("anthropic/claude-opus-4"),
-            "claude-opus-4",
+            self.resolver.strip_provider_prefix('anthropic/claude-opus-4'),
+            'claude-opus-4',
         )
-        self.assertEqual(self.resolver.strip_provider_prefix("openai/gpt-4o"), "gpt-4o")
+        self.assertEqual(self.resolver.strip_provider_prefix('openai/gpt-4o'), 'gpt-4o')
         self.assertEqual(
-            self.resolver.strip_provider_prefix("google/gemini-2.0-flash"),
-            "gemini-2.0-flash",
+            self.resolver.strip_provider_prefix('google/gemini-2.0-flash'),
+            'gemini-2.0-flash',
         )
 
     def test_strip_provider_prefix_with_unknown_prefix(self):
         """Test strip_provider_prefix preserves unknown prefixes."""
         self.assertEqual(
-            self.resolver.strip_provider_prefix("custom/model"), "custom/model"
+            self.resolver.strip_provider_prefix('custom/model'), 'custom/model'
         )
         self.assertEqual(
-            self.resolver.strip_provider_prefix("gemini/gemini-2.0-flash"),
-            "gemini/gemini-2.0-flash",
+            self.resolver.strip_provider_prefix('gemini/gemini-2.0-flash'),
+            'gemini/gemini-2.0-flash',
         )
         self.assertEqual(
-            self.resolver.strip_provider_prefix("lmstudio/qwen"), "lmstudio/qwen"
+            self.resolver.strip_provider_prefix('lmstudio/qwen'), 'lmstudio/qwen'
         )
 
     def test_strip_provider_prefix_no_prefix(self):
         """Test strip_provider_prefix returns original when no prefix."""
-        self.assertEqual(self.resolver.strip_provider_prefix("llama3.2"), "llama3.2")
-        self.assertEqual(self.resolver.strip_provider_prefix("gpt-4o"), "gpt-4o")
+        self.assertEqual(self.resolver.strip_provider_prefix('llama3.2'), 'llama3.2')
+        self.assertEqual(self.resolver.strip_provider_prefix('gpt-4o'), 'gpt-4o')
 
     def test_strip_provider_prefix_case_insensitive(self):
         """Test strip_provider_prefix is case-insensitive."""
         self.assertEqual(
-            self.resolver.strip_provider_prefix("OLLAMA/llama3.2"), "llama3.2"
+            self.resolver.strip_provider_prefix('OLLAMA/llama3.2'), 'llama3.2'
         )
         self.assertEqual(
-            self.resolver.strip_provider_prefix("Anthropic/claude-opus-4"),
-            "claude-opus-4",
+            self.resolver.strip_provider_prefix('Anthropic/claude-opus-4'),
+            'claude-opus-4',
         )
 
 
@@ -434,24 +432,28 @@ class TestDiscoverAllLocalModels(TestCase):
 
     def test_discover_all_local_models_success(self):
         """Test discover_all_local_models returns models from all providers."""
-        with patch("backend.inference.provider_resolver.get_resolver") as mock_get_resolver:
+        with patch(
+            'backend.inference.provider_resolver.get_resolver'
+        ) as mock_get_resolver:
             mock_resolver = MagicMock()
             mock_resolver.get_available_local_models.side_effect = lambda provider: {
-                "ollama": ["llama3.2", "codellama"],
-                "lm_studio": ["qwen"],
-                "vllm": [],
+                'ollama': ['llama3.2', 'codellama'],
+                'lm_studio': ['qwen'],
+                'vllm': [],
             }.get(provider, [])
             mock_get_resolver.return_value = mock_resolver
 
             result = discover_all_local_models()
 
             self.assertEqual(
-                result, {"ollama": ["llama3.2", "codellama"], "lm_studio": ["qwen"]}
+                result, {'ollama': ['llama3.2', 'codellama'], 'lm_studio': ['qwen']}
             )
 
     def test_discover_all_local_models_no_models(self):
         """Test discover_all_local_models returns empty dict when no models."""
-        with patch("backend.inference.provider_resolver.get_resolver") as mock_get_resolver:
+        with patch(
+            'backend.inference.provider_resolver.get_resolver'
+        ) as mock_get_resolver:
             mock_resolver = MagicMock()
             mock_resolver.get_available_local_models.return_value = []
             mock_get_resolver.return_value = mock_resolver
@@ -466,46 +468,52 @@ class TestCheckLocalProviders(TestCase):
 
     def test_check_local_providers_all_running(self):
         """Test check_local_providers when all providers are running."""
-        with patch("backend.inference.provider_resolver.get_resolver") as mock_get_resolver:
+        with patch(
+            'backend.inference.provider_resolver.get_resolver'
+        ) as mock_get_resolver:
             mock_resolver = MagicMock()
             mock_resolver._probe_endpoint.return_value = True
             mock_get_resolver.return_value = mock_resolver
 
             result = check_local_providers()
 
-            self.assertTrue(result["ollama"])
-            self.assertTrue(result["lm_studio"])
-            self.assertTrue(result["vllm"])
+            self.assertTrue(result['ollama'])
+            self.assertTrue(result['lm_studio'])
+            self.assertTrue(result['vllm'])
 
     def test_check_local_providers_none_running(self):
         """Test check_local_providers when no providers are running."""
-        with patch("backend.inference.provider_resolver.get_resolver") as mock_get_resolver:
+        with patch(
+            'backend.inference.provider_resolver.get_resolver'
+        ) as mock_get_resolver:
             mock_resolver = MagicMock()
             mock_resolver._probe_endpoint.return_value = False
             mock_get_resolver.return_value = mock_resolver
 
             result = check_local_providers()
 
-            self.assertFalse(result["ollama"])
-            self.assertFalse(result["lm_studio"])
-            self.assertFalse(result["vllm"])
+            self.assertFalse(result['ollama'])
+            self.assertFalse(result['lm_studio'])
+            self.assertFalse(result['vllm'])
 
     def test_check_local_providers_partial(self):
         """Test check_local_providers with some providers running."""
-        with patch("backend.inference.provider_resolver.get_resolver") as mock_get_resolver:
+        with patch(
+            'backend.inference.provider_resolver.get_resolver'
+        ) as mock_get_resolver:
             mock_resolver = MagicMock()
 
             def probe_side_effect(url):
-                return "11434" in url  # Only Ollama port
+                return '11434' in url  # Only Ollama port
 
             mock_resolver._probe_endpoint.side_effect = probe_side_effect
             mock_get_resolver.return_value = mock_resolver
 
             result = check_local_providers()
 
-            self.assertTrue(result["ollama"])
-            self.assertFalse(result["lm_studio"])
-            self.assertFalse(result["vllm"])
+            self.assertTrue(result['ollama'])
+            self.assertFalse(result['lm_studio'])
+            self.assertFalse(result['vllm'])
 
 
 class TestLocalEndpoints(TestCase):
@@ -514,27 +522,27 @@ class TestLocalEndpoints(TestCase):
     def test_local_endpoints_structure(self):
         """Test LOCAL_ENDPOINTS has expected structure."""
         self.assertIsInstance(LOCAL_ENDPOINTS, dict)
-        self.assertIn("ollama", LOCAL_ENDPOINTS)
-        self.assertIn("lm_studio", LOCAL_ENDPOINTS)
-        self.assertIn("vllm", LOCAL_ENDPOINTS)
+        self.assertIn('ollama', LOCAL_ENDPOINTS)
+        self.assertIn('lm_studio', LOCAL_ENDPOINTS)
+        self.assertIn('vllm', LOCAL_ENDPOINTS)
 
     def test_local_endpoints_ollama(self):
         """Test Ollama endpoints."""
-        self.assertIsInstance(LOCAL_ENDPOINTS["ollama"], list)
-        self.assertTrue(any("11434" in url for url in LOCAL_ENDPOINTS["ollama"]))
+        self.assertIsInstance(LOCAL_ENDPOINTS['ollama'], list)
+        self.assertTrue(any('11434' in url for url in LOCAL_ENDPOINTS['ollama']))
 
     def test_local_endpoints_lm_studio(self):
         """Test LM Studio endpoints."""
-        self.assertIsInstance(LOCAL_ENDPOINTS["lm_studio"], list)
-        self.assertTrue(any("1234" in url for url in LOCAL_ENDPOINTS["lm_studio"]))
+        self.assertIsInstance(LOCAL_ENDPOINTS['lm_studio'], list)
+        self.assertTrue(any('1234' in url for url in LOCAL_ENDPOINTS['lm_studio']))
 
     def test_local_endpoints_vllm(self):
         """Test vLLM endpoints."""
-        self.assertIsInstance(LOCAL_ENDPOINTS["vllm"], list)
-        self.assertTrue(any("8000" in url for url in LOCAL_ENDPOINTS["vllm"]))
+        self.assertIsInstance(LOCAL_ENDPOINTS['vllm'], list)
+        self.assertTrue(any('8000' in url for url in LOCAL_ENDPOINTS['vllm']))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     import unittest
 
     unittest.main()

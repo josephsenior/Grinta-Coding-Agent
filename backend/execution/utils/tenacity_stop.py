@@ -13,6 +13,6 @@ if TYPE_CHECKING:
 class stop_if_should_exit(stop_base):
     """Stop if the should_exit flag is set."""
 
-    def __call__(self, retry_state: "RetryCallState") -> bool:
+    def __call__(self, retry_state: 'RetryCallState') -> bool:
         """Return True when the global shutdown signal has been triggered."""
         return should_exit()

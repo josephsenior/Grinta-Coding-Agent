@@ -40,21 +40,21 @@ class SessionCheckpointManager:
         """
         try:
             # Enforce valid characters in checkpoint name to prevent path traversals
-            clean_name = "".join(c for c in name if c.isalnum() or c in "_-")
+            clean_name = ''.join(c for c in name if c.isalnum() or c in '_-')
             if not clean_name:
-                raise ValueError("Invalid checkpoint name")
+                raise ValueError('Invalid checkpoint name')
 
             checkpoint_dir = get_conversation_checkpoints_dir(self.sid, self.user_id)
-            checkpoint_path = f"{checkpoint_dir}{clean_name}.json"
+            checkpoint_path = f'{checkpoint_dir}{clean_name}.json'
 
             # Use State's JSON serialization logic
-            if hasattr(state, "_to_json_str"):
+            if hasattr(state, '_to_json_str'):
                 encoded = state._to_json_str()
             else:
                 # Fallback if method is missing (should not happen with correct State)
                 # This suggests State interface might have changed or we are mocking it
                 logger.warning(
-                    "State object missing _to_json_str, creating ad-hoc dump"
+                    'State object missing _to_json_str, creating ad-hoc dump'
                 )
                 import json
 
@@ -77,7 +77,7 @@ class SessionCheckpointManager:
         checkpoint_dir = get_conversation_checkpoints_dir(self.sid, self.user_id)
         try:
             files = self.file_store.list(checkpoint_dir)
-            return [f.replace(".json", "") for f in files if f.endswith(".json")]
+            return [f.replace('.json', '') for f in files if f.endswith('.json')]
         except Exception:
             # If directory doesn't exist or error listing
             return []
@@ -95,9 +95,9 @@ class SessionCheckpointManager:
         from backend.orchestration.state.state import State
 
         try:
-            clean_name = "".join(c for c in name if c.isalnum() or c in "_-")
+            clean_name = ''.join(c for c in name if c.isalnum() or c in '_-')
             checkpoint_dir = get_conversation_checkpoints_dir(self.sid, self.user_id)
-            checkpoint_path = f"{checkpoint_dir}{clean_name}.json"
+            checkpoint_path = f'{checkpoint_dir}{clean_name}.json'
 
             raw = self.file_store.read(checkpoint_path)
             state = State._from_raw(raw)
@@ -120,9 +120,9 @@ class SessionCheckpointManager:
 
         """
         try:
-            clean_name = "".join(c for c in name if c.isalnum() or c in "_-")
+            clean_name = ''.join(c for c in name if c.isalnum() or c in '_-')
             checkpoint_dir = get_conversation_checkpoints_dir(self.sid, self.user_id)
-            checkpoint_path = f"{checkpoint_dir}{clean_name}.json"
+            checkpoint_path = f'{checkpoint_dir}{clean_name}.json'
 
             self.file_store.delete(checkpoint_path)
             logger.info("Deleted checkpoint '%s'", clean_name)

@@ -11,17 +11,19 @@ import re
 from pathlib import Path
 from typing import Any
 
-from backend.core.logger import app_logger as logger
-from backend.context.graph_store import GraphMemoryStore
 from backend.context.graph_rag import GraphRAG
+from backend.context.graph_store import GraphMemoryStore
 from backend.context.vector_store import EnhancedVectorStore
+from backend.core.logger import app_logger as logger
 
 # Global graph store instance (lazy initialization)
 _graph_store: GraphMemoryStore | None = None
 _graph_rag: GraphRAG | None = None
 
 
-def _get_graph_store(workspace_root: str = "/workspace") -> tuple[GraphMemoryStore, GraphRAG | None]:
+def _get_graph_store(
+    workspace_root: str = '/workspace',
+) -> tuple[GraphMemoryStore, GraphRAG | None]:
     """Get or create the global graph store and GraphRAG."""
     global _graph_store, _graph_rag
     if _graph_store is None:
@@ -36,11 +38,11 @@ def _get_graph_store(workspace_root: str = "/workspace") -> tuple[GraphMemorySto
 
 def explore_tree_structure(
     start_entities: list[str],
-    direction: str = "downstream",
+    direction: str = 'downstream',
     traversal_depth: int = 2,
     entity_type_filter: list[str] | None = None,
     dependency_type_filter: list[str] | None = None,
-    workspace_root: str = "/workspace",
+    workspace_root: str = '/workspace',
 ) -> dict[str, Any]:
     """Explore code structure starting from given entities.
 
@@ -61,11 +63,11 @@ def explore_tree_structure(
 
     # Index files if needed
     for entity_id in start_entities:
-        if ":" in entity_id:
-            file_path = entity_id.split(":")[0]
+        if ':' in entity_id:
+            file_path = entity_id.split(':')[0]
             full_path = os.path.join(workspace_root, file_path)
             if os.path.exists(full_path):
-                with open(full_path, "r", encoding="utf-8") as f:
+                with open(full_path, 'r', encoding='utf-8') as f:
                     content = f.read()
                 if graph_rag is not None:
                     graph_rag.index_code_file(file_path, content)
@@ -87,14 +89,16 @@ def explore_tree_structure(
         # In GraphMemoryStore, the node ID might be just the symbol name or file path.
         # We need to handle the "file:symbol" format from start_entities.
         node_id = entity_id
-        if ":" in entity_id:
-            node_id = entity_id.split(":")[1]
+        if ':' in entity_id:
+            node_id = entity_id.split(':')[1]
 
         node = graph_store.get_node(node_id)
         if not node:
             # Try to resolve as file path
             if os.path.exists(os.path.join(workspace_root, entity_id)):
-                with open(os.path.join(workspace_root, entity_id), "r", encoding="utf-8") as f:
+                with open(
+                    os.path.join(workspace_root, entity_id), 'r', encoding='utf-8'
+                ) as f:
                     content = f.read()
                 if graph_rag is not None:
                     graph_rag.index_code_file(entity_id, content)
@@ -104,56 +108,68 @@ def explore_tree_structure(
             return
 
         # Apply entity type filter
-        if entity_type_filter and node.get("type") not in entity_type_filter:
+        if entity_type_filter and node.get('type') not in entity_type_filter:
             return
 
         explored_entities[node_id] = {
-            "entity_id": node_id,
-            "entity_type": node.get("type"),
-            "file_path": node.get("file_path"),
-            "name": node_id,
-            "line_start": node.get("line_start"),
-            "line_end": node.get("line_end"),
-            "parent_id": node.get("parent_id"),
+            'entity_id': node_id,
+            'entity_type': node.get('type'),
+            'file_path': node.get('file_path'),
+            'name': node_id,
+            'line_start': node.get('line_start'),
+            'line_end': node.get('line_end'),
+            'parent_id': node.get('parent_id'),
         }
 
         # Get dependencies
         # GraphMemoryStore uses get_neighbors, which returns outgoing edges.
         # For upstream, we need predecessors.
         deps = []
-        if direction in ("downstream", "both"):
+        if direction in ('downstream', 'both'):
             for neighbor in graph_store.get_neighbors(node_id):
-                if dependency_type_filter and neighbor["relationship"] not in dependency_type_filter:
+                if (
+                    dependency_type_filter
+                    and neighbor['relationship'] not in dependency_type_filter
+                ):
                     continue
-                deps.append({
-                    "from_entity": node_id,
-                    "to_entity": neighbor["id"],
-                    "dependency_type": neighbor["relationship"],
-                })
+                deps.append(
+                    {
+                        'from_entity': node_id,
+                        'to_entity': neighbor['id'],
+                        'dependency_type': neighbor['relationship'],
+                    }
+                )
 
-        if direction in ("upstream", "both"):
+        if direction in ('upstream', 'both'):
             if node_id in graph_store.graph:
                 for pred in graph_store.graph.predecessors(node_id):
                     edge_data = graph_store.graph.get_edge_data(pred, node_id)
                     for data in edge_data.values():
-                        if dependency_type_filter and data.get("type") not in dependency_type_filter:
+                        if (
+                            dependency_type_filter
+                            and data.get('type') not in dependency_type_filter
+                        ):
                             continue
-                        deps.append({
-                            "from_entity": pred,
-                            "to_entity": node_id,
-                            "dependency_type": data.get("type"),
-                        })
+                        deps.append(
+                            {
+                                'from_entity': pred,
+                                'to_entity': node_id,
+                                'dependency_type': data.get('type'),
+                            }
+                        )
 
         explored_dependencies.extend(deps)
 
         # Traverse dependencies
         for dep in deps:
             next_entity_id = (
-                dep["to_entity"] if direction == "downstream" else dep["from_entity"]
+                dep['to_entity'] if direction == 'downstream' else dep['from_entity']
             )
-            if direction == "both":
+            if direction == 'both':
                 next_entity_id = (
-                    dep["to_entity"] if dep["from_entity"] == node_id else dep["from_entity"]
+                    dep['to_entity']
+                    if dep['from_entity'] == node_id
+                    else dep['from_entity']
                 )
             traverse(next_entity_id, depth + 1, visited)
 
@@ -164,13 +180,13 @@ def explore_tree_structure(
 
     # Format results
     return {
-        "entities": list(explored_entities.values()),
-        "dependencies": explored_dependencies,
+        'entities': list(explored_entities.values()),
+        'dependencies': explored_dependencies,
     }
 
 
 def get_entity_contents(
-    entity_names: list[str], workspace_root: str = "/workspace"
+    entity_names: list[str], workspace_root: str = '/workspace'
 ) -> dict[str, Any]:
     """Get the complete content of specified entities.
 
@@ -186,25 +202,25 @@ def get_entity_contents(
 
     for entity_name in entity_names:
         # Parse entity identifier
-        if ":" in entity_name:
-            file_path, symbol_path = entity_name.split(":", 1)
+        if ':' in entity_name:
+            file_path, symbol_path = entity_name.split(':', 1)
         else:
             file_path = entity_name
             symbol_path = None
 
-        stripped = file_path.lstrip("/")
-        if stripped.startswith("workspace/") or stripped.startswith("workspace\\"):
-            stripped = stripped[len("workspace/"):]
-        elif stripped == "workspace":
-            stripped = "."
+        stripped = file_path.lstrip('/')
+        if stripped.startswith('workspace/') or stripped.startswith('workspace\\'):
+            stripped = stripped[len('workspace/') :]
+        elif stripped == 'workspace':
+            stripped = '.'
         full_path = Path(workspace_root) / stripped
 
         if not full_path.exists():
-            results[entity_name] = f"Error: File not found: {file_path}"
+            results[entity_name] = f'Error: File not found: {file_path}'
             continue
 
         try:
-            with open(full_path, encoding="utf-8") as f:
+            with open(full_path, encoding='utf-8') as f:
                 content = f.read()
 
             # If no symbol specified, return entire file
@@ -217,10 +233,10 @@ def get_entity_contents(
                 graph_rag.index_code_file(file_path, content)
 
             node = graph_store.get_node(symbol_path)
-            if node and node.get("line_start") and node.get("line_end"):
+            if node and node.get('line_start') and node.get('line_end'):
                 lines = content.splitlines()
-                entity_content = "\n".join(
-                    lines[node["line_start"] - 1 : node["line_end"]]
+                entity_content = '\n'.join(
+                    lines[node['line_start'] - 1 : node['line_end']]
                 )
                 results[entity_name] = entity_content
             else:
@@ -230,9 +246,9 @@ def get_entity_contents(
                 )
 
         except Exception as e:
-            results[entity_name] = f"Error reading {entity_name}: {e}"
+            results[entity_name] = f'Error reading {entity_name}: {e}'
 
-    return {"entities": results}
+    return {'entities': results}
 
 
 def _extract_symbol_by_name(content: str, symbol_path: str, file_path: str) -> str:
@@ -241,7 +257,7 @@ def _extract_symbol_by_name(content: str, symbol_path: str, file_path: str) -> s
     lines = content.splitlines()
 
     # Try to find class or function definition
-    pattern = rf"(class|def)\s+{re.escape(symbol_path.split('.')[-1])}"
+    pattern = rf'(class|def)\s+{re.escape(symbol_path.split(".")[-1])}'
     for i, line in enumerate(lines):
         if re.match(pattern, line.strip()):
             # Find the end of the definition (simple heuristic)
@@ -254,11 +270,11 @@ def _extract_symbol_by_name(content: str, symbol_path: str, file_path: str) -> s
                     lines[j].strip()
                     and len(lines[j]) - len(lines[j].lstrip()) <= indent
                 ):
-                    if not lines[j].strip().startswith(("#", '"', "'")):
+                    if not lines[j].strip().startswith(('#', '"', "'")):
                         break
                 end = j + 1
 
-            return "\n".join(lines[start:end])
+            return '\n'.join(lines[start:end])
 
     return f"Symbol '{symbol_path}' not found in {file_path}"
 
@@ -266,8 +282,8 @@ def _extract_symbol_by_name(content: str, symbol_path: str, file_path: str) -> s
 def search_code_snippets(
     search_terms: list[str] | None = None,
     line_nums: list[int] | None = None,
-    file_path_or_pattern: str = "**/*.py",
-    workspace_root: str = "/workspace",
+    file_path_or_pattern: str = '**/*.py',
+    workspace_root: str = '/workspace',
 ) -> dict[str, Any]:
     """Search for code snippets matching terms or around line numbers.
 
@@ -294,7 +310,7 @@ def search_code_snippets(
             continue
 
         try:
-            with open(file_path, encoding="utf-8") as f:
+            with open(file_path, encoding='utf-8') as f:
                 content = f.read()
             lines = content.splitlines()
 
@@ -311,17 +327,17 @@ def search_code_snippets(
                         context = _get_line_context(lines, line_num, context_lines=5)
                         results.append(
                             {
-                                "file_path": str(file_path.relative_to(workspace)),
-                                "line_number": line_num,
-                                "content": context,
-                                "match_type": "line_number",
+                                'file_path': str(file_path.relative_to(workspace)),
+                                'line_number': line_num,
+                                'content': context,
+                                'match_type': 'line_number',
                             }
                         )
 
         except Exception as e:
-            logger.debug("Error searching in %s: %s", file_path, e)
+            logger.debug('Error searching in %s: %s', file_path, e)
 
-    return {"snippets": results}
+    return {'snippets': results}
 
 
 def _search_in_content(
@@ -336,11 +352,11 @@ def _search_in_content(
             context = _get_line_context(lines, i, context_lines=3)
             results.append(
                 {
-                    "file_path": file_path,
-                    "line_number": i,
-                    "content": context,
-                    "match_type": "term",
-                    "search_term": term,
+                    'file_path': file_path,
+                    'line_number': i,
+                    'content': context,
+                    'match_type': 'term',
+                    'search_term': term,
                 }
             )
 
@@ -355,6 +371,6 @@ def _get_line_context(lines: list[str], line_num: int, context_lines: int = 5) -
 
     # Add line numbers
     numbered = [
-        f"{i + start + 1:4d} | {line}" for i, line in enumerate(context_lines_list)
+        f'{i + start + 1:4d} | {line}' for i, line in enumerate(context_lines_list)
     ]
-    return "\n".join(numbered)
+    return '\n'.join(numbered)

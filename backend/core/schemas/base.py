@@ -13,25 +13,25 @@ from backend.core.enums import EventSource, EventVersion
 class EventMetadata(BaseModel):
     """Metadata attached to all events."""
 
-    event_id: int | None = Field(None, description="Unique event identifier")
-    sequence: int | None = Field(None, description="Event sequence number for ordering")
+    event_id: int | None = Field(None, description='Unique event identifier')
+    sequence: int | None = Field(None, description='Event sequence number for ordering')
     timestamp: datetime | None = Field(
-        None, description="Event timestamp in ISO format"
+        None, description='Event timestamp in ISO format'
     )
     source: EventSource | None = Field(
-        None, description="Event source (AGENT, USER, ENVIRONMENT)"
+        None, description='Event source (AGENT, USER, ENVIRONMENT)'
     )
-    cause: int | None = Field(None, description="ID of event that caused this event")
-    hidden: bool = Field(False, description="Whether this event is hidden from the UI")
-    timeout: float | None = Field(None, description="Timeout value in seconds")
-    response_id: str | None = Field(None, description="LLM response ID for this event")
-    trace_id: str | None = Field(None, description="Distributed tracing ID")
+    cause: int | None = Field(None, description='ID of event that caused this event')
+    hidden: bool = Field(False, description='Whether this event is hidden from the UI')
+    timeout: float | None = Field(None, description='Timeout value in seconds')
+    response_id: str | None = Field(None, description='LLM response ID for this event')
+    trace_id: str | None = Field(None, description='Distributed tracing ID')
 
     model_config = ConfigDict(
         use_enum_values=True,
     )
 
-    @field_serializer("timestamp")
+    @field_serializer('timestamp')
     def serialize_timestamp(self, value: datetime | None) -> str | None:
         return value.isoformat() if value else None
 
@@ -45,10 +45,10 @@ class BaseEventSchema(BaseModel):
     """Base schema for all App events with versioning support."""
 
     schema_version: EventVersion = Field(
-        EventVersion.V1, description="Schema version for this event"
+        EventVersion.V1, description='Schema version for this event'
     )
     metadata: EventMetadata = Field(
-        default_factory=_create_default_event_metadata, description="Event metadata"
+        default_factory=_create_default_event_metadata, description='Event metadata'
     )
 
     model_config = ConfigDict(
@@ -57,7 +57,7 @@ class BaseEventSchema(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize event to dictionary."""
-        return self.model_dump(mode="json", exclude_none=True)
+        return self.model_dump(mode='json', exclude_none=True)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> BaseEventSchema:
@@ -73,7 +73,7 @@ class EventSchemaV1(BaseEventSchema):
 
     schema_version: EventVersion = Field(EventVersion.V1, frozen=True)
 
-    @field_validator("schema_version", mode="before")
+    @field_validator('schema_version', mode='before')
     @classmethod
     def validate_version(cls, v: Any) -> EventVersion:
         """Ensure schema version is V1."""

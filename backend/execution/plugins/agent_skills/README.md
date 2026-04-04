@@ -1,6 +1,6 @@
-# App Skill Sets
+# Grinta Skill Sets
 
-This folder implements a skill/tool set `agentskills` for App.
+This folder implements a skill/tool set `agentskills` for Grinta.
 
 It is intended to be used by the agent **inside runtime**.
 The skill set will be exposed as a `pip` package that can be installed as a plugin inside the runtime.

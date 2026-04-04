@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 from typing import cast
+from unittest.mock import MagicMock
 
-
-from backend.orchestration.services.circuit_breaker_service import CircuitBreakerService
 from backend.core.config import AgentConfig
+from backend.orchestration.services.circuit_breaker_service import CircuitBreakerService
 
 
 def _make_context() -> MagicMock:
@@ -79,10 +78,10 @@ class TestCheck:
         ctx = _make_context()
         svc = CircuitBreakerService(ctx)
         mock_cb = MagicMock()
-        mock_cb.check.return_value = "tripped"
+        mock_cb.check.return_value = 'tripped'
         svc._circuit_breaker = mock_cb
         result = svc.check()
-        assert result == "tripped"
+        assert result == 'tripped'
         mock_cb.check.assert_called_once()
 
 
@@ -95,14 +94,14 @@ class TestRecording:
         svc = CircuitBreakerService(ctx)
         mock_cb = MagicMock()
         svc._circuit_breaker = mock_cb
-        exc = RuntimeError("boom")
+        exc = RuntimeError('boom')
         svc.record_error(exc)
         mock_cb.record_error.assert_called_once_with(exc)
 
     def test_record_error_without_breaker_noop(self):
         ctx = _make_context()
         svc = CircuitBreakerService(ctx)
-        svc.record_error(RuntimeError("ok"))  # no error
+        svc.record_error(RuntimeError('ok'))  # no error
 
     def test_record_success(self):
         ctx = _make_context()
@@ -122,8 +121,8 @@ class TestRecording:
         svc = CircuitBreakerService(ctx)
         mock_cb = MagicMock()
         svc._circuit_breaker = mock_cb
-        svc.record_high_risk_action("HIGH")
-        mock_cb.record_high_risk_action.assert_called_once_with("HIGH")
+        svc.record_high_risk_action('HIGH')
+        mock_cb.record_high_risk_action.assert_called_once_with('HIGH')
 
     def test_record_high_risk_action_none_skips(self):
         ctx = _make_context()

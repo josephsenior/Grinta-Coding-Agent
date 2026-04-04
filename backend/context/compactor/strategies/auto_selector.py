@@ -70,7 +70,7 @@ def _update_signals_from_event(sig: TaskSignals, ev: Event) -> tuple[int, int]:
         sig.cmd_run_count += 1
     if isinstance(ev, CondensationAction):
         sig.condensation_count += 1
-    if type(ev).__name__ == "FileEditAction":
+    if type(ev).__name__ == 'FileEditAction':
         sig.code_edit_count += 1
     if isinstance(ev, Observation):
         len_delta = len(ev.content)
@@ -132,7 +132,7 @@ def select_compactor_config(
     fallback:
         Config returned when events are too few to decide meaningfully.
 
-    Returns
+    Returns:
     -------
     CompactorConfig
         The selected compactor configuration.
@@ -140,8 +140,8 @@ def select_compactor_config(
     sig = compute_signals(events)
 
     logger.debug(
-        "Compactor auto-select signals: events=%d errors=%d error_ratio=%.2f "
-        "edits=%d cmds=%d condensations=%d",
+        'Compactor auto-select signals: events=%d errors=%d error_ratio=%.2f '
+        'edits=%d cmds=%d condensations=%d',
         sig.total_events,
         sig.error_count,
         sig.error_ratio,
@@ -153,14 +153,14 @@ def select_compactor_config(
     # 1. Very short session → no condensation needed
     if sig.total_events < _SHORT_SESSION:
         logger.info(
-            "Auto-select compactor: noop (short session, %d events)", sig.total_events
+            'Auto-select compactor: noop (short session, %d events)', sig.total_events
         )
         return fallback or NoOpCompactorConfig()
 
     # 2. High error ratio → keep recent events for debugging context
     if sig.error_ratio >= _HIGH_ERROR_RATIO:
         logger.info(
-            "Auto-select compactor: recent (high error ratio %.2f)", sig.error_ratio
+            'Auto-select compactor: recent (high error ratio %.2f)', sig.error_ratio
         )
         return RecentEventsCompactorConfig(
             keep_first=3, max_events=min(sig.total_events, 80)
@@ -171,7 +171,7 @@ def select_compactor_config(
         if llm_config:
             if supports_function_calling:
                 logger.info(
-                    "Auto-select compactor: structured (long session + function calling, %d events)",
+                    'Auto-select compactor: structured (long session + function calling, %d events)',
                     sig.total_events,
                 )
                 return StructuredSummaryCompactorConfig(
@@ -180,7 +180,7 @@ def select_compactor_config(
                     keep_first=5,
                 )
             logger.info(
-                "Auto-select compactor: smart (long session, %d events)",
+                'Auto-select compactor: smart (long session, %d events)',
                 sig.total_events,
             )
             return SmartCompactorConfig(
@@ -190,7 +190,7 @@ def select_compactor_config(
             )
         # No LLM → amortized pruning
         logger.info(
-            "Auto-select compactor: amortized (long session, no LLM, %d events)",
+            'Auto-select compactor: amortized (long session, no LLM, %d events)',
             sig.total_events,
         )
         return AmortizedPruningCompactorConfig(max_size=150, keep_first=3)
@@ -198,11 +198,11 @@ def select_compactor_config(
     # 5. Medium session → observation masking (light-weight)
     if sig.total_events >= _MEDIUM_SESSION:
         logger.info(
-            "Auto-select compactor: observation_masking (medium session, %d events)",
+            'Auto-select compactor: observation_masking (medium session, %d events)',
             sig.total_events,
         )
         return ObservationMaskingCompactorConfig(attention_window=60)
 
     # 6. Default — noop / fallback
-    logger.info("Auto-select compactor: fallback/noop (%d events)", sig.total_events)
+    logger.info('Auto-select compactor: fallback/noop (%d events)', sig.total_events)
     return fallback or NoOpCompactorConfig()

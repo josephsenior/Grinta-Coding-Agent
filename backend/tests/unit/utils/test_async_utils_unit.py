@@ -16,22 +16,21 @@ from backend.utils.async_utils import (
     wait_all,
 )
 
-
 # ── AsyncException ───────────────────────────────────────────────────
 
 
 class TestAsyncException:
     def test_str_single(self):
-        exc = AsyncException([ValueError("a")])
-        assert str(exc) == "a"
+        exc = AsyncException([ValueError('a')])
+        assert str(exc) == 'a'
 
     def test_str_multi(self):
-        exc = AsyncException([ValueError("a"), TypeError("b")])
-        assert "a" in str(exc)
-        assert "b" in str(exc)
+        exc = AsyncException([ValueError('a'), TypeError('b')])
+        assert 'a' in str(exc)
+        assert 'b' in str(exc)
 
     def test_stores_exceptions(self):
-        errs = [ValueError("x"), TypeError("y")]
+        errs = [ValueError('x'), TypeError('y')]
         exc = AsyncException(errs)
         assert exc.exceptions is errs
 
@@ -62,8 +61,8 @@ class TestCreateTrackedTask:
         async def noop():
             pass
 
-        task = create_tracked_task(noop(), name="my_task", task_set=bag)
-        assert task.get_name() == "my_task"
+        task = create_tracked_task(noop(), name='my_task', task_set=bag)
+        assert task.get_name() == 'my_task'
         await task
 
     @pytest.mark.asyncio
@@ -86,24 +85,24 @@ class TestCreateTrackedTask:
 
 class TestCallAsyncFromSync:
     def test_none_raises(self):
-        with pytest.raises(ValueError, match="corofn is None"):
+        with pytest.raises(ValueError, match='corofn is None'):
             call_async_from_sync(None)
 
     def test_not_coroutine_raises(self):
         def sync_fn():
             pass
 
-        with pytest.raises(ValueError, match="not a coroutine"):
+        with pytest.raises(ValueError, match='not a coroutine'):
             call_async_from_sync(sync_fn)
 
     def test_valid_coro(self):
         async def greet(name):
-            return f"hi {name}"
+            return f'hi {name}'
 
-        result = call_async_from_sync(greet, timeout=5.0, name="world")
+        result = call_async_from_sync(greet, timeout=5.0, name='world')
         # On some platforms this may work; on others executor might be shut down.
         # We mainly test the validation paths above.
-        assert result == "hi world"
+        assert result == 'hi world'
 
 
 # ── _collect_results ─────────────────────────────────────────────────
@@ -123,21 +122,21 @@ class TestCollectResults:
     @pytest.mark.asyncio
     async def test_single_error(self):
         async def fail():
-            raise ValueError("boom")
+            raise ValueError('boom')
 
         task = asyncio.create_task(fail())
         with pytest.raises(ValueError):
             await task
-        with pytest.raises(ValueError, match="boom"):
+        with pytest.raises(ValueError, match='boom'):
             _collect_results([task])
 
     @pytest.mark.asyncio
     async def test_multi_error(self):
         async def fail_a():
-            raise ValueError("a")
+            raise ValueError('a')
 
         async def fail_b():
-            raise TypeError("b")
+            raise TypeError('b')
 
         t1 = asyncio.create_task(fail_a())
         t2 = asyncio.create_task(fail_b())
@@ -182,9 +181,9 @@ class TestWaitAll:
     @pytest.mark.asyncio
     async def test_error(self):
         async def fail():
-            raise ValueError("oops")
+            raise ValueError('oops')
 
-        with pytest.raises(ValueError, match="oops"):
+        with pytest.raises(ValueError, match='oops'):
             await wait_all([fail()])
 
 

@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING, Any
 from backend.core.logger import app_logger as logger
 
 if TYPE_CHECKING:
-    from backend.orchestration.session_orchestrator import SessionOrchestrator
-    from backend.orchestration.state.state import State
     from backend.ledger.action import Action
     from backend.ledger.observation import Observation
+    from backend.orchestration.session_orchestrator import SessionOrchestrator
+    from backend.orchestration.state.state import State
 
 
 @dataclass
@@ -82,23 +82,23 @@ class ToolInvocationPipeline:
         )
 
     async def run_plan(self, ctx: ToolInvocationContext) -> None:
-        await self._run_stage("plan", ctx)
+        await self._run_stage('plan', ctx)
 
     async def run_verify(self, ctx: ToolInvocationContext) -> None:
         if ctx.blocked:
             return
-        await self._run_stage("verify", ctx)
+        await self._run_stage('verify', ctx)
 
     async def run_execute(self, ctx: ToolInvocationContext) -> None:
         if ctx.blocked:
             return
-        await self._run_stage("execute", ctx)
+        await self._run_stage('execute', ctx)
 
     async def run_observe(
         self, ctx: ToolInvocationContext, observation: Observation | None
     ) -> None:
-        ctx.metadata["observation"] = observation
-        await self._run_stage("observe", ctx, observation=observation)
+        ctx.metadata['observation'] = observation
+        await self._run_stage('observe', ctx, observation=observation)
 
     async def _run_stage(
         self,
@@ -119,12 +119,12 @@ class ToolInvocationPipeline:
                     await result
             except Exception as exc:  # pragma: no cover - defensive
                 logger.exception(
-                    "Tool middleware %s failed during stage %s: %s",
+                    'Tool middleware %s failed during stage %s: %s',
                     middleware.__class__.__name__,
                     stage,
                     exc,
                 )
-                ctx.block(reason=f"{middleware.__class__.__name__}:{stage}_error")
+                ctx.block(reason=f'{middleware.__class__.__name__}:{stage}_error')
                 break
 
 
@@ -132,26 +132,27 @@ class ToolInvocationPipeline:
 # for new code.
 def __getattr__(name: str) -> Any:
     if name in (
-        "AutoCheckMiddleware",
-        "BlackboardMiddleware",
-        "CircuitBreakerMiddleware",
-        "ConflictDetectionMiddleware",
-        "ContextWindowMiddleware",
-        "CostQuotaMiddleware",
-        "EditVerifyMiddleware",
-        "ErrorPatternMiddleware",
-        "LoggingMiddleware",
-        "ReflectionMiddleware",
-        "SafetyValidatorMiddleware",
-        "TelemetryMiddleware",
+        'AutoCheckMiddleware',
+        'BlackboardMiddleware',
+        'CircuitBreakerMiddleware',
+        'ConflictDetectionMiddleware',
+        'ContextWindowMiddleware',
+        'CostQuotaMiddleware',
+        'EditVerifyMiddleware',
+        'ErrorPatternMiddleware',
+        'LoggingMiddleware',
+        'ReflectionMiddleware',
+        'SafetyValidatorMiddleware',
+        'TelemetryMiddleware',
     ):
         from backend.orchestration import middleware as mw
+
         return getattr(mw, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
 
 
 __all__ = [
-    "ToolInvocationContext",
-    "ToolInvocationMiddleware",
-    "ToolInvocationPipeline",
+    'ToolInvocationContext',
+    'ToolInvocationMiddleware',
+    'ToolInvocationPipeline',
 ]

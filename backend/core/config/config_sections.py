@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING, get_args, get_origin, get_type_hints
 from pydantic import SecretStr, ValidationError
 
 from backend.core.config.agent_config import AgentConfig
-from backend.core.config.extended_config import ExtendedConfig
 from backend.core.config.app_config import AppConfig
+from backend.core.config.extended_config import ExtendedConfig
 from backend.core.config.llm_config import LLMConfig
 from backend.core.config.mcp_config import MCPConfig
 from backend.core.config.runtime_config import RuntimeConfig
@@ -32,7 +32,7 @@ def process_core_section(
     try:
         cfg_type_hints = get_type_hints(cfg.__class__)
     except NameError:
-        cfg_type_hints = getattr(cfg.__class__, "__annotations__", {})
+        cfg_type_hints = getattr(cfg.__class__, '__annotations__', {})
     for key, value in core_config.items():
         if hasattr(cfg, key):
             if expected_type := cfg_type_hints.get(key, None):
@@ -51,67 +51,67 @@ def process_agent_section(
     toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [agent] section of the TOML config."""
-    if "agent" in toml_config:
+    if 'agent' in toml_config:
         try:
-            agent_mapping = AgentConfig.from_toml_section(toml_config["agent"])
+            agent_mapping = AgentConfig.from_toml_section(toml_config['agent'])
             for agent_key, agent_conf in agent_mapping.items():
                 cfg.set_agent_config(agent_conf, agent_key)
         except (TypeError, KeyError, ValidationError) as e:
             logger.warning(
-                "Cannot parse [agent] config from toml, values have not been applied.\nError: %s",
+                'Cannot parse [agent] config from toml, values have not been applied.\nError: %s',
                 e,
             )
             if summary:
-                summary.record("agent", "invalid", str(e))
+                summary.record('agent', 'invalid', str(e))
 
 
 def process_llm_section(
     toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [llm] section of the TOML config."""
-    if "llm" in toml_config:
+    if 'llm' in toml_config:
         from backend.core.config.llm_config import suppress_llm_env_export
 
         try:
             with suppress_llm_env_export():
                 llm_instance = LLMConfig()
-                llm_mapping = llm_instance.from_toml_section(toml_config["llm"])
+                llm_mapping = llm_instance.from_toml_section(toml_config['llm'])
 
-            base_llm = llm_mapping.pop("llm", None)
+            base_llm = llm_mapping.pop('llm', None)
             for llm_key, llm_conf in llm_mapping.items():
                 cfg.set_llm_config(llm_conf, llm_key)
             if base_llm is not None:
-                cfg.set_llm_config(base_llm, "llm")
+                cfg.set_llm_config(base_llm, 'llm')
         except (TypeError, KeyError, ValidationError) as e:
             logger.warning(
-                "Cannot parse [llm] config from toml, values have not been applied.\nError: %s",
+                'Cannot parse [llm] config from toml, values have not been applied.\nError: %s',
                 e,
             )
             if summary:
-                summary.record("llm", "invalid", str(e))
+                summary.record('llm', 'invalid', str(e))
 
 
 def process_security_section(
     toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [security] section of the TOML config."""
-    if "security" in toml_config:
+    if 'security' in toml_config:
         try:
-            security_mapping = SecurityConfig.from_toml_section(toml_config["security"])
-            if "security" in security_mapping:
-                cfg.security = security_mapping["security"]
+            security_mapping = SecurityConfig.from_toml_section(toml_config['security'])
+            if 'security' in security_mapping:
+                cfg.security = security_mapping['security']
         except (TypeError, KeyError, ValidationError) as e:
             logger.warning(
-                "Cannot parse [security] config from toml, values have not been applied.\nError: %s",
+                'Cannot parse [security] config from toml, values have not been applied.\nError: %s',
                 e,
             )
             if summary:
-                summary.record("security", "invalid", str(e))
+                summary.record('security', 'invalid', str(e))
         except ValueError as exc:
             if summary:
-                summary.record("security", "warning", str(exc))
+                summary.record('security', 'warning', str(exc))
             logger.warning(
-                "Cannot parse [security] config from toml, values have not been applied.\nError: %s",
+                'Cannot parse [security] config from toml, values have not been applied.\nError: %s',
                 exc,
             )
 
@@ -120,22 +120,22 @@ def process_runtime_section(
     toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [runtime] section of the TOML config."""
-    if "runtime" in toml_config:
+    if 'runtime' in toml_config:
         try:
-            runtime_mapping = RuntimeConfig.from_toml_section(toml_config["runtime"])
-            if "runtime_config" in runtime_mapping:
-                cfg.runtime_config = runtime_mapping["runtime_config"]
+            runtime_mapping = RuntimeConfig.from_toml_section(toml_config['runtime'])
+            if 'runtime_config' in runtime_mapping:
+                cfg.runtime_config = runtime_mapping['runtime_config']
         except (TypeError, KeyError, ValidationError) as e:
             logger.warning(
-                "Cannot parse [runtime] config from toml, values have not been applied.\nError: %s",
+                'Cannot parse [runtime] config from toml, values have not been applied.\nError: %s',
                 e,
             )
             if summary:
-                summary.record("runtime", "invalid", str(e))
+                summary.record('runtime', 'invalid', str(e))
         except ValueError as e:
             if summary:
-                summary.record("runtime", "error", str(e))
-            msg = "Error in [runtime] section in settings.json"
+                summary.record('runtime', 'error', str(e))
+            msg = 'Error in [runtime] section in settings.json'
             raise ValueError(msg) from e
 
 
@@ -143,22 +143,22 @@ def process_mcp_section(
     toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [mcp] section of the TOML config."""
-    if "mcp" in toml_config:
+    if 'mcp' in toml_config:
         try:
-            mcp_mapping = MCPConfig.from_toml_section(toml_config["mcp"])
-            if "mcp" in mcp_mapping:
-                cfg.mcp = mcp_mapping["mcp"]
+            mcp_mapping = MCPConfig.from_toml_section(toml_config['mcp'])
+            if 'mcp' in mcp_mapping:
+                cfg.mcp = mcp_mapping['mcp']
         except (TypeError, KeyError, ValidationError) as e:
             logger.warning(
-                "Cannot parse MCP config from toml, values have not been applied.\nError: %s",
+                'Cannot parse MCP config from toml, values have not been applied.\nError: %s',
                 e,
             )
             if summary:
-                summary.record("mcp", "invalid", str(e))
+                summary.record('mcp', 'invalid', str(e))
         except ValueError as err:
             if summary:
-                summary.record("mcp", "error", str(err))
-            msg = "Error in MCP sections in settings.json"
+                summary.record('mcp', 'error', str(err))
+            msg = 'Error in MCP sections in settings.json'
             raise ValueError(msg) from err
 
 
@@ -171,28 +171,28 @@ def process_compactor_section(
     Otherwise the system defaults to auto-selection which adapts to the
     session dynamically.
     """
-    if "compactor" in toml_config:
+    if 'compactor' in toml_config:
         try:
             from backend.core.config.compactor_config import (
                 compactor_config_from_toml_section,
             )
 
             compactor_mapping = compactor_config_from_toml_section(
-                toml_config["compactor"], cfg.llms
+                toml_config['compactor'], cfg.llms
             )
-            if "compactor" in compactor_mapping:
+            if 'compactor' in compactor_mapping:
                 default_agent_config = cfg.get_agent_config()
-                default_agent_config.compactor_config = compactor_mapping["compactor"]
+                default_agent_config.compactor_config = compactor_mapping['compactor']
                 logger.debug(
-                    "Default compactor configuration loaded from config toml and assigned to default agent",
+                    'Default compactor configuration loaded from config toml and assigned to default agent',
                 )
         except (TypeError, KeyError, ValidationError) as e:
             logger.warning(
-                "Cannot parse [compactor] config from toml, values have not been applied.\nError: %s",
+                'Cannot parse [compactor] config from toml, values have not been applied.\nError: %s',
                 e,
             )
             if summary:
-                summary.record("compactor", "invalid", str(e))
+                summary.record('compactor', 'invalid', str(e))
     else:
         from backend.core.config.compactor_config import AutoCompactorConfig
 
@@ -201,7 +201,7 @@ def process_compactor_section(
             llm_config=cfg.get_llm_config(),
         )
         logger.debug(
-            "Auto compactor assigned to default agent (adapts to session dynamically)",
+            'Auto compactor assigned to default agent (adapts to session dynamically)',
         )
 
 
@@ -209,31 +209,31 @@ def process_extended_section(
     toml_config: dict, cfg: AppConfig, summary: ConfigLoadSummary | None = None
 ) -> None:
     """Process the [extended] section of the TOML config."""
-    if "extended" in toml_config:
+    if 'extended' in toml_config:
         try:
-            cfg.extended = ExtendedConfig(toml_config["extended"])
+            cfg.extended = ExtendedConfig(toml_config['extended'])
         except (TypeError, KeyError, ValidationError) as e:
             logger.warning(
-                "Cannot parse [extended] config from toml, values have not been applied.\nError: %s",
+                'Cannot parse [extended] config from toml, values have not been applied.\nError: %s',
                 e,
             )
             if summary:
-                summary.record("extended", "invalid", str(e))
+                summary.record('extended', 'invalid', str(e))
 
 
 def check_unknown_sections(toml_config: dict, toml_file: str) -> None:
     """Check for unknown sections in the TOML config."""
     known_sections = {
-        "core",
-        "extended",
-        "agent",
-        "llm",
-        "security",
-        "runtime",
-        "compactor",
-        "mcp",
-        "api_keys",
+        'core',
+        'extended',
+        'agent',
+        'llm',
+        'security',
+        'runtime',
+        'compactor',
+        'mcp',
+        'api_keys',
     }
     for key in toml_config:
         if key.lower() not in known_sections:
-            logger.debug("Unknown section [%s] in %s", key, toml_file)
+            logger.debug('Unknown section [%s] in %s', key, toml_file)

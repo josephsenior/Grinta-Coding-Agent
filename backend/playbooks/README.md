@@ -15,15 +15,15 @@
 | Source | Path |
 |--------|------|
 | Global (shipped) | This directory |
-| Per-user | `~/.app/playbooks/` |
-| Per-repo | `.app/playbooks/repo.md` (auto context; different loader) |
+| Per-user | `~/.grinta/playbooks/` |
+| Per-repo | `.grinta/playbooks/repo.md` (auto context; different loader) |
 
 ## Inventory (global)
 
 | File | Intent |
 |------|--------|
 | `add_agent.md` | How to add a playbook (meta) |
-| `add_repo_inst.md` | Scaffold `.app/playbooks/repo.md` |
+| `add_repo_inst.md` | Scaffold `.grinta/playbooks/repo.md` |
 | `address_pr_comments.md` | `/address_pr_comments` workflow |
 | `agent_memory.md` | `/remember` — lessons.md vs vector recall |
 | `api.md` | `/api` — REST/FastAPI patterns |

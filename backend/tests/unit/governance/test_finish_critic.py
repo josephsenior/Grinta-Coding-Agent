@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-
-from backend.ledger.action import PlaybookFinishAction, AgentThinkAction
+from backend.governance.finish_critic import AgentFinishedCritic
+from backend.ledger.action import AgentThinkAction, PlaybookFinishAction
 from backend.ledger.event import Event
 from backend.ledger.observation import Observation
-from backend.governance.finish_critic import AgentFinishedCritic
 
 
 class TestAgentFinishedCritic:
@@ -21,7 +20,7 @@ class TestAgentFinishedCritic:
         """Test successful finish when last action is PlaybookFinishAction."""
         critic = AgentFinishedCritic()
         events = [
-            AgentThinkAction(thought="thinking"),
+            AgentThinkAction(thought='thinking'),
             PlaybookFinishAction(),
         ]
 
@@ -34,8 +33,8 @@ class TestAgentFinishedCritic:
         """Test failure when last action is not PlaybookFinishAction."""
         critic = AgentFinishedCritic()
         events = [
-            AgentThinkAction(thought="thinking"),
-            AgentThinkAction(thought="more thinking"),
+            AgentThinkAction(thought='thinking'),
+            AgentThinkAction(thought='more thinking'),
         ]
 
         result = critic.evaluate(events)
@@ -47,10 +46,10 @@ class TestAgentFinishedCritic:
         """Test finish action is found even with observations after it."""
         critic = AgentFinishedCritic()
         events = [
-            AgentThinkAction(thought="thinking"),
+            AgentThinkAction(thought='thinking'),
             PlaybookFinishAction(),
-            Observation(content="some output"),
-            Observation(content="more output"),
+            Observation(content='some output'),
+            Observation(content='more output'),
         ]
 
         result = critic.evaluate(events)
@@ -66,7 +65,7 @@ class TestAgentFinishedCritic:
             PlaybookFinishAction(),
         ]
 
-        result = critic.evaluate(events, diff_patch="")
+        result = critic.evaluate(events, diff_patch='')
 
         assert result.score == 0
         assert result.success is False
@@ -78,7 +77,7 @@ class TestAgentFinishedCritic:
             PlaybookFinishAction(),
         ]
 
-        result = critic.evaluate(events, diff_patch="   \n\n   ")
+        result = critic.evaluate(events, diff_patch='   \n\n   ')
 
         assert result.score == 0
         assert result.success is False
@@ -110,8 +109,8 @@ index 1234567..abcdefg 100644
         """Test failure when there are no actions at all."""
         critic = AgentFinishedCritic()
         events = [
-            Observation(content="output 1"),
-            Observation(content="output 2"),
+            Observation(content='output 1'),
+            Observation(content='output 2'),
         ]
 
         result = critic.evaluate(events)
@@ -134,7 +133,7 @@ index 1234567..abcdefg 100644
         critic = AgentFinishedCritic()
         events = [
             PlaybookFinishAction(),
-            AgentThinkAction(thought="later thinking"),
+            AgentThinkAction(thought='later thinking'),
         ]
 
         result = critic.evaluate(events)
@@ -161,7 +160,7 @@ index 1234567..abcdefg 100644
             PlaybookFinishAction(),
         ]
 
-        result = critic.evaluate(events, diff_patch="  ")
+        result = critic.evaluate(events, diff_patch='  ')
 
         # Empty patch should be checked first and return 0
         assert result.score == 0
@@ -172,7 +171,7 @@ index 1234567..abcdefg 100644
         critic = AgentFinishedCritic()
         events = [
             PlaybookFinishAction(),
-            AgentThinkAction(thought="intermediate"),
+            AgentThinkAction(thought='intermediate'),
             PlaybookFinishAction(),
         ]
 
@@ -191,6 +190,6 @@ index 1234567..abcdefg 100644
         assert result_success.success is True  # score=1 >= 0.5
 
         # Failure case
-        events_failure = [AgentThinkAction(thought="test")]
+        events_failure = [AgentThinkAction(thought='test')]
         result_failure = critic.evaluate(events_failure)
         assert result_failure.success is False  # score=0 < 0.5

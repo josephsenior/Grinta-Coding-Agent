@@ -6,10 +6,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.orchestration.services.action_execution_service import ActionExecutionService
 from backend.ledger import EventSource
 from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.observation import ErrorObservation
+from backend.orchestration.services.action_execution_service import (
+    ActionExecutionService,
+)
 
 
 def _make_context():
@@ -85,8 +87,10 @@ class TestGetNextAction:
         """Uses agent.astep() when available and is coroutine."""
         ctx = _make_context()
         action = MagicMock()
+
         async def mock_astep(state):
             return action
+
         ctx.agent.astep = mock_astep
         ctx.agent.config = MagicMock()
         ctx.agent.config.llm_step_timeout_seconds = 30
@@ -98,19 +102,22 @@ class TestGetNextAction:
 
     @pytest.mark.asyncio
     async def test_astep_timeout_raises(self):
-        """astep timeout raises Timeout from llm.exceptions."""
+        """Astep timeout raises Timeout from llm.exceptions."""
         import asyncio
+
         from backend.inference.exceptions import Timeout
 
         ctx = _make_context()
+
         async def slow_astep(_state):
             await asyncio.sleep(10)
             return MagicMock()
+
         ctx.agent.astep = slow_astep
         ctx.agent.config = MagicMock()
         ctx.agent.config.llm_step_timeout_seconds = 0.01  # 10ms
         svc = ActionExecutionService(ctx)
-        with pytest.raises(Timeout, match="timed out"):
+        with pytest.raises(Timeout, match='timed out'):
             await svc.get_next_action()
 
     @pytest.mark.asyncio
@@ -118,7 +125,7 @@ class TestGetNextAction:
         from backend.core.errors import LLMMalformedActionError
 
         ctx = _make_context()
-        ctx.agent.step.side_effect = LLMMalformedActionError("bad")
+        ctx.agent.step.side_effect = LLMMalformedActionError('bad')
         svc = ActionExecutionService(ctx)
         result = await svc.get_next_action()
         assert result is None
@@ -133,7 +140,7 @@ class TestGetNextAction:
         from backend.core.errors import LLMNoActionError
 
         ctx = _make_context()
-        ctx.agent.step.side_effect = LLMNoActionError("no action")
+        ctx.agent.step.side_effect = LLMNoActionError('no action')
         svc = ActionExecutionService(ctx)
         result = await svc.get_next_action()
         assert result is None
@@ -143,7 +150,7 @@ class TestGetNextAction:
         from backend.core.errors import LLMResponseError
 
         ctx = _make_context()
-        ctx.agent.step.side_effect = LLMResponseError("bad response")
+        ctx.agent.step.side_effect = LLMResponseError('bad response')
         svc = ActionExecutionService(ctx)
         result = await svc.get_next_action()
         assert result is None
@@ -153,7 +160,7 @@ class TestGetNextAction:
         from backend.core.errors import FunctionCallNotExistsError
 
         ctx = _make_context()
-        ctx.agent.step.side_effect = FunctionCallNotExistsError("no func")
+        ctx.agent.step.side_effect = FunctionCallNotExistsError('no func')
         svc = ActionExecutionService(ctx)
         result = await svc.get_next_action()
         assert result is None
@@ -163,20 +170,20 @@ class TestGetNextAction:
         from backend.core.errors import FunctionCallValidationError
 
         ctx = _make_context()
-        ctx.agent.step.side_effect = FunctionCallValidationError("invalid args")
+        ctx.agent.step.side_effect = FunctionCallValidationError('invalid args')
         svc = ActionExecutionService(ctx)
         result = await svc.get_next_action()
         assert result is None
         ctx.event_stream.add_event.assert_called_once()
         args = ctx.event_stream.add_event.call_args[0]
-        assert "Tool validation failed" in args[0].content
+        assert 'Tool validation failed' in args[0].content
 
     @pytest.mark.asyncio
     async def test_api_connection_error_propagates(self):
         from backend.inference.exceptions import APIConnectionError
 
         ctx = _make_context()
-        ctx.agent.step.side_effect = APIConnectionError("timeout")
+        ctx.agent.step.side_effect = APIConnectionError('timeout')
         svc = ActionExecutionService(ctx)
         with pytest.raises(APIConnectionError):
             await svc.get_next_action()
@@ -186,7 +193,7 @@ class TestGetNextAction:
         from backend.inference.exceptions import RateLimitError
 
         ctx = _make_context()
-        ctx.agent.step.side_effect = RateLimitError("rate limited")
+        ctx.agent.step.side_effect = RateLimitError('rate limited')
         svc = ActionExecutionService(ctx)
         with pytest.raises(RateLimitError):
             await svc.get_next_action()
@@ -200,11 +207,11 @@ class TestHandleContextWindowError:
         svc = ActionExecutionService(ctx)
 
         with patch(
-            "backend.orchestration.services.action_execution_service.is_context_window_error",
+            'backend.orchestration.services.action_execution_service.is_context_window_error',
             return_value=True,
         ):
             result = await svc._handle_context_window_error(
-                Exception("context too long")
+                Exception('context too long')
             )
         assert result is None
         # Should have added a CondensationRequestAction
@@ -221,23 +228,23 @@ class TestHandleContextWindowError:
         svc = ActionExecutionService(ctx)
 
         with patch(
-            "backend.orchestration.services.action_execution_service.is_context_window_error",
+            'backend.orchestration.services.action_execution_service.is_context_window_error',
             return_value=True,
         ):
             with pytest.raises(LLMContextWindowExceedError):
-                await svc._handle_context_window_error(Exception("context too long"))
+                await svc._handle_context_window_error(Exception('context too long'))
 
     @pytest.mark.asyncio
     async def test_non_context_window_error_reraises(self):
         ctx = _make_context()
         svc = ActionExecutionService(ctx)
-        exc = Exception("not context window")
+        exc = Exception('not context window')
 
         with patch(
-            "backend.orchestration.services.action_execution_service.is_context_window_error",
+            'backend.orchestration.services.action_execution_service.is_context_window_error',
             return_value=False,
         ):
-            with pytest.raises(Exception, match="not context window"):
+            with pytest.raises(Exception, match='not context window'):
                 await svc._handle_context_window_error(exc)
 
 
@@ -249,7 +256,7 @@ class TestExecuteAction:
         action.runnable = False
         svc = ActionExecutionService(ctx)
 
-        with patch("backend.core.plugin.get_plugin_registry") as mock_reg:
+        with patch('backend.core.plugin.get_plugin_registry') as mock_reg:
             mock_reg.return_value.dispatch_action_pre = AsyncMock(return_value=action)
             await svc.execute_action(action)
 
@@ -270,7 +277,7 @@ class TestExecuteAction:
 
         svc = ActionExecutionService(ctx)
 
-        with patch("backend.core.plugin.get_plugin_registry") as mock_reg:
+        with patch('backend.core.plugin.get_plugin_registry') as mock_reg:
             mock_reg.return_value.dispatch_action_pre = AsyncMock(return_value=action)
             await svc.execute_action(action)
 
@@ -293,7 +300,7 @@ class TestExecuteAction:
 
         svc = ActionExecutionService(ctx)
 
-        with patch("backend.core.plugin.get_plugin_registry") as mock_reg:
+        with patch('backend.core.plugin.get_plugin_registry') as mock_reg:
             mock_reg.return_value.dispatch_action_pre = AsyncMock(return_value=action)
             await svc.execute_action(action)
 
@@ -307,9 +314,9 @@ class TestExecuteAction:
         action.runnable = False
         svc = ActionExecutionService(ctx)
 
-        with patch("backend.core.plugin.get_plugin_registry") as mock_reg:
+        with patch('backend.core.plugin.get_plugin_registry') as mock_reg:
             mock_reg.return_value.dispatch_action_pre = AsyncMock(
-                side_effect=RuntimeError("plugin crash")
+                side_effect=RuntimeError('plugin crash')
             )
             # Should not raise — plugins must not break the pipeline
             await svc.execute_action(action)
@@ -324,7 +331,7 @@ class TestExecuteAction:
         ctx = _make_context()
         action = MagicMock()
         ctx.agent.step.side_effect = [
-            LLMMalformedActionError("bad first"),
+            LLMMalformedActionError('bad first'),
             action,
         ]
         svc = ActionExecutionService(ctx)
@@ -339,9 +346,11 @@ class TestExecuteAction:
         from backend.core.schemas import AgentState
 
         ctx = _make_context()
-        ctx.agent.step.side_effect = LLMMalformedActionError("bad")
+        ctx.agent.step.side_effect = LLMMalformedActionError('bad')
         ctx.get_controller = MagicMock()
-        ctx.get_controller.return_value.get_agent_state.return_value = AgentState.RUNNING
+        ctx.get_controller.return_value.get_agent_state.return_value = (
+            AgentState.RUNNING
+        )
         ctx.get_controller.return_value.set_agent_state_to = AsyncMock()
 
         svc = ActionExecutionService(ctx)

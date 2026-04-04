@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 from backend.core.constants import LOG_ALL_EVENTS
+from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:
+    from backend.ledger.observation import Observation
     from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.orchestration.tool_pipeline import ToolInvocationContext
-    from backend.ledger.observation import Observation
 
 
 class LoggingMiddleware(ToolInvocationMiddleware):
@@ -21,16 +21,16 @@ class LoggingMiddleware(ToolInvocationMiddleware):
 
     async def plan(self, ctx: ToolInvocationContext) -> None:
         self.controller.log(
-            "debug",
-            f"[PLAN] {type(ctx.action).__name__}",
-            extra={"msg_type": "PIPELINE_PLAN"},
+            'debug',
+            f'[PLAN] {type(ctx.action).__name__}',
+            extra={'msg_type': 'PIPELINE_PLAN'},
         )
 
     async def execute(self, ctx: ToolInvocationContext) -> None:
         self.controller.log(
-            "debug",
-            f"[EXECUTE] {type(ctx.action).__name__}",
-            extra={"msg_type": "PIPELINE_EXECUTE"},
+            'debug',
+            f'[EXECUTE] {type(ctx.action).__name__}',
+            extra={'msg_type': 'PIPELINE_EXECUTE'},
         )
 
     async def observe(
@@ -38,9 +38,9 @@ class LoggingMiddleware(ToolInvocationMiddleware):
     ) -> None:
         if observation is None:
             return
-        log_level = "info" if LOG_ALL_EVENTS else "debug"
+        log_level = 'info' if LOG_ALL_EVENTS else 'debug'
         self.controller.log(
             log_level,
-            f"[OBSERVE] {observation}",
-            extra={"msg_type": "PIPELINE_OBSERVE"},
+            f'[OBSERVE] {observation}',
+            extra={'msg_type': 'PIPELINE_OBSERVE'},
         )

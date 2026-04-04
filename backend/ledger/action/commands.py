@@ -25,9 +25,9 @@ class CmdRunAction(Action):
 
     """
 
-    command: str = ""
+    command: str = ''
     is_input: bool = False
-    thought: str = ""
+    thought: str = ''
     blocking: bool = False
     is_static: bool = False
     cwd: str | None = None
@@ -44,13 +44,12 @@ class CmdRunAction(Action):
     @property
     def message(self) -> str:
         """Get command execution message."""
-        return f"Running command: {self.command}"
+        return f'Running command: {self.command}'
 
     def __str__(self) -> str:
         """Return a readable summary including command metadata."""
-        ret = f"**CmdRunAction (source={self.source}, is_input={self.is_input})**\n"
+        ret = f'**CmdRunAction (source={self.source}, is_input={self.is_input})**\n'
         if self.thought:
-            ret += f"THOUGHT: {self.thought}\n"
-        ret += f"COMMAND:\n{self.command}"
+            ret += f'THOUGHT: {self.thought}\n'
+        ret += f'COMMAND:\n{self.command}'
         return ret
-

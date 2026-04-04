@@ -16,7 +16,7 @@ class ConfigTelemetry:
         self._schema_missing += 1
 
     def record_schema_mismatch(self, provided: str | None) -> None:
-        key = str(provided or "unknown")
+        key = str(provided or 'unknown')
         self._schema_mismatch[key] += 1
 
     def record_invalid_agent(self, agent_name: str) -> None:
@@ -34,10 +34,10 @@ class ConfigTelemetry:
 
     def snapshot(self) -> dict[str, dict[str, int] | int]:
         return {
-            "schema_missing": self._schema_missing,
-            "schema_mismatch": dict(self._schema_mismatch),
-            "invalid_agents": dict(self._invalid_agents),
-            "invalid_base": self._invalid_base,
+            'schema_missing': self._schema_missing,
+            'schema_mismatch': dict(self._schema_mismatch),
+            'invalid_agents': dict(self._invalid_agents),
+            'invalid_base': self._invalid_base,
         }
 
 

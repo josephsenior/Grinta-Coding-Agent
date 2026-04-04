@@ -9,10 +9,12 @@ from backend.ledger import EventSource
 from backend.ledger.action import Action, ActionConfirmationStatus
 
 if TYPE_CHECKING:
-    from backend.orchestration.services.orchestration_context import OrchestrationContext
+    from backend.ledger.observation import Observation
+    from backend.orchestration.services.orchestration_context import (
+        OrchestrationContext,
+    )
     from backend.orchestration.services.safety_service import SafetyService
     from backend.orchestration.tool_pipeline import ToolInvocationContext
-    from backend.ledger.observation import Observation
 
 
 class ConfirmationService:
@@ -35,14 +37,14 @@ class ConfirmationService:
             action = controller._replay_manager.step()
             self._replay_action_count += 1
             action_type = type(action).__name__
-            action_id = getattr(action, "id", "unknown")
+            action_id = getattr(action, 'id', 'unknown')
             controller.log(
-                "debug",
-                f"Replay action #{self._replay_action_count}: {action_type} (id={action_id})",
+                'debug',
+                f'Replay action #{self._replay_action_count}: {action_type} (id={action_id})',
                 extra={
-                    "msg_type": "REPLAY_ACTION",
-                    "replay_index": controller._replay_manager.replay_index,
-                    "action_type": action_type,
+                    'msg_type': 'REPLAY_ACTION',
+                    'replay_index': controller._replay_manager.replay_index,
+                    'action_type': action_type,
                 },
             )
             return action
@@ -52,11 +54,11 @@ class ConfirmationService:
         self._live_action_count += 1
         action_type = type(action).__name__
         controller.log(
-            "debug",
-            f"Live action #{self._live_action_count}: {action_type}",
+            'debug',
+            f'Live action #{self._live_action_count}: {action_type}',
             extra={
-                "msg_type": "LIVE_ACTION",
-                "action_type": action_type,
+                'msg_type': 'LIVE_ACTION',
+                'action_type': action_type,
             },
         )
         return action
@@ -84,8 +86,8 @@ class ConfirmationService:
     def action_counts(self) -> dict[str, int]:
         """Return counts of replay vs live actions for telemetry."""
         return {
-            "replay_actions": self._replay_action_count,
-            "live_actions": self._live_action_count,
+            'replay_actions': self._replay_action_count,
+            'live_actions': self._live_action_count,
         }
 
     async def evaluate_action(self, action: Action) -> None:
@@ -109,7 +111,7 @@ class ConfirmationService:
 
     async def handle_pending_confirmation(self, action: Action) -> bool:
         """Transition controller to awaiting state when confirmation is required."""
-        if not hasattr(action, "confirmation_state"):
+        if not hasattr(action, 'confirmation_state'):
             return False
 
         if action.confirmation_state != ActionConfirmationStatus.AWAITING_CONFIRMATION:

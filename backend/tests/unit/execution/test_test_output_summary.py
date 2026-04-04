@@ -1,4 +1,4 @@
-﻿"""Golden-style tests for test runner stdout parsing (shared module)."""
+"""Golden-style tests for test runner stdout parsing (shared module)."""
 
 from __future__ import annotations
 
@@ -12,34 +12,33 @@ from backend.execution.utils.test_output_summary import (
 
 
 @pytest.mark.parametrize(
-    ("name", "raw", "expect_substrings"),
+    ('name', 'raw', 'expect_substrings'),
     [
         (
-            "pytest_footer",
-            "setup\n================ 5 passed in 0.12s ================\n",
-            ["[TEST_SUMMARY]", "5 passed"],
+            'pytest_footer',
+            'setup\n================ 5 passed in 0.12s ================\n',
+            ['[TEST_SUMMARY]', '5 passed'],
         ),
         (
-            "pytest_with_failures",
-            "FAILED tests/test_x.py::test_a - assert 0\n"
-            "================ 1 failed, 4 passed in 1.0s ================\n",
-            ["[TEST_SUMMARY]", "[FAILURES]", "FAILED "],
+            'pytest_with_failures',
+            'FAILED tests/test_x.py::test_a - assert 0\n'
+            '================ 1 failed, 4 passed in 1.0s ================\n',
+            ['[TEST_SUMMARY]', '[FAILURES]', 'FAILED '],
         ),
         (
-            "cargo_ok",
-            "\nrunning 3 tests\n...\ntest result: ok. 3 passed; 0 failed\n",
-            ["[TEST_SUMMARY]", "test result: ok."],
+            'cargo_ok',
+            '\nrunning 3 tests\n...\ntest result: ok. 3 passed; 0 failed\n',
+            ['[TEST_SUMMARY]', 'test result: ok.'],
         ),
         (
-            "go_package_ok",
-            "ok  \tgithub.com/acme/pkg\t0.045s\n",
-            ["[TEST_SUMMARY]", "ok", "github.com/acme/pkg"],
+            'go_package_ok',
+            'ok  \tgithub.com/acme/pkg\t0.045s\n',
+            ['[TEST_SUMMARY]', 'ok', 'github.com/acme/pkg'],
         ),
         (
-            "jest_summary",
-            "Ran all test suites.\n"
-            "Tests:       2 failed, 2 passed, 4 total\n",
-            ["[TEST_SUMMARY]", "Tests:", "failed", "passed"],
+            'jest_summary',
+            'Ran all test suites.\nTests:       2 failed, 2 passed, 4 total\n',
+            ['[TEST_SUMMARY]', 'Tests:', 'failed', 'passed'],
         ),
     ],
 )
@@ -53,25 +52,23 @@ def test_extract_test_summary_detects_frameworks(
 
 
 def test_extract_test_summary_none_for_non_test_output() -> None:
-    assert extract_test_summary("System error while connecting to host\n") is None
+    assert extract_test_summary('System error while connecting to host\n') is None
 
 
 def test_truncate_cmd_output_prepends_test_summary() -> None:
-    raw = "noise\n================ 3 passed in 0.1s ================\n"
+    raw = 'noise\n================ 3 passed in 0.1s ================\n'
     out = truncate_cmd_output(raw, max_chars=10_000)
-    assert out.startswith("[TEST_SUMMARY]")
+    assert out.startswith('[TEST_SUMMARY]')
 
 
 @pytest.mark.parametrize(
-    ("output", "passed", "failed"),
+    ('output', 'passed', 'failed'),
     [
-        ("= 5 passed in 0.1s =", 5, 0),
-        ("3 failed, 10 passed in 1s", 10, 3),
-        ("no summary here", 0, 0),
-        ("ERROR: 99 is not 100\n2 failed, 5 passed", 5, 2),
+        ('= 5 passed in 0.1s =', 5, 0),
+        ('3 failed, 10 passed in 1s', 10, 3),
+        ('no summary here', 0, 0),
+        ('ERROR: 99 is not 100\n2 failed, 5 passed', 5, 2),
     ],
 )
-def test_parse_pytest_pass_fail_counts(
-    output: str, passed: int, failed: int
-) -> None:
+def test_parse_pytest_pass_fail_counts(output: str, passed: int, failed: int) -> None:
     assert parse_pytest_pass_fail_counts(output) == (passed, failed)

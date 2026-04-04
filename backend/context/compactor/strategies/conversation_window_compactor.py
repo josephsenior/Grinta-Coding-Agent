@@ -5,15 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.core.config.compactor_config import ConversationWindowCompactorConfig
+    pass
+from backend.context.compactor.compactor import Compaction, RollingCompactor
+from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.agent import CondensationAction, RecallAction
 from backend.ledger.action.files import FileEditAction, FileWriteAction
 from backend.ledger.action.message import MessageAction, SystemMessageAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import Observation
-from backend.context.compactor.compactor import Compaction, RollingCompactor
-from backend.context.view import View
 
 if TYPE_CHECKING:
     from backend.inference.llm_registry import LLMRegistry
@@ -120,14 +120,14 @@ class ConversationWindowCompactor(RollingCompactor):
 
         if first_valid_event_index_in_slice == len(recent_events_slice):
             logger.warning(
-                "All recent events are dangling observations, which we truncate. This means the agent has only the essential first events. This should not happen.",
+                'All recent events are dangling observations, which we truncate. This means the agent has only the essential first events. This should not happen.',
             )
 
         first_valid_event_index = slice_start_index + first_valid_event_index_in_slice
 
         if first_valid_event_index_in_slice > 0:
             logger.debug(
-                "Removed %s dangling observation(s) from the start of recent event slice.",
+                'Removed %s dangling observation(s) from the start of recent event slice.',
                 first_valid_event_index_in_slice,
             )
 
@@ -162,7 +162,7 @@ class ConversationWindowCompactor(RollingCompactor):
 
         if file_action_ids:
             for ev in events:
-                cause = getattr(ev, "cause", None)
+                cause = getattr(ev, 'cause', None)
                 if (
                     cause is not None
                     and cause in file_action_ids
@@ -183,8 +183,7 @@ class ConversationWindowCompactor(RollingCompactor):
         # Check if pruned events form a contiguous range.
         if (
             len(pruned_event_ids) > 1
-            and pruned_event_ids[-1] - pruned_event_ids[0]
-            == len(pruned_event_ids) - 1
+            and pruned_event_ids[-1] - pruned_event_ids[0] == len(pruned_event_ids) - 1
         ):
             return CondensationAction(
                 pruned_events_start_id=pruned_event_ids[0],
@@ -215,7 +214,7 @@ class ConversationWindowCompactor(RollingCompactor):
 
         if first_user_msg is None:
             logger.warning(
-                "No first user message found in history during condensation."
+                'No first user message found in history during condensation.'
             )
             action = CondensationAction(pruned_event_ids=[])
             return Compaction(action=action)
@@ -243,7 +242,7 @@ class ConversationWindowCompactor(RollingCompactor):
         pruned_event_ids = sorted(all_event_ids - events_to_keep)
 
         logger.info(
-                "ConversationWindowCompactor: Keeping %s events, pruning %s events.",
+            'ConversationWindowCompactor: Keeping %s events, pruning %s events.',
             len(events_to_keep),
             len(pruned_event_ids),
         )
@@ -303,8 +302,8 @@ class ConversationWindowCompactor(RollingCompactor):
         # Proactive: condense before hitting the context window limit
         if len(view.events) > self._max_events:
             logger.info(
-                "ConversationWindowCompactor: proactive compaction triggered "
-                "(%d events > %d threshold)",
+                'ConversationWindowCompactor: proactive compaction triggered '
+                '(%d events > %d threshold)',
                 len(view.events),
                 self._max_events,
             )
@@ -319,7 +318,7 @@ class ConversationWindowCompactor(RollingCompactor):
     ) -> ConversationWindowCompactor:
         """Create a compactor instance from config."""
         return ConversationWindowCompactor(
-            max_events=getattr(_config, "max_events", 100),
+            max_events=getattr(_config, 'max_events', 100),
         )
 
 

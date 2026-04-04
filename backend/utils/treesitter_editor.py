@@ -97,93 +97,93 @@ class EditResult:
 # Tree-sitter provides robust parsing for all these languages
 LANGUAGE_EXTENSIONS = {
     # Core languages (most popular)
-    ".py": "python",
-    ".js": "javascript",
-    ".jsx": "javascript",
-    ".ts": "typescript",
-    ".tsx": "tsx",
-    ".go": "go",
-    ".rs": "rust",
-    ".java": "java",
-    ".c": "c",
-    ".cpp": "cpp",
-    ".cc": "cpp",
-    ".cxx": "cpp",
-    ".h": "c",
-    ".hpp": "cpp",
-    ".hxx": "cpp",
+    '.py': 'python',
+    '.js': 'javascript',
+    '.jsx': 'javascript',
+    '.ts': 'typescript',
+    '.tsx': 'tsx',
+    '.go': 'go',
+    '.rs': 'rust',
+    '.java': 'java',
+    '.c': 'c',
+    '.cpp': 'cpp',
+    '.cc': 'cpp',
+    '.cxx': 'cpp',
+    '.h': 'c',
+    '.hpp': 'cpp',
+    '.hxx': 'cpp',
     # JVM languages
-    ".kt": "kotlin",
-    ".kts": "kotlin",
-    ".scala": "scala",
-    ".clj": "clojure",
-    ".cljs": "clojure",
-    ".cljc": "clojure",
+    '.kt': 'kotlin',
+    '.kts': 'kotlin',
+    '.scala': 'scala',
+    '.clj': 'clojure',
+    '.cljs': 'clojure',
+    '.cljc': 'clojure',
     # .NET languages
-    ".cs": "c_sharp",
-    ".fs": "f_sharp",
-    ".fsx": "f_sharp",
+    '.cs': 'c_sharp',
+    '.fs': 'f_sharp',
+    '.fsx': 'f_sharp',
     # Scripting languages
-    ".rb": "ruby",
-    ".php": "php",
-    ".pl": "perl",
-    ".pm": "perl",
-    ".lua": "lua",
-    ".r": "r",
-    ".R": "r",
+    '.rb': 'ruby',
+    '.php': 'php',
+    '.pl': 'perl',
+    '.pm': 'perl',
+    '.lua': 'lua',
+    '.r': 'r',
+    '.R': 'r',
     # Web languages
-    ".html": "html",
-    ".htm": "html",
-    ".css": "css",
-    ".scss": "scss",
-    ".sass": "scss",
-    ".less": "css",
-    ".vue": "vue",
-    ".svelte": "svelte",
+    '.html': 'html',
+    '.htm': 'html',
+    '.css': 'css',
+    '.scss': 'scss',
+    '.sass': 'scss',
+    '.less': 'css',
+    '.vue': 'vue',
+    '.svelte': 'svelte',
     # Functional languages
-    ".hs": "haskell",
-    ".lhs": "haskell",
-    ".ex": "elixir",
-    ".exs": "elixir",
-    ".erl": "erlang",
-    ".hrl": "erlang",
-    ".ml": "ocaml",
-    ".mli": "ocaml",
-    ".elm": "elm",
+    '.hs': 'haskell',
+    '.lhs': 'haskell',
+    '.ex': 'elixir',
+    '.exs': 'elixir',
+    '.erl': 'erlang',
+    '.hrl': 'erlang',
+    '.ml': 'ocaml',
+    '.mli': 'ocaml',
+    '.elm': 'elm',
     # Modern systems languages
-    ".zig": "zig",
-    ".nim": "nim",
-    ".nims": "nim",
-    ".v": "v",
-    ".d": "d",
+    '.zig': 'zig',
+    '.nim': 'nim',
+    '.nims': 'nim',
+    '.v': 'v',
+    '.d': 'd',
     # Mobile/App development
-    ".swift": "swift",
-    ".m": "objective_c",
-    ".mm": "objective_c",
-    ".dart": "dart",
+    '.swift': 'swift',
+    '.m': 'objective_c',
+    '.mm': 'objective_c',
+    '.dart': 'dart',
     # Data/Config languages
-    ".json": "json",
-    ".json5": "json",
-    ".yaml": "yaml",
-    ".yml": "yaml",
-    ".toml": "toml",
-    ".xml": "xml",
+    '.json': 'json',
+    '.json5': 'json',
+    '.yaml': 'yaml',
+    '.yml': 'yaml',
+    '.toml': 'toml',
+    '.xml': 'xml',
     # Shell/Scripting
-    ".sh": "bash",
-    ".bash": "bash",
-    ".zsh": "bash",
-    ".fish": "fish",
+    '.sh': 'bash',
+    '.bash': 'bash',
+    '.zsh': 'bash',
+    '.fish': 'fish',
     # Query languages
-    ".sql": "sql",
-    ".graphql": "graphql",
-    ".gql": "graphql",
+    '.sql': 'sql',
+    '.graphql': 'graphql',
+    '.gql': 'graphql',
     # Other
-    ".proto": "proto",
-    ".md": "markdown",
-    ".markdown": "markdown",
-    ".rst": "rst",
-    ".tex": "latex",
-    ".jl": "julia",
+    '.proto': 'proto',
+    '.md': 'markdown',
+    '.markdown': 'markdown',
+    '.rst': 'rst',
+    '.tex': 'latex',
+    '.jl': 'julia',
 }
 
 
@@ -235,21 +235,21 @@ class TreeSitterEditor:
         """Initialize the universal editor."""
         if not TREE_SITTER_AVAILABLE:
             raise ImportError(
-                "🚨 CRITICAL: Tree-sitter not available!\n\n"
-                "Ultimate Editor requires Tree-sitter for structure-aware editing.\n"
+                '🚨 CRITICAL: Tree-sitter not available!\n\n'
+                'Ultimate Editor requires Tree-sitter for structure-aware editing.\n'
                 "This is App's competitive advantage - without it, only basic editing works.\n\n"
-                "PRODUCTION DEPLOYMENT ERROR:\n"
-                "  Tree-sitter should be a required dependency in pyproject.toml.\n"
-                "  Check that your runtime environment has the latest dependencies installed.\n\n"
-                "Quick fix (temporary): pip install tree-sitter tree-sitter-language-pack\n"
-                "Permanent fix: Ensure pyproject.toml has tree_sitter in main dependencies (not optional)"
+                'PRODUCTION DEPLOYMENT ERROR:\n'
+                '  Tree-sitter should be a required dependency in pyproject.toml.\n'
+                '  Check that your runtime environment has the latest dependencies installed.\n\n'
+                'Quick fix (temporary): pip install tree-sitter tree-sitter-language-pack\n'
+                'Permanent fix: Ensure pyproject.toml has tree_sitter in main dependencies (not optional)'
             )
 
         self.parsers: dict[str, ParserType] = {}
         self.tree_cache: dict[str, TreeType] = {}
         self.file_cache: dict[str, bytes] = {}
 
-        logger.info("Universal Editor initialized with Tree-sitter support")
+        logger.info('Universal Editor initialized with Tree-sitter support')
 
     def detect_language(self, file_path: str) -> str | None:
         """Detect programming language from file extension.
@@ -278,14 +278,14 @@ class TreeSitterEditor:
             return self.parsers[language]
 
         if _get_language is None or _RuntimeParser is None:
-            logger.error("Tree-sitter language pack is not available")
+            logger.error('Tree-sitter language pack is not available')
             return None
 
         try:
             lang = cast(Any, _get_language)(language)
             parser = _RuntimeParser(lang)
         except Exception as e:  # pragma: no cover - dependent on runtime env
-            logger.error("Failed to create parser for %s: %s", language, e)
+            logger.error('Failed to create parser for %s: %s', language, e)
             return None
 
         self.parsers[language] = parser
@@ -308,14 +308,14 @@ class TreeSitterEditor:
             return (
                 self.tree_cache[file_path],
                 self.file_cache[file_path],
-                self.detect_language(file_path) or "",
+                self.detect_language(file_path) or '',
             )
 
         try:
             # Detect language
             language = self.detect_language(file_path)
             if not language:
-                logger.warning("Unknown file type: %s", file_path)
+                logger.warning('Unknown file type: %s', file_path)
                 return None
 
             # Get parser
@@ -324,7 +324,7 @@ class TreeSitterEditor:
                 return None
 
             # Read file as bytes (Tree-sitter requires bytes)
-            with open(file_path, "rb") as f:
+            with open(file_path, 'rb') as f:
                 file_bytes = f.read()
 
             # Parse
@@ -337,10 +337,10 @@ class TreeSitterEditor:
             return tree, file_bytes, language
 
         except FileNotFoundError:
-            logger.error("File not found: %s", file_path)
+            logger.error('File not found: %s', file_path)
             return None
         except Exception as e:
-            logger.error("Failed to parse %s: %s", file_path, e)
+            logger.error('Failed to parse %s: %s', file_path, e)
             return None
 
     def find_symbol(
@@ -364,8 +364,8 @@ class TreeSitterEditor:
         tree, file_bytes, language = parse_result
 
         # Handle dot notation for methods
-        if "." in symbol_name:
-            parts = symbol_name.split(".")
+        if '.' in symbol_name:
+            parts = symbol_name.split('.')
             if len(parts) == 2:
                 return self._find_method_in_class(
                     tree, file_bytes, parts[0], parts[1], file_path, language
@@ -393,10 +393,10 @@ class TreeSitterEditor:
         """
         parse_result = self.parse_file(file_path, use_cache=False)
         if not parse_result:
-            return EditResult(success=False, message=f"Failed to parse {file_path}")
+            return EditResult(success=False, message=f'Failed to parse {file_path}')
 
         tree, file_bytes, language = parse_result
-        original_code = file_bytes.decode("utf-8")
+        original_code = file_bytes.decode('utf-8')
 
         # Find the function node
         func_node = self._find_function_node(tree, file_bytes, function_name, language)
@@ -421,17 +421,17 @@ class TreeSitterEditor:
         body_end = body_node.end_byte
         colon_end: int | None = None
         for child in func_node.children:
-            if child.type == ":":
+            if child.type == ':':
                 colon_end = child.end_byte
                 break
         if colon_end is not None:
             for child in func_node.children:
                 if child.start_byte >= colon_end and child.type not in (
-                    ":",
-                    "NEWLINE",
-                    "INDENT",
-                    "DEDENT",
-                    "newline",
+                    ':',
+                    'NEWLINE',
+                    'INDENT',
+                    'DEDENT',
+                    'newline',
                 ):
                     body_start = min(body_start, child.start_byte)
                     body_end = max(body_end, child.end_byte)
@@ -441,11 +441,12 @@ class TreeSitterEditor:
             # Build new content using expanded body range
             from types import SimpleNamespace
 
-            effective_body = SimpleNamespace(
-                start_byte=body_start, end_byte=body_end
-            )
+            effective_body = SimpleNamespace(start_byte=body_start, end_byte=body_end)
             new_code = self._replace_node_content(
-                original_code, cast(NodeType, effective_body), new_body, preserve_indentation=True
+                original_code,
+                cast(NodeType, effective_body),
+                new_body,
+                preserve_indentation=True,
             )
 
             # Validate if requested
@@ -454,7 +455,7 @@ class TreeSitterEditor:
                 if not validation_result[0]:
                     return EditResult(
                         success=False,
-                        message=f"Syntax error after edit: {validation_result[1]}",
+                        message=f'Syntax error after edit: {validation_result[1]}',
                         syntax_valid=False,
                         original_code=original_code,
                     )
@@ -462,17 +463,17 @@ class TreeSitterEditor:
             # Normalize \r\n → \n before writing in text mode to
             # prevent doubling (original_code from binary read has \r\n,
             # text-mode write would add another \r).
-            new_code = new_code.replace("\r\n", "\n").replace("\r", "\n")
+            new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
 
             # Write back
-            with open(file_path, "w", encoding="utf-8") as f:
+            with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(new_code)
 
             # Clear cache
             self.tree_cache.pop(file_path, None)
             self.file_cache.pop(file_path, None)
 
-            lines_changed = new_body.count("\n") + 1
+            lines_changed = new_body.count('\n') + 1
 
             return EditResult(
                 success=True,
@@ -483,9 +484,9 @@ class TreeSitterEditor:
             )
 
         except Exception as e:
-            logger.error("Error editing function: %s", e)
+            logger.error('Error editing function: %s', e)
             return EditResult(
-                success=False, message=f"Error: {e}", original_code=original_code
+                success=False, message=f'Error: {e}', original_code=original_code
             )
 
     def rename_symbol(self, file_path: str, old_name: str, new_name: str) -> EditResult:
@@ -502,10 +503,10 @@ class TreeSitterEditor:
         """
         parse_result = self.parse_file(file_path, use_cache=False)
         if not parse_result:
-            return EditResult(success=False, message=f"Failed to parse {file_path}")
+            return EditResult(success=False, message=f'Failed to parse {file_path}')
 
         tree, file_bytes, language = parse_result
-        original_code = file_bytes.decode("utf-8")
+        original_code = file_bytes.decode('utf-8')
 
         # Find all occurrences of the symbol
         occurrences = self._find_all_symbol_occurrences(
@@ -529,7 +530,7 @@ class TreeSitterEditor:
         if not validation_result[0]:
             return EditResult(
                 success=False,
-                message=f"Rename created syntax error: {validation_result[1]}",
+                message=f'Rename created syntax error: {validation_result[1]}',
                 syntax_valid=False,
                 original_code=original_code,
             )
@@ -537,10 +538,10 @@ class TreeSitterEditor:
         # Normalize \r\n → \n before writing in text mode to
         # prevent doubling (original_code from binary read has \r\n,
         # text-mode write would add another \r).
-        new_code = new_code.replace("\r\n", "\n").replace("\r", "\n")
+        new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
 
         # Write back
-        with open(file_path, "w", encoding="utf-8") as f:
+        with open(file_path, 'w', encoding='utf-8') as f:
             f.write(new_code)
 
         self.tree_cache.pop(file_path, None)
@@ -562,20 +563,20 @@ class TreeSitterEditor:
 
         # Language-specific node types for functions
         function_types = {
-            "python": ["function_definition"],
-            "javascript": ["function_declaration", "function", "method_definition"],
-            "typescript": ["function_declaration", "function", "method_definition"],
-            "go": ["function_declaration", "method_declaration"],
-            "rust": ["function_item"],
-            "java": ["method_declaration", "constructor_declaration"],
-            "cpp": ["function_definition"],
-            "c": ["function_definition"],
-            "ruby": ["method", "singleton_method"],
-            "php": ["function_definition", "method_declaration"],
+            'python': ['function_definition'],
+            'javascript': ['function_declaration', 'function', 'method_definition'],
+            'typescript': ['function_declaration', 'function', 'method_definition'],
+            'go': ['function_declaration', 'method_declaration'],
+            'rust': ['function_item'],
+            'java': ['method_declaration', 'constructor_declaration'],
+            'cpp': ['function_definition'],
+            'c': ['function_definition'],
+            'ruby': ['method', 'singleton_method'],
+            'php': ['function_definition', 'method_declaration'],
         }
 
         target_types = function_types.get(
-            language, ["function_definition", "function_declaration"]
+            language, ['function_definition', 'function_declaration']
         )
 
         # Recursive search
@@ -592,7 +593,7 @@ class TreeSitterEditor:
             if name_node:
                 name_text = file_bytes[
                     name_node.start_byte : name_node.end_byte
-                ].decode("utf-8")
+                ].decode('utf-8')
                 if name_text == target_name:
                     return node
 
@@ -609,14 +610,14 @@ class TreeSitterEditor:
         # Common patterns across languages
         for child in node.children:
             if child.type in [
-                "identifier",
-                "name",
-                "property_identifier",
-                "type_identifier",
+                'identifier',
+                'name',
+                'property_identifier',
+                'type_identifier',
             ]:
                 return child
             # For some languages, name is in a child node
-            if child.type in ["function_declarator", "class_name"]:
+            if child.type in ['function_declarator', 'class_name']:
                 return self._get_name_node(child)
 
         return None
@@ -635,20 +636,20 @@ class TreeSitterEditor:
 
         # Language-specific class types
         class_types = {
-            "python": ["class_definition"],
-            "javascript": ["class_declaration"],
-            "typescript": ["class_declaration"],
-            "go": ["type_declaration"],  # structs with methods
-            "rust": ["impl_item"],
-            "java": ["class_declaration"],
-            "cpp": ["class_specifier"],
-            "c_sharp": ["class_declaration"],
-            "ruby": ["class"],
-            "php": ["class_declaration"],
+            'python': ['class_definition'],
+            'javascript': ['class_declaration'],
+            'typescript': ['class_declaration'],
+            'go': ['type_declaration'],  # structs with methods
+            'rust': ['impl_item'],
+            'java': ['class_declaration'],
+            'cpp': ['class_specifier'],
+            'c_sharp': ['class_declaration'],
+            'ruby': ['class'],
+            'php': ['class_declaration'],
         }
 
         target_class_types = class_types.get(
-            language, ["class_declaration", "class_definition"]
+            language, ['class_declaration', 'class_definition']
         )
 
         # Find the class
@@ -660,18 +661,18 @@ class TreeSitterEditor:
 
         # Find method within class
         method_types = {
-            "python": ["function_definition"],
-            "javascript": ["method_definition"],
-            "typescript": ["method_definition"],
-            "java": ["method_declaration"],
-            "cpp": ["function_definition"],
-            "c_sharp": ["method_declaration"],
-            "ruby": ["method"],
-            "php": ["method_declaration"],
+            'python': ['function_definition'],
+            'javascript': ['method_definition'],
+            'typescript': ['method_definition'],
+            'java': ['method_declaration'],
+            'cpp': ['function_definition'],
+            'c_sharp': ['method_declaration'],
+            'ruby': ['method'],
+            'php': ['method_declaration'],
         }
 
         target_method_types = method_types.get(
-            language, ["method_definition", "method_declaration"]
+            language, ['method_definition', 'method_declaration']
         )
 
         method_node = self._find_node_by_name(
@@ -704,22 +705,22 @@ class TreeSitterEditor:
         root = tree.root_node
 
         # Determine node types to search for
-        if symbol_type == "function":
+        if symbol_type == 'function':
             node_types = [
-                "function_definition",
-                "function_declaration",
-                "method_definition",
+                'function_definition',
+                'function_declaration',
+                'method_definition',
             ]
-        elif symbol_type == "class":
-            node_types = ["class_definition", "class_declaration"]
+        elif symbol_type == 'class':
+            node_types = ['class_definition', 'class_declaration']
         else:
             # Search for both
             node_types = [
-                "function_definition",
-                "function_declaration",
-                "method_definition",
-                "class_definition",
-                "class_declaration",
+                'function_definition',
+                'function_declaration',
+                'method_definition',
+                'class_definition',
+                'class_declaration',
             ]
 
         # Find node
@@ -743,7 +744,7 @@ class TreeSitterEditor:
     ) -> NodeType | None:
         """Get the body node of a function (language-specific)."""
         # Common body node names across languages
-        body_types = ["block", "body", "compound_statement", "expression_statement"]
+        body_types = ['block', 'body', 'compound_statement', 'expression_statement']
 
         for child in func_node.children:
             if child.type in body_types:
@@ -764,16 +765,16 @@ class TreeSitterEditor:
 
         # Get original indentation
         if preserve_indentation:
-            start_line_begin = original_code.rfind("\n", 0, start_byte) + 1
+            start_line_begin = original_code.rfind('\n', 0, start_byte) + 1
             original_indent = original_code[start_line_begin:start_byte]
 
             # Apply indentation to new content
-            new_content_lines = new_content.split("\n")
+            new_content_lines = new_content.split('\n')
             indented_lines = [
                 original_indent + line if i > 0 else line
                 for i, line in enumerate(new_content_lines)
             ]
-            new_content = "\n".join(indented_lines)
+            new_content = '\n'.join(indented_lines)
 
         # Replace
         return original_code[:start_byte] + new_content + original_code[end_byte:]
@@ -790,24 +791,24 @@ class TreeSitterEditor:
         try:
             parser = self.get_parser(language)
             if not parser:
-                return True, "Parser not available, skipping validation"
+                return True, 'Parser not available, skipping validation'
 
             # Parse the new code
-            tree = parser.parse(code.encode("utf-8"))
+            tree = parser.parse(code.encode('utf-8'))
 
             # Check for errors (Tree-sitter marks error nodes)
             if self._has_syntax_errors(tree.root_node):
-                return False, "Code contains syntax errors"
+                return False, 'Code contains syntax errors'
 
-            return True, "Syntax valid"
+            return True, 'Syntax valid'
 
         except Exception as e:
-            logger.warning("Validation failed: %s", e)
-            return True, f"Validation skipped: {e}"
+            logger.warning('Validation failed: %s', e)
+            return True, f'Validation skipped: {e}'
 
     def _has_syntax_errors(self, node: NodeType) -> bool:
         """Check if tree contains ERROR or MISSING nodes."""
-        if node.type == "ERROR" or node.is_missing:
+        if node.type == 'ERROR' or node.is_missing:
             return True
 
         for child in node.children:
@@ -830,8 +831,8 @@ class TreeSitterEditor:
 
             """
             # Check if this is an identifier matching our symbol
-            if node.type in ["identifier", "name", "property_identifier"]:
-                node_text = file_bytes[node.start_byte : node.end_byte].decode("utf-8")
+            if node.type in ['identifier', 'name', 'property_identifier']:
+                node_text = file_bytes[node.start_byte : node.end_byte].decode('utf-8')
                 if node_text == symbol_name:
                     occurrences.append(node)
 

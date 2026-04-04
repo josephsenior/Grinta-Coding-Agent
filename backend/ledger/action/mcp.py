@@ -19,9 +19,9 @@ class MCPAction(Action):
 
     """
 
-    name: str = ""
+    name: str = ''
     arguments: dict[str, Any] = field(default_factory=dict)
-    thought: str = ""
+    thought: str = ''
     action: ClassVar[str] = ActionType.MCP
     runnable: ClassVar[bool] = True
     security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN
@@ -29,16 +29,15 @@ class MCPAction(Action):
     @property
     def message(self) -> str:
         """Get MCP tool call message."""
-        return f"I am interacting with the MCP server with name:\n```\n{
+        return f'I am interacting with the MCP server with name:\n```\n{
             self.name
-        }\n```\nand arguments:\n```\n{self.arguments}\n```"
+        }\n```\nand arguments:\n```\n{self.arguments}\n```'
 
     def __str__(self) -> str:
         """Return a readable summary of the MCP invocation."""
-        ret = "**MCPAction**\n"
+        ret = '**MCPAction**\n'
         if self.thought:
-            ret += f"THOUGHT: {self.thought}\n"
-        ret += f"NAME: {self.name}\n"
-        ret += f"ARGUMENTS: {self.arguments}"
+            ret += f'THOUGHT: {self.thought}\n'
+        ret += f'NAME: {self.name}\n'
+        ret += f'ARGUMENTS: {self.arguments}'
         return ret
-

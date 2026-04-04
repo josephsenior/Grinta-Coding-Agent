@@ -1,19 +1,20 @@
 from unittest.mock import MagicMock, patch
+
 from backend.inference.direct_clients import GeminiClient
 
 
 def test_gemini_client_concatenates_system_messages():
     # Patch genai.Client to prevent any real SDK operations
-    with patch("backend.inference.direct_clients.genai.Client") as mock_client_class:
+    with patch('backend.inference.direct_clients.genai.Client') as mock_client_class:
         mock_instance = mock_client_class.return_value
         mock_chats = MagicMock()
         mock_instance.chats = mock_chats
 
-        client = GeminiClient(model_name="gemini-1.5-pro", api_key="test-key")
+        client = GeminiClient(model_name='gemini-1.5-pro', api_key='test-key')
         messages = [
-            {"role": "system", "content": "Instruction 1"},
-            {"role": "system", "content": "Instruction 2"},
-            {"role": "user", "content": "Hello"},
+            {'role': 'system', 'content': 'Instruction 1'},
+            {'role': 'system', 'content': 'Instruction 2'},
+            {'role': 'user', 'content': 'Hello'},
         ]
 
         mock_chat_session = MagicMock()
@@ -24,28 +25,28 @@ def test_gemini_client_concatenates_system_messages():
 
         # Verify system_instruction in config passed to create
         args, kwargs = mock_chats.create.call_args
-        config = kwargs.get("config")
-        assert config["system_instruction"] == "Instruction 1\n\nInstruction 2"
+        config = kwargs.get('config')
+        assert config['system_instruction'] == 'Instruction 1\n\nInstruction 2'
 
 
 def test_gemini_client_maps_tools_correctly():
-    with patch("backend.inference.direct_clients.genai.Client") as mock_client_class:
+    with patch('backend.inference.direct_clients.genai.Client') as mock_client_class:
         mock_instance = mock_client_class.return_value
         mock_chats = MagicMock()
         mock_instance.chats = mock_chats
 
-        client = GeminiClient(model_name="gemini-1.5-pro", api_key="test-key")
-        messages = [{"role": "user", "content": "Hello"}]
+        client = GeminiClient(model_name='gemini-1.5-pro', api_key='test-key')
+        messages = [{'role': 'user', 'content': 'Hello'}]
         tools = [
             {
-                "type": "function",
-                "function": {
-                    "name": "get_weather",
-                    "description": "Get weather info",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {"location": {"type": "string"}},
-                        "required": ["location"],
+                'type': 'function',
+                'function': {
+                    'name': 'get_weather',
+                    'description': 'Get weather info',
+                    'parameters': {
+                        'type': 'object',
+                        'properties': {'location': {'type': 'string'}},
+                        'required': ['location'],
                     },
                 },
             }
@@ -59,25 +60,25 @@ def test_gemini_client_maps_tools_correctly():
 
         # Verify tools in config
         args, kwargs = mock_chats.create.call_args
-        config = kwargs.get("config")
-        assert "tools" in config
-        gemini_tools = config["tools"]
+        config = kwargs.get('config')
+        assert 'tools' in config
+        gemini_tools = config['tools']
         assert len(gemini_tools) == 1
-        assert "function_declarations" in gemini_tools[0]
-        fd = gemini_tools[0]["function_declarations"][0]
-        assert fd["name"] == "get_weather"
-        assert fd["description"] == "Get weather info"
-        assert fd["parameters"]["type"] == "object"
+        assert 'function_declarations' in gemini_tools[0]
+        fd = gemini_tools[0]['function_declarations'][0]
+        assert fd['name'] == 'get_weather'
+        assert fd['description'] == 'Get weather info'
+        assert fd['parameters']['type'] == 'object'
 
 
 def test_gemini_client_sanitizes_kwargs():
-    with patch("backend.inference.direct_clients.genai.Client") as mock_client_class:
+    with patch('backend.inference.direct_clients.genai.Client') as mock_client_class:
         mock_instance = mock_client_class.return_value
         mock_chats = MagicMock()
         mock_instance.chats = mock_chats
 
-        client = GeminiClient(model_name="gemini-1.5-pro", api_key="test-key")
-        messages = [{"role": "user", "content": "Hello"}]
+        client = GeminiClient(model_name='gemini-1.5-pro', api_key='test-key')
+        messages = [{'role': 'user', 'content': 'Hello'}]
 
         mock_chat_session = MagicMock()
         mock_chats.create.return_value = mock_chat_session
@@ -89,36 +90,42 @@ def test_gemini_client_sanitizes_kwargs():
             messages,
             temperature=0.7,
             stream=False,
-            reasoning_effort="high",
-            metadata={"foo": "bar"},
+            reasoning_effort='high',
+            metadata={'foo': 'bar'},
         )
 
         # Verify kwargs passed to send_message
         send_args, send_kwargs = mock_chat_session.send_message.call_args
-        assert "temperature" not in send_kwargs
-        assert "reasoning_effort" not in send_kwargs
-        assert "metadata" not in send_kwargs
-        assert "stream" not in send_kwargs
+        assert 'temperature' not in send_kwargs
+        assert 'reasoning_effort' not in send_kwargs
+        assert 'metadata' not in send_kwargs
+        assert 'stream' not in send_kwargs
 
         # Verify temperature in flattened config (merged **gen_cfg)
         args, kwargs = mock_chats.create.call_args
-        config = kwargs.get("config")
-        assert config["temperature"] == 0.7
-        assert "generation_config" not in config
+        config = kwargs.get('config')
+        assert config['temperature'] == 0.7
+        assert 'generation_config' not in config
 
 
 def test_gemini_client_ignores_trailing_assistant_message_when_building_prompt():
-    with patch("backend.inference.direct_clients.genai.Client") as mock_client_class:
+    with patch('backend.inference.direct_clients.genai.Client') as mock_client_class:
         mock_instance = mock_client_class.return_value
         mock_chats = MagicMock()
         mock_instance.chats = mock_chats
 
-        client = GeminiClient(model_name="gemini-1.5-pro", api_key="test-key")
+        client = GeminiClient(model_name='gemini-1.5-pro', api_key='test-key')
         messages = [
-            {"role": "system", "content": "System prompt"},
-            {"role": "user", "content": "hello how are you"},
-            {"role": "user", "content": "<RUNTIME_INFORMATION>workspace</RUNTIME_INFORMATION>"},
-            {"role": "assistant", "content": "WARNING: Some MCP servers failed to connect."},
+            {'role': 'system', 'content': 'System prompt'},
+            {'role': 'user', 'content': 'hello how are you'},
+            {
+                'role': 'user',
+                'content': '<RUNTIME_INFORMATION>workspace</RUNTIME_INFORMATION>',
+            },
+            {
+                'role': 'assistant',
+                'content': 'WARNING: Some MCP servers failed to connect.',
+            },
         ]
 
         mock_chat_session = MagicMock()
@@ -128,8 +135,11 @@ def test_gemini_client_ignores_trailing_assistant_message_when_building_prompt()
         client.completion(messages)
 
         _args, kwargs = mock_chats.create.call_args
-        history = kwargs.get("history")
+        history = kwargs.get('history')
         assert history == []
 
         send_args, _send_kwargs = mock_chat_session.send_message.call_args
-        assert send_args[0] == "hello how are you\n<RUNTIME_INFORMATION>workspace</RUNTIME_INFORMATION>"
+        assert (
+            send_args[0]
+            == 'hello how are you\n<RUNTIME_INFORMATION>workspace</RUNTIME_INFORMATION>'
+        )

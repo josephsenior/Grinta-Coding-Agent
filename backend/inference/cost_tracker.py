@@ -34,11 +34,11 @@ def get_completion_cost(
 
     prices = get_pricing(model)
     if prices:
-        input_cost = (prompt_tokens / 1_000_000) * prices["input"]
-        output_cost = (completion_tokens / 1_000_000) * prices["output"]
+        input_cost = (prompt_tokens / 1_000_000) * prices['input']
+        output_cost = (completion_tokens / 1_000_000) * prices['output']
         return input_cost + output_cost
 
-    logger.debug("No pricing data for model %s — cost reported as $0.00", model)
+    logger.debug('No pricing data for model %s — cost reported as $0.00', model)
     return 0.0
 
 
@@ -54,16 +54,16 @@ def record_llm_cost_from_metrics(user_key: str, metrics: Metrics) -> None:
         from backend.telemetry.cost_recording import record_llm_cost
 
         # Get accumulated cost from metrics
-        if hasattr(metrics, "accumulated_cost"):
+        if hasattr(metrics, 'accumulated_cost'):
             cost = metrics.accumulated_cost
             if cost > 0:
                 record_llm_cost(user_key, cost)
-                logger.debug("Recorded LLM cost $%.4f for %s", cost, user_key)
+                logger.debug('Recorded LLM cost $%.4f for %s', cost, user_key)
     except ImportError:
         # Cost quota middleware not available
         pass
     except Exception as e:
-        logger.error("Failed to record LLM cost: %s", e)
+        logger.error('Failed to record LLM cost: %s', e)
 
 
 def record_llm_cost_from_response(
@@ -81,20 +81,20 @@ def record_llm_cost_from_response(
     try:
         from backend.telemetry.cost_recording import record_llm_cost
 
-        usage = response.get("usage", {})
-        prompt_tokens = usage.get("prompt_tokens", 0)
-        completion_tokens = usage.get("completion_tokens", 0)
+        usage = response.get('usage', {})
+        prompt_tokens = usage.get('prompt_tokens', 0)
+        completion_tokens = usage.get('completion_tokens', 0)
 
         cost = get_completion_cost(model, prompt_tokens, completion_tokens, config)
 
         if cost > 0:
             record_llm_cost(user_key, cost)
             logger.debug(
-                "Recorded LLM cost $%.4f for %s using %s", cost, user_key, model
+                'Recorded LLM cost $%.4f for %s using %s', cost, user_key, model
             )
         else:
             logger.debug(
-                "LLM usage for %s using %s: %d prompt, %d completion",
+                'LLM usage for %s using %s: %d prompt, %d completion',
                 user_key,
                 model,
                 prompt_tokens,
@@ -104,4 +104,4 @@ def record_llm_cost_from_response(
     except ImportError:
         pass
     except Exception as e:
-        logger.error("Failed to record LLM cost from response: %s", e)
+        logger.error('Failed to record LLM cost from response: %s', e)

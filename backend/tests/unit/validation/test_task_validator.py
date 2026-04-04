@@ -1,7 +1,8 @@
 """Tests for backend.validation.task_validator — task completion validation framework."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from backend.ledger.action.files import FileWriteAction
 from backend.ledger.observation.files import FileReadObservation
@@ -22,46 +23,46 @@ class TestTask:
 
     def test_create_minimal_task(self):
         """Test creating Task with minimal fields."""
-        task = Task(description="Fix the bug")
-        assert task.description == "Fix the bug"
+        task = Task(description='Fix the bug')
+        assert task.description == 'Fix the bug'
         assert task.requirements == []
         assert task.acceptance_criteria == []
 
     def test_create_task_with_requirements(self):
         """Test creating Task with requirements."""
         task = Task(
-            description="Add feature",
-            requirements=["Must pass tests", "Must update docs"],
+            description='Add feature',
+            requirements=['Must pass tests', 'Must update docs'],
         )
-        assert task.description == "Add feature"
+        assert task.description == 'Add feature'
         assert len(task.requirements) == 2
-        assert "Must pass tests" in task.requirements
+        assert 'Must pass tests' in task.requirements
 
     def test_create_task_with_acceptance_criteria(self):
         """Test creating Task with acceptance criteria."""
         task = Task(
-            description="Refactor",
-            acceptance_criteria=["Code coverage > 80%", "No lint errors"],
+            description='Refactor',
+            acceptance_criteria=['Code coverage > 80%', 'No lint errors'],
         )
         assert len(task.acceptance_criteria) == 2
-        assert "Code coverage > 80%" in task.acceptance_criteria
+        assert 'Code coverage > 80%' in task.acceptance_criteria
 
     def test_create_full_task(self):
         """Test creating Task with all fields."""
         task = Task(
-            description="Complete feature",
-            requirements=["Req1", "Req2"],
-            acceptance_criteria=["Criteria1", "Criteria2"],
+            description='Complete feature',
+            requirements=['Req1', 'Req2'],
+            acceptance_criteria=['Criteria1', 'Criteria2'],
         )
-        assert task.description == "Complete feature"
+        assert task.description == 'Complete feature'
         assert len(task.requirements) == 2
         assert len(task.acceptance_criteria) == 2
 
     def test_task_default_factory(self):
         """Test Task default factory creates separate lists."""
-        task1 = Task(description="Task 1")
-        task2 = Task(description="Task 2")
-        task1.requirements.append("Req1")
+        task1 = Task(description='Task 1')
+        task2 = Task(description='Task 2')
+        task1.requirements.append('Req1')
         assert len(task1.requirements) == 1
         assert not task2.requirements  # Should be independent
 
@@ -71,52 +72,52 @@ class TestValidationResult:
 
     def test_create_minimal_result(self):
         """Test creating ValidationResult with minimal fields."""
-        result = ValidationResult(passed=True, reason="All good")
+        result = ValidationResult(passed=True, reason='All good')
         assert result.passed is True
-        assert result.reason == "All good"
+        assert result.reason == 'All good'
         assert result.confidence == 1.0
         assert result.missing_items == []
         assert result.suggestions == []
 
     def test_create_failed_result(self):
         """Test creating failed ValidationResult."""
-        result = ValidationResult(passed=False, reason="Tests failed")
+        result = ValidationResult(passed=False, reason='Tests failed')
         assert result.passed is False
-        assert result.reason == "Tests failed"
+        assert result.reason == 'Tests failed'
 
     def test_create_with_custom_confidence(self):
         """Test creating ValidationResult with custom confidence."""
-        result = ValidationResult(passed=True, reason="OK", confidence=0.8)
+        result = ValidationResult(passed=True, reason='OK', confidence=0.8)
         assert result.confidence == 0.8
 
     def test_create_with_missing_items(self):
         """Test creating ValidationResult with missing items."""
         result = ValidationResult(
             passed=False,
-            reason="Incomplete",
-            missing_items=["tests", "docs"],
+            reason='Incomplete',
+            missing_items=['tests', 'docs'],
         )
         assert len(result.missing_items) == 2
-        assert "tests" in result.missing_items
+        assert 'tests' in result.missing_items
 
     def test_create_with_suggestions(self):
         """Test creating ValidationResult with suggestions."""
         result = ValidationResult(
             passed=False,
-            reason="Failed",
-            suggestions=["Run pytest", "Fix linting"],
+            reason='Failed',
+            suggestions=['Run pytest', 'Fix linting'],
         )
         assert len(result.suggestions) == 2
-        assert "Run pytest" in result.suggestions
+        assert 'Run pytest' in result.suggestions
 
     def test_create_full_result(self):
         """Test creating ValidationResult with all fields."""
         result = ValidationResult(
             passed=False,
-            reason="Incomplete task",
+            reason='Incomplete task',
             confidence=0.9,
-            missing_items=["item1"],
-            suggestions=["suggestion1"],
+            missing_items=['item1'],
+            suggestions=['suggestion1'],
         )
         assert result.passed is False
         assert result.confidence == 0.9
@@ -125,8 +126,8 @@ class TestValidationResult:
 
     def test_confidence_bounds(self):
         """Test ValidationResult confidence can be 0.0 to 1.0."""
-        result1 = ValidationResult(passed=True, reason="Test", confidence=0.0)
-        result2 = ValidationResult(passed=True, reason="Test", confidence=1.0)
+        result1 = ValidationResult(passed=True, reason='Test', confidence=0.0)
+        result2 = ValidationResult(passed=True, reason='Test', confidence=1.0)
         assert result1.confidence == 0.0
         assert result2.confidence == 1.0
 
@@ -141,7 +142,7 @@ class TestTaskValidator:
 
     def test_has_validate_completion_method(self):
         """Test TaskValidator has abstract validate_completion method."""
-        assert hasattr(TaskValidator, "validate_completion")
+        assert hasattr(TaskValidator, 'validate_completion')
 
 
 class TestTestPassingValidator:
@@ -174,30 +175,30 @@ class TestDiffValidator:
     def test_is_diff_metadata_recognizes_git_metadata(self):
         """Test _is_diff_metadata recognizes git diff metadata lines."""
         validator = DiffValidator()
-        assert validator._is_diff_metadata("diff --git a/file.py b/file.py")
-        assert validator._is_diff_metadata("index 1234567..89abcdef 100644")
-        assert validator._is_diff_metadata("+++ b/file.py")
-        assert validator._is_diff_metadata("--- a/file.py")
-        assert not validator._is_diff_metadata("+def test():")
-        assert not validator._is_diff_metadata("-old line")
+        assert validator._is_diff_metadata('diff --git a/file.py b/file.py')
+        assert validator._is_diff_metadata('index 1234567..89abcdef 100644')
+        assert validator._is_diff_metadata('+++ b/file.py')
+        assert validator._is_diff_metadata('--- a/file.py')
+        assert not validator._is_diff_metadata('+def test():')
+        assert not validator._is_diff_metadata('-old line')
 
     def test_is_comment_line_recognizes_comments(self):
         """Test _is_comment_line recognizes comment syntax."""
         validator = DiffValidator()
-        assert validator._is_comment_line("# Python comment")
-        assert validator._is_comment_line("// JavaScript comment")
-        assert not validator._is_comment_line("def function():")
-        assert not validator._is_comment_line("  code here")
+        assert validator._is_comment_line('# Python comment')
+        assert validator._is_comment_line('// JavaScript comment')
+        assert not validator._is_comment_line('def function():')
+        assert not validator._is_comment_line('  code here')
 
     def test_is_meaningful_change_line_filters_correctly(self):
         """Test _is_meaningful_change_line filters non-meaningful changes."""
         validator = DiffValidator()
-        assert validator._is_meaningful_change_line("+def test():")
-        assert validator._is_meaningful_change_line("-old_code()")
-        assert not validator._is_meaningful_change_line("diff --git a/file b/file")
-        assert not validator._is_meaningful_change_line("+# comment")
-        assert not validator._is_meaningful_change_line("+")  # Empty line
-        assert not validator._is_meaningful_change_line(" unchanged line")
+        assert validator._is_meaningful_change_line('+def test():')
+        assert validator._is_meaningful_change_line('-old_code()')
+        assert not validator._is_meaningful_change_line('diff --git a/file b/file')
+        assert not validator._is_meaningful_change_line('+# comment')
+        assert not validator._is_meaningful_change_line('+')  # Empty line
+        assert not validator._is_meaningful_change_line(' unchanged line')
 
     def test_count_meaningful_changes(self):
         """Test _count_meaningful_changes counts correctly."""
@@ -225,9 +226,9 @@ class TestFileExistsValidator:
 
     def test_create_with_expected_files(self):
         """Test creating FileExistsValidator with expected files."""
-        validator = FileExistsValidator(expected_files=["output.txt", "result.json"])
+        validator = FileExistsValidator(expected_files=['output.txt', 'result.json'])
         assert len(validator.expected_files) == 2
-        assert "output.txt" in validator.expected_files
+        assert 'output.txt' in validator.expected_files
 
     def test_inherits_from_task_validator(self):
         """Test FileExistsValidator inherits from TaskValidator."""
@@ -236,7 +237,7 @@ class TestFileExistsValidator:
     def test_extract_expected_files_from_description(self):
         """Test _extract_expected_files extracts file paths from task description."""
         validator = FileExistsValidator()
-        description = "Create a file output.txt and save to results.json"
+        description = 'Create a file output.txt and save to results.json'
         files = validator._extract_expected_files(description)
         assert files
         # Should find at least one file pattern
@@ -245,33 +246,33 @@ class TestFileExistsValidator:
         """Test _extract_expected_files handles different patterns."""
         validator = FileExistsValidator()
         patterns = [
-            "create data.csv",
-            "output to report.pdf",
-            "save results.json",
+            'create data.csv',
+            'output to report.pdf',
+            'save results.json',
         ]
         for pattern in patterns:
             files = validator._extract_expected_files(pattern)
             assert len(files) >= 0  # Should extract or fail gracefully
 
     def test_check_file_exists_uses_typed_history_events(self):
-        validator = FileExistsValidator(expected_files=["output.txt"])
+        validator = FileExistsValidator(expected_files=['output.txt'])
         state = MagicMock()
-        state.history = [FileWriteAction(path="output.txt", content="done")]
-        assert validator._check_file_exists(state, "output.txt") is True
+        state.history = [FileWriteAction(path='output.txt', content='done')]
+        assert validator._check_file_exists(state, 'output.txt') is True
 
     def test_check_file_exists_does_not_infer_from_shell_text(self):
-        validator = FileExistsValidator(expected_files=["output.txt"])
+        validator = FileExistsValidator(expected_files=['output.txt'])
         state = MagicMock()
         fake_cmd = MagicMock()
-        fake_cmd.command = "cat output.txt"
+        fake_cmd.command = 'cat output.txt'
         state.history = [fake_cmd]
-        assert validator._check_file_exists(state, "output.txt") is False
+        assert validator._check_file_exists(state, 'output.txt') is False
 
     def test_check_file_exists_accepts_file_read_observation(self):
-        validator = FileExistsValidator(expected_files=["config.json"])
+        validator = FileExistsValidator(expected_files=['config.json'])
         state = MagicMock()
-        state.history = [FileReadObservation(path="config.json", content="{}")]
-        assert validator._check_file_exists(state, "config.json") is True
+        state.history = [FileReadObservation(path='config.json', content='{}')]
+        assert validator._check_file_exists(state, 'config.json') is True
 
 
 class TestLLMTaskEvaluator:
@@ -297,15 +298,15 @@ class TestLLMTaskEvaluator:
         from unittest.mock import MagicMock
 
         evaluator = LLMTaskEvaluator()
-        task = Task(description="Fix bug", requirements=["Pass tests"])
+        task = Task(description='Fix bug', requirements=['Pass tests'])
         state = MagicMock()
         state.history = []
 
         prompt = evaluator._create_evaluation_prompt(task, state)
-        assert "Fix bug" in prompt
-        assert "Pass tests" in prompt
-        assert "completed" in prompt
-        assert "JSON" in prompt
+        assert 'Fix bug' in prompt
+        assert 'Pass tests' in prompt
+        assert 'completed' in prompt
+        assert 'JSON' in prompt
 
 
 class TestCompositeValidator:
@@ -337,9 +338,9 @@ class TestCompositeValidator:
         """Test _calculate_vote_metrics calculates correctly."""
         composite = CompositeValidator(validators=[])
         results = [
-            ValidationResult(passed=True, reason="OK", confidence=0.9),
-            ValidationResult(passed=True, reason="OK", confidence=0.8),
-            ValidationResult(passed=False, reason="Failed", confidence=0.7),
+            ValidationResult(passed=True, reason='OK', confidence=0.9),
+            ValidationResult(passed=True, reason='OK', confidence=0.8),
+            ValidationResult(passed=False, reason='Failed', confidence=0.7),
         ]
         passed_count, avg_confidence = composite._calculate_vote_metrics(results)
         assert passed_count == 2
@@ -382,7 +383,7 @@ class TestValidatorIntegration:
         validators = [
             TestPassingValidator(),
             DiffValidator(),
-            FileExistsValidator(expected_files=["output.txt"]),
+            FileExistsValidator(expected_files=['output.txt']),
         ]
         composite = CompositeValidator(validators=validators, min_confidence=0.8)
         assert len(composite.validators) == 3
@@ -392,13 +393,13 @@ class TestValidatorIntegration:
         """Test ValidationResult can hold complex validation data."""
         result = ValidationResult(
             passed=False,
-            reason="Multiple failures detected",
+            reason='Multiple failures detected',
             confidence=0.6,
-            missing_items=["tests", "docs", "examples"],
+            missing_items=['tests', 'docs', 'examples'],
             suggestions=[
-                "Run test suite",
-                "Update documentation",
-                "Add usage examples",
+                'Run test suite',
+                'Update documentation',
+                'Add usage examples',
             ],
         )
         assert len(result.missing_items) == 3

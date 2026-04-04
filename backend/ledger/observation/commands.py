@@ -19,7 +19,7 @@ from backend.core.schemas.metadata import CmdOutputMetadataSchema
 from backend.ledger.observation.observation import Observation
 
 CMD_OUTPUT_METADATA_PS1_REGEX = re.compile(
-    f"^{CMD_OUTPUT_PS1_BEGIN.strip()}(.*?){CMD_OUTPUT_PS1_END.strip()}",
+    f'^{CMD_OUTPUT_PS1_BEGIN.strip()}(.*?){CMD_OUTPUT_PS1_END.strip()}',
     re.DOTALL | re.MULTILINE,
 )
 
@@ -33,17 +33,17 @@ class CmdOutputMetadata(CmdOutputMetadataSchema):
         prompt = CMD_OUTPUT_PS1_BEGIN
         json_str = json.dumps(
             {
-                "pid": "$!",
-                "exit_code": "$?",
-                "username": "\\u",
-                "hostname": "\\h",
-                "working_dir": "$(pwd)",
-                "py_interpreter_path": '$(which python 2>/dev/null || echo "")',
+                'pid': '$!',
+                'exit_code': '$?',
+                'username': '\\u',
+                'hostname': '\\h',
+                'working_dir': '$(pwd)',
+                'py_interpreter_path': '$(which python 2>/dev/null || echo "")',
             },
             indent=2,
         )
         prompt += json_str.replace('"', '\\"')
-        prompt += CMD_OUTPUT_PS1_END + "\n"
+        prompt += CMD_OUTPUT_PS1_END + '\n'
         return prompt
 
     @classmethod
@@ -64,7 +64,7 @@ class CmdOutputMetadata(CmdOutputMetadataSchema):
                 matches.append(match)
             except json.JSONDecodeError:
                 logger.warning(
-                    "Failed to parse PS1 metadata: %s. Skipping.%s",
+                    'Failed to parse PS1 metadata: %s. Skipping.%s',
                     match.group(1),
                     traceback.format_exc(),
                 )
@@ -76,20 +76,20 @@ class CmdOutputMetadata(CmdOutputMetadataSchema):
         """Extract the required metadata from a PS1 prompt."""
         metadata = json.loads(match.group(1))
         processed = metadata.copy()
-        if "pid" in metadata:
+        if 'pid' in metadata:
             try:
-                processed["pid"] = int(float(str(metadata["pid"])))
+                processed['pid'] = int(float(str(metadata['pid'])))
             except (ValueError, TypeError):
-                processed["pid"] = -1
-        if "exit_code" in metadata:
+                processed['pid'] = -1
+        if 'exit_code' in metadata:
             try:
-                processed["exit_code"] = int(float(str(metadata["exit_code"])))
+                processed['exit_code'] = int(float(str(metadata['exit_code'])))
             except (ValueError, TypeError):
                 logger.warning(
-                    "Failed to parse exit code: %s. Setting to -1.",
-                    metadata["exit_code"],
+                    'Failed to parse exit code: %s. Setting to -1.',
+                    metadata['exit_code'],
                 )
-                processed["exit_code"] = -1
+                processed['exit_code'] = -1
         return cls(**processed)
 
 
@@ -118,28 +118,27 @@ class CmdOutputObservation(Observation):
         super().__init__(content)
         self.command = command
         # Store observation value in a private attribute to avoid ClassVar conflict
-        object.__setattr__(self, "observation", observation)
+        object.__setattr__(self, 'observation', observation)
         self.hidden = hidden
         if isinstance(metadata, dict):
             self.metadata = CmdOutputMetadata(**metadata)
         else:
             self.metadata = metadata or CmdOutputMetadata()
-        if "exit_code" in kwargs:
-            self.metadata.exit_code = kwargs["exit_code"]
-        if "command_id" in kwargs:
-            self.metadata.pid = kwargs["command_id"]
+        if 'exit_code' in kwargs:
+            self.metadata.exit_code = kwargs['exit_code']
+        if 'command_id' in kwargs:
+            self.metadata.pid = kwargs['command_id']
 
         # Synchronize with base Observation exit_code
         self.exit_code = self.metadata.exit_code
 
     _ERROR_LINE_PATTERNS = re.compile(
-        r"(?i)(error|Error|ERROR|warning|Warning|WARNING|FAILED|FAIL|fail"
-        r"|traceback|Traceback|exception|Exception|panic|PANIC"
-        r"|ModuleNotFoundError|ImportError|SyntaxError|TypeError|ValueError"
-        r"|NameError|AttributeError|KeyError|IndexError|FileNotFoundError"
-        r"|PermissionError|RuntimeError|AssertionError|OSError|IOError"
-        r"|ENOENT|EACCES|EPERM|segfault|Segmentation fault"
-        r"|npm ERR|cargo error|compile error|build failed)",
+        r'(?i)\b(error|warning|FAILED|FAIL|traceback|exception|panic'
+        r'|ModuleNotFoundError|ImportError|SyntaxError|TypeError|ValueError'
+        r'|NameError|AttributeError|KeyError|IndexError|FileNotFoundError'
+        r'|PermissionError|RuntimeError|AssertionError|OSError|IOError'
+        r'|ENOENT|EACCES|EPERM|segfault|Segmentation fault'
+        r'|npm ERR|cargo error|compile error|build failed)\b',
     )
 
     @classmethod
@@ -168,17 +167,23 @@ class CmdOutputObservation(Observation):
         middle_budget = max_size - head_budget - tail_budget
         head = content[:head_budget]
         tail = content[-tail_budget:]
-        middle = content[head_budget:-tail_budget] if tail_budget > 0 else content[head_budget:]
+        middle = (
+            content[head_budget:-tail_budget]
+            if tail_budget > 0
+            else content[head_budget:]
+        )
         middle_lines = middle.splitlines(keepends=True)
 
         error_line_indices = cls._find_error_line_indices(middle_lines)
-        middle_preserved = cls._build_middle_preserved(middle_lines, error_line_indices, middle_budget)
+        middle_preserved = cls._build_middle_preserved(
+            middle_lines, error_line_indices, middle_budget
+        )
 
         truncated = cls._build_truncated_output(
             head, tail, middle_preserved, len(content), error_line_indices
         )
         logger.debug(
-            "Smart-truncated command output: %s -> %s chars (%d error lines kept)",
+            'Smart-truncated command output: %s -> %s chars (%d error lines kept)',
             len(content),
             len(truncated),
             len(error_line_indices),
@@ -201,7 +206,7 @@ class CmdOutputObservation(Observation):
     ) -> str:
         """Build preserved middle section from error-relevant lines within budget."""
         if not error_indices:
-            return ""
+            return ''
         kept: list[str] = []
         prev_idx = -2
         current_size = 0
@@ -209,23 +214,28 @@ class CmdOutputObservation(Observation):
             if current_size >= middle_budget:
                 break
             if idx > prev_idx + 1:
-                kept.append("  [...]\n")
+                kept.append('  [...]\n')
                 current_size += 8
             kept.append(middle_lines[idx])
             current_size += len(middle_lines[idx])
             prev_idx = idx
-        return "".join(kept)
+        return ''.join(kept)
 
     @classmethod
     def _build_truncated_output(
-        cls, head: str, tail: str, middle_preserved: str, original_length: int, error_indices: set[int]
+        cls,
+        head: str,
+        tail: str,
+        middle_preserved: str,
+        original_length: int,
+        error_indices: set[int],
     ) -> str:
         """Assemble truncated output with markers."""
         retained = len(head) + len(middle_preserved) + len(tail)
         pct = round(retained / original_length * 100) if original_length else 100
         marker = (
-            f"\n[... Observation truncated: {original_length} chars → ~{retained} chars "
-            f"({pct}% retained, {len(error_indices)} error-relevant lines preserved from middle) ...]\n"
+            f'\n[... Observation truncated: {original_length} chars → ~{retained} chars '
+            f'({pct}% retained, {len(error_indices)} error-relevant lines preserved from middle) ...]\n'
         )
         return head + marker + middle_preserved + marker + tail
 
@@ -257,7 +267,7 @@ class CmdOutputObservation(Observation):
     @property
     def message(self) -> str:
         """Get formatted command completion message."""
-        return f"Command `{self.command}` executed with exit code {self.exit_code}."
+        return f'Command `{self.command}` executed with exit code {self.exit_code}.'
 
     @property
     def success(self) -> bool:
@@ -272,11 +282,11 @@ class CmdOutputObservation(Observation):
             metadata_json = json.dumps(model_dump_with_options(self.metadata), indent=2)
         except Exception:
             metadata_json = repr(self.metadata)
-        return f"**CmdOutputObservation (source={self.source}, exit code={
+        return f'**CmdOutputObservation (source={self.source}, exit code={
             self.exit_code
         }, metadata={metadata_json})**\n--BEGIN AGENT OBSERVATION--\n{
             self.to_agent_observation()
-        }\n--END AGENT OBSERVATION--"
+        }\n--END AGENT OBSERVATION--'
 
     def to_agent_observation(self) -> str:
         """Format observation for agent with metadata context.
@@ -285,11 +295,11 @@ class CmdOutputObservation(Observation):
             Formatted observation string with working directory and exit code info
 
         """
-        ret = f"{self.metadata.prefix}{self.content}{self.metadata.suffix}"
+        ret = f'{self.metadata.prefix}{self.content}{self.metadata.suffix}'
         if self.metadata.working_dir:
-            ret += f"\n[Current working directory: {self.metadata.working_dir}]"
+            ret += f'\n[Current working directory: {self.metadata.working_dir}]'
         if self.metadata.py_interpreter_path:
-            ret += f"\n[Python interpreter: {self.metadata.py_interpreter_path}]"
+            ret += f'\n[Python interpreter: {self.metadata.py_interpreter_path}]'
         if self.metadata.exit_code != -1:
-            ret += f"\n[Command finished with exit code {self.metadata.exit_code}]"
+            ret += f'\n[Command finished with exit code {self.metadata.exit_code}]'
         return ret

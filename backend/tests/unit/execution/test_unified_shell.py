@@ -1,4 +1,4 @@
-﻿"""Tests for backend.execution.utils.unified_shell module.
+"""Tests for backend.execution.utils.unified_shell module.
 
 Targets 23.1% coverage (78 statements) by testing BaseShellSession.
 """
@@ -13,9 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.execution.utils.unified_shell import BaseShellSession
-from backend.execution.utils.unified_shell import create_shell_session
-
+from backend.execution.utils.unified_shell import BaseShellSession, create_shell_session
 
 # -----------------------------------------------------------
 # Concrete stub
@@ -81,10 +79,10 @@ class TestNormalizeTimeout:
         assert shell._normalize_timeout(30) == 30
 
     def test_string_converted(self, shell):
-        assert shell._normalize_timeout("45") == 45
+        assert shell._normalize_timeout('45') == 45
 
     def test_invalid_string_returns_60(self, shell):
-        assert shell._normalize_timeout("bad") == 60
+        assert shell._normalize_timeout('bad') == 60
 
     def test_zero_returned(self, shell):
         assert shell._normalize_timeout(0) == 0
@@ -97,23 +95,23 @@ class TestNormalizeTimeout:
 
 class TestPrepareCommand:
     def test_normal_command(self, shell):
-        cmd, bg = shell._prepare_command("echo hello")
-        assert cmd == "echo hello"
+        cmd, bg = shell._prepare_command('echo hello')
+        assert cmd == 'echo hello'
         assert bg is False
 
     def test_background_command(self, shell):
-        cmd, bg = shell._prepare_command("sleep 100 &")
-        assert cmd == "sleep 100"
+        cmd, bg = shell._prepare_command('sleep 100 &')
+        assert cmd == 'sleep 100'
         assert bg is True
 
     def test_strips_whitespace(self, shell):
-        cmd, bg = shell._prepare_command("  echo hi  ")
-        assert cmd == "echo hi"
+        cmd, bg = shell._prepare_command('  echo hi  ')
+        assert cmd == 'echo hi'
         assert bg is False
 
     def test_trailing_ampersand_stripped(self, shell):
-        cmd, bg = shell._prepare_command("python server.py &")
-        assert cmd == "python server.py"
+        cmd, bg = shell._prepare_command('python server.py &')
+        assert cmd == 'python server.py'
         assert bg is True
 
 
@@ -145,29 +143,29 @@ class TestGetDetectedServer:
 
 class TestUpdateCwdFromOutput:
     def test_updates_cwd_on_success(self, shell, tmp_path):
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout=str(tmp_path) + "\n")
-            shell._update_cwd_from_output(["pwd"])
+        with patch('subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout=str(tmp_path) + '\n')
+            shell._update_cwd_from_output(['pwd'])
         assert shell._cwd == str(tmp_path)
 
     def test_ignores_nonexistent_dir(self, shell):
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="/nonexistent_xyz\n")
+        with patch('subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='/nonexistent_xyz\n')
             original_cwd = shell._cwd
-            shell._update_cwd_from_output(["pwd"])
+            shell._update_cwd_from_output(['pwd'])
         assert shell._cwd == original_cwd  # unchanged
 
     def test_ignores_subprocess_failure(self, shell):
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stdout="")
+        with patch('subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stdout='')
             original_cwd = shell._cwd
-            shell._update_cwd_from_output(["pwd"])
+            shell._update_cwd_from_output(['pwd'])
         assert shell._cwd == original_cwd
 
     def test_handles_exception(self, shell):
-        with patch("subprocess.run", side_effect=RuntimeError("whoops")):
+        with patch('subprocess.run', side_effect=RuntimeError('whoops')):
             original_cwd = shell._cwd
-            shell._update_cwd_from_output(["pwd"])
+            shell._update_cwd_from_output(['pwd'])
         assert shell._cwd == original_cwd
 
 
@@ -183,7 +181,7 @@ class _DummyTools:
         has_bash: bool,
         has_tmux: bool,
         has_powershell: bool = False,
-        shell_type: str = "bash",
+        shell_type: str = 'bash',
     ):
         self.has_bash = has_bash
         self.has_tmux = has_tmux
@@ -195,10 +193,10 @@ class _DummyTools:
 
 class TestCreateShellSession:
     def test_unix_prefers_tmux_bash_session(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("backend.execution.utils.unified_shell.os.name", "posix")
+        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'posix')
         monkeypatch.setitem(
             sys.modules,
-            "backend.execution.utils.bash",
+            'backend.execution.utils.bash',
             types.SimpleNamespace(BashSession=_DummySession),
         )
 
@@ -211,10 +209,10 @@ class TestCreateShellSession:
         assert isinstance(session, _DummySession)
 
     def test_unix_falls_back_to_simple_bash_without_tmux(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("backend.execution.utils.unified_shell.os.name", "posix")
+        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'posix')
         monkeypatch.setitem(
             sys.modules,
-            "backend.execution.utils.simple_bash",
+            'backend.execution.utils.simple_bash',
             types.SimpleNamespace(SimpleBashSession=_DummySession),
         )
 
@@ -227,10 +225,10 @@ class TestCreateShellSession:
         assert isinstance(session, _DummySession)
 
     def test_windows_prefers_bash_when_available(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("backend.execution.utils.unified_shell.os.name", "nt")
+        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'nt')
         monkeypatch.setitem(
             sys.modules,
-            "backend.execution.utils.simple_bash",
+            'backend.execution.utils.simple_bash',
             types.SimpleNamespace(SimpleBashSession=_DummySession),
         )
 
@@ -238,7 +236,7 @@ class TestCreateShellSession:
             has_bash=True,
             has_tmux=False,
             has_powershell=True,
-            shell_type="pwsh",
+            shell_type='pwsh',
         )
         session = create_shell_session(
             work_dir=str(tmp_path),

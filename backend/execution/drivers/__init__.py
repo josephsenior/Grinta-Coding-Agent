@@ -1,4 +1,4 @@
-﻿"""Runtime implementations for App.
+"""Runtime implementations for App.
 
 This package exposes implementation classes lazily to avoid importing heavy
 runtime dependencies unless they are actually used.
@@ -17,15 +17,15 @@ if TYPE_CHECKING:  # Only for static typing
     )
 
 
-__all__ = ["LocalRuntimeInProcess"]
+__all__ = ['LocalRuntimeInProcess']
 
 
 def __getattr__(name: str):
-    if name == "LocalRuntimeInProcess":
+    if name == 'LocalRuntimeInProcess':
         from importlib import import_module
 
         return getattr(
-            import_module("backend.execution.drivers.local.local_runtime_inprocess"),
-            "LocalRuntimeInProcess",
+            import_module('backend.execution.drivers.local.local_runtime_inprocess'),
+            'LocalRuntimeInProcess',
         )
     raise AttributeError(name)

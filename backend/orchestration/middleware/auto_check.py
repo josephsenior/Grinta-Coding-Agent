@@ -8,11 +8,13 @@ from typing import TYPE_CHECKING, Any
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:
-    from backend.orchestration.tool_pipeline import ToolInvocationContext
     from backend.ledger.observation import Observation
+    from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
-def _treesitter_syntax_check(path: str, content: bytes | None = None) -> tuple[bool, str] | None:
+def _treesitter_syntax_check(
+    path: str, content: bytes | None = None
+) -> tuple[bool, str] | None:
     """Check syntax using tree-sitter.
 
     Args:
@@ -49,7 +51,7 @@ def _treesitter_syntax_check(path: str, content: bytes | None = None) -> tuple[b
     # If no content supplied, try reading from disk (local-runtime case).
     if content is None:
         try:
-            with open(path, "rb") as f:
+            with open(path, 'rb') as f:
                 content = f.read()
         except (OSError, IOError):
             return None
@@ -57,29 +59,29 @@ def _treesitter_syntax_check(path: str, content: bytes | None = None) -> tuple[b
     tree = parser.parse(content)
     errors = _collect_syntax_errors(tree.root_node, content, max_errors=5)
     if not errors:
-        return (True, "")
-    detail = "; ".join(errors)
+        return (True, '')
+    detail = '; '.join(errors)
     return (False, detail)
 
 
-def _collect_syntax_errors(
-    node: Any, source: bytes, max_errors: int = 5
-) -> list[str]:
+def _collect_syntax_errors(node: Any, source: bytes, max_errors: int = 5) -> list[str]:
     """Walk tree-sitter AST and collect ERROR/MISSING node descriptions."""
     errors: list[str] = []
 
     def _walk(n: Any) -> None:
         if len(errors) >= max_errors:
             return
-        if n.type == "ERROR" or n.is_missing:
+        if n.type == 'ERROR' or n.is_missing:
             row = n.start_point[0] + 1
             col = n.start_point[1] + 1
             # Extract the problematic source snippet
-            snippet = source[n.start_byte : n.end_byte].decode("utf-8", errors="replace")
+            snippet = source[n.start_byte : n.end_byte].decode(
+                'utf-8', errors='replace'
+            )
             if len(snippet) > 60:
-                snippet = snippet[:60] + "..."
-            kind = "missing node" if n.is_missing else "syntax error"
-            errors.append(f"line {row}:{col} {kind}: {snippet!r}")
+                snippet = snippet[:60] + '...'
+            kind = 'missing node' if n.is_missing else 'syntax error'
+            errors.append(f'line {row}:{col} {kind}: {snippet!r}')
             return  # don't recurse into ERROR subtrees
         for child in n.children:
             _walk(child)
@@ -107,7 +109,7 @@ class AutoCheckMiddleware(ToolInvocationMiddleware):
             return
         if not isinstance(ctx.action, (FileEditAction, FileWriteAction)):
             return
-        path = getattr(ctx.action, "path", None)
+        path = getattr(ctx.action, 'path', None)
         if not path:
             return
 
@@ -115,19 +117,23 @@ class AutoCheckMiddleware(ToolInvocationMiddleware):
         # (the file may only exist inside a sandbox/container).
         raw = None
         if isinstance(ctx.action, FileEditAction):
-            raw = getattr(ctx.action, "file_text", None) or getattr(ctx.action, "content", None)
+            raw = getattr(ctx.action, 'file_text', None) or getattr(
+                ctx.action, 'content', None
+            )
         elif isinstance(ctx.action, FileWriteAction):
-            raw = getattr(ctx.action, "content", None)
+            raw = getattr(ctx.action, 'content', None)
 
-        content = raw.encode("utf-8") if raw else None
+        content = raw.encode('utf-8') if raw else None
 
         result = _treesitter_syntax_check(path, content)
         if result is None:
             return  # unsupported language or tree-sitter unavailable
 
-        current = getattr(observation, "content", "") or ""
+        current = getattr(observation, 'content', '') or ''
         is_valid, detail = result
         if is_valid:
-            observation.content = current + "\n<SYNTAX_CHECK_PASSED />"
+            observation.content = current + '\n<SYNTAX_CHECK_PASSED />'
         else:
-            observation.content = current + f"\n<SYNTAX_CHECK_FAILED>\n{detail}\n</SYNTAX_CHECK_FAILED>"
+            observation.content = (
+                current + f'\n<SYNTAX_CHECK_FAILED>\n{detail}\n</SYNTAX_CHECK_FAILED>'
+            )

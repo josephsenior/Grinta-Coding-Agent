@@ -14,7 +14,7 @@ try:
     from asyncpg import Pool
 except ImportError as _exc:
     raise ImportError(
-        "asyncpg is required for database storage mode. "
+        'asyncpg is required for database storage mode. '
         "Install with:  uv pip install 'app-ai[database]'"
     ) from _exc
 
@@ -89,9 +89,9 @@ class DatabaseConversationStore(ConversationStore):
         try:
             async with self._pool.acquire() as conn:
                 await conn.execute(CONVERSATION_SCHEMA_SQL)
-                logger.info("Conversation database schema verified/initialized.")
+                logger.info('Conversation database schema verified/initialized.')
         except Exception as e:
-            logger.critical("Failed to initialize Conversation database schema: %s", e)
+            logger.critical('Failed to initialize Conversation database schema: %s', e)
             raise
 
     async def save_metadata(self, metadata: ConversationMetadata) -> None:
@@ -144,31 +144,31 @@ class DatabaseConversationStore(ConversationStore):
         """Load conversation metadata."""
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
-                "SELECT * FROM conversation_metadata WHERE conversation_id = $1",
+                'SELECT * FROM conversation_metadata WHERE conversation_id = $1',
                 conversation_id,
             )
             if not row:
-                raise KeyError(f"Conversation {conversation_id} not found")
+                raise KeyError(f'Conversation {conversation_id} not found')
             return self._row_to_metadata(row)
 
     async def delete_metadata(self, conversation_id: str) -> None:
         """Delete conversation metadata."""
         async with self._pool.acquire() as conn:
             await conn.execute(
-                "DELETE FROM conversation_metadata WHERE conversation_id = $1",
+                'DELETE FROM conversation_metadata WHERE conversation_id = $1',
                 conversation_id,
             )
 
     async def delete_all_metadata(self) -> None:
         """Delete all conversation metadata."""
         async with self._pool.acquire() as conn:
-            await conn.execute("DELETE FROM conversation_metadata")
+            await conn.execute('DELETE FROM conversation_metadata')
 
     async def exists(self, conversation_id: str) -> bool:
         """Check if conversation exists."""
         async with self._pool.acquire() as conn:
             val = await conn.fetchval(
-                "SELECT 1 FROM conversation_metadata WHERE conversation_id = $1",
+                'SELECT 1 FROM conversation_metadata WHERE conversation_id = $1',
                 conversation_id,
             )
             return bool(val)
@@ -209,31 +209,31 @@ class DatabaseConversationStore(ConversationStore):
 
     def _row_to_metadata(self, row: asyncpg.Record) -> ConversationMetadata:
         pr_number = []
-        if row["pr_number"]:
-            if isinstance(row["pr_number"], str):
-                pr_number = json.loads(row["pr_number"])
+        if row['pr_number']:
+            if isinstance(row['pr_number'], str):
+                pr_number = json.loads(row['pr_number'])
             else:
-                pr_number = row["pr_number"]
+                pr_number = row['pr_number']
 
         return ConversationMetadata(
-            conversation_id=row["conversation_id"],
-            title=row["title"],
-            selected_repository=row["selected_repository"],
-            user_id=row["user_id"],
-            selected_branch=row["selected_branch"],
-            vcs_provider=ProviderType(row["vcs_provider"])
-            if row["vcs_provider"]
+            conversation_id=row['conversation_id'],
+            title=row['title'],
+            selected_repository=row['selected_repository'],
+            user_id=row['user_id'],
+            selected_branch=row['selected_branch'],
+            vcs_provider=ProviderType(row['vcs_provider'])
+            if row['vcs_provider']
             else None,
-            last_updated_at=row["last_updated_at"],
-            trigger=ConversationTrigger(row["trigger"]) if row["trigger"] else None,
+            last_updated_at=row['last_updated_at'],
+            trigger=ConversationTrigger(row['trigger']) if row['trigger'] else None,
             pr_number=pr_number,
-            created_at=row["created_at"],
-            llm_model=row["llm_model"],
-            accumulated_cost=row["accumulated_cost"],
-            prompt_tokens=row["prompt_tokens"],
-            completion_tokens=row["completion_tokens"],
-            total_tokens=row["total_tokens"],
-            name=row["name"],
+            created_at=row['created_at'],
+            llm_model=row['llm_model'],
+            accumulated_cost=row['accumulated_cost'],
+            prompt_tokens=row['prompt_tokens'],
+            completion_tokens=row['completion_tokens'],
+            total_tokens=row['total_tokens'],
+            name=row['name'],
         )
 
     # 🚀 Observability Extension: Log agent success/failure
@@ -245,7 +245,7 @@ class DatabaseConversationStore(ConversationStore):
         error_message: str | None = None,
         tokens_used: int = 0,
         cost: float = 0.0,
-        user_id: str | None = "oss_user",
+        user_id: str | None = 'oss_user',
     ) -> None:
         """Log agent activity for iterative improvement analysis."""
         async with self._pool.acquire() as conn:
@@ -263,4 +263,3 @@ class DatabaseConversationStore(ConversationStore):
                 tokens_used,
                 cost,
             )
-

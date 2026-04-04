@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from backend.core.constants import MAX_LINES_TO_EDIT
 from backend.core.logger import app_logger as logger
+from backend.execution.utils.diff import get_diff
 from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
@@ -21,18 +22,17 @@ from backend.ledger.observation import (
     FileWriteObservation,
     Observation,
 )
-from backend.validation.code_quality import DefaultLinter
-from backend.execution.utils.diff import get_diff
 from backend.utils.chunk_localizer import Chunk, get_top_k_chunk_matches
+from backend.validation.code_quality import DefaultLinter
 
 if TYPE_CHECKING:
     from backend.core.config import AppConfig
     from backend.inference.llm import LLM
     from backend.inference.llm_registry import LLMRegistry
 
-USER_MSG = "\nCode changes will be provided in the form of a draft. You will need to apply the draft to the original code.\nThe original code will be enclosed within `<original_code>` tags.\nThe draft will be enclosed within `<update_snippet>` tags.\nYou need to output the update code within `<updated_code>` tags.\n\nWithin the `<updated_code>` tag, include only the final code after updation. Do not include any explanations or other content within these tags.\n\n<original_code>{old_contents}</original_code>\n\n<update_snippet>{draft_changes}</update_snippet>\n    "
-CORRECT_SYS_MSG = "You are a code repair assistant. Now you have an original file content and error information from a static code checking tool (lint tool). Your task is to automatically modify and return the repaired complete code based on these error messages and refer to the current file content.\n\nThe following are the specific task steps you need to complete:\n\nCarefully read the current file content to ensure that you fully understand its code structure.\n\nAccording to the lint error prompt, accurately locate and analyze the cause of the problem.\n\nModify the original file content and fix all errors prompted by the lint tool.\n\nReturn complete, runnable, and error-fixed code, paying attention to maintaining the overall style and specifications of the original code.\n\nPlease note:\n\nPlease strictly follow the lint error prompts to make modifications and do not miss any problems.\n\nThe modified code must be complete and cannot introduce new errors or bugs.\n\nThe modified code must maintain the original code function and logic, and no changes unrelated to error repair should be made."
-CORRECT_USER_MSG = "\nTHE FOLLOWING ARE THE ORIGINAL FILE CONTENTS AND THE ERROR INFORMATION REPORTED BY THE LINT TOOL\n\n# CURRENT FILE CONTENT:\n```\n{file_content}\n```\n\n# ERROR MESSAGE FROM STATIC CODE CHECKING TOOL:\n```\n{lint_error}\n```\n".strip()
+USER_MSG = '\nCode changes will be provided in the form of a draft. You will need to apply the draft to the original code.\nThe original code will be enclosed within `<original_code>` tags.\nThe draft will be enclosed within `<update_snippet>` tags.\nYou need to output the update code within `<updated_code>` tags.\n\nWithin the `<updated_code>` tag, include only the final code after updation. Do not include any explanations or other content within these tags.\n\n<original_code>{old_contents}</original_code>\n\n<update_snippet>{draft_changes}</update_snippet>\n    '
+CORRECT_SYS_MSG = 'You are a code repair assistant. Now you have an original file content and error information from a static code checking tool (lint tool). Your task is to automatically modify and return the repaired complete code based on these error messages and refer to the current file content.\n\nThe following are the specific task steps you need to complete:\n\nCarefully read the current file content to ensure that you fully understand its code structure.\n\nAccording to the lint error prompt, accurately locate and analyze the cause of the problem.\n\nModify the original file content and fix all errors prompted by the lint tool.\n\nReturn complete, runnable, and error-fixed code, paying attention to maintaining the overall style and specifications of the original code.\n\nPlease note:\n\nPlease strictly follow the lint error prompts to make modifications and do not miss any problems.\n\nThe modified code must be complete and cannot introduce new errors or bugs.\n\nThe modified code must maintain the original code function and logic, and no changes unrelated to error repair should be made.'
+CORRECT_USER_MSG = '\nTHE FOLLOWING ARE THE ORIGINAL FILE CONTENTS AND THE ERROR INFORMATION REPORTED BY THE LINT TOOL\n\n# CURRENT FILE CONTENT:\n```\n{file_content}\n```\n\n# ERROR MESSAGE FROM STATIC CODE CHECKING TOOL:\n```\n{lint_error}\n```\n'.strip()
 
 
 def _extract_code(string: str) -> str | None:
@@ -45,8 +45,8 @@ def _extract_code(string: str) -> str | None:
         str | None: The extracted code content or None if not found.
 
     """
-    start_tag = "<updated_code>"
-    end_tag = "</updated_code>"
+    start_tag = '<updated_code>'
+    end_tag = '</updated_code>'
 
     start_idx = string.find(start_tag)
     if start_idx == -1:
@@ -64,16 +64,22 @@ def _extract_code(string: str) -> str | None:
     content = string[start_idx:end_idx].strip()
 
     # Strip markdown formatting often returned by models
-    if content.startswith("```python"):
-        content = content[len("```python"):].lstrip()
-    elif content.startswith("```"):
-        content = content[len("```"):].lstrip()
+    if content.startswith('```'):
+        first_newline = content.find('\n')
+        if first_newline != -1 and content.rstrip().endswith('```'):
+            content = content[first_newline + 1 :]
+            content = content.rstrip()
+            if content.endswith('```'):
+                content = content[: -3].rstrip()
+        else:
+            # Opening fence with no closing — just strip the fence line
+            if content.startswith('```python'):
+                content = content[len('```python') :].lstrip()
+            elif content.startswith('```'):
+                content = content[len('```') :].lstrip()
 
-    if content.endswith("```"):
-        content = content[:-len("```")].rstrip()
-
-    if content.startswith("#EDIT:"):
-        content = content[content.find("\n") + 1:]
+    if content.startswith('#EDIT:'):
+        content = content[content.find('\n') + 1 :]
 
     return content
 
@@ -96,14 +102,14 @@ def get_new_file_contents(
     while num_retries > 0:
         messages = [
             {
-                "role": "user",
-                "content": USER_MSG.format(
+                'role': 'user',
+                'content': USER_MSG.format(
                     old_contents=old_contents, draft_changes=draft_changes
                 ),
             },
         ]
         resp = llm.completion(messages=messages)
-        new_contents = _extract_code(resp["choices"][0]["message"]["content"])
+        new_contents = _extract_code(resp['choices'][0]['message']['content'])
         if new_contents is not None:
             return new_contents
         num_retries -= 1
@@ -141,23 +147,23 @@ class FileEditRuntimeMixin(ABC):
         self.draft_editor_llm = None
         if not self.enable_llm_editor:
             return
-        draft_editor_config = self.config.get_llm_config("draft_editor")
+        draft_editor_config = self.config.get_llm_config('draft_editor')
         if draft_editor_config.caching_prompt:
             logger.debug(
-                "It is not recommended to cache draft editor LLM prompts as it may incur high costs for the same prompt. Automatically setting caching_prompt=false.",
+                'It is not recommended to cache draft editor LLM prompts as it may incur high costs for the same prompt. Automatically setting caching_prompt=false.',
             )
             draft_editor_config.caching_prompt = False
         self.draft_editor_llm = llm_registry.get_llm(
-            "draft_editor_llm", draft_editor_config
+            'draft_editor_llm', draft_editor_config
         )
         logger.debug(
-            "[Draft edit functionality] enabled with LLM: %s", self.draft_editor_llm
+            '[Draft edit functionality] enabled with LLM: %s', self.draft_editor_llm
         )
 
     def _require_draft_editor_llm(self) -> LLM:
         """Return the configured draft editor LLM or raise if unavailable."""
         if self.draft_editor_llm is None:
-            raise RuntimeError("LLM-backed editing is disabled for this runtime.")
+            raise RuntimeError('LLM-backed editing is disabled for this runtime.')
         return self.draft_editor_llm
 
     @abstractmethod
@@ -179,11 +185,11 @@ class FileEditRuntimeMixin(ABC):
             or (start > end and end != -1 and (start != -1))
         ):
             return ErrorObservation(
-                f"Invalid range for editing: start={start}, end={end}, total lines={total_lines}. start must be >= 1 and <={total_lines} (total lines of the edited file), start <= end, or start == -1 (append to the end of the file).",
+                f'Invalid range for editing: start={start}, end={end}, total lines={total_lines}. start must be >= 1 and <={total_lines} (total lines of the edited file), start <= end, or start == -1 (append to the end of the file).',
             )
         if (end < 1 and end != -1) or end > total_lines:
             return ErrorObservation(
-                f"Invalid range for editing: start={start}, end={end}, total lines={total_lines}. end must be >= 1 and <= {total_lines} (total lines of the edited file), end >= start, or end == -1 (to edit till the end of the file).",
+                f'Invalid range for editing: start={start}, end={end}, total lines={total_lines}. end must be >= 1 and <= {total_lines} (total lines of the edited file), end >= start, or end == -1 (to edit till the end of the file).',
             )
         return None
 
@@ -199,13 +205,13 @@ class FileEditRuntimeMixin(ABC):
         with (
             tempfile.NamedTemporaryFile(
                 suffix=suffix,
-                mode="w+",
-                encoding="utf-8",
+                mode='w+',
+                encoding='utf-8',
             ) as original_file_copy,
             tempfile.NamedTemporaryFile(
                 suffix=suffix,
-                mode="w+",
-                encoding="utf-8",
+                mode='w+',
+                encoding='utf-8',
             ) as updated_file_copy,
         ):
             original_file_copy.write(old_content)
@@ -217,7 +223,7 @@ class FileEditRuntimeMixin(ABC):
             )
 
             # If local linter (LSP/Ruff) found nothing, use rigour as a deep fallback for non-Python
-            if not updated_lint_error and suffix != ".py":
+            if not updated_lint_error and suffix != '.py':
                 # We don't trigger rigour automatically here to avoid latency
                 # The agent is encouraged to use it manually via system prompt
                 pass
@@ -231,20 +237,20 @@ class FileEditRuntimeMixin(ABC):
                     new_content=new_content,
                 )
                 error_message = (
-                    f"\n[Linting failed for edited file {filepath}. {
+                    f'\n[Linting failed for edited file {filepath}. {
                         len(updated_lint_error)
                     } lint errors found.]\n[begin attempted changes]\n{
                         _obs.visualize_diff(change_applied=False)
-                    }\n[end attempted changes]\n"
-                    + "-" * 40
-                    + "\n"
+                    }\n[end attempted changes]\n'
+                    + '-' * 40
+                    + '\n'
                 )
-                error_message += "-" * 20 + "First 5 lint errors" + "-" * 20 + "\n"
+                error_message += '-' * 20 + 'First 5 lint errors' + '-' * 20 + '\n'
                 for i, lint_error in enumerate(updated_lint_error[:5]):
-                    error_message += f"[begin lint error {i}]\n"
-                    error_message += lint_error.visualize().strip() + "\n"
-                    error_message += f"[end lint error {i}]\n"
-                    error_message += "-" * 40 + "\n"
+                    error_message += f'[begin lint error {i}]\n'
+                    error_message += lint_error.visualize().strip() + '\n'
+                    error_message += f'[end lint error {i}]\n'
+                    error_message += '-' * 40 + '\n'
                 return ErrorObservation(error_message)
         return None
 
@@ -256,13 +262,13 @@ class FileEditRuntimeMixin(ABC):
         if isinstance(obs, ErrorObservation):
             return obs
         if not isinstance(obs, FileWriteObservation):
-            msg = f"Expected FileWriteObservation, got {type(obs)}: {obs!s}"
+            msg = f'Expected FileWriteObservation, got {type(obs)}: {obs!s}'
             raise ValueError(msg)
         return FileEditObservation(
-            content=get_diff("", action.content, action.path),
+            content=get_diff('', action.content, action.path),
             path=action.path,
             prev_exist=False,
-            old_content="",
+            old_content='',
             new_content=action.content,
         )
 
@@ -274,7 +280,7 @@ class FileEditRuntimeMixin(ABC):
         retry_num: int,
     ) -> Observation:
         """Handle appending content to end of file (start == -1)."""
-        updated_content = "\n".join(old_lines + action.content.split("\n"))
+        updated_content = '\n'.join(old_lines + action.content.split('\n'))
         diff = get_diff(original_content, updated_content, action.path)
 
         if self.config.runtime_config.enable_auto_lint:
@@ -308,9 +314,9 @@ class FileEditRuntimeMixin(ABC):
         original_content: str,
     ) -> str:
         """Build error message with relevant snippets when edit range is too long."""
-        error_msg = f"[Edit error: The range of lines to edit is too long.]\n[The maximum number of lines allowed to edit at once is {
+        error_msg = f'[Edit error: The range of lines to edit is too long.]\n[The maximum number of lines allowed to edit at once is {
             MAX_LINES_TO_EDIT
-        }. Got (L{start_idx + 1}-L{end_idx}) {length_of_range} lines.]\n"
+        }. Got (L{start_idx + 1}-L{end_idx}) {length_of_range} lines.]\n'
 
         topk_chunks: list[Chunk] = get_top_k_chunk_matches(
             text=original_content,
@@ -319,22 +325,22 @@ class FileEditRuntimeMixin(ABC):
             max_chunk_size=20,
         )
         error_msg += (
-            "Here are some snippets that maybe relevant to the provided edit.\n"
+            'Here are some snippets that maybe relevant to the provided edit.\n'
         )
 
         for i, chunk in enumerate(topk_chunks):
             line_mid = (chunk.line_range[0] + chunk.line_range[1]) // 2
-            error_msg += f"[begin relevant snippet {i + 1}. Line range: L{
+            error_msg += f'[begin relevant snippet {i + 1}. Line range: L{
                 chunk.line_range[0]
-            }-L{chunk.line_range[1]}. Similarity: {chunk.normalized_lcs}]\n"
+            }-L{chunk.line_range[1]}. Similarity: {chunk.normalized_lcs}]\n'
             error_msg += (
                 f'[Browse around it via `open_file("{action.path}", {line_mid})`]\n'
             )
-            error_msg += chunk.visualize() + "\n"
-            error_msg += f"[end relevant snippet {i + 1}]\n"
-            error_msg += "-" * 40 + "\n"
+            error_msg += chunk.visualize() + '\n'
+            error_msg += f'[end relevant snippet {i + 1}]\n'
+            error_msg += '-' * 40 + '\n'
 
-        error_msg += "Consider using `open_file` to explore around the relevant snippets if needed.\n"
+        error_msg += 'Consider using `open_file` to explore around the relevant snippets if needed.\n'
         error_msg += f'**IMPORTANT**: Please REDUCE the range of edits to less than {
             MAX_LINES_TO_EDIT
         } lines by setting `start` and `end` in the edit action (e.g. `<file_edit path="{
@@ -352,7 +358,7 @@ class FileEditRuntimeMixin(ABC):
         retry_num: int,
     ) -> Observation:
         """Perform the actual LLM-based edit on the specified range."""
-        content_to_edit = "\n".join(old_lines[start_idx:end_idx])
+        content_to_edit = '\n'.join(old_lines[start_idx:end_idx])
         draft_llm = self._require_draft_editor_llm()
         _edited_content = get_new_file_contents(
             draft_llm, content_to_edit, action.content
@@ -360,15 +366,15 @@ class FileEditRuntimeMixin(ABC):
 
         if _edited_content is None:
             ret_err = ErrorObservation(
-                "Failed to get new file contents. Please try to reduce the number of edits and try again.",
+                'Failed to get new file contents. Please try to reduce the number of edits and try again.',
             )
             ret_err.llm_metrics = draft_llm.metrics
             return ret_err
 
         updated_lines = (
-            old_lines[:start_idx] + _edited_content.split("\n") + old_lines[end_idx:]
+            old_lines[:start_idx] + _edited_content.split('\n') + old_lines[end_idx:]
         )
-        updated_content = "\n".join(updated_lines)
+        updated_content = '\n'.join(updated_lines)
         diff = get_diff(original_content, updated_content, action.path)
 
         if self.config.runtime_config.enable_auto_lint:
@@ -454,10 +460,10 @@ class FileEditRuntimeMixin(ABC):
 
         if (
             isinstance(obs, ErrorObservation)
-            and "File not found".lower() in obs.content.lower()
+            and 'File not found'.lower() in obs.content.lower()
         ):
             logger.debug(
-                "Agent attempted to edit a file that does not exist. Creating the file. Error msg: %s",
+                'Agent attempted to edit a file that does not exist. Creating the file. Error msg: %s',
                 obs.content,
             )
             return self._handle_new_file_creation(action)
@@ -465,11 +471,11 @@ class FileEditRuntimeMixin(ABC):
         if not isinstance(obs, FileReadObservation):
             if isinstance(obs, ErrorObservation):
                 return obs
-            msg = f"Expected FileReadObservation, got {type(obs)}: {obs!s}"
+            msg = f'Expected FileReadObservation, got {type(obs)}: {obs!s}'
             raise ValueError(msg)
 
         content = obs.content
-        lines = content.split("\n")
+        lines = content.split('\n')
         return content, lines
 
     def _calculate_edit_range(
@@ -522,15 +528,15 @@ class FileEditRuntimeMixin(ABC):
         draft_llm = self._require_draft_editor_llm()
         tools = check_tools([dict(create_llm_based_edit_tool())], draft_llm.config)
         messages = [
-            {"role": "system", "content": CORRECT_SYS_MSG},
+            {'role': 'system', 'content': CORRECT_SYS_MSG},
             {
-                "role": "user",
-                "content": CORRECT_USER_MSG.format(
+                'role': 'user',
+                'content': CORRECT_USER_MSG.format(
                     file_content=file_content, lint_error=error_obs.content
                 ),
             },
         ]
-        params: dict = {"messages": messages, "tools": tools}
+        params: dict = {'messages': messages, 'tools': tools}
         try:
             response = draft_llm.completion(**params)
             actions = orchestrator_function_calling.response_to_actions(response)
@@ -540,5 +546,5 @@ class FileEditRuntimeMixin(ABC):
                 if isinstance(action, FileEditAction):
                     return self.llm_based_edit(action, _retry_num)
         except Exception as e:
-            logger.error("correct lint error is failed: %s", e)
+            logger.error('correct lint error is failed: %s', e)
         return error_obs

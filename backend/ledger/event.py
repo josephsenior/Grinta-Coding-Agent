@@ -18,9 +18,8 @@ Functions:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.schemas import EventSource
 from backend.ledger.tool import ToolCallMetadata
@@ -38,15 +37,15 @@ class Event:
     @property
     def message(self) -> str | None:
         """Get human-readable message for this event."""
-        if hasattr(self, "_message"):
+        if hasattr(self, '_message'):
             msg = self._message
             return str(msg) if msg is not None else None
-        return ""
+        return ''
 
     @property
     def id(self) -> int:
         """Get event ID (assigned when added to event stream)."""
-        if hasattr(self, "_id"):
+        if hasattr(self, '_id'):
             id_val = self._id
             return int(id_val) if id_val is not None else Event.INVALID_ID
         return Event.INVALID_ID
@@ -59,7 +58,7 @@ class Event:
     @property
     def sequence(self) -> int:
         """Sequence number for guaranteed event ordering."""
-        if hasattr(self, "_sequence"):
+        if hasattr(self, '_sequence'):
             seq_val = self._sequence
             return int(seq_val) if seq_val is not None else Event.INVALID_ID
         return Event.INVALID_ID
@@ -72,7 +71,7 @@ class Event:
     @property
     def timestamp(self) -> str | None:
         """Get event timestamp in ISO format."""
-        if hasattr(self, "_timestamp") and isinstance(self._timestamp, str):
+        if hasattr(self, '_timestamp') and isinstance(self._timestamp, str):
             ts = self._timestamp
             return str(ts) if ts is not None else None
         return None
@@ -88,7 +87,7 @@ class Event:
     @property
     def source(self) -> EventSource | None:
         """Get event source (USER, AGENT, ENVIRONMENT, etc.)."""
-        if hasattr(self, "_source"):
+        if hasattr(self, '_source'):
             src = self._source
             return EventSource(src) if src is not None else None
         return None
@@ -112,13 +111,13 @@ class Event:
                 self._source = value  # preserve unknown sources from old payloads
         else:
             raise TypeError(
-                f"source must be EventSource, str, or None — got {type(value).__name__}"
+                f'source must be EventSource, str, or None — got {type(value).__name__}'
             )
 
     @property
     def cause(self) -> int | None:
         """Get ID of event that caused this event."""
-        if hasattr(self, "_cause"):
+        if hasattr(self, '_cause'):
             cause_val = self._cause
             return int(cause_val) if cause_val is not None else None
         return None
@@ -131,7 +130,7 @@ class Event:
     @property
     def hidden(self) -> bool:
         """Return whether this event is hidden."""
-        return bool(getattr(self, "_hidden", False))
+        return bool(getattr(self, '_hidden', False))
 
     @hidden.setter
     def hidden(self, value: bool) -> None:
@@ -141,7 +140,7 @@ class Event:
     @property
     def timeout(self) -> float | None:
         """Get timeout value in seconds."""
-        if hasattr(self, "_timeout"):
+        if hasattr(self, '_timeout'):
             timeout_val = self._timeout
             return float(timeout_val) if timeout_val is not None else None
         return None
@@ -153,7 +152,7 @@ class Event:
         until the timeout is reached.
         """
         self._timeout = value
-        if hasattr(self, "blocking"):
+        if hasattr(self, 'blocking'):
             self.blocking = blocking
 
     @property
@@ -162,7 +161,7 @@ class Event:
         try:
             from backend.inference.metrics import Metrics
 
-            if hasattr(self, "_llm_metrics"):
+            if hasattr(self, '_llm_metrics'):
                 metrics = self._llm_metrics
                 return metrics if isinstance(metrics, Metrics) else None
             return None
@@ -177,7 +176,7 @@ class Event:
     @property
     def tool_call_metadata(self) -> ToolCallMetadata | None:
         """Get tool call metadata if this event involved tool calls."""
-        if not hasattr(self, "_tool_call_metadata"):
+        if not hasattr(self, '_tool_call_metadata'):
             return None
         metadata_raw: Any = self._tool_call_metadata
         # Be resilient to monkeypatched ToolCallMetadata classes in unit tests.
@@ -186,7 +185,7 @@ class Event:
             return None
         if isinstance(metadata_raw, ToolCallMetadata):  # fast path
             return metadata_raw
-        required_attrs = {"function_name", "tool_call_id", "total_calls_in_response"}
+        required_attrs = {'function_name', 'tool_call_id', 'total_calls_in_response'}
         if all(hasattr(metadata_raw, attr) for attr in required_attrs):
             return cast(
                 ToolCallMetadata, metadata_raw
@@ -205,9 +204,9 @@ class Event:
         This is optional and best-effort. It exists to make tool outcomes
         machine-checkable without requiring parsing of free-form strings.
         """
-        if not hasattr(self, "_tool_result"):
+        if not hasattr(self, '_tool_result'):
             return None
-        value: Any = getattr(self, "_tool_result")
+        value: Any = getattr(self, '_tool_result')
         return value if isinstance(value, dict) else None
 
     @tool_result.setter
@@ -217,7 +216,7 @@ class Event:
     @property
     def response_id(self) -> str | None:
         """Get LLM response ID for this event."""
-        return self._response_id if hasattr(self, "_response_id") else None
+        return self._response_id if hasattr(self, '_response_id') else None
 
     @response_id.setter
     def response_id(self, value: str) -> None:
@@ -225,4 +224,4 @@ class Event:
         self._response_id = value
 
 
-__all__ = ["Event", "EventSource"]
+__all__ = ['Event', 'EventSource']

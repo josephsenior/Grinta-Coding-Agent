@@ -36,10 +36,10 @@ import httpx
 import pytest
 import socketio
 
-BASE = os.environ.get("APP_TEST_BASE_URL", "http://127.0.0.1:3000")
+BASE = os.environ.get('APP_TEST_BASE_URL', 'http://127.0.0.1:3000')
 
 # Maximum seconds to wait for the agent to produce activity.
-AGENT_TIMEOUT = int(os.environ.get("APP_TEST_AGENT_TIMEOUT", "120"))
+AGENT_TIMEOUT = int(os.environ.get('APP_TEST_AGENT_TIMEOUT', '120'))
 
 # Maximum seconds to wait for the server to finish initializing the
 # conversation (LOADING → AWAITING_USER_INPUT).
@@ -56,11 +56,11 @@ _IDLE_CUTOFF = 30
 
 def _create_conversation() -> str:
     """POST /api/v1/conversations and return the conversation_id."""
-    r = httpx.post(f"{BASE}/api/v1/conversations", json={}, timeout=30.0)
+    r = httpx.post(f'{BASE}/api/v1/conversations', json={}, timeout=30.0)
     r.raise_for_status()
     data = r.json()
-    cid = data.get("conversation_id") or data.get("id")
-    assert cid, f"No conversation_id in response: {data}"
+    cid = data.get('conversation_id') or data.get('id')
+    assert cid, f'No conversation_id in response: {data}'
     return cid
 
 
@@ -88,38 +88,44 @@ class _EventCollector:
         self._saw_running = False
         self._last_event_at: float = 0.0
 
-        @self.sio.on("*")
+        @self.sio.on('*')
         def on_any(event_name: str, data: Any = None) -> None:
-            if event_name != "app_event" or not isinstance(data, dict):
+            if event_name != 'app_event' or not isinstance(data, dict):
                 return
             with self._lock:
                 self.events.append(data)
                 self._last_event_at = time.monotonic()
 
-            action = data.get("action", "")
-            obs = data.get("observation", "")
-            agent_state = (
-                data.get("extras", {}).get("agent_state", "")
-            ).upper()
+            action = data.get('action', '')
+            obs = data.get('observation', '')
+            agent_state = (data.get('extras', {}).get('agent_state', '')).upper()
 
             # Real event-stream events carry an ``id``; the synthetic
             # "Default state on connection" fallback does not.
-            has_id = data.get("id") is not None
+            has_id = data.get('id') is not None
 
-            if agent_state == "AWAITING_USER_INPUT" and has_id:
+            if agent_state == 'AWAITING_USER_INPUT' and has_id:
                 self._initialized.set()
 
-            if agent_state == "RUNNING":
+            if agent_state == 'RUNNING':
                 self._saw_running = True
 
-            if action == "finish" or obs in ("agent_finish",) or agent_state in (
-                "FINISHED", "STOPPED", "ERROR", "REJECTED",
+            if (
+                action == 'finish'
+                or obs in ('agent_finish',)
+                or agent_state
+                in (
+                    'FINISHED',
+                    'STOPPED',
+                    'ERROR',
+                    'REJECTED',
+                )
             ):
                 self._terminal.set()
 
     def connect_to(self, conversation_id: str) -> None:
-        url = f"{BASE}?conversation_id={conversation_id}&latest_event_id=-1"
-        self.sio.connect(url, transports=["websocket"], wait_timeout=15)
+        url = f'{BASE}?conversation_id={conversation_id}&latest_event_id=-1'
+        self.sio.connect(url, transports=['websocket'], wait_timeout=15)
 
     def wait_for_ready(self, timeout: float = _INIT_TIMEOUT) -> None:
         """Block until the server finishes initialization.
@@ -135,16 +141,16 @@ class _EventCollector:
             with self._lock:
                 n = len(self.events)
             raise TimeoutError(
-                f"Server did not reach awaiting_user_input within {timeout}s. "
-                f"Events received: {n}"
+                f'Server did not reach awaiting_user_input within {timeout}s. '
+                f'Events received: {n}'
             )
 
     def send_message(self, content: str) -> None:
         self.sio.emit(
-            "app_user_action",
+            'app_user_action',
             {
-                "action": "message",
-                "args": {"content": content, "image_urls": []},
+                'action': 'message',
+                'args': {'content': content, 'image_urls': []},
             },
         )
 
@@ -164,9 +170,9 @@ class _EventCollector:
         with self._lock:
             n = len(self.events)
         raise TimeoutError(
-            f"Timed out after {timeout}s. "
-            f"Events received: {n}, "
-            f"saw_running: {self._saw_running}"
+            f'Timed out after {timeout}s. '
+            f'Events received: {n}, '
+            f'saw_running: {self._saw_running}'
         )
 
     def disconnect(self) -> None:
@@ -178,9 +184,9 @@ class _EventCollector:
     def agent_states(self) -> list[str]:
         with self._lock:
             return [
-                e.get("extras", {}).get("agent_state", "").upper()
+                e.get('extras', {}).get('agent_state', '').upper()
                 for e in self.events
-                if e.get("extras", {}).get("agent_state")
+                if e.get('extras', {}).get('agent_state')
             ]
 
     def all_text(self) -> str:
@@ -188,16 +194,16 @@ class _EventCollector:
         with self._lock:
             parts: list[str] = []
             for e in self.events:
-                parts.append(e.get("message", ""))
-                parts.append(e.get("content", ""))
-                parts.append(str(e.get("args", {}).get("content", "")))
-            return " ".join(parts)
+                parts.append(e.get('message', ''))
+                parts.append(e.get('content', ''))
+                parts.append(str(e.get('args', {}).get('content', '')))
+            return ' '.join(parts)
 
     def has_error(self) -> str | None:
         with self._lock:
             for e in self.events:
-                if (e.get("extras", {}).get("agent_state", "")).upper() == "ERROR":
-                    return e.get("message", "unknown error")
+                if (e.get('extras', {}).get('agent_state', '')).upper() == 'ERROR':
+                    return e.get('message', 'unknown error')
         return None
 
 
@@ -219,22 +225,22 @@ def test_agent_responds_to_prompt() -> None:
     try:
         collector.connect_to(cid)
         collector.wait_for_ready()
-        collector.send_message("Say exactly: Hello World")
+        collector.send_message('Say exactly: Hello World')
         collector.wait_for_activity(timeout=AGENT_TIMEOUT)
     finally:
         collector.disconnect()
 
     err = collector.has_error()
-    assert err is None, f"Agent entered ERROR state: {err}"
+    assert err is None, f'Agent entered ERROR state: {err}'
 
     with collector._lock:
         n_events = len(collector.events)
-    assert n_events > 0, "No events received from the agent"
+    assert n_events > 0, 'No events received from the agent'
 
     # step() must have fired — RUNNING state must appear.
     states = collector.agent_states()
-    assert "RUNNING" in states, (
-        f"RUNNING state never seen — step() may not have fired. States: {states}"
+    assert 'RUNNING' in states, (
+        f'RUNNING state never seen — step() may not have fired. States: {states}'
     )
 
 
@@ -251,15 +257,15 @@ def test_event_stream_delivers_state_transitions() -> None:
     try:
         collector.connect_to(cid)
         collector.wait_for_ready()
-        collector.send_message("What is 2 + 2?")
+        collector.send_message('What is 2 + 2?')
         collector.wait_for_activity(timeout=AGENT_TIMEOUT)
     finally:
         collector.disconnect()
 
     states = collector.agent_states()
     assert len(states) >= 2, (
-        f"Expected at least 2 state transitions, got {len(states)}: {states}"
+        f'Expected at least 2 state transitions, got {len(states)}: {states}'
     )
-    assert "RUNNING" in states, (
-        f"RUNNING state never seen — step() may not have fired. States: {states}"
+    assert 'RUNNING' in states, (
+        f'RUNNING state never seen — step() may not have fired. States: {states}'
     )

@@ -408,12 +408,12 @@ class TestSnapshot:
 
         snapshot = governor.snapshot()
 
-        assert snapshot["max_tokens_per_minute"] == 50000
-        assert snapshot["window_seconds"] == 120
-        assert snapshot["current_backoff_s"] == 1.0
-        assert snapshot["consecutive_throttles"] == 0
-        assert snapshot["latency_p95_s"] is None
-        assert snapshot["history_size"] == 0
+        assert snapshot['max_tokens_per_minute'] == 50000
+        assert snapshot['window_seconds'] == 120
+        assert snapshot['current_backoff_s'] == 1.0
+        assert snapshot['consecutive_throttles'] == 0
+        assert snapshot['latency_p95_s'] is None
+        assert snapshot['history_size'] == 0
 
     def test_snapshot_with_history(self):
         """Snapshot should include history size."""
@@ -423,7 +423,7 @@ class TestSnapshot:
 
         snapshot = governor.snapshot()
 
-        assert snapshot["history_size"] == 2
+        assert snapshot['history_size'] == 2
 
     def test_snapshot_with_latency_data(self):
         """Snapshot should include P95 latency when available."""
@@ -434,8 +434,8 @@ class TestSnapshot:
 
         snapshot = governor.snapshot()
 
-        assert snapshot["latency_p95_s"] is not None
-        assert snapshot["latency_p95_s"] == 20.0
+        assert snapshot['latency_p95_s'] is not None
+        assert snapshot['latency_p95_s'] == 20.0
 
     def test_snapshot_after_throttle(self):
         """Snapshot should reflect consecutive throttles."""
@@ -445,8 +445,8 @@ class TestSnapshot:
 
         snapshot = governor.snapshot()
 
-        assert snapshot["consecutive_throttles"] == 3
-        assert snapshot["current_backoff_s"] == 4.5
+        assert snapshot['consecutive_throttles'] == 3
+        assert snapshot['current_backoff_s'] == 4.5
 
     def test_snapshot_rounds_values(self):
         """Snapshot should round floating point values."""
@@ -459,6 +459,6 @@ class TestSnapshot:
         snapshot = governor.snapshot()
 
         # current_backoff_s rounded to 2 decimals
-        assert snapshot["current_backoff_s"] == 1.23
+        assert snapshot['current_backoff_s'] == 1.23
         # latency_p95_s rounded to 3 decimals
-        assert isinstance(snapshot["latency_p95_s"], float)
+        assert isinstance(snapshot['latency_p95_s'], float)

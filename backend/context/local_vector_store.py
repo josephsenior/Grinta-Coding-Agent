@@ -15,7 +15,14 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from backend.persistence.locations import get_active_local_data_root
+
 logger = logging.getLogger(__name__)
+
+
+def _default_memory_persist_directory(backend_name: str) -> Path:
+    """Return the canonical persistent memory directory for the active project."""
+    return Path(get_active_local_data_root()) / 'memory' / backend_name
 
 
 class VectorBackend(ABC):
@@ -68,7 +75,7 @@ class ChromaDBBackend(VectorBackend):
 
         """
         if persist_directory is None:
-            persist_directory = Path.home() / '.grinta' / 'memory' / 'chroma'
+            persist_directory = _default_memory_persist_directory('chroma')
         persist_directory.mkdir(parents=True, exist_ok=True)
 
         import chromadb
@@ -118,20 +125,17 @@ class ChromaDBBackend(VectorBackend):
 
     def _load_model(self) -> None:
         """Load the embedding model. Thread-safe, called from background thread."""
-        if self._model is not None:
-            return
         with self._model_lock:
-            if self._model is not None:
-                return
-            logger.info("Loading embedding model '%s'…", self._model_name)
-            from sentence_transformers import SentenceTransformer
+            if self._model is None:
+                logger.info("Loading embedding model '%s'…", self._model_name)
+                from sentence_transformers import SentenceTransformer
 
-            with contextlib.redirect_stderr(io.StringIO()), \
-                 contextlib.redirect_stdout(io.StringIO()):
-                self._model = SentenceTransformer(
-                    self._model_name, trust_remote_code=True,
-                )
-            logger.info('Embedding model loaded')
+                with contextlib.redirect_stderr(io.StringIO()), \
+                     contextlib.redirect_stdout(io.StringIO()):
+                    self._model = SentenceTransformer(
+                        self._model_name, trust_remote_code=True,
+                    )
+                logger.info('Embedding model loaded')
 
     @property
     def model(self) -> Any:
@@ -273,7 +277,7 @@ class SQLiteBM25Backend(VectorBackend):
         persist_directory: Path | None = None,
     ) -> None:
         if persist_directory is None:
-            persist_directory = Path.home() / '.grinta' / 'memory' / 'sqlite'
+            persist_directory = _default_memory_persist_directory('sqlite')
         persist_directory.mkdir(parents=True, exist_ok=True)
         self.db_path = persist_directory / f'{collection_name}_fts.db'
         self._init_db()

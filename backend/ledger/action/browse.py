@@ -19,8 +19,8 @@ class BrowseInteractiveAction(Action):
     browser tool/runtime.
     """
 
-    browser_actions: str = ""
-    thought: str = ""
+    browser_actions: str = ''
+    thought: str = ''
 
     action: ClassVar[str] = ActionType.BROWSE_INTERACTIVE
     runnable: ClassVar[bool] = True
@@ -30,5 +30,4 @@ class BrowseInteractiveAction(Action):
 
     @property
     def message(self) -> str:
-        return "Running interactive browser actions"
-
+        return 'Running interactive browser actions'

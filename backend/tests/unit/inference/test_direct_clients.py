@@ -159,13 +159,13 @@ class TestGetDirectClientRouting:
     @patch(
         "backend.inference.direct_clients.get_shared_http_client", return_value=MagicMock()
     )
-    def test_openhands_routing_rewrites_model_for_proxy(self, _h, _ah, _oai, _aoai):
+    def test_lightning_routing_strips_provider_prefix(self, _h, _ah, _oai, _aoai):
         client = get_direct_client(
-            "openhands/claude-sonnet-4-5-20250929",
+            "lightning/google/gemini-3-flash-preview",
             api_key="key",
         )
         assert type(client).__name__ == "OpenAIClient"
-        assert client._model_name == "litellm_proxy/claude-sonnet-4-5-20250929"
+        assert client._model_name == "google/gemini-3-flash-preview"
 
     @patch("backend.inference.direct_clients.AsyncOpenAI")
     @patch("backend.inference.direct_clients.OpenAI")

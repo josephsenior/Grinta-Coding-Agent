@@ -40,7 +40,7 @@ from backend.ledger.action.message import (
 # ---------------------------------------------------------------------------
 class TestActionBase(unittest.TestCase):
     def test_default_action_class_var(self):
-        self.assertEqual(Action.action, "")
+        self.assertEqual(Action.action, '')
 
     def test_default_runnable(self):
         self.assertFalse(Action.runnable)
@@ -61,7 +61,7 @@ class TestActionBase(unittest.TestCase):
 class TestMessageAction(unittest.TestCase):
     def test_defaults(self):
         m = MessageAction()
-        self.assertEqual(m.content, "")
+        self.assertEqual(m.content, '')
         self.assertIsNone(m.file_urls)
         self.assertIsNone(m.image_urls)
         self.assertFalse(m.wait_for_response)
@@ -70,28 +70,28 @@ class TestMessageAction(unittest.TestCase):
         self.assertEqual(MessageAction.action, ActionType.MESSAGE)
 
     def test_message_property(self):
-        m = MessageAction(content="hello")
-        self.assertEqual(m.message, "hello")
+        m = MessageAction(content='hello')
+        self.assertEqual(m.message, 'hello')
 
     def test_str_basic(self):
-        m = MessageAction(content="hi")
+        m = MessageAction(content='hi')
         m.source = EventSource.USER
         s = str(m)
-        self.assertIn("MessageAction", s)
-        self.assertIn("hi", s)
+        self.assertIn('MessageAction', s)
+        self.assertIn('hi', s)
 
     def test_str_with_images(self):
-        m = MessageAction(content="pic", image_urls=["http://a.png", "http://b.png"])
+        m = MessageAction(content='pic', image_urls=['http://a.png', 'http://b.png'])
         m.source = EventSource.AGENT
         s = str(m)
-        self.assertIn("IMAGE_URL: http://a.png", s)
-        self.assertIn("IMAGE_URL: http://b.png", s)
+        self.assertIn('IMAGE_URL: http://a.png', s)
+        self.assertIn('IMAGE_URL: http://b.png', s)
 
     def test_str_with_files(self):
-        m = MessageAction(content="doc", file_urls=["f1.txt"])
+        m = MessageAction(content='doc', file_urls=['f1.txt'])
         m.source = EventSource.USER
         s = str(m)
-        self.assertIn("FILE_URL: f1.txt", s)
+        self.assertIn('FILE_URL: f1.txt', s)
 
     def test_security_risk_default(self):
         self.assertEqual(MessageAction().security_risk, ActionSecurityRisk.UNKNOWN)
@@ -105,28 +105,28 @@ class TestSystemMessageAction(unittest.TestCase):
         self.assertEqual(SystemMessageAction.action, ActionType.SYSTEM)
 
     def test_message_property(self):
-        s = SystemMessageAction(content="sys prompt")
-        self.assertEqual(s.message, "sys prompt")
+        s = SystemMessageAction(content='sys prompt')
+        self.assertEqual(s.message, 'sys prompt')
 
     def test_tools_and_agent_class(self):
-        s = SystemMessageAction(content="x", tools=[{"t": 1}], agent_class="TestAgent")
+        s = SystemMessageAction(content='x', tools=[{'t': 1}], agent_class='TestAgent')
         assert s.tools is not None
         self.assertEqual(len(s.tools), 1)
         self.assertIsNotNone(s.APP_version)
-        self.assertEqual(s.agent_class, "TestAgent")
+        self.assertEqual(s.agent_class, 'TestAgent')
 
     def test_str_with_tools(self):
-        s = SystemMessageAction(content="x", tools=[1, 2, 3], agent_class="A")
+        s = SystemMessageAction(content='x', tools=[1, 2, 3], agent_class='A')
         s.source = EventSource.USER
         text = str(s)
-        self.assertIn("3 tools available", text)
-        self.assertIn("AGENT_CLASS: A", text)
+        self.assertIn('3 tools available', text)
+        self.assertIn('AGENT_CLASS: A', text)
 
     def test_str_no_tools(self):
-        s = SystemMessageAction(content="only content")
+        s = SystemMessageAction(content='only content')
         s.source = EventSource.USER
         text = str(s)
-        self.assertNotIn("TOOLS", text)
+        self.assertNotIn('TOOLS', text)
 
 
 # ---------------------------------------------------------------------------
@@ -141,18 +141,18 @@ class TestStreamingChunkAction(unittest.TestCase):
 
     def test_defaults(self):
         c = StreamingChunkAction()
-        self.assertEqual(c.chunk, "")
-        self.assertEqual(c.accumulated, "")
+        self.assertEqual(c.chunk, '')
+        self.assertEqual(c.accumulated, '')
         self.assertFalse(c.is_final)
 
     def test_str_streaming(self):
-        c = StreamingChunkAction(chunk="tok", accumulated="hello tok")
-        self.assertIn("STREAMING", str(c))
-        self.assertIn("9 chars", str(c))
+        c = StreamingChunkAction(chunk='tok', accumulated='hello tok')
+        self.assertIn('STREAMING', str(c))
+        self.assertIn('9 chars', str(c))
 
     def test_str_final(self):
-        c = StreamingChunkAction(accumulated="done", is_final=True)
-        self.assertIn("FINAL", str(c))
+        c = StreamingChunkAction(accumulated='done', is_final=True)
+        self.assertIn('FINAL', str(c))
 
 
 # ---------------------------------------------------------------------------
@@ -167,28 +167,28 @@ class TestCmdRunAction(unittest.TestCase):
 
     def test_defaults(self):
         c = CmdRunAction()
-        self.assertEqual(c.command, "")
+        self.assertEqual(c.command, '')
         self.assertFalse(c.is_input)
         self.assertFalse(c.blocking)
         self.assertFalse(c.hidden)
         self.assertIsNone(c.cwd)
 
     def test_message_property(self):
-        c = CmdRunAction(command="ls -la")
-        self.assertIn("ls -la", c.message)
+        c = CmdRunAction(command='ls -la')
+        self.assertIn('ls -la', c.message)
 
     def test_str_with_thought(self):
-        c = CmdRunAction(command="pwd", thought="check dir")
+        c = CmdRunAction(command='pwd', thought='check dir')
         c.source = EventSource.AGENT
         s = str(c)
-        self.assertIn("THOUGHT: check dir", s)
-        self.assertIn("pwd", s)
+        self.assertIn('THOUGHT: check dir', s)
+        self.assertIn('pwd', s)
 
     def test_str_no_thought(self):
-        c = CmdRunAction(command="echo hi")
+        c = CmdRunAction(command='echo hi')
         c.source = EventSource.AGENT
         s = str(c)
-        self.assertNotIn("THOUGHT", s)
+        self.assertNotIn('THOUGHT', s)
 
     def test_security_risk(self):
         self.assertEqual(CmdRunAction().security_risk, ActionSecurityRisk.UNKNOWN)
@@ -211,13 +211,13 @@ class TestFileReadAction(unittest.TestCase):
 
     def test_defaults(self):
         f = FileReadAction()
-        self.assertEqual(f.path, "")
+        self.assertEqual(f.path, '')
         self.assertEqual(f.start, 0)
         self.assertEqual(f.end, -1)
 
     def test_message_property(self):
-        f = FileReadAction(path="/tmp/foo.py")
-        self.assertIn("/tmp/foo.py", f.message)
+        f = FileReadAction(path='/tmp/foo.py')
+        self.assertIn('/tmp/foo.py', f.message)
 
     def test_impl_source_default(self):
         self.assertEqual(FileReadAction().impl_source, FileReadSource.DEFAULT)
@@ -234,15 +234,15 @@ class TestFileWriteAction(unittest.TestCase):
         self.assertTrue(FileWriteAction.runnable)
 
     def test_message_property(self):
-        f = FileWriteAction(path="out.txt")
-        self.assertIn("out.txt", f.message)
+        f = FileWriteAction(path='out.txt')
+        self.assertIn('out.txt', f.message)
 
     def test_repr(self):
-        f = FileWriteAction(path="a.py", content="x=1", start=1, end=5, thought="fix")
+        f = FileWriteAction(path='a.py', content='x=1', start=1, end=5, thought='fix')
         r = repr(f)
-        self.assertIn("FileWriteAction", r)
-        self.assertIn("a.py", r)
-        self.assertIn("x=1", r)
+        self.assertIn('FileWriteAction', r)
+        self.assertIn('a.py', r)
+        self.assertIn('x=1', r)
 
 
 # ---------------------------------------------------------------------------
@@ -260,37 +260,41 @@ class TestFileEditAction(unittest.TestCase):
 
     def test_repr_llm_mode(self):
         f = FileEditAction(
-            path="x.py",
-            content="new code",
-            thought="refactor",
+            path='x.py',
+            content='new code',
+            thought='refactor',
             impl_source=FileEditSource.LLM_BASED_EDIT,
         )
         r = repr(f)
-        self.assertIn("FileEditAction", r)
-        self.assertIn("x.py", r)
-        self.assertIn("new code", r)
+        self.assertIn('FileEditAction', r)
+        self.assertIn('x.py', r)
+        self.assertIn('new code', r)
 
     def test_repr_file_editor_create(self):
-        f = FileEditAction(path="y.py", command="create_file", file_text="hello")
+        f = FileEditAction(path='y.py', command='create_file', file_text='hello')
         r = repr(f)
-        self.assertIn("Command: create_file", r)
-        self.assertIn("hello", r)
+        self.assertIn('Command: create_file', r)
+        self.assertIn('hello', r)
 
     def test_repr_replace_text(self):
-        f = FileEditAction(path="z.py", command="replace_text", old_str="a", new_str="b")
+        f = FileEditAction(
+            path='z.py', command='replace_text', old_str='a', new_str='b'
+        )
         r = repr(f)
-        self.assertIn("Old String", r)
-        self.assertIn("New String", r)
+        self.assertIn('Old String', r)
+        self.assertIn('New String', r)
 
     def test_repr_insert_text(self):
-        f = FileEditAction(path="w.py", command="insert_text", insert_line=5, new_str="line")
+        f = FileEditAction(
+            path='w.py', command='insert_text', insert_line=5, new_str='line'
+        )
         r = repr(f)
-        self.assertIn("Insert Line: 5", r)
+        self.assertIn('Insert Line: 5', r)
 
     def test_repr_undo(self):
-        f = FileEditAction(path="u.py", command="undo_last_edit")
+        f = FileEditAction(path='u.py', command='undo_last_edit')
         r = repr(f)
-        self.assertIn("Undo Edit", r)
+        self.assertIn('Undo Edit', r)
 
 
 # ---------------------------------------------------------------------------
@@ -305,18 +309,18 @@ class TestMCPAction(unittest.TestCase):
 
     def test_defaults(self):
         m = MCPAction()
-        self.assertEqual(m.name, "")
+        self.assertEqual(m.name, '')
         self.assertEqual(m.arguments, {})
 
     def test_message_property(self):
-        m = MCPAction(name="read_file", arguments={"path": "/a"})
-        self.assertIn("read_file", m.message)
+        m = MCPAction(name='read_file', arguments={'path': '/a'})
+        self.assertIn('read_file', m.message)
 
     def test_str_with_thought(self):
-        m = MCPAction(name="tool", arguments={"k": "v"}, thought="need data")
+        m = MCPAction(name='tool', arguments={'k': 'v'}, thought='need data')
         s = str(m)
-        self.assertIn("THOUGHT: need data", s)
-        self.assertIn("NAME: tool", s)
+        self.assertIn('THOUGHT: need data', s)
+        self.assertIn('NAME: tool', s)
 
 
 # ---------------------------------------------------------------------------
@@ -327,7 +331,7 @@ class TestNullAction(unittest.TestCase):
         self.assertEqual(NullAction.action, ActionType.NULL)
 
     def test_message(self):
-        self.assertEqual(NullAction().message, "No action")
+        self.assertEqual(NullAction().message, 'No action')
 
     def test_not_runnable(self):
         self.assertFalse(NullAction.runnable)
@@ -342,10 +346,10 @@ class TestChangeAgentStateAction(unittest.TestCase):
 
     def test_message(self):
         c = ChangeAgentStateAction(agent_state=AgentState.RUNNING)
-        self.assertIn("RUNNING", c.message)
+        self.assertIn('RUNNING', c.message)
 
     def test_default_agent_state(self):
-        self.assertEqual(ChangeAgentStateAction().agent_state, "")
+        self.assertEqual(ChangeAgentStateAction().agent_state, '')
 
 
 # ---------------------------------------------------------------------------
@@ -356,8 +360,8 @@ class TestPlaybookFinishAction(unittest.TestCase):
         self.assertEqual(PlaybookFinishAction.action, ActionType.FINISH)
 
     def test_message_with_thought(self):
-        f = PlaybookFinishAction(thought="done")
-        self.assertEqual(f.message, "done")
+        f = PlaybookFinishAction(thought='done')
+        self.assertEqual(f.message, 'done')
 
     def test_message_without_thought(self):
         f = PlaybookFinishAction()
@@ -378,8 +382,8 @@ class TestAgentThinkAction(unittest.TestCase):
         self.assertEqual(AgentThinkAction.action, ActionType.THINK)
 
     def test_message(self):
-        t = AgentThinkAction(thought="hmm")
-        self.assertIn("hmm", t.message)
+        t = AgentThinkAction(thought='hmm')
+        self.assertIn('hmm', t.message)
 
 
 # ---------------------------------------------------------------------------
@@ -391,11 +395,11 @@ class TestAgentRejectAction(unittest.TestCase):
 
     def test_message_no_reason(self):
         r = AgentRejectAction()
-        self.assertIn("rejected", r.message)
+        self.assertIn('rejected', r.message)
 
     def test_message_with_reason(self):
-        r = AgentRejectAction(outputs={"reason": "unsafe"})
-        self.assertIn("unsafe", r.message)
+        r = AgentRejectAction(outputs={'reason': 'unsafe'})
+        self.assertIn('unsafe', r.message)
 
 
 # ---------------------------------------------------------------------------
@@ -409,16 +413,16 @@ class TestRecallAction(unittest.TestCase):
         self.assertEqual(RecallAction().recall_type, RecallType.WORKSPACE_CONTEXT)
 
     def test_message_truncates(self):
-        r = RecallAction(query="a" * 100)
-        self.assertIn("a" * 50, r.message)
+        r = RecallAction(query='a' * 100)
+        self.assertIn('a' * 50, r.message)
         # Should truncate at 50 chars
-        self.assertNotIn("a" * 51, r.message)
+        self.assertNotIn('a' * 51, r.message)
 
     def test_str(self):
-        r = RecallAction(query="find tests")
+        r = RecallAction(query='find tests')
         s = str(r)
-        self.assertIn("RecallAction", s)
-        self.assertIn("find tests", s)
+        self.assertIn('RecallAction', s)
+        self.assertIn('find tests', s)
 
 
 # ---------------------------------------------------------------------------
@@ -439,14 +443,14 @@ class TestCondensationAction(unittest.TestCase):
     def test_with_summary(self):
         c = CondensationAction(
             pruned_event_ids=[1],
-            summary="condensed",
+            summary='condensed',
             summary_offset=0,
         )
-        self.assertIn("condensed", c.message)
+        self.assertIn('condensed', c.message)
 
     def test_message_without_summary(self):
         c = CondensationAction(pruned_event_ids=[1, 2])
-        self.assertIn("dropping", c.message)
+        self.assertIn('dropping', c.message)
 
     def test_invalid_config_raises(self):
         # Both event_ids and event_range → invalid
@@ -463,7 +467,7 @@ class TestCondensationAction(unittest.TestCase):
 
     def test_summary_without_offset_raises(self):
         with self.assertRaises(ValueError):
-            CondensationAction(pruned_event_ids=[1], summary="s")
+            CondensationAction(pruned_event_ids=[1], summary='s')
 
     def test_offset_without_summary_raises(self):
         with self.assertRaises(ValueError):
@@ -480,7 +484,7 @@ class TestCondensationRequestAction(unittest.TestCase):
         )
 
     def test_message(self):
-        self.assertIn("condensation", CondensationRequestAction().message)
+        self.assertIn('condensation', CondensationRequestAction().message)
 
 
 # ---------------------------------------------------------------------------
@@ -492,19 +496,19 @@ class TestTaskTrackingAction(unittest.TestCase):
 
     def test_message_empty(self):
         t = TaskTrackingAction()
-        self.assertIn("Clearing", t.message)
+        self.assertIn('Clearing', t.message)
 
     def test_message_one_task(self):
-        t = TaskTrackingAction(task_list=[{"id": 1, "status": "done"}])
-        self.assertIn("1 task", t.message)
+        t = TaskTrackingAction(task_list=[{'id': 1, 'status': 'done'}])
+        self.assertIn('1 task', t.message)
 
     def test_message_multiple_tasks(self):
-        t = TaskTrackingAction(task_list=[{"id": 1}, {"id": 2}, {"id": 3}])
-        self.assertIn("3 task items", t.message)
+        t = TaskTrackingAction(task_list=[{'id': 1}, {'id': 2}, {'id': 3}])
+        self.assertIn('3 task items', t.message)
 
     def test_default_command(self):
-        self.assertEqual(TaskTrackingAction().command, "view")
+        self.assertEqual(TaskTrackingAction().command, 'view')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

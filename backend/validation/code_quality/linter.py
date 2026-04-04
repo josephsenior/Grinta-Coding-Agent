@@ -7,8 +7,6 @@ backends with proper error formatting and reporting.
 from __future__ import annotations
 
 import hashlib
-import json
-import subprocess
 import tempfile
 import time
 from collections import OrderedDict
@@ -27,17 +25,17 @@ class LintError:
     column: int | None
     message: str
     code: str | None = None
-    severity: str = "error"  # "error" or "warning"
+    severity: str = 'error'  # "error" or "warning"
     file_path: str | None = None
 
     def visualize(self) -> str:
         """Format the lint error for display."""
-        location = f"line {self.line}"
+        location = f'line {self.line}'
         if self.column is not None:
-            location += f", column {self.column}"
+            location += f', column {self.column}'
         if self.code:
-            location += f" [{self.code}]"
-        return f"{location}: {self.message}"
+            location += f' [{self.code}]'
+        return f'{location}: {self.message}'
 
 
 @dataclass
@@ -51,8 +49,8 @@ class LintResult:
         """Separate errors and warnings after initialization."""
         # Ensure errors and warnings are properly separated
         all_issues = self.errors + self.warnings
-        self.errors = [issue for issue in all_issues if issue.severity == "error"]
-        self.warnings = [issue for issue in all_issues if issue.severity == "warning"]
+        self.errors = [issue for issue in all_issues if issue.severity == 'error']
+        self.warnings = [issue for issue in all_issues if issue.severity == 'warning']
 
     def lint_file_diff(self, original_file: str, updated_file: str) -> list[LintError]:
         """Lint the diff between two files.
@@ -100,7 +98,7 @@ class DefaultLinter:
 
     def __init__(
         self,
-        backend: str = "auto",  # "auto", "tree-sitter"
+        backend: str = 'auto',  # "auto", "tree-sitter"
         config_path: str | None = None,
         enable_cache: bool = True,
         cache_ttl: int = 300,  # 5 minutes default
@@ -127,7 +125,7 @@ class DefaultLinter:
         self._cache_misses = 0
 
         # Detect available backends
-        if backend == "auto":
+        if backend == 'auto':
             self._detected_backend = self._detect_best_backend()
         else:
             self._detected_backend = (
@@ -136,24 +134,29 @@ class DefaultLinter:
 
         if not self._detected_backend:
             logger.warning(
-                "No linter backend available. Linting will return empty results."
+                'No linter backend available. Linting will return empty results.'
             )
 
     def _detect_best_backend(self) -> str | None:
         """Detect the best available linter backend."""
         # Removed ruff & pylint. Default to tree-sitter.
-        if self._check_backend_available("tree-sitter"):
-            return "tree-sitter"
+        if self._check_backend_available('tree-sitter'):
+            return 'tree-sitter'
         return None
 
     def _check_backend_available(self, backend: str) -> bool:
         """Check if a linter backend is available."""
-        if backend == "tree-sitter":
+        if backend == 'tree-sitter':
+            import sys
+
+            if 'tree_sitter' in sys.modules:
+                return sys.modules['tree_sitter'] is not None
+
             try:
-                import tree_sitter
-                return True
+                __import__('tree_sitter')
             except ImportError:
                 return False
+            return True
         return False
 
     def lint(
@@ -179,7 +182,7 @@ class DefaultLinter:
             cached_result = self._get_from_cache(cache_key)
             if cached_result is not None:
                 self._cache_hits += 1
-                logger.debug("Linter cache HIT for: %s", file_path or "content")
+                logger.debug('Linter cache HIT for: %s', file_path or 'content')
                 return cached_result
 
         self._cache_misses += 1
@@ -207,19 +210,19 @@ class DefaultLinter:
                 if path.exists():
                     mtime = path.stat().st_mtime
                     config_hash = self._hash_config()
-                    return f"lint:{file_path}:{mtime}:{config_hash}"
+                    return f'lint:{file_path}:{mtime}:{config_hash}'
             except OSError:
                 pass
         elif content:
             # Hash content for cache key
             content_hash = hashlib.sha256(content.encode()).hexdigest()[:16]
             config_hash = self._hash_config()
-            return f"lint:content:{content_hash}:{config_hash}"
+            return f'lint:content:{content_hash}:{config_hash}'
         return None
 
     def _hash_config(self) -> str:
         """Generate hash of linter configuration."""
-        config_str = f"{self._detected_backend}:{self.config_path or ''}"
+        config_str = f'{self._detected_backend}:{self.config_path or ""}'
         return hashlib.sha256(config_str.encode()).hexdigest()[:8]
 
     def _get_from_cache(self, cache_key: str) -> LintResult | None:
@@ -252,11 +255,11 @@ class DefaultLinter:
         total = self._cache_hits + self._cache_misses
         hit_rate = (self._cache_hits / total * 100) if total > 0 else 0.0
         return {
-            "hits": self._cache_hits,
-            "misses": self._cache_misses,
-            "hit_rate": f"{hit_rate:.1f}%",
-            "size": len(self._cache),
-            "max_size": self._max_cache_size,
+            'hits': self._cache_hits,
+            'misses': self._cache_misses,
+            'hit_rate': f'{hit_rate:.1f}%',
+            'size': len(self._cache),
+            'max_size': self._max_cache_size,
         }
 
     def clear_cache(self) -> None:
@@ -264,7 +267,7 @@ class DefaultLinter:
         self._cache.clear()
         self._cache_hits = 0
         self._cache_misses = 0
-        logger.debug("Linter cache cleared")
+        logger.debug('Linter cache cleared')
 
     def lint_file_diff(self, original_file: str, updated_file: str) -> list[LintError]:
         """Lint the difference between two files.
@@ -283,19 +286,22 @@ class DefaultLinter:
         """Lint a file using the detected backend."""
         # Try LSP first for all supported languages
         from backend.utils.lsp_client import get_lsp_client
+
         lsp = get_lsp_client()
-        lsp_res = lsp.query("diagnostics", file_path)
+        lsp_res = lsp.query('diagnostics', file_path)
 
         if lsp_res.available and not lsp_res.error:
             errors = []
             for loc in lsp_res.locations:
-                errors.append(LintError(
-                    line=loc.line,
-                    column=loc.column,
-                    message="LSP Diagnostic",
-                    severity="error",
-                    file_path=file_path
-                ))
+                errors.append(
+                    LintError(
+                        line=loc.line,
+                        column=loc.column,
+                        message='LSP Diagnostic',
+                        severity='error',
+                        file_path=file_path,
+                    )
+                )
             if errors:
                 return LintResult(errors=errors, warnings=[])
 
@@ -304,9 +310,9 @@ class DefaultLinter:
     def _lint_content(self, content: str, file_path: str | None = None) -> LintResult:
         """Lint content string using the detected backend."""
         # Write content to temporary file and lint it
-        suffix = Path(file_path).suffix if file_path else ".py"
+        suffix = Path(file_path).suffix if file_path else '.py'
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=suffix, delete=False
+            mode='w', suffix=suffix, delete=False
         ) as tmp_file:
             tmp_file.write(content)
             tmp_path = tmp_file.name

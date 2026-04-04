@@ -1,12 +1,12 @@
 """Structure Editor tool providing structure-aware editing for the Orchestrator agent."""
 
+from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import (
     create_tool_definition,
     get_command_param,
     get_path_param,
     get_security_risk_param,
 )
-from backend.engine.contracts import ChatCompletionToolParam
 
 _DETAILED_STRUCTURE_EDITOR_DESCRIPTION = """Structure-aware editor powered by Tree-sitter (40+ languages)
 
@@ -103,84 +103,84 @@ def create_structure_editor_tool(
     )
 
     return create_tool_definition(
-        name="ast_code_editor",
+        name='ast_code_editor',
         description=description,
         properties={
-            "command": get_command_param(
-                "The command to execute",
+            'command': get_command_param(
+                'The command to execute',
                 [
-                    "edit_symbol_body",
-                    "rename_symbol",
-                    "find_symbol",
-                    "replace_range",
-                    "normalize_indent",
-                    "create_file",
-                    "view_file",
-                    "replace_text",
-                    "insert_text",
-                    "undo_last_edit",
+                    'edit_symbol_body',
+                    'rename_symbol',
+                    'find_symbol',
+                    'replace_range',
+                    'normalize_indent',
+                    'create_file',
+                    'view_file',
+                    'replace_text',
+                    'insert_text',
+                    'undo_last_edit',
                 ],
             ),
-            "path": get_path_param("Path to the file to edit"),
-            "function_name": {
-                "type": "string",
-                "description": "Name of the function to edit (required for edit_symbol_body)",
+            'path': get_path_param('Path to the file to edit'),
+            'function_name': {
+                'type': 'string',
+                'description': 'Name of the function to edit (required for edit_symbol_body)',
             },
-            "new_body": {
-                "type": "string",
-                "description": "New content for the function (required for edit_symbol_body)",
+            'new_body': {
+                'type': 'string',
+                'description': 'New content for the function (required for edit_symbol_body)',
             },
-            "old_name": {
-                "type": "string",
-                "description": "Original name of the symbol (required for rename_symbol)",
+            'old_name': {
+                'type': 'string',
+                'description': 'Original name of the symbol (required for rename_symbol)',
             },
-            "new_name": {
-                "type": "string",
-                "description": "New name for the symbol (required for rename_symbol)",
+            'new_name': {
+                'type': 'string',
+                'description': 'New name for the symbol (required for rename_symbol)',
             },
-            "symbol_name": {
-                "type": "string",
-                "description": "Name of the symbol to find (required for find_symbol)",
+            'symbol_name': {
+                'type': 'string',
+                'description': 'Name of the symbol to find (required for find_symbol)',
             },
-            "symbol_type": {
-                "type": "string",
-                "description": "Type of symbol (function, class, method) for find_symbol",
-                "enum": ["function", "class", "method"],
+            'symbol_type': {
+                'type': 'string',
+                'description': 'Type of symbol (function, class, method) for find_symbol',
+                'enum': ['function', 'class', 'method'],
             },
-            "start_line": {
-                "type": "integer",
-                "description": "Start line number (1-indexed) for replace_range",
+            'start_line': {
+                'type': 'integer',
+                'description': 'Start line number (1-indexed) for replace_range',
             },
-            "end_line": {
-                "type": "integer",
-                "description": "End line number (1-indexed) for replace_range",
+            'end_line': {
+                'type': 'integer',
+                'description': 'End line number (1-indexed) for replace_range',
             },
-            "new_code": {
-                "type": "string",
-                "description": "New code to insert (required for replace_range)",
+            'new_code': {
+                'type': 'string',
+                'description': 'New code to insert (required for replace_range)',
             },
-            "style": {
-                "type": "string",
-                "description": "Indentation style (spaces, tabs) for normalize_indent",
-                "enum": ["spaces", "tabs"],
+            'style': {
+                'type': 'string',
+                'description': 'Indentation style (spaces, tabs) for normalize_indent',
+                'enum': ['spaces', 'tabs'],
             },
-            "size": {
-                "type": "integer",
-                "description": "Indentation size (2, 4, 8) for normalize_indent",
+            'size': {
+                'type': 'integer',
+                'description': 'Indentation size (2, 4, 8) for normalize_indent',
             },
-            "file_text": {
-                "description": "Content to write to the file (for create_file command)",
-                "type": "string",
+            'file_text': {
+                'description': 'Content to write to the file (for create_file command)',
+                'type': 'string',
             },
-            "new_str": {
-                "description": "Text to insert (for insert_text command)",
-                "type": "string",
+            'new_str': {
+                'description': 'Text to insert (for insert_text command)',
+                'type': 'string',
             },
-            "insert_line": {
-                "description": "Line number to insert after (0 for beginning of file, for insert_text command)",
-                "type": "integer",
+            'insert_line': {
+                'description': 'Line number to insert after (0 for beginning of file, for insert_text command)',
+                'type': 'integer',
             },
-            "security_risk": get_security_risk_param(),
+            'security_risk': get_security_risk_param(),
         },
-        required=["command", "path"],
+        required=['command', 'path'],
     )

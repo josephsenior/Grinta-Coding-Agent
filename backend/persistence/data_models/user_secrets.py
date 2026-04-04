@@ -15,16 +15,16 @@ from pydantic import (
 )
 from pydantic.json import pydantic_encoder
 
-from backend.core.pydantic_compat import model_dump_with_options
 from backend.core.provider_types import (
+    CustomSecret,
     CustomSecretsType,
     CustomSecretsWithTypeSchema,
+    ProviderToken,
     ProviderTokenType,
     ProviderTokenWithTypeSchema,
-    CustomSecret,
-    ProviderToken,
     ProviderType,
 )
+from backend.core.pydantic_compat import model_dump_with_options
 
 if TYPE_CHECKING:
     from backend.ledger.stream import EventStream
@@ -39,7 +39,7 @@ class UserSecrets(BaseModel):
         frozen=True, validate_assignment=True, arbitrary_types_allowed=True
     )
 
-    @field_serializer("provider_tokens")
+    @field_serializer('provider_tokens')
     def provider_tokens_serializer(
         self,
         provider_tokens: ProviderTokenType,
@@ -56,7 +56,7 @@ class UserSecrets(BaseModel):
 
         """
         tokens = {}
-        expose_secrets = info.context and info.context.get("expose_secrets", False)
+        expose_secrets = info.context and info.context.get('expose_secrets', False)
         for token_type, provider_token in provider_tokens.items():
             if not provider_token or not provider_token.token:
                 continue
@@ -72,13 +72,13 @@ class UserSecrets(BaseModel):
                 else pydantic_encoder(provider_token.token)
             )
             tokens[token_type_str] = {
-                "token": token,
-                "host": provider_token.host,
-                "user_id": provider_token.user_id,
+                'token': token,
+                'host': provider_token.host,
+                'user_id': provider_token.user_id,
             }
         return tokens
 
-    @field_serializer("custom_secrets")
+    @field_serializer('custom_secrets')
     def custom_secrets_serializer(
         self, custom_secrets: CustomSecretsType, info: SerializationInfo
     ):
@@ -93,16 +93,16 @@ class UserSecrets(BaseModel):
 
         """
         secrets = {}
-        expose_secrets = info.context and info.context.get("expose_secrets", False)
+        expose_secrets = info.context and info.context.get('expose_secrets', False)
         if custom_secrets:
             for secret_name, secret_value in custom_secrets.items():
                 secrets[secret_name] = {
-                    "secret": (
+                    'secret': (
                         secret_value.secret.get_secret_value()
                         if expose_secrets
                         else pydantic_encoder(secret_value.secret)
                     ),
-                    "description": secret_value.description,
+                    'description': secret_value.description,
                 }
         return secrets
 
@@ -161,7 +161,7 @@ class UserSecrets(BaseModel):
 
         return MappingProxyType(converted_secrets)
 
-    @model_validator(mode="before")
+    @model_validator(mode='before')
     @classmethod
     def convert_dict_to_mappingproxy(
         cls,
@@ -180,50 +180,50 @@ class UserSecrets(BaseModel):
 
         """
         if data is None:
-            return {"provider_tokens": None, "custom_secrets": MappingProxyType({})}
+            return {'provider_tokens': None, 'custom_secrets': MappingProxyType({})}
         if not isinstance(data, dict):
-            msg = "UserSecrets must be initialized with a dictionary"
+            msg = 'UserSecrets must be initialized with a dictionary'
             raise ValueError(msg)
 
         new_data: dict[str, MappingProxyType | None] = {}
 
         # Convert provider tokens if present
-        if "provider_tokens" in data and data["provider_tokens"] is not None:
-            new_data["provider_tokens"] = cls._convert_provider_tokens(
-                data["provider_tokens"]
+        if 'provider_tokens' in data and data['provider_tokens'] is not None:
+            new_data['provider_tokens'] = cls._convert_provider_tokens(
+                data['provider_tokens']
             )
         else:
-            new_data["provider_tokens"] = MappingProxyType({})
+            new_data['provider_tokens'] = MappingProxyType({})
 
         # Convert custom secrets if present
-        if "custom_secrets" in data and data["custom_secrets"] is not None:
-            new_data["custom_secrets"] = cls._convert_custom_secrets(
-                data["custom_secrets"]
+        if 'custom_secrets' in data and data['custom_secrets'] is not None:
+            new_data['custom_secrets'] = cls._convert_custom_secrets(
+                data['custom_secrets']
             )
         else:
-            new_data["custom_secrets"] = MappingProxyType({})
+            new_data['custom_secrets'] = MappingProxyType({})
 
         return new_data
 
     def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
         """Normalize internal storage after validation."""
-        provider_tokens = getattr(self, "provider_tokens")
+        provider_tokens = getattr(self, 'provider_tokens')
         if provider_tokens is None:
-            object.__setattr__(self, "provider_tokens", MappingProxyType({}))
+            object.__setattr__(self, 'provider_tokens', MappingProxyType({}))
         elif not isinstance(provider_tokens, MappingProxyType):
             object.__setattr__(
                 self,
-                "provider_tokens",
+                'provider_tokens',
                 self._convert_provider_tokens(dict(provider_tokens)),
             )
 
-        custom_secrets = getattr(self, "custom_secrets")
+        custom_secrets = getattr(self, 'custom_secrets')
         if custom_secrets is None:
-            object.__setattr__(self, "custom_secrets", MappingProxyType({}))
+            object.__setattr__(self, 'custom_secrets', MappingProxyType({}))
         elif not isinstance(custom_secrets, MappingProxyType):
             object.__setattr__(
                 self,
-                "custom_secrets",
+                'custom_secrets',
                 self._convert_custom_secrets(dict(custom_secrets)),
             )
 
@@ -244,10 +244,10 @@ class UserSecrets(BaseModel):
             Dictionary mapping secret names to string values
 
         """
-        secret_store = model_dump_with_options(self, context={"expose_secrets": True})
-        custom_secrets = secret_store.get("custom_secrets", {})
+        secret_store = model_dump_with_options(self, context={'expose_secrets': True})
+        custom_secrets = secret_store.get('custom_secrets', {})
         return {
-            secret_name: value["secret"]
+            secret_name: value['secret']
             for secret_name, value in custom_secrets.items()
         }
 

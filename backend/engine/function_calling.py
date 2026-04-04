@@ -32,10 +32,6 @@ from backend.engine.tools.analyze_project_structure import (
     build_analyze_project_structure_action,
 )
 from backend.engine.tools.apply_patch import build_apply_patch_action
-from backend.engine.tools.batch_edit import (
-    BATCH_EDIT_TOOL_NAME,
-    build_batch_edit_action,
-)
 from backend.engine.tools.blackboard import (
     BLACKBOARD_TOOL_NAME,
     build_blackboard_action,
@@ -50,10 +46,6 @@ from backend.engine.tools.checkpoint import (
 from backend.engine.tools.delegate_task import (
     DELEGATE_TASK_TOOL_NAME,
     build_delegate_task_action,
-)
-from backend.engine.tools.error_recovery_memory import (
-    ERROR_RECOVERY_MEMORY_TOOL_NAME,
-    build_error_recovery_memory_action,
 )
 from backend.engine.tools.execute_mcp_tool import EXECUTE_MCP_TOOL_TOOL_NAME
 from backend.engine.tools.explore_code import (
@@ -71,10 +63,6 @@ from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.revert_to_checkpoint import (
     REVERT_TO_CHECKPOINT_TOOL_NAME,
     build_revert_to_checkpoint_action,
-)
-from backend.engine.tools.search_available_tools import (
-    SEARCH_AVAILABLE_TOOLS_TOOL_NAME,
-    build_search_available_tools_action,
 )
 from backend.engine.tools.search_code import (
     SEARCH_CODE_TOOL_NAME,
@@ -309,11 +297,6 @@ def _handle_search_code_tool(arguments: dict) -> CmdRunAction:
 def _handle_workspace_status_tool(arguments: dict):
     """Handle workspace_status tool: status, diff, checkpoints, revert."""
     return build_workspace_status_action(arguments)
-
-
-def _handle_error_recovery_memory_tool(arguments: dict) -> AgentThinkAction:
-    """Handle error_recovery_memory tool: retrieve/store structured recovery guidance."""
-    return build_error_recovery_memory_action(arguments)
 
 
 def _handle_checkpoint_tool(arguments: dict) -> AgentThinkAction:
@@ -739,13 +722,50 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
 
 def _handle_batch_replace_command(arguments: dict) -> CmdRunAction:
     """Handle batch_replace command — atomic multi-file edits with rollback."""
+    import json as _json
     edits = arguments.get('edits')
     if not edits or not isinstance(edits, list):
         raise FunctionCallValidationError(
             'batch_replace requires "edits" array of {path, old_str, new_str}'
         )
     preview = arguments.get('preview', False)
-    return build_batch_edit_action(edits, preview=bool(preview))
+    edits_json = _json.dumps(edits)
+    preview_flag = 'True' if preview else 'False'
+    py = (
+        'import json,sys;'
+        f'edits=json.loads({repr(edits_json)});'
+        f'preview={preview_flag};'
+        'backups=[];'
+        'errors=[];'
+        "for i,edit in enumerate(edits):\n"
+        "  path=edit['path'];old=edit['old_str'];new=edit['new_str'];\n"
+        "  try:\n"
+        "    with open(path,'r',encoding='utf-8') as f: content=f.read()\n"
+        "    count=content.count(old)\n"
+        "    if count==0: errors.append(f'Edit {i}: old_str not found in {path}'); break\n"
+        "    if count>1: errors.append(f'Edit {i}: old_str matches {count} locations in {path} — must be unique'); break\n"
+        "    backups.append((path,content));\n"
+        "    if not preview:\n"
+        "      with open(path,'w',encoding='utf-8') as f: f.write(content.replace(old,new,1))\n"
+        "    print(f'  [OK] {path}')\n"
+        "  except Exception as e: errors.append(f'Edit {i}: {e}'); break\n"
+        "if errors:\n"
+        "  for bpath,bcontent in backups:\n"
+        "    try:\n"
+        "      with open(bpath,'w',encoding='utf-8') as f: f.write(bcontent)\n"
+        "    except OSError as e:\n"
+        "      import sys; sys.stderr.write(f'[batch_replace] Rollback failed for {bpath!r}: {e}\\n')\n"
+        "  print('BATCH EDIT FAILED — all changes rolled back.');\n"
+        "  print('Error:',errors[0]); sys.exit(1)\n"
+        "else:\n"
+        "  if preview: print('DRY RUN: all',len(edits),'edits would apply cleanly.')\n"
+        "  else: print('BATCH EDIT OK:',len(edits),'files updated atomically.')"
+    )
+    label = 'dry-run' if preview else 'applying'
+    return CmdRunAction(
+        command=f'python -c "{py}"',
+        thought=f'[BATCH REPLACE] {label} {len(edits)} edit(s) atomically',
+    )
 
 
 def _handle_check_tool_status_tool(
@@ -1183,25 +1203,6 @@ def _handle_communicate_tool(arguments: dict) -> Action:
         )
 
 
-def _handle_batch_edit_tool(arguments: dict) -> CmdRunAction:
-    """Handle batch_edit tool call — atomic multi-file replace_text with rollback."""
-    edits = arguments.get('edits')
-    if not edits or not isinstance(edits, list):
-        raise FunctionCallValidationError(
-            'Missing or invalid "edits" argument in batch_edit tool call'
-        )
-    preview = arguments.get('preview', False)
-    return build_batch_edit_action(edits, preview=bool(preview))
-
-
-def _handle_search_available_tools_tool(
-    arguments: dict,
-    mcp_tool_names: list[str] | None = None,
-    mcp_tools: list[dict] | None = None,
-) -> Action:
-    return build_search_available_tools_action(arguments)
-
-
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     """Create dispatch map for tool handlers."""
     return {
@@ -1235,14 +1236,8 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         TERMINAL_MANAGER_TOOL_NAME: handle_terminal_manager_tool,
         'explore_tree_structure': build_explore_tree_structure_action,
         'read_symbol_definition': build_read_symbol_definition_action,
-        # Meta-cognition tools
         COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
-        # MCP gateway
         EXECUTE_MCP_TOOL_TOOL_NAME: _handle_execute_mcp_tool_tool,
-        # Backward compatibility — retired tools still dispatch if called
-        BATCH_EDIT_TOOL_NAME: _handle_batch_edit_tool,
-        SEARCH_AVAILABLE_TOOLS_TOOL_NAME: _handle_search_available_tools_tool,
-        ERROR_RECOVERY_MEMORY_TOOL_NAME: _handle_error_recovery_memory_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
         REVERT_TO_CHECKPOINT_TOOL_NAME: build_revert_to_checkpoint_action,
         SESSION_DIFF_TOOL_NAME: _handle_session_diff_tool,

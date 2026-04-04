@@ -38,7 +38,7 @@ def _make_config(**overrides):
     cfg = MagicMock()
     cfg.enable_vector_memory = False
     cfg.enable_som_visual_browsing = False
-    cfg.cli_mode = False
+    cfg.cli_mode = True
     cfg.enable_hybrid_retrieval = False
     for k, v in overrides.items():
         setattr(cfg, k, v)

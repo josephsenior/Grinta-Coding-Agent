@@ -11,7 +11,9 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from backend.core.config.app_config import AppConfig
-    from backend.persistence.data_models.conversation_metadata import ConversationMetadata
+    from backend.persistence.data_models.conversation_metadata import (
+        ConversationMetadata,
+    )
     from backend.persistence.data_models.conversation_metadata_result_set import (
         ConversationMetadataResultSet,
     )

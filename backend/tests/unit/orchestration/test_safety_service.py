@@ -3,28 +3,27 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.orchestration.services.safety_service import SafetyService
 from backend.ledger.action import (
     ActionConfirmationStatus,
     ActionSecurityRisk,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
-    Action,
 )
+from backend.orchestration.services.safety_service import SafetyService
 
 
 def _make_context(**overrides) -> MagicMock:
     ctx = MagicMock()
-    ctx.security_analyzer = overrides.get("security_analyzer")
-    ctx.autonomy_controller = overrides.get("autonomy_controller")
-    ctx.confirmation_mode = overrides.get("confirmation_mode", False)
-    ctx.pending_action = overrides.get("pending_action")
+    ctx.security_analyzer = overrides.get('security_analyzer')
+    ctx.autonomy_controller = overrides.get('autonomy_controller')
+    ctx.confirmation_mode = overrides.get('confirmation_mode', False)
+    ctx.pending_action = overrides.get('pending_action')
     ctx.emit_event = MagicMock()
     ctx.clear_pending_action = MagicMock()
     return ctx
@@ -40,17 +39,17 @@ def _as_action(payload: SimpleNamespace) -> Any:
 class TestActionRequiresConfirmation:
     def test_cmd_run_requires_confirmation(self):
         svc = SafetyService(_make_context())
-        action = CmdRunAction(command="echo hi")
+        action = CmdRunAction(command='echo hi')
         assert svc.action_requires_confirmation(action) is True
 
     def test_file_edit_requires_confirmation(self):
         svc = SafetyService(_make_context())
-        action = FileEditAction(path="/tmp/x.py", content="x")
+        action = FileEditAction(path='/tmp/x.py', content='x')
         assert svc.action_requires_confirmation(action) is True
 
     def test_file_read_requires_confirmation(self):
         svc = SafetyService(_make_context())
-        action = FileReadAction(path="/tmp/x.py")
+        action = FileReadAction(path='/tmp/x.py')
         assert svc.action_requires_confirmation(action) is True
 
     def test_generic_action_does_not_require_confirmation(self):
@@ -133,18 +132,17 @@ class TestAnalyzeSecurity:
         svc = SafetyService(ctx)
         action = _as_action(SimpleNamespace())
         await svc.analyze_security(action)
-        assert not hasattr(action, "security_risk")
+        assert not hasattr(action, 'security_risk')
 
 
 # ── apply_confirmation_state ─────────────────────────────────────────
 
 
 class TestApplyConfirmationState:
-    def test_cli_mode_autonomous_requests_confirmation(self):
+    def test_autonomy_requests_confirmation(self):
         autonomy = MagicMock()
         autonomy.should_request_confirmation.return_value = True
         controller = MagicMock()
-        controller.agent.config.cli_mode = True
         ctx = _make_context(autonomy_controller=autonomy)
         ctx.get_controller.return_value = controller
         svc = SafetyService(ctx)
@@ -156,12 +154,11 @@ class TestApplyConfirmationState:
             action.confirmation_state == ActionConfirmationStatus.AWAITING_CONFIRMATION
         )
 
-    def test_non_cli_high_risk_confirmation_mode(self):
+    def test_confirmation_when_autonomy_requests(self):
         autonomy = MagicMock()
         autonomy.should_request_confirmation.return_value = True
         controller = MagicMock()
-        controller.agent.config.cli_mode = False
-        ctx = _make_context(autonomy_controller=autonomy, confirmation_mode=True)
+        ctx = _make_context(autonomy_controller=autonomy)
         ctx.get_controller.return_value = controller
         svc = SafetyService(ctx)
         action = _as_action(SimpleNamespace(confirmation_state=None))
@@ -192,20 +189,20 @@ class TestApplyConfirmationState:
 class TestFinalizePendingAction:
     def test_confirmed(self):
         action = _as_action(
-            SimpleNamespace(thought="thinking...", confirmation_state=None, _id=42)
+            SimpleNamespace(thought='thinking...', confirmation_state=None, _id=42)
         )
         ctx = _make_context(pending_action=action)
         svc = SafetyService(ctx)
         svc.finalize_pending_action(confirmed=True)
         assert action.confirmation_state == ActionConfirmationStatus.CONFIRMED
-        assert action.thought == ""
+        assert action.thought == ''
         assert action._id is None
         ctx.emit_event.assert_called_once()
         ctx.clear_pending_action.assert_called_once()
 
     def test_rejected(self):
         action = _as_action(
-            SimpleNamespace(thought="thinking...", confirmation_state=None, _id=42)
+            SimpleNamespace(thought='thinking...', confirmation_state=None, _id=42)
         )
         ctx = _make_context(pending_action=action)
         svc = SafetyService(ctx)

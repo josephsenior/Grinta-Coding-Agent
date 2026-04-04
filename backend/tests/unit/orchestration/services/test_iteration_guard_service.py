@@ -3,8 +3,8 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.orchestration.services.iteration_guard_service import IterationGuardService
 from backend.core.schemas import AgentState
+from backend.orchestration.services.iteration_guard_service import IterationGuardService
 
 
 class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
@@ -17,7 +17,7 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.state.iteration_flag = MagicMock()
         self.mock_controller.state.iteration_flag.current_value = 5
         self.mock_controller.state.iteration_flag.max_value = 10
-        self.mock_controller.state.agent_state = "RUNNING"
+        self.mock_controller.state.agent_state = 'RUNNING'
         self.mock_controller.state_tracker = MagicMock()
         self.mock_controller.event_stream = MagicMock()
         self.mock_controller.headless_mode = False
@@ -39,7 +39,7 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
     async def test_run_control_flags_non_limit_error_raises(self):
         """Test run_control_flags raises non-limit errors."""
         self.mock_controller.state_tracker.run_control_flags.side_effect = ValueError(
-            "Some other error"
+            'Some other error'
         )
 
         with self.assertRaises(ValueError):
@@ -48,14 +48,14 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
     async def test_run_control_flags_limit_error_with_graceful_shutdown(self):
         """Test run_control_flags triggers graceful shutdown on limit error."""
         self.mock_controller.state_tracker.run_control_flags.side_effect = RuntimeError(
-            "Iteration limit exceeded"
+            'Iteration limit exceeded'
         )
 
         with patch.object(
-            self.service, "_graceful_shutdown_enabled", return_value=True
+            self.service, '_graceful_shutdown_enabled', return_value=True
         ):
             with patch.object(
-                self.service, "_schedule_graceful_shutdown"
+                self.service, '_schedule_graceful_shutdown'
             ) as mock_schedule:
                 with self.assertRaises(RuntimeError):
                     await self.service.run_control_flags()
@@ -65,26 +65,26 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
     async def test_run_control_flags_limit_error_without_graceful_shutdown(self):
         """Test run_control_flags raises limit error when graceful shutdown disabled."""
         self.mock_controller.state_tracker.run_control_flags.side_effect = RuntimeError(
-            "Budget limit exceeded"
+            'Budget limit exceeded'
         )
 
         with patch.object(
-            self.service, "_graceful_shutdown_enabled", return_value=False
+            self.service, '_graceful_shutdown_enabled', return_value=False
         ):
             with self.assertRaises(RuntimeError):
                 await self.service.run_control_flags()
 
     def test_is_limit_error_detects_limit(self):
         """Test _is_limit_error detects limit errors."""
-        self.assertTrue(self.service._is_limit_error("iteration limit exceeded"))
-        self.assertTrue(self.service._is_limit_error("maximum budget reached"))
-        self.assertTrue(self.service._is_limit_error("budget exceeded"))
-        self.assertTrue(self.service._is_limit_error("limit hit"))
+        self.assertTrue(self.service._is_limit_error('iteration limit exceeded'))
+        self.assertTrue(self.service._is_limit_error('maximum budget reached'))
+        self.assertTrue(self.service._is_limit_error('budget exceeded'))
+        self.assertTrue(self.service._is_limit_error('limit hit'))
 
     def test_is_limit_error_rejects_non_limit(self):
         """Test _is_limit_error rejects non-limit errors."""
-        self.assertFalse(self.service._is_limit_error("connection error"))
-        self.assertFalse(self.service._is_limit_error("null pointer"))
+        self.assertFalse(self.service._is_limit_error('connection error'))
+        self.assertFalse(self.service._is_limit_error('null pointer'))
 
     def test_graceful_shutdown_enabled_from_agent_config(self):
         """Test _graceful_shutdown_enabled reads from agent_config."""
@@ -95,7 +95,7 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(result)
 
-    @patch.dict("os.environ", {"APP_GRACEFUL_SHUTDOWN": "0"})
+    @patch.dict('os.environ', {'APP_GRACEFUL_SHUTDOWN': '0'})
     def test_graceful_shutdown_disabled_from_env(self):
         """Test _graceful_shutdown_enabled reads from env var."""
         self.mock_controller.agent_config = None
@@ -104,7 +104,7 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(result)
 
-    @patch.dict("os.environ", {"APP_GRACEFUL_SHUTDOWN": "1"})
+    @patch.dict('os.environ', {'APP_GRACEFUL_SHUTDOWN': '1'})
     def test_graceful_shutdown_enabled_from_env(self):
         """Test _graceful_shutdown_enabled defaults to enabled."""
         self.mock_controller.agent_config = None
@@ -113,7 +113,7 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(result)
 
-    @patch.dict("os.environ", {}, clear=True)
+    @patch.dict('os.environ', {}, clear=True)
     def test_graceful_shutdown_enabled_default(self):
         """Test _graceful_shutdown_enabled defaults to True when env not set."""
         self.mock_controller.agent_config = None
@@ -122,38 +122,37 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(result)
 
-    @patch("backend.utils.async_utils.create_tracked_task")
+    @patch('backend.utils.async_utils.create_tracked_task')
     def test_schedule_graceful_shutdown(self, mock_create_task):
         """Test _schedule_graceful_shutdown creates async task."""
-        self.service._schedule_graceful_shutdown("Test reason")
+        self.service._schedule_graceful_shutdown('Test reason')
 
         mock_create_task.assert_called_once()
         call_kwargs = mock_create_task.call_args[1]
-        self.assertEqual(call_kwargs["name"], "graceful-shutdown")
+        self.assertEqual(call_kwargs['name'], 'graceful-shutdown')
 
-    @patch("backend.orchestration.services.iteration_guard_service.MessageAction")
+    @patch('backend.orchestration.services.iteration_guard_service.MessageAction')
     async def test_graceful_shutdown_sends_message(self, mock_message_action):
         """Test _graceful_shutdown sends SYSTEM NOTICE message."""
         mock_msg = MagicMock()
         mock_message_action.return_value = mock_msg
 
-        await self.service._graceful_shutdown("Iteration limit")
+        await self.service._graceful_shutdown('Iteration limit')
 
         # Check MessageAction was created with system notice
         mock_message_action.assert_called_once()
-        content = mock_message_action.call_args[1]["content"]
-        self.assertIn("SYSTEM NOTICE", content)
-        self.assertIn("Iteration limit", content)
-        self.assertIn("ONE FINAL TURN", content)
+        content = mock_message_action.call_args[1]['content']
+        self.assertIn('SYSTEM NOTICE', content)
+        self.assertIn('Iteration limit', content)
+        self.assertIn('ONE FINAL TURN', content)
 
         # Check event was added
         self.mock_controller.event_stream.add_event.assert_called()
 
-    @patch("backend.orchestration.services.iteration_guard_service.MessageAction")
+    @patch('backend.orchestration.services.iteration_guard_service.MessageAction')
     async def test_graceful_shutdown_extends_iteration_limit(self, mock_message_action):
         """Test _graceful_shutdown extends iteration limit by 1."""
-
-        await self.service._graceful_shutdown("Budget exceeded")
+        await self.service._graceful_shutdown('Budget exceeded')
 
         # Check _step was called
         self.mock_controller._step.assert_called_once()
@@ -161,13 +160,13 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
         # Max should have been incremented during execution
         # (then potentially restored after)
 
-    @patch("backend.orchestration.services.iteration_guard_service.MessageAction")
+    @patch('backend.orchestration.services.iteration_guard_service.MessageAction')
     async def test_graceful_shutdown_restores_original_max(self, mock_message_action):
         """Test _graceful_shutdown restores original max value after step."""
         original_max = 10
         self.mock_controller.state.iteration_flag.max_value = original_max
 
-        await self.service._graceful_shutdown("Test")
+        await self.service._graceful_shutdown('Test')
 
         # Should have restored original max
         self.assertEqual(
@@ -180,25 +179,27 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
         # Set state to FINISHED so _force_partial_completion is skipped
         self.mock_controller.state.agent_state = AgentState.FINISHED
 
-        with patch("backend.orchestration.services.iteration_guard_service.MessageAction"):
+        with patch(
+            'backend.orchestration.services.iteration_guard_service.MessageAction'
+        ):
             # Should not raise exception
-            await self.service._graceful_shutdown("Test")
+            await self.service._graceful_shutdown('Test')
 
-    @patch("backend.orchestration.services.iteration_guard_service.MessageAction")
+    @patch('backend.orchestration.services.iteration_guard_service.MessageAction')
     async def test_graceful_shutdown_step_error(self, mock_message_action):
         """Test _graceful_shutdown handles step errors gracefully."""
-        self.mock_controller._step.side_effect = RuntimeError("Step failed")
+        self.mock_controller._step.side_effect = RuntimeError('Step failed')
 
         with patch.object(
-            self.service, "_force_partial_completion", new_callable=AsyncMock
+            self.service, '_force_partial_completion', new_callable=AsyncMock
         ) as mock_force:
             # Should not raise exception
-            await self.service._graceful_shutdown("Test")
+            await self.service._graceful_shutdown('Test')
 
             # Should call force completion
             mock_force.assert_called_once()
 
-    @patch("backend.orchestration.services.iteration_guard_service.MessageAction")
+    @patch('backend.orchestration.services.iteration_guard_service.MessageAction')
     async def test_graceful_shutdown_forces_completion_if_not_finished(
         self, mock_message_action
     ):
@@ -208,13 +209,13 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.state.agent_state = AgentState.RUNNING
 
         with patch.object(
-            self.service, "_force_partial_completion", new_callable=AsyncMock
+            self.service, '_force_partial_completion', new_callable=AsyncMock
         ) as mock_force:
-            await self.service._graceful_shutdown("Test")
+            await self.service._graceful_shutdown('Test')
 
-            mock_force.assert_called_once_with("Test")
+            mock_force.assert_called_once_with('Test')
 
-    @patch("backend.orchestration.services.iteration_guard_service.MessageAction")
+    @patch('backend.orchestration.services.iteration_guard_service.MessageAction')
     async def test_graceful_shutdown_skips_force_if_finished(self, mock_message_action):
         """Test _graceful_shutdown skips force completion when finished."""
         from backend.core.schemas import AgentState
@@ -222,13 +223,15 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.state.agent_state = AgentState.FINISHED
 
         with patch.object(
-            self.service, "_force_partial_completion", new_callable=AsyncMock
+            self.service, '_force_partial_completion', new_callable=AsyncMock
         ) as mock_force:
-            await self.service._graceful_shutdown("Test")
+            await self.service._graceful_shutdown('Test')
 
             mock_force.assert_not_called()
 
-    @patch("backend.orchestration.services.iteration_guard_service.PlaybookFinishAction")
+    @patch(
+        'backend.orchestration.services.iteration_guard_service.PlaybookFinishAction'
+    )
     async def test_force_partial_completion(self, mock_finish_action):
         """Test _force_partial_completion creates PlaybookFinishAction."""
         mock_finish = MagicMock()
@@ -237,14 +240,14 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.event_router = MagicMock()
         self.mock_controller.event_router._handle_finish_action = AsyncMock()
 
-        await self.service._force_partial_completion("Budget limit")
+        await self.service._force_partial_completion('Budget limit')
 
         # Check PlaybookFinishAction was created
         mock_finish_action.assert_called_once()
         call_kwargs = mock_finish_action.call_args[1]
-        self.assertEqual(call_kwargs["outputs"]["status"], "partial")
-        self.assertIn("Budget limit", call_kwargs["outputs"]["reason"])
-        self.assertTrue(call_kwargs["force_finish"])
+        self.assertEqual(call_kwargs['outputs']['status'], 'partial')
+        self.assertIn('Budget limit', call_kwargs['outputs']['reason'])
+        self.assertTrue(call_kwargs['force_finish'])
 
         # Check force_finish flag was set
         self.assertTrue(mock_finish.force_finish)
@@ -255,5 +258,5 @@ class TestIterationGuardService(unittest.IsolatedAsyncioTestCase):
         )
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

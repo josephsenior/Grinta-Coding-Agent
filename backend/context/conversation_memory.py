@@ -2,30 +2,14 @@
 
 from __future__ import annotations
 
-import os
 import hashlib
+import os
 from dataclasses import dataclass, field
 from typing import Any, cast
 
-from backend.core.config.agent_config import AgentConfig
-from backend.core.logger import app_logger as logger
-from backend.core.message import Message
-from backend.core.schemas import ActionType
-from backend.ledger.action import (
-    Action,
-    MessageAction,
-)
-from backend.ledger.action.message import SystemMessageAction
-from backend.ledger.event import Event, EventSource
-from backend.ledger.observation.agent import RecallObservation
-from backend.ledger.observation.commands import CmdOutputObservation
-from backend.ledger.observation.error import ErrorObservation
-from backend.ledger.observation.observation import Observation
-from backend.ledger.observation.reject import UserRejectObservation
 from backend.context.action_processors import convert_action_to_messages
 from backend.context.context_tracking import ContextTracker
 from backend.context.graph_store import GraphMemoryStore
-from backend.core.workspace_context import ensure_project_state_dir
 from backend.context.memory_types import (
     ContextAnchor,
     Decision,
@@ -47,6 +31,22 @@ from backend.context.tool_call_tracker import (
     flush_resolved_tool_calls,
 )
 from backend.context.vector_store import EnhancedVectorStore
+from backend.core.config.agent_config import AgentConfig
+from backend.core.logger import app_logger as logger
+from backend.core.message import Message
+from backend.core.schemas import ActionType
+from backend.core.workspace_context import ensure_project_state_dir
+from backend.ledger.action import (
+    Action,
+    MessageAction,
+)
+from backend.ledger.action.message import SystemMessageAction
+from backend.ledger.event import Event, EventSource
+from backend.ledger.observation.agent import RecallObservation
+from backend.ledger.observation.commands import CmdOutputObservation
+from backend.ledger.observation.error import ErrorObservation
+from backend.ledger.observation.observation import Observation
+from backend.ledger.observation.reject import UserRejectObservation
 from backend.utils.prompt import PromptManager
 
 
@@ -56,15 +56,15 @@ def _tool_ok_for_observation(obs: Observation) -> bool | None:
     Prefer canonical ``tool_result`` metadata when present. ``None`` means the
     observation does not carry a stable machine-readable success/failure signal.
     """
-    tool_result = getattr(obs, "tool_result", None)
-    if isinstance(tool_result, dict) and "ok" in tool_result:
-        raw_ok = tool_result.get("ok")
+    tool_result = getattr(obs, 'tool_result', None)
+    if isinstance(tool_result, dict) and 'ok' in tool_result:
+        raw_ok = tool_result.get('ok')
         if isinstance(raw_ok, bool):
             return raw_ok
     if isinstance(obs, (ErrorObservation, UserRejectObservation)):
         return False
     if isinstance(obs, CmdOutputObservation):
-        ec = getattr(obs, "exit_code", None)
+        ec = getattr(obs, 'exit_code', None)
         if ec is None:
             return None
         return ec == 0
@@ -88,15 +88,15 @@ class ContextMemory:
         # Initialize vector memory if enabled
         vector_store: EnhancedVectorStore | None = None
         graph_store: GraphMemoryStore | None = None
-        if bool(getattr(config, "enable_vector_memory", False)):
+        if bool(getattr(config, 'enable_vector_memory', False)):
             vector_store = self._initialize_vector_memory()
             try:
                 project_state_dir = ensure_project_state_dir()
                 graph_store = GraphMemoryStore(
-                    persistence_path=str(project_state_dir / "graph_memory.json")
+                    persistence_path=str(project_state_dir / 'graph_memory.json')
                 )
             except Exception as e:
-                logger.warning("Failed to initialize graph memory store: %s", e)
+                logger.warning('Failed to initialize graph memory store: %s', e)
 
         # Context tracking (decisions, anchors, vector memory)
         self._ctx = ContextTracker(vector_store=vector_store, graph_store=graph_store)
@@ -164,23 +164,23 @@ class ContextMemory:
         """
         try:
             hybrid_enabled = bool(
-                getattr(self.agent_config, "enable_hybrid_retrieval", False)
+                getattr(self.agent_config, 'enable_hybrid_retrieval', False)
             )
             store = EnhancedVectorStore(
-                collection_name="conversation_memory",
+                collection_name='conversation_memory',
                 enable_cache=True,
                 enable_reranking=hybrid_enabled,
             )
             logger.info(
-                "✅ Vector memory initialized for ContextMemory\n   Accuracy: 92%% | Hybrid retrieval: %s",
-                "enabled" if hybrid_enabled else "disabled",
+                '✅ Vector memory initialized for ContextMemory\n   Accuracy: 92%% | Hybrid retrieval: %s',
+                'enabled' if hybrid_enabled else 'disabled',
             )
             return store
         except Exception as e:
             logger.warning(
-                "Failed to initialize vector memory: %s\n"
-                "Continuing without persistent memory. To enable:\n"
-                "  pip install chromadb sentence-transformers",
+                'Failed to initialize vector memory: %s\n'
+                'Continuing without persistent memory. To enable:\n'
+                '  pip install chromadb sentence-transformers',
                 e,
             )
             return None
@@ -231,7 +231,7 @@ class ContextMemory:
         """
         events = self._prepare_event_history(condensed_history, initial_user_action)
         logger.debug(
-            "Visual browsing: %s", self.agent_config.enable_som_visual_browsing
+            'Visual browsing: %s', self.agent_config.enable_som_visual_browsing
         )
         messages: list[Message] = []
         tool_state = _ToolCallTracking()
@@ -297,28 +297,28 @@ class ContextMemory:
     def _fallback_message_for_generic_event(self, event: Any) -> list[Message]:
         """Convert generic event doubles to user messages when possible."""
         fallback_content = None
-        if hasattr(event, "content") and isinstance(getattr(event, "content"), str):
-            fallback_content = getattr(event, "content")
-        elif hasattr(event, "message") and isinstance(getattr(event, "message"), str):
-            fallback_content = getattr(event, "message")
+        if hasattr(event, 'content') and isinstance(getattr(event, 'content'), str):
+            fallback_content = getattr(event, 'content')
+        elif hasattr(event, 'message') and isinstance(getattr(event, 'message'), str):
+            fallback_content = getattr(event, 'message')
         if fallback_content is not None:
             logger.debug(
-                "[ContextMemory] Handling generic event type %s via fallback.",
+                '[ContextMemory] Handling generic event type %s via fallback.',
                 type(event).__name__,
             )
-            return [message_with_text("user", fallback_content)]
+            return [message_with_text('user', fallback_content)]
         raise ValueError(
-            f"Unknown event type without text content: {type(event).__name__}"
+            f'Unknown event type without text content: {type(event).__name__}'
         )
 
     def _track_user_message_as_anchor(self, event: MessageAction) -> bool:
         """Track user message as requirement anchor if substantive. Returns True if handled."""
-        user_text = (event.content or "").strip()
+        user_text = (event.content or '').strip()
         if len(user_text) < 24:
             return False
         self._add_anchor_if_new(
             content=user_text[:600],
-            category="requirement",
+            category='requirement',
             importance=0.95,
         )
         return True
@@ -327,25 +327,25 @@ class ContextMemory:
         """Track error observation as anchor if substantive. Returns True if handled."""
         if not isinstance(event, ErrorObservation):
             return False
-        error_text = (event.content or "").strip()
+        error_text = (event.content or '').strip()
         if len(error_text) < 12:
             return False
         self._add_anchor_if_new(
             content=error_text[:500],
-            category="error",
+            category='error',
             importance=0.9,
         )
         return True
 
     def _track_agent_think_as_decision(self, event: Any) -> None:
         """Track agent think action as decision if planning-related keywords present."""
-        if type(event).__name__ != "AgentThinkAction":
+        if type(event).__name__ != 'AgentThinkAction':
             return
-        thought = (getattr(event, "thought", "") or "").strip()
+        thought = (getattr(event, 'thought', '') or '').strip()
         if not thought:
             return
         lower = thought.lower()
-        keywords = ("plan", "strategy", "approach", "decide", "next steps")
+        keywords = ('plan', 'strategy', 'approach', 'decide', 'next steps')
         if any(kw in lower for kw in keywords):
             self._track_decision_if_new(thought)
 
@@ -367,7 +367,7 @@ class ContextMemory:
 
             self._track_agent_think_as_decision(event)
         except Exception:
-            logger.debug("Auto context tracking skipped for event", exc_info=True)
+            logger.debug('Auto context tracking skipped for event', exc_info=True)
 
     def _index_event_for_semantic_recall(self, event: Event) -> None:
         """Index durable event content into vector memory when available."""
@@ -385,70 +385,70 @@ class ContextMemory:
     ) -> tuple[str, str, str, dict[str, Any]] | None:
         """Return an indexable memory record for high-value conversation events."""
         if isinstance(event, MessageAction) and event.source == EventSource.USER:
-            content = (event.content or "").strip()
+            content = (event.content or '').strip()
             if not content:
                 return None
             return (
                 self._semantic_event_id(event, content),
-                "user",
+                'user',
                 content[:2000],
-                {"event_type": type(event).__name__},
+                {'event_type': type(event).__name__},
             )
 
-        if type(event).__name__ == "AgentThinkAction":
-            thought = str(getattr(event, "thought", "") or "").strip()
+        if type(event).__name__ == 'AgentThinkAction':
+            thought = str(getattr(event, 'thought', '') or '').strip()
             if not thought:
                 return None
             return (
                 self._semantic_event_id(event, thought),
-                "assistant",
+                'assistant',
                 thought[:2000],
-                {"event_type": type(event).__name__},
+                {'event_type': type(event).__name__},
             )
 
         if isinstance(event, ErrorObservation):
-            content = (event.content or "").strip()
+            content = (event.content or '').strip()
             if not content:
                 return None
             return (
                 self._semantic_event_id(event, content),
-                "observation",
+                'observation',
                 content[:2000],
                 {
-                    "event_type": type(event).__name__,
-                    "error_id": getattr(event, "error_id", None),
+                    'event_type': type(event).__name__,
+                    'error_id': getattr(event, 'error_id', None),
                 },
             )
 
         if isinstance(event, CmdOutputObservation):
-            content = (event.content or "").strip()
+            content = (event.content or '').strip()
             if not content:
                 return None
             return (
                 self._semantic_event_id(event, content),
-                "observation",
-                f"Command: {getattr(event, 'command', '')}\n{content[:1800]}",
+                'observation',
+                f'Command: {getattr(event, "command", "")}\n{content[:1800]}',
                 {
-                    "event_type": type(event).__name__,
-                    "exit_code": getattr(event, "exit_code", None),
+                    'event_type': type(event).__name__,
+                    'exit_code': getattr(event, 'exit_code', None),
                 },
             )
 
-        if isinstance(event, Observation) and type(event).__name__ == "MCPObservation":
-            content = (getattr(event, "content", "") or "").strip()
+        if isinstance(event, Observation) and type(event).__name__ == 'MCPObservation':
+            content = (getattr(event, 'content', '') or '').strip()
             if not content:
                 return None
             metadata: dict[str, Any] = {
-                "event_type": type(event).__name__,
-                "tool_name": getattr(event, "name", None),
+                'event_type': type(event).__name__,
+                'tool_name': getattr(event, 'name', None),
             }
-            tool_result = getattr(event, "tool_result", None)
+            tool_result = getattr(event, 'tool_result', None)
             if isinstance(tool_result, dict):
-                metadata["tool_ok"] = tool_result.get("ok")
-                metadata["error_code"] = tool_result.get("error_code")
+                metadata['tool_ok'] = tool_result.get('ok')
+                metadata['error_code'] = tool_result.get('error_code')
             return (
                 self._semantic_event_id(event, content),
-                "tool",
+                'tool',
                 content[:2000],
                 metadata,
             )
@@ -458,13 +458,13 @@ class ContextMemory:
     @staticmethod
     def _semantic_event_id(event: Event, content: str) -> str:
         """Stable ID for vector-memory indexing."""
-        event_id = getattr(event, "id", None)
+        event_id = getattr(event, 'id', None)
         if event_id is not None:
-            return f"event_{event_id}"
+            return f'event_{event_id}'
         digest = hashlib.sha1(
-            f"{type(event).__name__}:{content[:400]}".encode("utf-8", "ignore")
+            f'{type(event).__name__}:{content[:400]}'.encode('utf-8', 'ignore')
         ).hexdigest()[:16]
-        return f"synthetic_{type(event).__name__}_{digest}"
+        return f'synthetic_{type(event).__name__}_{digest}'
 
     def _add_anchor_if_new(
         self,
@@ -484,7 +484,7 @@ class ContextMemory:
                 return
         self.track_decision(
             description=thought[:120],
-            rationale="auto-tracked from agent planning thought",
+            rationale='auto-tracked from agent planning thought',
             decision_type=DecisionType.WORKFLOW,
             context=thought[:600],
             confidence=0.6,
@@ -498,36 +498,36 @@ class ContextMemory:
 
     def _ensure_leading_system_message(self, messages: list[Message]) -> list[Message]:
         """Ensure messages have a single leading system prompt. Mutates list in place."""
-        first_idx = next(
-            (i for i, m in enumerate(messages) if m.role == "system"), -1
-        )
+        first_idx = next((i for i, m in enumerate(messages) if m.role == 'system'), -1)
         if first_idx == -1:
             try:
                 system_prompt = self.prompt_manager.get_system_message(
-                    cli_mode=self.agent_config.cli_mode,
+                    cli_mode=True,
                     config=self.agent_config,
                 )
             except Exception as e:
                 logger.error(
-                    "Failed to load system prompt from PromptManager: %s",
+                    'Failed to load system prompt from PromptManager: %s',
                     e,
                     exc_info=True,
                 )
-                if os.getenv("APP_ALLOW_EMERGENCY_SYSTEM_PROMPT", "").strip().lower() in (
-                    "1",
-                    "true",
-                    "yes",
+                if os.getenv(
+                    'APP_ALLOW_EMERGENCY_SYSTEM_PROMPT', ''
+                ).strip().lower() in (
+                    '1',
+                    'true',
+                    'yes',
                 ):
                     logger.warning(
-                        "APP_ALLOW_EMERGENCY_SYSTEM_PROMPT set — using minimal emergency system text"
+                        'APP_ALLOW_EMERGENCY_SYSTEM_PROMPT set — using minimal emergency system text'
                     )
-                    system_prompt = "You are App agent."
+                    system_prompt = 'You are App agent.'
                 else:
                     raise RuntimeError(
-                        "System prompt could not be loaded. Fix PromptManager configuration or set "
-                        "APP_ALLOW_EMERGENCY_SYSTEM_PROMPT=1 for an explicit degraded mode."
+                        'System prompt could not be loaded. Fix PromptManager configuration or set '
+                        'APP_ALLOW_EMERGENCY_SYSTEM_PROMPT=1 for an explicit degraded mode.'
                     ) from e
-            messages.insert(0, message_with_text("system", system_prompt))
+            messages.insert(0, message_with_text('system', system_prompt))
         elif first_idx != 0:
             messages.insert(0, messages.pop(first_idx))
         return messages
@@ -538,18 +538,18 @@ class ContextMemory:
         if not context_summary or not messages:
             return
         sys_msg = messages[0]
-        if sys_msg.role != "system":
+        if sys_msg.role != 'system':
             return
         for content in sys_msg.content:
             if is_text_content(content):
-                content.text += f"\n\n{context_summary}"
+                content.text += f'\n\n{context_summary}'
                 break
 
     def _dedupe_system_messages(self, messages: list[Message]) -> list[Message]:
         """Return list with leading message plus non-system messages only."""
         if not messages:
             return messages
-        return [messages[0]] + [m for m in messages[1:] if m.role != "system"]
+        return [messages[0]] + [m for m in messages[1:] if m.role != 'system']
 
     def _normalize_system_messages(self, messages: list[Message]) -> list[Message]:
         """Ensure a single leading system prompt and drop duplicates."""
@@ -631,7 +631,7 @@ class ContextMemory:
                 cast(RecallObservation, obs), current_index, events or []
             )
 
-        if isinstance(obs, ErrorObservation) and getattr(obs, "notify_ui_only", False):
+        if isinstance(obs, ErrorObservation) and getattr(obs, 'notify_ui_only', False):
             return []
 
         # Handle different observation types
@@ -643,9 +643,9 @@ class ContextMemory:
         )
 
         # Handle tool call metadata
-        if (tool_call_metadata := getattr(obs, "tool_call_metadata", None)) is not None:
+        if (tool_call_metadata := getattr(obs, 'tool_call_metadata', None)) is not None:
             tool_call_id_to_message[tool_call_metadata.tool_call_id] = Message(
-                role="tool",
+                role='tool',
                 content=message.content,
                 tool_call_id=tool_call_metadata.tool_call_id,
                 name=tool_call_metadata.function_name,
@@ -672,7 +672,7 @@ class ContextMemory:
 
     def _ensure_system_message(self, events: list[Event]) -> None:
         """Checks if a system message exists and adds one if not.
-        
+
         If a system message already exists, it is replaced with a new one containing
         the latest system prompt to ensure the agent always sees the most up-to-date
         configuration (e.g. dynamically connected MCP tools).
@@ -681,14 +681,14 @@ class ContextMemory:
         when tests or alternate imports provide compatible event stubs.
         """
         system_prompt = self.prompt_manager.get_system_message(
-            cli_mode=self.agent_config.cli_mode, config=self.agent_config
+            cli_mode=True, config=self.agent_config
         )
         if not system_prompt:
             return
 
         system_message = SystemMessageAction(content=system_prompt)
         has_system_message = False
-        
+
         for i, event in enumerate(events):
             # Primary fast-path: direct isinstance or duck-typed equivalent
             if is_instance_of(event, SystemMessageAction):
@@ -697,23 +697,23 @@ class ContextMemory:
                 break
             # Class name match fallback (handles duplicate class loading / re-import edge cases)
             if (
-                type(event).__name__ == "SystemMessageAction"
+                type(event).__name__ == 'SystemMessageAction'
             ):  # pragma: no cover - defensive
                 has_system_message = True
                 events[i] = system_message
                 break
             # Duck-typed detection: an event with action == ActionType.SYSTEM is treated as system
-            if getattr(event, "action", None) == ActionType.SYSTEM:
+            if getattr(event, 'action', None) == ActionType.SYSTEM:
                 has_system_message = True
                 events[i] = system_message
                 break
-                
+
         if not has_system_message:
             logger.debug(
-                "[ContextMemory] No SystemMessageAction found in events. Adding one.",
+                '[ContextMemory] No SystemMessageAction found in events. Adding one.',
             )
             events.insert(0, system_message)
-            logger.info("[ContextMemory] Added SystemMessageAction")
+            logger.info('[ContextMemory] Added SystemMessageAction')
 
     def _ensure_initial_user_message(
         self, events: list[Event], initial_user_action: MessageAction
@@ -747,7 +747,7 @@ class ContextMemory:
     def _append_initial_user_action(
         events: list[Event], initial_user_action: MessageAction
     ) -> None:
-        logger.error("Cannot ensure initial user message: event list is empty.")
+        logger.error('Cannot ensure initial user message: event list is empty.')
         events.append(initial_user_action)
 
     @staticmethod
@@ -775,7 +775,7 @@ class ContextMemory:
         insert_pos = 1 if events else 0
         events.insert(insert_pos, initial_user_action)
         logger.debug(
-            "Repositioned existing initial user action to index %s", insert_pos
+            'Repositioned existing initial user action to index %s', insert_pos
         )
         return True
 
@@ -787,13 +787,15 @@ class ContextMemory:
     ) -> None:
         insert_pos = 1 if events else 0
         events.insert(insert_pos, initial_user_action)
-        logger.info("Inserted initial user action at index %s", insert_pos)
+        logger.info('Inserted initial user action at index %s', insert_pos)
 
     def _is_user_message(self, event: Event) -> bool:
         if not is_instance_of(event, MessageAction):
             return False
-        source = getattr(event, "source", getattr(event, "_source", None))
+        source = getattr(event, 'source', getattr(event, '_source', None))
         if isinstance(source, EventSource):
             return source == EventSource.USER
-        return source == "user"
-__all__ = ["ContextMemory"]
+        return source == 'user'
+
+
+__all__ = ['ContextMemory']

@@ -6,18 +6,17 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backend.context.compactor.compactor import Compaction
+from backend.context.compactor.strategies.smart_compactor import SmartCompactor
 from backend.ledger.action import MessageAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.empty import NullObservation
-from backend.context.compactor.compactor import Compaction
-from backend.context.compactor.strategies.smart_compactor import SmartCompactor
-
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
 
-def _event(eid: int, cls=None, source=EventSource.AGENT, content="x") -> Event:
+def _event(eid: int, cls=None, source=EventSource.AGENT, content='x') -> Event:
     e: Event
     if cls is None or cls == MessageAction:
         e = MessageAction(content=content, wait_for_response=False)
@@ -79,7 +78,7 @@ class TestIdentifyEssentialEvents:
         sc = SmartCompactor(llm=None, keep_first=0)
         events = [
             _event(0, source=EventSource.AGENT),
-            _event(1, MessageAction, source=EventSource.USER, content="hello"),
+            _event(1, MessageAction, source=EventSource.USER, content='hello'),
             _event(2, source=EventSource.AGENT),
         ]
         essential = sc._identify_essential_events(events)
@@ -89,7 +88,7 @@ class TestIdentifyEssentialEvents:
         sc = SmartCompactor(llm=None, keep_first=0)
         events = [_event(i) for i in range(60)]
         # Add a critical error in the last 50
-        err = ErrorObservation(content="CRITICAL: system crash detected")
+        err = ErrorObservation(content='CRITICAL: system crash detected')
         err.id = 55
         events[55] = err
         essential = sc._identify_essential_events(events)
@@ -98,7 +97,7 @@ class TestIdentifyEssentialEvents:
     def test_ignores_non_critical_errors(self):
         sc = SmartCompactor(llm=None, keep_first=0)
         events = [_event(i) for i in range(60)]
-        err = ErrorObservation(content="minor warning about formatting")
+        err = ErrorObservation(content='minor warning about formatting')
         err.id = 55
         events[55] = err
         essential = sc._identify_essential_events(events)
@@ -111,20 +110,20 @@ class TestIdentifyEssentialEvents:
 class TestHeuristicScoring:
     def test_user_messages_score_high(self):
         sc = SmartCompactor(llm=None)
-        user_msg = _event(0, MessageAction, EventSource.USER, "help me")
+        user_msg = _event(0, MessageAction, EventSource.USER, 'help me')
         scores = sc._heuristic_scoring([user_msg])
         assert scores[0] == 0.9
 
     def test_errors_score_high(self):
         sc = SmartCompactor(llm=None)
-        err = ErrorObservation(content="something broke")
+        err = ErrorObservation(content='something broke')
         err.id = 1
         scores = sc._heuristic_scoring([err])
         assert scores[1] == 0.8
 
     def test_default_score(self):
         sc = SmartCompactor(llm=None)
-        obs = NullObservation(content="short")
+        obs = NullObservation(content='short')
         obs.id = 2
         scores = sc._heuristic_scoring([obs])
         # Short observation defaults to 0.5
@@ -132,7 +131,7 @@ class TestHeuristicScoring:
 
     def test_long_observation_scores_higher(self):
         sc = SmartCompactor(llm=None)
-        obs = NullObservation(content="x" * 600)
+        obs = NullObservation(content='x' * 600)
         obs.id = 3
         scores = sc._heuristic_scoring([obs])
         assert scores[3] == 0.6
@@ -216,7 +215,7 @@ class TestGetCompaction:
         )
         events = [_event(i) for i in range(30)]
         # Make first one a user message
-        events[0] = _event(0, MessageAction, EventSource.USER, "do something")
+        events[0] = _event(0, MessageAction, EventSource.USER, 'do something')
         view = _view(events)
         result = sc.get_compaction(view)
         assert isinstance(result, Compaction)
@@ -234,13 +233,13 @@ class TestGetCompaction:
 class TestGetEventSummary:
     def test_content_attribute(self):
         sc = SmartCompactor(llm=None)
-        e = _event(0, content="hello world")
+        e = _event(0, content='hello world')
         summary = sc._get_event_summary(e)
-        assert "hello world" in summary
+        assert 'hello world' in summary
 
     def test_truncates_long_content(self):
         sc = SmartCompactor(llm=None)
-        e = _event(0, content="x" * 200)
+        e = _event(0, content='x' * 200)
         summary = sc._get_event_summary(e)
         assert len(summary) <= 100
 
@@ -251,18 +250,18 @@ class TestGetEventSummary:
 class TestCreateScoringPrompt:
     def test_builds_prompt(self):
         sc = SmartCompactor(llm=None)
-        events = [_event(0, content="test"), _event(1, content="data")]
+        events = [_event(0, content='test'), _event(1, content='data')]
         prompt = sc._create_scoring_prompt(events)
-        assert "importance" in prompt.lower()
-        assert "MessageAction" in prompt or "NullObservation" in prompt
+        assert 'importance' in prompt.lower()
+        assert 'MessageAction' in prompt or 'NullObservation' in prompt
 
     def test_lists_events(self):
         sc = SmartCompactor(llm=None)
-        events = [_event(i, content=f"event-{i}") for i in range(3)]
+        events = [_event(i, content=f'event-{i}') for i in range(3)]
         prompt = sc._create_scoring_prompt(events)
-        assert "0." in prompt
-        assert "1." in prompt
-        assert "2." in prompt
+        assert '0.' in prompt
+        assert '1.' in prompt
+        assert '2.' in prompt
 
 
 # ── _parse_llm_scores ────────────────────────────────────────────────
@@ -274,7 +273,7 @@ class TestParseLlmScores:
         events = [_event(0), _event(1), _event(2)]
         response = MagicMock()
         response.choices = [MagicMock()]
-        response.choices[0].message.content = "[0.8, 0.3, 0.9]"
+        response.choices[0].message.content = '[0.8, 0.3, 0.9]'
         scores = sc._parse_llm_scores(response, events)
         assert scores[0] == pytest.approx(0.8)
         assert scores[1] == pytest.approx(0.3)
@@ -285,7 +284,7 @@ class TestParseLlmScores:
         events = [_event(0), _event(1)]
         response = MagicMock()
         response.choices = [MagicMock()]
-        response.choices[0].message.content = "```json\n[0.5, 0.7]\n```"
+        response.choices[0].message.content = '```json\n[0.5, 0.7]\n```'
         scores = sc._parse_llm_scores(response, events)
         assert scores[0] == pytest.approx(0.5)
         assert scores[1] == pytest.approx(0.7)
@@ -295,7 +294,7 @@ class TestParseLlmScores:
         events = [_event(0)]
         response = MagicMock()
         response.choices = [MagicMock()]
-        response.choices[0].message.content = "[1.5]"
+        response.choices[0].message.content = '[1.5]'
         scores = sc._parse_llm_scores(response, events)
         assert scores[0] == 1.0  # Clamped to max
 
@@ -304,7 +303,7 @@ class TestParseLlmScores:
         events = [_event(0)]
         response = MagicMock()
         response.choices = [MagicMock()]
-        response.choices[0].message.content = "not valid json"
+        response.choices[0].message.content = 'not valid json'
         scores = sc._parse_llm_scores(response, events)
         # Should fall back to heuristic scoring
         assert 0 in scores
@@ -316,9 +315,9 @@ class TestParseLlmScores:
 class TestPreserveActionObservationPairs:
     def test_adds_observation_for_kept_action(self):
         sc = SmartCompactor(llm=None)
-        action = MessageAction(content="do something", wait_for_response=False)
+        action = MessageAction(content='do something', wait_for_response=False)
         action.id = 0
-        obs = NullObservation(content="result")
+        obs = NullObservation(content='result')
         obs.id = 1
         obs._cause = 0  # type: ignore[attr-defined]
         events = [action, obs]
@@ -329,9 +328,9 @@ class TestPreserveActionObservationPairs:
 
     def test_adds_action_for_kept_observation(self):
         sc = SmartCompactor(llm=None)
-        action = MessageAction(content="do something", wait_for_response=False)
+        action = MessageAction(content='do something', wait_for_response=False)
         action.id = 0
-        obs = NullObservation(content="result")
+        obs = NullObservation(content='result')
         obs.id = 1
         obs._cause = 0  # type: ignore[attr-defined]
         events = [action, obs]
@@ -348,13 +347,13 @@ class TestGetExtraConfigArgs:
     def test_defaults(self):
         config = MagicMock(spec=[])
         args = SmartCompactor._get_extra_config_args(config)
-        assert args["importance_threshold"] == 0.6
-        assert args["recency_bonus_window"] == 20
+        assert args['importance_threshold'] == 0.6
+        assert args['recency_bonus_window'] == 20
 
     def test_from_config(self):
         config = MagicMock()
         config.importance_threshold = 0.9
         config.recency_bonus_window = 10
         args = SmartCompactor._get_extra_config_args(config)
-        assert args["importance_threshold"] == 0.9
-        assert args["recency_bonus_window"] == 10
+        assert args['importance_threshold'] == 0.9
+        assert args['recency_bonus_window'] == 10

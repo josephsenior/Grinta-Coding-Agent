@@ -5,13 +5,13 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.orchestration.services.action_service import ActionService
-from backend.orchestration.services.observation_service import ObservationService
-from backend.orchestration.services.pending_action_service import PendingActionService
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation.commands import CmdOutputObservation
+from backend.orchestration.services.action_service import ActionService
+from backend.orchestration.services.observation_service import ObservationService
+from backend.orchestration.services.pending_action_service import PendingActionService
 
 
 class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
@@ -35,10 +35,12 @@ class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
             completion_tokens=0,
         )
         self.controller.conversation_stats = MagicMock()
-        self.controller.conversation_stats.get_combined_metrics.return_value = MagicMock(
-            accumulated_cost=0.0,
-            accumulated_token_usage=MagicMock(),
-            max_budget_per_task=None,
+        self.controller.conversation_stats.get_combined_metrics.return_value = (
+            MagicMock(
+                accumulated_cost=0.0,
+                accumulated_token_usage=MagicMock(),
+                max_budget_per_task=None,
+            )
         )
         self.controller.tool_pipeline = None
 
@@ -54,24 +56,26 @@ class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
         self.action_service = ActionService(
             self.context, self.pending_service, self.confirmation_service
         )
-        self.observation_service = ObservationService(self.context, self.pending_service)
+        self.observation_service = ObservationService(
+            self.context, self.pending_service
+        )
 
     async def test_action_pending_observation_clear_single_step_chain(self):
         """Runnable action resolution should follow one pending-action lifecycle."""
-        action = CmdRunAction(command="echo hello")
+        action = CmdRunAction(command='echo hello')
         action.id = 101
         action.source = EventSource.AGENT
 
         observation = CmdOutputObservation(
-            content="hello",
-            command="echo hello",
-            metadata={"exit_code": 0},
+            content='hello',
+            command='echo hello',
+            metadata={'exit_code': 0},
         )
         observation.cause = 101
 
         with (
-            patch.object(PendingActionService, "_schedule_watchdog", autospec=True),
-            patch("backend.core.plugin.get_plugin_registry") as mock_registry,
+            patch.object(PendingActionService, '_schedule_watchdog', autospec=True),
+            patch('backend.core.plugin.get_plugin_registry') as mock_registry,
         ):
             mock_registry.return_value.dispatch_action_post = AsyncMock(
                 return_value=observation
@@ -80,7 +84,9 @@ class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
             await self.action_service.run(action, None)
             self.assertIs(self.pending_service.get(), action)
 
-            await self.observation_service._handle_pending_action_observation(observation)
+            await self.observation_service._handle_pending_action_observation(
+                observation
+            )
 
         self.assertIsNone(self.pending_service.get())
         self.confirmation_service.evaluate_action.assert_awaited_once_with(action)
@@ -98,13 +104,13 @@ class TestActionLifecycleInvariant(unittest.IsolatedAsyncioTestCase):
         self.controller.state.agent_state = AgentState.PAUSED
 
         late_observation = CmdOutputObservation(
-            content="late result",
-            command="echo hello",
-            metadata={"exit_code": 0},
+            content='late result',
+            command='echo hello',
+            metadata={'exit_code': 0},
         )
         late_observation.cause = 101
 
-        with patch("backend.core.plugin.get_plugin_registry"):
+        with patch('backend.core.plugin.get_plugin_registry'):
             await self.observation_service._handle_pending_action_observation(
                 late_observation
             )

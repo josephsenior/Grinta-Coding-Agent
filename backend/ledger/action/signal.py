@@ -20,7 +20,7 @@ class SignalProgressAction(Action):
     migrations, or other sustained sequential operations.
     """
 
-    progress_note: str = ""  # What was just done and what's next
+    progress_note: str = ''  # What was just done and what's next
 
     action: ClassVar[str] = ActionType.SIGNAL_PROGRESS
     runnable: ClassVar[bool] = True
@@ -29,9 +29,8 @@ class SignalProgressAction(Action):
 
     @property
     def message(self) -> str:
-        note = self.progress_note[:100] or "(no note)"
-        return f"SignalProgress: {note}"
+        note = self.progress_note[:100] or '(no note)'
+        return f'SignalProgress: {note}'
 
     def __str__(self) -> str:
-        return f"**SignalProgressAction**\nNOTE:\n{self.progress_note}"
-
+        return f'**SignalProgressAction**\nNOTE:\n{self.progress_note}'

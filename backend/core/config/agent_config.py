@@ -156,7 +156,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_signal_progress: bool = Field(default=True)
     enable_swarming: bool = Field(default=True)
     enable_blackboard: bool = Field(default=False)
-    enable_workspace_status: bool = Field(default=True)
+    enable_workspace_status: bool = Field(default=False)
     enable_analyze_project_structure: bool = Field(default=False)
     enable_verify_file_lines: bool = Field(default=False)
     enable_meta_cognition: bool = Field(default=False)
@@ -348,7 +348,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         """Return a safe system prompt filename for PromptManager."""
         filename = getattr(self, 'system_prompt_filename', None)
         if not filename or not isinstance(filename, str):
-            return 'system_prompt.j2'
+            return 'system_prompt'
         return filename
 
     @classmethod

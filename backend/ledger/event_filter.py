@@ -105,7 +105,7 @@ class EventFilter:
 
     def _check_hidden_filter(self, event: Event) -> bool:
         """Check if event passes hidden filter."""
-        return not self.exclude_hidden or not getattr(event, "hidden", False)
+        return not self.exclude_hidden or not getattr(event, 'hidden', False)
 
     def _check_query_filter(self, event: Event) -> bool:
         """Check if event passes query filter."""
@@ -129,4 +129,3 @@ class EventFilter:
 
         """
         return not self.include(event)
-

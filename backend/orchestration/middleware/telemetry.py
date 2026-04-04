@@ -8,9 +8,9 @@ from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 from backend.orchestration.tool_telemetry import ToolTelemetry
 
 if TYPE_CHECKING:
+    from backend.ledger.observation import Observation
     from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.orchestration.tool_pipeline import ToolInvocationContext
-    from backend.ledger.observation import Observation
 
 
 class TelemetryMiddleware(ToolInvocationMiddleware):

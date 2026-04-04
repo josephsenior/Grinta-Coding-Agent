@@ -3,12 +3,12 @@
 import unittest
 from unittest.mock import MagicMock
 
-from backend.orchestration.services.step_prerequisite_service import (
-    StepPrerequisiteService,
-)
 from backend.core.schemas import AgentState
 from backend.ledger import RecallType
 from backend.ledger.action.agent import RecallAction
+from backend.orchestration.services.step_prerequisite_service import (
+    StepPrerequisiteService,
+)
 
 
 class TestStepPrerequisiteService(unittest.TestCase):
@@ -46,8 +46,8 @@ class TestStepPrerequisiteService(unittest.TestCase):
         # Should log the block reason
         self.mock_controller.log.assert_called_once()
         call_args = self.mock_controller.log.call_args[0]
-        self.assertEqual(call_args[0], "debug")
-        self.assertIn("PAUSED", call_args[1])
+        self.assertEqual(call_args[0], 'debug')
+        self.assertIn('PAUSED', call_args[1])
 
     def test_can_step_blocked_by_state_finished(self):
         """Test can_step returns False when state is FINISHED."""
@@ -72,7 +72,7 @@ class TestStepPrerequisiteService(unittest.TestCase):
         self.mock_controller.get_agent_state.return_value = AgentState.RUNNING
 
         mock_pending = MagicMock()
-        mock_pending.id = "action-123"
+        mock_pending.id = 'action-123'
         self.mock_context.pending_action = mock_pending
 
         result = self.service.can_step()
@@ -82,7 +82,7 @@ class TestStepPrerequisiteService(unittest.TestCase):
         # Should log pending action info
         self.mock_controller.log.assert_called_once()
         call_args = self.mock_controller.log.call_args[0]
-        self.assertIn("action-123", call_args[1])
+        self.assertIn('action-123', call_args[1])
 
     def test_can_step_pending_action_no_id(self):
         """Test can_step handles pending action without id attribute."""
@@ -97,20 +97,22 @@ class TestStepPrerequisiteService(unittest.TestCase):
 
         # Should log with 'unknown' id
         call_args = self.mock_controller.log.call_args[0]
-        self.assertIn("unknown", call_args[1])
+        self.assertIn('unknown', call_args[1])
 
     def test_can_step_allows_pending_recall_action(self):
         """KNOWLEDGE recall actions should not block the main step path."""
         self.mock_controller.get_agent_state.return_value = AgentState.RUNNING
         self.mock_context.pending_action = RecallAction(
-            query="q", recall_type=RecallType.KNOWLEDGE
+            query='q', recall_type=RecallType.KNOWLEDGE
         )
 
         result = self.service.can_step()
 
         self.assertTrue(result)
         call_kwargs = self.mock_controller.log.call_args[1]
-        self.assertEqual(call_kwargs["extra"]["msg_type"], "STEP_ALLOWED_PENDING_RECALL")
+        self.assertEqual(
+            call_kwargs['extra']['msg_type'], 'STEP_ALLOWED_PENDING_RECALL'
+        )
 
     def test_can_step_blocks_workspace_context_recall(self):
         """WORKSPACE_CONTEXT recall must block stepping until context is ready.
@@ -122,7 +124,7 @@ class TestStepPrerequisiteService(unittest.TestCase):
         """
         self.mock_controller.get_agent_state.return_value = AgentState.RUNNING
         self.mock_context.pending_action = RecallAction(
-            query="q", recall_type=RecallType.WORKSPACE_CONTEXT
+            query='q', recall_type=RecallType.WORKSPACE_CONTEXT
         )
 
         result = self.service.can_step()
@@ -130,7 +132,7 @@ class TestStepPrerequisiteService(unittest.TestCase):
         self.assertFalse(result)
         call_kwargs = self.mock_controller.log.call_args[1]
         self.assertEqual(
-            call_kwargs["extra"]["msg_type"], "STEP_BLOCKED_RECALL_CONTEXT"
+            call_kwargs['extra']['msg_type'], 'STEP_BLOCKED_RECALL_CONTEXT'
         )
 
     def test_can_step_log_message_type_state(self):
@@ -141,7 +143,7 @@ class TestStepPrerequisiteService(unittest.TestCase):
 
         # Should use STEP_BLOCKED_STATE message type
         call_kwargs = self.mock_controller.log.call_args[1]
-        self.assertEqual(call_kwargs["extra"]["msg_type"], "STEP_BLOCKED_STATE")
+        self.assertEqual(call_kwargs['extra']['msg_type'], 'STEP_BLOCKED_STATE')
 
     def test_can_step_log_message_type_pending(self):
         """Test can_step logs correct message type for pending action block."""
@@ -153,7 +155,7 @@ class TestStepPrerequisiteService(unittest.TestCase):
         # Should use STEP_BLOCKED_PENDING_ACTION message type
         call_kwargs = self.mock_controller.log.call_args[1]
         self.assertEqual(
-            call_kwargs["extra"]["msg_type"], "STEP_BLOCKED_PENDING_ACTION"
+            call_kwargs['extra']['msg_type'], 'STEP_BLOCKED_PENDING_ACTION'
         )
 
     def test_can_step_multiple_blocks_state_first(self):
@@ -167,7 +169,7 @@ class TestStepPrerequisiteService(unittest.TestCase):
 
         # Should log state block (not pending action)
         call_kwargs = self.mock_controller.log.call_args[1]
-        self.assertEqual(call_kwargs["extra"]["msg_type"], "STEP_BLOCKED_STATE")
+        self.assertEqual(call_kwargs['extra']['msg_type'], 'STEP_BLOCKED_STATE')
 
     def test_can_step_awaiting_user_input(self):
         """Test can_step returns False when awaiting user input."""
@@ -190,5 +192,5 @@ class TestStepPrerequisiteService(unittest.TestCase):
         self.assertFalse(result)
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

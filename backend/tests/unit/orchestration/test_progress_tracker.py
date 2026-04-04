@@ -3,14 +3,13 @@
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
-
+from backend.ledger.action import CmdRunAction, FileEditAction
+from backend.ledger.observation import CmdOutputObservation
 from backend.orchestration.progress_tracker import (
     Milestone,
     ProgressMetrics,
     ProgressTracker,
 )
-from backend.ledger.action import CmdRunAction, FileEditAction
-from backend.ledger.observation import CmdOutputObservation
 
 
 class TestMilestone:
@@ -20,26 +19,26 @@ class TestMilestone:
         """Test creating milestone with required fields."""
         now = datetime.now()
         milestone = Milestone(
-            name="tests_passing",
+            name='tests_passing',
             iteration=10,
             timestamp=now,
         )
-        assert milestone.name == "tests_passing"
+        assert milestone.name == 'tests_passing'
         assert milestone.iteration == 10
         assert milestone.timestamp == now
-        assert milestone.description == ""
+        assert milestone.description == ''
 
     def test_create_with_description(self):
         """Test creating milestone with description."""
         now = datetime.now()
         milestone = Milestone(
-            name="first_commit",
+            name='first_commit',
             iteration=5,
             timestamp=now,
-            description="Initial implementation complete",
+            description='Initial implementation complete',
         )
-        assert milestone.name == "first_commit"
-        assert milestone.description == "Initial implementation complete"
+        assert milestone.name == 'first_commit'
+        assert milestone.description == 'Initial implementation complete'
 
 
 class TestProgressMetrics:
@@ -60,7 +59,7 @@ class TestProgressMetrics:
     def test_create_with_values(self):
         """Test creating with custom values."""
         now = datetime.now()
-        milestones = [Milestone("test", 1, now)]
+        milestones = [Milestone('test', 1, now)]
 
         metrics = ProgressMetrics(
             completion_percentage=0.5,
@@ -117,17 +116,17 @@ class TestProgressTracker:
         state = MagicMock()
         state.iteration_flag.current_value = 3
         state.history = [
-            FileEditAction(path="test.py", content="print('hello')"),
-            FileEditAction(path="main.py", content="import os"),
-            FileEditAction(path="test.py", content="print('world')"),  # Duplicate
+            FileEditAction(path='test.py', content="print('hello')"),
+            FileEditAction(path='main.py', content='import os'),
+            FileEditAction(path='test.py', content="print('world')"),  # Duplicate
         ]
 
         tracker.update(state)
 
         # Should have 2 unique files
         assert len(tracker.files_modified) == 2
-        assert "test.py" in tracker.files_modified
-        assert "main.py" in tracker.files_modified
+        assert 'test.py' in tracker.files_modified
+        assert 'main.py' in tracker.files_modified
 
     def test_track_test_executions_passing(self):
         """Test tracks passing test executions."""
@@ -136,10 +135,10 @@ class TestProgressTracker:
         state = MagicMock()
         state.iteration_flag.current_value = 5
         state.history = [
-            CmdRunAction(command="pytest tests/"),
+            CmdRunAction(command='pytest tests/'),
             CmdOutputObservation(
-                content="10 passed",
-                command="pytest tests/",
+                content='10 passed',
+                command='pytest tests/',
                 exit_code=0,
             ),
         ]
@@ -156,10 +155,10 @@ class TestProgressTracker:
         state = MagicMock()
         state.iteration_flag.current_value = 5
         state.history = [
-            CmdRunAction(command="npm test"),
+            CmdRunAction(command='npm test'),
             CmdOutputObservation(
-                content="3 failed",
-                command="npm test",
+                content='3 failed',
+                command='npm test',
                 exit_code=1,
             ),
         ]
@@ -177,8 +176,8 @@ class TestProgressTracker:
         state.iteration_flag.current_value = 10
         state.history = [
             CmdOutputObservation(
-                content="All tests passed",
-                command="pytest",
+                content='All tests passed',
+                command='pytest',
                 exit_code=0,
             ),
         ]
@@ -186,7 +185,7 @@ class TestProgressTracker:
         tracker.update(state)
 
         assert len(tracker.milestones) == 1
-        assert tracker.milestones[0].name == "tests_passing"
+        assert tracker.milestones[0].name == 'tests_passing'
         assert tracker.milestones[0].iteration == 10
         assert tracker.last_progress_iteration == 10
 
@@ -197,7 +196,7 @@ class TestProgressTracker:
         state = MagicMock()
         state.iteration_flag.current_value = 10
         state.history = [
-            CmdOutputObservation(content="passed", command="pytest", exit_code=0),
+            CmdOutputObservation(content='passed', command='pytest', exit_code=0),
         ]
 
         # First update
@@ -229,10 +228,10 @@ class TestProgressTracker:
         state = MagicMock()
         state.iteration_flag.current_value = 50
         state.history = [
-            FileEditAction(path="test1.py", content="code"),
-            FileEditAction(path="test2.py", content="code"),
-            CmdRunAction(command="pytest"),
-            CmdOutputObservation(content="passed", command="pytest", exit_code=0),
+            FileEditAction(path='test1.py', content='code'),
+            FileEditAction(path='test2.py', content='code'),
+            CmdRunAction(command='pytest'),
+            CmdOutputObservation(content='passed', command='pytest', exit_code=0),
         ]
 
         # First update
@@ -241,11 +240,11 @@ class TestProgressTracker:
         # Add more progress markers
         state.history.extend(
             [
-                FileEditAction(path="test3.py", content="code"),
-                CmdOutputObservation(content="passed", command="pytest", exit_code=0),
+                FileEditAction(path='test3.py', content='code'),
+                CmdOutputObservation(content='passed', command='pytest', exit_code=0),
             ]
         )
-        tracker.milestones.append(Milestone("tests_passing", 50, datetime.now()))
+        tracker.milestones.append(Milestone('tests_passing', 50, datetime.now()))
 
         # Second update
         state.iteration_flag.current_value = 60
@@ -323,7 +322,7 @@ class TestProgressTracker:
         state = MagicMock()
         state.iteration_flag.current_value = 50
         state.history = [
-            FileEditAction(path="test.py", content="code"),
+            FileEditAction(path='test.py', content='code'),
         ]
 
         metrics = tracker.update(state)
@@ -342,10 +341,10 @@ class TestProgressTracker:
         state.history = []
 
         # Force completion to 100%
-        tracker.files_modified = {f"file{i}.py" for i in range(10)}
+        tracker.files_modified = {f'file{i}.py' for i in range(10)}
         tracker.tests_run = 10
         tracker.tests_passed = 10
-        tracker.milestones = [Milestone(f"m{i}", i, datetime.now()) for i in range(10)]
+        tracker.milestones = [Milestone(f'm{i}', i, datetime.now()) for i in range(10)]
 
         metrics = tracker.update(state)
 
@@ -371,10 +370,10 @@ class TestProgressTracker:
         tracker = ProgressTracker(max_iterations=10)
 
         # Add lots of progress markers
-        tracker.files_modified = {f"file{i}.py" for i in range(20)}
+        tracker.files_modified = {f'file{i}.py' for i in range(20)}
         tracker.tests_run = 20
         tracker.tests_passed = 20
-        tracker.milestones = [Milestone(f"m{i}", i, datetime.now()) for i in range(20)]
+        tracker.milestones = [Milestone(f'm{i}', i, datetime.now()) for i in range(20)]
 
         state = MagicMock()
         state.iteration_flag.current_value = 10
@@ -388,7 +387,7 @@ class TestProgressTracker:
     def test_milestones_reached_is_copy(self):
         """Test milestones_reached is a copy, not reference."""
         tracker = ProgressTracker(max_iterations=100)
-        tracker.milestones = [Milestone("test", 1, datetime.now())]
+        tracker.milestones = [Milestone('test', 1, datetime.now())]
 
         state = MagicMock()
         state.iteration_flag.current_value = 5
@@ -397,7 +396,7 @@ class TestProgressTracker:
         metrics = tracker.update(state)
 
         # Modify metrics milestones
-        metrics.milestones_reached.append(Milestone("new", 2, datetime.now()))
+        metrics.milestones_reached.append(Milestone('new', 2, datetime.now()))
 
         # Original should be unchanged
         assert len(tracker.milestones) == 1

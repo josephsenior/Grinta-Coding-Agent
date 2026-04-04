@@ -24,7 +24,7 @@ class LspQueryObservation(Observation):
         LLM knows the graceful-degrade path was taken.
     """
 
-    content: str = ""
+    content: str = ''
     available: bool = True
     observation: ClassVar[str] = ObservationType.LSP_QUERY_RESULT
     observation_type: ClassVar[str] = ObservationType.LSP_QUERY_RESULT
@@ -32,10 +32,9 @@ class LspQueryObservation(Observation):
     @property
     def message(self) -> str:
         if not self.available:
-            return "LSP unavailable — falling back to grep/search."
-        return "LSP query completed."
+            return 'LSP unavailable — falling back to grep/search.'
+        return 'LSP query completed.'
 
     def __str__(self) -> str:
-        status = "OK" if self.available else "UNAVAILABLE"
-        return f"**LspQueryObservation [{status}]**\n{self.content}"
-
+        status = 'OK' if self.available else 'UNAVAILABLE'
+        return f'**LspQueryObservation [{status}]**\n{self.content}'

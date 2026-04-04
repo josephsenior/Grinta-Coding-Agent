@@ -6,7 +6,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.persistence.data_models.conversation_metadata import ConversationMetadata
+    from backend.persistence.data_models.conversation_metadata import (
+        ConversationMetadata,
+    )
 
 
 @dataclass

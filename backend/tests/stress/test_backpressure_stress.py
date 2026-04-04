@@ -31,7 +31,7 @@ pytestmark = pytest.mark.stress
 
 
 def _dummy_event(idx: int = 0) -> NullObservation:
-    ev = NullObservation(content=f"stress-{idx}")
+    ev = NullObservation(content=f'stress-{idx}')
     ev._id = idx
     return ev
 
@@ -39,8 +39,8 @@ def _dummy_event(idx: int = 0) -> NullObservation:
 def _make_persisted(eid: int = 1) -> PersistedEvent:
     return PersistedEvent(
         event_id=eid,
-        payload={"id": eid, "type": "stress"},
-        filename=f"stress_{eid}.json",
+        payload={'id': eid, 'type': 'stress'},
+        filename=f'stress_{eid}.json',
     )
 
 
@@ -57,7 +57,7 @@ class TestBackpressureDropOldest:
         """Flooding a small queue should drop oldest events, not crash."""
         bp = BackpressureManager(
             max_queue_size=10,
-            drop_policy="drop_oldest",
+            drop_policy='drop_oldest',
         )
         q: asyncio.Queue = asyncio.Queue(maxsize=10)
         total = 200
@@ -68,17 +68,17 @@ class TestBackpressureDropOldest:
         # Queue should be at most max_queue_size
         assert q.qsize() <= 10
         # Drops should have been recorded
-        assert bp.stats["dropped_oldest"] > 0
+        assert bp.stats['dropped_oldest'] > 0
         # With drop_oldest, every new event is still enqueued (old ones are evicted)
-        assert bp.stats["enqueued"] == total
-        assert bp.stats["dropped_oldest"] == total - 10  # one eviction per overflow
+        assert bp.stats['enqueued'] == total
+        assert bp.stats['dropped_oldest'] == total - 10  # one eviction per overflow
 
     @pytest.mark.asyncio
     async def test_flood_preserves_recent(self):
         """Under drop_oldest, the most recent events should be in the queue."""
         bp = BackpressureManager(
             max_queue_size=5,
-            drop_policy="drop_oldest",
+            drop_policy='drop_oldest',
         )
         q: asyncio.Queue = asyncio.Queue(maxsize=5)
 
@@ -90,7 +90,7 @@ class TestBackpressureDropOldest:
         while not q.empty():
             remaining.append(q.get_nowait())
         # Last events should be the most recent ones
-        ids = [int(e.content.split("-")[1]) for e in remaining]
+        ids = [int(e.content.split('-')[1]) for e in remaining]
         assert ids[-1] >= 45  # Last event should be near the end
 
 
@@ -102,7 +102,7 @@ class TestBackpressureDropNewest:
         """Flooding a small queue with drop_newest should keep old events."""
         bp = BackpressureManager(
             max_queue_size=10,
-            drop_policy="drop_newest",
+            drop_policy='drop_newest',
         )
         q: asyncio.Queue = asyncio.Queue(maxsize=10)
 
@@ -110,7 +110,7 @@ class TestBackpressureDropNewest:
             await bp.enqueue_event(_dummy_event(i), q)
 
         assert q.qsize() == 10
-        assert bp.stats["dropped_newest"] > 0
+        assert bp.stats['dropped_newest'] > 0
 
 
 class TestBackpressureBlock:
@@ -121,7 +121,7 @@ class TestBackpressureBlock:
         """Block policy should timeout and drop after block_timeout."""
         bp = BackpressureManager(
             max_queue_size=2,
-            drop_policy="block",
+            drop_policy='block',
             block_timeout=0.05,  # 50ms timeout
         )
         q: asyncio.Queue = asyncio.Queue(maxsize=2)
@@ -135,7 +135,7 @@ class TestBackpressureBlock:
         await bp.enqueue_event(_dummy_event(2), q)
         elapsed = time.monotonic() - start
 
-        assert bp.stats["dropped_newest"] >= 1
+        assert bp.stats['dropped_newest'] >= 1
         assert elapsed >= 0.04  # Should have waited near the timeout
 
 
@@ -146,8 +146,8 @@ class TestBackpressureCriticalEvents:
     async def test_critical_events_survive_full_queue(self):
         bp = BackpressureManager(
             max_queue_size=5,
-            drop_policy="drop_newest",
-            is_critical_event=lambda e: "critical" in cast(Any, e).content,
+            drop_policy='drop_newest',
+            is_critical_event=lambda e: 'critical' in cast(Any, e).content,
         )
         q: asyncio.Queue = asyncio.Queue(maxsize=5)
 
@@ -160,13 +160,13 @@ class TestBackpressureCriticalEvents:
         q.task_done()
 
         # Critical event should still be added
-        critical = NullObservation(content="critical-event")
+        critical = NullObservation(content='critical-event')
         critical._id = 999
         await bp.enqueue_event(critical, q)
 
         # Critical should be enqueued
-        assert bp.stats["critical_events"] >= 1
-        assert bp.stats["enqueued"] >= 6  # 5 normal + 1 critical
+        assert bp.stats['critical_events'] >= 1
+        assert bp.stats['enqueued'] >= 6  # 5 normal + 1 critical
 
 
 class TestBackpressureHighWatermark:
@@ -176,7 +176,7 @@ class TestBackpressureHighWatermark:
     async def test_hwm_fires_when_queue_fills(self):
         bp = BackpressureManager(
             max_queue_size=10,
-            drop_policy="drop_oldest",
+            drop_policy='drop_oldest',
             hwm_ratio=0.5,  # 50% = 5 events
         )
         q: asyncio.Queue = asyncio.Queue(maxsize=10)
@@ -185,7 +185,7 @@ class TestBackpressureHighWatermark:
             await bp.enqueue_event(_dummy_event(i), q)
 
         # HWM should have fired multiple times (at 5, 6, 7, 8, 9 events)
-        assert bp.stats["high_watermark_hits"] > 0
+        assert bp.stats['high_watermark_hits'] > 0
 
 
 class TestBackpressureRateWindow:
@@ -203,9 +203,9 @@ class TestBackpressureRateWindow:
             await bp.enqueue_event(_dummy_event(i), q)
 
         snapshot = bp.get_snapshot(started_at=time.monotonic() - 10)
-        assert snapshot["events_window_count"] == 50
-        assert snapshot["events_per_minute"] > 0
-        assert snapshot["queue_utilization_pct"] > 0
+        assert snapshot['events_window_count'] == 50
+        assert snapshot['events_per_minute'] > 0
+        assert snapshot['queue_utilization_pct'] > 0
 
 
 class TestBackpressureConcurrent:
@@ -215,7 +215,7 @@ class TestBackpressureConcurrent:
     async def test_concurrent_producers(self):
         bp = BackpressureManager(
             max_queue_size=100,
-            drop_policy="drop_oldest",
+            drop_policy='drop_oldest',
         )
         q: asyncio.Queue = asyncio.Queue(maxsize=100)
         n_producers = 10
@@ -230,10 +230,10 @@ class TestBackpressureConcurrent:
 
         total = n_producers * events_per_producer
         # With drop_oldest, every new event is enqueued; old ones are evicted separately.
-        assert bp.stats["enqueued"] == total
+        assert bp.stats['enqueued'] == total
         # Evictions should be non-negative and not exceed theoretical max
-        assert bp.stats["dropped_oldest"] >= 0
-        assert bp.stats["dropped_oldest"] <= total
+        assert bp.stats['dropped_oldest'] >= 0
+        assert bp.stats['dropped_oldest'] <= total
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ class TestCircuitBreakerUnderLoad:
 
     @pytest.mark.asyncio
     async def test_rapid_failures_open_breaker(self):
-        cb = CircuitBreaker("stress-test")
+        cb = CircuitBreaker('stress-test')
         cb.failure_threshold = 3
 
         # Trigger failures
@@ -254,17 +254,17 @@ class TestCircuitBreakerUnderLoad:
             try:
 
                 async def fail():
-                    raise RuntimeError("boom")
+                    raise RuntimeError('boom')
 
                 await cb.async_call(fail)
             except RuntimeError:
                 pass
 
-        assert cb.state.state == "open"
+        assert cb.state.state == 'open'
 
     @pytest.mark.asyncio
     async def test_breaker_blocks_when_open(self):
-        cb = CircuitBreaker("block-test")
+        cb = CircuitBreaker('block-test')
         cb.failure_threshold = 2
         cb.base_open_seconds = 10  # Long open period
 
@@ -273,23 +273,23 @@ class TestCircuitBreakerUnderLoad:
             try:
 
                 async def fail():
-                    raise RuntimeError("boom")
+                    raise RuntimeError('boom')
 
                 await cb.async_call(fail)
             except RuntimeError:
                 pass
 
         # Subsequent calls should be blocked
-        with pytest.raises(RuntimeError, match="circuit_open"):
+        with pytest.raises(RuntimeError, match='circuit_open'):
 
             async def should_not_run():
-                return "ok"
+                return 'ok'
 
             await cb.async_call(should_not_run)
 
     @pytest.mark.asyncio
     async def test_half_open_recovery(self):
-        cb = CircuitBreaker("recovery-test")
+        cb = CircuitBreaker('recovery-test')
         cb.failure_threshold = 2
         cb.base_open_seconds = 0.05  # Very short open period
 
@@ -298,24 +298,24 @@ class TestCircuitBreakerUnderLoad:
             try:
 
                 async def fail():
-                    raise RuntimeError("boom")
+                    raise RuntimeError('boom')
 
                 await cb.async_call(fail)
             except RuntimeError:
                 pass
 
-        assert cb.state.state == "open"
+        assert cb.state.state == 'open'
 
         # Wait for it to transition to half-open
         await asyncio.sleep(0.1)
 
         # A successful call should close the breaker
         async def succeed():
-            return "ok"
+            return 'ok'
 
         result = await cb.async_call(succeed)
-        assert result == "ok"
-        assert cb.state.state == "closed"
+        assert result == 'ok'
+        assert cb.state.state == 'closed'
 
     @pytest.mark.asyncio
     async def test_manager_concurrent_access(self):
@@ -328,7 +328,7 @@ class TestCircuitBreakerUnderLoad:
             call_count += 1
             return call_count
 
-        tasks = [mgr.async_call("shared-key", increment) for _ in range(20)]
+        tasks = [mgr.async_call('shared-key', increment) for _ in range(20)]
         results = await asyncio.gather(*tasks)
         assert len(results) == 20
         assert call_count == 20
@@ -448,7 +448,7 @@ class TestDurableWriterErrorResilience:
             nonlocal call_count
             call_count += 1
             if call_count % 3 == 0:
-                raise OSError("transient disk error")
+                raise OSError('transient disk error')
 
         store.write.side_effect = flaky_write
         writer = DurableEventWriter(store, max_queue_size=64)

@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from backend.orchestration.services.event_router_service import EventRouterService
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import (
@@ -16,6 +15,7 @@ from backend.ledger.action import (
     PlaybookFinishAction,
 )
 from backend.ledger.observation import Observation
+from backend.orchestration.services.event_router_service import EventRouterService
 
 
 def _make_controller():
@@ -69,9 +69,9 @@ class TestRouteEvent:
         svc = EventRouterService(ctrl)
         event = MagicMock(spec=[])
 
-        with patch("backend.core.plugin.get_plugin_registry") as mock_reg:
+        with patch('backend.core.plugin.get_plugin_registry') as mock_reg:
             mock_reg.return_value.dispatch_event = AsyncMock(
-                side_effect=RuntimeError("boom")
+                side_effect=RuntimeError('boom')
             )
             # Should not raise
             await svc.route_event(event)
@@ -83,7 +83,7 @@ class TestHandleAction:
     async def test_change_state_action(self):
         ctrl = _make_controller()
         svc = EventRouterService(ctrl)
-        action = ChangeAgentStateAction(agent_state="running")
+        action = ChangeAgentStateAction(agent_state='running')
         await svc._handle_action(action)
         ctrl.set_agent_state_to.assert_called_once_with(AgentState.RUNNING)
 
@@ -91,7 +91,7 @@ class TestHandleAction:
     async def test_change_state_invalid(self):
         ctrl = _make_controller()
         svc = EventRouterService(ctrl)
-        action = ChangeAgentStateAction(agent_state="totally_invalid_state")
+        action = ChangeAgentStateAction(agent_state='totally_invalid_state')
         # Should log warning, not raise
         await svc._handle_action(action)
         ctrl.log.assert_called()
@@ -101,7 +101,7 @@ class TestHandleAction:
     async def test_message_action_from_user(self):
         ctrl = _make_controller()
         svc = EventRouterService(ctrl)
-        action = MessageAction(content="hello")
+        action = MessageAction(content='hello')
         action.source = EventSource.USER
         action.id = 1
         action.wait_for_response = False
@@ -114,7 +114,7 @@ class TestHandleAction:
     async def test_message_action_from_agent_wait(self):
         ctrl = _make_controller()
         svc = EventRouterService(ctrl)
-        action = MessageAction(content="need input")
+        action = MessageAction(content='need input')
         action.source = EventSource.AGENT
         action.wait_for_response = True
         await svc._handle_action(action)
@@ -124,7 +124,7 @@ class TestHandleAction:
     async def test_message_action_from_agent_no_wait(self):
         ctrl = _make_controller()
         svc = EventRouterService(ctrl)
-        action = MessageAction(content="info")
+        action = MessageAction(content='info')
         action.source = EventSource.AGENT
         action.wait_for_response = False
         await svc._handle_action(action)
@@ -136,11 +136,11 @@ class TestHandleFinishAction:
     async def test_successful_finish(self):
         ctrl = _make_controller()
         svc = EventRouterService(ctrl)
-        action = PlaybookFinishAction(outputs={"result": "done"})
+        action = PlaybookFinishAction(outputs={'result': 'done'})
         await svc._handle_finish_action(action)
         ctrl.state.set_outputs.assert_called_once()
         ctrl.set_agent_state_to.assert_called_with(AgentState.FINISHED)
-        ctrl.log_task_audit.assert_called_once_with(status="success")
+        ctrl.log_task_audit.assert_called_once_with(status='success')
 
     @pytest.mark.asyncio
     async def test_validation_failure_aborts(self):
@@ -158,7 +158,7 @@ class TestHandleRejectAction:
     async def test_reject(self):
         ctrl = _make_controller()
         svc = EventRouterService(ctrl)
-        action = AgentRejectAction(outputs={"reason": "too hard"})
+        action = AgentRejectAction(outputs={'reason': 'too hard'})
         await svc._handle_reject_action(action)
         ctrl.state.set_outputs.assert_called_once()
         ctrl.set_agent_state_to.assert_called_with(AgentState.REJECTED)

@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-APP_TASK_JSON_PREFIX = "APP_TASK_JSON:"
+APP_TASK_JSON_PREFIX = 'APP_TASK_JSON:'
 
 
 def parse_task_from_user_message(content: str) -> tuple[str, dict[str, Any]]:
@@ -27,16 +27,16 @@ def parse_task_from_user_message(content: str) -> tuple[str, dict[str, Any]]:
         ``(description, meta_dict)``. ``meta_dict`` is empty when unset.
     """
     if not content:
-        return "", {}
+        return '', {}
 
-    stripped = content.lstrip("\ufeff")
+    stripped = content.lstrip('\ufeff')
     if not stripped.startswith(APP_TASK_JSON_PREFIX):
         return content, {}
 
     rest = stripped[len(APP_TASK_JSON_PREFIX) :]
-    newline = rest.find("\n")
+    newline = rest.find('\n')
     if newline == -1:
-        json_line, body = rest, ""
+        json_line, body = rest, ''
     else:
         json_line, body = rest[:newline], rest[newline + 1 :]
 
@@ -52,4 +52,4 @@ def parse_task_from_user_message(content: str) -> tuple[str, dict[str, Any]]:
     if not isinstance(meta, dict):
         return content, {}
 
-    return (body if body else "").strip() or content, meta
+    return (body if body else '').strip() or content, meta

@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import importlib
 from typing import Any
@@ -14,9 +14,9 @@ def _lazy_import(module_path: str, attr: str) -> Any:
 
 # Map runtime keys to (module, attribute) for lazy loading
 _DEFAULT_RUNTIME_IMPORTS: dict[str, tuple[str, str]] = {
-    "local": (
-        "backend.execution.drivers.local.local_runtime_inprocess",
-        "LocalRuntimeInProcess",
+    'local': (
+        'backend.execution.drivers.local.local_runtime_inprocess',
+        'LocalRuntimeInProcess',
     ),
 }
 
@@ -37,5 +37,5 @@ def get_runtime_cls(name: str) -> type[Runtime]:
         return get_impl(Runtime, name)
     except Exception as e:
         known_keys = _ALL_RUNTIME_KEYS
-        msg = f"Runtime {name} not supported, known are: {known_keys}"
+        msg = f'Runtime {name} not supported, known are: {known_keys}'
         raise ValueError(msg) from e

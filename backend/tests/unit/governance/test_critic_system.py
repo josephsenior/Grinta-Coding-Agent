@@ -5,11 +5,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backend.governance import AgentFinishedCritic
+from backend.governance.base import BaseCritic, CriticResult
 from backend.ledger.action import Action, PlaybookFinishAction
 from backend.ledger.event import Event
 from backend.ledger.observation import Observation
-from backend.governance import AgentFinishedCritic
-from backend.governance.base import BaseCritic, CriticResult
 
 
 class TestCriticResult:
@@ -17,64 +17,64 @@ class TestCriticResult:
 
     def test_create_critic_result(self):
         """Test creating CriticResult instance."""
-        result = CriticResult(score=0.8, message="Good work")
+        result = CriticResult(score=0.8, message='Good work')
         assert result.score == 0.8
 
     def test_success_property_true(self):
         """Test success property returns True for score >= 0.5."""
-        result = CriticResult(score=0.5, message="")
+        result = CriticResult(score=0.5, message='')
         assert result.success is True
 
-        result = CriticResult(score=0.9, message="")
+        result = CriticResult(score=0.9, message='')
         assert result.success is True
 
-        result = CriticResult(score=1.0, message="")
+        result = CriticResult(score=1.0, message='')
         assert result.success is True
 
     def test_success_property_false(self):
         """Test success property returns False for score < 0.5."""
-        result = CriticResult(score=0.49, message="")
+        result = CriticResult(score=0.49, message='')
         assert result.success is False
 
-        result = CriticResult(score=0.0, message="")
+        result = CriticResult(score=0.0, message='')
         assert result.success is False
 
-        result = CriticResult(score=0.3, message="")
+        result = CriticResult(score=0.3, message='')
         assert result.success is False
 
     def test_success_exact_threshold(self):
         """Test success property at exact 0.5 threshold."""
-        result = CriticResult(score=0.5, message="Exactly at threshold")
+        result = CriticResult(score=0.5, message='Exactly at threshold')
         assert result.success is True
 
     def test_critic_result_with_various_messages(self):
         """Test CriticResult with different message types."""
-        result1 = CriticResult(score=1.0, message="Success")
-        result2 = CriticResult(score=0.0, message="Failed")
-        result3 = CriticResult(score=0.5, message="")
+        result1 = CriticResult(score=1.0, message='Success')
+        result2 = CriticResult(score=0.0, message='Failed')
+        result3 = CriticResult(score=0.5, message='')
 
-        assert result1.message == "Success"
-        assert result2.message == "Failed"
-        assert result3.message == ""
+        assert result1.message == 'Success'
+        assert result2.message == 'Failed'
+        assert result3.message == ''
 
     def test_critic_result_is_pydantic_model(self):
         """Test CriticResult is a Pydantic BaseModel."""
         from pydantic import BaseModel
 
-        result = CriticResult(score=0.7, message="Test")
+        result = CriticResult(score=0.7, message='Test')
         assert isinstance(result, BaseModel)
 
     def test_critic_result_serialization(self):
         """Test CriticResult can be serialized."""
-        result = CriticResult(score=0.8, message="Test message")
+        result = CriticResult(score=0.8, message='Test message')
         data = result.model_dump()
-        assert data["score"] == 0.8
-        assert data["message"] == "Test message"
+        assert data['score'] == 0.8
+        assert data['message'] == 'Test message'
 
     def test_critic_result_score_types(self):
         """Test CriticResult accepts different score numeric types."""
-        result_int = CriticResult(score=1, message="Integer score")
-        result_float = CriticResult(score=0.75, message="Float score")
+        result_int = CriticResult(score=1, message='Integer score')
+        result_float = CriticResult(score=0.75, message='Float score')
 
         assert result_int.score == 1.0
         assert result_float.score == 0.75
@@ -90,7 +90,7 @@ class TestBaseCritic:
 
     def test_has_evaluate_method(self):
         """Test BaseCritic has abstract evaluate method."""
-        assert hasattr(BaseCritic, "evaluate")
+        assert hasattr(BaseCritic, 'evaluate')
 
     def test_subclass_must_implement_evaluate(self):
         """Test subclass must implement evaluate method."""
@@ -106,7 +106,7 @@ class TestBaseCritic:
 
         class ValidCritic(BaseCritic):
             def evaluate(self, events, diff_patch=None):
-                return CriticResult(score=1.0, message="Valid")
+                return CriticResult(score=1.0, message='Valid')
 
         critic = ValidCritic()
         assert isinstance(critic, BaseCritic)
@@ -159,7 +159,7 @@ class TestAgentFinishedCritic:
         finish_action = PlaybookFinishAction(outputs={})
         events = [finish_action]
 
-        result = critic.evaluate(events, diff_patch="")
+        result = critic.evaluate(events, diff_patch='')
 
         assert result.score == 0.0
         assert result.success is False
@@ -170,7 +170,7 @@ class TestAgentFinishedCritic:
         finish_action = PlaybookFinishAction(outputs={})
         events = [finish_action]
 
-        result = critic.evaluate(events, diff_patch="   \n  \t  ")
+        result = critic.evaluate(events, diff_patch='   \n  \t  ')
 
         assert result.score == 0.0
         assert result.success is False
@@ -292,15 +292,15 @@ class TestCriticIntegration:
     def test_critic_result_success_threshold_boundary(self):
         """Test CriticResult success boundary cases."""
         # Just below threshold
-        result_below = CriticResult(score=0.4999, message="")
+        result_below = CriticResult(score=0.4999, message='')
         assert result_below.success is False
 
         # Exactly at threshold
-        result_at = CriticResult(score=0.5, message="")
+        result_at = CriticResult(score=0.5, message='')
         assert result_at.success is True
 
         # Just above threshold
-        result_above = CriticResult(score=0.5001, message="")
+        result_above = CriticResult(score=0.5001, message='')
         assert result_above.success is True
 
     def test_agent_finished_critic_comprehensive_scenario(self):
@@ -309,13 +309,13 @@ class TestCriticIntegration:
 
         # Scenario 1: Agent finished with changes
         finish = PlaybookFinishAction(outputs={})
-        patch = "+def new_function():\n+    pass"
+        patch = '+def new_function():\n+    pass'
         result = critic.evaluate([finish], diff_patch=patch)
         assert result.success is True
         assert result.score == 1.0
 
         # Scenario 2: Agent finished but no changes
-        result = critic.evaluate([finish], diff_patch="")
+        result = critic.evaluate([finish], diff_patch='')
         assert result.success is False
         assert result.score == 0.0
 

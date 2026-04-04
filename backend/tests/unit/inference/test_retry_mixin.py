@@ -6,7 +6,6 @@ from typing import Any, cast
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
-
 from backend.core.errors import LLMNoResponseError
 from backend.inference.retry_mixin import RetryMixin
 
@@ -56,12 +55,12 @@ class TestRetryMixin(TestCase):
 
         self.assertIsNotNone(decorator)
 
-    @patch("backend.inference.retry_mixin.logger")
+    @patch('backend.inference.retry_mixin.logger')
     def test_log_retry_attempt_basic(self, mock_logger):
         """Test logging retry attempt."""
         retry_state = MagicMock()
         retry_state.attempt_number = 2
-        exception = ValueError("Test error")
+        exception = ValueError('Test error')
         cast(Any, exception).retry_attempt = None
         cast(Any, exception).max_retries = None
         retry_state.outcome.exception.return_value = exception
@@ -71,15 +70,15 @@ class TestRetryMixin(TestCase):
         mock_logger.error.assert_called_once()
         call_args = mock_logger.error.call_args[0]
         # Check format string and attempt number
-        self.assertIn("Attempt", call_args[0])
+        self.assertIn('Attempt', call_args[0])
         self.assertEqual(call_args[2], 2)  # attempt_number is 3rd arg
 
-    @patch("backend.inference.retry_mixin.logger")
+    @patch('backend.inference.retry_mixin.logger')
     def test_log_retry_attempt_with_max_attempts(self, mock_logger):
         """Test logging retry attempt with max_attempts."""
         retry_state = MagicMock()
         retry_state.attempt_number = 1
-        exception = ValueError("Test error")
+        exception = ValueError('Test error')
         retry_state.outcome.exception.return_value = exception
 
         # Mock stop condition with max_attempts
@@ -93,12 +92,12 @@ class TestRetryMixin(TestCase):
         self.assertEqual(cast(Any, exception).retry_attempt, 1)
         self.assertEqual(cast(Any, exception).max_retries, 3)
 
-    @patch("backend.inference.retry_mixin.logger")
+    @patch('backend.inference.retry_mixin.logger')
     def test_log_retry_attempt_no_retry_object(self, mock_logger):
         """Test logging retry attempt without retry_object."""
-        retry_state = MagicMock(spec=["attempt_number", "outcome"])
+        retry_state = MagicMock(spec=['attempt_number', 'outcome'])
         retry_state.attempt_number = 1
-        exception = ValueError("Error")
+        exception = ValueError('Error')
         retry_state.outcome.exception.return_value = exception
 
         # Should not raise exception
@@ -112,10 +111,10 @@ class TestRetryMixin(TestCase):
 
         @decorator
         def test_function():
-            return "success"
+            return 'success'
 
         result = test_function()
-        self.assertEqual(result, "success")
+        self.assertEqual(result, 'success')
 
     def test_retry_decorator_retries_on_exception(self):
         """Test that retry decorator retries on specified exception."""
@@ -130,13 +129,13 @@ class TestRetryMixin(TestCase):
             nonlocal call_count
             call_count += 1
             if call_count < 3:
-                raise ValueError("Retry me")
-            return "success"
+                raise ValueError('Retry me')
+            return 'success'
 
-        with patch.object(self.mixin, "log_retry_attempt"):
+        with patch.object(self.mixin, 'log_retry_attempt'):
             result = test_function()
 
-        self.assertEqual(result, "success")
+        self.assertEqual(result, 'success')
         self.assertEqual(call_count, 3)
 
     def test_retry_decorator_gives_up_after_max_retries(self):
@@ -147,9 +146,9 @@ class TestRetryMixin(TestCase):
 
         @decorator
         def test_function():
-            raise ValueError("Always fails")
+            raise ValueError('Always fails')
 
-        with patch.object(self.mixin, "log_retry_attempt"):
+        with patch.object(self.mixin, 'log_retry_attempt'):
             with self.assertRaises(ValueError):
                 test_function()
 
@@ -161,18 +160,18 @@ class TestRetryMixin(TestCase):
 
         @decorator
         def test_function():
-            raise TypeError("Different exception")
+            raise TypeError('Different exception')
 
         with self.assertRaises(TypeError):
             test_function()
 
-    @patch("backend.inference.retry_mixin.logger")
+    @patch('backend.inference.retry_mixin.logger')
     def test_before_sleep_with_llm_no_response_error_temp_zero(self, mock_logger):
         """Test before_sleep adjusts temperature for LLMNoResponseError with temp=0."""
         retry_state = MagicMock()
         retry_state.attempt_number = 1
-        retry_state.kwargs = {"temperature": 0}
-        exception = LLMNoResponseError("No response")
+        retry_state.kwargs = {'temperature': 0}
+        exception = LLMNoResponseError('No response')
         retry_state.outcome.exception.return_value = exception
 
         # Get decorator and trigger retry
@@ -187,20 +186,20 @@ class TestRetryMixin(TestCase):
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise LLMNoResponseError("No response")
-            return "success"
+                raise LLMNoResponseError('No response')
+            return 'success'
 
         result = test_function(temperature=0)
 
-        self.assertEqual(result, "success")
+        self.assertEqual(result, 'success')
         mock_logger.warning.assert_called()
         # Verify warning about temperature adjustment
         warning_calls = [call[0][0] for call in mock_logger.warning.call_args_list]
         self.assertTrue(
-            any("temperature=0" in msg and "1.0" in msg for msg in warning_calls)
+            any('temperature=0' in msg and '1.0' in msg for msg in warning_calls)
         )
 
-    @patch("backend.inference.retry_mixin.logger")
+    @patch('backend.inference.retry_mixin.logger')
     def test_before_sleep_with_llm_no_response_error_non_zero_temp(self, mock_logger):
         """Test before_sleep handles LLMNoResponseError with non-zero temperature."""
         decorator = self.mixin.retry_decorator(
@@ -214,12 +213,12 @@ class TestRetryMixin(TestCase):
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise LLMNoResponseError("No response")
-            return "success"
+                raise LLMNoResponseError('No response')
+            return 'success'
 
         result = test_function(temperature=0.7)
 
-        self.assertEqual(result, "success")
+        self.assertEqual(result, 'success')
         # The retry_state from tenacity doesn't expose .kwargs,
         # so the temperature adjustment branch is not reached.
         # Verify at least that the retry error was logged.
@@ -239,19 +238,19 @@ class TestRetryMixin(TestCase):
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise ValueError("Retry")
-            return "success"
+                raise ValueError('Retry')
+            return 'success'
 
-        with patch.object(self.mixin, "log_retry_attempt"):
+        with patch.object(self.mixin, 'log_retry_attempt'):
             result = test_function()
 
-        self.assertEqual(result, "success")
+        self.assertEqual(result, 'success')
         listener.assert_called()
         # Verify listener was called with attempt number and max retries
         listener.assert_called_with(1, 2)
 
-    @patch("backend.inference.retry_mixin.tenacity_before_sleep_factory")
-    @patch("backend.inference.retry_mixin.tenacity_after_factory")
+    @patch('backend.inference.retry_mixin.tenacity_before_sleep_factory')
+    @patch('backend.inference.retry_mixin.tenacity_after_factory')
     def test_retry_decorator_with_metrics(
         self, mock_after_factory, mock_before_factory
     ):
@@ -263,30 +262,30 @@ class TestRetryMixin(TestCase):
 
         @decorator
         def test_function():
-            return "success"
+            return 'success'
 
         result = test_function()
 
-        self.assertEqual(result, "success")
-        mock_before_factory.assert_called_once_with("llm_completion")
-        mock_after_factory.assert_called_once_with("llm_completion")
+        self.assertEqual(result, 'success')
+        mock_before_factory.assert_called_once_with('llm_completion')
+        mock_after_factory.assert_called_once_with('llm_completion')
 
-    @patch("backend.inference.retry_mixin.tenacity_before_sleep_factory")
+    @patch('backend.inference.retry_mixin.tenacity_before_sleep_factory')
     def test_retry_decorator_handles_metrics_factory_exception(
         self, mock_before_factory
     ):
         """Test retry decorator handles metrics factory exceptions gracefully."""
-        mock_before_factory.side_effect = Exception("Metrics error")
+        mock_before_factory.side_effect = Exception('Metrics error')
 
         # Should not raise exception
         decorator = self.mixin.retry_decorator(num_retries=1)
 
         @decorator
         def test_function():
-            return "success"
+            return 'success'
 
         result = test_function()
-        self.assertEqual(result, "success")
+        self.assertEqual(result, 'success')
 
     def test_retry_decorator_exponential_backoff(self):
         """Test that retry decorator uses exponential backoff."""
@@ -300,16 +299,16 @@ class TestRetryMixin(TestCase):
 
         @decorator
         def test_function():
-            return "success"
+            return 'success'
 
         result = test_function()
-        self.assertEqual(result, "success")
+        self.assertEqual(result, 'success')
 
     def test_log_retry_attempt_extracts_max_attempts_from_stop_condition(self):
         """Test that log_retry_attempt extracts max_attempts from stop condition."""
         retry_state = MagicMock()
         retry_state.attempt_number = 2
-        exception = ValueError("Error")
+        exception = ValueError('Error')
         cast(Any, exception).retry_attempt = None
         cast(Any, exception).max_retries = None
         retry_state.outcome.exception.return_value = exception
@@ -321,18 +320,18 @@ class TestRetryMixin(TestCase):
         retry_state.retry_object.stop = MagicMock()
         retry_state.retry_object.stop.stops = [stop_func]
 
-        with patch("backend.inference.retry_mixin.logger"):
+        with patch('backend.inference.retry_mixin.logger'):
             self.mixin.log_retry_attempt(retry_state)
 
         self.assertEqual(cast(Any, exception).retry_attempt, 2)
         self.assertEqual(cast(Any, exception).max_retries, 5)
 
-    @patch("backend.inference.retry_mixin.logger")
+    @patch('backend.inference.retry_mixin.logger')
     def test_log_retry_attempt_no_max_attempts(self, mock_logger):
         """Test log_retry_attempt when stop condition has no max_attempts."""
         retry_state = MagicMock()
         retry_state.attempt_number = 1
-        exception = ValueError("Error")
+        exception = ValueError('Error')
         cast(Any, exception).retry_attempt = None
         cast(Any, exception).max_retries = None
         retry_state.outcome.exception.return_value = exception
@@ -356,10 +355,10 @@ class TestRetryMixin(TestCase):
 
         @decorator
         def test_function():
-            raise ValueError("Persistent error")
+            raise ValueError('Persistent error')
 
-        with patch.object(self.mixin, "log_retry_attempt"):
-            with self.assertRaisesRegex(ValueError, "Persistent error"):
+        with patch.object(self.mixin, 'log_retry_attempt'):
+            with self.assertRaisesRegex(ValueError, 'Persistent error'):
                 test_function()
 
     def test_retry_decorator_allows_all_parameters(self):
@@ -377,12 +376,12 @@ class TestRetryMixin(TestCase):
 
         @decorator
         def test_function():
-            return "success"
+            return 'success'
 
         result = test_function()
-        self.assertEqual(result, "success")
+        self.assertEqual(result, 'success')
 
-    @patch("backend.inference.retry_mixin.stop_if_should_exit")
+    @patch('backend.inference.retry_mixin.stop_if_should_exit')
     def test_retry_decorator_includes_stop_if_should_exit(
         self, mock_stop_if_should_exit
     ):
@@ -393,10 +392,10 @@ class TestRetryMixin(TestCase):
 
         @decorator
         def test_function():
-            return "success"
+            return 'success'
 
         result = test_function()
-        self.assertEqual(result, "success")
+        self.assertEqual(result, 'success')
         mock_stop_if_should_exit.assert_called_once()
 
     def test_before_sleep_suppresses_metrics_exceptions(self):
@@ -413,11 +412,11 @@ class TestRetryMixin(TestCase):
             nonlocal call_count
             call_count += 1
             if call_count < 2:
-                raise ValueError("Retry")
-            return "success"
+                raise ValueError('Retry')
+            return 'success'
 
         # Should not raise even if metrics throw exceptions
-        with patch.object(self.mixin, "log_retry_attempt"):
+        with patch.object(self.mixin, 'log_retry_attempt'):
             result = test_function()
 
-        self.assertEqual(result, "success")
+        self.assertEqual(result, 'success')

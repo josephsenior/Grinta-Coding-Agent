@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 import shutil
 import stat
-import time
 import tempfile
+import time
 
 from backend.core.logger import app_logger as logger
 from backend.persistence.files import FileStore
@@ -19,7 +19,7 @@ class LocalFileStore(FileStore):
 
     def __init__(self, root: str) -> None:
         """Normalize and create the storage root directory path."""
-        if root.startswith("~"):
+        if root.startswith('~'):
             root = os.path.expanduser(root)
         self.root = root
         os.makedirs(self.root, exist_ok=True)
@@ -49,11 +49,9 @@ class LocalFileStore(FileStore):
             return str(safe_path.path)
         except ImportError as imp_err:
             # Fail closed: do not fall back to weaker manual validation
-            logger.error(
-                "SafePath module not available; cannot safely validate paths"
-            )
+            logger.error('SafePath module not available; cannot safely validate paths')
             raise RuntimeError(
-                "Path validation module unavailable. Cannot safely access file storage."
+                'Path validation module unavailable. Cannot safely access file storage.'
             ) from imp_err
         except Exception as e:
             # Fail CLOSED — do NOT fall back to naive join on security rejection
@@ -78,11 +76,11 @@ class LocalFileStore(FileStore):
         tmp_path: str | None = None
         try:
             fd, tmp_path = tempfile.mkstemp(
-                prefix=f".{os.path.basename(full_path)}.tmp.",
+                prefix=f'.{os.path.basename(full_path)}.tmp.',
                 dir=dir_name,
             )
-            mode = "w" if isinstance(contents, str) else "wb"
-            encoding = "utf-8" if isinstance(contents, str) else None
+            mode = 'w' if isinstance(contents, str) else 'wb'
+            encoding = 'utf-8' if isinstance(contents, str) else None
 
             with os.fdopen(fd, mode, encoding=encoding) as f:
                 fd = None
@@ -98,14 +96,14 @@ class LocalFileStore(FileStore):
                     os.close(fd)
                 except Exception:
                     logger.warning(
-                        "Failed to close temp file descriptor", exc_info=True
+                        'Failed to close temp file descriptor', exc_info=True
                     )
             if tmp_path is not None:
                 try:
                     os.remove(tmp_path)
                 except Exception:
                     logger.warning(
-                        "Failed to remove temp file %s", tmp_path, exc_info=True
+                        'Failed to remove temp file %s', tmp_path, exc_info=True
                     )
 
     def read(self, path: str) -> str:
@@ -119,7 +117,7 @@ class LocalFileStore(FileStore):
 
         """
         full_path = self.get_full_path(path)
-        with open(full_path, encoding="utf-8") as f:
+        with open(full_path, encoding='utf-8') as f:
             return f.read()
 
     def list(self, path: str) -> list[str]:
@@ -136,9 +134,9 @@ class LocalFileStore(FileStore):
         files: list[str] = []
         for f in os.listdir(full_path):
             joined = os.path.join(path, f)
-            norm = joined.replace("\\", "/")
-            if os.path.isdir(self.get_full_path(joined)) and (not norm.endswith("/")):
-                norm = f"{norm}/"
+            norm = joined.replace('\\', '/')
+            if os.path.isdir(self.get_full_path(joined)) and (not norm.endswith('/')):
+                norm = f'{norm}/'
             files.append(norm)
         return files
 
@@ -152,16 +150,16 @@ class LocalFileStore(FileStore):
         try:
             full_path = self.get_full_path(path)
             if not os.path.exists(full_path):
-                logger.debug("Local path does not exist: %s", full_path)
+                logger.debug('Local path does not exist: %s', full_path)
                 return
             if os.path.isfile(full_path):
                 self._delete_file_with_retry(full_path)
-                logger.debug("Removed local file: %s", full_path)
+                logger.debug('Removed local file: %s', full_path)
             elif os.path.isdir(full_path):
                 self._delete_dir_with_retry(full_path)
-                logger.debug("Removed local directory: %s", full_path)
+                logger.debug('Removed local directory: %s', full_path)
         except Exception as e:
-            logger.error("Error clearing local file store: %s", str(e))
+            logger.error('Error clearing local file store: %s', str(e))
 
     def _delete_file_with_retry(self, full_path: str) -> None:
         last_error: Exception | None = None

@@ -25,23 +25,23 @@ from backend.context.compactor.strategies.recent_events_compactor import (
 from backend.context.compactor.strategies.semantic_compactor import (
     SemanticCompactor,
 )
+from backend.context.compactor.strategies.smart_compactor import SmartCompactor
 from backend.context.compactor.strategies.structured_summary_compactor import (
     StructuredSummaryCompactor,
 )
-from backend.context.compactor.strategies.smart_compactor import SmartCompactor
 
 __all__ = [
-    "AmortizedPruningCompactor",
-    "AutoCompactor",
-    "CompactorPipeline",
-    "ConversationWindowCompactor",
-    "ImportantEventSelection",
-    "LLMAttentionCompactor",
-    "LLMSummarizingCompactor",
-    "NoOpCompactor",
-    "ObservationMaskingCompactor",
-    "RecentEventsCompactor",
-    "SemanticCompactor",
-    "SmartCompactor",
-    "StructuredSummaryCompactor",
+    'AmortizedPruningCompactor',
+    'AutoCompactor',
+    'CompactorPipeline',
+    'ConversationWindowCompactor',
+    'ImportantEventSelection',
+    'LLMAttentionCompactor',
+    'LLMSummarizingCompactor',
+    'NoOpCompactor',
+    'ObservationMaskingCompactor',
+    'RecentEventsCompactor',
+    'SemanticCompactor',
+    'SmartCompactor',
+    'StructuredSummaryCompactor',
 ]

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
 import unittest
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 from backend.core.plugin import (
@@ -16,9 +16,9 @@ from backend.core.plugin import (
 class _SimplePlugin(AppPlugin):
     """Concrete plugin for testing."""
 
-    name = "test-plugin"
-    version = "1.0.0"
-    description = "A test plugin"
+    name = 'test-plugin'
+    version = '1.0.0'
+    description = 'A test plugin'
 
     async def on_event(self, event):
         pass
@@ -33,9 +33,9 @@ class _SimplePlugin(AppPlugin):
 class _ActionPlugin(AppPlugin):
     """Plugin that modifies actions."""
 
-    name = "action-plugin"
-    version = "0.1.0"
-    description = "Modifies actions"
+    name = 'action-plugin'
+    version = '0.1.0'
+    description = 'Modifies actions'
 
     async def on_action_pre(self, action):
         action.modified = True
@@ -57,16 +57,16 @@ class _ActionPlugin(AppPlugin):
 
 class TestHookType(unittest.TestCase):
     def test_values(self):
-        self.assertEqual(HookType.ACTION_PRE, "action_pre")
-        self.assertEqual(HookType.LLM_POST, "llm_post")
-        self.assertEqual(HookType.TOOL_INVOKE, "tool_invoke")
+        self.assertEqual(HookType.ACTION_PRE, 'action_pre')
+        self.assertEqual(HookType.LLM_POST, 'llm_post')
+        self.assertEqual(HookType.TOOL_INVOKE, 'tool_invoke')
 
 
 class TestAppPluginBase(unittest.TestCase):
     def test_repr(self):
         p = _SimplePlugin()
-        self.assertIn("test-plugin", repr(p))
-        self.assertIn("1.0.0", repr(p))
+        self.assertIn('test-plugin', repr(p))
+        self.assertIn('1.0.0', repr(p))
 
     def test_validate_default_name(self):
         class Unnamed(AppPlugin):
@@ -81,11 +81,11 @@ class TestAppPluginBase(unittest.TestCase):
 
         p = Unnamed()
         warnings = p.validate()
-        self.assertTrue(any("unnamed-plugin" in w for w in warnings))
+        self.assertTrue(any('unnamed-plugin' in w for w in warnings))
 
     def test_validate_default_version(self):
         class NoVer(AppPlugin):
-            name = "good-name"
+            name = 'good-name'
 
             async def on_event(self, event):
                 pass
@@ -97,12 +97,12 @@ class TestAppPluginBase(unittest.TestCase):
                 pass
 
         warnings = NoVer().validate()
-        self.assertTrue(any("0.0.0" in w for w in warnings))
+        self.assertTrue(any('0.0.0' in w for w in warnings))
 
     def test_validate_no_description(self):
         class NoDesc(AppPlugin):
-            name = "good"
-            version = "1.0"
+            name = 'good'
+            version = '1.0'
 
             async def on_event(self, event):
                 pass
@@ -114,7 +114,7 @@ class TestAppPluginBase(unittest.TestCase):
                 pass
 
         warnings = NoDesc().validate()
-        self.assertTrue(any("description" in w.lower() for w in warnings))
+        self.assertTrue(any('description' in w.lower() for w in warnings))
 
     def test_validate_all_good(self):
         p = _SimplePlugin()
@@ -127,7 +127,7 @@ class TestPluginRegistry(unittest.TestCase):
         reg = PluginRegistry()
         p = _SimplePlugin()
         reg.register(p)
-        self.assertIs(reg.get_plugin("test-plugin"), p)
+        self.assertIs(reg.get_plugin('test-plugin'), p)
         self.assertEqual(len(reg.plugins), 1)
 
     def test_duplicate_skipped(self):
@@ -139,18 +139,18 @@ class TestPluginRegistry(unittest.TestCase):
     def test_unregister(self):
         reg = PluginRegistry()
         reg.register(_SimplePlugin())
-        reg.unregister("test-plugin")
-        self.assertIsNone(reg.get_plugin("test-plugin"))
+        reg.unregister('test-plugin')
+        self.assertIsNone(reg.get_plugin('test-plugin'))
         self.assertEqual(len(reg.plugins), 0)
 
     def test_unregister_missing_no_error(self):
         reg = PluginRegistry()
-        reg.unregister("nonexistent")  # Should not raise
+        reg.unregister('nonexistent')  # Should not raise
 
     def test_incompatible_version_rejected(self):
         class FuturePlugin(AppPlugin):
-            name = "future"
-            version = "1.0"
+            name = 'future'
+            version = '1.0'
             min_api_version = (99, 99)
 
             async def on_event(self, event):
@@ -164,16 +164,16 @@ class TestPluginRegistry(unittest.TestCase):
 
         reg = PluginRegistry()
         reg.register(FuturePlugin())
-        self.assertIsNone(reg.get_plugin("future"))
+        self.assertIsNone(reg.get_plugin('future'))
 
     def test_validate_all(self):
         reg = PluginRegistry()
         reg.register(_SimplePlugin())
 
         class Bad(AppPlugin):
-            name = "bad"
-            version = "1.0"
-            description = "test"
+            name = 'bad'
+            version = '1.0'
+            description = 'test'
 
             async def on_event(self, event):
                 pass
@@ -185,13 +185,13 @@ class TestPluginRegistry(unittest.TestCase):
                 pass
 
             def validate(self):
-                return ["something wrong"]
+                return ['something wrong']
 
         reg.register(Bad())
         results = reg.validate_all()
-        self.assertIn("bad", results)
-        self.assertEqual(results["bad"], ["something wrong"])
-        self.assertNotIn("test-plugin", results)
+        self.assertIn('bad', results)
+        self.assertEqual(results['bad'], ['something wrong'])
+        self.assertNotIn('test-plugin', results)
 
 
 class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
@@ -215,7 +215,7 @@ class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
     async def test_dispatch_event(self):
         reg = PluginRegistry()
         plugin = MagicMock(spec=_SimplePlugin)
-        plugin.name = "mock"
+        plugin.name = 'mock'
         plugin.min_api_version = (1, 0)
         plugin.on_event = AsyncMock()
         reg.register(plugin)
@@ -226,28 +226,28 @@ class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
     async def test_dispatch_session_start(self):
         reg = PluginRegistry()
         plugin = MagicMock(spec=_SimplePlugin)
-        plugin.name = "mock"
+        plugin.name = 'mock'
         plugin.min_api_version = (1, 0)
         plugin.on_session_start = AsyncMock()
         reg.register(plugin)
-        await reg.dispatch_session_start("sess-1", {"key": "val"})
+        await reg.dispatch_session_start('sess-1', {'key': 'val'})
         plugin.on_session_start.assert_awaited_once()
 
     async def test_dispatch_session_end(self):
         reg = PluginRegistry()
         plugin = MagicMock(spec=_SimplePlugin)
-        plugin.name = "mock"
+        plugin.name = 'mock'
         plugin.min_api_version = (1, 0)
         plugin.on_session_end = AsyncMock()
         reg.register(plugin)
-        await reg.dispatch_session_end("sess-1")
+        await reg.dispatch_session_end('sess-1')
         plugin.on_session_end.assert_awaited_once()
 
     async def test_dispatch_llm_pre(self):
         reg = PluginRegistry()
         p = _SimplePlugin()
         reg.register(p)
-        msgs = [{"role": "user", "content": "hi"}]
+        msgs = [{'role': 'user', 'content': 'hi'}]
         result = await reg.dispatch_llm_pre(msgs)
         self.assertEqual(result, msgs)
 
@@ -255,7 +255,7 @@ class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
         reg = PluginRegistry()
         p = _SimplePlugin()
         reg.register(p)
-        resp: dict[str, Any] = {"choices": []}
+        resp: dict[str, Any] = {'choices': []}
         result = await reg.dispatch_llm_post(resp)
         self.assertEqual(result, resp)
 
@@ -263,30 +263,30 @@ class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
         reg = PluginRegistry()
         p = _SimplePlugin()
         reg.register(p)
-        result = await reg.dispatch_condense(["orig"], ["condensed"], {"type": "x"})
-        self.assertEqual(result, ["condensed"])
+        result = await reg.dispatch_condense(['orig'], ['condensed'], {'type': 'x'})
+        self.assertEqual(result, ['condensed'])
 
     async def test_dispatch_memory_recall(self):
         reg = PluginRegistry()
         p = _SimplePlugin()
         reg.register(p)
-        result = await reg.dispatch_memory_recall("workspace_context", {"data": 1})
-        self.assertEqual(result, {"data": 1})
+        result = await reg.dispatch_memory_recall('workspace_context', {'data': 1})
+        self.assertEqual(result, {'data': 1})
 
     async def test_dispatch_tool_invoke(self):
         reg = PluginRegistry()
         p = _SimplePlugin()
         reg.register(p)
-        result = await reg.dispatch_tool_invoke("run_cmd", {"cmd": "ls"})
-        self.assertEqual(result, {"cmd": "ls"})
+        result = await reg.dispatch_tool_invoke('run_cmd', {'cmd': 'ls'})
+        self.assertEqual(result, {'cmd': 'ls'})
 
     async def test_dispatch_exception_handled(self):
         """Plugin exceptions should be caught, not propagated."""
         reg = PluginRegistry()
         plugin = MagicMock(spec=_SimplePlugin)
-        plugin.name = "broken"
+        plugin.name = 'broken'
         plugin.min_api_version = (1, 0)
-        plugin.on_event = AsyncMock(side_effect=RuntimeError("boom"))
+        plugin.on_event = AsyncMock(side_effect=RuntimeError('boom'))
         reg.register(plugin)
         # Should not raise
         await reg.dispatch_event(MagicMock())
@@ -295,17 +295,17 @@ class TestPluginRegistryDispatch(unittest.IsolatedAsyncioTestCase):
         reg = PluginRegistry()
 
         class P1(_SimplePlugin):
-            name = "p1"
+            name = 'p1'
 
             async def on_llm_pre(self, messages, **kwargs):
-                messages.append({"role": "system", "content": "from p1"})
+                messages.append({'role': 'system', 'content': 'from p1'})
                 return messages
 
         class P2(_SimplePlugin):
-            name = "p2"
+            name = 'p2'
 
             async def on_llm_pre(self, messages, **kwargs):
-                messages.append({"role": "system", "content": "from p2"})
+                messages.append({'role': 'system', 'content': 'from p2'})
                 return messages
 
         reg.register(P1())
@@ -319,8 +319,8 @@ class TestPluginTemplate(unittest.IsolatedAsyncioTestCase):
         from backend.core.plugin_template import MyPlugin
 
         p = MyPlugin()
-        self.assertEqual(p.name, "my-plugin")
-        self.assertEqual(p.version, "0.1.0")
+        self.assertEqual(p.name, 'my-plugin')
+        self.assertEqual(p.version, '0.1.0')
 
         # on_action_pre returns action unchanged
         action = MagicMock()
@@ -331,15 +331,15 @@ class TestPluginTemplate(unittest.IsolatedAsyncioTestCase):
         await p.on_event(MagicMock())
 
         # session hooks
-        await p.on_session_start("sess-1", {})
-        await p.on_session_end("sess-1", {})
+        await p.on_session_start('sess-1', {})
+        await p.on_session_end('sess-1', {})
 
     def test_register_function(self):
         from backend.core.plugin_template import register
 
         reg = PluginRegistry()
         register(reg)
-        self.assertIsNotNone(reg.get_plugin("my-plugin"))
+        self.assertIsNotNone(reg.get_plugin('my-plugin'))
 
     def test_validate(self):
         from backend.core.plugin_template import MyPlugin
@@ -348,5 +348,5 @@ class TestPluginTemplate(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(warnings, [])
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

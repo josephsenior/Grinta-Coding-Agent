@@ -8,9 +8,9 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from backend.core.constants import SETTINGS_CACHE_TTL
 from pydantic import SecretStr
 
+from backend.core.constants import SETTINGS_CACHE_TTL
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.persistence import get_file_store
 from backend.persistence.data_models.settings import Settings
@@ -32,7 +32,7 @@ class FileSettingsStore(SettingsStore):
     """SettingsStore implementation persisting workspace settings to local file."""
 
     file_store: FileStore
-    path: str = "settings.json"
+    path: str = 'settings.json'
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False, repr=False)
 
     async def load(self) -> Settings | None:
@@ -86,23 +86,23 @@ class FileSettingsStore(SettingsStore):
         # UI we must not drop it on the next LLM-only save (merge happens before store).
         minimal = model_dump_with_options(
             settings,
-            context={"expose_secrets": True},
-            include={"llm_model", "llm_api_key", "llm_base_url", "mcp_config"},
+            context={'expose_secrets': True},
+            include={'llm_model', 'llm_api_key', 'llm_base_url', 'mcp_config'},
             exclude_none=False,
         )
 
-        llm_api_key = minimal.get("llm_api_key")
+        llm_api_key = minimal.get('llm_api_key')
         if isinstance(llm_api_key, SecretStr):
             llm_api_key = llm_api_key.get_secret_value()
 
         normalized: dict = {
-            "llm_model": minimal.get("llm_model"),
-            "llm_api_key": llm_api_key,
-            "llm_base_url": minimal.get("llm_base_url"),
+            'llm_model': minimal.get('llm_model'),
+            'llm_api_key': llm_api_key,
+            'llm_base_url': minimal.get('llm_base_url'),
         }
-        mcp = minimal.get("mcp_config")
+        mcp = minimal.get('mcp_config')
         if mcp is not None:
-            normalized["mcp_config"] = mcp
+            normalized['mcp_config'] = mcp
 
         json_str = json.dumps(normalized, ensure_ascii=False, indent=2)
         await call_sync_from_async(self.file_store.write, self.path, json_str)

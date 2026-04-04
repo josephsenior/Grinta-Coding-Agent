@@ -8,49 +8,48 @@ import pytest
 
 from backend.ledger.nested_event_store import NestedEventStore
 
-
 # ── _build_search_params ─────────────────────────────────────────────
 
 
 class TestBuildSearchParams:
     def setup_method(self):
         self.store = NestedEventStore(
-            base_url="http://test:3000",
-            sid="s1",
-            user_id="u1",
+            base_url='http://test:3000',
+            sid='s1',
+            user_id='u1',
         )
 
     def test_forward_default(self):
         params = self.store._build_search_params(
             start_cursor=0, end_cursor=None, reverse=False, limit=None
         )
-        assert params == {"start_id": 0, "reverse": False}
+        assert params == {'start_id': 0, 'reverse': False}
 
     def test_forward_with_limit(self):
         params = self.store._build_search_params(
             start_cursor=5, end_cursor=None, reverse=False, limit=50
         )
-        assert params["start_id"] == 5
-        assert params["limit"] == 50
+        assert params['start_id'] == 5
+        assert params['limit'] == 50
 
     def test_limit_capped_at_100(self):
         params = self.store._build_search_params(
             start_cursor=0, end_cursor=None, reverse=False, limit=999
         )
-        assert params["limit"] == 100
+        assert params['limit'] == 100
 
     def test_reverse_with_end_cursor(self):
         params = self.store._build_search_params(
             start_cursor=0, end_cursor=50, reverse=True, limit=None
         )
-        assert params["reverse"] is True
-        assert params["end_id"] == 50
+        assert params['reverse'] is True
+        assert params['end_id'] == 50
 
     def test_reverse_without_end_cursor(self):
         params = self.store._build_search_params(
             start_cursor=0, end_cursor=None, reverse=True, limit=None
         )
-        assert "end_id" not in params
+        assert 'end_id' not in params
 
 
 # ── _update_cursors ──────────────────────────────────────────────────
@@ -59,9 +58,9 @@ class TestBuildSearchParams:
 class TestUpdateCursors:
     def setup_method(self):
         self.store = NestedEventStore(
-            base_url="http://test:3000",
-            sid="s1",
-            user_id="u1",
+            base_url='http://test:3000',
+            sid='s1',
+            user_id='u1',
         )
 
     def test_reverse_with_page_min(self):
@@ -92,9 +91,9 @@ class TestUpdateCursors:
 class TestProcessEvent:
     def setup_method(self):
         self.store = NestedEventStore(
-            base_url="http://test:3000",
-            sid="s1",
-            user_id="u1",
+            base_url='http://test:3000',
+            sid='s1',
+            user_id='u1',
         )
 
     def test_event_at_end_id_no_filter(self):
@@ -140,36 +139,36 @@ class TestProcessEvent:
 class TestGetEvent:
     def setup_method(self):
         self.store = NestedEventStore(
-            base_url="http://test:3000",
-            sid="s1",
-            user_id="u1",
+            base_url='http://test:3000',
+            sid='s1',
+            user_id='u1',
         )
 
     def test_get_event_not_found(self):
-        with patch.object(self.store, "search_events", return_value=iter([])):
-            with pytest.raises(FileNotFoundError, match="no_event"):
+        with patch.object(self.store, 'search_events', return_value=iter([])):
+            with pytest.raises(FileNotFoundError, match='no_event'):
                 self.store.get_event(99)
 
     def test_get_event_found(self):
         ev = MagicMock(id=99)
-        with patch.object(self.store, "search_events", return_value=iter([ev])):
+        with patch.object(self.store, 'search_events', return_value=iter([ev])):
             result = self.store.get_event(99)
             assert result is ev
 
     def test_get_latest_event_not_found(self):
-        with patch.object(self.store, "search_events", return_value=iter([])):
-            with pytest.raises(FileNotFoundError, match="no_event"):
+        with patch.object(self.store, 'search_events', return_value=iter([])):
+            with pytest.raises(FileNotFoundError, match='no_event'):
                 self.store.get_latest_event()
 
     def test_get_latest_event_found(self):
         ev = MagicMock(id=100)
-        with patch.object(self.store, "search_events", return_value=iter([ev])):
+        with patch.object(self.store, 'search_events', return_value=iter([ev])):
             result = self.store.get_latest_event()
             assert result is ev
 
     def test_get_latest_event_id(self):
         ev = MagicMock(id=42)
-        with patch.object(self.store, "get_latest_event", return_value=ev):
+        with patch.object(self.store, 'get_latest_event', return_value=ev):
             assert self.store.get_latest_event_id() == 42
 
 
@@ -179,8 +178,8 @@ class TestGetEvent:
 class TestDataclass:
     def test_defaults(self):
         store = NestedEventStore(
-            base_url="http://localhost:3000",
-            sid="abc",
-            user_id="user1",
+            base_url='http://localhost:3000',
+            sid='abc',
+            user_id='user1',
         )
-        assert store.user_id == "user1"
+        assert store.user_id == 'user1'

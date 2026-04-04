@@ -17,12 +17,12 @@ def model_to_dict(obj: Any) -> Any:
     json roundtrip, and finally return the object itself as a last resort.
     """
     try:
-        if hasattr(obj, "model_dump") and callable(obj.model_dump):
+        if hasattr(obj, 'model_dump') and callable(obj.model_dump):
             return obj.model_dump()
     except Exception:
         pass
     try:
-        if hasattr(obj, "dict") and callable(obj.dict):
+        if hasattr(obj, 'dict') and callable(obj.dict):
             return obj.dict()
     except Exception:
         pass
@@ -35,7 +35,7 @@ def model_to_dict(obj: Any) -> Any:
 def _try_get_v2_model_fields(model_cls: Any) -> set[str] | None:
     """Try to get field names from Pydantic v2 model_fields."""
     try:
-        mf = getattr(model_cls, "model_fields", None)
+        mf = getattr(model_cls, 'model_fields', None)
         if mf and isinstance(mf, dict):
             return set(mf.keys())
     except Exception:
@@ -46,7 +46,7 @@ def _try_get_v2_model_fields(model_cls: Any) -> set[str] | None:
 def _try_get_v1_model_fields(model_cls: Any) -> set[str] | None:
     """Try to get field names from Pydantic v1 __fields__."""
     try:
-        if hasattr(model_cls, "__fields__"):
+        if hasattr(model_cls, '__fields__'):
             return set(model_cls.__fields__.keys())
     except Exception:
         pass
@@ -55,7 +55,7 @@ def _try_get_v1_model_fields(model_cls: Any) -> set[str] | None:
 
 def _get_annotations_fallback(model_cls: Any) -> set[str]:
     """Get field names from __annotations__ as last resort."""
-    return set(getattr(model_cls, "__annotations__", {}).keys())
+    return set(getattr(model_cls, '__annotations__', {}).keys())
 
 
 def get_model_field_names(model_cls: Any) -> set[str]:
@@ -77,7 +77,7 @@ def get_model_field_names(model_cls: Any) -> set[str]:
 def _try_model_dump(obj: Any, **kwargs) -> tuple[bool, Any]:
     """Try to call Pydantic v2's model_dump method."""
     try:
-        md = getattr(obj, "model_dump", None)
+        md = getattr(obj, 'model_dump', None)
         if md and callable(md):
             return True, obj.model_dump(**kwargs)
     except Exception:
@@ -88,11 +88,11 @@ def _try_model_dump(obj: Any, **kwargs) -> tuple[bool, Any]:
 def _try_json_dump(obj: Any, **kwargs) -> tuple[bool, Any]:
     """Try to call Pydantic v1's json method with mode='json'."""
     try:
-        mode = kwargs.get("mode")
-        if mode == "json":
-            j = getattr(obj, "json", None)
+        mode = kwargs.get('mode')
+        if mode == 'json':
+            j = getattr(obj, 'json', None)
             if j and callable(j):
-                filtered_kwargs = {k: v for k, v in kwargs.items() if k != "mode"}
+                filtered_kwargs = {k: v for k, v in kwargs.items() if k != 'mode'}
                 return True, json.loads(obj.json(**filtered_kwargs))
     except Exception:
         pass
@@ -102,9 +102,9 @@ def _try_json_dump(obj: Any, **kwargs) -> tuple[bool, Any]:
 def _try_dict_dump(obj: Any, **kwargs) -> tuple[bool, Any]:
     """Try to call Pydantic v1's dict method."""
     try:
-        d = getattr(obj, "dict", None)
+        d = getattr(obj, 'dict', None)
         if d and callable(d):
-            filtered_kwargs = {k: v for k, v in kwargs.items() if k != "mode"}
+            filtered_kwargs = {k: v for k, v in kwargs.items() if k != 'mode'}
             return True, obj.dict(**filtered_kwargs)
     except Exception:
         pass
@@ -137,20 +137,20 @@ def model_dump_json(obj: Any, **kwargs) -> str:
     `model_dump_with_options`/`model_to_dict`.
     """
     try:
-        mdj = getattr(obj, "model_dump_json", None)
+        mdj = getattr(obj, 'model_dump_json', None)
         if mdj and callable(mdj):
             return obj.model_dump_json(**kwargs)
     except Exception:
         pass
     try:
-        j = getattr(obj, "json", None)
+        j = getattr(obj, 'json', None)
         if j and callable(j):
             return obj.json(**kwargs)
     except Exception:
         pass
     try:
         data = model_dump_with_options(
-            obj, **{k: v for k, v in kwargs.items() if k != "mode"}
+            obj, **{k: v for k, v in kwargs.items() if k != 'mode'}
         )
         return json.dumps(data, default=str)
     except Exception:

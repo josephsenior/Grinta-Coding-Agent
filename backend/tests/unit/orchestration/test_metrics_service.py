@@ -13,7 +13,6 @@ from backend.orchestration.services.metrics_service import (
     TaskMetrics,
 )
 
-
 # ---------------------------------------------------------------------------
 # TaskMetrics dataclass
 # ---------------------------------------------------------------------------
@@ -21,30 +20,30 @@ from backend.orchestration.services.metrics_service import (
 
 class TestTaskMetrics:
     def test_defaults(self):
-        tm = TaskMetrics(task_id="t1")
-        assert tm.task_id == "t1"
+        tm = TaskMetrics(task_id='t1')
+        assert tm.task_id == 't1'
         assert tm.iterations_count == 0
         assert tm.error_count == 0
         assert tm.success is None
 
     def test_duration_running(self):
-        tm = TaskMetrics(task_id="t", started_at=time.time() - 10)
+        tm = TaskMetrics(task_id='t', started_at=time.time() - 10)
         assert tm.duration_seconds >= 9.5
 
     def test_duration_completed(self):
-        tm = TaskMetrics(task_id="t", started_at=100.0, completed_at=110.0)
+        tm = TaskMetrics(task_id='t', started_at=100.0, completed_at=110.0)
         assert tm.duration_seconds == pytest.approx(10.0)
 
     def test_success_rate_no_iterations(self):
-        tm = TaskMetrics(task_id="t")
+        tm = TaskMetrics(task_id='t')
         assert tm.success_rate == 0.0
 
     def test_success_rate_all_good(self):
-        tm = TaskMetrics(task_id="t", iterations_count=10, error_count=0)
+        tm = TaskMetrics(task_id='t', iterations_count=10, error_count=0)
         assert tm.success_rate == 1.0
 
     def test_success_rate_half_errors(self):
-        tm = TaskMetrics(task_id="t", iterations_count=10, error_count=5)
+        tm = TaskMetrics(task_id='t', iterations_count=10, error_count=5)
         assert tm.success_rate == pytest.approx(0.5)
 
 
@@ -92,34 +91,34 @@ class TestMetricsService:
         assert svc.get_current_task_metrics() is None
 
     def test_start_task(self, svc):
-        svc.start_task("task-1")
+        svc.start_task('task-1')
         current = svc.get_current_task_metrics()
         assert current is not None
-        assert current.task_id == "task-1"
+        assert current.task_id == 'task-1'
 
     def test_record_iteration(self, svc):
-        svc.start_task("t")
+        svc.start_task('t')
         svc.record_iteration()
         svc.record_iteration()
         assert svc.get_current_task_metrics().iterations_count == 2
 
     def test_record_error(self, svc):
-        svc.start_task("t")
+        svc.start_task('t')
         svc.record_error()
         assert svc.get_current_task_metrics().error_count == 1
 
     def test_record_high_risk_action(self, svc):
-        svc.start_task("t")
+        svc.start_task('t')
         svc.record_high_risk_action()
         assert svc.get_current_task_metrics().high_risk_actions == 1
 
     def test_record_stuck_detection(self, svc):
-        svc.start_task("t")
+        svc.start_task('t')
         svc.record_stuck_detection()
         assert svc.get_current_task_metrics().stuck_detections == 1
 
     def test_record_llm_call(self, svc):
-        svc.start_task("t")
+        svc.start_task('t')
         svc.record_llm_call(cost=0.05)
         svc.record_llm_call(cost=0.10)
         current = svc.get_current_task_metrics()
@@ -127,7 +126,7 @@ class TestMetricsService:
         assert current.total_cost == pytest.approx(0.15)
 
     def test_complete_task_success(self, svc):
-        svc.start_task("t1")
+        svc.start_task('t1')
         svc.record_iteration()
         result = svc.complete_task(success=True)
         assert result.success is True
@@ -140,25 +139,25 @@ class TestMetricsService:
         assert agg.failed_tasks == 0
 
     def test_complete_task_failure(self, svc):
-        svc.start_task("t2")
-        result = svc.complete_task(success=False, failure_reason="timeout")
+        svc.start_task('t2')
+        result = svc.complete_task(success=False, failure_reason='timeout')
         assert result.success is False
-        assert result.failure_reason == "timeout"
+        assert result.failure_reason == 'timeout'
 
         agg = svc.get_aggregate_metrics()
         assert agg.failed_tasks == 1
 
     def test_complete_no_active_task(self, svc):
         result = svc.complete_task(success=False)
-        assert result.task_id == "unknown"
+        assert result.task_id == 'unknown'
 
     def test_aggregate_across_tasks(self, svc):
-        svc.start_task("a")
+        svc.start_task('a')
         svc.record_llm_call(cost=0.01)
         svc.record_iteration()
         svc.complete_task(success=True)
 
-        svc.start_task("b")
+        svc.start_task('b')
         svc.record_llm_call(cost=0.02)
         svc.record_iteration()
         svc.record_error()
@@ -173,7 +172,7 @@ class TestMetricsService:
         assert agg.success_rate == pytest.approx(0.5)
 
     def test_reset(self, svc):
-        svc.start_task("t")
+        svc.start_task('t')
         svc.record_iteration()
         svc.complete_task(success=True)
         svc.reset()

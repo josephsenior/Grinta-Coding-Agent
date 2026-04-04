@@ -30,29 +30,29 @@ else:
 class NoOpCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for NoOpCompactor."""
 
-    type: Literal["noop"] = Field(default="noop")
-    model_config = ConfigDict(extra="forbid")
+    type: Literal['noop'] = Field(default='noop')
+    model_config = ConfigDict(extra='forbid')
 
 
 class ObservationMaskingCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for ObservationMaskingCompactor."""
 
-    type: Literal["observation_masking"] = Field(default="observation_masking")
+    type: Literal['observation_masking'] = Field(default='observation_masking')
     attention_window: int = Field(
         default=DEFAULT_COMPACTOR_ATTENTION_WINDOW,
-        description="The number of most-recent events where observations will not be masked.",
+        description='The number of most-recent events where observations will not be masked.',
         ge=1,
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class BrowserOutputCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for the BrowserOutputCompactor."""
 
-    type: Literal["browser_output_masking"] = Field(default="browser_output_masking")
+    type: Literal['browser_output_masking'] = Field(default='browser_output_masking')
     attention_window: int = Field(
         default=DEFAULT_BROWSER_COMPACTOR_ATTENTION_WINDOW,
-        description="The number of most recent browser output observations that will not be masked.",
+        description='The number of most recent browser output observations that will not be masked.',
         ge=1,
     )
 
@@ -60,146 +60,146 @@ class BrowserOutputCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass)
 class RecentEventsCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for RecentEventsCompactor."""
 
-    type: Literal["recent"] = Field(default="recent")
+    type: Literal['recent'] = Field(default='recent')
     keep_first: int = Field(
         default=DEFAULT_COMPACTOR_KEEP_FIRST,
-        description="The number of initial events to condense.",
+        description='The number of initial events to condense.',
         ge=0,
     )
     max_events: int = Field(
         default=DEFAULT_COMPACTOR_MAX_EVENTS,
-        description="Maximum number of events to keep.",
+        description='Maximum number of events to keep.',
         ge=1,
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class LLMSummarizingCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for LLMSummarizingCompactor."""
 
-    type: Literal["llm"] = Field(default="llm")
+    type: Literal['llm'] = Field(default='llm')
     llm_config: LLMConfig = Field(
-        ..., description="Configuration for the LLM to use for condensing."
+        ..., description='Configuration for the LLM to use for condensing.'
     )
     keep_first: int = Field(
         default=DEFAULT_COMPACTOR_KEEP_FIRST,
-        description="Number of initial events to always keep in history.",
+        description='Number of initial events to always keep in history.',
         ge=0,
     )
     max_size: int = Field(
         default=DEFAULT_COMPACTOR_MAX_SIZE,
-        description="Maximum size of the condensed history before triggering pruning.",
+        description='Maximum size of the condensed history before triggering pruning.',
         ge=2,
     )
     max_event_length: int = Field(
         default=DEFAULT_COMPACTOR_MAX_EVENT_LENGTH,
-        description="Maximum length of the event representations to be passed to the LLM.",
+        description='Maximum length of the event representations to be passed to the LLM.',
     )
     token_budget: int | None = Field(
         default=None,
         description=(
-            "Optional token budget. When set, condensation also triggers if "
-            "the estimated token count of the view exceeds this limit."
+            'Optional token budget. When set, condensation also triggers if '
+            'the estimated token count of the view exceeds this limit.'
         ),
         ge=1,
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class AmortizedPruningCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for AmortizedPruningCompactor."""
 
-    type: Literal["amortized"] = Field(default="amortized")
+    type: Literal['amortized'] = Field(default='amortized')
     max_size: int = Field(
         default=DEFAULT_COMPACTOR_MAX_SIZE,
-        description="Maximum size of the condensed history before triggering pruning.",
+        description='Maximum size of the condensed history before triggering pruning.',
         ge=2,
     )
     keep_first: int = Field(
         default=DEFAULT_COMPACTOR_KEEP_FIRST,
-        description="Number of initial events to always keep in history.",
+        description='Number of initial events to always keep in history.',
         ge=0,
     )
     token_budget: int | None = Field(
         default=None,
         description=(
-            "Optional token budget.  When set, condensation also triggers if "
-            "the estimated token count of the view exceeds this limit."
+            'Optional token budget.  When set, condensation also triggers if '
+            'the estimated token count of the view exceeds this limit.'
         ),
         ge=1,
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class LLMAttentionCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for LLMAttentionCompactor."""
 
-    type: Literal["llm_attention"] = Field(default="llm_attention")
+    type: Literal['llm_attention'] = Field(default='llm_attention')
     llm_config: LLMConfig = Field(
-        ..., description="Configuration for the LLM to use for attention."
+        ..., description='Configuration for the LLM to use for attention.'
     )
     max_size: int = Field(
         default=DEFAULT_COMPACTOR_MAX_SIZE,
-        description="Maximum size of the condensed history before triggering pruning.",
+        description='Maximum size of the condensed history before triggering pruning.',
         ge=2,
     )
     keep_first: int = Field(
         default=DEFAULT_COMPACTOR_KEEP_FIRST,
-        description="Number of initial events to always keep in history.",
+        description='Number of initial events to always keep in history.',
         ge=0,
     )
     token_budget: int | None = Field(
         default=None,
         description=(
-            "Optional token budget.  When set, condensation also triggers if "
-            "the estimated token count of the view exceeds this limit."
+            'Optional token budget.  When set, condensation also triggers if '
+            'the estimated token count of the view exceeds this limit.'
         ),
         ge=1,
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class StructuredSummaryCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for StructuredSummaryCompactor instances."""
 
-    type: Literal["structured"] = Field(default="structured")
+    type: Literal['structured'] = Field(default='structured')
     llm_config: LLMConfig = Field(
-        ..., description="Configuration for the LLM to use for condensing."
+        ..., description='Configuration for the LLM to use for condensing.'
     )
     keep_first: int = Field(
         default=DEFAULT_COMPACTOR_KEEP_FIRST,
-        description="Number of initial events to always keep in history.",
+        description='Number of initial events to always keep in history.',
         ge=0,
     )
     max_size: int = Field(
         default=DEFAULT_COMPACTOR_MAX_SIZE,
-        description="Maximum size of the condensed history before triggering pruning.",
+        description='Maximum size of the condensed history before triggering pruning.',
         ge=2,
     )
     max_event_length: int = Field(
         default=DEFAULT_COMPACTOR_MAX_EVENT_LENGTH,
-        description="Maximum length of the event representations to be passed to the LLM.",
+        description='Maximum length of the event representations to be passed to the LLM.',
     )
     token_budget: int | None = Field(
         default=None,
         description=(
-            "Optional token budget.  When set, condensation also triggers if "
-            "the estimated token count of the view exceeds this limit."
+            'Optional token budget.  When set, condensation also triggers if '
+            'the estimated token count of the view exceeds this limit.'
         ),
         ge=1,
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class CompactorPipelineConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for the CompactorPipeline."""
 
-    type: Literal["pipeline"] = Field(default="pipeline")
+    type: Literal['pipeline'] = Field(default='pipeline')
     compactors: list[CompactorConfig] = Field(
         default_factory=list,
-        description="List of compactor configurations to be used in the pipeline.",
+        description='List of compactor configurations to be used in the pipeline.',
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class ConversationWindowCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
@@ -208,16 +208,16 @@ class ConversationWindowCompactorConfig(BaseModel, metaclass=CanonicalModelMetac
     Not currently supported by the TOML or ENV_VAR configuration strategies.
     """
 
-    type: Literal["conversation_window"] = Field(default="conversation_window")
+    type: Literal['conversation_window'] = Field(default='conversation_window')
     max_events: int = Field(
         default=100,
         description=(
-            "Proactive condensation threshold. When the event count exceeds "
-            "this value the compactor trims history BEFORE hitting the "
-            "context window limit."
+            'Proactive condensation threshold. When the event count exceeds '
+            'this value the compactor trims history BEFORE hitting the '
+            'context window limit.'
         ),
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class AutoCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
@@ -227,67 +227,67 @@ class AutoCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     and picks the most appropriate compactor strategy dynamically.
     """
 
-    type: Literal["auto"] = Field(default="auto")
+    type: Literal['auto'] = Field(default='auto')
     llm_config: LLMConfig | str | None = Field(
         default=None,
-        description="LLM config name made available to LLM-based strategies when auto-selected.",
+        description='LLM config name made available to LLM-based strategies when auto-selected.',
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class SmartCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for SmartCompactor with LLM-assisted importance scoring."""
 
-    type: Literal["smart"] = Field(default="smart")
+    type: Literal['smart'] = Field(default='smart')
     llm_config: LLMConfig | str | None = Field(
-        default=None, description="LLM config name to use for importance scoring."
+        default=None, description='LLM config name to use for importance scoring.'
     )
     max_size: int = Field(
         default=DEFAULT_SMART_COMPACTOR_MAX_SIZE,
-        description="Maximum events before triggering condensation.",
+        description='Maximum events before triggering condensation.',
         ge=2,
     )
     keep_first: int = Field(
         default=DEFAULT_SMART_COMPACTOR_KEEP_FIRST,
-        description="Number of initial events to always keep.",
+        description='Number of initial events to always keep.',
         ge=0,
     )
     importance_threshold: float = Field(
         default=DEFAULT_SMART_COMPACTOR_IMPORTANCE_THRESHOLD,
-        description="Minimum importance score to keep event (0.0-1.0).",
+        description='Minimum importance score to keep event (0.0-1.0).',
         ge=0.0,
         le=1.0,
     )
     recency_bonus_window: int = Field(
         default=DEFAULT_SMART_COMPACTOR_RECENCY_BONUS_WINDOW,
-        description="Number of recent events to give recency bonus.",
+        description='Number of recent events to give recency bonus.',
         ge=1,
     )
     token_budget: int | None = Field(
         default=None,
         description=(
-            "Optional token budget.  When set, condensation also triggers if "
-            "the estimated token count of the view exceeds this limit."
+            'Optional token budget.  When set, condensation also triggers if '
+            'the estimated token count of the view exceeds this limit.'
         ),
         ge=1,
     )
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 class SemanticCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for SemanticCompactor."""
 
-    type: Literal["semantic"] = Field(default="semantic")
+    type: Literal['semantic'] = Field(default='semantic')
     llm_config: LLMConfig | str | None = Field(
-        default=None, description="LLM config name to use for summarization (optional)."
+        default=None, description='LLM config name to use for summarization (optional).'
     )
     max_size: int = Field(default=DEFAULT_SMART_COMPACTOR_MAX_SIZE, ge=2)
     keep_first: int = Field(default=DEFAULT_SMART_COMPACTOR_KEEP_FIRST, ge=0)
     similarity_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
-    model_name: str = Field(default="all-MiniLM-L6-v2")
+    model_name: str = Field(default='all-MiniLM-L6-v2')
     token_budget: int | None = Field(default=None, ge=1)
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra='forbid')
 
 
 # Define the union type for all compactor configurations
@@ -336,16 +336,16 @@ def compactor_config_from_toml_section(
     """
     compactor_mapping: dict[str, CompactorConfig] = {}
     try:
-        compactor_type = data.get("type", "smart")
+        compactor_type = data.get('type', 'smart')
         if (
-            compactor_type in ("llm", "llm_attention", "smart")
-            and "llm_config" in data
-            and isinstance(data["llm_config"], str)
+            compactor_type in ('llm', 'llm_attention', 'smart')
+            and 'llm_config' in data
+            and isinstance(data['llm_config'], str)
         ):
-            llm_config_name = data["llm_config"]
+            llm_config_name = data['llm_config']
             if llm_configs and llm_config_name in llm_configs:
                 data_copy = data.copy()
-                data_copy["llm_config"] = llm_configs[llm_config_name]
+                data_copy['llm_config'] = llm_configs[llm_config_name]
                 config = create_compactor_config(compactor_type, data_copy)
             else:
                 logger.app_logger.warning(
@@ -353,16 +353,16 @@ def compactor_config_from_toml_section(
                     llm_config_name,
                     compactor_type,
                 )
-                config = NoOpCompactorConfig(type="noop")
+                config = NoOpCompactorConfig(type='noop')
         else:
             config = create_compactor_config(compactor_type, data)
-        compactor_mapping["compactor"] = config
+        compactor_mapping['compactor'] = config
     except (ValidationError, ValueError) as e:
         logger.app_logger.warning(
-            "Invalid compactor configuration: %s. Using NoOpCompactorConfig.", e
+            'Invalid compactor configuration: %s. Using NoOpCompactorConfig.', e
         )
-        config = NoOpCompactorConfig(type="noop")
-        compactor_mapping["compactor"] = config
+        config = NoOpCompactorConfig(type='noop')
+        compactor_mapping['compactor'] = config
     return compactor_mapping
 
 
@@ -382,26 +382,26 @@ def create_compactor_config(compactor_type: str, data: dict) -> CompactorConfig:
 
     """
     compactor_classes = {
-        "noop": NoOpCompactorConfig,
-        "observation_masking": ObservationMaskingCompactorConfig,
-        "recent": RecentEventsCompactorConfig,
-        "llm": LLMSummarizingCompactorConfig,
-        "amortized": AmortizedPruningCompactorConfig,
-        "llm_attention": LLMAttentionCompactorConfig,
-        "structured": StructuredSummaryCompactorConfig,
-        "pipeline": CompactorPipelineConfig,
-        "conversation_window": ConversationWindowCompactorConfig,
-        "browser_output_masking": BrowserOutputCompactorConfig,
-        "smart": SmartCompactorConfig,
-        "auto": AutoCompactorConfig,
-        "semantic": SemanticCompactorConfig,
+        'noop': NoOpCompactorConfig,
+        'observation_masking': ObservationMaskingCompactorConfig,
+        'recent': RecentEventsCompactorConfig,
+        'llm': LLMSummarizingCompactorConfig,
+        'amortized': AmortizedPruningCompactorConfig,
+        'llm_attention': LLMAttentionCompactorConfig,
+        'structured': StructuredSummaryCompactorConfig,
+        'pipeline': CompactorPipelineConfig,
+        'conversation_window': ConversationWindowCompactorConfig,
+        'browser_output_masking': BrowserOutputCompactorConfig,
+        'smart': SmartCompactorConfig,
+        'auto': AutoCompactorConfig,
+        'semantic': SemanticCompactorConfig,
     }
     if compactor_type not in compactor_classes:
-        msg = f"Unknown compactor type: {compactor_type}"
+        msg = f'Unknown compactor type: {compactor_type}'
         raise ValueError(msg)
     try:
         config_class = compactor_classes[compactor_type]
-        return cast("CompactorConfig", config_class(**data))
+        return cast('CompactorConfig', config_class(**data))
     except ValidationError as e:
         msg = f"Validation failed for compactor type '{compactor_type}': {e}"
         raise ValueError(msg) from e

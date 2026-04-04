@@ -10,15 +10,15 @@ from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action.mcp import MCPAction
 
-VERIFY_UI_CHANGE_TOOL_NAME = "verify_ui_change"
-BROWSER_SERVER_NAME = "browser-use"  # Updated to match config.json
+VERIFY_UI_CHANGE_TOOL_NAME = 'verify_ui_change'
+BROWSER_SERVER_NAME = 'browser-use'  # Updated to match config.json
 
 _DESCRIPTION = (
-    "Navigate to a URL and immediately take a screenshot to verify frontend changes. "
-    "Use this tool after modifying UI components (HTML, CSS, React, etc.) to visually "
-    "confirm your changes.\n\n"
-    "This tool automates the process of opening a browser, navigating to the URL, "
-    "and capturing the screen. It returns a description of the visual layout."
+    'Navigate to a URL and immediately take a screenshot to verify frontend changes. '
+    'Use this tool after modifying UI components (HTML, CSS, React, etc.) to visually '
+    'confirm your changes.\n\n'
+    'This tool automates the process of opening a browser, navigating to the URL, '
+    'and capturing the screen. It returns a description of the visual layout.'
 )
 
 
@@ -28,12 +28,12 @@ def create_verify_ui_change_tool() -> ChatCompletionToolParam:
         name=VERIFY_UI_CHANGE_TOOL_NAME,
         description=_DESCRIPTION,
         properties={
-            "url": {
-                "type": "string",
-                "description": "The URL to verify (e.g., 'http://localhost:3000').",
+            'url': {
+                'type': 'string',
+                'description': "The URL to verify (e.g., 'http://localhost:3000').",
             },
         },
-        required=["url"],
+        required=['url'],
     )
 
 
@@ -41,7 +41,7 @@ def build_verify_ui_change_action(arguments: dict) -> MCPAction:
     """Build the composite MCP action to verify the UI."""
     from backend.core.errors import FunctionCallValidationError
 
-    url = arguments.get("url")
+    url = arguments.get('url')
     if not url:
         raise FunctionCallValidationError(
             'Missing required argument "url" in tool call verify_ui_change'
@@ -59,7 +59,7 @@ def build_verify_ui_change_action(arguments: dict) -> MCPAction:
 
     # We prefix it with the server name as required by MCP tool calling logic.
     return MCPAction(
-        name=f"{BROWSER_SERVER_NAME}_screenshot",
-        arguments={"url": url},
-        thought=f"[UI VERIFY] Navigating to {url} and capturing screenshot...",
+        name=f'{BROWSER_SERVER_NAME}_screenshot',
+        arguments={'url': url},
+        thought=f'[UI VERIFY] Navigating to {url} and capturing screenshot...',
     )

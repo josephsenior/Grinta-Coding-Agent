@@ -2,4 +2,4 @@
 
 from backend.validation.task_validator import TaskValidator, ValidationResult
 
-__all__ = ["TaskValidator", "ValidationResult"]
+__all__ = ['TaskValidator', 'ValidationResult']

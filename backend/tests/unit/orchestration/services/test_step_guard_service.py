@@ -1,7 +1,7 @@
 """Tests for StepGuardService."""
 
-from types import SimpleNamespace
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 from backend.orchestration.services.step_guard_service import StepGuardService
@@ -37,9 +37,9 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         mock_cb_service = MagicMock()
         mock_result = MagicMock()
         mock_result.tripped = True
-        mock_result.reason = "Too many errors"
-        mock_result.action = "stop"
-        mock_result.recommendation = "Fix the errors"
+        mock_result.reason = 'Too many errors'
+        mock_result.action = 'stop'
+        mock_result.recommendation = 'Fix the errors'
         mock_cb_service.check.return_value = mock_result
 
         self.mock_controller.circuit_breaker_service = mock_cb_service
@@ -58,7 +58,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result)
         self.mock_controller.event_stream.add_event.assert_called_once()
         emitted = self.mock_controller.event_stream.add_event.call_args.args[0]
-        self.assertEqual(getattr(emitted, "error_id", ""), "CIRCUIT_BREAKER_WARNING")
+        self.assertEqual(getattr(emitted, 'error_id', ''), 'CIRCUIT_BREAKER_WARNING')
         self.mock_controller.set_agent_state_to.assert_not_called()
 
     async def test_ensure_can_step_circuit_breaker_blocks_after_warning_limit(self):
@@ -66,9 +66,9 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         mock_cb_service = MagicMock()
         mock_result = MagicMock()
         mock_result.tripped = True
-        mock_result.reason = "Too many errors"
-        mock_result.action = "stop"
-        mock_result.recommendation = "Fix the errors"
+        mock_result.reason = 'Too many errors'
+        mock_result.action = 'stop'
+        mock_result.recommendation = 'Fix the errors'
         mock_cb_service.check.return_value = mock_result
 
         self.mock_controller.circuit_breaker_service = mock_cb_service

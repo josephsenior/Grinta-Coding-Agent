@@ -17,7 +17,7 @@ from backend.core import logger
 from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
 
-if __name__ != "__main__":
+if __name__ != '__main__':
     from collections.abc import MutableMapping
 
 
@@ -60,7 +60,7 @@ def cast_value_to_type(value: str, field_type: Any) -> Any:
         field_type = _get_optional_type(field_type)
 
     if field_type is bool:
-        return value.lower() in {"true", "1"}
+        return value.lower() in {'true', '1'}
 
     if _is_dict_or_list_type(field_type):
         cast_value = literal_eval(value)
@@ -92,26 +92,26 @@ def _process_field_value(
         return
 
     try:
-        if field_name.lower().endswith("api_key"):
+        if field_name.lower().endswith('api_key'):
             cast_value = SecretStr(value)
         else:
             cast_value = cast_value_to_type(value, field_type)
         setattr(sub_config, field_name, cast_value)
 
-        if field_name == "api_key":
+        if field_name == 'api_key':
             try:
                 from backend.core.config.api_key_manager import api_key_manager
 
-                if hasattr(sub_config, "model") and cast_value is not None:
+                if hasattr(sub_config, 'model') and cast_value is not None:
                     api_key_manager.set_api_key(sub_config.model, cast_value)
                     api_key_manager.set_environment_variables(
                         sub_config.model, cast_value
                     )
             except Exception:
-                logger.app_logger.debug("Failed to sync API key manager")
+                logger.app_logger.debug('Failed to sync API key manager')
     except (ValueError, TypeError):
         logger.app_logger.error(
-            "Error setting env var %s=<redacted>: check that the value is of the right type",
+            'Error setting env var %s=<redacted>: check that the value is of the right type',
             env_var_name,
         )
 
@@ -119,7 +119,7 @@ def _process_field_value(
 def _set_attr_from_env(
     sub_config: BaseModel,
     env_dict: dict,
-    prefix: str = "",
+    prefix: str = '',
 ) -> None:
     """Set attributes of a config model based on environment variables."""
     for field_name, field_info in sub_config.__class__.model_fields.items():
@@ -128,7 +128,7 @@ def _set_attr_from_env(
         env_var_name = (prefix + field_name).upper()
 
         if isinstance(field_value, BaseModel):
-            _set_attr_from_env(field_value, env_dict, prefix=f"{field_name}_")
+            _set_attr_from_env(field_value, env_dict, prefix=f'{field_name}_')
         elif env_var_name in env_dict:
             _process_field_value(
                 sub_config, field_name, field_type, env_var_name, env_dict
@@ -143,22 +143,22 @@ def load_from_env(
 
     _set_attr_from_env(cfg, env_dict)
     default_llm_config = cfg.get_llm_config()
-    _set_attr_from_env(default_llm_config, env_dict, "LLM_")
+    _set_attr_from_env(default_llm_config, env_dict, 'LLM_')
 
-    if "LLM_API_KEY" in env_dict:
+    if 'LLM_API_KEY' in env_dict:
         from backend.core.config.llm_config import suppress_llm_env_export
 
         updated_data = default_llm_config.model_dump()
         if isinstance(default_llm_config.api_key, SecretStr):
-            updated_data["api_key"] = default_llm_config.api_key.get_secret_value()
+            updated_data['api_key'] = default_llm_config.api_key.get_secret_value()
 
-        updated_data["api_key"] = env_dict["LLM_API_KEY"]
+        updated_data['api_key'] = env_dict['LLM_API_KEY']
         with suppress_llm_env_export():
             new_config = LLMConfig.model_validate(updated_data)
         cfg.set_llm_config(new_config)
     else:
         cfg.set_llm_config(default_llm_config)
-    _set_attr_from_env(cfg.get_agent_config(), env_dict, "AGENT_")
+    _set_attr_from_env(cfg.get_agent_config(), env_dict, 'AGENT_')
 
 
 def restore_environment(original_env: dict[str, str]) -> None:
@@ -184,5 +184,5 @@ def export_llm_api_keys(cfg: AppConfig) -> None:
                 api_key_manager.set_environment_variables(llm.model, llm.api_key)
     except Exception:
         logger.app_logger.debug(
-            "Failed to export LLM API keys after configuration load"
+            'Failed to export LLM API keys after configuration load'
         )

@@ -17,4 +17,3 @@ class UserRejectObservation(Observation):
     def message(self) -> str:
         """Get rejection reason message."""
         return self.content
-

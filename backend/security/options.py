@@ -9,12 +9,12 @@ from backend.security.analyzer import SecurityAnalyzer
 # Registry of available security analyzers
 # Maps analyzer name to analyzer class
 SecurityAnalyzers: dict[str, type[SecurityAnalyzer]] = {
-    "default": SecurityAnalyzer,
+    'default': SecurityAnalyzer,
 }
 
 
 def get_security_analyzer(
-    name: str = "default",
+    name: str = 'default',
     config: dict[str, Any] | None = None,
 ) -> SecurityAnalyzer:
     """Instantiate a registered security analyzer.
@@ -33,4 +33,4 @@ def get_security_analyzer(
     return cls(config=config)
 
 
-__all__ = ["SecurityAnalyzers", "get_security_analyzer"]
+__all__ = ['SecurityAnalyzers', 'get_security_analyzer']

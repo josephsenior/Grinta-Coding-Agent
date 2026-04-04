@@ -8,17 +8,23 @@ shape matches capabilities that orjson can satisfy without changing behavior.
 from __future__ import annotations
 
 import json as _json
-from typing import Any, IO
+from typing import IO, Any
 
 JSONDecodeError = _json.JSONDecodeError
 
+_orjson: Any = None
+_ORJSON_AVAILABLE = False
+
 try:
-    import orjson as _orjson
+    import orjson as _orjson_module
 except Exception:  # pragma: no cover - optional dependency import guard
-    _orjson = None
+    pass
+else:
+    _orjson = _orjson_module
+    _ORJSON_AVAILABLE = True
 
 
-_COMPACT_SEPARATORS = (",", ":")
+_COMPACT_SEPARATORS = (',', ':')
 
 
 def _can_use_orjson(
@@ -29,7 +35,7 @@ def _can_use_orjson(
     cls: type[Any] | None,
     kwargs: dict[str, Any],
 ) -> bool:
-    if _orjson is None:
+    if not _ORJSON_AVAILABLE:
         return False
     if ensure_ascii:
         return False
@@ -81,12 +87,13 @@ def dumps(
         cls=cls,
         kwargs=kwargs,
     ):
-        option = _orjson.OPT_NON_STR_KEYS
+        orjson_module = _orjson
+        option = orjson_module.OPT_NON_STR_KEYS
         if sort_keys:
-            option |= _orjson.OPT_SORT_KEYS
+            option |= orjson_module.OPT_SORT_KEYS
         if indent == 2:
-            option |= _orjson.OPT_INDENT_2
-        return _orjson.dumps(obj, default=default, option=option).decode("utf-8")
+            option |= orjson_module.OPT_INDENT_2
+        return orjson_module.dumps(obj, default=default, option=option).decode('utf-8')
 
     return _json.dumps(
         obj,
@@ -110,7 +117,7 @@ def dump(obj: Any, fp: IO[str], **kwargs: Any) -> None:
 
 def loads(data: str | bytes | bytearray | memoryview, **kwargs: Any) -> Any:
     """Deserialize JSON text or bytes."""
-    if _orjson is not None and not kwargs:
+    if _ORJSON_AVAILABLE and not kwargs:
         return _orjson.loads(data)
     return _json.loads(data, **kwargs)
 

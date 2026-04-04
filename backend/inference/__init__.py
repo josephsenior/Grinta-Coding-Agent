@@ -2,4 +2,4 @@
 
 from backend.inference.llm import LLM
 
-__all__ = ["LLM"]
+__all__ = ['LLM']

@@ -114,7 +114,7 @@ class LLMBatchProcessor:
                 batch_results.append(BatchResult(success=False, error=result))
             else:
                 # Type narrowing: result is BatchResult here
-                assert isinstance(result, BatchResult), "Expected BatchResult"
+                assert isinstance(result, BatchResult), 'Expected BatchResult'
                 batch_results.append(result)
         return batch_results
 
@@ -135,67 +135,67 @@ class LLMBatchProcessor:
         try:
             async with self._semaphore:
                 # Use getattr to handle dynamic method access
-                acompletion = getattr(self.primary_llm, "acompletion", None)
+                acompletion = getattr(self.primary_llm, 'acompletion', None)
                 if acompletion is None:
                     # Fallback to completion if acompletion doesn't exist
                     completion_func = self.primary_llm.completion()
                     response = await asyncio.to_thread(
                         completion_func,
-                        messages=[{"role": "user", "content": request.prompt}],
+                        messages=[{'role': 'user', 'content': request.prompt}],
                         model=request.model,
                         temperature=request.temperature,
                         max_tokens=request.max_tokens,
                     )
                 else:
                     response = await acompletion(
-                        messages=[{"role": "user", "content": request.prompt}],
+                        messages=[{'role': 'user', 'content': request.prompt}],
                         model=request.model,
                         temperature=request.temperature,
                         max_tokens=request.max_tokens,
                     )
 
             latency = (time.time() - start_time) * 1000
-            cost = getattr(self.primary_llm, "metrics", {}).get("accumulated_cost", 0.0)
+            cost = getattr(self.primary_llm, 'metrics', {}).get('accumulated_cost', 0.0)
 
             return BatchResult(
                 success=True,
                 response=response.choices[0].message.content
                 if response.choices
                 else None,
-                provider="primary",
+                provider='primary',
                 cost=cost,
                 latency_ms=latency,
             )
         except Exception as e:
-            logger.warning("Primary LLM failed: %s, trying backup providers...", e)
+            logger.warning('Primary LLM failed: %s, trying backup providers...', e)
 
             # Try backup providers
             for backup_llm in self.backup_llms:
                 try:
                     async with self._semaphore:
                         # Use getattr to handle dynamic method access
-                        acompletion = getattr(backup_llm, "acompletion", None)
+                        acompletion = getattr(backup_llm, 'acompletion', None)
                         if acompletion is None:
                             # Fallback to completion if acompletion doesn't exist
                             completion_func = backup_llm.completion()
                             response = await asyncio.to_thread(
                                 completion_func,
-                                messages=[{"role": "user", "content": request.prompt}],
+                                messages=[{'role': 'user', 'content': request.prompt}],
                                 model=request.model,
                                 temperature=request.temperature,
                                 max_tokens=request.max_tokens,
                             )
                         else:
                             response = await acompletion(
-                                messages=[{"role": "user", "content": request.prompt}],
+                                messages=[{'role': 'user', 'content': request.prompt}],
                                 model=request.model,
                                 temperature=request.temperature,
                                 max_tokens=request.max_tokens,
                             )
 
                     latency = (time.time() - start_time) * 1000
-                    cost = getattr(backup_llm, "metrics", {}).get(
-                        "accumulated_cost", 0.0
+                    cost = getattr(backup_llm, 'metrics', {}).get(
+                        'accumulated_cost', 0.0
                     )
 
                     return BatchResult(
@@ -203,12 +203,12 @@ class LLMBatchProcessor:
                         response=response.choices[0].message.content
                         if response.choices
                         else None,
-                        provider="backup",
+                        provider='backup',
                         cost=cost,
                         latency_ms=latency,
                     )
                 except Exception as backup_error:
-                    logger.warning("Backup LLM failed: %s", backup_error)
+                    logger.warning('Backup LLM failed: %s', backup_error)
                     continue
 
             # All providers failed

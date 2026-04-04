@@ -1,22 +1,23 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fastapi import Request
+
     from backend.execution.action_execution_server import RuntimeExecutor
 
 
 async def _resolve_list_path(request: Request, client: RuntimeExecutor) -> str:
     """Resolve file listing path from request payload or fallback to runtime cwd."""
-    path = ""
+    path = ''
     try:
         data = await request.json()
         if isinstance(data, dict):
-            path = str(data.get("path") or "")
+            path = str(data.get('path') or '')
     except Exception:
-        path = ""
+        path = ''
 
     if not path:
         return client.initial_cwd

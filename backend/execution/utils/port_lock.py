@@ -28,9 +28,9 @@ class PortLock:
         """Prepare filesystem lock state for the given port under the optional directory."""
         self.port = port
         self.lock_dir = lock_dir or os.path.join(
-            tempfile.gettempdir(), "app_port_locks"
+            tempfile.gettempdir(), 'app_port_locks'
         )
-        self.lock_file_path = os.path.join(self.lock_dir, f"port_{port}.lock")
+        self.lock_file_path = os.path.join(self.lock_dir, f'port_{port}.lock')
         self.lock_fd: int | None = None
         self._locked = False
         os.makedirs(self.lock_dir, exist_ok=True)
@@ -38,9 +38,9 @@ class PortLock:
     def _write_lock_info(self) -> None:
         """Write port information to the lock file."""
         if self.lock_fd is None:
-            msg = "Lock file descriptor is not open"
+            msg = 'Lock file descriptor is not open'
             raise RuntimeError(msg)
-        os.write(self.lock_fd, f"{self.port}\n".encode())
+        os.write(self.lock_fd, f'{self.port}\n'.encode())
         os.fsync(self.lock_fd)
 
     def _acquire_with_fcntl(self, timeout: float) -> bool:
@@ -54,7 +54,7 @@ class PortLock:
 
         """
         if not HAS_FCNTL or fcntl is None:
-            msg = "fcntl is not available on this platform"
+            msg = 'fcntl is not available on this platform'
             raise RuntimeError(msg)
 
         self.lock_fd = os.open(
@@ -71,7 +71,7 @@ class PortLock:
                 )
                 self._locked = True
                 self._write_lock_info()
-                logger.debug("Acquired lock for port %s", self.port)
+                logger.debug('Acquired lock for port %s', self.port)
                 return True
             except OSError:
                 time.sleep(0.01)
@@ -102,7 +102,7 @@ class PortLock:
                 )
                 self._locked = True
                 self._write_lock_info()
-                logger.debug("Acquired lock for port %s", self.port)
+                logger.debug('Acquired lock for port %s', self.port)
                 return True
             except OSError:
                 time.sleep(0.01)
@@ -134,7 +134,7 @@ class PortLock:
                 return self._acquire_with_fcntl(timeout)
             return self._acquire_without_fcntl(timeout)
         except Exception as e:
-            logger.debug("Failed to acquire lock for port %s: %s", self.port, e)
+            logger.debug('Failed to acquire lock for port %s: %s', self.port, e)
             self._cleanup_on_failure()
             return False
 
@@ -149,9 +149,9 @@ class PortLock:
             os.close(self.lock_fd)
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(self.lock_file_path)
-            logger.debug("Released lock for port %s", self.port)
+            logger.debug('Released lock for port %s', self.port)
         except Exception as e:
-            logger.warning("Error releasing lock for port %s: %s", self.port, e)
+            logger.warning('Error releasing lock for port %s: %s', self.port, e)
         finally:
             self.lock_fd = None
             self._locked = False
@@ -159,7 +159,7 @@ class PortLock:
     def __enter__(self) -> Self:
         """Acquire the port lock when entering a context manager block."""
         if not self.acquire():
-            msg = f"Could not acquire lock for port {self.port}"
+            msg = f'Could not acquire lock for port {self.port}'
             raise OSError(msg)
         return self
 
@@ -182,7 +182,7 @@ def find_available_port_with_lock(
     min_port: int = 30000,
     max_port: int = 39999,
     max_attempts: int = 20,
-    bind_address: str = "0.0.0.0",  # nosec B104 - Safe: configurable bind address for port availability check
+    bind_address: str = '0.0.0.0',  # nosec B104 - Safe: configurable bind address for port availability check
     lock_timeout: float = 1.0,
 ) -> tuple[int, PortLock] | None:
     """Find an available port and acquire a lock for it.
@@ -208,7 +208,7 @@ def find_available_port_with_lock(
         lock = PortLock(port)
         if lock.acquire(timeout=lock_timeout):
             if _check_port_available(port, bind_address):
-                logger.debug("Found and locked available port %s", port)
+                logger.debug('Found and locked available port %s', port)
                 return (port, lock)
             lock.release()
         time.sleep(0.001)
@@ -221,12 +221,12 @@ def find_available_port_with_lock(
         lock = PortLock(port)
         if lock.acquire(timeout=lock_timeout):
             if _check_port_available(port, bind_address):
-                logger.debug("Found and locked available port %s", port)
+                logger.debug('Found and locked available port %s', port)
                 return (port, lock)
             lock.release()
         time.sleep(0.001)
     logger.error(
-        "Could not find and lock available port in range %s-%s after %s attempts",
+        'Could not find and lock available port in range %s-%s after %s attempts',
         min_port,
         max_port,
         max_attempts,
@@ -236,7 +236,7 @@ def find_available_port_with_lock(
 
 def _check_port_available(
     port: int,
-    bind_address: str = "0.0.0.0",
+    bind_address: str = '0.0.0.0',
 ) -> bool:  # nosec B104 - Safe: configurable bind address for port checking
     """Check if a port is available by trying to bind to it."""
     try:
@@ -259,25 +259,25 @@ def cleanup_stale_locks(max_age_seconds: int = 300) -> int:
         Number of lock files cleaned up
 
     """
-    lock_dir = os.path.join(tempfile.gettempdir(), "app_port_locks")
+    lock_dir = os.path.join(tempfile.gettempdir(), 'app_port_locks')
     if not os.path.exists(lock_dir):
         return 0
     cleaned = 0
     current_time = time.time()
     try:
         for filename in os.listdir(lock_dir):
-            if filename.startswith("port_") and filename.endswith(".lock"):
+            if filename.startswith('port_') and filename.endswith('.lock'):
                 lock_path = os.path.join(lock_dir, filename)
                 try:
                     stat = os.stat(lock_path)
                     if current_time - stat.st_mtime > max_age_seconds:
                         os.unlink(lock_path)
                         cleaned += 1
-                        logger.debug("Cleaned up stale lock file: %s", filename)
+                        logger.debug('Cleaned up stale lock file: %s', filename)
                 except OSError:
                     pass
     except OSError:
         pass
     if cleaned > 0:
-        logger.info("Cleaned up %s stale port lock files", cleaned)
+        logger.info('Cleaned up %s stale port lock files', cleaned)
     return cleaned

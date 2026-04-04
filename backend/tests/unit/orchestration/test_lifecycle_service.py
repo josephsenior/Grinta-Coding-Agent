@@ -3,15 +3,11 @@
 from __future__ import annotations
 
 from typing import cast
-
 from unittest.mock import ANY, MagicMock, patch
 
 from backend.core.config import AgentConfig, LLMConfig
-from backend.ledger import Event
-
+from backend.ledger import Event, EventStreamSubscriber
 from backend.orchestration.services.lifecycle_service import LifecycleService
-from backend.ledger import EventStreamSubscriber
-
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
@@ -48,7 +44,7 @@ class TestInitializeCoreAttributes:
         svc = LifecycleService(ctrl)
 
         event_stream = MagicMock()
-        event_stream.sid = "stream-sid"
+        event_stream.sid = 'stream-sid'
         agent = MagicMock()
         file_store = MagicMock()
         stats = MagicMock()
@@ -56,10 +52,10 @@ class TestInitializeCoreAttributes:
         security = MagicMock()
 
         svc.initialize_core_attributes(
-            sid="s1",
+            sid='s1',
             event_stream=event_stream,
             agent=agent,
-            user_id="u1",
+            user_id='u1',
             file_store=file_store,
             headless_mode=True,
             conversation_stats=stats,
@@ -67,7 +63,7 @@ class TestInitializeCoreAttributes:
             security_analyzer=security,
         )
 
-        assert ctrl.user_id == "u1"
+        assert ctrl.user_id == 'u1'
         assert ctrl.file_store is file_store
         assert ctrl.headless_mode is True
         assert ctrl.status_callback is status_cb
@@ -82,7 +78,7 @@ class TestInitializeCoreAttributes:
         svc = LifecycleService(ctrl)
 
         event_stream = MagicMock()
-        event_stream.sid = "fallback-sid"
+        event_stream.sid = 'fallback-sid'
 
         svc.initialize_core_attributes(
             sid=None,
@@ -103,10 +99,10 @@ class TestInitializeCoreAttributes:
         svc = LifecycleService(ctrl)
 
         event_stream = MagicMock()
-        event_stream.sid = "s1"
+        event_stream.sid = 's1'
 
         svc.initialize_core_attributes(
-            sid="s1",
+            sid='s1',
             event_stream=event_stream,
             agent=MagicMock(),
             user_id=None,
@@ -133,12 +129,12 @@ class TestInitializeStateAndTracking:
         file_store = MagicMock()
 
         with patch(
-            "backend.orchestration.services.lifecycle_service.StateTracker"
+            'backend.orchestration.services.lifecycle_service.StateTracker'
         ) as mock_st:
             svc.initialize_state_and_tracking(
-                sid="s1",
+                sid='s1',
                 file_store=file_store,
-                user_id="u1",
+                user_id='u1',
                 initial_state=MagicMock(),
                 conversation_stats=MagicMock(),
                 iteration_delta=100,
@@ -147,7 +143,7 @@ class TestInitializeStateAndTracking:
                 replay_events=None,
             )
 
-            mock_st.assert_called_once_with("s1", file_store, "u1")
+            mock_st.assert_called_once_with('s1', file_store, 'u1')
             assert ctrl.state_tracker == mock_st.return_value
             assert ctrl.confirmation_mode is True
             ctrl.set_initial_state.assert_called_once()
@@ -158,12 +154,12 @@ class TestInitializeStateAndTracking:
 
         replay_events = cast(list[Event], [MagicMock(), MagicMock()])
 
-        with patch("backend.orchestration.services.lifecycle_service.StateTracker"):
+        with patch('backend.orchestration.services.lifecycle_service.StateTracker'):
             with patch(
-                "backend.orchestration.services.lifecycle_service.ReplayManager"
+                'backend.orchestration.services.lifecycle_service.ReplayManager'
             ) as mock_rm:
                 svc.initialize_state_and_tracking(
-                    sid="s1",
+                    sid='s1',
                     file_store=None,
                     user_id=None,
                     initial_state=None,
@@ -187,10 +183,10 @@ class TestInitializeAgentConfigs:
         svc = LifecycleService(ctrl)
 
         llm_configs: dict[str, LLMConfig] = cast(
-            dict[str, LLMConfig], {"agent1": MagicMock()}
+            dict[str, LLMConfig], {'agent1': MagicMock()}
         )
         agent_configs: dict[str, AgentConfig] = cast(
-            dict[str, AgentConfig], {"agent1": MagicMock()}
+            dict[str, AgentConfig], {'agent1': MagicMock()}
         )
 
         svc.initialize_agent_configs(

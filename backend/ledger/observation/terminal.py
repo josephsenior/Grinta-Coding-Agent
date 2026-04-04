@@ -20,9 +20,8 @@ class TerminalObservation(Observation):
     @property
     def message(self) -> str:
         """Get the observation message."""
-        return f"Terminal ({self.session_id}) output updated."
+        return f'Terminal ({self.session_id}) output updated.'
 
     def __str__(self) -> str:
         """Return a readable summary."""
-        return f"**TerminalObservation (session_id={self.session_id})**\nCONTENT:\n{self.content}"
-
+        return f'**TerminalObservation (session_id={self.session_id})**\nCONTENT:\n{self.content}'

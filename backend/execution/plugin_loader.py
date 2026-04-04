@@ -1,4 +1,4 @@
-﻿"""Plugin loading and initialization for the action execution server."""
+"""Plugin loading and initialization for the action execution server."""
 
 from __future__ import annotations
 
@@ -10,9 +10,7 @@ if TYPE_CHECKING:
     from backend.execution.plugins import Plugin
 
 
-async def init_plugins(
-    plugins_to_load: list[Plugin], username: str
-) -> dict[str, Any]:
+async def init_plugins(plugins_to_load: list[Plugin], username: str) -> dict[str, Any]:
     """Initialize a list of plugins.
 
     Args:
@@ -26,5 +24,5 @@ async def init_plugins(
     for plugin in plugins_to_load:
         plugins[plugin.name] = plugin
         await plugin.initialize(username)
-        logger.info("Plugin %s initialized", plugin.name)
+        logger.info('Plugin %s initialized', plugin.name)
     return plugins

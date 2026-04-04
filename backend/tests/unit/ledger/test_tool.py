@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-
 from backend.ledger.tool import ToolCallMetadata, build_tool_call_metadata
 
 
-def create_mock_response(response_id="chatcmpl-123", model="gpt-4"):
+def create_mock_response(response_id='chatcmpl-123', model='gpt-4'):
     """Create a properly configured mock response object."""
     mock = MagicMock()
     mock.id = response_id
@@ -25,27 +24,27 @@ class TestBuildToolCallMetadata:
 
     def test_creates_metadata_with_all_fields(self):
         """Test creates ToolCallMetadata with all required fields."""
-        response = create_mock_response("chatcmpl-123", "gpt-4")
+        response = create_mock_response('chatcmpl-123', 'gpt-4')
 
         metadata = build_tool_call_metadata(
-            function_name="test_function",
-            tool_call_id="call_abc",
+            function_name='test_function',
+            tool_call_id='call_abc',
             response_obj=response,
             total_calls_in_response=2,
         )
 
         assert isinstance(metadata, ToolCallMetadata)
-        assert metadata.function_name == "test_function"
-        assert metadata.tool_call_id == "call_abc"
+        assert metadata.function_name == 'test_function'
+        assert metadata.tool_call_id == 'call_abc'
         assert metadata.total_calls_in_response == 2
 
     def test_captures_model_response_lite(self):
         """Test captures lightweight model response representation."""
-        response = create_mock_response("chatcmpl-456", "gpt-3.5-turbo")
+        response = create_mock_response('chatcmpl-456', 'gpt-3.5-turbo')
 
         metadata = build_tool_call_metadata(
-            function_name="my_func",
-            tool_call_id="call_xyz",
+            function_name='my_func',
+            tool_call_id='call_xyz',
             response_obj=response,
             total_calls_in_response=1,
         )
@@ -55,11 +54,11 @@ class TestBuildToolCallMetadata:
 
     def test_stores_raw_response_privately(self):
         """Test stores raw SDK response in private attribute."""
-        response = create_mock_response("chatcmpl-789")
+        response = create_mock_response('chatcmpl-789')
 
         metadata = build_tool_call_metadata(
-            function_name="func",
-            tool_call_id="call_123",
+            function_name='func',
+            tool_call_id='call_123',
             response_obj=response,
             total_calls_in_response=1,
         )
@@ -75,11 +74,11 @@ class TestToolCallMetadata:
 
     def test_from_sdk_creates_instance(self):
         """Test from_sdk classmethod creates instance."""
-        response = create_mock_response("chatcmpl-111", "gpt-4")
+        response = create_mock_response('chatcmpl-111', 'gpt-4')
 
         metadata = ToolCallMetadata.from_sdk(
-            function_name="test",
-            tool_call_id="call_aaa",
+            function_name='test',
+            tool_call_id='call_aaa',
             response_obj=response,
             total_calls_in_response=3,
         )
@@ -90,32 +89,32 @@ class TestToolCallMetadata:
         """Test metadata contains function name."""
         response = create_mock_response()
         metadata = ToolCallMetadata.from_sdk(
-            function_name="execute_code",
-            tool_call_id="call_001",
+            function_name='execute_code',
+            tool_call_id='call_001',
             response_obj=response,
             total_calls_in_response=1,
         )
 
-        assert metadata.function_name == "execute_code"
+        assert metadata.function_name == 'execute_code'
 
     def test_contains_tool_call_id(self):
         """Test metadata contains tool call ID."""
         response = create_mock_response()
         metadata = ToolCallMetadata.from_sdk(
-            function_name="read_file",
-            tool_call_id="call_unique_123",
+            function_name='read_file',
+            tool_call_id='call_unique_123',
             response_obj=response,
             total_calls_in_response=1,
         )
 
-        assert metadata.tool_call_id == "call_unique_123"
+        assert metadata.tool_call_id == 'call_unique_123'
 
     def test_contains_total_calls_count(self):
         """Test metadata contains total calls in response."""
         response = create_mock_response()
         metadata = ToolCallMetadata.from_sdk(
-            function_name="func",
-            tool_call_id="call_x",
+            function_name='func',
+            tool_call_id='call_x',
             response_obj=response,
             total_calls_in_response=5,
         )
@@ -124,11 +123,11 @@ class TestToolCallMetadata:
 
     def test_model_response_is_dict(self):
         """Test model_response is serialized as dict."""
-        response = create_mock_response("chatcmpl-222")
+        response = create_mock_response('chatcmpl-222')
 
         metadata = ToolCallMetadata.from_sdk(
-            function_name="func",
-            tool_call_id="call_y",
+            function_name='func',
+            tool_call_id='call_y',
             response_obj=response,
             total_calls_in_response=1,
         )
@@ -139,65 +138,65 @@ class TestToolCallMetadata:
         """Test _raw_response is private and not serialized."""
         response = create_mock_response()
         metadata = ToolCallMetadata.from_sdk(
-            function_name="func",
-            tool_call_id="call_z",
+            function_name='func',
+            tool_call_id='call_z',
             response_obj=response,
             total_calls_in_response=1,
         )
 
         dumped = metadata.model_dump()
-        assert "_raw_response" not in dumped
+        assert '_raw_response' not in dumped
 
     def test_can_serialize_to_dict(self):
         """Test can serialize metadata to dictionary."""
-        response = create_mock_response("chatcmpl-333")
+        response = create_mock_response('chatcmpl-333')
 
         metadata = ToolCallMetadata.from_sdk(
-            function_name="my_function",
-            tool_call_id="call_serialize",
+            function_name='my_function',
+            tool_call_id='call_serialize',
             response_obj=response,
             total_calls_in_response=2,
         )
 
         dumped = metadata.model_dump()
-        assert dumped["function_name"] == "my_function"
-        assert dumped["tool_call_id"] == "call_serialize"
-        assert dumped["total_calls_in_response"] == 2
+        assert dumped['function_name'] == 'my_function'
+        assert dumped['tool_call_id'] == 'call_serialize'
+        assert dumped['total_calls_in_response'] == 2
 
     def test_preserves_original_response_object(self):
         """Test preserves reference to original SDK response."""
         response = create_mock_response()
-        response.custom_field = "test_value"
+        response.custom_field = 'test_value'
 
         metadata = ToolCallMetadata.from_sdk(
-            function_name="func",
-            tool_call_id="call_preserve",
+            function_name='func',
+            tool_call_id='call_preserve',
             response_obj=response,
             total_calls_in_response=1,
         )
 
-        assert metadata._raw_response.custom_field == "test_value"
+        assert metadata._raw_response.custom_field == 'test_value'
 
     def test_multiple_instances_have_independent_raw_responses(self):
         """Test multiple instances maintain independent raw responses."""
-        response1 = create_mock_response("resp1")
-        response2 = create_mock_response("resp2")
+        response1 = create_mock_response('resp1')
+        response2 = create_mock_response('resp2')
 
         metadata1 = ToolCallMetadata.from_sdk(
-            function_name="func1",
-            tool_call_id="call1",
+            function_name='func1',
+            tool_call_id='call1',
             response_obj=response1,
             total_calls_in_response=1,
         )
         metadata2 = ToolCallMetadata.from_sdk(
-            function_name="func2",
-            tool_call_id="call2",
+            function_name='func2',
+            tool_call_id='call2',
             response_obj=response2,
             total_calls_in_response=1,
         )
 
-        assert metadata1._raw_response.id == "resp1"
-        assert metadata2._raw_response.id == "resp2"
+        assert metadata1._raw_response.id == 'resp1'
+        assert metadata2._raw_response.id == 'resp2'
 
 
 # ── build_tool_call_metadata function ──────────────────────────────────
@@ -208,28 +207,28 @@ class TestBuildToolCallMetadataHelper:
 
     def test_creates_metadata_with_all_fields(self):
         """Test creates ToolCallMetadata with all required fields."""
-        response = create_mock_response("chatcmpl-123", "gpt-4")
+        response = create_mock_response('chatcmpl-123', 'gpt-4')
         response.choices = []
 
         metadata = build_tool_call_metadata(
-            function_name="test_function",
-            tool_call_id="call_abc",
+            function_name='test_function',
+            tool_call_id='call_abc',
             response_obj=response,
             total_calls_in_response=2,
         )
 
         assert isinstance(metadata, ToolCallMetadata)
-        assert metadata.function_name == "test_function"
-        assert metadata.tool_call_id == "call_abc"
+        assert metadata.function_name == 'test_function'
+        assert metadata.tool_call_id == 'call_abc'
         assert metadata.total_calls_in_response == 2
 
     def test_captures_model_response_lite(self):
         """Test captures lightweight model response representation."""
-        response = create_mock_response("chatcmpl-456", "gpt-3.5-turbo")
+        response = create_mock_response('chatcmpl-456', 'gpt-3.5-turbo')
 
         metadata = build_tool_call_metadata(
-            function_name="my_func",
-            tool_call_id="call_xyz",
+            function_name='my_func',
+            tool_call_id='call_xyz',
             response_obj=response,
             total_calls_in_response=1,
         )
@@ -239,11 +238,11 @@ class TestBuildToolCallMetadataHelper:
 
     def test_stores_raw_response_privately(self):
         """Test stores raw SDK response in private attribute."""
-        response = create_mock_response("chatcmpl-789")
+        response = create_mock_response('chatcmpl-789')
 
         metadata = build_tool_call_metadata(
-            function_name="func",
-            tool_call_id="call_123",
+            function_name='func',
+            tool_call_id='call_123',
             response_obj=response,
             total_calls_in_response=1,
         )
@@ -259,11 +258,11 @@ class TestToolCallMetadataModel:
 
     def test_from_sdk_creates_instance(self):
         """Test from_sdk classmethod creates instance."""
-        response = create_mock_response("chatcmpl-111", "gpt-4")
+        response = create_mock_response('chatcmpl-111', 'gpt-4')
 
         metadata = ToolCallMetadata.from_sdk(
-            function_name="test",
-            tool_call_id="call_aaa",
+            function_name='test',
+            tool_call_id='call_aaa',
             response_obj=response,
             total_calls_in_response=3,
         )
@@ -274,32 +273,32 @@ class TestToolCallMetadataModel:
         """Test metadata contains function name."""
         response = create_mock_response()
         metadata = ToolCallMetadata.from_sdk(
-            function_name="execute_code",
-            tool_call_id="call_001",
+            function_name='execute_code',
+            tool_call_id='call_001',
             response_obj=response,
             total_calls_in_response=1,
         )
 
-        assert metadata.function_name == "execute_code"
+        assert metadata.function_name == 'execute_code'
 
     def test_contains_tool_call_id(self):
         """Test metadata contains tool call ID."""
         response = create_mock_response()
         metadata = ToolCallMetadata.from_sdk(
-            function_name="read_file",
-            tool_call_id="call_unique_123",
+            function_name='read_file',
+            tool_call_id='call_unique_123',
             response_obj=response,
             total_calls_in_response=1,
         )
 
-        assert metadata.tool_call_id == "call_unique_123"
+        assert metadata.tool_call_id == 'call_unique_123'
 
     def test_contains_total_calls_count(self):
         """Test metadata contains total calls in response."""
         response = create_mock_response()
         metadata = ToolCallMetadata.from_sdk(
-            function_name="func",
-            tool_call_id="call_x",
+            function_name='func',
+            tool_call_id='call_x',
             response_obj=response,
             total_calls_in_response=5,
         )
@@ -308,11 +307,11 @@ class TestToolCallMetadataModel:
 
     def test_model_response_is_dict(self):
         """Test model_response is serialized as dict."""
-        response = create_mock_response("chatcmpl-222")
+        response = create_mock_response('chatcmpl-222')
 
         metadata = ToolCallMetadata.from_sdk(
-            function_name="func",
-            tool_call_id="call_y",
+            function_name='func',
+            tool_call_id='call_y',
             response_obj=response,
             total_calls_in_response=1,
         )
@@ -323,68 +322,68 @@ class TestToolCallMetadataModel:
         """Test _raw_response is private and not serialized."""
         response = create_mock_response()
         metadata = ToolCallMetadata.from_sdk(
-            function_name="func",
-            tool_call_id="call_z",
+            function_name='func',
+            tool_call_id='call_z',
             response_obj=response,
             total_calls_in_response=1,
         )
 
         dumped = metadata.model_dump()
-        assert "_raw_response" not in dumped
+        assert '_raw_response' not in dumped
 
     def test_can_serialize_to_dict(self):
         """Test can serialize metadata to dictionary."""
-        response = create_mock_response("chatcmpl-333")
+        response = create_mock_response('chatcmpl-333')
 
         metadata = ToolCallMetadata.from_sdk(
-            function_name="my_function",
-            tool_call_id="call_serialize",
+            function_name='my_function',
+            tool_call_id='call_serialize',
             response_obj=response,
             total_calls_in_response=2,
         )
 
         dumped = metadata.model_dump()
-        assert dumped["function_name"] == "my_function"
-        assert dumped["tool_call_id"] == "call_serialize"
-        assert dumped["total_calls_in_response"] == 2
+        assert dumped['function_name'] == 'my_function'
+        assert dumped['tool_call_id'] == 'call_serialize'
+        assert dumped['total_calls_in_response'] == 2
 
     def test_preserves_original_response_object(self):
         """Test preserves reference to original SDK response."""
         response = create_mock_response()
-        response.custom_field = "test_value"
+        response.custom_field = 'test_value'
 
         metadata = ToolCallMetadata.from_sdk(
-            function_name="func",
-            tool_call_id="call_preserve",
+            function_name='func',
+            tool_call_id='call_preserve',
             response_obj=response,
             total_calls_in_response=1,
         )
 
-        assert metadata._raw_response.custom_field == "test_value"
+        assert metadata._raw_response.custom_field == 'test_value'
 
     def test_multiple_instances_have_independent_raw_responses(self):
         """Test multiple instances maintain independent raw responses."""
         response1 = MagicMock()
-        response1.id = "resp1"
-        response1.model = "gpt-4"
+        response1.id = 'resp1'
+        response1.model = 'gpt-4'
         response1.choices = []
         response2 = MagicMock()
-        response2.id = "resp2"
-        response2.model = "gpt-4"
+        response2.id = 'resp2'
+        response2.model = 'gpt-4'
         response2.choices = []
 
         metadata1 = ToolCallMetadata.from_sdk(
-            function_name="func1",
-            tool_call_id="call1",
+            function_name='func1',
+            tool_call_id='call1',
             response_obj=response1,
             total_calls_in_response=1,
         )
         metadata2 = ToolCallMetadata.from_sdk(
-            function_name="func2",
-            tool_call_id="call2",
+            function_name='func2',
+            tool_call_id='call2',
             response_obj=response2,
             total_calls_in_response=1,
         )
 
-        assert metadata1._raw_response.id == "resp1"
-        assert metadata2._raw_response.id == "resp2"
+        assert metadata1._raw_response.id == 'resp1'
+        assert metadata2._raw_response.id == 'resp2'
