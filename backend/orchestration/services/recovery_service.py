@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,10 @@ from backend.inference.exceptions import (
     AuthenticationError,
     ContentPolicyViolationError,
     ContextWindowExceededError,
+    InternalServerError,
+    NotFoundError,
+    RateLimitError,
+    ServiceUnavailableError,
     Timeout,
 )
 from backend.ledger import EventSource
@@ -21,6 +26,25 @@ if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (
         OrchestrationContext,
     )
+
+
+# Errors that require the user to intervene before the agent can continue.
+# Everything else is considered "agent-survivable": the error is injected as
+# an observation and the agent re-steps so the model can adapt its approach.
+_HARD_STOP_EXCEPTIONS = (
+    AuthenticationError,
+    ContentPolicyViolationError,
+    ContextWindowExceededError,
+    LLMContextWindowExceedError,
+    NotFoundError,
+)
+
+# Errors that need a rate-limit back-off before retrying. These also use the
+# retry-queue path so the delay is honoured.
+_RATE_LIMITED_EXCEPTIONS = (
+    RateLimitError,
+    ServiceUnavailableError,
+)
 
 
 def _resolve_pending_action_service(controller):
@@ -69,17 +93,48 @@ class RecoveryService:
             EventSource.ENVIRONMENT,
         )
 
-        try:
-            await controller.retry_service.schedule_retry_after_failure(exc)
-        except Exception:
-            logger.debug('schedule_retry_after_failure failed', exc_info=True)
+        # ------------------------------------------------------------------ #
+        # State transition after an error.
+        #
+        # Hard-stop errors (auth failure, context window, model not found):
+        #   → AWAITING_USER_INPUT — user must fix config/credentials first.
+        #
+        # Rate-limited errors (429, 503):
+        #   → AWAITING_USER_INPUT + retry queue — the queue handles the
+        #     back-off delay and transitions back to RUNNING automatically.
+        #
+        # All other errors (transient 5xx, bad-request from wrong tool args,
+        #   timeout, unexpected runtime exceptions):
+        #   → Stay RUNNING — the error observation is already in the model's
+        #     context; it can read it and adapt its next action.  The circuit
+        #     breaker (default: 5 consecutive errors) acts as the safety net
+        #     against infinite failure loops.
+        # ------------------------------------------------------------------ #
+        if isinstance(exc, _HARD_STOP_EXCEPTIONS):
+            await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
+            return
 
-        # Always leave RUNNING state after an error.  If a retry was
-        # scheduled the retry worker will transition back to RUNNING
-        # when the delay expires (see _resume_agent_after_retry).
-        # Without this the _step drain loop immediately re-calls the
-        # LLM and hits the same error in an infinite loop.
-        await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
+        if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
+            try:
+                await controller.retry_service.schedule_retry_after_failure(exc)
+            except Exception:
+                logger.debug('schedule_retry_after_failure failed', exc_info=True)
+            await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
+            return
+
+        # Agent-survivable error: brief pause so we don't hammer the provider,
+        # then continue. The model sees the ErrorObservation and can try a
+        # different approach.
+        logger.warning(
+            'Agent-survivable error (%s): staying RUNNING so model can adapt',
+            type(exc).__name__,
+        )
+        pause = 1.0
+        if isinstance(exc, (InternalServerError, Timeout)):
+            pause = 2.0
+        await asyncio.sleep(pause)
+        if controller.get_agent_state() == AgentState.RUNNING:
+            controller.step()
 
     def _apply_timeout_planning_routing(self, controller, exc: Exception) -> None:
         """Route timeout recoveries based on recent MCP validation failures."""
@@ -149,8 +204,18 @@ class RecoveryService:
             err_id = 'AGENT_RUNTIME_ERROR'
 
         text = f'{type(exc).__name__}: {exc}'
-        guidance = (
-            'The agent step failed with the error above. Adjust strategy '
-            '(different tool, smaller change, or confirm configuration) and continue.'
-        )
+
+        # Hard stops need user action; survivable errors get guidance for the model.
+        if isinstance(exc, _HARD_STOP_EXCEPTIONS):
+            guidance = (
+                'This error requires user intervention (check credentials, model name, '
+                'or context window). Wait for the user to fix the configuration.'
+            )
+        elif isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
+            guidance = 'Rate limit reached. Waiting before retrying — no action needed.'
+        else:
+            guidance = (
+                'A transient error occurred on this step. The error has been recorded. '
+                'Review what went wrong, choose a different approach or tool, and continue.'
+            )
         return f'{text}\n\n{guidance}', err_id, notify_ui_only
