@@ -356,6 +356,17 @@ class MCPClient(BaseModel):
                     type(exc).__name__,
                     exc,
                 )
+            except RuntimeError as exc:
+                # On Windows with ProactorEventLoop, a broken stdio subprocess pipe raises
+                # RuntimeError("Event loop is closed") — misleading name, it's the IOCP
+                # transport handle becoming invalid. Treat it like a transport drop.
+                if 'closed' not in str(exc).lower():
+                    raise
+                logger.warning(
+                    'MCP call_tool(%s) RuntimeError (Windows transport): %s — reconnect + single retry',
+                    tool_name,
+                    exc,
+                )
 
             await self._reconnect()
             return await _call_once()
