@@ -39,18 +39,18 @@ from backend.core.log_formatters import (
 )
 
 __all__ = [
-    "_TRACE_LOCAL",
-    "ColoredFormatter",
-    "ColorType",
-    "EnhancedJSONFormatter",
-    "NoColorFormatter",
-    "OpenTelemetryTraceFilter",
-    "SensitiveDataFilter",
-    "StackInfoFilter",
-    "TraceContextFilter",
-    "_fix_record",
-    "file_formatter",
-    "strip_ansi",
+    '_TRACE_LOCAL',
+    'ColoredFormatter',
+    'ColorType',
+    'EnhancedJSONFormatter',
+    'NoColorFormatter',
+    'OpenTelemetryTraceFilter',
+    'SensitiveDataFilter',
+    'StackInfoFilter',
+    'TraceContextFilter',
+    '_fix_record',
+    'file_formatter',
+    'strip_ansi',
 ]
 
 if TYPE_CHECKING:
@@ -62,12 +62,12 @@ if TYPE_CHECKING:
 # that headless services and CI runs cannot hang on an unexpected prompt.
 if DEBUG_LLM:
     logging.warning(
-        "DEBUG_LLM enabled via environment; verbose LLM logs may include sensitive content. Do NOT use in production.",
+        'DEBUG_LLM enabled via environment; verbose LLM logs may include sensitive content. Do NOT use in production.',
     )
 if DEBUG:
-    LOG_LEVEL = "DEBUG"
+    LOG_LEVEL = 'DEBUG'
 
-llm_formatter = logging.Formatter("%(message)s")
+llm_formatter = logging.Formatter('%(message)s')
 
 
 class RollingLogger:
@@ -86,8 +86,8 @@ class RollingLogger:
         """Initialize the rolling buffer with display bounds."""
         self.max_lines = max_lines
         self.char_limit = char_limit
-        self.log_lines = [""] * self.max_lines
-        self.all_lines = ""
+        self.log_lines = [''] * self.max_lines
+        self.all_lines = ''
 
     def is_enabled(self) -> bool:
         """Check if rolling logger should be active.
@@ -98,9 +98,9 @@ class RollingLogger:
         """
         return DEBUG and sys.stdout.isatty()
 
-    def start(self, message: str = "") -> None:
+    def start(self, message: str = '') -> None:
         """Start rolling logger with optional initial message."""
-        self._write("\n" * self.max_lines)
+        self._write('\n' * self.max_lines)
         self._flush()
 
     def add_line(self, line: str) -> None:
@@ -108,7 +108,7 @@ class RollingLogger:
         self.log_lines.pop(0)
         self.log_lines.append(line[: self.char_limit])
         self.print_lines()
-        self.all_lines += line + "\n"
+        self.all_lines += line + '\n'
 
     def write_immediately(self, line: str) -> None:
         """Write line immediately without buffering."""
@@ -125,12 +125,12 @@ class RollingLogger:
         r"""'\\033[F' moves the cursor up one line."""
         if amount == -1:
             amount = self.max_lines
-        self._write("\x1b[F" * self.max_lines)
+        self._write('\x1b[F' * self.max_lines)
         self._flush()
 
-    def replace_current_line(self, line: str = "") -> None:
+    def replace_current_line(self, line: str = '') -> None:
         r"""'\\033[2K\\r' clears the line and moves the cursor to the beginning."""
-        self._write("\x1b[2K" + line + "\n")
+        self._write('\x1b[2K' + line + '\n')
         self._flush()
 
     def _write(self, line: str) -> None:
@@ -148,8 +148,8 @@ def set_trace_context(ctx: dict[str, object] | None) -> None:
     """Set thread-local trace context (overwrites existing). Pass None to clear."""
     try:
         if ctx is None:
-            if hasattr(_TRACE_LOCAL, "context"):
-                delattr(_TRACE_LOCAL, "context")
+            if hasattr(_TRACE_LOCAL, 'context'):
+                delattr(_TRACE_LOCAL, 'context')
         else:
             _TRACE_LOCAL.context = dict(ctx)
     except Exception:
@@ -163,8 +163,8 @@ def clear_trace_context() -> None:
     Silently handles any exceptions during cleanup.
     """
     try:
-        if hasattr(_TRACE_LOCAL, "context"):
-            delattr(_TRACE_LOCAL, "context")
+        if hasattr(_TRACE_LOCAL, 'context'):
+            delattr(_TRACE_LOCAL, 'context')
     except Exception:
         pass
 
@@ -175,7 +175,7 @@ def get_trace_context() -> dict[str, object]:
     If no context exists, returns an empty dict. Safe for import anywhere.
     """
     try:
-        ctx = getattr(_TRACE_LOCAL, "context", None)
+        ctx = getattr(_TRACE_LOCAL, 'context', None)
         if isinstance(ctx, dict):
             return dict(ctx)
     except Exception:
@@ -187,21 +187,21 @@ def get_console_handler(log_level: int = logging.INFO) -> logging.StreamHandler:
     """Returns a console handler for logging."""
     console_handler = logging.StreamHandler()
     console_handler.setLevel(log_level)
-    formatter_str = "\x1b[92m%(asctime)s - %(name)s:%(levelname)s\x1b[0m: %(filename)s:%(lineno)s - %(message)s"
-    console_handler.setFormatter(ColoredFormatter(formatter_str, datefmt="%H:%M:%S"))
+    formatter_str = '\x1b[92m%(asctime)s - %(name)s:%(levelname)s\x1b[0m: %(filename)s:%(lineno)s - %(message)s'
+    console_handler.setFormatter(ColoredFormatter(formatter_str, datefmt='%H:%M:%S'))
     return console_handler
 
 
 def get_file_handler(
     log_dir: str,
     log_level: int = logging.INFO,
-    when: str = "d",
+    when: str = 'd',
     backup_count: int = 7,
     utc: bool = False,
 ) -> TimedRotatingFileHandler:
     """Returns a file handler for logging."""
     os.makedirs(log_dir, exist_ok=True)
-    file_name = "app.log"
+    file_name = 'app.log'
     file_handler = TimedRotatingFileHandler(
         os.path.join(log_dir, file_name),
         when=when,
@@ -223,9 +223,9 @@ def json_formatter() -> JsonFormatter:
         JsonFormatter configured with timestamp and custom level field naming
 
     """
-    fmt = "{asctime} {message} {levelname}"
+    fmt = '{asctime} {message} {levelname}'
     return JsonFormatter(
-        fmt, style="{", rename_fields={"levelname": LOG_JSON_LEVEL_KEY}, timestamp=True
+        fmt, style='{', rename_fields={'levelname': LOG_JSON_LEVEL_KEY}, timestamp=True
     )
 
 
@@ -257,8 +257,8 @@ def log_uncaught_exceptions(
 
     """
     if tb:
-        logging.error("".join(traceback.format_tb(tb)))
-    logging.error("%s: %s", ex_cls, ex)
+        logging.error(''.join(traceback.format_tb(tb)))
+    logging.error('%s: %s', ex_cls, ex)
 
 
 sys.excepthook = log_uncaught_exceptions
@@ -266,8 +266,8 @@ sys.excepthook = log_uncaught_exceptions
 # Module-level flags that can be toggled at runtime by config loading
 DISABLE_COLOR_PRINTING: bool = False
 
-app_logger = logging.getLogger("app")
-access_logger = logging.getLogger("app.access")
+app_logger = logging.getLogger('app')
+access_logger = logging.getLogger('app.access')
 current_log_level = logging.INFO
 if LOG_LEVEL in logging.getLevelNamesMapping():
     current_log_level = logging.getLevelNamesMapping()[LOG_LEVEL]
@@ -276,13 +276,13 @@ access_logger.setLevel(current_log_level)
 if DEBUG:
     app_logger.addFilter(StackInfoFilter())
 if current_log_level == logging.DEBUG:
-    app_logger.debug("DEBUG mode enabled.")
-if LOG_JSON:
-    app_logger.addHandler(json_log_handler(current_log_level))
-    access_logger.addHandler(json_log_handler(current_log_level))
-else:
-    app_logger.addHandler(get_console_handler(current_log_level))
-    access_logger.addHandler(get_console_handler(current_log_level))
+    app_logger.debug('DEBUG mode enabled.')
+
+# Always suppress stdout logging — Rich Live owns the terminal.
+app_logger.addHandler(logging.NullHandler())
+access_logger.addHandler(logging.NullHandler())
+app_logger.setLevel(logging.ERROR)
+access_logger.setLevel(logging.ERROR)
 app_logger.addFilter(SensitiveDataFilter(app_logger.name))
 app_logger.addFilter(TraceContextFilter())
 # Optionally correlate logs with active OpenTelemetry spans
@@ -297,10 +297,10 @@ if OTEL_LOG_CORRELATION:
 access_logger.propagate = False
 
 # Add log shipping handler if enabled
-LOG_SHIPPING_ENABLED = os.getenv("LOG_SHIPPING_ENABLED", "false").lower() in [
-    "true",
-    "1",
-    "yes",
+LOG_SHIPPING_ENABLED = os.getenv('LOG_SHIPPING_ENABLED', 'false').lower() in [
+    'true',
+    '1',
+    'yes',
 ]
 if LOG_SHIPPING_ENABLED:
     try:
@@ -310,27 +310,27 @@ if LOG_SHIPPING_ENABLED:
         if log_shipper:
             app_logger.addHandler(LogShippingHandler(log_shipper))
             access_logger.addHandler(LogShippingHandler(log_shipper))
-            app_logger.debug("Log shipping handler added")
+            app_logger.debug('Log shipping handler added')
     except Exception as e:
-        app_logger.warning("Failed to initialize log shipping: %s", e)
+        app_logger.warning('Failed to initialize log shipping: %s', e)
 
-app_logger.debug("Logging initialized")
+app_logger.debug('Logging initialized')
 LOG_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs"
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'logs'
 )
 if LOG_TO_FILE:
     app_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
     access_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
-    app_logger.debug("Logging to file in: %s", LOG_DIR)
+    app_logger.debug('Logging to file in: %s', LOG_DIR)
 LOQUACIOUS_LOGGERS = [
-    "engineio",
-    "engineio.server",
-    "socketio",
-    "socketio.client",
-    "socketio.server",
+    'engineio',
+    'engineio.server',
+    'socketio',
+    'socketio.client',
+    'socketio.server',
 ]
 for logger_name in LOQUACIOUS_LOGGERS:
-    logging.getLogger(logger_name).setLevel("WARNING")
+    logging.getLogger(logger_name).setLevel('WARNING')
 
 
 class LlmFileHandler(logging.FileHandler):
@@ -339,8 +339,8 @@ class LlmFileHandler(logging.FileHandler):
     def __init__(
         self,
         filename: str,
-        mode: str = "a",
-        encoding: str = "utf-8",
+        mode: str = 'a',
+        encoding: str = 'utf-8',
         delay: bool = False,
     ) -> None:
         """Initialize the file handler for logging LLM prompts or responses.
@@ -355,10 +355,10 @@ class LlmFileHandler(logging.FileHandler):
         self.filename = filename
         self.message_counter = 1
         if DEBUG:
-            self.session = datetime.now().strftime("%y-%m-%d_%H-%M")
+            self.session = datetime.now().strftime('%y-%m-%d_%H-%M')
         else:
-            self.session = "default"
-        self.log_directory = os.path.join(LOG_DIR, "llm", self.session)
+            self.session = 'default'
+        self.log_directory = os.path.join(LOG_DIR, 'llm', self.session)
         os.makedirs(self.log_directory, exist_ok=True)
         if not DEBUG:
             for file in os.listdir(self.log_directory):
@@ -367,9 +367,9 @@ class LlmFileHandler(logging.FileHandler):
                     os.unlink(file_path)
                 except Exception as e:
                     app_logger.exception(
-                        "Failed to delete %s. Reason: %s", file_path, e
+                        'Failed to delete %s. Reason: %s', file_path, e
                     )
-        filename = f"{self.filename}_{self.message_counter:03}.log"
+        filename = f'{self.filename}_{self.message_counter:03}.log'
         self.baseFilename = os.path.join(self.log_directory, filename)
         super().__init__(self.baseFilename, mode, encoding, delay)
 
@@ -380,12 +380,12 @@ class LlmFileHandler(logging.FileHandler):
             record (logging.LogRecord): The log record to emit.
 
         """
-        filename = f"{self.filename}_{self.message_counter:03}.log"
+        filename = f'{self.filename}_{self.message_counter:03}.log'
         self.baseFilename = os.path.join(self.log_directory, filename)
         self.stream = self._open()
         super().emit(record)
         self.stream.close()
-        app_logger.debug("Logging to %s", self.baseFilename)
+        app_logger.debug('Logging to %s', self.baseFilename)
         self.message_counter += 1
 
 
@@ -405,8 +405,8 @@ def _setup_llm_logger(name: str, log_level: int) -> logging.Logger:
     return logger
 
 
-llm_prompt_logger = _setup_llm_logger("prompt", current_log_level)
-llm_response_logger = _setup_llm_logger("response", current_log_level)
+llm_prompt_logger = _setup_llm_logger('prompt', current_log_level)
+llm_response_logger = _setup_llm_logger('response', current_log_level)
 
 
 class AppLoggerAdapter(logging.LoggerAdapter):
@@ -439,10 +439,10 @@ class AppLoggerAdapter(logging.LoggerAdapter):
 
         Starting in Python 3.13, LoggerAdapter's merge_extra option will do this.
         """
-        if "extra" in kwargs and isinstance(kwargs["extra"], dict):
-            kwargs["extra"] = {**self.extra, **kwargs["extra"]}
+        if 'extra' in kwargs and isinstance(kwargs['extra'], dict):
+            kwargs['extra'] = {**self.extra, **kwargs['extra']}
         else:
-            kwargs["extra"] = self.extra
+            kwargs['extra'] = self.extra
         return (msg, kwargs)
 
 

@@ -224,6 +224,26 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
         if 'project_root' in data and data['project_root']:
             cfg.project_root = data['project_root']
 
+        # MCP servers saved by add_mcp_server() / /settings UI
+        if 'mcp_config' in data and isinstance(data.get('mcp_config'), dict):
+            from backend.core.config.mcp_config import MCPServerConfig
+
+            raw_servers = data['mcp_config'].get('servers') or []
+            parsed: list[MCPServerConfig] = []
+            for entry in raw_servers:
+                if not isinstance(entry, dict):
+                    continue
+                try:
+                    parsed.append(MCPServerConfig(**entry))
+                except Exception as exc:
+                    logger.app_logger.debug('Skipping invalid mcp_config server %r: %s', entry, exc)
+            if parsed:
+                existing_names = {s.name for s in cfg.mcp.servers}
+                cfg.mcp.servers = list(cfg.mcp.servers) + [
+                    s for s in parsed if s.name not in existing_names
+                ]
+                cfg.mcp.enabled = True
+
     finally:
         summary.emit()
 
@@ -258,13 +278,6 @@ def _get_active_agent_config(cfg: AppConfig) -> AgentConfig:
     return cfg.get_agent_config(agent_name)
 
 
-def _is_cli_mode(cfg: AppConfig) -> bool:
-    try:
-        cli_mode = getattr(_get_active_agent_config(cfg), 'cli_mode', False)
-    except Exception:
-        return False
-    return cli_mode if isinstance(cli_mode, bool) else False
-
 
 def _ensure_active_agent_auto_compactor(cfg: AppConfig) -> None:
     from backend.core.config.compactor_config import AutoCompactorConfig
@@ -289,25 +302,14 @@ def _ensure_active_agent_auto_compactor(cfg: AppConfig) -> None:
 
 def finalize_config(cfg: AppConfig) -> None:
     """More tweaks to the config after it's been loaded."""
-    from backend.core.config.mcp_config import (
-        ensure_default_mcp_http_server,
-        extend_mcp_servers_with_bundled_defaults,
-    )
+    from backend.core.config.mcp_config import extend_mcp_servers_with_bundled_defaults
 
     _ensure_active_agent_auto_compactor(cfg)
-    if _is_cli_mode(cfg):
-        logger.app_logger.debug(
-            'Skipping bundled/default MCP servers while running in CLI mode'
-        )
-        # Disable browser initialization in CLI mode — the browser env
-        # is a stub that only emits noisy warnings.
-        cfg.enable_browser = False
-        agent_cfg = cfg.get_agent_config(cfg.default_agent)
-        if agent_cfg is not None:
-            agent_cfg.enable_browsing = False
-    else:
-        extend_mcp_servers_with_bundled_defaults(cfg.mcp.servers)
-        ensure_default_mcp_http_server(cfg)
+    cfg.enable_browser = False
+    agent_cfg = cfg.get_agent_config(cfg.default_agent)
+    if agent_cfg is not None:
+        agent_cfg.enable_browsing = False
+    extend_mcp_servers_with_bundled_defaults(cfg.mcp.servers)
     _configure_llm_logging(cfg)
     _ensure_cache_directory(cfg)
     _configure_jwt_secret(cfg)

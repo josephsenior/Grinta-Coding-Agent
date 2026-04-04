@@ -11,22 +11,25 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import io
 import logging
 import os
 import sys
+import time
 import warnings
 from pathlib import Path
-from typing import IO
+from typing import Any
 
 # Suppress third-party DeprecationWarnings (belt-and-suspenders with entry.py).
 warnings.filterwarnings('ignore', message='importing.*from.*astroid', category=DeprecationWarning)
 
-import time
 
-from rich.align import Align
-from rich.console import Console, Group
-from rich.text import Text
+def _create_console(*args: Any, **kwargs: Any) -> Any:
+    from rich.console import Console as RichConsole
+
+    return RichConsole(*args, **kwargs)
+
+
+Console = _create_console
 
 
 # ── Silence logging immediately at import time ──────────────────────
@@ -64,8 +67,10 @@ def _silence_all_loggers() -> None:
 _silence_all_loggers()
 
 
-def _configure_redirected_streams(*streams: io.TextIOBase | IO[str] | None) -> None:
+def _configure_redirected_streams(*streams: object | None) -> None:
     """Prefer UTF-8 when writing Rich output to redirected streams."""
+    if not streams:
+        streams = (sys.stdout, sys.stderr)
     for stream in streams:
         if stream is None:
             continue
@@ -79,27 +84,93 @@ def _configure_redirected_streams(*streams: io.TextIOBase | IO[str] | None) -> N
                 continue
 
 
-def show_grinta_splash(console: Console | None = None) -> None:
+def show_grinta_splash(console: Any | None = None) -> None:
     """Render the GRINTA boot splash — animated drop-in on TTY, static otherwise."""
+    from rich.align import Align
+    from rich.console import Group
     from rich.live import Live
+    from rich.text import Text
 
     console = console or Console()
 
-    _LINES = [
-        ' ██████  ██████  ██ ██    ██ ████████  █████  ',
-        '██       ██   ██ ██ ███   ██    ██    ██   ██ ',
-        '██  ███  ██████  ██ ██ ██ ██    ██    ███████ ',
-        '██   ██  ██  ██  ██ ██  ████    ██    ██   ██ ',
-        ' ██████  ██   ██ ██ ██   ███    ██    ██   ██ ',
+    _RED = 'bold #c0152c'
+    _WHT = 'bold white'
+    _E   = '◉'   # U+25C9 FISHEYE — white ring + dark centre = cartoon eye
+
+    def _r(s: str) -> Text:
+        return Text(s, style=_RED)
+
+    def _m(*parts: tuple[str, str]) -> Text:
+        t = Text()
+        for txt, sty in parts:
+            t.append(txt, style=sty)
+        return t
+
+    R, W = _RED, _WHT
+
+    #  Different line widths create the anvil silhouette via Align.center:
+    #
+    #  face  56w ████████████████████████████████████████████████████████
+    #  face  56w ████████████████████████████████████████████████████████
+    #  body  42w   ████████                          ████████
+    #  eyes  42w   ████████    ◉                ◉    ████████   ← white
+    #  smile 42w   ████████        ╰────────╯        ████████   ← white arc
+    #  body  42w   ████████                          ████████
+    #  term  42w   ████████           >_             ████████   ← white
+    #  body  42w   ████████                          ████████
+    #  close 42w   ██████████████████████████████████████████
+    #  waist 20w             ████████████████████
+    #  feet  22w             ████              ████
+    #  base  24w         ██████████    ██████████
+    _LINES: list[Any] = [
+        # ── face: WIDEST — overhangs the body wings on each side ─────────
+        _r('████████████████████████████████████████████████████████'),  # 56
+        _r('████████████████████████████████████████████████████████'),  # 56
+        # ── body shell: wings on left/right, open centre ─────────────────
+        _r('████████                          ████████'),               # 42
+        # ── eyes: ◉ = white ring / dark centre = cartoon pupil ───────────
+        _m(('████████    ', R), (_E, W), ('                ', R), (_E, W), ('    ████████', R)),   # 42
+        # ── smile arc ────────────────────────────────────────────────────
+        _m(('████████        ', R), ('╰────────╯', W), ('        ████████', R)),                   # 42
+        # ── mid body ─────────────────────────────────────────────────────
+        _r('████████                          ████████'),               # 42
+        # ── terminal prompt ──────────────────────────────────────────────
+        _m(('████████           ', R), ('>_', W), ('             ████████', R)),                   # 42
+        _r('████████                          ████████'),               # 42
+        # ── body closes ──────────────────────────────────────────────────
+        _r('██████████████████████████████████████████'),               # 42
+        # ── waist / pedestal: narrows sharply ────────────────────────────
+        _r('████████████████████'),                                     # 20
+        # ── two rectangular feet ─────────────────────────────────────────
+        _r('████              ████'),                                   # 22
+        _r('██████████    ██████████'),                                 # 24
+        # ── spacer ───────────────────────────────────────────────────────
+        _r(''),
+        # ── GRINTA block letters ─────────────────────────────────────────
+        _r(' ╭──────────────────────────────────────────────╮ '),
+        _r(' │ ██████  ██████  ██ ██    ██ ████████  █████  │ '),
+        _r(' │██       ██   ██ ██ ███   ██    ██    ██   ██ │ '),
+        _r(' │██  ███  ██████  ██ ██ ██ ██    ██    ███████ │ '),
+        _r(' │██   ██  ██  ██  ██ ██  ████    ██    ██   ██ │ '),
+        _r(' │ ██████  ██   ██ ██ ██   ███    ██    ██   ██ │ '),
+        _r(' ╰──────────────────────────────────────────────╯ '),
     ]
     _SUBTITLE = 'think · code · ship'
     _HINT     = 'Type a task or press Tab after / for commands'
 
-    def _frame(visible: int, *, subtitle: bool = False, flash: bool = False) -> Group:
-        style = 'bold white' if flash else 'bold red'
+    def _frame(visible: int, *, subtitle: bool = False, flash: bool = False) -> Any:
         rows: list = [Text('')]
-        for i, line in enumerate(_LINES):
-            rows.append(Align.center(Text(line if i < visible else '', style=style)))
+        for i, raw in enumerate(_LINES):
+            if i >= visible:
+                rows.append(Text(''))
+                continue
+            if flash:
+                plain = raw.plain if isinstance(raw, Text) else raw
+                rows.append(Align.center(Text(plain, style='bold white')))
+            elif isinstance(raw, Text):
+                rows.append(Align.center(raw))
+            else:
+                rows.append(Align.center(Text(raw, style='bold red')))
         rows.append(Text(''))
         if subtitle:
             rows.append(Align.center(Text(_SUBTITLE, style='bold red')))
@@ -179,7 +250,7 @@ def _resolve_invocation(
         '--cleanup-storage',
         action='store_true',
         default=False,
-        help='Migrate legacy project-local storage to the global Grinta data directory',
+        help='Consolidate legacy project data into .grinta/storage and exit',
     )
     args = parser.parse_args(argv)
     if args.cleanup_storage:
@@ -209,59 +280,49 @@ async def _async_main(
     initial_input = _read_piped_stdin()
 
     # -- load config -------------------------------------------------------
-    previous_cli_mode = os.environ.get('AGENT_CLI_MODE')
-    os.environ['AGENT_CLI_MODE'] = 'true'
-    try:
-        config = load_app_config()
-        config.get_agent_config(config.default_agent).cli_mode = True
+    config = load_app_config()
 
-        # -- apply CLI overrides (non-persistent) ------------------------------
-        if model:
-            llm_cfg = config.get_llm_config()
-            llm_cfg.model = model
-        resolved_project = (
-            str(Path(project).resolve()) if project else str(Path.cwd().resolve())
-        )
-        config.project_root = resolved_project
-        # local_data_root intentionally NOT overridden here — it stays at the
-        # user-level default (~/.grinta/storage) so Grinta never pollutes the
-        # user's workspace with sessions/ or storage/ directories.
+    # -- apply CLI overrides (non-persistent) ------------------------------
+    if model:
+        llm_cfg = config.get_llm_config()
+        llm_cfg.model = model
+    resolved_project = (
+        str(Path(project).resolve()) if project else str(Path.cwd().resolve())
+    )
+    config.project_root = resolved_project
+    # local_data_root intentionally NOT overridden here — it stays at the
+    # user-level default (~/.grinta/storage) so Grinta never pollutes the
+    # user's workspace with sessions/ or storage/ directories.
 
-        # -- onboarding if needed ----------------------------------------------
-        if needs_onboarding(config):
-            # Try auto-detecting API keys from environment first
-            detected_provider = auto_detect_api_keys(config)
-            if detected_provider and not needs_onboarding(config):
-                console.print(
-                    f'  [green]✓[/green] Auto-detected API key from environment '
-                    f'([cyan]{detected_provider}[/cyan])',
-                )
-                ensure_default_model(config)
-            else:
-                config = run_onboarding()
-                config.get_agent_config(config.default_agent).cli_mode = True
-                ensure_default_model(config)
-                if model:
-                    llm_cfg = config.get_llm_config()
-                    llm_cfg.model = model
-                config.project_root = resolved_project
-                # Re-check after onboarding.
-                if needs_onboarding(config):
-                    console.print('[red]No API key configured. Exiting.[/red]')
-                    return
-        else:
+    # -- onboarding if needed ----------------------------------------------
+    if needs_onboarding(config):
+        # Try auto-detecting API keys from environment first
+        detected_provider = auto_detect_api_keys(config)
+        if detected_provider and not needs_onboarding(config):
+            console.print(
+                f'  [green]✓[/green] Auto-detected API key from environment '
+                f'([cyan]{detected_provider}[/cyan])',
+            )
             ensure_default_model(config)
-
-        # -- launch REPL -------------------------------------------------------
-        repl = Repl(config, console)
-        if initial_input:
-            repl.queue_initial_input(initial_input)
-        await repl.run()
-    finally:
-        if previous_cli_mode is None:
-            os.environ.pop('AGENT_CLI_MODE', None)
         else:
-            os.environ['AGENT_CLI_MODE'] = previous_cli_mode
+            config = run_onboarding()
+            ensure_default_model(config)
+            if model:
+                llm_cfg = config.get_llm_config()
+                llm_cfg.model = model
+            config.project_root = resolved_project
+            # Re-check after onboarding.
+            if needs_onboarding(config):
+                console.print('[red]No API key configured. Exiting.[/red]')
+                return
+    else:
+        ensure_default_model(config)
+
+    # -- launch REPL -------------------------------------------------------
+    repl = Repl(config, console)
+    if initial_input:
+        repl.queue_initial_input(initial_input)
+    await repl.run()
 
 
 def main(
@@ -275,7 +336,7 @@ def main(
     # module-level handlers (backend/core/logger.py installs a JSON→stdout
     # handler when imported, which would spew INFO noise into the terminal).
     _setup_logging()
-    _configure_redirected_streams(sys.stdout, sys.stderr)
+    _configure_redirected_streams()
     if cleanup_storage:
         from backend.cli.storage_cleanup import run_storage_cleanup_command
         run_storage_cleanup_command(project)
