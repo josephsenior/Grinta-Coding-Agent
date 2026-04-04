@@ -108,15 +108,31 @@ def show_grinta_splash(console: Any | None = None) -> None:
 
     R, W = _RED, _WHT
 
+    # -- figlet title (pyfiglet is a project dep; fallback if missing) --------
+    try:
+        import pyfiglet as _pyfiglet
+        _raw = _pyfiglet.figlet_format('GRINTA', font='slant').splitlines()
+        while _raw and not _raw[-1].strip():
+            _raw.pop()
+        _figlet_lines: list[Any] = [_r(line) for line in _raw]
+    except Exception:
+        _figlet_lines = [
+            _r('  ____ ____  ___ _   _ _____  _'),
+            _r(' / ___|  _ \\|_ _| \\ | |_   _|/ \\'),
+            _r('| |  _| |_) || ||  \\| | | | / _ \\'),
+            _r('| |_| |  _ < | || |\\  | | |/ ___ \\'),
+            _r(' \\____|_| \\_\\___|_| \\_| |_/_/   \\_\\'),
+        ]
+
     #  Different line widths create the anvil silhouette via Align.center:
     #
     #  head  56w  ████████████████████████████████████████████████████████
     #  head  56w  ████████████████████████████████████████████████████████
-    #  eyes  56w  █████████████████ [ ● ] ███████████ [ ● ] ██████████████  ← white sclera on solid red
-    #  smile 56w  ██████████████████████ ╰────────╯ ████████████████████████  ← white arc on solid red
+    #  eyes  56w  █████████████████ [ ● ] ███████████ [ ● ] ██████████████
+    #  smile 56w  ██████████████████████ ╰────────╯ ████████████████████████
     #  chin  56w  ████████████████████████████████████████████████████████
     #  body  42w    ████████                          ████████
-    #  term  42w    ████████            >_            ████████   ← white
+    #  term  42w    ████████            >_            ████████
     #  body  42w    ████████                          ████████
     #  close 42w    ██████████████████████████████████████████
     #  waist 20w              ████████████████████
@@ -136,7 +152,6 @@ def show_grinta_splash(console: Any | None = None) -> None:
             ('██████████████████', R),
         ),  # 17+5+11+5+18 = 56
         # ── SMILE: white arc centred between the eyes ─────────────────────
-        # layout: 22 red + 10 smile + 24 red = 56
         _m(('██████████████████████', R), ('╰────────╯', W), ('████████████████████████', R)),  # 56
         # ── CHIN: closes the face block ───────────────────────────────────
         _r('████████████████████████████████████████████████████████'),  # 56
@@ -154,14 +169,8 @@ def show_grinta_splash(console: Any | None = None) -> None:
         _r('██████████    ██████████'),                                 # 24
         # ── spacer ────────────────────────────────────────────────────────
         _r(''),
-        # ── GRINTA block letters ──────────────────────────────────────────
-        _r(' ╭──────────────────────────────────────────────╮ '),
-        _r(' │ ██████  ██████  ██ ██    ██ ████████  █████  │ '),
-        _r(' │██       ██   ██ ██ ███   ██    ██    ██   ██ │ '),
-        _r(' │██  ███  ██████  ██ ██ ██ ██    ██    ███████ │ '),
-        _r(' │██   ██  ██  ██  ██ ██  ████    ██    ██   ██ │ '),
-        _r(' │ ██████  ██   ██ ██ ██   ███    ██    ██   ██ │ '),
-        _r(' ╰──────────────────────────────────────────────╯ '),
+        # ── GRINTA figlet title (slant font) ──────────────────────────────
+        *_figlet_lines,
     ]
     _SUBTITLE = 'think · code · ship'
     _HINT     = 'Type a task or press Tab after / for commands'
@@ -283,7 +292,7 @@ async def _async_main(
     # Backend imports above trigger module-level logger setup — re-silence.
     _silence_all_loggers()
 
-    console = Console()
+    console = Console(style='on #202A44')
     show_grinta_splash(console)
     initial_input = _read_piped_stdin()
 

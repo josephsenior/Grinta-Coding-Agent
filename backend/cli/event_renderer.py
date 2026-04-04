@@ -490,6 +490,8 @@ class CLIEventRenderer:
 
     def stop_live(self) -> None:
         """Stop the Rich Live display."""
+        # Flush any remaining thinking before the Live panel disappears.
+        self._flush_thinking_block()
         live = self._live
         if live is None:
             return
@@ -681,6 +683,7 @@ class CLIEventRenderer:
             return
 
         if isinstance(action, MessageAction):
+            self._flush_thinking_block()
             self._reasoning.stop()
             self._clear_streaming_preview()
             if action.content.strip():
@@ -1257,6 +1260,23 @@ class CLIEventRenderer:
             # We still keep _live_items empty since they're printed inline.
         else:
             self._console.print(renderable)
+
+    def _flush_thinking_block(self) -> None:
+        """Print accumulated thoughts as a persistent dim block before they are cleared.
+
+        Called just before _reasoning.stop() so the thought lines are still available.
+        Does nothing when no thoughts were collected this turn.
+        """
+        thoughts = self._reasoning.snapshot_thoughts()
+        if not thoughts:
+            return
+        block = Text()
+        block.append('  💭  ', style='bright_black')
+        for i, line in enumerate(thoughts):
+            if i > 0:
+                block.append('\n       ', style='')
+            block.append(line, style='italic bright_black')
+        self._print_or_buffer(block)
 
     def _clear_streaming_preview(self) -> None:
         self._streaming_accumulated = ''

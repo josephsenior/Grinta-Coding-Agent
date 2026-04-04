@@ -65,8 +65,8 @@ dependencies = [
   "aiofiles>=25.1.0",
   "rich>=14.0,<15",
   "prompt_toolkit>=3.0.50,<4",
-  "asyncpg>=0.30.0",
   "optimum[onnxruntime]>=2.1.0",
+  "pyfiglet>=1.0.4",
 ]
 
 optional-dependencies.all = [

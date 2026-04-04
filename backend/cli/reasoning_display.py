@@ -116,6 +116,10 @@ class ReasoningDisplay:
             self._recent_actions.append(label)
         self._current_action = label
 
+    def snapshot_thoughts(self) -> list[str]:
+        """Return a copy of current thought lines without clearing them."""
+        return list(self._thought_lines)
+
     def update_cost(self, cost_usd: float) -> None:
         """Track current session cost for budget burn display."""
         self._current_cost = cost_usd
