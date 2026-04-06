@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+import backend
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.text import Text
 
@@ -19,6 +21,8 @@ class HUDState:
     cost_usd: float = 0.0
     ledger_status: str = 'Healthy'
     llm_calls: int = 0
+    #: None until engine bootstrap (incl. MCP) has finished; then connected MCP client count.
+    mcp_servers: int | None = None
 
 
 class HUDBar:
@@ -26,6 +30,43 @@ class HUDBar:
 
     def __init__(self) -> None:
         self.state = HUDState()
+        self._bundled_skill_count = HUDBar.count_bundled_playbook_skills()
+
+    @property
+    def bundled_skill_count(self) -> int:
+        """Count of bundled ``.md`` playbooks under ``backend/playbooks/`` (see :meth:`count_bundled_playbook_skills`)."""
+        return self._bundled_skill_count
+
+    @staticmethod
+    def count_bundled_playbook_skills() -> int:
+        """Markdown playbooks shipped under ``backend/playbooks/`` (excludes ``README.md``)."""
+        try:
+            root = Path(backend.__file__).resolve().parent / 'playbooks'
+            if not root.is_dir():
+                return 0
+            return sum(
+                1
+                for p in root.iterdir()
+                if p.is_file()
+                and p.suffix.lower() == '.md'
+                and p.name.lower() != 'readme.md'
+            )
+        except OSError:
+            return 0
+
+    @staticmethod
+    def _format_mcp_servers_label(n: int | None) -> str:
+        if n is None:
+            return 'MCP servers —'
+        if n == 1:
+            return '1 MCP server'
+        return f'{n} MCP servers'
+
+    @staticmethod
+    def _format_skills_label(count: int) -> str:
+        if count == 1:
+            return '1 skill'
+        return f'{count} skills'
 
     # -- rich renderable protocol ------------------------------------------
 
@@ -36,7 +77,7 @@ class HUDBar:
         bar = self._format_compact() if width < 80 else self._format()
 
         pad = max(0, width - len(bar.plain))
-        line = Text(' ') + bar + Text(' ' * pad)
+        line = bar + Text(' ' * pad)
         line.stylize('on grey11')
         yield line
 
@@ -54,6 +95,8 @@ class HUDBar:
             token_display = f'{ctx} tkns'
         else:
             token_display = f'{ctx}/{lim}'
+        mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
+        skills_label = self._format_skills_label(self._bundled_skill_count)
         parts = [
             (self.state.model, 'bright_black'),
             (' │ ', 'grey27'),
@@ -62,6 +105,10 @@ class HUDBar:
             (f'${self.state.cost_usd:.4f}', 'bright_black'),
             (' │ ', 'grey27'),
             (f'{self.state.llm_calls} calls', 'bright_black'),
+            (' │ ', 'grey27'),
+            (mcp_label, 'bright_black'),
+            (' │ ', 'grey27'),
+            (skills_label, 'bright_black'),
             (' │ ', 'grey27'),
             (self.state.ledger_status, self._ledger_style()),
         ]
@@ -79,6 +126,12 @@ class HUDBar:
             token_display = f'{ctx}t'
         else:
             token_display = ctx
+        mcp_short = (
+            '?'
+            if self.state.mcp_servers is None
+            else str(min(self.state.mcp_servers, 99))
+        )
+        sk_short = str(min(self._bundled_skill_count, 99))
         parts = [
             (
                 self.state.model.rsplit('/', maxsplit=1)[-1][:12],
@@ -88,6 +141,10 @@ class HUDBar:
             (token_display, 'bright_black'),
             (' ', 'grey27'),
             (f'${self.state.cost_usd:.3f}', 'bright_black'),
+            (' ', 'grey27'),
+            (f'm{mcp_short}', 'bright_black'),
+            (' ', 'grey27'),
+            (f'k{sk_short}', 'bright_black'),
             (' ', 'grey27'),
             (self._ledger_icon(), self._ledger_style()),
         ]
@@ -102,6 +159,7 @@ class HUDBar:
             'Healthy': '●',
             'Ready': '○',
             'Idle': '○',
+            'Starting': '◌',
             'Review': '◆',
             'Paused': '⏸',
             'Error': '✗',
@@ -109,7 +167,7 @@ class HUDBar:
         return mapping.get(self.state.ledger_status, '?')
 
     def _ledger_style(self) -> str:
-        if self.state.ledger_status in {'Healthy', 'Ready', 'Idle'}:
+        if self.state.ledger_status in {'Healthy', 'Ready', 'Idle', 'Starting'}:
             return 'bright_black'
         if self.state.ledger_status == 'Review':
             return 'yellow'
@@ -139,6 +197,10 @@ class HUDBar:
 
     def update_ledger(self, status: str) -> None:
         self.state.ledger_status = status
+
+    def update_mcp_servers(self, count: int) -> None:
+        """Set connected MCP server count (0 when MCP is enabled but none connected)."""
+        self.state.mcp_servers = max(0, int(count))
 
     @staticmethod
     def _has_usage_signal(usage: Any) -> bool:
@@ -186,13 +248,16 @@ class HUDBar:
             response_latencies = getattr(metrics, 'response_latencies', []) or []
             costs = getattr(metrics, 'costs', []) or []
             accumulated_usage = getattr(metrics, 'accumulated_token_usage', None)
-            self.state.llm_calls = self._resolve_call_count(
+            resolved_calls = self._resolve_call_count(
                 usages=usages,
                 response_latencies=response_latencies,
                 costs=costs,
                 accumulated_usage=accumulated_usage,
                 accumulated_cost=accumulated_cost,
             )
+            # Never let metrics with no usage data overwrite a call count that
+            # was already incremented (e.g. by _handle_streaming_chunk).
+            self.state.llm_calls = max(self.state.llm_calls, resolved_calls)
 
             if self._has_usage_signal(accumulated_usage):
                 prompt_tokens = int(getattr(accumulated_usage, 'prompt_tokens', 0) or 0)
@@ -231,13 +296,14 @@ class HUDBar:
             self.state.cost_usd = accumulated_cost
             usages = metrics.get('token_usages', [])
             accumulated_usage = metrics.get('accumulated_token_usage')
-            self.state.llm_calls = self._resolve_call_count(
+            resolved_calls = self._resolve_call_count(
                 usages=usages if isinstance(usages, list) else [],
                 response_latencies=metrics.get('response_latencies', []),
                 costs=metrics.get('costs', []),
                 accumulated_usage=accumulated_usage,
                 accumulated_cost=accumulated_cost,
             )
+            self.state.llm_calls = max(self.state.llm_calls, resolved_calls)
 
             if isinstance(accumulated_usage, dict):
                 total = (

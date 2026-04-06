@@ -6,6 +6,7 @@ validation, and atomic operations. Designed for production agent environments.
 
 from __future__ import annotations
 
+from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -44,6 +45,8 @@ class FileEditor:
     error handling and validation. Used by runtime for file I/O operations.
     """
 
+    _UNDO_MAX_PER_FILE = 32
+
     def __init__(self, workspace_root: str | None = None) -> None:
         """Initialize the file editor.
 
@@ -54,8 +57,55 @@ class FileEditor:
         # Transaction support: stack of backup dictionaries
         # Each backup dict maps file_path -> original_content (None if file didn't exist)
         self._transaction_stack: list[dict[str, str | None]] = []
+        # Per-file undo: before each mutating write we append the previous snapshot
+        # (None means the file did not exist). Bounded FIFO via deque maxlen.
+        self._undo_history: dict[str, deque[str | None]] = defaultdict(
+            lambda: deque(maxlen=self._UNDO_MAX_PER_FILE)
+        )
         # Path validator for security
         self._path_validator = None  # Lazy initialization
+
+    def _undo_key(self, file_path: Path) -> str:
+        try:
+            return str(file_path.resolve())
+        except OSError:
+            return str(file_path)
+
+    def _push_undo_snapshot(self, file_path: Path, snapshot: str | None) -> None:
+        """Record file state *before* a mutating write (None = file absent)."""
+        self._undo_history[self._undo_key(file_path)].append(snapshot)
+
+    def _handle_undo_last_edit(self, file_path: Path, display_path: str) -> ToolResult:
+        key = self._undo_key(file_path)
+        hist = self._undo_history.get(key)
+        if not hist:
+            return ToolResult(
+                output='',
+                error=f'No undo history for {display_path}',
+            )
+        snapshot = hist.pop()
+        if not hist:
+            del self._undo_history[key]
+        try:
+            if snapshot is None:
+                if file_path.exists():
+                    file_path.unlink()
+                return ToolResult(
+                    output='Undid last edit (file removed; it did not exist before that edit).',
+                    old_content=None,
+                    new_content=None,
+                )
+            self._write_file(file_path, snapshot)
+            return ToolResult(
+                output='Undid last edit; restored previous file contents.',
+                old_content=snapshot,
+                new_content=snapshot,
+            )
+        except Exception as e:
+            hist.append(snapshot)
+            if key not in self._undo_history:
+                self._undo_history[key] = hist
+            return ToolResult(output='', error=f'Failed to undo: {e}')
 
     def __call__(
         self,
@@ -76,7 +126,7 @@ class FileEditor:
         """Execute a file editor command.
 
         Args:
-            command: Command to execute ("view_file", "replace_text", "insert_text", "create_file", "undo_last_edit", "view_and_replace", "edit", "write")
+            command: Command to execute ("view_file", "replace_text", "insert_text", "create_file", "undo_last_edit", "view_and_replace", "edit", "write").
             path: File path (relative to workspace_root or absolute)
             file_text: Optional file content for write/edit operations (use MISSING if not provided)
             view_range: Optional [start_line, end_line] for view command (1-indexed)
@@ -121,14 +171,7 @@ class FileEditor:
                     dry_run=dry_run,
                 )
             if command == 'undo_last_edit':
-                # Runtime file editor has no durable undo stack yet.
-                return ToolResult(
-                    output='',
-                    error=(
-                        'undo_last_edit is not currently supported in runtime mode. '
-                        'Use checkpoint/rollback for reversal.'
-                    ),
-                )
+                return self._handle_undo_last_edit(file_path, path)
             if command in ('write', 'create_file'):
                 # Handle sentinels for write/create_file command
                 content = self._extract_content(file_text, new_str)
@@ -314,6 +357,13 @@ class FileEditor:
                     new_content=new_content,
                 )
 
+            if old_content == new_content:
+                return ToolResult(
+                    output='No changes applied (content unchanged).',
+                    old_content=old_content,
+                    new_content=new_content,
+                )
+
             # Write results
             return self._write_edit_result(file_path, old_content, new_content)
 
@@ -449,6 +499,8 @@ class FileEditor:
         if self._transaction_stack:
             self._backup_file(file_path, old_content)
 
+        self._push_undo_snapshot(file_path, old_content)
+
         # Write new content
         self._write_file(file_path, new_content)
 
@@ -498,9 +550,18 @@ class FileEditor:
                     new_content=content,
                 )
 
+            if file_existed and old_content == content:
+                return ToolResult(
+                    output='No changes applied (content unchanged).',
+                    old_content=old_content,
+                    new_content=content,
+                )
+
             # Backup original if in transaction
             if self._transaction_stack:
                 self._backup_file(file_path, old_content)
+
+            self._push_undo_snapshot(file_path, old_content)
 
             self._write_file(file_path, content)
 

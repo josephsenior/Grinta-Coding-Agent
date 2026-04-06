@@ -9,8 +9,6 @@ import pytest
 
 from backend.ledger.action import CmdRunAction, FileEditAction
 from backend.orchestration.tool_pipeline import (
-    ConflictDetectionMiddleware,
-    ReflectionMiddleware,
     ToolInvocationContext,
     ToolInvocationMiddleware,
     ToolInvocationPipeline,
@@ -100,26 +98,6 @@ class TestToolInvocationContext:
 
 
 class TestBaseMiddleware:
-    def test_plan_is_noop(self) -> None:
-        mw = ToolInvocationMiddleware()
-        ctx = ToolInvocationContext(
-            controller=_mock_controller(),
-            action=_mock_action(),
-            state=_mock_state(),
-        )
-        result = asyncio.run(mw.plan(ctx))
-        assert result is None
-
-    def test_verify_is_noop(self) -> None:
-        mw = ToolInvocationMiddleware()
-        ctx = ToolInvocationContext(
-            controller=_mock_controller(),
-            action=_mock_action(),
-            state=_mock_state(),
-        )
-        result = asyncio.run(mw.verify(ctx))
-        assert result is None
-
     def test_execute_is_noop(self) -> None:
         mw = ToolInvocationMiddleware()
         ctx = ToolInvocationContext(
@@ -152,12 +130,6 @@ class _RecordingMiddleware(ToolInvocationMiddleware):
     def __init__(self):
         self.calls = []
 
-    async def plan(self, ctx):
-        self.calls.append('plan')
-
-    async def verify(self, ctx):
-        self.calls.append('verify')
-
     async def execute(self, ctx):
         self.calls.append('execute')
 
@@ -166,31 +138,13 @@ class _RecordingMiddleware(ToolInvocationMiddleware):
 
 
 class _BlockingMiddleware(ToolInvocationMiddleware):
-    """Blocks execution during verify stage."""
+    """Blocks execution during execute stage."""
 
-    async def verify(self, ctx):
+    async def execute(self, ctx):
         ctx.block('blocked by test')
 
 
 class TestPipelineStageExecution:
-    @pytest.mark.asyncio
-    async def test_run_plan_calls_plan(self):
-        ctrl = _mock_controller()
-        mw = _RecordingMiddleware()
-        pip = ToolInvocationPipeline(ctrl, [mw])
-        ctx = pip.create_context(_mock_action(), _mock_state())
-        await pip.run_plan(ctx)
-        assert 'plan' in mw.calls
-
-    @pytest.mark.asyncio
-    async def test_run_verify_calls_verify(self):
-        ctrl = _mock_controller()
-        mw = _RecordingMiddleware()
-        pip = ToolInvocationPipeline(ctrl, [mw])
-        ctx = pip.create_context(_mock_action(), _mock_state())
-        await pip.run_verify(ctx)
-        assert 'verify' in mw.calls
-
     @pytest.mark.asyncio
     async def test_run_execute_calls_execute(self):
         ctrl = _mock_controller()
@@ -227,16 +181,6 @@ class TestPipelineStageExecution:
 
 class TestBlockingPropagation:
     @pytest.mark.asyncio
-    async def test_blocked_context_skips_verify(self):
-        ctrl = _mock_controller()
-        mw = _RecordingMiddleware()
-        pip = ToolInvocationPipeline(ctrl, [mw])
-        ctx = pip.create_context(_mock_action(), _mock_state())
-        ctx.blocked = True
-        await pip.run_verify(ctx)
-        assert 'verify' not in mw.calls
-
-    @pytest.mark.asyncio
     async def test_blocked_context_skips_execute(self):
         ctrl = _mock_controller()
         mw = _RecordingMiddleware()
@@ -253,10 +197,10 @@ class TestBlockingPropagation:
         recorder = _RecordingMiddleware()
         pip = ToolInvocationPipeline(ctrl, [blocker, recorder])
         ctx = pip.create_context(_mock_action(), _mock_state())
-        await pip.run_verify(ctx)
+        await pip.run_execute(ctx)
         assert ctx.blocked is True
         assert ctx.block_reason == 'blocked by test'
-        assert 'verify' not in recorder.calls
+        assert 'execute' not in recorder.calls
 
 
 # ---------------------------------------------------------------------------
@@ -271,20 +215,20 @@ class TestMiddlewareOrdering:
         order = []
 
         class MW1(ToolInvocationMiddleware):
-            async def plan(self, ctx):
+            async def execute(self, ctx):
                 order.append(1)
 
         class MW2(ToolInvocationMiddleware):
-            async def plan(self, ctx):
+            async def execute(self, ctx):
                 order.append(2)
 
         class MW3(ToolInvocationMiddleware):
-            async def plan(self, ctx):
+            async def execute(self, ctx):
                 order.append(3)
 
         pip = ToolInvocationPipeline(ctrl, [MW1(), MW2(), MW3()])
         ctx = pip.create_context(_mock_action(), _mock_state())
-        await pip.run_plan(ctx)
+        await pip.run_execute(ctx)
         assert order == [1, 2, 3]
 
 
@@ -332,44 +276,5 @@ class TestCreateContext:
         assert ctx.metadata == {}
 
 
-class TestNewPolicyMiddlewares:
-    @pytest.mark.asyncio
-    async def test_reflection_blocks_destructive_command(self):
-        ctrl = _mock_controller()
-        ctrl.agent = MagicMock()
-        ctrl.agent.config = MagicMock()
-        ctrl.agent.config.enable_reflection = True
-        ctrl.agent.config.enable_reflection_middleware = True
 
-        mw = ReflectionMiddleware(ctrl)
-        ctx = ToolInvocationContext(
-            controller=ctrl,
-            action=CmdRunAction(command='rm -rf /'),
-            state=_mock_state(),
-        )
 
-        await mw.verify(ctx)
-
-        assert ctx.blocked is True
-        assert 'destructive' in (ctx.block_reason or '')
-        ctrl.event_stream.add_event.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_conflict_detection_is_noop(self):
-        """ConflictDetectionMiddleware.verify() is a no-op (blocking removed to prevent loops)."""
-        ctrl = _mock_controller()
-        mw = ConflictDetectionMiddleware()
-
-        # Even with prior unverified edits, verify should not block.
-        mw._unverified_edits['src/main.py'] = 2
-
-        ctx = ToolInvocationContext(
-            controller=ctrl,
-            action=FileEditAction(path='src/main.py', command='replace_text'),
-            state=_mock_state(),
-        )
-
-        await mw.verify(ctx)
-
-        assert ctx.blocked is False
-        assert ctx.block_reason is None

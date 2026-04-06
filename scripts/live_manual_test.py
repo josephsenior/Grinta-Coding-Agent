@@ -329,7 +329,7 @@ async def _ensure_server_healthy(client: AppClient) -> bool:
 
 async def main() -> int:
     print(f"{'=' * 72}")
-    print(f"  FORGE LIVE AGENT MANUAL TEST")
+    print(f"  GRINTA LIVE AGENT MANUAL TEST")
     print(f"  Server: {BASE_URL}")
     print(f"  Task timeout: {TASK_TIMEOUT}s")
     print(f"{'=' * 72}\n")

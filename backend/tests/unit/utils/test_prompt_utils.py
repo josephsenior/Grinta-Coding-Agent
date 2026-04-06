@@ -197,18 +197,22 @@ class TestOrchestratorPromptManager:
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
         opm.set_prompt_tier('debug')
 
-        with patch(
-            'backend.core.workspace_resolution.get_effective_workspace_root',
-            return_value=tmp_path,
+        with (
+            patch(
+                'backend.core.workspace_resolution.get_effective_workspace_root',
+                return_value=tmp_path,
+            ),
+            patch(
+                'backend.core.workspace_resolution.workspace_agent_state_dir',
+                return_value=tmp_path,
+            ),
         ):
             # Test missing lessons file
             result = opm.get_system_message()
             assert 'REPOSITORY_LESSONS_LEARNED' not in result
 
             # Test existing lessons file
-            lessons_dir = tmp_path / '.grinta'
-            lessons_dir.mkdir(exist_ok=True)
-            lessons_file = lessons_dir / 'lessons.md'
+            lessons_file = tmp_path / 'lessons.md'
             lessons_file.write_text('Always test your code.', encoding='utf-8')
 
             result = opm.get_system_message()

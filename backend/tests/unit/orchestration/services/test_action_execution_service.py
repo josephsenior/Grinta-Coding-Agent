@@ -179,20 +179,18 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
         mock_pipeline = MagicMock()
         mock_pipeline.create_context = MagicMock(return_value=mock_ctx)
-        mock_pipeline.run_plan = AsyncMock()
         self.mock_context.operation_pipeline = mock_pipeline
 
         with patch('backend.core.plugin.get_plugin_registry'):
             await self.service.execute_action(mock_action)
 
-        # Should create context and run plan
+        # Should create context
         mock_pipeline.create_context.assert_called_once_with(
             mock_action, self.mock_context.state
         )
         self.mock_context.register_action_context.assert_called_once_with(
             mock_action, mock_ctx
         )
-        mock_pipeline.run_plan.assert_called_once_with(mock_ctx)
 
         # Should apply dynamic iterations
         self.mock_context.iteration_service.apply_dynamic_iterations.assert_called_once_with(
@@ -201,30 +199,6 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
         # Should run action
         self.mock_context.run_action.assert_called_once_with(mock_action, mock_ctx)
-
-    async def test_execute_action_blocked_during_plan(self):
-        """Test execute_action handles blocked action during plan."""
-        mock_action = MagicMock(spec=Action)
-        mock_action.runnable = True
-
-        mock_ctx = MagicMock()
-        mock_ctx.blocked = True
-
-        mock_pipeline = MagicMock()
-        mock_pipeline.create_context = MagicMock(return_value=mock_ctx)
-        mock_pipeline.run_plan = AsyncMock()
-        self.mock_context.operation_pipeline = mock_pipeline
-
-        with patch('backend.core.plugin.get_plugin_registry'):
-            await self.service.execute_action(mock_action)
-
-        # Should handle blocked invocation
-        self.mock_context.telemetry_service.handle_blocked_invocation.assert_called_once_with(
-            mock_action, mock_ctx
-        )
-
-        # Should not run action
-        self.mock_context.run_action.assert_not_called()
 
     async def test_execute_action_non_runnable(self):
         """Test execute_action processes non-runnable action."""

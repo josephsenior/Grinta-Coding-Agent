@@ -127,6 +127,10 @@ class CircuitBreaker:
         self.recent_actions_success: deque[bool] = deque(
             maxlen=config.error_rate_window * 2
         )
+        # Per-tool-type consecutive error tracking — prevents cross-task
+        # failures (e.g. ast_code_editor + npm lint) from compounding into
+        # a single global counter that trips too early.
+        self._per_tool_errors: dict[str, int] = {}
 
         logger.info(
             'CircuitBreaker initialized: max_consecutive_errors=%s, '
@@ -213,21 +217,30 @@ class CircuitBreaker:
             action='continue',
         )
 
-    def record_error(self, error: Exception) -> None:
+    def record_error(self, error: Exception, tool_name: str = '') -> None:
         """Record an error occurrence.
 
         Args:
             error: The exception that occurred
+            tool_name: Optional tool name for per-tool tracking
 
         """
         self.consecutive_errors += 1
         self.recent_errors.append(str(error))
         self.recent_actions_success.append(False)
+        if tool_name:
+            self._per_tool_errors[tool_name] = self._per_tool_errors.get(tool_name, 0) + 1
 
-    def record_success(self) -> None:
+    def record_success(self, tool_name: str = '') -> None:
         """Record a successful action."""
         self.consecutive_errors = 0  # Reset consecutive error counter
         self.recent_actions_success.append(True)
+        if tool_name:
+            self._per_tool_errors.pop(tool_name, None)
+
+    def get_tool_error_count(self, tool_name: str) -> int:
+        """Return consecutive error count for a specific tool type."""
+        return self._per_tool_errors.get(tool_name, 0)
 
     def record_high_risk_action(self, risk_level: ActionSecurityRisk) -> None:
         """Record a high-risk action.
@@ -283,6 +296,7 @@ class CircuitBreaker:
         self.stuck_detection_count = 0
         self.recent_errors.clear()
         self.recent_actions_success.clear()
+        self._per_tool_errors.clear()
         logger.info('Circuit breaker reset')
 
     def _update_metrics(self, state: State) -> None:

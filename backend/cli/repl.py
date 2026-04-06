@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
 import shutil
 import sys
 import time
@@ -258,6 +259,56 @@ class Repl:
         self._acquire_result: Any | None = None
         self._pending_resume: str | None = None
         self._queued_input: list[str] = []
+        #: Single-line bootstrap / idle status under the stats bar (prompt_toolkit only).
+        self._footer_system_status: str = ''
+        self._footer_system_kind: str = 'system'
+        self._pt_session: Any | None = None
+
+    def _invalidate_pt(self) -> None:
+        sess = self._pt_session
+        if sess is None:
+            return
+        app = getattr(sess, 'app', None)
+        if app is not None:
+            app.invalidate()
+
+    def _set_footer_system_line(self, text: str, *, kind: str = 'system') -> None:
+        """One shared status line under the stats bar; replaces previous text."""
+        self._footer_system_status = text
+        self._footer_system_kind = kind
+        self._invalidate_pt()
+
+    def _append_footer_system_fragments(
+        self,
+        fragments: list[tuple[str, str]],
+        add: Callable[[str, str], None],
+    ) -> None:
+        status = self._footer_system_status.strip()
+        if not status:
+            return
+        warn = self._footer_system_kind.strip().lower() == 'warning'
+        body_cls = 'class:prompt.footer.warn_body' if warn else 'class:prompt.footer.body'
+        label = 'system'
+        sep = ': '
+        cols = shutil.get_terminal_size((110, 24)).columns
+        reserve = 5 + len(label) + len(sep)
+        max_w = max(16, cols - reserve)
+        if len(status) > max_w:
+            status = status[: max_w - 1] + '…'
+        add('', '\n')
+        if warn:
+            add('class:prompt.footer.warn_bracket', '[')
+            add('class:prompt.footer.warn_core', '!')
+            add('class:prompt.footer.warn_bracket', ']  ')
+            add('class:prompt.footer.warn_kicker', label)
+            add('class:prompt.footer.warn_sep', sep)
+        else:
+            add('class:prompt.footer.badge_bracket', '[')
+            add('class:prompt.footer.badge_core', 'i')
+            add('class:prompt.footer.badge_bracket', ']  ')
+            add('class:prompt.footer.kicker', label)
+            add('class:prompt.footer.sep', sep)
+        add(body_cls, status)
 
     @property
     def pending_resume(self) -> str | None:
@@ -315,9 +366,7 @@ class Repl:
 
     def _prompt_message(self) -> str:
         state = self._current_prompt_state()
-        if state == AgentState.PAUSED:
-            label = 'paused '
-        elif state in {AgentState.ERROR, AgentState.REJECTED}:
+        if state in {AgentState.ERROR, AgentState.REJECTED}:
             label = 'retry '
         else:
             label = ''
@@ -327,15 +376,11 @@ class Repl:
         from prompt_toolkit.formatted_text import HTML
 
         return HTML(
-            '<style fg="#5d7286">'
-            '<i>Describe the task, or type /help</i>'
-            '</style>'
+            '<style fg="#5d7286"><i>Describe the task, or type /help</i></style>'
         )
 
     def _prompt_state_label(self) -> str:
         state = self._current_prompt_state()
-        if state == AgentState.PAUSED:
-            return 'Paused'
         if state == AgentState.AWAITING_USER_CONFIRMATION:
             return 'Needs approval'
         if state in {AgentState.ERROR, AgentState.REJECTED}:
@@ -382,6 +427,8 @@ class Repl:
             token_display = f'{tokens} tkns'
         else:
             token_display = f'{tokens}/{lim}'
+        mcp_txt = HUDBar._format_mcp_servers_label(hud.mcp_servers)
+        skills_txt = HUDBar._format_skills_label(self._hud.bundled_skill_count)
         return {
             'state_label': self._prompt_state_label(),
             'autonomy_label': self._prompt_autonomy_label(),
@@ -389,13 +436,13 @@ class Repl:
             'token_display': token_display,
             'cost': f'${hud.cost_usd:.4f}',
             'calls': f'{hud.llm_calls} calls',
+            'mcp': mcp_txt,
+            'skills': skills_txt,
             'ledger': hud.ledger_status,
         }
 
     def _prompt_state_style(self) -> str:
         state = self._current_prompt_state()
-        if state == AgentState.PAUSED:
-            return 'class:prompt.badge.paused'
         if state == AgentState.AWAITING_USER_CONFIRMATION:
             return 'class:prompt.badge.review'
         if state in {AgentState.ERROR, AgentState.REJECTED}:
@@ -414,7 +461,7 @@ class Repl:
 
     @staticmethod
     def _prompt_ledger_style(ledger_status: str) -> str:
-        if ledger_status in {'Healthy', 'Ready', 'Idle'}:
+        if ledger_status in {'Healthy', 'Ready', 'Idle', 'Starting'}:
             return 'class:prompt.health.good'
         if ledger_status in {'Review', 'Paused'}:
             return 'class:prompt.health.warn'
@@ -427,15 +474,48 @@ class Repl:
         controls = f'{state_label}  │  {autonomy_label}  │  Tab for commands'
         telemetry = (
             f"{data['model']}  │  {data['token_display']}  │  {data['cost']}  │  "
-            f"{data['calls']}  │  {data['ledger']}"
+            f"{data['calls']}  │  {data['mcp']}  │  {data['skills']}  │  {data['ledger']}"
         )
         return f' {controls}\n {telemetry} '
 
-    def _prompt_panel_message(self) -> Any:
-        width = shutil.get_terminal_size((110, 24)).columns
-        if width < 72:
-            return self._prompt_message()
+    def _prompt_stats_row1_fragments(self, data: dict[str, str], compact: bool) -> list[tuple[str, str]]:
+        frags: list[tuple[str, str]] = []
+        frags.append(('class:prompt.brand', 'GRINTA'))
+        frags.append(('class:prompt.dim', '  '))
+        frags.append((self._prompt_state_style(), f" {data['state_label'].upper()} "))
+        frags.append(('class:prompt.dim', '  '))
+        frags.append((self._prompt_autonomy_style(), data['autonomy_label']))
+        if not compact:
+            frags.append(('class:prompt.dim', '  '))
+            frags.append(('class:prompt.hint', 'Tab for commands'))
+        return frags
 
+    def _prompt_stats_row2_fragments(
+        self, data: dict[str, str], compact: bool, model: str
+    ) -> list[tuple[str, str]]:
+        frags: list[tuple[str, str]] = []
+        frags.append(('class:prompt.model', model))
+        frags.append(('class:prompt.sep', '  •  '))
+        frags.append(('class:prompt.value', data['token_display']))
+        frags.append(('class:prompt.sep', '  •  '))
+        frags.append(('class:prompt.value', data['cost']))
+        if not compact:
+            frags.append(('class:prompt.sep', '  •  '))
+            frags.append(('class:prompt.value', data['calls']))
+        frags.append(('class:prompt.sep', '  •  '))
+        frags.append(('class:prompt.value', data['mcp']))
+        frags.append(('class:prompt.sep', '  •  '))
+        frags.append(('class:prompt.value', data['skills']))
+        frags.append(('class:prompt.sep', '  •  '))
+        frags.append((self._prompt_ledger_style(data['ledger']), data['ledger']))
+        if compact:
+            frags.append(('class:prompt.sep', '  •  '))
+            frags.append(('class:prompt.hint', '/help'))
+        return frags
+
+    def _prompt_bottom_toolbar(self) -> Any:
+        """Two-line status under the input; no filled backgrounds (terminal default)."""
+        width = shutil.get_terminal_size((110, 24)).columns
         data = self._prompt_panel_data()
         compact = width < 110
         model_limit = 24 if compact else 36
@@ -446,36 +526,28 @@ class Repl:
         def add(style: str, text: str) -> None:
             fragments.append((style, text))
 
-        add('class:prompt.border', '╭─ ')
-        add('class:prompt.brand', 'GRINTA')
-        add('class:prompt.dim', '  ')
-        add(self._prompt_state_style(), f" {data['state_label'].upper()} ")
-        add('class:prompt.dim', '  ')
-        add(self._prompt_autonomy_style(), data['autonomy_label'])
-        if not compact:
-            add('class:prompt.dim', '  ')
-            add('class:prompt.hint', 'Tab for commands')
+        if width < 72:
+            line = (
+                f"{data['state_label']} · {data['autonomy_label']} · "
+                f"{model} · {data['token_display']} · {data['cost']}"
+            )
+            add('class:prompt.dim', line)
+            self._append_footer_system_fragments(fragments, add)
+            return fragments
 
+        fragments.extend(self._prompt_stats_row1_fragments(data, compact))
         add('', '\n')
-        add('class:prompt.border', '│  ')
-        add('class:prompt.model', model)
-        add('class:prompt.sep', '  •  ')
-        add('class:prompt.value', data['token_display'])
-        add('class:prompt.sep', '  •  ')
-        add('class:prompt.value', data['cost'])
-        if not compact:
-            add('class:prompt.sep', '  •  ')
-            add('class:prompt.value', data['calls'])
-        add('class:prompt.sep', '  •  ')
-        add(self._prompt_ledger_style(data['ledger']), data['ledger'])
-        if compact:
-            add('class:prompt.sep', '  •  ')
-            add('class:prompt.hint', '/help')
-
-        add('', '\n')
-        add('class:prompt.border', '╰─')
-        add('class:prompt.arrow', '▶ ')
+        fragments.extend(self._prompt_stats_row2_fragments(data, compact, model))
+        self._append_footer_system_fragments(fragments, add)
         return fragments
+
+    def _prompt_panel_message(self) -> Any:
+        width = shutil.get_terminal_size((110, 24)).columns
+        if width < 72:
+            return self._prompt_message()
+
+        # Single-line prefix; avoids full-width box drawing (width often ≠ PT layout width).
+        return [('class:prompt.arrow', '▶ ')]
 
     def _create_prompt_session(self) -> Any:
         from prompt_toolkit import PromptSession
@@ -486,26 +558,41 @@ class Repl:
         from backend.cli.session_manager import get_session_suggestions
 
         prompt_style = Style.from_dict({
-            '': 'bg:#08111d #e6eef7',
-            'prompt.border': 'bg:#08111d #385168',
-            'prompt.brand': 'bg:#08111d bold #7dd3fc',
-            'prompt.dim': 'bg:#08111d #5c7287',
-            'prompt.model': 'bg:#08111d bold #dbe7f3',
-            'prompt.value': 'bg:#08111d #b4c4d5',
-            'prompt.sep': 'bg:#08111d #2f465b',
-            'prompt.arrow': 'bg:#08111d bold #7dd3fc',
-            'prompt.hint': 'bg:#08111d bold #f1bf63',
-            'prompt.badge.ready': 'bg:#163d34 #c9ffe9 bold',
-            'prompt.badge.running': 'bg:#173650 #c8e8ff bold',
-            'prompt.badge.review': 'bg:#4a3310 #ffe0a1 bold',
-            'prompt.badge.paused': 'bg:#4a3310 #ffe0a1 bold',
-            'prompt.badge.error': 'bg:#4a1f25 #ffd3d9 bold',
-            'prompt.autonomy.balanced': 'bg:#08111d #8bd8ff',
-            'prompt.autonomy.full': 'bg:#08111d #f1bf63 bold',
-            'prompt.autonomy.supervised': 'bg:#08111d #f0a3ff bold',
-            'prompt.health.good': 'bg:#08111d #8fdfb1 bold',
-            'prompt.health.warn': 'bg:#08111d #f1bf63 bold',
-            'prompt.health.bad': 'bg:#08111d #ff9ea8 bold',
+            # Default prompt text; no bg so the terminal background shows through.
+            '': 'noreverse #e6eef7',
+            # PT defaults bottom-toolbar to reverse — disable without adding a fill color.
+            'bottom-toolbar': 'noreverse',
+            'bottom-toolbar.text': 'noreverse',
+            'prompt.border': '#385168',
+            'prompt.frame.border': 'bold #34d399',
+            'prompt.brand': 'bold #7dd3fc',
+            'prompt.dim': '#5c7287',
+            'prompt.model': 'bold #dbe7f3',
+            'prompt.value': '#b4c4d5',
+            'prompt.sep': '#2f465b',
+            'prompt.arrow': 'bold #7dd3fc',
+            'prompt.hint': 'bold #f1bf63',
+            'prompt.badge.ready': '#86efac bold',
+            'prompt.badge.running': '#93c5fd bold',
+            'prompt.badge.review': '#fcd34d bold',
+            'prompt.badge.paused': '#fcd34d bold',
+            'prompt.badge.error': '#fca5a5 bold',
+            'prompt.autonomy.balanced': '#8bd8ff',
+            'prompt.autonomy.full': '#f1bf63 bold',
+            'prompt.autonomy.supervised': '#f0a3ff bold',
+            'prompt.health.good': '#8fdfb1 bold',
+            'prompt.health.warn': '#f1bf63 bold',
+            'prompt.health.bad': '#ff9ea8 bold',
+            'prompt.footer.badge_bracket': '#0e7490',
+            'prompt.footer.badge_core': 'bold #22d3ee',
+            'prompt.footer.kicker': 'bold #a5f3fc',
+            'prompt.footer.sep': '#64748b',
+            'prompt.footer.body': '#94a3b8',
+            'prompt.footer.warn_bracket': '#a16207',
+            'prompt.footer.warn_core': 'bold #facc15',
+            'prompt.footer.warn_kicker': 'bold #fde68a',
+            'prompt.footer.warn_sep': '#92400e',
+            'prompt.footer.warn_body': '#fcd34d',
             'completion-menu': 'bg:#0f1824 #b8c7d8',
             'completion-menu.completion': 'bg:#0f1824 #b8c7d8',
             'completion-menu.completion.current': 'bg:#21425d #ffffff',
@@ -515,6 +602,7 @@ class Repl:
 
         return PromptSession(
             message=self._prompt_panel_message,
+            bottom_toolbar=self._prompt_bottom_toolbar,
             history=FileHistory(str(_ensure_history())),
             key_bindings=_build_bindings(),
             completer=_build_command_completer(
@@ -522,7 +610,7 @@ class Repl:
             ),
             auto_suggest=AutoSuggestFromHistory(),
             complete_while_typing=True,
-            reserve_space_for_menu=4,
+            reserve_space_for_menu=5,
             enable_history_search=True,
             multiline=False,
             style=prompt_style,
@@ -606,12 +694,14 @@ class Repl:
         from backend.core.bootstrap.main import (
             _create_early_status_callback,
             _initialize_session_components,
-            _setup_memory_and_mcp,
+            _setup_mcp_tools,
+            _setup_memory,
             _setup_runtime_for_controller,
         )
         from backend.core.bootstrap.setup import create_controller
 
         try:
+            bootstrap_task: asyncio.Task[None] | None = None
             config = self._config
             self._hud.update_model(get_current_model(config))
 
@@ -619,90 +709,38 @@ class Repl:
             session: Any | None = None
             if _supports_prompt_session(sys.stdin, sys.stdout):
                 session = self._create_prompt_session()
+            self._pt_session = session
 
             # -- renderer (no event-stream subscription yet) ------------------
+            get_pt_session = (lambda: session) if session is not None else None
             self._renderer = CLIEventRenderer(
                 self._console,
                 self._hud,
                 self._reasoning,
                 loop=loop,
                 max_budget=config.max_budget_per_task,
+                get_prompt_session=get_pt_session,
+                cli_tool_icons=config.cli_tool_icons,
             )
             renderer = self._renderer
             if renderer is None:
                 raise RuntimeError('CLI renderer did not initialize.')
 
-            # -- heavy init runs in background while user sees the prompt -----
-            async def _heavy_init() -> None:
-                """Session bootstrap + runtime + memory + MCP in the background."""
-                bootstrap_state = await asyncio.to_thread(
-                    _initialize_session_components,
-                    config,
-                    None,
-                )
-                session_id = bootstrap_state[0]
-                llm_registry = bootstrap_state[1]
-                conversation_stats = bootstrap_state[2]
-                config_ = bootstrap_state[3]
-                agent = bootstrap_state[4]
+            # -- staged init runs in background while user sees the prompt -----
+            chat_ready_done = asyncio.Event()
+            engine_init_done = asyncio.Event()
+            engine_init_exc: list[BaseException | None] = [None]
 
-                self._agent = agent
-                self._llm_registry = llm_registry
-                self._conversation_stats = conversation_stats
-                self._config = config_
+            def _invalidate_prompt_session() -> None:
+                if session is None:
+                    return
+                app = getattr(session, 'app', None)
+                if app is not None:
+                    app.invalidate()
 
-                runtime_state = await asyncio.to_thread(
-                    _setup_runtime_for_controller,
-                    config_,
-                    llm_registry,
-                    session_id,
-                    True,
-                    agent,
-                    None,
-                )
-                runtime = runtime_state[0]
-                repo_directory = runtime_state[1]
-                acquire_result = runtime_state[2]
-
-                event_stream = runtime.event_stream
-                if event_stream is None:
-                    raise RuntimeError('Runtime did not produce an event stream.')
-
-                self._event_stream = event_stream
-                self._runtime = runtime
-                self._acquire_result = acquire_result
-
-                memory = await _setup_memory_and_mcp(
-                    config_,
-                    runtime,
-                    session_id,
-                    repo_directory,
-                    None,
-                    None,
-                    agent,
-                )
-                self._memory = memory
-
-                # Subscribe renderer now that the stream exists.
-                renderer.subscribe(event_stream, event_stream.sid)
-
-            # -- enter input loop ---------------------------------------------
-            controller = None
-            end_states = [
-                AgentState.AWAITING_USER_INPUT,
-                AgentState.FINISHED,
-                AgentState.REJECTED,
-                AgentState.ERROR,
-                AgentState.PAUSED,
-                AgentState.STOPPED,
-            ]
-
-            # -- init engine before showing prompt
-            renderer.add_system_message('Initializing engine...', title='system')
-            try:
-                await _heavy_init()
-                renderer.add_system_message('Ready.', title='system')
-            except Exception as exc:
+            def _handle_bootstrap_failure(exc: BaseException) -> None:
+                engine_init_exc[0] = exc
+                self._set_footer_system_line('')
                 exc_name = type(exc).__name__
                 if 'AuthenticationError' in exc_name or 'api_key' in str(exc).lower():
                     renderer.add_system_message(
@@ -716,7 +754,136 @@ class Repl:
                     renderer.add_system_message(
                         f'Initialization failed: {exc}', title='error'
                     )
-                return
+                self._running = False
+                _invalidate_prompt_session()
+
+            async def _engine_bootstrap() -> None:
+                """Prepare chat first, then finish optional tool warmup in the background."""
+                try:
+                    try:
+                        bootstrap_state = await asyncio.to_thread(
+                            _initialize_session_components,
+                            config,
+                            None,
+                        )
+                        session_id = bootstrap_state[0]
+                        llm_registry = bootstrap_state[1]
+                        conversation_stats = bootstrap_state[2]
+                        config_ = bootstrap_state[3]
+                        agent = bootstrap_state[4]
+
+                        self._agent = agent
+                        self._llm_registry = llm_registry
+                        self._conversation_stats = conversation_stats
+                        self._config = config_
+                    except Exception as exc:
+                        _handle_bootstrap_failure(exc)
+                        return
+                    try:
+                        runtime_state = await asyncio.to_thread(
+                            _setup_runtime_for_controller,
+                            config_,
+                            llm_registry,
+                            session_id,
+                            True,
+                            agent,
+                            None,
+                            inline_event_delivery=True,
+                        )
+                        runtime = runtime_state[0]
+                        repo_directory = runtime_state[1]
+                        acquire_result = runtime_state[2]
+
+                        event_stream = runtime.event_stream
+                        if event_stream is None:
+                            raise RuntimeError('Runtime did not produce an event stream.')
+
+                        self._event_stream = event_stream
+                        self._runtime = runtime
+                        self._acquire_result = acquire_result
+
+                        memory = await _setup_memory(
+                            config_,
+                            runtime,
+                            session_id,
+                            repo_directory,
+                            None,
+                            None,
+                            agent,
+                        )
+                        self._memory = memory
+
+                        renderer.subscribe(event_stream, event_stream.sid)
+                        if agent.config.enable_mcp:
+                            if session is not None:
+                                self._set_footer_system_line(
+                                    'Chat ready. MCP tools warming in background.'
+                                )
+                            else:
+                                renderer.add_system_message(
+                                    'Chat ready. MCP tools warming in background.',
+                                    title='system',
+                                )
+                        else:
+                            self._hud.update_mcp_servers(0)
+                            if session is not None:
+                                self._set_footer_system_line('Ready.')
+                            else:
+                                renderer.add_system_message('Ready.', title='system')
+                        self._hud.update_ledger('Ready')
+                        _invalidate_prompt_session()
+                        chat_ready_done.set()
+                    except Exception as exc:
+                        _handle_bootstrap_failure(exc)
+                        return
+
+                    if not agent.config.enable_mcp:
+                        return
+
+                    try:
+                        await _setup_mcp_tools(agent, runtime, memory)
+                    except Exception as exc:
+                        logger.warning('MCP warmup failed after chat became ready', exc_info=True)
+                        self._hud.update_mcp_servers(0)
+                        msg = f'MCP warmup failed: {exc}'
+                        if session is not None:
+                            self._set_footer_system_line(msg, kind='warning')
+                        else:
+                            renderer.add_system_message(msg, title='warning')
+                    else:
+                        mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
+                        try:
+                            mcp_n = int(mcp_status.get('connected_client_count') or 0)
+                        except (TypeError, ValueError):
+                            mcp_n = 0
+                        self._hud.update_mcp_servers(mcp_n)
+                        if session is not None:
+                            self._set_footer_system_line('MCP tools loaded.')
+                        else:
+                            renderer.add_system_message(
+                                'MCP tools loaded.', title='system'
+                            )
+                finally:
+                    chat_ready_done.set()
+                    engine_init_done.set()
+
+            # -- enter input loop ---------------------------------------------
+            controller = None
+            end_states = [
+                AgentState.AWAITING_USER_INPUT,
+                AgentState.FINISHED,
+                AgentState.ERROR,
+                AgentState.STOPPED,
+            ]
+
+            self._hud.update_ledger('Starting')
+            if session is not None:
+                self._set_footer_system_line('Initializing engine...')
+            else:
+                renderer.add_system_message('Initializing engine...', title='system')
+            bootstrap_task = asyncio.create_task(
+                _engine_bootstrap(), name='grinta-engine-bootstrap'
+            )
 
             while self._running:
                 try:
@@ -737,11 +904,21 @@ class Repl:
                     traceback.print_exc()
                     break
 
+                if not self._running:
+                    break
+
                 text = user_input.strip()
                 if not text:
                     continue
 
                 if text.startswith('/'):
+                    parts_sl = text.strip().split()
+                    if parts_sl:
+                        sc = _canonical_command_name(parts_sl[0].lower())
+                        if sc == '/resume':
+                            await engine_init_done.wait()
+                            if engine_init_exc[0] is not None:
+                                continue
                     should_continue = self._handle_command(text)
                     if not should_continue:
                         break
@@ -753,7 +930,7 @@ class Repl:
                         agent_task = None
                         result = await self._resume_session(
                             target,
-                            config,
+                            self._config,
                             create_controller,
                             _create_early_status_callback,
                             run_agent_until_done,
@@ -763,8 +940,11 @@ class Repl:
                             controller, agent_task = result
                     continue
 
-                # -- heavy init is already done before the loop
-                # we just need to use the components
+                await chat_ready_done.wait()
+                if engine_init_exc[0] is not None:
+                    continue
+
+                config = self._config
                 agent = self._agent
                 llm_registry = self._llm_registry
                 conversation_stats = self._conversation_stats
@@ -788,7 +968,8 @@ class Repl:
 
                 # -- user message: start Live for agent turn
                 # Print the user message statically since prompt_toolkit erases it
-                self._renderer.add_user_message(text)
+                self._set_footer_system_line('')
+                await self._renderer.add_user_message(text)
 
                 initial_action = MessageAction(content=text)
                 self._renderer.start_live()
@@ -823,7 +1004,13 @@ class Repl:
                     await self._cancel_agent(agent_task)
                 finally:
                     self._renderer.stop_live()
+                    _invalidate_prompt_session()
         finally:
+            self._pt_session = None
+            if bootstrap_task is not None and not bootstrap_task.done():
+                bootstrap_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await bootstrap_task
             controller = self._controller
             if controller is not None:
                 with contextlib.suppress(Exception):
@@ -882,7 +1069,6 @@ class Repl:
             AgentState.ERROR,
             AgentState.REJECTED,
             AgentState.STOPPED,
-            AgentState.PAUSED,
         }:
             await controller.set_agent_state_to(AgentState.RUNNING)
 
@@ -911,11 +1097,14 @@ class Repl:
             AgentState.FINISHED,
             AgentState.ERROR,
             AgentState.STOPPED,
-            AgentState.PAUSED,
             AgentState.REJECTED,
         }
 
-        _HARD_TIMEOUT = 120  # 2 minutes absolute ceiling
+        _hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_SECONDS', '300')
+        try:
+            _HARD_TIMEOUT = max(30, int(_hard_timeout_raw))
+        except (ValueError, TypeError):
+            _HARD_TIMEOUT = 300  # 5 minutes absolute ceiling
         _start = time.monotonic()
 
         while True:
@@ -968,6 +1157,11 @@ class Repl:
                         title='⏱ Timeout',
                     )
                     renderer.drain_events()
+                # Cancel the stale task so it does not linger into the next turn.
+                if agent_task and not agent_task.done():
+                    agent_task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                        await agent_task
                 break
 
     async def _drain_renderer_until_settled(
@@ -1061,6 +1255,7 @@ class Repl:
                 True,
                 agent,
                 None,
+                inline_event_delivery=True,
             )
             runtime = runtime_state[0]
             repo_directory = runtime_state[1]
@@ -1099,6 +1294,12 @@ class Repl:
             agent,
         )
         self._memory = memory
+        mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
+        try:
+            mcp_n = int(mcp_status.get('connected_client_count') or 0)
+        except (TypeError, ValueError):
+            mcp_n = 0
+        self._hud.update_mcp_servers(mcp_n)
 
         # Subscribe renderer to the new event stream.
         if self._renderer is not None:
@@ -1248,6 +1449,8 @@ class Repl:
                 open_settings(self._console)
             self._config = load_app_config()
             self._hud.update_model(get_current_model(self._config))
+            if self._renderer is not None:
+                self._renderer.set_cli_tool_icons(self._config.cli_tool_icons)
             # Don't add_system_message — settings are navigational, not part of
             # the agentic conversation and should not appear in chat history.
             return True

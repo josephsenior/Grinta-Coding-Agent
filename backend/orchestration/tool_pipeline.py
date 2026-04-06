@@ -39,17 +39,7 @@ class ToolInvocationContext:
 
 
 class ToolInvocationMiddleware:
-    """Base middleware with optional lifecycle hooks."""
-
-    async def plan(
-        self, ctx: ToolInvocationContext
-    ) -> None:  # pragma: no cover - default no-op
-        return None
-
-    async def verify(
-        self, ctx: ToolInvocationContext
-    ) -> None:  # pragma: no cover - default no-op
-        return None
+    """Base middleware with optional lifecycle hooks (execute + observe)."""
 
     async def execute(
         self, ctx: ToolInvocationContext
@@ -63,7 +53,7 @@ class ToolInvocationMiddleware:
 
 
 class ToolInvocationPipeline:
-    """Runs middleware stages (plan → verify → execute → observe) for tool calls."""
+    """Runs middleware stages (execute → observe) for tool calls."""
 
     def __init__(
         self,
@@ -80,14 +70,6 @@ class ToolInvocationPipeline:
             action=action,
             state=state,
         )
-
-    async def run_plan(self, ctx: ToolInvocationContext) -> None:
-        await self._run_stage('plan', ctx)
-
-    async def run_verify(self, ctx: ToolInvocationContext) -> None:
-        if ctx.blocked:
-            return
-        await self._run_stage('verify', ctx)
 
     async def run_execute(self, ctx: ToolInvocationContext) -> None:
         if ctx.blocked:
@@ -135,13 +117,9 @@ def __getattr__(name: str) -> Any:
         'AutoCheckMiddleware',
         'BlackboardMiddleware',
         'CircuitBreakerMiddleware',
-        'ConflictDetectionMiddleware',
         'ContextWindowMiddleware',
         'CostQuotaMiddleware',
-        'EditVerifyMiddleware',
-        'ErrorPatternMiddleware',
         'LoggingMiddleware',
-        'ReflectionMiddleware',
         'SafetyValidatorMiddleware',
         'TelemetryMiddleware',
     ):

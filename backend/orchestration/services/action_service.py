@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
@@ -33,7 +32,7 @@ def _resolve_operation_pipeline(controller):
 
 
 class ActionService:
-    """Coordinates tool pipeline verification/execute and pending action lifecycle."""
+    """Coordinates tool pipeline execute/observe and pending action lifecycle."""
 
     def __init__(
         self,
@@ -55,7 +54,7 @@ class ActionService:
 
         controller = self._context.get_controller()
         if ctx and ctx.blocked:
-            controller.telemetry_service.handle_blocked_invocation(action, ctx)
+            controller.handle_blocked_invocation(action, ctx)
             return
 
         if not isinstance(action, NullAction):
@@ -64,20 +63,7 @@ class ActionService:
     async def _handle_runnable_action(
         self, action: Action, ctx: ToolInvocationContext | None
     ) -> None:
-        controller = self._context.get_controller()
-        pipeline = _resolve_operation_pipeline(controller)
-
-        if ctx and pipeline:
-            await pipeline.run_verify(ctx)
-            if ctx.blocked:
-                return
-
         await self._confirmation_service.evaluate_action(action)
-
-        # Pending must be registered before the action is added to the stream: the runtime
-        # may emit an observation as soon as the action is enqueued, before the caller
-        # regains control (see EventStream delivery workers).
-        self.set_pending_action(action)
 
     async def _finalize_action(
         self, action: Action, ctx: ToolInvocationContext | None
@@ -90,7 +76,7 @@ class ActionService:
         if ctx and pipeline:
             await pipeline.run_execute(ctx)
             if ctx.blocked:
-                controller.telemetry_service.handle_blocked_invocation(action, ctx)
+                controller.handle_blocked_invocation(action, ctx)
                 return
 
         self._prepare_metrics_for_action(action)
@@ -110,6 +96,14 @@ class ActionService:
 
         controller.event_stream.add_event(action, action.source or EventSource.AGENT)
 
+        # Register pending AFTER add_event so action.id is the real assigned
+        # stream ID. Only runnable actions receive an observation from the runtime,
+        # so only they need pending tracking. Agent-level actions (MessageAction,
+        # AgentThinkAction, etc.) transition state synchronously and never produce
+        # an observation to clear the pending slot.
+        if action.runnable:
+            self.set_pending_action(action)
+
         if ctx:
             ctx.action_id = action.id
             controller._bind_action_context(action, ctx)
@@ -121,15 +115,7 @@ class ActionService:
         """Attach cost/token metrics to an action before it's emitted."""
         controller = self._context.get_controller()
         metrics = controller.conversation_stats.get_combined_metrics()
-
-        if isinstance(metrics, Metrics):
-            clean_metrics = metrics.copy()
-        else:
-            clean_metrics = Metrics()
-            clean_metrics.accumulated_cost = metrics.accumulated_cost
-            clean_metrics._accumulated_token_usage = copy.deepcopy(
-                metrics.accumulated_token_usage
-            )
+        clean_metrics = metrics.copy()
         if controller.state.budget_flag:
             clean_metrics.max_budget_per_task = controller.state.budget_flag.max_value
         action.llm_metrics = clean_metrics

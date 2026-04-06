@@ -46,6 +46,22 @@ class TestPromptManager:
         )
         assert 'test-repo' in ctx
 
+    def test_build_workspace_context_includes_project_path_guidance(
+        self, prompt_dir
+    ):
+        from backend.utils.prompt import RuntimeInfo
+
+        pm = PromptManager(prompt_dir)
+        ctx = pm.build_workspace_context(
+            None,
+            RuntimeInfo(date='2026-01-01', working_dir='/tmp/grinta_project'),
+            None,
+        )
+        assert 'The current working directory is /tmp/grinta_project' in ctx
+        assert 'relative' in ctx.lower()
+        assert 'does not list project files' in ctx
+        assert 'analyze_project_structure' in ctx
+
     def test_build_playbook_info(self, prompt_dir):
         pm = PromptManager(prompt_dir)
         assert pm.build_playbook_info([]) == ''
@@ -103,9 +119,15 @@ class TestOrchestratorPromptManager:
         # Line 255: return content if file doesn't exist
         opm = OrchestratorPromptManager(prompt_dir)
         content = 'original'
-        with patch(
-            'backend.core.workspace_resolution.get_effective_workspace_root',
-            return_value=tmp_path,
+        with (
+            patch(
+                'backend.core.workspace_resolution.get_effective_workspace_root',
+                return_value=tmp_path,
+            ),
+            patch(
+                'backend.core.workspace_resolution.workspace_agent_state_dir',
+                return_value=tmp_path,
+            ),
         ):
             result = opm._inject_lessons_learned(content)
             assert result == content
@@ -114,12 +136,17 @@ class TestOrchestratorPromptManager:
         # Line 260-288 coverage
         opm = OrchestratorPromptManager(prompt_dir)
         content = 'base-prompt'
-        lessons = tmp_path / '.grinta' / 'lessons.md'
-        lessons.parent.mkdir(parents=True)
+        lessons = tmp_path / 'lessons.md'
         lessons.write_text('lesson 1', encoding='utf-8')
-        with patch(
-            'backend.core.workspace_resolution.get_effective_workspace_root',
-            return_value=tmp_path,
+        with (
+            patch(
+                'backend.core.workspace_resolution.get_effective_workspace_root',
+                return_value=tmp_path,
+            ),
+            patch(
+                'backend.core.workspace_resolution.workspace_agent_state_dir',
+                return_value=tmp_path,
+            ),
         ):
             result = opm._inject_lessons_learned(content)
             assert 'lesson 1' in result
@@ -128,12 +155,17 @@ class TestOrchestratorPromptManager:
     def test_inject_lessons_learned_truncation(self, prompt_dir, tmp_path):
         opm = OrchestratorPromptManager(prompt_dir)
         long_lessons = 'X' * 4000
-        lessons = tmp_path / '.grinta' / 'lessons.md'
-        lessons.parent.mkdir(parents=True)
+        lessons = tmp_path / 'lessons.md'
         lessons.write_text(long_lessons, encoding='utf-8')
-        with patch(
-            'backend.core.workspace_resolution.get_effective_workspace_root',
-            return_value=tmp_path,
+        with (
+            patch(
+                'backend.core.workspace_resolution.get_effective_workspace_root',
+                return_value=tmp_path,
+            ),
+            patch(
+                'backend.core.workspace_resolution.workspace_agent_state_dir',
+                return_value=tmp_path,
+            ),
         ):
             result = opm._inject_lessons_learned('content')
             assert 'truncated' in result
@@ -141,12 +173,17 @@ class TestOrchestratorPromptManager:
 
     def test_inject_lessons_learned_empty_file(self, prompt_dir, tmp_path):
         opm = OrchestratorPromptManager(prompt_dir)
-        lessons = tmp_path / '.grinta' / 'lessons.md'
-        lessons.parent.mkdir(parents=True)
+        lessons = tmp_path / 'lessons.md'
         lessons.write_text('  ', encoding='utf-8')
-        with patch(
-            'backend.core.workspace_resolution.get_effective_workspace_root',
-            return_value=tmp_path,
+        with (
+            patch(
+                'backend.core.workspace_resolution.get_effective_workspace_root',
+                return_value=tmp_path,
+            ),
+            patch(
+                'backend.core.workspace_resolution.workspace_agent_state_dir',
+                return_value=tmp_path,
+            ),
         ):
             result = opm._inject_lessons_learned('content')
             assert result == 'content'

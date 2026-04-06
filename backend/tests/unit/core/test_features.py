@@ -16,7 +16,7 @@ class TestFeatureUnavailableError:
         err = FeatureUnavailableError('turbo_mode')
         assert err.feature_name == 'turbo_mode'
         assert 'turbo_mode' in str(err)
-        assert 'App Pro' in str(err) or 'Enterprise' in str(err)
+        assert 'not available' in str(err)
 
     def test_custom_message(self):
         err = FeatureUnavailableError('x', message='nope')
@@ -36,16 +36,6 @@ class TestFeatureFlags:
     def test_security_risk_always_false(self):
         flags = FeatureFlags()
         assert flags.risk_assessment_enabled is False
-
-    def test_get_flags_for_ui_structure(self):
-        flags = FeatureFlags()
-        ui = flags.get_flags_for_ui()
-        assert 'security_risk_assessment' in ui
-        entry = ui['security_risk_assessment']
-        assert entry['enabled'] is False
-        assert entry['coming_soon'] is True
-        assert entry['tier'] == 'pro'
-        assert isinstance(entry['description'], str)
 
     def test_with_config(self):
         sentinel = object()

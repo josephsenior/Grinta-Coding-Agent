@@ -17,7 +17,7 @@ class SafetyValidatorMiddleware(ToolInvocationMiddleware):
     def __init__(self, controller: SessionOrchestrator) -> None:
         self.controller = controller
 
-    async def verify(self, ctx: ToolInvocationContext) -> None:
+    async def execute(self, ctx: ToolInvocationContext) -> None:
         if not ctx.action.runnable:
             return
         validator = getattr(self.controller, 'safety_validator', None)

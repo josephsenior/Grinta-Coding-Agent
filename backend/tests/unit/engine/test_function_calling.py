@@ -121,6 +121,20 @@ class TestHandleCmdRunTool:
         with pytest.raises(FunctionCallValidationError, match='Invalid float'):
             _handle_cmd_run_tool({'command': 'ls', 'timeout': 'not_a_number'})
 
+    def test_glued_windows_drive_sets_thought_hint(self):
+        action = _handle_cmd_run_tool(
+            {'command': "ls -F app/dashboard/ && ls -F componentsC:/Users/x/foo/"}
+        )
+        assert isinstance(action, CmdRunAction)
+        assert '[SHELL]' in (action.thought or '')
+
+    def test_separated_windows_drive_no_glue_hint(self):
+        action = _handle_cmd_run_tool(
+            {'command': 'ls -F components/C:/Users/x/foo/'}
+        )
+        assert isinstance(action, CmdRunAction)
+        assert not (action.thought or '').strip()
+
 
 # ---------------------------------------------------------------------------
 # _handle_finish_tool

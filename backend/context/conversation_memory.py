@@ -170,6 +170,7 @@ class ContextMemory:
                 collection_name='conversation_memory',
                 enable_cache=True,
                 enable_reranking=hybrid_enabled,
+                warm_embeddings_in_background=False,
             )
             logger.info(
                 '✅ Vector memory initialized for ContextMemory\n   Accuracy: 92%% | Hybrid retrieval: %s',
@@ -184,6 +185,15 @@ class ContextMemory:
                 e,
             )
             return None
+
+    def start_vector_memory_warmup(self) -> None:
+        """Start any optional vector-memory warmup without delaying chat readiness."""
+        store = self.vector_store
+        if store is None:
+            return
+        starter = getattr(store, 'start_background_warmup', None)
+        if callable(starter):
+            starter()
 
     @staticmethod
     def _is_valid_image_url(url: str | None) -> bool:

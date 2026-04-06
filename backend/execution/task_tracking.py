@@ -19,6 +19,8 @@ from backend.persistence.locations import get_conversation_dir
 
 logger = logging.getLogger(__name__)
 
+_TASK_TRACKER_NOOP_PREFIX = '[TASK_TRACKER] Update skipped because the plan is unchanged.'
+
 if TYPE_CHECKING:
     from backend.ledger.action import TaskTrackingAction
 
@@ -45,12 +47,8 @@ class TaskTrackingMixin:
         if action.command in ('plan', 'update'):
             return self._handle_task_plan_action(action, task_file_path)
         if action.command == 'view':
-            # If the agent passed a task_list with a view command, treat it as
-            # an update — the model frequently calls view while providing tasks,
-            # intending to set the plan rather than read it.
-            if action.task_list:
-                return self._handle_task_plan_action(action, task_file_path)
-            # Track consecutive view-only calls; intervene if stuck in a loop.
+            # Always read TASKS.md for view. The engine may hydrate task_list from
+            # active_plan.json on the same action; that must not be treated as a plan write.
             count = getattr(self, '_consecutive_task_view_count', 0) + 1
             self._consecutive_task_view_count = count
             return self._handle_task_view_action(
@@ -66,6 +64,15 @@ class TaskTrackingMixin:
         self, action: TaskTrackingAction, task_file_path: str
     ) -> Observation:
         """Handle task plan command — create / update task list."""
+        thought = (getattr(action, 'thought', '') or '').strip()
+        if thought.startswith(_TASK_TRACKER_NOOP_PREFIX):
+            self._consecutive_task_view_count = 0
+            return TaskTrackingObservation(
+                content=thought,
+                command=action.command,
+                task_list=action.task_list,
+            )
+
         content = self._generate_task_list_content(action.task_list)
         n = len(action.task_list)
 
@@ -76,6 +83,8 @@ class TaskTrackingMixin:
             return ErrorObservation(
                 f'Failed to write task list to session directory {task_file_path}: {e!s}'
             )
+
+        self._consecutive_task_view_count = 0
 
         msg = f'✅ Plan created with {n} tasks. Now begin implementing the first task.'
 
@@ -140,11 +149,16 @@ class TaskTrackingMixin:
         """Generate markdown content for task list."""
         content = '# Task List\n\n'
         for i, task in enumerate(task_list, 1):
-            status_icon = {'todo': '⏳', 'in_progress': '🔄', 'done': '✅'}.get(
-                task.get('status', 'todo'),
+            status = task.get('status', 'todo')
+            status_icon = {'todo': '⏳', 'in_progress': '🔄', 'done': '✅', 'pending': '⏳', 'completed': '✅'}.get(
+                status,
                 '⏳',
             )
-            content += (
-                f'{i}. {status_icon} {task.get("title", "")}\n{task.get("notes", "")}\n'
-            )
+            # Support both 'description' (canonical) and 'title' (legacy)
+            desc = task.get('description') or task.get('title') or 'Untitled'
+            result = task.get('result') or task.get('notes') or ''
+            line = f'{i}. {status_icon} **{desc}** `[{status}]`\n'
+            if result:
+                line += f'   - {result}\n'
+            content += line
         return content

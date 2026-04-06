@@ -55,53 +55,9 @@ Google Cloud Storage uses Google Cloud Storage buckets for file storage.
 - The bucket name is specified by `local_data_root` with a fallback to the `GOOGLE_CLOUD_BUCKET_NAME` environment variable.
 - `GOOGLE_APPLICATION_CREDENTIALS`: Path to Google Cloud credentials JSON file
 
-## Webhook Protocol
+## Local-First Behavior
 
-The webhook protocol allows for integration with external systems by sending HTTP requests when files are written or deleted.
-
-### Overview
-
-The `WebHookFileStore` wraps another `FileStore` implementation and sends HTTP requests to a specified URL whenever files are written or deleted. This enables real-time notifications and synchronization with external systems.
-
-**Configuration Options:**
-
-- `file_store_web_hook_url`: The base URL for webhook requests
-- `file_store_web_hook_headers`: HTTP headers to include in webhook requests
-- `file_store_web_hook_batch`: Whether to use batched webhook requests (default: false)
-
-### Protocol Details
-
-#### Standard Webhook Protocol (Non-Batched)
-
-1. **File Write Operation**:
-   - When a file is written, a POST request is sent to `{base_url}{path}`
-   - The request body contains the file contents
-   - The operation is retried up to 3 times with a 1-second delay between attempts
-
-2. **File Delete Operation**:
-   - When a file is deleted, a DELETE request is sent to `{base_url}{path}`
-   - The operation is retried up to 3 times with a 1-second delay between attempts
-
-#### Batched Webhook Protocol
-
-The `BatchedWebHookFileStore` extends the webhook functionality by batching multiple file operations into a single request, which can significantly improve performance when many files are being modified in a short period of time.
-
-1. **Batch Request**:
-   - A single POST request is sent to `{base_url}` with a JSON array in the body
-   - Each item in the array contains:
-     - `method`: "POST" for write operations, "DELETE" for delete operations
-     - `path`: The file path
-     - `content`: The file contents (for write operations only)
-     - `encoding`: "base64" if binary content was base64-encoded (optional)
-
-2. **Batch Triggering**:
-   - Batches are sent when one of the following conditions is met:
-     - A timeout period has elapsed (defaults to 5 seconds, configurable via constructor parameter)
-     - The total size of batched content exceeds a size limit (defaults to 1MB, configurable via constructor parameter)
-     - The `flush()` method is explicitly called
-
-3. **Error Handling**:
-   - The batch request is retried up to 3 times with a 1-second delay between attempts
+Grinta now uses local-first storage only. Remote webhook forwarding and database-backed file-store adapters were removed to keep persistence predictable for the single-user CLI workflow.
 
 ## Configuration
 
@@ -109,26 +65,9 @@ To configure the storage module in App, use the following configuration options:
 
 ```toml
 [core]
-# File store type: "local", "memory", "s3", "google_cloud"
+# File store type: "local" or "memory"
 file_store = "local"
 
 # Disk root for local file store
 local_data_root = "/tmp/file_store"
-
-# Optional webhook URL
-file_store_web_hook_url = "https://example.com/api/files"
-
-# Optional webhook headers (JSON string)
-file_store_web_hook_headers = '{"Authorization": "Bearer token"}'
-
-# Optional batched webhook mode (default: false)
-file_store_web_hook_batch = true
 ```
-
-**Batched Webhook Configuration:**
-The batched webhook behavior uses predefined constants with the following default values:
-
-- Batch timeout: 5 seconds
-- Batch size limit: 1MB (1048576 bytes)
-
-These values can be customized by passing `batch_timeout_seconds` and `batch_size_limit_bytes` parameters to the `BatchedWebHookFileStore` constructor.

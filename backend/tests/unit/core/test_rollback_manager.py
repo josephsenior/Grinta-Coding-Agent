@@ -79,7 +79,9 @@ class TestRollbackManager:
     def test_init_creates_dirs(self, workspace):
         rm = RollbackManager(str(workspace))
         assert rm.checkpoints_dir.exists()
-        assert rm.checkpoints_dir == workspace / '.grinta' / 'checkpoints'
+        from backend.core.workspace_resolution import workspace_agent_state_dir
+
+        assert rm.checkpoints_dir == workspace_agent_state_dir(workspace) / 'rollback_checkpoints'
         assert rm.max_checkpoints == 20
 
     def test_create_checkpoint(self, workspace):

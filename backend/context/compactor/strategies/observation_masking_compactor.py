@@ -97,12 +97,10 @@ def _register_config():
 
     """
     from backend.core.config.compactor_config import (
-        BrowserOutputCompactorConfig,
         ObservationMaskingCompactorConfig,
     )
 
     ObservationMaskingCompactor.register_config(ObservationMaskingCompactorConfig)
-    ObservationMaskingCompactor.register_config(BrowserOutputCompactorConfig)
 
 
 _register_config()

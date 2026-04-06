@@ -17,13 +17,13 @@ from backend.ledger.action.agent import AgentThinkAction
 
 CHECKPOINT_TOOL_NAME = 'checkpoint'
 
-_CHECKPOINTS_FILE = '.grinta/checkpoints.json'
+_CHECKPOINTS_FILE = 'checkpoints.json'
 
 
 def _checkpoints_path() -> Path:
-    from backend.core.workspace_resolution import require_effective_workspace_root
+    from backend.core.workspace_resolution import workspace_agent_state_dir
 
-    return require_effective_workspace_root() / _CHECKPOINTS_FILE
+    return workspace_agent_state_dir() / _CHECKPOINTS_FILE
 
 
 def _load_checkpoints() -> list[dict]:

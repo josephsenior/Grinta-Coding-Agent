@@ -128,7 +128,9 @@ def create_llm_based_edit_tool() -> ChatCompletionToolParam:
         name='edit_file',
         description=_FILE_EDIT_DESCRIPTION,
         properties={
-            'path': get_path_param('The absolute path to the file to be edited.'),
+            'path': get_path_param(
+                'Path to the file, relative to the project root or absolute under it.'
+            ),
             'content': {
                 'type': 'string',
                 'description': 'A draft of the new content for the file being edited. Note that the assistant may skip unchanged lines.',

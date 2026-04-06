@@ -383,7 +383,7 @@ class BaseLLMCompactor(RollingCompactor, ABC):
             # Replace longest/most-specific variants first to avoid partial matches.
             for token in (ws_dbl, ws_back, ws_fwd, ws_dir):
                 if token:
-                    text = text.replace(token, '/workspace')
+                    text = text.replace(token, '[project]')
             return text
 
         # ── Fuzzy fallback when env var is unavailable ──────────────────────
@@ -392,12 +392,12 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         # Full paths with drive letter or Unix root.
         text = re.sub(
             r'(?:[A-Za-z]:[/\\]|/)\S*app_workspace\S*',
-            '/workspace',
+            '[project]',
             text,
         )
         # Bare references without a leading path root.
         if 'app_workspace' in text:
-            text = re.sub(r'app_workspace\S*', '/workspace', text)
+            text = re.sub(r'app_workspace\S*', '[project]', text)
         return text
 
     def _truncate(self, content: str) -> str:

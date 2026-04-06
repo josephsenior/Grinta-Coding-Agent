@@ -29,7 +29,9 @@ class TaskTracker:
             )
 
             workspace_root = require_effective_workspace_root()
-        self.path = Path(workspace_root) / '.grinta' / 'active_plan.json'
+        from backend.core.workspace_resolution import workspace_agent_state_dir
+
+        self.path = workspace_agent_state_dir(workspace_root) / 'active_plan.json'
 
     def load_from_file(self) -> list[dict[str, Any]]:
         """Load the task list from disk."""

@@ -53,11 +53,9 @@ COMMANDS:
 
 8. `insert_text` - Insert code after a specific line
     Required: path, new_str, insert_line
-   insert_line=0 inserts at the beginning of the file
+    insert_line=0 inserts at the beginning of the file
 
-9. `undo_last_edit` - Undo the most recent edit to a file
-    Required: path
-   Reverts the last change made by the editor
+9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `replace_text`, `insert_text`, etc.). Symbol-level commands (`edit_symbol_body`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
 
 FEATURES:
 - Language-agnostic: Works with ALL languages via Tree-sitter

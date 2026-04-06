@@ -96,7 +96,7 @@ class TestRecording:
         svc._circuit_breaker = mock_cb
         exc = RuntimeError('boom')
         svc.record_error(exc)
-        mock_cb.record_error.assert_called_once_with(exc)
+        mock_cb.record_error.assert_called_once_with(exc, tool_name='')
 
     def test_record_error_without_breaker_noop(self):
         ctx = _make_context()

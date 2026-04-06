@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from backend.engine.tools.common import (
@@ -15,8 +16,29 @@ from backend.engine.tools.prompt import get_shell_name, get_terminal_tool_name
 
 ChatCompletionToolParam = Any
 
+# e.g. ``componentsC:/Users/...`` (missing ``/`` before the drive letter)
+_WINDOWS_DRIVE_GLUED_RE = re.compile(r'[A-Za-z0-9_]C:/', re.IGNORECASE)
+
+
+def windows_drive_glued_in_command(command: str) -> bool:
+    """True when a path token looks like a dirname glued to a Windows drive (``fooC:/``)."""
+    if not command or not isinstance(command, str):
+        return False
+    return _WINDOWS_DRIVE_GLUED_RE.search(command) is not None
+
+
+def windows_drive_glued_hint() -> str:
+    """Short hint for the reasoning line when a command may have a glued Windows path."""
+    return (
+        '[SHELL] Possible typo: a folder name may be glued to a Windows drive '
+        '(e.g. componentsC:/...). Insert a separator: components/C:/... or quote the path.'
+    )
+
+
 _DETAILED_BASH_DESCRIPTION = (
     'Execute a {shell} command in a persistent shell session.\n\n'
+    '* **Discovery & reading project files:** use `analyze_project_structure`, `search_code`, '
+    'or `str_replace_editor` (`view_file`)—not `cat`/`grep`/`find` for source and config under the repo.\n'
     '* One command at a time. Chain with `&&` or `;`.\n'
     '* Persistent: env vars, venvs, cwd persist between calls.\n'
     '* Do NOT use `set -e` / `set -eu` / `set -euo pipefail`.\n'
@@ -24,12 +46,17 @@ _DETAILED_BASH_DESCRIPTION = (
     '* Exit code `-1`: process still running. Set `is_input=true` to send input, '
     'empty string for more logs, or `C-c`/`C-d`/`C-z` to interrupt.\n'
     "* Do NOT create/write files with this tool — use `str_replace_editor(command='create')` instead.\n"
-    '* Use absolute paths. Verify parent dirs before creating files/dirs.\n'
+    '* Shell cwd is the **project root** (see runtime). Prefer relative paths (`dir/file`, `./script`). '
+    'There is no `/workspace` alias — use real relative or absolute paths.\n'
+    '* In bash, never glue a folder name to a Windows drive letter: use `dir/C:/path` or quotes, '
+    'not `dirC:/path`.\n'
 )
 _SHORT_BASH_DESCRIPTION = (
-    'Execute a {shell} command. Chain with `&&`/`;`. '
+    'Execute a {shell} command. Prefer `search_code` / `analyze_project_structure` / editor `view_file` '
+    'for repo reads—not cat/grep. Chain with `&&`/`;`. '
     'Background long-running commands with `cmd > out.log 2>&1 &`. '
-    'Exit code -1 means still running — set is_input=true to interact.'
+    'Exit code -1 means still running — set is_input=true to interact. '
+    'Do not glue paths to Windows drives (`dirC:/`); use `dir/C:/` or quotes.'
 )
 
 

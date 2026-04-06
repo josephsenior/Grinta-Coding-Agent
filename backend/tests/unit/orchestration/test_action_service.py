@@ -17,7 +17,7 @@ def _make_context() -> MagicMock:
     controller = MagicMock()
     controller.event_stream = MagicMock()
     controller.tool_pipeline = None
-    controller.telemetry_service = MagicMock()
+    controller.handle_blocked_invocation = MagicMock()
     controller.conversation_stats = MagicMock()
     controller.state = MagicMock()
     controller.state.budget_flag = None
@@ -86,7 +86,7 @@ class TestRunBlocked:
         inv_ctx.blocked = True
         inv_ctx.block_reason = 'too risky'
         await svc.run(action, inv_ctx)
-        controller.telemetry_service.handle_blocked_invocation.assert_called_once()
+        controller.handle_blocked_invocation.assert_called_once_with(action, inv_ctx)
 
 
 # ── set_pending_action / get_pending_action ──────────────────────────

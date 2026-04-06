@@ -201,16 +201,6 @@ class OrchestrationContext:
     def iteration_service(self):
         return getattr(self._controller, 'iteration_service', None)
 
-    @property
-    def telemetry_service(self):
-        return getattr(self._controller, 'telemetry_service', None)
-
-    @property
-    def metrics_service(self):
-        """Access agent performance metrics service."""
-        services = getattr(self._controller, 'services', None)
-        return getattr(services, 'metrics', None) if services else None
-
     def register_action_context(
         self, action: Action, ctx: ToolInvocationContext
     ) -> None:

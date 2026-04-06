@@ -11,7 +11,7 @@ import asyncio
 import time
 from collections import deque
 from collections.abc import Callable
-from typing import Any, ClassVar
+from typing import Any
 
 from backend.core.logger import app_logger as logger
 from backend.ledger.config import get_event_runtime_defaults
@@ -36,14 +36,6 @@ class BackpressureManager:
     is_critical_event:
         Optional callable ``(Event) -> bool`` to classify critical events.
     """
-
-    _DEFAULTS: ClassVar[dict[str, str]] = {
-        'max_queue_size': 'APP_EVENTSTREAM_MAX_QUEUE',
-        'drop_policy': 'APP_EVENTSTREAM_POLICY',
-        'hwm_ratio': 'APP_EVENTSTREAM_HWM_RATIO',
-        'block_timeout': 'APP_EVENTSTREAM_BLOCK_TIMEOUT',
-        'rate_window_seconds': 'APP_EVENTSTREAM_RATE_WINDOW_SECONDS',
-    }
 
     def __init__(
         self,
@@ -204,9 +196,17 @@ class BackpressureManager:
     async def _enqueue_critical(self, event: Event, queue: asyncio.Queue[Any]) -> None:
         if queue.full():
             self.stats['critical_queue_blocked'] += 1
-        await queue.put(event)
-        self.stats['enqueued'] += 1
-        self._record_recent(self._recent_enqueued)
+        try:
+            await asyncio.wait_for(queue.put(event), timeout=self.block_timeout * 10)
+            self.stats['enqueued'] += 1
+            self._record_recent(self._recent_enqueued)
+        except TimeoutError:
+            self.stats['dropped_newest'] += 1
+            self._record_recent(self._recent_drops)
+            logger.error(
+                'EventStream critical event dropped after blocking %.3fs; consumer may be stalled',
+                self.block_timeout * 10,
+            )
         self.queue_size = queue.qsize()
 
     async def _handle_full_queue(self, event: Event, queue: asyncio.Queue[Any]) -> None:
@@ -223,7 +223,6 @@ class BackpressureManager:
     def _try_drop_oldest_and_put(self, event: Event, queue: asyncio.Queue[Any]) -> None:
         try:
             _ = queue.get_nowait()
-            queue.task_done()
             self.stats['dropped_oldest'] += 1
             self._record_recent(self._recent_drops)
             queue.put_nowait(event)

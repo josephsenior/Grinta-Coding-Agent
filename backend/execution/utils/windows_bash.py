@@ -55,6 +55,8 @@ def _find_powershell_executable() -> str:
             ['pwsh', '-NoProfile', '-Command', '$PSVersionTable.PSVersion'],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=5,
             check=False,
         )
@@ -70,6 +72,8 @@ def _find_powershell_executable() -> str:
             ['powershell', '-NoProfile', '-Command', '$PSVersionTable.PSVersion'],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=5,
             check=False,
         )
@@ -184,6 +188,8 @@ class WindowsPowershellSession(BaseShellSession):
                 stderr=subprocess.PIPE,
                 stdin=subprocess.PIPE if input_text is not None else None,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
             )
 
             # Register for cancellation

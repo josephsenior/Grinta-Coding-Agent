@@ -1,14 +1,15 @@
 """File state tracking middleware for the tool pipeline.
 
 Maintains a manifest of files read, modified, and created during a session.
-The manifest survives condensation by persisting to .app/file_manifest.json
-alongside the scratchpad, and is injected into context via the planner.
+The manifest path for on-disk persistence (when used) is under
+``~/.grinta/workspaces/<id>/agent/file_manifest.json``; the in-memory summary
+is injected into context via the planner.
 """
 
 from __future__ import annotations
 
-import os
 import time
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -20,7 +21,13 @@ if TYPE_CHECKING:
     from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
-_MANIFEST_PATH = os.path.join('.grinta', 'file_manifest.json')
+def file_manifest_path() -> Path:
+    """Resolved path for the session file manifest (agent state bucket)."""
+    from backend.core.workspace_resolution import workspace_agent_state_dir
+
+    return workspace_agent_state_dir() / 'file_manifest.json'
+
+
 _MAX_TRACKED_FILES = 50
 
 

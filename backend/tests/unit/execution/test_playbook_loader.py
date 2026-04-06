@@ -266,8 +266,10 @@ class TestGetPlaybooksFromSelectedRepo:
 
         rt.get_playbooks_from_selected_repo(None)
 
+        from backend.core.workspace_resolution import workspace_grinta_root
+
         mock_load.assert_called_once_with(
-            rt.workspace_root / '.grinta' / 'playbooks', 'repository'
+            workspace_grinta_root(rt.workspace_root) / 'playbooks', 'repository'
         )
 
     @patch.object(PlaybookLoaderMixin, 'get_playbooks_from_org_or_user')

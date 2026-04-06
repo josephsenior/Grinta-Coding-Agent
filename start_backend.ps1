@@ -1,5 +1,5 @@
-# Start Backend Server
-# Sets PYTHONPATH correctly so app module can be found
+# Start Raw HTTP Backend
+# Launches the FastAPI action execution server used by API/OpenAPI tooling.
 
 param(
     [int]$Port = 3000
@@ -16,7 +16,7 @@ function Get-ListeningPidsForPort {
     }
 }
 
-function Is-AppPythonProcess {
+function Test-AppPythonProcess {
     param([int]$ProcessId)
     try {
         $proc = Get-CimInstance Win32_Process -Filter "ProcessId=$ProcessId" -ErrorAction Stop
@@ -29,8 +29,7 @@ function Is-AppPythonProcess {
             return $false
         }
         return (
-            $cmd -match "start_server\.py" -or
-            $cmd -match "backend\.api\.listen:app" -or
+            $cmd -match "backend\.execution\.action_execution_server" -or
             $cmd -match "uvicorn"
         )
     }
@@ -63,16 +62,16 @@ function Test-AppAlive {
     )
 
     try {
-        $uri = "http://127.0.0.1:$TargetPort/alive"
-        $resp = Invoke-RestMethod -Uri $uri -TimeoutSec $TimeoutSeconds -ErrorAction Stop
-        return $resp.status -eq "ok"
+        $uri = "http://127.0.0.1:$TargetPort/openapi.json"
+        $resp = Invoke-WebRequest -Uri $uri -TimeoutSec $TimeoutSeconds -UseBasicParsing -ErrorAction Stop
+        return $resp.StatusCode -eq 200
     }
     catch {
         return $false
     }
 }
 
-Write-Host "🚀 Starting Backend Server..." -ForegroundColor Cyan
+Write-Host "🚀 Starting Raw HTTP Backend..." -ForegroundColor Cyan
 
 # Change to project directory
 Set-Location -Path $PSScriptRoot
@@ -115,7 +114,7 @@ if ($listeners -and $listeners.Count -gt 0) {
     $nonAppPids = @()
 
     foreach ($listenerPid in $listeners) {
-        if (Is-AppPythonProcess -ProcessId $listenerPid) {
+        if (Test-AppPythonProcess -ProcessId $listenerPid) {
             $appPids += $listenerPid
         }
         else {
@@ -149,7 +148,8 @@ if (Test-AppAlive -TargetPort $resolvedPort) {
     exit 0
 }
 
-Write-Host "`n🚀 Starting server on http://127.0.0.1:$resolvedPort" -ForegroundColor Green
+Write-Host "`n🚀 Starting backend on http://127.0.0.1:$resolvedPort" -ForegroundColor Green
+Write-Host "📄 OpenAPI: http://127.0.0.1:$resolvedPort/openapi.json" -ForegroundColor Cyan
 Write-Host "Press Ctrl+C to stop`n" -ForegroundColor Yellow
 
 # Start server with PYTHONPATH set
@@ -160,7 +160,7 @@ $env:PYTHONUTF8 = "1"
 # Prefer the project venv so Ctrl+C goes to Python (not a uv wrapper); fallback to uv run.
 $venvPy = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
 if (Test-Path -LiteralPath $venvPy) {
-    & $venvPy start_server.py
+    & $venvPy -m backend.execution.action_execution_server $resolvedPort --working-dir $PSScriptRoot
 } else {
-    uv run python start_server.py
+    uv run python -m backend.execution.action_execution_server $resolvedPort --working-dir $PSScriptRoot
 }

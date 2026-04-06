@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import time
+from unittest.mock import MagicMock, PropertyMock, patch
 
 from backend.context.local_vector_store import ChromaDBBackend, SQLiteBM25Backend
 from backend.context.vector_store import EnhancedVectorStore, QueryCache
@@ -122,3 +123,46 @@ class TestDefaultCollectionNames:
     def test_enhanced_vector_store_default_collection_name(self):
         signature = inspect.signature(EnhancedVectorStore)
         assert signature.parameters['collection_name'].default == 'APP_memory'
+
+
+class TestVectorStoreWarmup:
+    def test_chromadb_stats_does_not_force_model_load(self):
+        backend = object.__new__(ChromaDBBackend)
+        backend.collection = MagicMock()
+        backend.collection.count.return_value = 3
+        backend._model_name = 'test-embeddings'
+        backend._model = None
+
+        with patch.object(
+            ChromaDBBackend,
+            'model',
+            new_callable=PropertyMock,
+            side_effect=AssertionError('stats() should not touch model'),
+        ):
+            stats = backend.stats()
+
+        assert stats == {
+            'backend': 'ChromaDB (Local)',
+            'num_documents': 3,
+            'embedding_model': 'test-embeddings',
+            'model_loaded': False,
+        }
+
+    def test_enhanced_vector_store_init_does_not_call_backend_stats(self):
+        fake_backend = MagicMock()
+        fake_backend.backend_name = 'Fake backend'
+        fake_backend.stats.side_effect = AssertionError(
+            '__init__ should not call backend.stats()'
+        )
+
+        with (
+            patch(
+                'backend.context.local_vector_store.ChromaDBBackend',
+                return_value=fake_backend,
+            ),
+            patch('backend.context.vector_store.SQLiteBM25Backend', return_value=MagicMock()),
+        ):
+            store = EnhancedVectorStore(collection_name='demo')
+
+        assert store.backend is fake_backend
+        fake_backend.stats.assert_not_called()

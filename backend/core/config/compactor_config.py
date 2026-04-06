@@ -9,7 +9,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from backend._canonical import CanonicalModelMetaclass
 from backend.core import logger
 from backend.core.constants import (
-    DEFAULT_BROWSER_COMPACTOR_ATTENTION_WINDOW,
     DEFAULT_COMPACTOR_ATTENTION_WINDOW,
     DEFAULT_COMPACTOR_KEEP_FIRST,
     DEFAULT_COMPACTOR_MAX_EVENT_LENGTH,
@@ -46,17 +45,6 @@ class ObservationMaskingCompactorConfig(BaseModel, metaclass=CanonicalModelMetac
     model_config = ConfigDict(extra='forbid')
 
 
-class BrowserOutputCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
-    """Configuration for the BrowserOutputCompactor."""
-
-    type: Literal['browser_output_masking'] = Field(default='browser_output_masking')
-    attention_window: int = Field(
-        default=DEFAULT_BROWSER_COMPACTOR_ATTENTION_WINDOW,
-        description='The number of most recent browser output observations that will not be masked.',
-        ge=1,
-    )
-
-
 class RecentEventsCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for RecentEventsCompactor."""
 
@@ -74,70 +62,10 @@ class RecentEventsCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     model_config = ConfigDict(extra='forbid')
 
 
-class LLMSummarizingCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
-    """Configuration for LLMSummarizingCompactor."""
-
-    type: Literal['llm'] = Field(default='llm')
-    llm_config: LLMConfig = Field(
-        ..., description='Configuration for the LLM to use for condensing.'
-    )
-    keep_first: int = Field(
-        default=DEFAULT_COMPACTOR_KEEP_FIRST,
-        description='Number of initial events to always keep in history.',
-        ge=0,
-    )
-    max_size: int = Field(
-        default=DEFAULT_COMPACTOR_MAX_SIZE,
-        description='Maximum size of the condensed history before triggering pruning.',
-        ge=2,
-    )
-    max_event_length: int = Field(
-        default=DEFAULT_COMPACTOR_MAX_EVENT_LENGTH,
-        description='Maximum length of the event representations to be passed to the LLM.',
-    )
-    token_budget: int | None = Field(
-        default=None,
-        description=(
-            'Optional token budget. When set, condensation also triggers if '
-            'the estimated token count of the view exceeds this limit.'
-        ),
-        ge=1,
-    )
-    model_config = ConfigDict(extra='forbid')
-
-
 class AmortizedPruningCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for AmortizedPruningCompactor."""
 
     type: Literal['amortized'] = Field(default='amortized')
-    max_size: int = Field(
-        default=DEFAULT_COMPACTOR_MAX_SIZE,
-        description='Maximum size of the condensed history before triggering pruning.',
-        ge=2,
-    )
-    keep_first: int = Field(
-        default=DEFAULT_COMPACTOR_KEEP_FIRST,
-        description='Number of initial events to always keep in history.',
-        ge=0,
-    )
-    token_budget: int | None = Field(
-        default=None,
-        description=(
-            'Optional token budget.  When set, condensation also triggers if '
-            'the estimated token count of the view exceeds this limit.'
-        ),
-        ge=1,
-    )
-    model_config = ConfigDict(extra='forbid')
-
-
-class LLMAttentionCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
-    """Configuration for LLMAttentionCompactor."""
-
-    type: Literal['llm_attention'] = Field(default='llm_attention')
-    llm_config: LLMConfig = Field(
-        ..., description='Configuration for the LLM to use for attention.'
-    )
     max_size: int = Field(
         default=DEFAULT_COMPACTOR_MAX_SIZE,
         description='Maximum size of the condensed history before triggering pruning.',
@@ -202,24 +130,6 @@ class CompactorPipelineConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     model_config = ConfigDict(extra='forbid')
 
 
-class ConversationWindowCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
-    """Configuration for ConversationWindowCompactor.
-
-    Not currently supported by the TOML or ENV_VAR configuration strategies.
-    """
-
-    type: Literal['conversation_window'] = Field(default='conversation_window')
-    max_events: int = Field(
-        default=100,
-        description=(
-            'Proactive condensation threshold. When the event count exceeds '
-            'this value the compactor trims history BEFORE hitting the '
-            'context window limit.'
-        ),
-    )
-    model_config = ConfigDict(extra='forbid')
-
-
 class AutoCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for task-aware automatic compactor selection.
 
@@ -274,37 +184,16 @@ class SmartCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     model_config = ConfigDict(extra='forbid')
 
 
-class SemanticCompactorConfig(BaseModel, metaclass=CanonicalModelMetaclass):
-    """Configuration for SemanticCompactor."""
-
-    type: Literal['semantic'] = Field(default='semantic')
-    llm_config: LLMConfig | str | None = Field(
-        default=None, description='LLM config name to use for summarization (optional).'
-    )
-    max_size: int = Field(default=DEFAULT_SMART_COMPACTOR_MAX_SIZE, ge=2)
-    keep_first: int = Field(default=DEFAULT_SMART_COMPACTOR_KEEP_FIRST, ge=0)
-    similarity_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
-    model_name: str = Field(default='all-MiniLM-L6-v2')
-    token_budget: int | None = Field(default=None, ge=1)
-
-    model_config = ConfigDict(extra='forbid')
-
-
 # Define the union type for all compactor configurations
 CompactorConfig = (
     NoOpCompactorConfig
     | ObservationMaskingCompactorConfig
-    | BrowserOutputCompactorConfig
     | RecentEventsCompactorConfig
-    | LLMSummarizingCompactorConfig
     | AmortizedPruningCompactorConfig
-    | LLMAttentionCompactorConfig
     | StructuredSummaryCompactorConfig
     | CompactorPipelineConfig
-    | ConversationWindowCompactorConfig
     | SmartCompactorConfig
     | AutoCompactorConfig
-    | SemanticCompactorConfig
 )
 
 
@@ -323,7 +212,7 @@ def compactor_config_from_toml_section(
 
     For compactors that require an LLM config, you can specify the name of an LLM config:
         [compactor]
-        type = "llm"
+        type = "smart"
         llm_config = "my_llm"  # References [llm.my_llm] section
 
     Args:
@@ -338,7 +227,7 @@ def compactor_config_from_toml_section(
     try:
         compactor_type = data.get('type', 'smart')
         if (
-            compactor_type in ('llm', 'llm_attention', 'smart')
+            compactor_type in ('smart', 'structured')
             and 'llm_config' in data
             and isinstance(data['llm_config'], str)
         ):
@@ -385,16 +274,11 @@ def create_compactor_config(compactor_type: str, data: dict) -> CompactorConfig:
         'noop': NoOpCompactorConfig,
         'observation_masking': ObservationMaskingCompactorConfig,
         'recent': RecentEventsCompactorConfig,
-        'llm': LLMSummarizingCompactorConfig,
         'amortized': AmortizedPruningCompactorConfig,
-        'llm_attention': LLMAttentionCompactorConfig,
         'structured': StructuredSummaryCompactorConfig,
         'pipeline': CompactorPipelineConfig,
-        'conversation_window': ConversationWindowCompactorConfig,
-        'browser_output_masking': BrowserOutputCompactorConfig,
         'smart': SmartCompactorConfig,
         'auto': AutoCompactorConfig,
-        'semantic': SemanticCompactorConfig,
     }
     if compactor_type not in compactor_classes:
         msg = f'Unknown compactor type: {compactor_type}'
@@ -408,10 +292,7 @@ def create_compactor_config(compactor_type: str, data: dict) -> CompactorConfig:
 
 
 # Rebuild models that have LLMConfig forward references
-LLMSummarizingCompactorConfig.model_rebuild()
-LLMAttentionCompactorConfig.model_rebuild()
 StructuredSummaryCompactorConfig.model_rebuild()
 CompactorPipelineConfig.model_rebuild()
 SmartCompactorConfig.model_rebuild()
 AutoCompactorConfig.model_rebuild()
-SemanticCompactorConfig.model_rebuild()

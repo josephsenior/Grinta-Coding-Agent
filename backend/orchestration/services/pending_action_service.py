@@ -6,7 +6,7 @@ import asyncio
 import math
 import threading
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.constants import MCP_PENDING_ACTION_TIMEOUT_FLOOR
 from backend.core.logger import app_logger as logger
@@ -22,12 +22,19 @@ if TYPE_CHECKING:
 
 
 class PendingActionService:
-    """Maintains pending action state and emits timeout events."""
+    """Maintains pending action state and emits timeout events.
+
+    Multiple runnable actions may be in flight (e.g. overlapping async delivery,
+    or a revived parallel batch).  We track **every** outstanding action by stream
+    id so an observation with ``cause=<id>`` resolves the correct row without
+    colliding when a newer action overwrote the single-slot ``_pending`` model.
+    """
 
     def __init__(self, context: OrchestrationContext, timeout: float) -> None:
         self._context = context
         self._timeout = timeout
-        self._pending: tuple[Action, float] | None = None
+        self._outstanding: dict[int, tuple[Action, float]] = {}
+        self._legacy_pending: tuple[Action, float] | None = None
         self._watchdog_handle: asyncio.TimerHandle | threading.Timer | None = None
         self._watchdog_delay_s: float = timeout + 2
 
@@ -40,15 +47,25 @@ class PendingActionService:
             return max(float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR)
         return float(base)
 
+    @staticmethod
+    def _int_action_id(action: Action) -> int | None:
+        raw = getattr(action, 'id', None)
+        try:
+            return int(raw)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+
     def set(self, action: Action | None) -> None:
         controller = self._context.get_controller()
-        # Cancel any existing watchdog before changing state
         self._cancel_watchdog()
         if action is None:
-            if self._pending is not None:
-                prev_action, timestamp = self._pending
-                self._log_clear(controller, prev_action, timestamp)
-            self._pending = None
+            for act, ts in list(self._outstanding.values()):
+                self._log_clear(controller, act, ts)
+            self._outstanding.clear()
+            if self._legacy_pending is not None:
+                act, ts = self._legacy_pending
+                self._log_clear(controller, act, ts)
+                self._legacy_pending = None
             return
 
         action_id = getattr(action, 'id', 'unknown')
@@ -58,29 +75,92 @@ class PendingActionService:
             f'Set pending action: {action_type} (id={action_id})',
             extra={'msg_type': 'PENDING_ACTION_SET'},
         )
-        self._pending = (action, time.time())
-        effective = self._effective_timeout_seconds(self._timeout, action)
-        self._watchdog_delay_s = effective + 2 if math.isfinite(effective) else 0.0
-        # Schedule a watchdog that triggers step() after the timeout, ensuring
-        # the timeout check in get() is actually reached even if no other event
-        # drives the agent loop forward. Skipped when timeout is disabled (<=0).
-        if math.isfinite(effective):
-            self._schedule_watchdog()
+        now = time.time()
+        aid = self._int_action_id(action)
+        if aid is not None:
+            self._outstanding[aid] = (action, now)
+        else:
+            self._legacy_pending = (action, now)
+
+        self._schedule_watchdog_if_needed()
+
+    def peek_for_cause(self, cause: object | None) -> Action | None:
+        """Return the pending action for *cause* without removing it (for observation routing)."""
+        if cause is None:
+            return None
+        try:
+            cid = int(cast(Any, cause))
+        except (TypeError, ValueError):
+            return None
+        self._purge_timeouts()
+        entry = self._outstanding.get(cid)
+        return entry[0] if entry else None
+
+    def has_outstanding_for_cause(self, cause: object | None) -> bool:
+        """True if *cause* maps to a stream id currently present in ``_outstanding``."""
+        if cause is None:
+            return False
+        try:
+            cid = int(cast(Any, cause))
+        except (TypeError, ValueError):
+            return False
+        self._purge_timeouts()
+        return cid in self._outstanding
+
+    def pop_for_cause(self, cause: object | None) -> Action | None:
+        """Remove and return the pending action whose stream id equals *cause*."""
+        if cause is None:
+            return None
+        try:
+            cid = int(cast(Any, cause))
+        except (TypeError, ValueError):
+            return None
+        self._purge_timeouts()
+        entry = self._outstanding.pop(cid, None)
+        if entry is None:
+            return None
+        action, ts = entry
+        self._log_clear(self._context.get_controller(), action, ts)
+        self._schedule_watchdog_if_needed()
+        return action
+
+    def _primary_entry(self) -> tuple[Action, float] | None:
+        """Latest / highest-id outstanding row (for step guards and logging)."""
+        if not self._outstanding:
+            return self._legacy_pending
+        best_id = max(self._outstanding.keys())
+        return self._outstanding[best_id]
+
+    def _purge_timeouts(self) -> None:
+        controller = self._context.get_controller()
+        now = time.time()
+        dead: list[int] = []
+        for aid, (action, ts) in list(self._outstanding.items()):
+            elapsed = now - ts
+            limit = self._effective_timeout_seconds(self._timeout, action)
+            if math.isfinite(limit) and elapsed > limit:
+                self._handle_timeout(controller, action, elapsed)
+                dead.append(aid)
+        for aid in dead:
+            self._outstanding.pop(aid, None)
+
+        if self._legacy_pending is not None:
+            action, ts = self._legacy_pending
+            elapsed = now - ts
+            limit = self._effective_timeout_seconds(self._timeout, action)
+            if math.isfinite(limit) and elapsed > limit:
+                self._handle_timeout(controller, action, elapsed)
+                self._legacy_pending = None
 
     def get(self) -> Action | None:
-        if self._pending is None:
+        self._purge_timeouts()
+        primary = self._primary_entry()
+        if primary is None:
             return None
-
+        action, timestamp = primary
         controller = self._context.get_controller()
-        action, timestamp = self._pending
         elapsed = time.time() - timestamp
         limit = self._effective_timeout_seconds(self._timeout, action)
-
-        if math.isfinite(limit) and elapsed > limit:
-            self._cancel_watchdog()
-            self._handle_timeout(controller, action, elapsed)
-            self._pending = None
-            return None
 
         if math.isfinite(limit) and elapsed > 60.0 and int(elapsed) % 30 == 0:
             controller.log(
@@ -92,14 +172,14 @@ class PendingActionService:
         return action
 
     def info(self) -> tuple[Action, float] | None:
-        if self.get() is None:
-            return None
-        return self._pending
+        self._purge_timeouts()
+        return self._primary_entry()
 
     def shutdown(self) -> None:
         """Cancel watchdog and clear pending state during controller shutdown."""
         self._cancel_watchdog()
-        self._pending = None
+        self._outstanding.clear()
+        self._legacy_pending = None
 
     def _log_clear(self, controller, prev_action: Action, timestamp: float) -> None:
         action_id = getattr(prev_action, 'id', 'unknown')
@@ -112,6 +192,7 @@ class PendingActionService:
         )
 
     def _handle_timeout(self, controller, action: Action, elapsed: float) -> None:
+        self._cancel_watchdog()
         action_id = getattr(action, 'id', 'unknown')
         action_type = type(action).__name__
         controller.log(
@@ -134,20 +215,28 @@ class PendingActionService:
         )
         controller.event_stream.add_event(timeout_obs, EventSource.ENVIRONMENT)
 
-    def _schedule_watchdog(self) -> None:
-        """Schedule a delayed trigger_step after the timeout period.
+    def _schedule_watchdog_if_needed(self) -> None:
+        """Schedule the next watchdog using the soonest finite timeout among rows."""
+        self._cancel_watchdog()
+        delays: list[float] = []
+        for action, _ts in self._outstanding.values():
+            eff = self._effective_timeout_seconds(self._timeout, action)
+            if math.isfinite(eff):
+                delays.append(eff + 2.0)
+        if self._legacy_pending is not None:
+            eff = self._effective_timeout_seconds(self._timeout, self._legacy_pending[0])
+            if math.isfinite(eff):
+                delays.append(eff + 2.0)
+        if not delays:
+            return
+        self._watchdog_delay_s = min(delays)
+        self._schedule_watchdog()
 
-        This ensures the timeout path in get() is reached even when no external
-        event drives the agent loop forward (e.g. Memory silently drops the
-        RecallAction or the EventStream delivery thread crashes).
-        """
+    def _schedule_watchdog(self) -> None:
+        """Schedule a delayed trigger_step after the timeout period."""
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            # No running event loop in this thread. If the process has a
-            # registered main loop, bounce back onto it later without blocking
-            # the caller. If no loop is available at all, skip watchdog
-            # scheduling; timeout enforcement still happens on the next get().
             from backend.utils.async_utils import get_main_event_loop
 
             main_loop = get_main_event_loop()
@@ -171,30 +260,18 @@ class PendingActionService:
             self._watchdog_fire,
         )
 
-    async def _watchdog_async(self) -> None:
-        """Async fallback watchdog when no running loop is available at schedule time."""
-        await asyncio.sleep(self._watchdog_delay_s)
-        self._watchdog_fire()
-
     def _watchdog_fire(self) -> None:
-        """Trigger a step if the pending action is still active (presumably timed out)."""
+        """Trigger a step if any pending action is still active."""
         self._watchdog_handle = None
-        if self._pending is None:
+        if not self._outstanding and self._legacy_pending is None:
             return
-        action, timestamp = self._pending
-        elapsed = time.time() - timestamp
-        limit = self._effective_timeout_seconds(self._timeout, action)
-        if math.isfinite(limit) and elapsed >= limit:
-            logger.warning(
-                'Pending action watchdog fired after %.1fs for %s (id=%s); triggering step',
-                elapsed,
-                type(action).__name__,
-                getattr(action, 'id', 'unknown'),
-            )
-            self._context.trigger_step()
+        logger.warning(
+            'Pending action watchdog fired; triggering step (outstanding ids=%s)',
+            list(self._outstanding.keys()),
+        )
+        self._context.trigger_step()
 
     def _cancel_watchdog(self) -> None:
-        """Cancel any scheduled watchdog callback."""
         if self._watchdog_handle is not None:
             self._watchdog_handle.cancel()
             self._watchdog_handle = None

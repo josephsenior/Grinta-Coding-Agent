@@ -165,12 +165,7 @@ class OrchestratorExecutor:
         checkpoint.commit(ckpt_token)
 
         execution_time = time.time() - start_time
-        actions = self._response_to_actions(response)
-        for action in actions:
-            if getattr(action, 'action', '') == 'message':
-                content = getattr(action, 'content', '')
-                if not str(content).strip():
-                    raise ModelProviderError('LLM returned an empty message action')
+        actions = self._without_blank_agent_messages(self._response_to_actions(response))
         return ExecutionResult(actions, response, execution_time, error_message)
 
     # ------------------------------------------------------------------ #
@@ -211,12 +206,14 @@ class OrchestratorExecutor:
         tool_calls_dict = {}
 
         try:
+            from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+
             logger.info('OrchestratorExecutor.async_execute: calling LLM.astream')
             stream_iter = self._llm.astream(**call_params)
 
-            first_chunk_timeout: float | None = 20.0
+            first_chunk_timeout: float | None = 45.0
             first_chunk_timeout_raw = os.getenv(
-                'APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '20'
+                'APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '45'
             ).strip()
             try:
                 parsed_first_chunk_timeout = float(first_chunk_timeout_raw)
@@ -226,7 +223,7 @@ class OrchestratorExecutor:
                     else None
                 )
             except ValueError:
-                first_chunk_timeout = 20.0
+                first_chunk_timeout = 45.0
 
             async def _consume_stream():
                 nonlocal content_accumulate
@@ -236,24 +233,20 @@ class OrchestratorExecutor:
                     if not text_piece:
                         return
 
-                    # Some providers deliver very large deltas, which makes UI updates
-                    # appear "all at once". Emit smaller chunks for smoother typing.
-                    emit_size = 24
-                    for i in range(0, len(text_piece), emit_size):
-                        piece = text_piece[i : i + emit_size]
-                        if not piece:
-                            continue
-                        content_accumulate += piece
-                        if event_stream:
-                            ev = StreamingChunkAction(
-                                chunk=piece,
-                                accumulated=content_accumulate,
-                                is_final=False,
-                            )
-                            ev.source = EventSource.AGENT
-                            event_stream.add_event(ev, EventSource.AGENT)
-                            # Yield so Socket.IO / asyncio can flush between chunks.
-                            await asyncio.sleep(0.008)
+                    content_accumulate += text_piece
+                    display_acc = redact_streamed_tool_call_markers(
+                        content_accumulate
+                    )
+                    if event_stream:
+                        ev = StreamingChunkAction(
+                            chunk=text_piece,
+                            accumulated=display_acc,
+                            is_final=False,
+                        )
+                        ev.source = EventSource.AGENT
+                        event_stream.add_event(ev, EventSource.AGENT)
+                        # Yield so Socket.IO / asyncio can flush between chunks.
+                        await asyncio.sleep(0)
 
                 async def _process_delta(delta: dict[str, Any]) -> None:
                     text_chunk = ''
@@ -322,7 +315,7 @@ class OrchestratorExecutor:
                                     )
                                     ev.source = EventSource.AGENT
                                     event_stream.add_event(ev, EventSource.AGENT)
-                                    await asyncio.sleep(0.001)
+                                    await asyncio.sleep(0)
 
                 stream_aiter = stream_iter.__aiter__()
                 if first_chunk_timeout is not None:
@@ -351,15 +344,15 @@ class OrchestratorExecutor:
                         fallback_params = dict(call_params)
                         fallback_params['stream'] = False
 
-                        fallback_timeout = 30.0
+                        fallback_timeout = 60.0
                         try:
                             _fb_raw = os.getenv(
-                                'APP_LLM_FALLBACK_TIMEOUT_SECONDS', '30'
+                                'APP_LLM_FALLBACK_TIMEOUT_SECONDS', '60'
                             )
                             _fb_parsed = float(_fb_raw)
-                            fallback_timeout = _fb_parsed if _fb_parsed > 0 else 30.0
+                            fallback_timeout = _fb_parsed if _fb_parsed > 0 else 60.0
                         except (TypeError, ValueError):
-                            fallback_timeout = 30.0
+                            fallback_timeout = 60.0
                         logger.warning(
                             'Attempting non-streaming fallback with %.1fs timeout',
                             fallback_timeout,
@@ -490,9 +483,10 @@ class OrchestratorExecutor:
                 await asyncio.wait_for(consume_task, timeout=timeout_seconds)
 
             # finalize streams
+            visible_accum = redact_streamed_tool_call_markers(content_accumulate).strip()
             if event_stream and content_accumulate:
                 ev = StreamingChunkAction(
-                    chunk='', accumulated=content_accumulate, is_final=True
+                    chunk='', accumulated=visible_accum, is_final=True
                 )
                 ev.source = EventSource.AGENT
                 event_stream.add_event(ev, EventSource.AGENT)
@@ -505,7 +499,7 @@ class OrchestratorExecutor:
 
             model_name = getattr(getattr(self._llm, 'config', None), 'model', 'unknown')
             response = LLMResponse(
-                content=content_accumulate,
+                content=visible_accum,
                 model=model_name,
                 usage={'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0},
                 response_id='',
@@ -545,12 +539,7 @@ class OrchestratorExecutor:
         checkpoint.commit(ckpt_token)
 
         execution_time = time.time() - start_time
-        actions = self._response_to_actions(response)
-        for action in actions:
-            if getattr(action, 'action', '') == 'message':
-                action_content = getattr(action, 'content', '')
-                if not str(action_content).strip():
-                    raise ModelProviderError('LLM returned an empty message action')
+        actions = self._without_blank_agent_messages(self._response_to_actions(response))
         return ExecutionResult(actions, response, execution_time, error_message)
 
     def _raise_if_recovery_blocked(self, event_stream: EventStream | None) -> None:
@@ -661,12 +650,17 @@ class OrchestratorExecutor:
         event_stream: EventStream,
         response: ModelResponse | None = None,
     ) -> None:
+        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
         # Keep event volume bounded. UI-side coalescing exists, but we still
         # avoid emitting thousands of tiny events for long responses.
         chunk_size = 80
+
+        # Strip ``[Tool call] name({...})`` blobs (proxy / history echo) from
+        # assistant text — structured tool actions already render in the CLI.
+        text = redact_streamed_tool_call_markers(text or '').strip()
 
         # Stream text response if any
         if text:
@@ -749,6 +743,22 @@ class OrchestratorExecutor:
     # ------------------------------------------------------------------ #
     # Response processing
     # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _without_blank_agent_messages(actions: list[Action]) -> list[Action]:
+        """Drop agent ``MessageAction``s with nothing user-visible (no text, no thought)."""
+        from backend.ledger.action import MessageAction
+
+        out: list[Action] = []
+        for action in actions:
+            if isinstance(action, MessageAction):
+                content = str(getattr(action, 'content', '') or '').strip()
+                thought = str(getattr(action, 'thought', '') or '').strip()
+                if not content and not thought:
+                    continue
+            out.append(action)
+        return out
+
     def _response_to_actions(self, response: ModelResponse) -> list[Action]:
         mcp_tools = self._mcp_tools_provider()
         actions = list(

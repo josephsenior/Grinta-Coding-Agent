@@ -12,24 +12,107 @@ import asyncio
 import logging
 import re
 from collections import deque
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
-# Patterns for extracting / stripping <think> blocks from reasoning models.
-_THINK_EXTRACT_RE = re.compile(r'<think>(.*?)(?:</think>|$)', re.DOTALL | re.IGNORECASE)
-_THINK_STRIP_RE = re.compile(r'<think>.*?(?:</think>|$)', re.DOTALL | re.IGNORECASE)
+# Patterns for extracting / stripping <redacted_thinking> blocks from reasoning models.
+_THINK_EXTRACT_RE = re.compile(r'<redacted_thinking>(.*?)(?:</redacted_thinking>|$)', re.DOTALL | re.IGNORECASE)
+_THINK_STRIP_RE = re.compile(r'<redacted_thinking>.*?(?:</redacted_thinking>|$)', re.DOTALL | re.IGNORECASE)
+_INTERNAL_THINK_TAG_RE = re.compile(
+    r'^\[(?P<tag>[A-Z0-9_]+)\](?:\s*(?P<payload>.*))?$',
+    re.DOTALL,
+)
+_INTERNAL_THINK_LABELS = {
+    'CHECK_TOOL_STATUS': 'Checking tool status…',
+    'EXPLORE_TREE_STRUCTURE': 'Exploring code graph…',
+    'PREVIEW': 'Preparing preview…',
+    'READ_SYMBOL_DEFINITION': 'Reading symbol definitions…',
+    'SCRATCHPAD': 'Updating scratchpad…',
+    'VERIFY_FILE_LINES': 'Verifying file lines…',
+    'VIEW_AND_REPLACE': 'Preparing edit…',
+    'WORKING_MEMORY': 'Updating working memory…',
+}
+_TASK_STATUS_LABELS = {
+    'completed': 'done',
+    'done': 'done',
+    'failed': 'failed',
+    'in_progress': 'doing',
+    'pending': 'todo',
+    'skipped': 'skip',
+    'todo': 'todo',
+}
+_TASK_STATUS_STYLES = {
+    'completed': 'green',
+    'done': 'green',
+    'failed': 'red',
+    'in_progress': 'yellow',
+    'pending': 'cyan',
+    'skipped': 'bright_black',
+    'todo': 'cyan',
+}
+_CMD_SUMMARY_NOISE_PATTERNS = (
+    'a complete log of this run can be found in',
+    '[below is the output of the previous command.]',
+    '[the command completed with exit code',
+    '[app: output truncated',
+)
+_CMD_SUMMARY_PRIORITY_PATTERNS = (
+    re.compile(
+        r'^\[(shell_mismatch|scaffold_setup_failed|missing_module|missing_tool|disk_full|permission_error|oom_killed|segfault|repeated_command_failure)\]',
+        re.IGNORECASE,
+    ),
+    re.compile(r'could not read package\.json', re.IGNORECASE),
+    re.compile(r'contains files that could conflict', re.IGNORECASE),
+    re.compile(r'operation cancelled', re.IGNORECASE),
+    re.compile(r'command not found|not recognized as', re.IGNORECASE),
+    re.compile(r'module(?:notfounderror| not found)|importerror', re.IGNORECASE),
+    re.compile(r'permission denied', re.IGNORECASE),
+    re.compile(r'enoent|eacces|eperm|fatal:|exception|traceback|error', re.IGNORECASE),
+)
 
+from rich import box
 from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.live import Live
 from rich.markdown import Markdown
+from rich.padding import Padding
 from rich.panel import Panel
 from rich.syntax import Syntax
+from rich.table import Table
 from rich.text import Text
 
 from backend.cli.hud import HUDBar
+from backend.cli.layout_tokens import (
+    ACTIVITY_BLOCK_BOTTOM_PAD,
+    CALLOUT_PANEL_PADDING,
+    frame_live_body,
+    frame_transcript_body,
+    gap_below_live_section,
+    spacer_live_section,
+)
+from backend.cli.tool_call_display import (
+    format_tool_activity_rows,
+    looks_like_streaming_tool_arguments,
+    mcp_result_user_preview,
+    redact_streamed_tool_call_markers,
+    redact_task_list_json_blobs,
+    tool_headline,
+    try_format_message_as_tool_json,
+)
+from backend.cli.transcript import (
+    format_activity_block,
+    format_activity_secondary,
+    format_activity_result_secondary,
+    format_activity_shell_block,
+    format_activity_turn_header,
+    format_callout_panel,
+    format_ground_truth_tool_line,
+    format_shell_result_secondary,
+    strip_tool_result_validation_annotations,
+)
 from backend.core.enums import AgentState, EventSource
 from backend.ledger import EventStreamSubscriber
 from backend.ledger.action import (
@@ -83,6 +166,111 @@ from backend.ledger.observation import (
     TerminalObservation,
     UserRejectObservation,
 )
+
+
+def _sync_reasoning_after_tool_line(
+    reasoning: Any,
+    tool_label: str,
+    thought: str,
+) -> None:
+    """Live panel: spinner + optional dim thinking text (``action.thought`` is LLM tags only; often empty)."""
+    t = (thought or '').strip()
+    if not t:
+        return
+    reasoning.start()
+    reasoning.update_action(tool_label)
+    reasoning.update_thought(t)
+
+
+def _normalize_reasoning_text(text: str) -> tuple[str | None, str | None]:
+    """Split internal tagged thoughts into a user-facing action label and optional short text."""
+    stripped = (text or '').strip()
+    if not stripped or stripped == 'Your thought has been logged.':
+        return None, None
+
+    match = _INTERNAL_THINK_TAG_RE.match(stripped)
+    if not match:
+        return None, stripped
+
+    tag = match.group('tag')
+    payload = (match.group('payload') or '').strip()
+    label = _INTERNAL_THINK_LABELS.get(
+        tag,
+        tag.replace('_', ' ').capitalize() + '…',
+    )
+    if not payload:
+        return label, None
+    if payload.startswith('{') or payload.startswith('['):
+        return label, None
+
+    payload_lines = [line.strip() for line in payload.splitlines() if line.strip()]
+    if payload_lines and all(line[:1] in '{["' for line in payload_lines[:2]):
+        return label, None
+
+    return label, payload
+
+
+def _task_panel_signature(task_list: list[dict[str, Any]]) -> tuple[tuple[str, str, str], ...]:
+    """Build a stable signature for the visible task tracker state."""
+    rows: list[tuple[str, str, str]] = []
+    for item in task_list:
+        status = str(item.get('status') or 'pending').lower()
+        desc = str(item.get('description') or item.get('title') or '…')
+        task_id = str(item.get('id') or '?')
+        rows.append((task_id, status, desc))
+    return tuple(rows)
+
+
+def _summarize_cmd_failure(content: str) -> str:
+    """Pick the most actionable single-line failure summary for the CLI transcript."""
+    lines = [line.strip() for line in (content or '').splitlines() if line.strip()]
+    if not lines:
+        return ''
+
+    filtered = [
+        line
+        for line in lines
+        if not any(noise in line.lower() for noise in _CMD_SUMMARY_NOISE_PATTERNS)
+    ]
+    candidates = filtered or lines
+
+    for pattern in _CMD_SUMMARY_PRIORITY_PATTERNS:
+        for line in reversed(candidates):
+            if pattern.search(line):
+                return line[:160]
+
+    return candidates[-1][:160]
+
+
+def _build_task_panel(task_list: list[dict[str, Any]]) -> Any:
+    """Render the current task list as a single reusable panel block."""
+    table = Table.grid(expand=True, padding=(0, 1))
+    table.add_column(no_wrap=True)
+    table.add_column(ratio=1)
+
+    for task_id, status, desc in _task_panel_signature(task_list):
+        badge = Text()
+        badge.append('[', style='bright_black')
+        badge.append(
+            _TASK_STATUS_LABELS.get(status, 'todo').upper(),
+            style=f"bold {_TASK_STATUS_STYLES.get(status, 'cyan')}",
+        )
+        badge.append(']', style='bright_black')
+
+        body = Text()
+        if task_id and task_id != '?':
+            body.append(f'{task_id}  ', style='bright_black')
+        display_desc = desc[:117] + '…' if len(desc) > 120 else desc
+        body.append(display_desc, style='default')
+        table.add_row(badge, body)
+
+    empty_state: Any = table if task_list else Text('No tracked tasks yet.', style='bright_black')
+    return format_callout_panel(
+        f'Tasks ({len(task_list)})',
+        empty_state,
+        accent_style='cyan',
+    )
+
 
 if TYPE_CHECKING:
     from backend.cli.reasoning_display import ReasoningDisplay
@@ -318,10 +506,13 @@ def _build_error_panel(
     """Render a structured error panel with recovery guidance when available."""
     summary, detail = _split_error_text(error_text)
     body_parts: list[Any] = [Text(summary, style=f'{accent_style} bold')]
-    if detail:
-        body_parts.append(Text(detail, style=f'{accent_style} dim'))
 
     guidance = _error_guidance(error_text)
+    # When we have actionable guidance (recognized error type), the raw provider
+    # detail is noisy and redundant — suppress it so the panel stays clean.
+    if guidance is None and detail:
+        body_parts.append(Text(detail, style=f'{accent_style} dim'))
+
     if guidance is not None:
         body_parts.append(_build_recovery_text(guidance))
 
@@ -330,92 +521,45 @@ def _build_error_panel(
         Group(*body_parts),
         title=panel_title,
         border_style=accent_style,
-        padding=(0, 1),
+        padding=CALLOUT_PANEL_PADDING,
     )
 
 
-def _system_message_style(title: str) -> tuple[str, str]:
-    """Return a stable icon/color pair for non-agent status messages."""
+def _system_message_tag(title: str) -> tuple[str, str]:
+    """ASCII bracket tag + color (no Unicode icons)."""
     normalized = title.strip().lower()
     if normalized == 'warning':
-        return '⚠', 'yellow'
+        return '[!]', 'yellow'
     if normalized == 'autonomy':
-        return '⚙', 'magenta'
+        return '[auto]', 'magenta'
     if normalized == 'status':
-        return '●', 'blue'
+        return '[*]', 'blue'
     if normalized == 'settings':
-        return '⚙', 'cyan'
+        return '[cfg]', 'cyan'
     if 'timeout' in normalized:
-        return '⏱', 'yellow'
-    return 'ℹ', 'cyan'
-
-
-# -- Tool call display helpers ------------------------------------------------
-
-_TOOL_DISPLAY = {
-    'execute_bash': ('$', 'cyan', 'command'),
-    'str_replace_editor': ('✏', 'yellow', 'edit'),
-    'create': ('✏', 'yellow', 'create'),
-    'create_file': ('✏', 'yellow', 'create'),
-    'view': ('👁', 'blue', 'view'),
-    'replace_text': ('✏', 'yellow', 'edit'),
-    'insert_text': ('✏', 'yellow', 'insert'),
-    'undo_edit': ('↩', 'yellow', 'undo'),
-}
-
-
-def _friendly_tool_name(tool_name: str) -> str:
-    """Convert an internal tool name to a user-friendly label."""
-    info = _TOOL_DISPLAY.get(tool_name)
-    if info:
-        return info[2]
-    # Fallback: strip common prefixes and snake_case → spaces.
-    name = tool_name.replace('_', ' ').strip()
-    return name or 'tool'
-
-
-def _extract_tool_hint(partial_json: str) -> str:
-    """Try to extract a readable hint from partial tool call JSON.
-
-    Returns a short string like ``command: git status`` or ``path: src/main.py``
-    when enough of the JSON has streamed. Returns '' if nothing useful yet.
-    """
-    import json as _json
-
-    # First try a full parse (arguments may already be complete).
-    try:
-        args = _json.loads(partial_json)
-        if isinstance(args, dict):
-            parts: list[str] = []
-            if 'command' in args:
-                parts.append(f'$ {args["command"]}')
-            if 'path' in args:
-                parts.append(args['path'])
-            return '\n'.join(parts) if parts else ''
-    except (ValueError, TypeError):
-        pass
-
-    # Fallback: regex extraction for partially-streamed keys.
-    hints: list[str] = []
-    import re as _re
-
-    m = _re.search(r'"command"\s*:\s*"([^"]*)', partial_json)
-    if m:
-        hints.append(f'$ {m.group(1)}')
-    m = _re.search(r'"path"\s*:\s*"([^"]*)', partial_json)
-    if m:
-        hints.append(m.group(1))
-    return '\n'.join(hints)
+        return '[time]', 'yellow'
+    if normalized in ('system', 'grinta'):
+        return '[grinta]', 'cyan'
+    label = (title.strip() or 'note').replace('\n', ' ')
+    if len(label) > 24:
+        label = label[:21] + '...'
+    return f'[{label}]', 'cyan'
 
 
 class CLIEventRenderer:
     """Bridges EventStream → live rich layout.
 
+    Activity rows (verb + detail, optional dim stats) are built by
+    :func:`backend.cli.transcript.format_activity_block` and related helpers.
+    — one line per tool event, no deduplication. Model thoughts use :class:`~backend.cli.reasoning_display.ReasoningDisplay`
+    (plain dim text), separate from ground truth.
+
     Operates in two modes:
 
-    * **Live mode** (during an agent turn): a Rich ``Live`` display is active
-      and the renderer continuously redraws the streaming panel, reasoning
-      spinner, and HUD footer.
+    * **Live mode** (during an agent turn): a Rich ``Live`` display shows the
+      task strip, streaming preview, reasoning line, and HUD.  Finalized
+      transcript lines are ``console.print``ed immediately so they stay in
+      scrollback and are not clipped to the terminal height.
     * **Static mode** (idle / prompt): no ``Live`` display.  Output is printed
       once via ``console.print()`` so prompt_toolkit can own the terminal for
       user input without any contention.
@@ -429,11 +573,15 @@ class CLIEventRenderer:
         *,
         loop: asyncio.AbstractEventLoop | None = None,
         max_budget: float | None = None,
+        get_prompt_session: Callable[[], Any | None] | None = None,
+        cli_tool_icons: bool = True,
     ) -> None:
         self._console = console
         self._hud = hud
         self._reasoning = reasoning
+        self._cli_tool_icons = bool(cli_tool_icons)
         self._loop = loop or asyncio.get_event_loop()
+        self._get_prompt_session = get_prompt_session
         self._live: Live | None = None
         self._streaming_accumulated = ''
         self._streaming_final = False
@@ -448,8 +596,17 @@ class CLIEventRenderer:
         self._turn_start_cost: float = 0.0
         self._turn_start_tokens: int = 0
         self._turn_start_calls: int = 0
-        # Items queued during Live mode; flushed as static output on stop_live.
-        self._live_items: list[Any] = []
+        self._task_panel: Any | None = None
+        self._task_panel_signature: tuple[tuple[str, str, str], ...] | None = None
+        self._last_printed_task_panel_signature: (
+            tuple[tuple[str, str, str], ...] | None
+        ) = None
+        #: Last shell command label; paired with :class:`CmdOutputObservation` for one dim result row.
+        self._pending_shell_command: str | None = None
+        #: Buffered (verb, label) from CmdRunAction — printed as a combined card on CmdOutputObservation.
+        self._pending_shell_action: tuple[str, str] | None = None
+        #: First tool/shell row each turn prints a small section marker for scanability.
+        self._activity_turn_header_emitted: bool = False
 
     @property
     def current_state(self) -> AgentState | None:
@@ -471,13 +628,16 @@ class CLIEventRenderer:
     def pending_event_count(self) -> int:
         return len(self._pending_events)
 
+    def set_cli_tool_icons(self, enabled: bool) -> None:
+        """Toggle emoji tool headlines (e.g. after /settings)."""
+        self._cli_tool_icons = bool(enabled)
+
     # -- Live lifecycle (per agent turn) -----------------------------------
 
     def start_live(self) -> None:
         """Create and start a Rich Live display for the current agent turn."""
         if self._live is not None:
             return
-        self._live_items.clear()
         live = Live(
             self,
             console=self._console,
@@ -496,12 +656,16 @@ class CLIEventRenderer:
         if live is None:
             return
         self._live = None
+        if (
+            self._task_panel is not None
+            and self._task_panel_signature != self._last_printed_task_panel_signature
+        ):
+            self._console.print(self._task_panel)
+            self._last_printed_task_panel_signature = self._task_panel_signature
         try:
             live.stop()
         except Exception:
             logger.debug('Live.stop() failed', exc_info=True)
-        # We don't reprint anything because _print_or_buffer printed it inline.
-        self._live_items.clear()
 
     def refresh(self) -> None:
         """Redraw the Live display if active."""
@@ -537,6 +701,9 @@ class CLIEventRenderer:
 
     def begin_turn(self) -> None:
         """Snapshot metrics and mark the agent as running."""
+        self._pending_shell_command = None
+        self._pending_shell_action = None
+        self._activity_turn_header_emitted = False
         self._current_state = AgentState.RUNNING
         self._hud.update_ledger('Healthy')
         self._state_event.clear()
@@ -557,17 +724,48 @@ class CLIEventRenderer:
         return self._current_state
 
     def clear_history(self) -> None:
-        self._live_items.clear()
+        self._pending_shell_command = None
+        self._pending_shell_action = None
+        self._activity_turn_header_emitted = False
+        self._task_panel = None
+        self._task_panel_signature = None
+        self._last_printed_task_panel_signature = None
         self._clear_streaming_preview()
         self._reasoning.stop()
         self.refresh()
 
-    def add_user_message(self, text: str) -> None:
-        """Print a user message. Always printed statically (prompt is idle)."""
-        msg = Text()
-        msg.append('\n❯ ', style='bold')
-        msg.append(text, style='bold')
-        self._console.print(msg)
+    async def add_user_message(self, text: str) -> None:
+        """Print a user turn — rounded panel, high-contrast label."""
+        body = Text((text or '').rstrip(), style='default')
+        panel = Panel(
+            Padding(body, CALLOUT_PANEL_PADDING),
+            title=Text('You', style='bold cyan'),
+            title_align='left',
+            box=box.ROUNDED,
+            border_style='dim cyan',
+            padding=(0, 0),
+            style='default',
+        )
+        framed = frame_transcript_body(panel)
+        spacer = frame_transcript_body(Text(''))
+        group = Group(spacer, framed, spacer)
+
+        if self._live is not None:
+            self._console.print(group)
+            return
+
+        sess: Any | None = None
+        if self._get_prompt_session is not None:
+            try:
+                sess = self._get_prompt_session()
+            except Exception:
+                sess = None
+        app = getattr(sess, 'app', None) if sess is not None else None
+        if app is not None and getattr(app, 'is_running', False):
+            await self._safe_print_above_prompt(group)
+            return
+
+        self._console.print(group)
 
     def add_system_message(self, text: str, *, title: str = 'Info') -> None:
         lower_title = title.strip().lower()
@@ -582,23 +780,29 @@ class CLIEventRenderer:
             self._hud.update_ledger('Error')
             return
         if lower_title == 'warning':
-            icon, color = _system_message_style(title)
+            tag, color = _system_message_tag(title)
             warning = Text()
-            warning.append(f'  {icon} {title}: ', style=f'bold {color}')
+            warning.append(f'{tag} ', style=f'bold {color}')
+            warning.append(f'{title}: ', style=f'bold {color}')
             warning.append(text, style=color)
             self._print_or_buffer(warning)
             return
 
-        icon, color = _system_message_style(title)
+        tag, color = _system_message_tag(title)
         message = Text()
-        message.append(f'  {icon} {title}: ', style=f'bold {color}')
+        message.append(f'{tag} ', style=f'bold {color}')
         message.append(text, style='dim' if color == 'cyan' else color)
         self._print_or_buffer(message)
 
     def add_markdown_block(self, title: str, text: str) -> None:
         from rich.rule import Rule
-        self._print_or_buffer(Rule(title, style='bright_black'))
-        self._print_or_buffer(Markdown(text))
+
+        self._print_or_buffer(Text(''))
+        self._print_or_buffer(
+            Padding(Rule(title, style='bright_black'), (1, 0, 1, 0), expand=False)
+        )
+        self._print_or_buffer(Padding(Markdown(text), (0, 0, 1, 0), expand=False))
+        self._print_or_buffer(Text(''))
 
     # -- subscription ------------------------------------------------------
 
@@ -659,19 +863,28 @@ class CLIEventRenderer:
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        # During Live mode, only show active streaming and reasoning.
-        # Finished items were aggressively printed out to the static terminal.
-        body_items = []
+        # During Live: task strip, streaming preview, reasoning, HUD. Committed
+        # transcript lines are printed via console.print immediately so Rich does
+        # not clip tall turns (Live vertical_overflow ellipsis).
+        body_items: list[Any] = []
+        live_sections: list[Any] = []
+        if self._task_panel is not None:
+            live_sections.append(self._task_panel)
         if self._streaming_accumulated:
-            body_items.append(self._render_streaming_preview())
+            live_sections.append(self._render_streaming_preview())
         if self._reasoning.active:
-            body_items.append(self._reasoning.renderable())
-        
-        # Include HUD at the bottom immediately so stats update in real-time
-        body_items.append(self._hud)
-        # Pad slightly above the HUD if there's active text streaming above it
-        if len(body_items) > 1:
-            body_items.insert(-1, Text(''))
+            live_sections.append(self._reasoning.renderable())
+
+        for index, section in enumerate(live_sections):
+            framed = frame_live_body(section)
+            if index < len(live_sections) - 1:
+                body_items.append(gap_below_live_section(framed))
+            else:
+                body_items.append(framed)
+
+        if live_sections:
+            body_items.append(spacer_live_section())
+        body_items.append(frame_transcript_body(self._hud))
 
         yield Group(*body_items)
 
@@ -683,24 +896,63 @@ class CLIEventRenderer:
             return
 
         if isinstance(action, MessageAction):
-            self._flush_thinking_block()
-            self._reasoning.stop()
+            cot = (getattr(action, 'thought', None) or '').strip()
+            if cot:
+                self._ensure_reasoning()
+                self._reasoning.update_thought(cot)
+            self._stop_reasoning()
             self._clear_streaming_preview()
-            if action.content.strip():
-                # Show file/image attachment indicators
+            display_content = redact_streamed_tool_call_markers(
+                (action.content or '').strip()
+            ).strip()
+            if display_content:
                 file_urls = getattr(action, 'file_urls', None) or []
                 image_urls = getattr(action, 'image_urls', None) or []
                 attachments: list[Any] = []
                 if file_urls:
-                    attachments.append(Text(f'  📎 {len(file_urls)} file(s) attached', style='dim'))
+                    attachments.append(
+                        format_activity_secondary(
+                            f'files attached · {len(file_urls)} file(s)',
+                            kind='neutral',
+                        )
+                    )
                 if image_urls:
-                    attachments.append(Text(f'  🖼️  {len(image_urls)} image(s) attached', style='dim'))
+                    attachments.append(
+                        format_activity_secondary(
+                            f'images attached · {len(image_urls)} image(s)',
+                            kind='neutral',
+                        )
+                    )
 
                 from rich.rule import Rule
-                self._append_history(Rule(style='bright_black', characters='─'))
-                self._append_history(Markdown(action.content))
+
+                self._append_history(Text(''))
+                self._append_history(
+                    Padding(
+                        Text('Assistant', style='bold green'),
+                        (1, 0, 0, 0),
+                        expand=False,
+                    )
+                )
+                self._append_history(
+                    Padding(
+                        Rule(style='bright_black', characters='─'),
+                        (0, 0, 1, 0),
+                        expand=False,
+                    )
+                )
+                tool_lines = try_format_message_as_tool_json(
+                    display_content, use_icons=self._cli_tool_icons
+                )
+                if tool_lines is not None:
+                    _icon, friendly = tool_lines
+                    for line in friendly.split('\n'):
+                        self._append_history(Text(line, style='cyan'))
+                else:
+                    self._append_history(Padding(Markdown(display_content), (0, 0, 1, 0)))
                 for att in attachments:
                     self._append_history(att)
+                self._append_history(Text(''))
             else:
                 self.refresh()
             return
@@ -709,53 +961,85 @@ class CLIEventRenderer:
             self._clear_streaming_preview()
 
         if isinstance(action, AgentThinkAction):
-            thought = getattr(action, 'thought', '') or getattr(action, 'content', '')
-            if thought:
-                self._ensure_reasoning()
-                self._reasoning.update_thought(thought)
+            if getattr(action, 'suppress_cli', False):
                 self.refresh()
+                return
+            thought = getattr(action, 'thought', '') or getattr(action, 'content', '')
+            self._apply_reasoning_text(thought)
+            self.refresh()
             return
 
         if isinstance(action, CmdRunAction):
             self._clear_streaming_preview()
-            cmd_display = action.command
-            if len(cmd_display) > 120:
-                cmd_display = cmd_display[:117] + '…'
-            self._ensure_reasoning()
-            self._reasoning.update_action(f'$ {cmd_display}')
-            thought = getattr(action, 'thought', '')
-            if thought:
-                self._reasoning.update_thought(thought)
+            if getattr(action, 'hidden', False):
+                self.refresh()
+                return
+            # Flush any previous buffered command that never received an observation
+            if self._pending_shell_action is not None:
+                self._flush_pending_shell_action()
+            cmd_display = (action.command or '').strip()
+            if len(cmd_display) > 12_000:
+                cmd_display = cmd_display[:11_997] + '…'
+            self._pending_shell_command = cmd_display
+            label = f'$ {cmd_display}' if cmd_display else '$ (empty)'
+            # Buffer — combined card (command + result) is printed in CmdOutputObservation
+            self._pending_shell_action = ('Ran', label)
+            thought = getattr(action, 'thought', '') or ''
+            _sync_reasoning_after_tool_line(self._reasoning, label, thought)
             self.refresh()
             return
 
         if isinstance(action, FileEditAction):
             self._clear_streaming_preview()
-            op = getattr(action, 'command', 'edit')
-            self._ensure_reasoning()
-            self._reasoning.update_action(f'{op}: {action.path}')
-            thought = getattr(action, 'thought', '')
-            if thought:
-                self._reasoning.update_thought(thought)
+            cmd = getattr(action, 'command', '')
+            path = action.path
+            insert_line = getattr(action, 'insert_line', None)
+            start = getattr(action, 'start', 1)
+            end = getattr(action, 'end', -1)
+            stats: str | None = None
+            if cmd == 'view_file':
+                verb, detail = 'Viewed', path
+            elif cmd == 'create_file':
+                verb, detail = 'Created', path
+            elif cmd == 'insert_text':
+                verb, detail = 'Inserted', path
+                stats = f'line {insert_line}' if insert_line is not None else None
+            elif cmd == 'undo_last_edit':
+                verb, detail = 'Reverted', path
+            elif not cmd:
+                end_str = f'L{end}' if end != -1 else 'end'
+                verb, detail = 'Edited', f'{path} · L{start}:{end_str}'
+            elif cmd == 'write':
+                verb, detail = 'Wrote', path
+            else:
+                verb = 'Edited'
+                detail = path
+            self._print_activity(verb, detail, stats, title='File')
+            thought = getattr(action, 'thought', '') or ''
+            _sync_reasoning_after_tool_line(self._reasoning, f'{verb} {detail}', thought)
             self.refresh()
             return
 
         if isinstance(action, FileWriteAction):
             self._clear_streaming_preview()
-            self._ensure_reasoning()
-            self._reasoning.update_action(f'write: {action.path}')
-            thought = getattr(action, 'thought', '')
-            if thought:
-                self._reasoning.update_thought(thought)
+            content = getattr(action, 'content', '') or ''
+            n_lines = content.count('\n') + 1 if content.strip() else 0
+            stats = f'{n_lines:,} lines' if n_lines else None
+            self._print_activity('Created', action.path, stats, title='File')
+            thought = getattr(action, 'thought', '') or ''
+            _sync_reasoning_after_tool_line(
+                self._reasoning, f'Created {action.path}', thought
+            )
             self.refresh()
             return
 
         if isinstance(action, RecallAction):
             self._clear_streaming_preview()
             query = getattr(action, 'query', '')
-            label = f'Recalling: {query}' if query else 'Recalling context…'
-            self._ensure_reasoning()
-            self._reasoning.update_action(label)
+            detail = query if query else 'workspace context'
+            if len(detail) > 100:
+                detail = detail[:97] + '…'
+            self._print_activity('Recalled', detail, None, title='Memory')
             self.refresh()
             return
 
@@ -763,11 +1047,19 @@ class CLIEventRenderer:
         if isinstance(action, FileReadAction):
             self._clear_streaming_preview()
             path = getattr(action, 'path', '')
-            self._ensure_reasoning()
-            self._reasoning.update_action(f'read: {path}')
-            thought = getattr(action, 'thought', '')
-            if thought:
-                self._reasoning.update_thought(thought)
+            view_range = getattr(action, 'view_range', None)
+            start = getattr(action, 'start', 0)
+            end = getattr(action, 'end', -1)
+            if view_range and len(view_range) == 2:
+                detail = f'{path} · L{view_range[0]}:L{view_range[1]}'
+            elif start not in (0, 1) or end != -1:
+                end_str = str(end) if end != -1 else 'end'
+                detail = f'{path} · L{start}:{end_str}'
+            else:
+                detail = path
+            self._print_activity('Viewed', detail, None, title='File')
+            thought = getattr(action, 'thought', '') or ''
+            _sync_reasoning_after_tool_line(self._reasoning, f'Viewed {path}', thought)
             self.refresh()
             return
 
@@ -775,22 +1067,30 @@ class CLIEventRenderer:
         if isinstance(action, MCPAction):
             self._clear_streaming_preview()
             name = getattr(action, 'name', 'tool')
-            self._ensure_reasoning()
-            self._reasoning.update_action(f'mcp: {name}')
-            thought = getattr(action, 'thought', '')
-            if thought:
-                self._reasoning.update_thought(thought)
+            raw_args = getattr(action, 'arguments', None) or {}
+            args_dict = raw_args if isinstance(raw_args, dict) else {}
+            verb, detail, stats = format_tool_activity_rows(name, args_dict)
+            self._print_activity(verb, detail, stats, title='MCP')
+            thought = getattr(action, 'thought', '') or ''
+            _sync_reasoning_after_tool_line(
+                self._reasoning, f'{verb} {detail}', thought
+            )
             self.refresh()
             return
 
         # -- Browser ----------------------------------------------------------
         if isinstance(action, BrowseInteractiveAction):
             self._clear_streaming_preview()
-            self._ensure_reasoning()
-            self._reasoning.update_action('Browsing…')
-            thought = getattr(action, 'thought', '')
-            if thought:
-                self._reasoning.update_thought(thought)
+            browser_actions = getattr(action, 'browser_actions', '') or ''
+            url_match = re.search(r'https?://[^\s\'")\]]+', browser_actions)
+            if url_match:
+                url = url_match.group(0)[:80]
+                detail = url
+            else:
+                detail = 'interactive session'
+            self._print_activity('Opened', detail, None, title='Browser')
+            thought = getattr(action, 'thought', '') or ''
+            _sync_reasoning_after_tool_line(self._reasoning, detail, thought)
             self.refresh()
             return
 
@@ -800,14 +1100,15 @@ class CLIEventRenderer:
             cmd = getattr(action, 'command', 'query')
             file = getattr(action, 'file', '')
             symbol = getattr(action, 'symbol', '')
-            label = f'{cmd}: {symbol}' if symbol else f'{cmd}: {file}'
-            self._ensure_reasoning()
-            self._reasoning.update_action(f'code nav: {label}')
+            detail = symbol if symbol else file
+            stats = str(cmd) if cmd else None
+            self._print_activity('Analyzed', detail, stats, title='Code')
             self.refresh()
             return
 
         # -- Task tracking ----------------------------------------------------
         if isinstance(action, TaskTrackingAction):
+            self._clear_streaming_preview()
             self.refresh()
             return
 
@@ -830,18 +1131,17 @@ class CLIEventRenderer:
         # -- Terminal session -------------------------------------------------
         if isinstance(action, TerminalRunAction):
             self._clear_streaming_preview()
-            cmd = getattr(action, 'command', '')
-            cmd_display = cmd[:100] + '…' if len(cmd) > 100 else cmd
-            self._ensure_reasoning()
-            self._reasoning.update_action(f'$ {cmd_display}')
+            cmd = (getattr(action, 'command', '') or '').strip()
+            if len(cmd) > 12_000:
+                cmd = cmd[:11_997] + '…'
+            self._pending_shell_command = cmd
             self.refresh()
             return
 
         if isinstance(action, TerminalInputAction):
             inp = getattr(action, 'input', '')
             inp_display = inp[:60] + '…' if len(inp) > 60 else inp
-            self._ensure_reasoning()
-            self._reasoning.update_action(f'input: {inp_display}')
+            self._print_activity('Sent input', inp_display, None, title='Terminal')
             self.refresh()
             return
 
@@ -850,46 +1150,64 @@ class CLIEventRenderer:
             self._clear_streaming_preview()
             desc = getattr(action, 'task_description', '')
             desc_display = desc[:80] + '…' if len(desc) > 80 else desc
-            self._ensure_reasoning()
-            self._reasoning.update_action(f'Delegating: {desc_display}')
+            self._print_activity('Delegated', desc_display, None, title='Agent')
             self.refresh()
             return
 
         # -- Playbook finish --------------------------------------------------
         if isinstance(action, PlaybookFinishAction):
-            self._reasoning.stop()
+            self._stop_reasoning()
             self._clear_streaming_preview()
             self.refresh()
             return
 
         # -- Escalation to human ----------------------------------------------
         if isinstance(action, EscalateToHumanAction):
-            self._reasoning.stop()
+            self._stop_reasoning()
             self._clear_streaming_preview()
             reason = getattr(action, 'reason', '')
             help_needed = getattr(action, 'specific_help_needed', '')
-            body_parts: list[Any] = []
+            escalate_parts: list[Any] = []
             if reason:
-                body_parts.append(Text(f'  {reason}', style='yellow'))
+                escalate_parts.append(Text(reason, style='yellow'))
             if help_needed:
-                body_parts.append(Text(f'  help needed: {help_needed}', style='yellow'))
-            for part in body_parts:
-                self._append_history(part)
-            if not body_parts:
-                self._append_history(Text('  needs your input', style='yellow'))
+                escalate_parts.append(Text(f'Help needed: {help_needed}', style='yellow'))
+            if not escalate_parts:
+                escalate_parts.append(
+                    Text('The agent needs your input to continue.', style='yellow')
+                )
+            self._append_history(
+                format_callout_panel(
+                    'Need your input',
+                    Group(*escalate_parts),
+                    accent_style='yellow',
+                )
+            )
             self.refresh()
             return
 
         # -- Clarification request --------------------------------------------
         if isinstance(action, ClarificationRequestAction):
-            self._reasoning.stop()
+            self._stop_reasoning()
             self._clear_streaming_preview()
             question = getattr(action, 'question', '')
             options = getattr(action, 'options', []) or []
+            clarify_parts: list[Any] = []
             if question:
-                self._append_history(Text(f'  {question}', style='yellow'))
+                clarify_parts.append(Text(question, style='yellow'))
             for i, opt in enumerate(options, 1):
-                self._append_history(Text(f'  {i}. {opt}', style='dim'))
+                line = Text()
+                line.append(f'{i}. ', style='bold #f1bf63')
+                line.append(str(opt), style='#e2e8f0')
+                clarify_parts.append(line)
+            if clarify_parts:
+                self._append_history(
+                    format_callout_panel(
+                        'Question',
+                        Group(*clarify_parts),
+                        accent_style='yellow',
+                    )
+                )
             self.refresh()
             return
 
@@ -897,29 +1215,56 @@ class CLIEventRenderer:
         if isinstance(action, UncertaintyAction):
             concerns = getattr(action, 'specific_concerns', []) or []
             info_needed = getattr(action, 'requested_information', '')
+            uncertainty_parts: list[Any] = []
             for concern in concerns[:5]:
-                self._append_history(Text(f'  {concern}', style='dim'))
+                line = Text()
+                line.append('• ', style='bright_black')
+                line.append(str(concern), style='dim')
+                uncertainty_parts.append(line)
             if info_needed:
-                self._append_history(Text(f'  needs: {info_needed}', style='dim'))
+                uncertainty_parts.append(Text(f'Need: {info_needed}', style='yellow'))
+            if uncertainty_parts:
+                self._append_history(
+                    format_callout_panel(
+                        'Needs context',
+                        Group(*uncertainty_parts),
+                        accent_style='yellow',
+                    )
+                )
             self.refresh()
             return
 
         # -- Proposal with options --------------------------------------------
         if isinstance(action, ProposalAction):
-            self._reasoning.stop()
+            self._stop_reasoning()
             self._clear_streaming_preview()
             options = getattr(action, 'options', []) or []
             recommended = getattr(action, 'recommended', 0)
             rationale = getattr(action, 'rationale', '')
+            proposal_parts: list[Any] = []
             if rationale:
-                self._append_history(Text(f'  {rationale}', style='dim'))
+                proposal_parts.append(Text(rationale, style='dim'))
             for i, opt in enumerate(options):
                 label = opt.get('name', opt.get('title', f'Option {i + 1}'))
                 desc = opt.get('description', '')
                 marker = ' (recommended)' if i == recommended else ''
-                self._append_history(Text(f'  {i + 1}. {label}{marker}', style='bold' if i == recommended else ''))
+                line = Text()
+                line.append(f'{i + 1}. ', style='bold #a78bfa')
+                line.append(
+                    f'{label}{marker}',
+                    style='bold #f1bf63' if i == recommended else 'bold #e2e8f0',
+                )
+                proposal_parts.append(line)
                 if desc:
-                    self._append_history(Text(f'     {desc}', style='dim'))
+                    proposal_parts.append(Text(f'   {desc}', style='dim'))
+            if proposal_parts:
+                self._append_history(
+                    format_callout_panel(
+                        'Options',
+                        Group(*proposal_parts),
+                        accent_style='#7c3aed',
+                    )
+                )
             self.refresh()
             return
 
@@ -928,22 +1273,28 @@ class CLIEventRenderer:
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         raw = action.accumulated
 
-        # Tool call argument streaming: show progress in reasoning panel
-        # instead of the content preview (avoids raw JSON in the preview).
+        # Tool call argument streaming: spinner + headline only. Do not put partial
+        # JSON / command hints into the thinking buffer — those were flushed as dim
+        # lines and looked like duplicate ``$ cmd`` reasoning (not LLM thinking).
         if action.is_tool_call:
             tool_name = action.tool_call_name or 'tool'
-            friendly = _friendly_tool_name(tool_name)
+            _icon, headline = tool_headline(
+                tool_name, use_icons=self._cli_tool_icons
+            )
             self._ensure_reasoning()
-            self._reasoning.update_action(f'Preparing {friendly}…')
-            # Try to extract useful info from partial JSON args
-            hint = _extract_tool_hint(raw)
-            if hint:
-                self._reasoning.set_streaming_thought(hint)
+            self._reasoning.update_action(f'{headline}…')
             self.refresh()
             return
 
-        # Route <think> content to the reasoning display so the user sees
+        # Route <redacted_thinking> content to the reasoning display so the user sees
         # the model's chain-of-thought in real time.
+        if looks_like_streaming_tool_arguments(raw):
+            self._ensure_reasoning()
+            self._reasoning.update_action('Tool…')
+            self._streaming_accumulated = ''
+            self.refresh()
+            return
+
         think_match = _THINK_EXTRACT_RE.search(raw)
         if think_match:
             thinking_text = think_match.group(1)
@@ -952,9 +1303,13 @@ class CLIEventRenderer:
                 self._reasoning.set_streaming_thought(thinking_text)
             # Strip thinking from the streaming preview.
             display_text = _THINK_STRIP_RE.sub('', raw).strip()
-            self._streaming_accumulated = display_text
+            self._streaming_accumulated = redact_task_list_json_blobs(
+                redact_streamed_tool_call_markers(display_text)
+            )
         else:
-            self._streaming_accumulated = raw
+            self._streaming_accumulated = redact_task_list_json_blobs(
+                redact_streamed_tool_call_markers(raw)
+            )
 
         self._streaming_final = action.is_final
         if action.is_final:
@@ -969,21 +1324,54 @@ class CLIEventRenderer:
             return
 
         if isinstance(obs, AgentThinkObservation):
-            thought = getattr(obs, 'thought', '') or getattr(obs, 'content', '')
-            if thought:
-                self._ensure_reasoning()
-                self._reasoning.update_thought(thought)
+            if getattr(obs, 'suppress_cli', False):
                 self.refresh()
+                return
+            thought = getattr(obs, 'thought', '') or getattr(obs, 'content', '')
+            self._apply_reasoning_text(thought)
+            self.refresh()
             return
 
         if isinstance(obs, CmdOutputObservation):
-            # Command output is intentionally hidden from the chat view.
-            # The agent still receives the result — this is a display-only choice.
-            self._reasoning.stop()
+            self._stop_reasoning()
+            if getattr(obs, 'hidden', False):
+                self._pending_shell_action = None
+                self._pending_shell_command = None
+                return
+            exit_code = getattr(obs, 'exit_code', None)
+            if exit_code is None:
+                meta = getattr(obs, 'metadata', None)
+                exit_code = getattr(meta, 'exit_code', None) if meta else None
+            raw = (getattr(obs, 'content', '') or '').strip()
+            content = strip_tool_result_validation_annotations(raw)
+            # Retrieve buffered action (verb + label) set by CmdRunAction
+            pending = self._pending_shell_action
+            self._pending_shell_action = None
+            self._pending_shell_command = None
+            verb = pending[0] if pending else 'Ran'
+            label = pending[1] if pending else '$ (command)'
+            if exit_code is not None and exit_code != 0:
+                err_line = _summarize_cmd_failure(content)
+                msg = f'exit {exit_code}'
+                if err_line:
+                    msg += f' · {err_line}'
+                result_kind = 'err'
+            elif exit_code == 0:
+                first_line = content.split('\n')[0].strip()[:220] if content else ''
+                msg = first_line if first_line and len(first_line) > 2 else 'done'
+                result_kind = 'ok'
+            else:
+                msg = None
+                result_kind = 'neutral'
+            self._emit_activity_turn_header()  # noqa: not a duplicate
+            inner = format_activity_shell_block(
+                verb, label, result_message=msg, result_kind=result_kind
+            )
+            self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
             return
 
         if isinstance(obs, (FileEditObservation, FileWriteObservation)):
-            self._reasoning.stop()
+            self._stop_reasoning()
             path = getattr(obs, 'path', '')
             if isinstance(obs, FileEditObservation):
                 from backend.cli.diff_renderer import DiffPanel
@@ -991,12 +1379,13 @@ class CLIEventRenderer:
                 self._append_history(DiffPanel(obs))
             else:
                 self._append_history(
-                    Text(f'  wrote {path}', style='dim'),
+                    format_activity_result_secondary(f'wrote · {path}', kind='ok')
                 )
             return
 
         if isinstance(obs, ErrorObservation):
-            self._reasoning.stop()
+            self._stop_reasoning()
+            self._flush_pending_shell_action()
             error_content = getattr(obs, 'content', str(obs))
             self._append_history(
                 _build_error_panel(error_content),
@@ -1005,16 +1394,19 @@ class CLIEventRenderer:
             return
 
         if isinstance(obs, UserRejectObservation):
+            self._flush_pending_shell_action()
             content = getattr(obs, 'content', '')
-            if content:
-                self._append_history(Text(f'  ✗ Rejected: {content}', style='yellow'))
-            else:
-                self._append_history(Text('  ✗ Action rejected.', style='yellow'))
+            self._append_history(
+                format_callout_panel(
+                    'Rejected',
+                    Text(content or 'Action rejected.', style='yellow'),
+                    accent_style='yellow',
+                )
+            )
             return
 
         if isinstance(obs, RecallObservation):
             # Show brief recall summary — full content goes to the agent
-            kb_results = getattr(obs, 'knowledge_base_results', []) or []
             recall_type = getattr(obs, 'recall_type', None)
             label = str(recall_type.value) if recall_type else 'context'
             # The next agent step will call the LLM — show activity indicator
@@ -1026,32 +1418,48 @@ class CLIEventRenderer:
         if isinstance(obs, StatusObservation):
             content = getattr(obs, 'content', '')
             if content:
-                self._append_history(Text(f'  ℹ {content}', style='dim'))
+                self._append_history(
+                    format_activity_result_secondary(f'status · {content}', kind='neutral')
+                )
             return
 
         # -- File read result -------------------------------------------------
         if isinstance(obs, FileReadObservation):
-            self._reasoning.stop()
+            self._stop_reasoning()
+            content = getattr(obs, 'content', '') or ''
+            n_lines = content.count('\n') + 1 if content.strip() else 0
+            n_chars = len(content)
+            if n_lines or n_chars:
+                parts: list[str] = []
+                if n_lines:
+                    parts.append(f'{n_lines:,} lines')
+                if n_chars:
+                    parts.append(f'{n_chars:,} chars')
+                self._append_history(
+                    format_activity_result_secondary(' · '.join(parts), kind='neutral')
+                )
             return
 
         # -- MCP tool result --------------------------------------------------
         if isinstance(obs, MCPObservation):
-            self._reasoning.stop()
-            name = getattr(obs, 'name', 'tool')
+            self._stop_reasoning()
             content = getattr(obs, 'content', '')
-            content_preview = content[:200].strip() if content else ''
-            if content_preview:
-                body_parts: list[Any] = [
-                    Syntax(content_preview, 'text', word_wrap=True, theme='ansi_dark'),
-                ]
-                if len(content) > 200:
-                    body_parts.append(Text(f'  … ({len(content):,} chars total)', style='bright_black'))
-                self._append_history(Group(*body_parts))
+            friendly = mcp_result_user_preview(content)
+            if friendly:
+                self._append_history(
+                    format_activity_result_secondary(friendly, kind='neutral')
+                )
+                if len(content) > len(friendly) + 20:
+                    self._append_history(
+                        format_activity_result_secondary(
+                            f'{len(content):,} chars total', kind='neutral'
+                        )
+                    )
             return
 
         # -- Terminal output --------------------------------------------------
         if isinstance(obs, TerminalObservation):
-            self._reasoning.stop()
+            self._stop_reasoning()
             content = getattr(obs, 'content', '')
             if content.strip():
                 display = content[:2000]
@@ -1060,20 +1468,35 @@ class CLIEventRenderer:
                 ]
                 if len(content) > 2000:
                     terminal_parts.append(
-                        Text(f'  … ({len(content):,} chars total)', style='bright_black')
+                        format_activity_result_secondary(
+                            f'{len(content):,} chars total',
+                            kind='neutral',
+                        )
                     )
                 self._append_history(Group(*terminal_parts))
             return
 
         # -- LSP / code navigation result -------------------------------------
         if isinstance(obs, LspQueryObservation):
-            self._reasoning.stop()
+            self._stop_reasoning()
             available = getattr(obs, 'available', True)
-            content = getattr(obs, 'content', '')
+            content = getattr(obs, 'content', '') or ''
             if not available:
                 self._append_history(
-                    Text('  code nav: not available', style='bright_black'),
+                    format_activity_result_secondary(
+                        'code navigation unavailable',
+                        kind='neutral',
+                    ),
                 )
+            elif content.strip():
+                lines = [line for line in content.split('\n') if line.strip()]
+                n = len(lines)
+                if n:
+                    preview = lines[0][:80]
+                    suffix = f' · {n} lines' if n > 1 else ''
+                    self._append_history(
+                        format_activity_result_secondary(f'{preview}{suffix}', kind='neutral')
+                    )
             return
 
         # -- Server ready -----------------------------------------------------
@@ -1082,16 +1505,20 @@ class CLIEventRenderer:
             port = getattr(obs, 'port', '')
             label = url or f'port {port}'
             self._append_history(
-                Text(f'  server ready at {label}', style='dim'),
+                format_activity_result_secondary(
+                    f'server ready · {label}',
+                    kind='ok',
+                ),
             )
             return
 
         # -- Success ----------------------------------------------------------
         if isinstance(obs, SuccessObservation):
             content = getattr(obs, 'content', '')
-            self._append_history(
-                Text(f'  {content}' if content else '', style='dim'),
-            )
+            if content:
+                self._append_history(
+                    format_activity_result_secondary(content, kind='ok'),
+                )
             return
 
         # -- Recall failure ---------------------------------------------------
@@ -1101,7 +1528,10 @@ class CLIEventRenderer:
             label = str(recall_type.value) if recall_type else 'recall'
             if error_msg:
                 self._append_history(
-                    Text(f'  {label} failed: {error_msg}', style='bright_black')
+                    format_activity_result_secondary(
+                        f'{label} failed · {error_msg}',
+                        kind='err',
+                    )
                 )
             return
 
@@ -1109,23 +1539,45 @@ class CLIEventRenderer:
         if isinstance(obs, FileDownloadObservation):
             path = getattr(obs, 'file_path', '')
             self._append_history(
-                Text(f'  downloaded: {path}', style='dim'),
+                format_activity_result_secondary(f'downloaded · {path}', kind='neutral'),
             )
             return
 
         # -- Delegation result ------------------------------------------------
         if isinstance(obs, DelegateTaskObservation):
-            self._reasoning.stop()
+            self._stop_reasoning()
             success = getattr(obs, 'success', True)
             error = getattr(obs, 'error_message', '')
             if not success:
                 self._append_history(
-                    Text(f'  delegation failed: {error}' if error else '  delegation failed', style='red dim'),
+                    format_activity_result_secondary(
+                        f'delegation failed · {error}' if error else 'delegation failed',
+                        kind='err',
+                    ),
                 )
             return
 
         # -- Task tracking result ---------------------------------------------
         if isinstance(obs, TaskTrackingObservation):
+            self._stop_reasoning()
+            task_list = getattr(obs, 'task_list', None)
+            cmd = getattr(obs, 'command', '')
+            if task_list is not None and cmd in ('plan', 'update'):
+                self._set_task_panel(task_list)
+            content = strip_tool_result_validation_annotations(
+                (getattr(obs, 'content', None) or '').strip()
+            )
+            body = ''
+            if task_list is None or cmd not in ('plan', 'update'):
+                body = content
+            elif content.startswith('[TASK_TRACKER]'):
+                body = content
+            if body:
+                for line in body.splitlines():
+                    self._append_history(
+                        format_activity_result_secondary(line, kind='neutral')
+                    )
+            self.refresh()
             return
 
         # -- Context condensation result --------------------------------------
@@ -1168,14 +1620,17 @@ class CLIEventRenderer:
         elif state == AgentState.AWAITING_USER_INPUT:
             self._hud.update_ledger('Ready')
         elif state == AgentState.PAUSED:
-            self._hud.update_ledger('Paused')
+            # PAUSED is treated as STOPPED in CLI — collapse to same UX
+            state = AgentState.STOPPED
+            self._current_state = state
+            self._hud.update_ledger('Idle')
         elif state in (AgentState.FINISHED, AgentState.STOPPED):
             self._hud.update_ledger('Idle')
         elif state == AgentState.RUNNING:
             self._hud.update_ledger('Healthy')
 
         if state == AgentState.AWAITING_USER_CONFIRMATION:
-            self._reasoning.stop()
+            self._stop_reasoning()
             self._clear_streaming_preview()
             if previous_state != state:
                 self._append_history(
@@ -1188,43 +1643,41 @@ class CLIEventRenderer:
             return
 
         if state == AgentState.AWAITING_USER_INPUT:
-            self._reasoning.stop()
+            self._stop_reasoning()
             self._clear_streaming_preview()
             self.refresh()
             return
 
-        if state == AgentState.PAUSED:
-            self._reasoning.stop()
-            self._clear_streaming_preview()
-            if previous_state != state:
-                self._append_history(
-                    Text('  paused — send guidance to continue.', style='dim')
-                )
-            return
-
         if state == AgentState.FINISHED:
-            self._reasoning.stop()
+            self._stop_reasoning()
             self._clear_streaming_preview()
             return
 
         if state == AgentState.ERROR:
-            self._reasoning.stop()
+            self._stop_reasoning()
             self._clear_streaming_preview()
             self._append_history(
                 Text('  error — send a follow-up to retry.', style='red dim'),
             )
             return
 
+        # REJECTED collapses to ERROR in CLI
         if state == AgentState.REJECTED:
-            self._reasoning.stop()
+            self._stop_reasoning()
             self._clear_streaming_preview()
             self._append_history(
-                Text('  action rejected — adjust the task and retry.', style='yellow dim')
+                Text('  error — send a follow-up to retry.', style='red dim')
             )
             return
 
+        # STOPPED (and collapsed PAUSED)
+        if state == AgentState.STOPPED:
+            self._stop_reasoning()
+            self._clear_streaming_preview()
+            return
+
         if state in _IDLE_STATES:
-            self._reasoning.stop()
+            self._stop_reasoning()
 
         self.refresh()
 
@@ -1253,13 +1706,134 @@ class CLIEventRenderer:
         self._print_or_buffer(renderable)
 
     def _print_or_buffer(self, renderable: Any) -> None:
-        """Print statically immediately, suspending Live if active."""
+        """Print transcript output, or schedule above the prompt when idle with PT.
+
+        While Rich ``Live`` is active (agent turn), print each committed line
+        through the same console so it lands in normal scrollback and the Live
+        region only holds streaming, reasoning, tasks, and HUD — avoiding
+        terminal-height clipping.
+
+        When a prompt_toolkit session is active (user at the input prompt), Rich
+        ``console.print`` writes at the wrong cursor and corrupts the multiline
+        prompt.  In that case schedule ``run_in_terminal`` so output scrolls above
+        the prompt.
+        """
+        framed = frame_transcript_body(renderable)
         if self._live is not None:
-            with self.suspend_live():
-                self._console.print(renderable)
-            # We still keep _live_items empty since they're printed inline.
-        else:
+            self._console.print(framed)
+            self.refresh()
+            return
+
+        sess: Any | None = None
+        if self._get_prompt_session is not None:
+            try:
+                sess = self._get_prompt_session()
+            except Exception:
+                sess = None
+        app = getattr(sess, 'app', None) if sess is not None else None
+        if app is not None and getattr(app, 'is_running', False):
+            try:
+                task = self._loop.create_task(
+                    self._safe_print_above_prompt(framed)
+                )
+
+                def _log_fail(t: asyncio.Task) -> None:
+                    try:
+                        t.result()
+                    except asyncio.CancelledError:
+                        pass
+                    except Exception:
+                        logger.debug(
+                            'Safe console print above prompt failed',
+                            exc_info=True,
+                        )
+
+                task.add_done_callback(_log_fail)
+            except RuntimeError:
+                self._console.print(framed)
+            return
+
+        self._console.print(framed)
+
+    async def _safe_print_above_prompt(self, renderable: Any) -> None:
+        from prompt_toolkit.application import run_in_terminal
+
+        def _sync_print() -> None:
             self._console.print(renderable)
+
+        await run_in_terminal(_sync_print)
+
+    def _emit_activity_turn_header(self) -> None:
+        if self._activity_turn_header_emitted:
+            return
+        self._activity_turn_header_emitted = True
+        self._print_or_buffer(
+            Padding(format_activity_turn_header(), pad=(0, 0, 1, 0))
+        )
+
+    def _print_activity(
+        self,
+        verb: str,
+        detail: str,
+        stats: str | None = None,
+        *,
+        shell_rail: bool = False,
+        title: str | None = None,
+    ) -> None:
+        """Primary activity row plus optional dim stats (tool / file / shell)."""
+        self._emit_activity_turn_header()  # noqa: not a duplicate
+        if shell_rail:
+            inner = format_activity_shell_block(
+                verb, detail, secondary=stats, secondary_kind='neutral'
+            )
+        else:
+            inner = format_activity_block(
+                verb, detail, secondary=stats, secondary_kind='neutral', title=title
+            )
+        self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
+
+    def _flush_pending_shell_action(self) -> None:
+        """Print buffered command card without a result (fallback for orphaned CmdRunActions)."""
+        if self._pending_shell_action is None:
+            return
+        verb, label = self._pending_shell_action
+        self._pending_shell_action = None
+        self._pending_shell_command = None
+        self._emit_activity_turn_header()  # noqa: not a duplicate
+        inner = format_activity_shell_block(verb, label)
+        self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
+
+    def _print_tool_call(self, label: str) -> None:
+        """Emit one legacy ground-truth tool row (``> label``)."""
+        self._emit_activity_turn_header()
+        self._print_or_buffer(
+            Padding(
+                format_ground_truth_tool_line(label),
+                pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+            )
+        )
+
+    def _apply_reasoning_text(self, text: str) -> None:
+        """Update the reasoning display while keeping tagged tool payloads out of the transcript."""
+        action_label, thought = _normalize_reasoning_text(text)
+        if action_label is None and thought is None:
+            return
+        self._ensure_reasoning()
+        if action_label:
+            self._reasoning.update_action(action_label)
+        if thought:
+            self._reasoning.update_thought(thought)
+
+    def _set_task_panel(self, task_list: list[dict[str, Any]]) -> None:
+        """Replace the visible task tracker panel with the latest known state."""
+        self._task_panel = _build_task_panel(task_list)
+        self._task_panel_signature = _task_panel_signature(task_list)
+        if (
+            self._live is None
+            and self._task_panel_signature != self._last_printed_task_panel_signature
+        ):
+            self._print_or_buffer(self._task_panel)
+            self._last_printed_task_panel_signature = self._task_panel_signature
 
     def _flush_thinking_block(self) -> None:
         """Print accumulated thoughts as a persistent dim block before they are cleared.
@@ -1270,13 +1844,23 @@ class CLIEventRenderer:
         thoughts = self._reasoning.snapshot_thoughts()
         if not thoughts:
             return
-        block = Text()
-        block.append('  💭  ', style='bright_black')
-        for i, line in enumerate(thoughts):
-            if i > 0:
-                block.append('\n       ', style='')
-            block.append(line, style='italic bright_black')
-        self._print_or_buffer(block)
+        self._print_or_buffer(
+            Group(
+                *[
+                    format_activity_secondary(line, kind='neutral')
+                    for line in thoughts
+                ]
+            )
+        )
+
+    def _stop_reasoning(self) -> None:
+        """Flush any accumulated thoughts to static output, then stop the spinner.
+
+        Always use this instead of calling _reasoning.stop() directly so that
+        thoughts are never silently discarded mid-turn or at turn end.
+        """
+        self._flush_thinking_block()
+        self._reasoning.stop()
 
     def _clear_streaming_preview(self) -> None:
         self._streaming_accumulated = ''
@@ -1286,8 +1870,12 @@ class CLIEventRenderer:
     def _render_streaming_preview(self) -> Any:
         body: list[Any] = [Markdown(self._streaming_accumulated or '')]
         if not self._streaming_final:
-            body.append(Text('▌', style='bright_black'))
-        return Group(*body)
+            body.append(Text('streaming…', style='bright_black'))
+        return format_callout_panel(
+            'Draft reply',
+            Group(*body),
+            accent_style='bright_black',
+        )
 
     @staticmethod
     def _format_command_display(command: str, *, limit: int = 96) -> str:
@@ -1319,7 +1907,7 @@ class CLIEventRenderer:
                     ),
                     title='[red bold]Budget Exceeded[/red bold]',
                     border_style='red',
-                    padding=(0, 1),
+                    padding=(1, 2),
                 )
             )
         elif cost >= self._max_budget * 0.8 and not self._budget_warned_80:
@@ -1332,6 +1920,6 @@ class CLIEventRenderer:
                     ),
                     title='[yellow]Budget Warning[/yellow]',
                     border_style='yellow',
-                    padding=(0, 1),
+                    padding=(1, 2),
                 )
             )

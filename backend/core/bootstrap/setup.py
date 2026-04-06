@@ -27,6 +27,7 @@ from backend.orchestration import SessionOrchestrator
 from backend.orchestration.agent import Agent
 from backend.orchestration.state.state import State
 from backend.persistence import get_file_store
+from backend.persistence.locations import get_local_data_root
 from backend.persistence.data_models.user_secrets import UserSecrets
 from backend.utils.async_utils import call_async_from_sync
 
@@ -130,6 +131,7 @@ def create_runtime(
     env_vars: dict[str, str] | None = None,
     user_id: str | None = None,
     project_root: str | None = None,
+    inline_event_delivery: bool = False,
 ) -> Runtime:
     """Create a runtime for the agent to run on.
 
@@ -145,6 +147,8 @@ def create_runtime(
         env_vars: Optional environment variables for the runtime.
         user_id: Optional user ID for ownership and quotas.
         project_root: Optional open-project directory (overrides config.project_root).
+        inline_event_delivery: When True, all events are delivered inline (same call chain)
+            instead of via background thread pool. Eliminates threading races in CLI mode.
 
     Returns:
         The created Runtime instance (not yet connected or initialized).
@@ -152,8 +156,15 @@ def create_runtime(
     """
     if event_stream is None:
         session_id = sid or generate_sid(config)
-        file_store = get_file_store(config.file_store, config.local_data_root)
-        event_stream = EventStream(session_id, file_store)
+        file_store = get_file_store(
+            config.file_store, get_local_data_root(config)
+        )
+        # worker_count=0 enables inline delivery: no thread pool, no races.
+        event_stream = EventStream(
+            session_id,
+            file_store,
+            worker_count=0 if inline_event_delivery else None,
+        )
     else:
         session_id = sid or event_stream.sid
     agent_cls = type(agent) if agent else Agent.get_cls(config.default_agent)

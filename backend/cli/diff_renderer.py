@@ -32,7 +32,7 @@ class DiffPanel:
                 Text(f'+ new file ({line_count} lines)', style='green'),
                 title=f'[bold green]created[/bold green] {path}',
                 border_style='green',
-                padding=(0, 1),
+                padding=(1, 2),
             )
             return
 
@@ -46,11 +46,25 @@ class DiffPanel:
 
         if groups:
             diff_text = self._render_groups(groups)
+            added = sum(
+                1 for g in groups for l in g.get('after_edits', []) if l.startswith('+')
+            )
+            removed = sum(
+                1 for g in groups for l in g.get('before_edits', []) if l.startswith('-')
+            )
+            stats = ''
+            if added or removed:
+                parts = []
+                if added:
+                    parts.append(f'+{added}')
+                if removed:
+                    parts.append(f'-{removed}')
+                stats = f' [{", ".join(parts)}]'
             yield Panel(
                 diff_text,
-                title=f'[bold yellow]edited[/bold yellow] {path}',
+                title=f'[bold yellow]edited[/bold yellow] {path}[dim]{stats}[/dim]',
                 border_style='yellow',
-                padding=(0, 1),
+                padding=(1, 2),
             )
             return
 
@@ -67,14 +81,14 @@ class DiffPanel:
                 Text(diff_str[:3000]),
                 title=f'[bold yellow]edited[/bold yellow] {path}',
                 border_style='yellow',
-                padding=(0, 1),
+                padding=(1, 2),
             )
         else:
             yield Panel(
                 Text('✓ written', style='green'),
                 title=f'[bold green]wrote[/bold green] {path}',
                 border_style='green',
-                padding=(0, 1),
+                padding=(1, 2),
             )
 
     @staticmethod

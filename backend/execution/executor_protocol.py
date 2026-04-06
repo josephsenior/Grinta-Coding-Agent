@@ -19,6 +19,7 @@ from backend.ledger.action import (
     FileEditAction,
     FileReadAction,
     FileWriteAction,
+    LspQueryAction,
 )
 from backend.ledger.observation import Observation
 
@@ -70,3 +71,5 @@ class RuntimeExecutorProtocol(Protocol):
     async def write(self, action: FileWriteAction) -> Observation: ...
 
     async def edit(self, action: FileEditAction) -> Observation: ...
+
+    async def lsp_query(self, action: LspQueryAction) -> Observation: ...

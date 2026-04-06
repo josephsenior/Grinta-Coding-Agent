@@ -121,6 +121,7 @@ class OrchestratorPlanner:
         from backend.engine.tools.memory_manager import (
             create_memory_manager_tool,
         )
+        from backend.engine.tools.note import create_note_tool, create_recall_tool
         from backend.engine.tools.think import create_think_tool
 
         if getattr(self._config, 'enable_cmd', True):
@@ -133,6 +134,8 @@ class OrchestratorPlanner:
             tools.append(create_summarize_context_tool())
         if getattr(self._config, 'enable_working_memory', True):
             tools.append(create_memory_manager_tool())
+        tools.append(create_note_tool())
+        tools.append(create_recall_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
         """Add apply_patch, task_tracker, search_code, explore_code tools."""

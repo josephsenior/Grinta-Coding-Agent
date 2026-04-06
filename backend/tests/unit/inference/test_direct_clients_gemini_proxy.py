@@ -56,7 +56,7 @@ class TestCrossFamilyMessageNormalization:
         assert cleaned == [
             {
                 'role': 'assistant',
-                'content': '[Tool call] task_tracker({"command":"show_tasks"})',
+                'content': '[Tool call] 📋 Tasks: show_tasks',
             },
             {
                 'role': 'user',

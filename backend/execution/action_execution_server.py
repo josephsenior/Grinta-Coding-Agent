@@ -84,6 +84,7 @@ from backend.ledger.observation import (
 )
 from backend.ledger.observation.signal import SignalProgressObservation
 from backend.ledger.observation.terminal import TerminalObservation
+from backend.persistence.locations import get_workspace_downloads_dir
 from backend.utils.async_utils import call_sync_from_async
 from backend.utils.regex_limits import try_compile_user_regex
 
@@ -91,9 +92,21 @@ if TYPE_CHECKING:
     from backend.execution.browser.browser_env import BrowserEnv
 
 
-WORKSPACE_VIRTUAL_ROOT = '/workspace'
-_WORKSPACE_TOKEN_RE = re.compile(r'/workspace(?=/|$)')
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m')
+_POWERSHELL_BUILTIN_COMMANDS = frozenset(
+    {
+        'Get-Content',
+        'Write-Output',
+        'Get-ChildItem',
+        'Select-String',
+        'Set-Location',
+        'Select-Object',
+        'Measure-Object',
+        'Out-File',
+        'Test-Path',
+        'Remove-Item',
+    }
+)
 
 # Note: Import is deferred to avoid executing windows_bash.py on non-Windows platforms
 if sys.platform == 'win32':
@@ -160,10 +173,7 @@ class RuntimeExecutor:
         self.start_time = time.time()
         self.last_execution_time = time.time()
         self.downloaded_files: list[str] = []
-        self.downloads_directory = os.path.join(work_dir, '.grinta', 'downloads')
-        # Ensure downloads directory exists (hidden under .grinta/ so it doesn't
-        # clutter the user's project root)
-        os.makedirs(self.downloads_directory, exist_ok=True)
+        self.downloads_directory = get_workspace_downloads_dir(work_dir)
 
         # Track repeated identical command failures to nudge strategy pivots
         # before the circuit breaker is the only recovery mechanism.
@@ -312,73 +322,24 @@ class RuntimeExecutor:
             action_type = action.action
             obs = await getattr(self, action_type)(action)
 
-        # Replace the real workspace temp path with /workspace in all
-        # observation text so the LLM's perspective stays consistent.
+        # Strip ANSI from text fields for consistent CLI / log display.
         if hasattr(obs, 'content') and isinstance(obs.content, str):
-            obs.content = self._denormalize_obs_text(obs.content)
+            obs.content = self._strip_ansi_obs_text(obs.content)
         if hasattr(obs, 'path') and isinstance(obs.path, str):
-            obs.path = self._denormalize_obs_text(obs.path)
+            obs.path = self._strip_ansi_obs_text(obs.path)
         if hasattr(obs, 'message') and isinstance(obs.message, str):
             try:
-                obs.message = self._denormalize_obs_text(obs.message)
+                obs.message = self._strip_ansi_obs_text(obs.message)
             except AttributeError:
-                pass  # message is read-only (e.g. MCPObservation); content already denormalized
+                pass  # message is read-only (e.g. MCPObservation); content already sanitized
         return obs
 
-    def _normalize_workspace_path(self, path: str) -> str:
-        """Translate /workspace/... virtual paths to the actual workspace directory.
-
-        When running outside a container the real workspace is a temp directory
-        (e.g. /tmp/app_workspace_<sid>_... on Linux/macOS or under %%TEMP%%
-        on Windows).  The LLM always uses the /workspace virtual prefix, so
-        this method strips it and returns the corresponding absolute path
-        inside the real workspace root.
-        """
-        norm = path.replace('\\', '/')
-        if norm == WORKSPACE_VIRTUAL_ROOT:
-            return self._initial_cwd
-        workspace_prefix = f'{WORKSPACE_VIRTUAL_ROOT}/'
-        if norm.startswith(workspace_prefix):
-            rel = norm[len(workspace_prefix) :]
-            return os.path.join(self._initial_cwd, rel)
-        return path
-
-    def _rewrite_workspace_tokens(self, text: str) -> str:
-        """Replace virtual /workspace path tokens with the actual workspace path."""
-        if not text or WORKSPACE_VIRTUAL_ROOT not in text:
-            return text
-        workspace_root = self._initial_cwd.replace('\\', '/')
-        return _WORKSPACE_TOKEN_RE.sub(workspace_root, text)
-
-    def _denormalize_obs_text(self, text: str) -> str:
-        """Replace the real workspace temp path with /workspace in observation text.
-
-        This keeps the LLM's perspective consistent: it always sees /workspace
-        paths regardless of the underlying temp directory location.
-        Without this, the LLM sees path mismatches (it sends /workspace/foo but
-        gets back the real app_workspace temp path) and loops trying to
-        reconcile them.
-
-        Also strips ANSI color codes so terminal output is clean for the LLM.
-        """
+    @staticmethod
+    def _strip_ansi_obs_text(text: str) -> str:
+        """Strip ANSI escape codes from observation text."""
         if not text:
             return text
-        # Strip ANSI escape codes from PowerShell / terminal output.
-        text = _ANSI_ESCAPE_RE.sub('', text)
-        if not self._initial_cwd:
-            return text
-        # Replace both forward-slash and backslash variants of the temp path.
-        ws = self._initial_cwd.replace('\\', '/')
-        ws_back = self._initial_cwd.replace('/', '\\')
-        text = text.replace(ws_back, '/workspace')
-        text = text.replace(ws, '/workspace')
-        # Also replace any mixed-slash variant: normalize then replace.
-        text = re.sub(
-            re.escape(self._initial_cwd).replace('\\\\', r'[/\\]'),
-            WORKSPACE_VIRTUAL_ROOT,
-            text,
-        )
-        return text
+        return _ANSI_ESCAPE_RE.sub('', text)
 
     def _should_rewrite_python3_to_python(self) -> bool:
         """Return True only when running in Windows PowerShell mode.
@@ -467,7 +428,7 @@ class RuntimeExecutor:
                 'Action blocked by hardened_local policy: interactive directory changes must target an explicit path inside the workspace.',
             )
 
-        target = Path(self._rewrite_workspace_tokens(tokens[1]))
+        target = Path(tokens[1])
         predicted = (
             target.resolve()
             if target.is_absolute()
@@ -594,11 +555,27 @@ class RuntimeExecutor:
             self._same_cmd_failure_count = 1
 
         if self._same_cmd_failure_count >= 2:
+            scaffold_failure = self._detect_scaffold_setup_failure(
+                action.command,
+                observation.content,
+            )
+            pivot_hint = (
+                'Pivot now: this looks like a PowerShell command running in bash. '
+                'Rewrite it with bash equivalents or switch to a PowerShell terminal.'
+                if self._detect_powershell_in_bash_mismatch(
+                    action.command,
+                    observation.content,
+                )
+                else 'Pivot now: the scaffold step did not create a project. Run the generator alone, '
+                'inspect its output, and prefer a fresh subdirectory instead of ".".'
+                if scaffold_failure
+                else 'Pivot now: inspect available tools/interpreters, adjust environment, '
+                'or choose a different command/tool.'
+            )
             observation.content += (
                 '\n\n[REPEATED_COMMAND_FAILURE] '
                 f'The same command failed {self._same_cmd_failure_count} times with the same error signature. '
-                'Do NOT retry unchanged. Pivot now: inspect available tools/interpreters, '
-                'adjust environment, or choose a different command/tool.'
+                f'Do NOT retry unchanged. {pivot_hint}'
             )
 
     # Patterns for common environment errors → (regex, tag, guidance).
@@ -646,6 +623,24 @@ class RuntimeExecutor:
         if exit_code == 0:
             return
 
+        shell_mismatch = self._detect_powershell_in_bash_mismatch(
+            getattr(observation, 'command', ''),
+            content,
+        )
+        if shell_mismatch:
+            observation.content += f'\n\n[SHELL_MISMATCH] {shell_mismatch}'
+            return
+
+        scaffold_failure = self._detect_scaffold_setup_failure(
+            getattr(observation, 'command', ''),
+            content,
+        )
+        if scaffold_failure:
+            observation.content += (
+                f'\n\n[SCAFFOLD_SETUP_FAILED] {scaffold_failure}'
+            )
+            return
+
         for pattern, tag, guidance_template in self._ENV_ERROR_PATTERNS:
             m = re.search(pattern, content)
             if m:
@@ -655,6 +650,72 @@ class RuntimeExecutor:
                 observation.content += f'\n\n{tag} {guidance}'
                 # Only annotate the first matching pattern to avoid noise.
                 return
+
+    @staticmethod
+    def _detect_powershell_in_bash_mismatch(command: str, content: str) -> str | None:
+        """Return guidance when PowerShell syntax appears to be running in bash."""
+        if not command or not content:
+            return None
+
+        lower_content = content.lower()
+        if '/bin/bash' not in lower_content and 'bash:' not in lower_content:
+            return None
+        if 'command not found' not in lower_content and 'not recognized as' not in lower_content:
+            return None
+
+        missing_match = re.search(r'([A-Za-z][A-Za-z0-9-]*)\s*:\s*command not found', content)
+        if missing_match:
+            missing_cmd = missing_match.group(1)
+            if missing_cmd in _POWERSHELL_BUILTIN_COMMANDS:
+                return (
+                    f'{missing_cmd} is a PowerShell command and was not found because this '
+                    'session is bash. Use bash equivalents like cat/echo/ls/grep/cd, '
+                    'or switch to the PowerShell terminal.'
+                )
+
+        command_tokens = set(re.findall(r'\b[A-Za-z][A-Za-z0-9-]*\b', command))
+        for token in _POWERSHELL_BUILTIN_COMMANDS:
+            if token in command_tokens:
+                return (
+                    f'{token} is PowerShell syntax, not a missing bash package. '
+                    'Rewrite the command with bash equivalents like cat/echo/ls/grep/cd, '
+                    'or switch to the PowerShell terminal.'
+                )
+
+        return None
+
+    @staticmethod
+    def _detect_scaffold_setup_failure(command: str, content: str) -> str | None:
+        """Return guidance when a chained project scaffold never produced package.json."""
+        if not command or not content:
+            return None
+
+        lower_command = command.lower()
+        if '&&' not in lower_command:
+            return None
+
+        scaffold_tokens = (
+            'create-vite',
+            'npm create vite',
+            'npm init vite',
+            'create-next-app',
+            'create-react-app',
+            'cargo new',
+        )
+        if not any(token in lower_command for token in scaffold_tokens):
+            return None
+
+        lower_content = content.lower()
+        if 'could not read package.json' not in lower_content:
+            return None
+        if 'enoent' not in lower_content and 'no such file or directory' not in lower_content:
+            return None
+
+        return (
+            'The scaffold step did not create a project before follow-up install commands ran. '
+            'Run the generator by itself first, inspect its output, and if the current directory '
+            'is not empty scaffold into a fresh subdirectory instead of ".".'
+        )
 
     async def run(
         self, action: CmdRunAction
@@ -667,11 +728,6 @@ class RuntimeExecutor:
         observation extras when relevant.
         """
         try:
-            # Replace /workspace virtual path with the real workspace directory.
-            # Outside containers /workspace doesn't point at the temp workspace.
-            if action.command:
-                action.command = self._rewrite_workspace_tokens(action.command)
-
             # Rewrite python3->python only in Windows PowerShell mode.
             if self._should_rewrite_python3_to_python() and action.command:
                 action.command = re.sub(r'\bpython3\b', 'python', action.command)
@@ -857,7 +913,6 @@ class RuntimeExecutor:
             )
 
             if action.command:
-                action.command = self._rewrite_workspace_tokens(action.command)
                 predicted_cwd, policy_error = (
                     self._evaluate_interactive_terminal_command(
                         action.command,
@@ -900,7 +955,7 @@ class RuntimeExecutor:
             return scope_error
 
         try:
-            write_content = self._rewrite_workspace_tokens(action.input)
+            write_content = action.input
             # Add newline if not a control sequence, unless user explicitly handles it?
             # TerminalInputAction usually implies raw input.
             # If user types "ls", they usually mean "ls\n".
@@ -971,9 +1026,6 @@ class RuntimeExecutor:
         if bash_session is None:
             return ErrorObservation('Default shell session not initialized')
 
-        # Translate /workspace/ virtual paths to the actual workspace directory.
-        action.path = self._normalize_workspace_path(action.path)
-
         # Check for binary files (skip probe if path is missing — avoids noisy errors)
         if os.path.isfile(action.path) and is_binary(action.path):
             return ErrorObservation('ERROR_BINARY_FILE')
@@ -1008,9 +1060,6 @@ class RuntimeExecutor:
         bash_session = self.session_manager.get_session('default')
         if bash_session is None:
             return ErrorObservation('Default shell session not initialized')
-
-        # Translate /workspace/ virtual paths to the actual workspace directory.
-        action.path = self._normalize_workspace_path(action.path)
 
         working_dir = bash_session.cwd
         try:
@@ -1178,8 +1227,6 @@ class RuntimeExecutor:
         bash_session = self.session_manager.get_session('default')
         if bash_session is None:
             return ErrorObservation('Default shell session not initialized')
-        # Translate /workspace/ virtual paths to the actual workspace directory.
-        action.path = self._normalize_workspace_path(action.path)
         working_dir = bash_session.cwd
         try:
             filepath = self._resolve_workspace_file_path(action.path, working_dir)
@@ -1380,7 +1427,26 @@ def get_mcp_proxy() -> MCPProxyManager | None:
 async def lifespan(app: FastAPI):
     """Manage FastAPI application lifespan."""
     global initialization_task
-    logger.info('Starting server (initialization will run in background)...')
+    logger.info('Starting server (prewarm check for local models)...')
+
+    # Run prewarm check synchronously (in a thread) so we fail startup fast if
+    # prebundled model artifacts are missing.
+    try:
+        from backend.utils.model_prewarm import (
+            get_default_models_to_prewarm,
+            ensure_models_available,
+        )
+        prebundle_env = os.getenv('PREBUNDLED_MODELS', '')
+        models = get_default_models_to_prewarm()
+        if prebundle_env:
+            models += [m.strip() for m in prebundle_env.split(',') if m.strip()]
+        # snapshot_download is blocking; run it in a thread to avoid blocking the loop.
+        await asyncio.to_thread(ensure_models_available, models, True)
+        logger.info('Prewarm check succeeded: required models available locally')
+    except Exception as e:
+        logger.error('Prewarm model check failed: %s', e, exc_info=True)
+        # Raise to prevent yielding readiness — startup should fail fast when artifacts are missing.
+        raise
 
     # Start initialization in background task
     initialize_background = globals().get('_initialize_background')
@@ -1392,7 +1458,7 @@ async def lifespan(app: FastAPI):
         initialize_background = _noop_initialize
     initialization_task = asyncio.create_task(initialize_background(app))
 
-    # Yield immediately so server can start accepting requests
+    # Yield after prewarm so server can start accepting requests
     yield
 
     # Cleanup on shutdown

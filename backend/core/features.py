@@ -20,10 +20,7 @@ class FeatureUnavailableError(Exception):
         """
         self.feature_name = feature_name
         if message is None:
-            message = (
-                f"Feature '{feature_name}' is not available in App Core. "
-                'This feature is part of the App Pro/Enterprise editions.'
-            )
+            message = f"Feature '{feature_name}' is not available."
         super().__init__(message)
 
 
@@ -44,26 +41,8 @@ class FeatureFlags:
 
     @property
     def risk_assessment_enabled(self) -> bool:
-        """Check if security risk assessment is enabled.
-
-        Always False in App Core.
-        """
+        """Check if security risk assessment is enabled."""
         return False
-
-    def get_flags_for_ui(self) -> dict[str, dict[str, str | bool]]:
-        """Get feature flags formatted for client consumption.
-
-        Returns:
-            Dictionary of feature flags with metadata
-        """
-        return {
-            'security_risk_assessment': {
-                'enabled': self.risk_assessment_enabled,
-                'coming_soon': True,
-                'tier': 'pro',
-                'description': 'Security risk assessment for agent actions',
-            },
-        }
 
 
 def get_feature_flags(config: AppConfig | None = None) -> FeatureFlags:

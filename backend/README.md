@@ -7,7 +7,6 @@ This folder contains all backend-related code and resources for the Grinta proje
 ```
 backend/
 ├── core/            # Shared config, schemas, logging, and bootstrap
-├── gateway/         # FastAPI app, routes, middleware, sessions
 ├── orchestration/   # Session orchestration loop and services
 ├── engine/          # LLM-facing agent engine
 ├── ledger/          # Record stream, persistence, and serialization
@@ -15,9 +14,8 @@ backend/
 ├── execution/       # Local runtime execution and policy enforcement
 ├── inference/       # Model/provider abstraction layer
 ├── knowledge/       # Knowledge base logic
-├── persistence/     # File and database persistence
+├── persistence/     # Local file-backed persistence
 ├── playbooks/       # Built-in playbook content and engine
-├── governance/      # Governance critics and review helpers
 ├── security/        # Security analysis and policy checks
 ├── validation/      # Validation and code-quality checks
 ├── scripts/         # Backend utility scripts
@@ -45,7 +43,6 @@ make test-unit
 
 Backend scripts are organized in `backend/scripts/` subdirectories:
 
-- **`database/`** - Database setup, backup, and query scripts
 - **`setup/`** - Installation and configuration scripts
 - **`dev/`** - Development utilities and test helpers
 - **`verify/`** - Verification and check scripts
@@ -55,7 +52,6 @@ Backend scripts are organized in `backend/scripts/` subdirectories:
 Run them from the project root:
 ```bash
 python backend/scripts/build/compile_protos.py
-python backend/scripts/database/setup_database.py
 ```
 
 ## Development

@@ -24,6 +24,10 @@ class LocalFileStore(FileStore):
         self.root = root
         os.makedirs(self.root, exist_ok=True)
 
+    def get_base_path(self) -> str:
+        """Filesystem root for paths that bypass :meth:`get_full_path` (e.g. SQLite next to JSON)."""
+        return self.root
+
     def get_full_path(self, path: str) -> str:
         """Convert relative path to full filesystem path with security validation.
 
@@ -57,12 +61,16 @@ class LocalFileStore(FileStore):
             # Fail CLOSED — do NOT fall back to naive join on security rejection
             raise ValueError(f"Path validation rejected '{path}': {e}") from e
 
-    def write(self, path: str, contents: str | bytes) -> None:
+    def write(self, path: str, contents: str | bytes, *, fsync: bool = True) -> None:
         """Write file to local filesystem.
 
         Args:
             path: File path relative to storage root
             contents: Content to write
+            fsync: Whether to fsync the file before replacing.  Defaults to True
+                for crash-safe writes.  Pass ``False`` for high-frequency transient
+                data (e.g. streaming chunks) where speed matters more than
+                durability — the atomic rename still prevents corruption.
 
         """
         full_path = self.get_full_path(path)
@@ -72,39 +80,27 @@ class LocalFileStore(FileStore):
         # This prevents partially-written files (e.g., JSON event files) if the
         # process crashes mid-write.
         dir_name = os.path.dirname(full_path)
-        fd: int | None = None
-        tmp_path: str | None = None
-        try:
-            fd, tmp_path = tempfile.mkstemp(
-                prefix=f'.{os.path.basename(full_path)}.tmp.',
-                dir=dir_name,
-            )
-            mode = 'w' if isinstance(contents, str) else 'wb'
-            encoding = 'utf-8' if isinstance(contents, str) else None
+        mode = 'w' if isinstance(contents, str) else 'wb'
+        encoding = 'utf-8' if isinstance(contents, str) else None
 
-            with os.fdopen(fd, mode, encoding=encoding) as f:
-                fd = None
-                f.write(contents)
-                f.flush()
-                os.fsync(f.fileno())
+        # Create a temp file, write contents, then atomically replace.
+        # Note: if an error occurs during write, the temp file may remain
+        # on disk. This is acceptable for transient failures; manual
+        # cleanup or periodic temp-directory pruning can remove leftovers.
+        with tempfile.NamedTemporaryFile(
+            prefix=f'.{os.path.basename(full_path)}.tmp.',
+            dir=dir_name,
+            delete=False,
+            mode=mode,
+            encoding=encoding,
+        ) as tmpf:
+            tmp_path = tmpf.name
+            tmpf.write(contents)
+            tmpf.flush()
+            if fsync:
+                os.fsync(tmpf.fileno())
 
-            os.replace(tmp_path, full_path)
-            tmp_path = None
-        finally:
-            if fd is not None:
-                try:
-                    os.close(fd)
-                except Exception:
-                    logger.warning(
-                        'Failed to close temp file descriptor', exc_info=True
-                    )
-            if tmp_path is not None:
-                try:
-                    os.remove(tmp_path)
-                except Exception:
-                    logger.warning(
-                        'Failed to remove temp file %s', tmp_path, exc_info=True
-                    )
+        os.replace(tmp_path, full_path)
 
     def read(self, path: str) -> str:
         """Read file from local filesystem.

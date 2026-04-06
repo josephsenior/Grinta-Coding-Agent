@@ -138,9 +138,6 @@ class TestServiceAliasing(unittest.TestCase):
             self.ctrl.step_prerequisites, self.ctrl.services.step_prerequisites
         )
 
-    def test_budget_guard_alias(self):
-        self.assertIs(self.ctrl.budget_guard, self.ctrl.services.budget_guard)
-
     def test_event_router_alias(self):
         self.assertIs(self.ctrl.event_router, self.ctrl.services.event_router)
 
@@ -172,9 +169,6 @@ class TestServiceAliasing(unittest.TestCase):
         self.assertIs(
             self.ctrl.circuit_breaker_service, self.ctrl.services.circuit_breaker
         )
-
-    def test_telemetry_service_property(self):
-        self.assertIs(self.ctrl.telemetry_service, self.ctrl.services.telemetry)
 
     def test_observation_service_property(self):
         self.assertIs(self.ctrl.observation_service, self.ctrl.services.observation)
@@ -249,7 +243,7 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
     async def test_step_returns_early_if_step_guard_fails(self):
         self.ctrl.services.step_prerequisites.can_step.return_value = True
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=False)
-        self.ctrl.services.budget_guard.sync_with_metrics = MagicMock()
+        self.ctrl._sync_budget_flag_with_metrics = MagicMock()
         self.ctrl.services.action_execution.get_next_action = AsyncMock()
 
         await self.ctrl._step()
@@ -259,7 +253,7 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
     async def test_step_returns_early_if_control_flags_fail(self):
         self.ctrl.services.step_prerequisites.can_step.return_value = True
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
-        self.ctrl.services.budget_guard.sync_with_metrics = MagicMock()
+        self.ctrl._sync_budget_flag_with_metrics = MagicMock()
 
         with patch.object(
             self.ctrl, '_run_control_flags_safely', new_callable=AsyncMock
@@ -273,7 +267,7 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
     async def test_step_returns_early_if_no_action(self):
         self.ctrl.services.step_prerequisites.can_step.return_value = True
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
-        self.ctrl.services.budget_guard.sync_with_metrics = MagicMock()
+        self.ctrl._sync_budget_flag_with_metrics = MagicMock()
         self.ctrl.services.action_execution.get_next_action = AsyncMock(
             return_value=None
         )
@@ -290,7 +284,7 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
     async def test_step_full_success_path(self):
         self.ctrl.services.step_prerequisites.can_step.return_value = True
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
-        self.ctrl.services.budget_guard.sync_with_metrics = MagicMock()
+        self.ctrl._sync_budget_flag_with_metrics = MagicMock()
         mock_action = MagicMock()
         self.ctrl.services.action_execution.get_next_action = AsyncMock(
             return_value=mock_action
@@ -318,7 +312,7 @@ class TestStepExecution(unittest.IsolatedAsyncioTestCase):
     async def test_step_resets_retry_on_success(self):
         self.ctrl.services.step_prerequisites.can_step.return_value = True
         self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
-        self.ctrl.services.budget_guard.sync_with_metrics = MagicMock()
+        self.ctrl._sync_budget_flag_with_metrics = MagicMock()
         self.ctrl.services.action_execution.get_next_action = AsyncMock(
             return_value=MagicMock()
         )

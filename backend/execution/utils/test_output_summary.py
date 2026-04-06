@@ -1,7 +1,7 @@
 """Shared parsing of test-runner stdout for truncation and review.
 
 Patterns are duplicated in a single module so ``truncate_cmd_output`` and
-``SuitePassCritic`` stay aligned and regressions are caught by one test suite.
+the test-output summarizers stay aligned and regressions are caught by one test suite.
 """
 
 from __future__ import annotations

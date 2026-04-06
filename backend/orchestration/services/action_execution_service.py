@@ -232,13 +232,7 @@ class ActionExecutionService:
             ctx = pipeline.create_context(action, self._context.state)
             if ctx is not None:
                 self._context.register_action_context(action, ctx)
-                await pipeline.run_plan(ctx)
                 await self._context.iteration_service.apply_dynamic_iterations(ctx)
-                if ctx.blocked:
-                    self._context.telemetry_service.handle_blocked_invocation(
-                        action, ctx
-                    )
-                    return
         await self._context.run_action(action, ctx)
 
     async def _handle_context_window_error(self, exc: Exception) -> Action | None:

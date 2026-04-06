@@ -5,8 +5,9 @@ from backend.engine.tools.common import create_tool_definition
 from backend.inference.tool_names import FINISH_TOOL_NAME
 
 _FINISH_DESCRIPTION = (
-    'Signal task completion. Include a summary of actions taken, results, and any next steps. '
-    'Use when the task is done or you cannot proceed further.'
+    'Signal task completion. Include a summary of actions taken and results. '
+    'Use only when the task is fully done. '
+    'To report a blocker or ask the user for input, use communicate_with_user instead.'
 )
 
 

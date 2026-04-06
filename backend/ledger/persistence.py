@@ -21,6 +21,21 @@ if TYPE_CHECKING:
     from backend.persistence import FileStore
 
 
+def _file_store_fs_root(file_store: FileStore) -> str | None:
+    """Directory for session-relative SQLite paths; ``None`` if store is not disk-backed."""
+    root = getattr(file_store, 'root', '') or ''
+    if isinstance(root, str) and root.strip():
+        return root
+    if hasattr(file_store, 'get_base_path'):
+        try:
+            p = file_store.get_base_path()
+            if isinstance(p, str) and p.strip():
+                return p
+        except Exception:
+            pass
+    return None
+
+
 class EventPersistence:
     """Handles durable event persistence with WAL crash recovery.
 
@@ -111,19 +126,19 @@ class EventPersistence:
             try:
                 from backend.persistence.sqlite_event_store import SQLiteEventStore
 
-                events_dir = get_conversation_events_dir(sid, user_id)
-                db_path = os.path.join(
-                    file_store.get_base_path()
-                    if hasattr(file_store, 'get_base_path')
-                    else '.',
-                    events_dir,
-                    'events.db',
-                )
-                self._sqlite_store = SQLiteEventStore(db_path=db_path)
-                logger.info(
-                    'SQLite event accelerator enabled for session %s',
-                    sid,
-                )
+                fs_root = _file_store_fs_root(file_store)
+                if fs_root:
+                    events_dir = get_conversation_events_dir(sid, user_id)
+                    db_path = os.path.join(
+                        fs_root,
+                        events_dir,
+                        'events.db',
+                    )
+                    self._sqlite_store = SQLiteEventStore(db_path=db_path)
+                    logger.info(
+                        'SQLite event accelerator enabled for session %s',
+                        sid,
+                    )
             except Exception as exc:
                 logger.warning(
                     'Failed to initialise SQLite event store, using file-based fallback: %s',

@@ -95,6 +95,7 @@ def _setup_runtime_and_repo(
     event_stream: EventStream | None = None,
     env_vars: dict[str, str] | None = None,
     user_id: str | None = None,
+    inline_event_delivery: bool = False,
 ) -> RuntimeAcquireResult:
     """Setup runtime and repository directory."""
     repo_tokens = (
@@ -125,6 +126,7 @@ def _setup_runtime_and_repo(
         event_stream=event_stream,
         env_vars=env_vars,
         user_id=user_id,
+        inline_event_delivery=inline_event_delivery,
     )
     runtime = acquire_result.runtime
     call_async_from_sync(runtime.connect)
@@ -142,6 +144,29 @@ async def _setup_memory_and_mcp(
     agent,
 ) -> Memory:
     """Setup memory and MCP tools."""
+    memory = await _setup_memory(
+        config_,
+        runtime,
+        session_id,
+        repo_directory,
+        memory,
+        conversation_instructions,
+        agent,
+    )
+    await _setup_mcp_tools(agent, runtime, memory)
+    return memory
+
+
+async def _setup_memory(
+    config_: AppConfig,
+    runtime: Runtime,
+    session_id: str,
+    repo_directory: str | None,
+    memory: Memory | None,
+    conversation_instructions: str | None,
+    agent,
+) -> Memory:
+    """Setup conversation memory without waiting for MCP warmup."""
     event_stream = runtime.event_stream
     if event_stream is None:
         raise RuntimeError('Runtime does not have an event stream')
@@ -156,11 +181,25 @@ async def _setup_memory_and_mcp(
             conversation_instructions=conversation_instructions,
             working_dir=config_.workspace_mount_path_in_runtime,
         )
+    _warm_agent_vector_memory(agent)
+    return memory
 
+
+async def _setup_mcp_tools(agent, runtime: Runtime, memory: Memory) -> None:
+    """Warm MCP tools after chat becomes usable."""
     if agent.config.enable_mcp:
         await add_mcp_tools_to_agent(agent, runtime, memory)
 
-    return memory
+
+def _warm_agent_vector_memory(agent) -> None:
+    """Start optional vector-memory warmup outside the critical agent-init path."""
+    conversation_memory = getattr(agent, 'conversation_memory', None)
+    starter = getattr(conversation_memory, 'start_vector_memory_warmup', None)
+    if callable(starter):
+        try:
+            starter()
+        except Exception:
+            logger.debug('Vector-memory warmup skipped', exc_info=True)
 
 
 def _setup_replay_events(
@@ -321,6 +360,7 @@ def _initialize_session_components(
         config_, session_id, None
     )
     agent = create_agent(config_, llm_registry)
+    _warm_agent_vector_memory(agent)
     return session_id, llm_registry, conversation_stats, config_, agent
 
 
@@ -331,6 +371,8 @@ def _setup_runtime_for_controller(
     headless_mode: bool,
     agent: Agent,
     runtime: Runtime | None,
+    *,
+    inline_event_delivery: bool = False,
 ) -> tuple[Runtime, str | None, RuntimeAcquireResult | None]:
     """Setup runtime for controller."""
     if runtime is not None:
@@ -341,6 +383,7 @@ def _setup_runtime_for_controller(
         llm_registry,
         agent,
         headless_mode,
+        inline_event_delivery=inline_event_delivery,
     )
     return acquire_result.runtime, acquire_result.repo_directory, acquire_result
 

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from backend.orchestration.conversation_stats import ConversationStats
 from backend.inference.llm_registry import LLMRegistry
 from backend.persistence import get_file_store
+from backend.persistence.locations import get_local_data_root
 
 if TYPE_CHECKING:
     from backend.core.config.app_config import AppConfig
@@ -59,10 +60,7 @@ def create_registry_and_conversation_stats(
     llm_registry = LLMRegistry(user_config, agent_cls)
     file_store = get_file_store(
         file_store_type=config.file_store,
-        local_data_root=config.local_data_root,
-        file_store_web_hook_url=config.file_store_web_hook_url,
-        file_store_web_hook_headers=config.file_store_web_hook_headers,
-        file_store_web_hook_batch=config.file_store_web_hook_batch,
+        local_data_root=get_local_data_root(config),
     )
     conversation_stats = ConversationStats(file_store, sid, user_id)
     llm_registry.subscribe(conversation_stats.register_llm)

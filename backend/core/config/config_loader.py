@@ -40,6 +40,7 @@ from backend.core.config.llm_config import LLMConfig
 from backend.core.config.model_rebuild import rebuild_config_models
 from backend.core.constants import JWT_SECRET_FILE as JWT_SECRET
 from backend.persistence import get_file_store
+from backend.persistence.locations import get_local_data_root
 from backend.utils.import_utils import get_impl
 
 if TYPE_CHECKING:
@@ -313,6 +314,9 @@ def finalize_config(cfg: AppConfig) -> None:
     _configure_llm_logging(cfg)
     _ensure_cache_directory(cfg)
     _configure_jwt_secret(cfg)
+    # Persist the effective store root on the config object so reload paths (e.g.
+    # /settings) match get_local_data_root() and never leave legacy "." / sessions.
+    cfg.local_data_root = get_local_data_root(cfg)
 
 
 def _configure_llm_logging(cfg: AppConfig) -> None:
@@ -329,7 +333,7 @@ def _configure_jwt_secret(cfg: AppConfig) -> None:
     if not cfg.jwt_secret:
         cfg.jwt_secret = SecretStr(
             get_or_create_jwt_secret(
-                get_file_store(cfg.file_store, cfg.local_data_root)
+                get_file_store(cfg.file_store, get_local_data_root(cfg))
             )
         )
 

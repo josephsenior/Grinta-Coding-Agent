@@ -12,11 +12,13 @@ from backend.cli.config_manager import (
     _PROVIDERS,
     add_mcp_server,
     get_budget,
+    get_cli_tool_icons_enabled,
     get_current_model,
     get_masked_api_key,
     get_mcp_servers,
     update_api_key,
     update_budget,
+    update_cli_tool_icons,
     update_model,
 )
 from backend.core.config import load_app_config
@@ -100,13 +102,16 @@ def _render_ai_tab(console: Console) -> None:
     table.add_row('Model', get_current_model(config))
     table.add_row('API Key', get_masked_api_key(config))
     table.add_row('Budget/task', get_budget(config))
+    icons = 'on' if get_cli_tool_icons_enabled(config) else 'off'
+    table.add_row('Tool icons', icons)
 
     console.print(
         Panel(table, title='[bold]AI Configuration[/bold]', border_style='cyan')
     )
     console.print()
     console.print(
-        '[dim]Commands:  [bold]m[/bold] change model  │  [bold]k[/bold] change api key  │  [bold]b[/bold] set budget  │  [bold]q[/bold] back[/dim]'
+        '[dim]Commands:  [bold]m[/bold] model  │  [bold]k[/bold] api key  │  [bold]b[/bold] budget  │  '
+        '[bold]i[/bold] tool icons  │  [bold]q[/bold] back[/dim]'
     )
 
 
@@ -161,6 +166,12 @@ def _handle_ai_command(console: Console) -> bool:
             console.print('[green]  Budget updated.[/green]')
         except ValueError:
             console.print('[red]  Invalid number.[/red]')
+    elif cmd == 'i':
+        cfg = load_app_config()
+        new_val = not get_cli_tool_icons_enabled(cfg)
+        update_cli_tool_icons(new_val)
+        state = 'on' if new_val else 'off'
+        console.print(f'[green]  Tool icons {state}.[/green]')
     return True
 
 

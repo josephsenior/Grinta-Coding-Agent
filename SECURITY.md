@@ -2,7 +2,7 @@
 
 ## Reporting Vulnerabilities
 
-If you discover a security vulnerability in App, please report it responsibly.
+If you discover a security vulnerability in Grinta, please report it responsibly.
 
 **DO NOT** open a public issue for security vulnerabilities.
 
@@ -43,8 +43,8 @@ If you discover a security vulnerability in App, please report it responsibly.
 - Request size limits and timeouts
 
 ### Runtime Boundary
-- App does not currently provide sandbox or container isolation for local command execution.
-- The local runtime executes with the permissions of the user running App.
+- Grinta does not currently provide sandbox or container isolation for local command execution.
+- The local runtime executes with the permissions of the user running Grinta.
 - `hardened_local` improves local safety with workspace-scoped policy enforcement, but it is not equivalent to a sandbox.
 - Treat the current runtime as appropriate for trusted local development workflows, not hostile repositories.
 

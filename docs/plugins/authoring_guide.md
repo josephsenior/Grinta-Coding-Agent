@@ -1,6 +1,6 @@
-# App Plugin Authoring Guide
+# Grinta Plugin Authoring Guide
 
-App supports a lightweight, hook-based plugin system that allows you to extend the agent's behavior, inspect events, and modify actions.
+Grinta supports a lightweight, hook-based plugin system that allows you to extend the agent's behavior, inspect events, and modify actions.
 
 ## 1. Plugin Structure
 

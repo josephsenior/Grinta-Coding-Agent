@@ -665,7 +665,10 @@ class Runtime(
         """
         # Handle special action types
         if isinstance(action, AgentThinkAction):
-            return AgentThinkObservation('Your thought has been logged.')
+            return AgentThinkObservation(
+                'Your thought has been logged.',
+                suppress_cli=getattr(action, 'suppress_cli', False),
+            )
 
         if isinstance(action, TaskTrackingAction):
             return self._handle_task_tracking_action(action)

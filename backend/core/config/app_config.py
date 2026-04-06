@@ -109,7 +109,7 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_LOCAL_DATA_ROOT,
         description=(
             'Filesystem root for LocalFileStore (e.g. sessions/). '
-            'Project-aware entrypoints set this to <project_root>/.grinta/storage.'
+            'Project-aware entrypoints set this to ~/.grinta/workspaces/<id>/storage.'
         ),
     )
     enable_browser: bool = Field(default=DEFAULT_ENABLE_BROWSER)
@@ -189,15 +189,6 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     workspace_mount_path_in_runtime: str | None = Field(
         default=None, description='Workspace mount path in runtime'
     )
-    file_store_web_hook_url: str | None = Field(
-        default=None, description='File store webhook URL'
-    )
-    file_store_web_hook_headers: dict[str, str] | None = Field(
-        default=None, description='File store webhook headers'
-    )
-    file_store_web_hook_batch: bool = Field(
-        default=False, description='Enable file store webhook batching'
-    )
     # Trajectory replay/save configuration
     replay_trajectory_path: str | None = Field(
         default=None, description='Path to trajectory file for replay'
@@ -211,6 +202,10 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     # CLI configuration
     cli_multiline_input: bool = Field(
         default=False, description='Enable multiline input in CLI'
+    )
+    cli_tool_icons: bool = Field(
+        default=True,
+        description='Show emoji in CLI tool activity headlines (streaming + tool JSON)',
     )
     # MCP configuration (host:port; default matches local dev server on :3000)
     mcp_host: str = Field(default=DEFAULT_MCP_HOST, description='MCP host address')

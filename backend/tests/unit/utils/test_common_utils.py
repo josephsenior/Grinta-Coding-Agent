@@ -9,6 +9,7 @@ Tests cover:
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import cast
 from unittest.mock import Mock, patch
 
@@ -41,9 +42,6 @@ def base_config() -> AppConfig:
     # Mock other config fields
     config.file_store = 'local'
     config.local_data_root = '/tmp/files'
-    config.file_store_web_hook_url = None
-    config.file_store_web_hook_headers = None
-    config.file_store_web_hook_batch = 10
 
     return config
 
@@ -322,10 +320,7 @@ class TestCreateRegistryAndStats:
         # Verify get_file_store was called with config values
         mock_get_file_store.assert_called_once_with(
             file_store_type='local',
-            local_data_root='/tmp/files',
-            file_store_web_hook_url=None,
-            file_store_web_hook_headers=None,
-            file_store_web_hook_batch=10,
+            local_data_root=str(Path('/tmp/files').resolve()),
         )
 
     @patch('backend.utils.core_utils.get_file_store')

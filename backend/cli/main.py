@@ -12,6 +12,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import os
+import shutil
 import sys
 import time
 import warnings
@@ -84,138 +86,80 @@ def _configure_redirected_streams(*streams: object | None) -> None:
 
 
 def show_grinta_splash(console: Any | None = None) -> None:
-    """Render the GRINTA boot splash — animated drop-in on TTY, static otherwise."""
+    """Render the GRINTA boot splash — figlet inside a heavy-border panel."""
     from rich.align import Align
+    from rich.box import HEAVY
     from rich.console import Group
-    from rich.live import Live
+    from rich.panel import Panel
     from rich.text import Text
 
     console = console or Console()
 
-    _RED = 'bold #c0152c'
-    _WHT = 'bold white'
-    _EBG = 'on white'              # eye sclera: white background
-    _EPU = 'bold black on white'   # eye pupil:  black dot on white
+    _R = 'bold #c0152c'
+    _D = '#c0152c'
 
-    def _r(s: str) -> Text:
-        return Text(s, style=_RED)
-
-    def _m(*parts: tuple[str, str]) -> Text:
-        t = Text()
-        for txt, sty in parts:
-            t.append(txt, style=sty)
-        return t
-
-    R, W = _RED, _WHT
-
-    # -- figlet title (pyfiglet is a project dep; fallback if missing) --------
     try:
         import pyfiglet as _pyfiglet
         _raw = _pyfiglet.figlet_format('GRINTA', font='slant').splitlines()
         while _raw and not _raw[-1].strip():
             _raw.pop()
-        _figlet_lines: list[Any] = [_r(line) for line in _raw]
+        _figlet_lines: list[str] = _raw
     except Exception:
         _figlet_lines = [
-            _r('  ____ ____  ___ _   _ _____  _'),
-            _r(' / ___|  _ \\|_ _| \\ | |_   _|/ \\'),
-            _r('| |  _| |_) || ||  \\| | | | / _ \\'),
-            _r('| |_| |  _ < | || |\\  | | |/ ___ \\'),
-            _r(' \\____|_| \\_\\___|_| \\_| |_/_/   \\_\\'),
+            '  ____ ____  ___ _   _ _____  _',
+            ' / ___|  _ \\|_ _| \\ | |_   _|/ \\',
+            '| |  _| |_) || ||  \\| | | | / _ \\',
+            '| |_| |  _ < | || |\\  | | |/ ___ \\',
+            ' \\____|_| \\_\\___|_| \\_| |_/_/   \\_\\',
         ]
 
-    #  Different line widths create the anvil silhouette via Align.center:
-    #
-    #  head  56w  ████████████████████████████████████████████████████████
-    #  head  56w  ████████████████████████████████████████████████████████
-    #  eyes  56w  █████████████████ [ ● ] ███████████ [ ● ] ██████████████
-    #  smile 56w  ██████████████████████ ╰────────╯ ████████████████████████
-    #  chin  56w  ████████████████████████████████████████████████████████
-    #  body  42w    ████████                          ████████
-    #  term  42w    ████████            >_            ████████
-    #  body  42w    ████████                          ████████
-    #  close 42w    ██████████████████████████████████████████
-    #  waist 20w              ████████████████████
-    #  feet  22w              ████              ████
-    #  base  24w          ██████████    ██████████
-    _LINES: list[Any] = [
-        # ── HEAD: widest section — overhangs body wings by 7 chars each side ─
-        _r('████████████████████████████████████████████████████████'),  # 56
-        _r('████████████████████████████████████████████████████████'),  # 56
-        # ── EYES: 5-char white sclera + black pupil carved into solid red ──
-        # layout: 17 red + [5 eye] + 11 red + [5 eye] + 18 red = 56
-        _m(
-            ('█████████████████', R),
-            (' ', _EBG), (' ', _EBG), ('●', _EPU), (' ', _EBG), (' ', _EBG),
-            ('███████████', R),
-            (' ', _EBG), (' ', _EBG), ('●', _EPU), (' ', _EBG), (' ', _EBG),
-            ('██████████████████', R),
-        ),  # 17+5+11+5+18 = 56
-        # ── SMILE: white arc centred between the eyes ─────────────────────
-        _m(('██████████████████████', R), ('╰────────╯', W), ('████████████████████████', R)),  # 56
-        # ── CHIN: closes the face block ───────────────────────────────────
-        _r('████████████████████████████████████████████████████████'),  # 56
-        # ── BODY WINGS: side extensions, open centre ──────────────────────
-        _r('████████                          ████████'),               # 42
-        # ── TERMINAL PROMPT: exactly centred ──────────────────────────────
-        _m(('████████            ', R), ('>_', W), ('            ████████', R)),                # 42
-        _r('████████                          ████████'),               # 42
-        # ── body closes ───────────────────────────────────────────────────
-        _r('██████████████████████████████████████████'),               # 42
-        # ── waist / pedestal: narrows sharply ─────────────────────────────
-        _r('████████████████████'),                                     # 20
-        # ── two rectangular feet ──────────────────────────────────────────
-        _r('████              ████'),                                   # 22
-        _r('██████████    ██████████'),                                 # 24
-        # ── spacer ────────────────────────────────────────────────────────
-        _r(''),
-        # ── GRINTA figlet title (slant font) ──────────────────────────────
-        *_figlet_lines,
-    ]
-    _SUBTITLE = 'think · code · ship'
-    _HINT     = 'Type a task or press Tab after / for commands'
+    _TAGLINE = 'AI agent. Pure grit.'
+    _HINT    = 'Type /help to explore commands'
 
-    def _frame(visible: int, *, subtitle: bool = False, flash: bool = False) -> Any:
-        rows: list = [Text('')]
-        for i, raw in enumerate(_LINES):
-            if i >= visible:
-                rows.append(Text(''))
-                continue
-            if flash:
-                plain = raw.plain if isinstance(raw, Text) else raw
-                rows.append(Align.center(Text(plain, style='bold white')))
-            elif isinstance(raw, Text):
-                rows.append(Align.center(raw))
+    def _body(visible: int, *, tagline: bool = False) -> Group:
+        figlet = Text()
+        for i, line in enumerate(_figlet_lines):
+            if i > 0:
+                figlet.append('\n')
+            if i < visible:
+                figlet.append(line, style=_R)
             else:
-                rows.append(Align.center(Text(raw, style='bold red')))
-        rows.append(Text(''))
-        if subtitle:
-            rows.append(Align.center(Text(_SUBTITLE, style='bold red')))
-            rows.append(Align.center(Text(_HINT, style='dim')))
+                figlet.append(' ' * len(line))
+        parts: list = [Align.center(figlet), Text('')]
+        if tagline:
+            parts.append(Text(_TAGLINE, style='italic #c0152c', justify='center'))
         else:
+            parts.append(Text(''))
+        return Group(*parts)
+
+    def _frame(visible: int, *, tagline: bool = False, hint: bool = False) -> Any:
+        panel = Panel(
+            _body(visible, tagline=tagline),
+            title='[bold #c0152c] >_ [/]',
+            border_style=_D,
+            box=HEAVY,
+            padding=(1, 4),
+        )
+        rows: list = [Text(''), Align.center(panel), Text('')]
+        if hint:
+            rows.append(Align.center(Text(_HINT, style='dim')))
             rows.append(Text(''))
-            rows.append(Text(''))
-        rows.append(Text(''))
         return Group(*rows)
 
-    # Non-interactive (piped / redirected): print static splash and return.
     if not console.is_terminal:
-        console.print(_frame(len(_LINES), subtitle=True))
+        console.print(_frame(len(_figlet_lines), tagline=True, hint=True))
         return
 
-    # Animated: lines drop in one by one, brief flash, subtitle fades in.
+    from rich.live import Live
+
     with Live(_frame(0), console=console, refresh_per_second=30, transient=False) as live:
-        for i in range(1, len(_LINES) + 1):
+        for i in range(1, len(_figlet_lines) + 1):
             live.update(_frame(i))
-            time.sleep(0.055)
-        # Quick white flash → settle to red
-        live.update(_frame(len(_LINES), flash=True))
-        time.sleep(0.08)
-        live.update(_frame(len(_LINES)))
-        time.sleep(0.06)
-        # Subtitle appears
-        live.update(_frame(len(_LINES), subtitle=True))
-        time.sleep(0.15)
+            time.sleep(0.08)
+        live.update(_frame(len(_figlet_lines), tagline=True))
+        time.sleep(0.1)
+        live.update(_frame(len(_figlet_lines), tagline=True, hint=True))
+        time.sleep(0.2)
 
 
 def _setup_logging() -> None:
@@ -288,13 +232,25 @@ async def _async_main(
     )
     from backend.cli.repl import Repl
     from backend.core.config import load_app_config
+    from backend.persistence.locations import get_project_local_data_root
 
     # Backend imports above trigger module-level logger setup — re-silence.
     _silence_all_loggers()
 
-    console = Console(style='on #202A44')
+    try:
+        term_cols = shutil.get_terminal_size().columns
+        # Narrower render width + inset keeps prose readable on ultra-wide terminals.
+        console = Console(width=max(72, min(116, term_cols - 8)))
+    except OSError:
+        console = Console()
     show_grinta_splash(console)
     initial_input = _read_piped_stdin()
+
+    resolved_project = (
+        str(Path(project).resolve()) if project else str(Path.cwd().resolve())
+    )
+    # Tools reload config in-process; pin the shell workspace so it matches this session.
+    os.environ['PROJECT_ROOT'] = resolved_project
 
     # -- load config -------------------------------------------------------
     config = load_app_config()
@@ -303,13 +259,8 @@ async def _async_main(
     if model:
         llm_cfg = config.get_llm_config()
         llm_cfg.model = model
-    resolved_project = (
-        str(Path(project).resolve()) if project else str(Path.cwd().resolve())
-    )
     config.project_root = resolved_project
-    # local_data_root intentionally NOT overridden here — it stays at the
-    # user-level default (~/.grinta/storage) so Grinta never pollutes the
-    # user's workspace with sessions/ or storage/ directories.
+    config.local_data_root = get_project_local_data_root(resolved_project)
 
     # -- onboarding if needed ----------------------------------------------
     if needs_onboarding(config):
@@ -328,6 +279,7 @@ async def _async_main(
                 llm_cfg = config.get_llm_config()
                 llm_cfg.model = model
             config.project_root = resolved_project
+            config.local_data_root = get_project_local_data_root(resolved_project)
             # Re-check after onboarding.
             if needs_onboarding(config):
                 console.print('[red]No API key configured. Exiting.[/red]')

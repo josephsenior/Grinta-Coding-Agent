@@ -5,11 +5,26 @@ import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-_THINK_TAG_RE = re.compile(r'<think>.*?</think>', re.DOTALL | re.IGNORECASE)
+_THINK_TAG_RE = re.compile(r'<redacted_thinking>.*?</redacted_thinking>', re.DOTALL | re.IGNORECASE)
+
+_THINK_INNER_RE = re.compile(
+    r'<redacted_thinking>\s*(.*?)\s*</redacted_thinking>',
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def extract_redacted_thinking_inner(text: str) -> str:
+    """Return inner text of all ``<redacted_thinking>...</redacted_thinking>`` blocks."""
+    parts = [
+        m.group(1).strip()
+        for m in _THINK_INNER_RE.finditer(text or '')
+        if m.group(1).strip()
+    ]
+    return '\n\n'.join(parts)
 
 
 def strip_thinking_tags(text: str) -> str:
-    """Remove <think>...</think> blocks emitted by reasoning models (e.g. MiniMax, DeepSeek R1).
+    """Remove <redacted_thinking>...</redacted_thinking> blocks emitted by reasoning models (e.g. MiniMax, DeepSeek R1).
 
     These blocks contain chain-of-thought that should not appear in the final
     user-facing response.  The surrounding whitespace is collapsed so the
@@ -93,30 +108,24 @@ def build_tool_call_metadata(
 
 
 def extract_thought_from_message(assistant_msg: Any) -> str:
-    """Extract thought text from assistant message content."""
-    content = getattr(assistant_msg, 'content', None)
-    return _coerce_message_content_text(content)
+    """LLM thinking tokens only: inner ``<redacted_thinking>...</redacted_thinking>`` text.
 
-
-def _coerce_message_content_text(content: Any) -> str:
-    """Coerce provider-specific message content shapes into plain text.
-
-    Supports:
-    - ``str``
-    - ``list[str]``
-    - ``list[dict]`` with ``{"text": ...}`` (any ``type``)
-    - ``dict`` with ``{"text": ...}``
-
-    ``<think>...</think>`` blocks emitted by reasoning models are stripped so
-    they never appear in the user-facing response.
+    Plain ``message.content`` without those tags is not treated as thinking — nothing
+    is merged into ``action.thought`` (no duplicate command lines in the CLI).
     """
+    raw = _raw_message_content_text(getattr(assistant_msg, 'content', None))
+    return extract_redacted_thinking_inner(raw).strip()
+
+
+def _raw_message_content_text(content: Any) -> str:
+    """Like :func:`_coerce_message_content_text` but leaves tags intact."""
     if content is None:
         return ''
     if isinstance(content, str):
-        return strip_thinking_tags(content)
+        return content
     if isinstance(content, dict):
         text = content.get('text')
-        return strip_thinking_tags(text) if isinstance(text, str) else ''
+        return text if isinstance(text, str) else ''
     if isinstance(content, list):
         parts: list[str] = []
         for item in content:
@@ -128,28 +137,43 @@ def _coerce_message_content_text(content: Any) -> str:
                 text = item.get('text')
                 if isinstance(text, str) and text:
                     parts.append(text)
-        return strip_thinking_tags(''.join(parts))
+        return ''.join(parts)
     return ''
+
+
+def _coerce_message_content_text(content: Any) -> str:
+    """Coerce provider-specific message content shapes into plain text.
+
+    Supports:
+    - ``str``
+    - ``list[str]``
+    - ``list[dict]`` with ``{"text": ...}`` (any ``type``)
+    - ``dict`` with ``{"text": ...}``
+
+    ``<redacted_thinking>...</redacted_thinking>`` blocks emitted by reasoning models are stripped so
+    they never appear in the user-facing response.
+    """
+    return strip_thinking_tags(_raw_message_content_text(content))
 
 
 def process_tool_calls(
     assistant_msg: Any,
     response: ModelResponse,
     create_action_fn: Callable[[Any, dict[str, Any]], Action],
-    extract_thought_fn: Callable[[str | None], str],
+    extract_thought_fn: Callable[[Any], str],
     combine_thought_fn: Callable[[Action, str], Action],
 ) -> list[Action]:
     """Common logic for processing tool calls and converting them to actions."""
     actions: list[Action] = []
-    thought = extract_thought_fn(getattr(assistant_msg, 'content', None))
+    thought = extract_thought_fn(assistant_msg)
 
     for i, tool_call in enumerate(assistant_msg.tool_calls):
         logger.debug('Processing tool call: %s', tool_call)
         arguments = parse_tool_call_arguments(tool_call)
         action = create_action_fn(tool_call, arguments)
 
-        # Add thought to first action
-        if i == 0:
+        # Attach thinking tokens to first tool call only when the model emitted them.
+        if i == 0 and thought:
             action = combine_thought_fn(action, thought)
 
         # Add tool call metadata
@@ -185,15 +209,22 @@ def common_response_to_actions(
             assistant_msg,
             response,
             create_action_fn,
-            lambda _: extract_thought_from_message(assistant_msg),
+            extract_thought_from_message,
             combine_thought_fn,
         )
     else:
         content = getattr(assistant_msg, 'content', None)
         text_content = _coerce_message_content_text(content)
+        cot = extract_redacted_thinking_inner(_raw_message_content_text(content)).strip()
         from backend.ledger.action import MessageAction
 
-        actions = [MessageAction(content=text_content, wait_for_response=True)]
+        actions = [
+            MessageAction(
+                content=text_content,
+                thought=cot,
+                wait_for_response=bool(text_content.strip()),
+            )
+        ]
 
     set_response_id_for_actions(actions, response)
     return actions

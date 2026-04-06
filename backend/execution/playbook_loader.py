@@ -18,6 +18,7 @@ from backend.ledger.observation import (
     ErrorObservation,
     FileReadObservation,
 )
+from backend.core.workspace_resolution import workspace_grinta_root
 from backend.playbooks.engine import BasePlaybook, load_playbooks_from_dir
 from backend.utils.async_utils import GENERAL_TIMEOUT, call_async_from_sync
 
@@ -139,7 +140,7 @@ class PlaybookLoaderMixin:
         For example, if the repository is github.com/acme-co/api, it will also check for
         github.com/acme-co/.grinta and load playbooks from there if it exists.
         """
-        playbooks_dir = self.workspace_root / '.grinta' / 'playbooks'
+        playbooks_dir = workspace_grinta_root(self.workspace_root) / 'playbooks'
         repo_root = None
         loaded_playbooks: list[BasePlaybook] = []
         if selected_repository:

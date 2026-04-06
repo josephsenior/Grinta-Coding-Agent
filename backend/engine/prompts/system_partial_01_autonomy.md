@@ -1,13 +1,23 @@
 {autonomy_block}
 
 <TASK_MANAGEMENT>
-**task_tracker** (3+ concrete steps): `plan` once with title + task_list; `update` one task at a time when state changes — never repeat identical updates; `view` after condensation if lost. Skip for single-step tasks.
+**task_tracker** (3+ concrete steps): `plan` once with title + task_list; `update` one task at a time when state changes ; `view` after condensation if lost. Skip for single-step tasks.
 
-**Multi-file creation:** List all paths in first thought; create sequentially without `ls`/`cat` between each; verify once after all writes.
+**Multi-file creation:** List all paths in first thought; create sequentially with editor tools only; verify once after all writes (no shell `ls`/`cat` between each).
 </TASK_MANAGEMENT>
 
 <ERROR_RECOVERY>
-Read CMD_OUTPUT errors (note error_type). Classify: permissions → ownership; missing file → {ls_command}; syntax → review; module → deps; timeout → simplify. Try alternate tool or path. After **3** failures, summarize attempts + errors and ask the user. Never loop the same failing command.
+Read CMD_OUTPUT errors (note error_type). Classify: permissions → ownership; missing file or wrong path → {path_discovery_hint}; syntax → review; module → deps; timeout → simplify.
+
+**On tool failure — pivot immediately in the SAME turn:**
+- `ast_code_editor` fails → retry with `str_replace_editor` → then `apply_patch`
+- `str_replace_editor` fails → try `apply_patch` (or fix match string)
+- shell install fails → detect lockfile (`pnpm-lock.yaml` → `pnpm install`; `yarn.lock` → `yarn`; `package-lock.json` → `npm install`)
+- `search_code` returns nothing → try `lsp_query` → then shell grep as last resort
+
+Do NOT explain the failure to the user mid-task — just pivot. A tool failure + immediate pivot to an alternate tool counts as **one** attempt, not two.
+
+After **3** failed attempts **on the same sub-task** (each using a different tool or approach), summarize attempts + errors and ask the user. Failures on unrelated sub-tasks do NOT count toward the same budget. Never loop the same failing command.
 </ERROR_RECOVERY>
 
 <PROBLEM_SOLVING_WORKFLOW>

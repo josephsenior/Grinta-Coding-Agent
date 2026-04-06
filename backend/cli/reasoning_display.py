@@ -11,35 +11,7 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-# Tool-specific icons for the spinner line
-_TOOL_ICONS: dict[str, str] = {
-    'read': '👁 ',
-    'edit': '✏️ ',
-    'write': '✏️ ',
-    'run': '⚡',
-    'bash': '⚡',
-    'terminal': '💻',
-    'search': '🔍',
-    'grep': '🔍',
-    'find': '🔍',
-    'lsp': '🔍',
-    'browse': '🌐',
-    'mcp': '🔧',
-    'recall': '📚',
-    'delegate': '🔀',
-    'think': '💭',
-    'compress': '🗜️ ',
-}
-
-
-def _icon_for_action(label: str) -> str:
-    """Return a tool-specific icon based on the action label."""
-    lower = label.lower()
-    for key, icon in _TOOL_ICONS.items():
-        if key in lower:
-            return icon
-    return '⚙️ '
-
+from backend.cli.transcript import format_callout_panel
 
 class ReasoningDisplay:
     """Renderable reasoning state used inside the main live layout.
@@ -93,7 +65,7 @@ class ReasoningDisplay:
         self.start()
         for line in text.splitlines():
             stripped = line.strip()
-            if stripped and (not self._thought_lines or self._thought_lines[-1] != stripped):
+            if stripped:
                 self._thought_lines.append(stripped)
         # Keep only the last N lines for a compact view.
         if len(self._thought_lines) > self._max_lines:
@@ -138,32 +110,40 @@ class ReasoningDisplay:
         yield self.renderable()
 
     def renderable(self) -> Any:
-        # Elapsed time
-        elapsed = ''
+        elapsed_bits: list[str] = []
         secs = self.elapsed_seconds
         if secs is not None:
             m, s = divmod(secs, 60)
-            elapsed = f'{m}m {s}s' if m > 0 else f'{s}s'
+            elapsed_bits.append(f'{m}m {s}s' if m > 0 else f'{s}s')
+
+        turn_cost = max(0.0, self._current_cost - self._cost_at_start)
+        if turn_cost > 0.0:
+            elapsed_bits.append(f'+${turn_cost:.4f}')
+        elapsed_bits.append('esc to interrupt')
 
         action_label = self._current_action or 'Thinking…'
         rows: list[Any] = []
 
-        # Thought lines — italic dim flowing text, no border
+        header = Table.grid(expand=True)
+        header.add_column(width=3)
+        header.add_column(ratio=1)
+        header.add_column(justify='right', no_wrap=True)
+        header.add_row(
+            Spinner('dots', style='bright_black'),
+            Text(action_label, style='bold #e2e8f0'),
+            Text(' · '.join(elapsed_bits), style='bright_black'),
+        )
+        rows.append(header)
+
         for line in self._thought_lines:
             t = Text()
             t.append('  ', style='')
-            t.append(line, style='italic bright_black')
+            t.append('· ', style='bright_black')
+            t.append(line, style='dim')
             rows.append(t)
 
-        # Spinner row
-        spinner_grid = Table.grid(padding=(0, 1))
-        spinner_grid.add_column(width=3)
-        spinner_grid.add_column(ratio=1)
-        label = Text()
-        label.append(action_label, style='dim')
-        if elapsed:
-            label.append(f' ({elapsed} · esc to interrupt)', style='bright_black')
-        spinner_grid.add_row(Spinner('dots', style='bright_black'), label)
-        rows.append(spinner_grid)
-
-        return Group(*rows)
+        return format_callout_panel(
+            'Working',
+            Group(*rows),
+            accent_style='bright_black',
+        )

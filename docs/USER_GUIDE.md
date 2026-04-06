@@ -1,6 +1,9 @@
-# App User Guide
+# Grinta User Guide
 
 > End-to-end guide: from installation to your first autonomous coding session.
+
+Canonical local startup is the terminal CLI via `python -m backend.cli.entry`.
+Any older references to `start_server.py`, `app.py`, or `uv run app serve` are obsolete.
 
 ## Table of Contents
 
@@ -33,7 +36,7 @@
 
 ```bash
 git clone https://github.com/josephsenior/App.git
-cd App
+cd Grinta
 uv sync
 ```
 
@@ -43,7 +46,7 @@ uv sync
 echo "LLM_API_KEY=sk-your-api-key-here" > .env
 ```
 
-Your API keys must be set via `.env` files ensuring all subprocesses inherit credentials properly. Use the Web UI to tune the rest of your agent parameters like Models and limits!
+Your API keys must be set via `.env` files ensuring all subprocesses inherit credentials properly. Tune the rest of your agent parameters in `settings.json`.
 
 ### Step 3: Start
 
@@ -55,19 +58,19 @@ Your API keys must be set via `.env` files ensuring all subprocesses inherit cre
 
 **Manual start (any OS):**
 
-Terminal 1 — Backend:
+Terminal 1 — CLI:
 
 ```bash
-python start_server.py
+uv run python -m backend.cli.entry
 ```
 
-Open the web UI at [http://localhost:3000](http://localhost:3000) (or run `python app.py` to start the server and open a browser tab automatically).
+If you specifically need the raw HTTP backend for API/OpenAPI tooling, run `./start_backend.ps1` on Windows or `uv run python -m backend.execution.action_execution_server 3000 --working-dir "$PWD"`.
 
 ---
 
 ## Configuration
 
-App uses a multi-layered configuration system based on JSON and Environment Variables to ensure flexibility across different environments and prevent UI syncing ambiguity.
+Grinta uses a multi-layered configuration system based on JSON and Environment Variables to ensure flexibility across different environments and prevent UI syncing ambiguity.
 
 ### Configuration Hierarchy
 
@@ -81,7 +84,7 @@ If the UI and CLI disagree, confirm the backend’s working directory (or set `A
 
 ### Getting Started
 
-For standard use, rely on the Web UI to edit the repo’s `settings.json` (under the app root above). Protect API keys in `.env` at the App project root (or via your shell environment):
+For standard use, rely on the Web UI to edit the repo’s `settings.json` (under the app root above). Protect API keys in `.env` at the Grinta project root (or via your shell environment):
 
 ```bash
 LLM_API_KEY=sk-your-key
@@ -119,17 +122,15 @@ Any setting can be injected. For complex setups, rely on `.env`:
 
 ## Your First Session
 
-### 1. Start App
+### 1. Start Grinta
 
 ```bash
-python start_server.py
+uv run python -m backend.cli.entry
 ```
 
-Then open [http://localhost:3000](http://localhost:3000) in a browser.
+### 2. Start a Session
 
-### 2. Create a Conversation
-
-From the web UI home screen, start a **new conversation** (or resume an existing one).
+Launch the CLI in the project you want to work in. Grinta will keep project-local state under `.grinta/storage` for that checkout.
 
 ### 3. Describe Your Task
 
@@ -155,8 +156,8 @@ The agent will:
 
 The agent shows each action as it executes. You can:
 
-- **Review diffs** in the diff viewer (press `d`)
-- **Approve/reject** actions in confirmation mode
+- **Review diffs** with your editor or `git diff`
+- **Resume work** later with the session commands in the CLI
 - **Interrupt** the agent at any time
 
 ### Example Tasks
@@ -182,7 +183,7 @@ Socket.IO APIs power automation via the Python package `client` (see tests under
 
 ## Working with the API
 
-App exposes a REST + Socket.IO API on port 3000.
+Grinta exposes a REST + Socket.IO API on port 3000.
 
 ### REST Endpoints
 
@@ -298,7 +299,7 @@ model = "gpt-4o-mini"             # Current config name for compaction workloads
 ## Context Memory & Compactors
 
 Context memory is compacted when conversation history grows too large for the
-LLM's context window. App now uses compactor as the canonical term in code,
+LLM's context window. Grinta now uses compactor as the canonical term in code,
 docs, and persisted config.
 
 ### Available Compactors
@@ -306,12 +307,10 @@ docs, and persisted config.
 | Compactor | Best For | Current Config |
 | --- | --- | --- |
 | **smart** (default) | General use — adapts automatically | `type = "smart"` |
-| **llm** | Long sessions needing high-quality summaries | `type = "llm"` |
+| **structured** | Long sessions needing high-quality summaries | `type = "structured"` |
 | **observation_masking** | Preserving structure, masking old outputs | `type = "observation_masking"` |
 | **recent** | Simple keep-N-recent approach | `type = "recent"` |
 | **amortized** | Gradual pruning of old context | `type = "amortized"` |
-| **semantic** | Embedding-based relevance filtering | `type = "semantic"` |
-| **llm_attention** | LLM-scored relevance prioritization | `type = "llm_attention"` |
 | **noop** | Debugging — no condensation | `type = "noop"` |
 
 ### Compactor Configuration
@@ -320,8 +319,8 @@ docs, and persisted config.
 [compactor]
 type = "smart"    # Recommended default
 
-# Or for long sessions with high-quality summarization:
-# type = "llm"
+# Or for long sessions with high-quality structured summaries:
+# type = "structured"
 # llm_config = "compactor"   # References the example [llm.compactor] section above
 # max_size = 100
 # keep_first = 1
@@ -363,6 +362,15 @@ The agent detects 6 types of stuck behavior:
 5. Semantic loops (similar but not identical actions)
 6. Context window error loops
 
+Stuck detection is **enabled by default**. If you need to disable it for
+a specific session:
+
+```json
+{
+  "stuck_detection_enabled": false
+}
+```
+
 ### Graceful Shutdown
 
 When budget/iteration limits are hit, the agent gets one final turn
@@ -375,9 +383,92 @@ enable_graceful_shutdown = true   # Recommended
 
 ---
 
+## Reliability & Long-Session Settings
+
+These settings are critical for unattended or long-running coding sessions.
+All are **enabled by default** for daily-driver reliability.
+
+### Pending Action Timeout (Watchdog)
+
+If a tool call doesn't produce an observation within the timeout, the
+agent receives an error and can retry or move on. This prevents sessions
+from stalling indefinitely on hung tools.
+
+```json
+{
+  "pending_action_timeout": 120.0
+}
+```
+
+- **Default**: `120` seconds (2 minutes)
+- **MCP tools**: Automatically use a higher floor of `180` seconds to
+  accommodate cold starts (npx, remote servers)
+- **Disable**: Set to `0` (not recommended for unattended sessions)
+
+### Auto-Retry on Error
+
+When enabled, the agent automatically retries after recoverable errors
+(rate limits, transient API failures, timeouts) without waiting for
+manual confirmation.
+
+```json
+{
+  "auto_retry_on_error": true
+}
+```
+
+- **Default**: `true`
+- Exponential backoff: 8s base delay, up to 64s max wait
+- Rate-limit errors get 2× base delay automatically
+- Max 5 retry attempts per failure
+
+### Stuck Detection
+
+Six-strategy pattern detector that catches infinite loops, repeating
+errors, monologue spirals, and context-window traps. When stuck is
+detected, the circuit breaker escalates (warning → replan → pause → stop).
+
+```json
+{
+  "stuck_detection_enabled": true
+}
+```
+
+- **Default**: `true`
+- Strategies: action-observation repeat, action-error repeat, monologue,
+  A-B-A-B oscillation, context-window trap, think-only loop
+- **Circuit breaker trip**: 3 stuck detections → agent stops
+- **Progress signals**: Agent can decrement stuck count by reporting progress
+
+### Recommended Long-Session Configuration
+
+For overnight or multi-hour unattended sessions, use these settings
+together in `settings.json`:
+
+```json
+{
+  "max_budget_per_task": 10.0,
+  "pending_action_timeout": 120.0,
+  "auto_retry_on_error": true,
+  "stuck_detection_enabled": true,
+  "enable_circuit_breaker": true,
+  "enable_graceful_shutdown": true,
+  "max_iterations": 500
+}
+```
+
+This configuration ensures:
+- **Cost control**: $10 cap with alerts at 50%/80%/90%
+- **Hang recovery**: 2-minute watchdog on every tool call
+- **Error recovery**: Automatic retry with exponential backoff
+- **Loop prevention**: 6-strategy stuck detection with circuit breaker
+- **Graceful exit**: Agent summarizes progress before forced shutdown
+
+---
+
 ## MCP Integration
 
-App supports the [Model Context Protocol](https://modelcontextprotocol.io/)
+Grinta supports the [Model Context Protocol](https://modelcontextprotocol.io/)
 for connecting external tool servers.
 
 ### MCP Configuration
@@ -408,7 +499,7 @@ detailed examples.
 
 ## Playbooks
 
-App includes 16 built-in playbooks that activate automatically when your message matches
+Grinta includes 16 built-in playbooks that activate automatically when your message matches
 their trigger phrases, injecting specialist guidance into the agent's context window.
 
 ### Context Playbooks (auto-triggered)
@@ -453,7 +544,7 @@ You can also pass them via the API when creating a conversation.
 
 ### Custom Playbooks
 
-Create your own playbooks in `~/.app/playbooks/` (user-level) or `.app/playbooks/`
+Create your own playbooks in `~/.grinta/playbooks/` (user-level) or `.grinta/playbooks/`
 (repo-level) using the same Markdown + frontmatter format. Type
 `add playbook` in chat for a guided template.
 
@@ -497,7 +588,7 @@ enable_summarize_context = false  # Agent-initiated condensation
    model = "gpt-4o-mini"
    
    [compactor]
-   type = "llm"
+   type = "structured"
    llm_config = "compactor"
    ```
 

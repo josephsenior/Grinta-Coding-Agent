@@ -65,7 +65,6 @@ class StructureEditor:
     editor.create_file("new_file.py", "print('hello')")
     editor.view_file("new_file.py")
     editor.insert_code("new_file.py", 1, "import os")
-    editor.undo_last_edit("new_file.py")
     ```
     """
 

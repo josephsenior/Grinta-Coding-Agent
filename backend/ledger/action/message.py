@@ -17,6 +17,7 @@ class MessageAction(Action):
 
     Attributes:
         content: Message text content
+        thought: Inner ``<think>...</think>`` text (CLI shows dim; stripped from ``content``).
         file_urls: URLs of attached files
         image_urls: URLs of attached images
         wait_for_response: Whether to wait for user response
@@ -24,6 +25,7 @@ class MessageAction(Action):
     """
 
     content: str = ''
+    thought: str = ''
     file_urls: list[str] | None = None
     image_urls: list[str] | None = None
     wait_for_response: bool = False

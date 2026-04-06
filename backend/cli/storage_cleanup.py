@@ -9,6 +9,10 @@ from pathlib import Path
 
 from rich.console import Console
 
+from backend.core.workspace_resolution import (
+    workspace_agent_state_dir,
+    workspace_grinta_root,
+)
 from backend.persistence.locations import get_project_local_data_root
 
 
@@ -50,7 +54,7 @@ class StorageCleanupReport:
 
 
 def cleanup_project_storage(project_root: str | Path) -> StorageCleanupReport:
-    """Consolidate legacy project data into ``.grinta/storage``."""
+    """Consolidate legacy project data into workspace-keyed storage under ``~/.grinta/workspaces/<id>/storage``."""
     root = Path(project_root).expanduser().resolve()
     if not root.is_dir():
         msg = f'Project directory does not exist: {root}'
@@ -116,6 +120,8 @@ def run_storage_cleanup_command(
 
 
 def _migration_specs(project_root: Path, canonical_root: Path) -> tuple[_MigrationSpec, ...]:
+    agent_root = workspace_agent_state_dir(project_root)
+    bucket_root = workspace_grinta_root(project_root)
     return (
         _MigrationSpec(
             project_root / '.grinta' / 'conversations' / 'oss_user',
@@ -131,14 +137,56 @@ def _migration_specs(project_root: Path, canonical_root: Path) -> tuple[_Migrati
             ignored_names=frozenset({'oss_user'}),
         ),
         _MigrationSpec(
+            project_root / '.grinta' / 'playbooks',
+            bucket_root / 'playbooks',
+        ),
+        _MigrationSpec(
+            project_root / '.grinta' / 'checkpoints',
+            agent_root / 'rollback_checkpoints',
+        ),
+        _MigrationSpec(
+            project_root / '.grinta' / 'context.md',
+            bucket_root / 'project_context' / 'context.md',
+        ),
+        _MigrationSpec(
+            project_root / '.grinta' / 'changelog.jsonl',
+            bucket_root / 'project_context' / 'changelog.jsonl',
+        ),
+        _MigrationSpec(
+            project_root / '.grinta' / '.gitignore',
+            bucket_root / 'project_context' / '.gitignore',
+        ),
+        _MigrationSpec(
+            project_root / '.grinta',
+            agent_root,
+            ignored_names=frozenset(
+                {
+                    'conversations',
+                    'checkpoints',
+                    'playbooks',
+                    'context.md',
+                    'changelog.jsonl',
+                    '.gitignore',
+                }
+            ),
+        ),
+        _MigrationSpec(
             project_root / 'storage' / '.grinta' / 'conversations',
             canonical_root / 'sessions',
             ignored_names=frozenset({'oss_user'}),
         ),
         _MigrationSpec(
+            project_root / 'storage' / '.grinta' / 'playbooks',
+            bucket_root / 'playbooks',
+        ),
+        _MigrationSpec(
+            project_root / 'storage' / '.grinta' / 'checkpoints',
+            agent_root / 'rollback_checkpoints',
+        ),
+        _MigrationSpec(
             project_root / 'storage' / '.grinta',
-            project_root / '.grinta',
-            ignored_names=frozenset({'conversations'}),
+            agent_root,
+            ignored_names=frozenset({'conversations', 'checkpoints', 'playbooks'}),
         ),
         _MigrationSpec(
             project_root / 'storage' / '.jwt_secret',
@@ -257,4 +305,5 @@ def _prunable_directories(project_root: Path) -> tuple[Path, ...]:
         project_root / 'storage',
         project_root / '.grinta' / 'conversations' / 'oss_user',
         project_root / '.grinta' / 'conversations',
+        project_root / '.grinta',
     )

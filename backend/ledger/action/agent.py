@@ -56,11 +56,14 @@ class AgentThinkAction(Action):
 
     Attributes:
         thought (str): The agent's explanation of its actions.
+        suppress_cli (bool): When True, the CLI transcript/reasoning UI skips this
+            thought (still recorded for the agent / history).
         action (str): The action type, namely ActionType.THINK.
 
     """
 
     thought: str = ''
+    suppress_cli: bool = False
     action: ClassVar[str] = ActionType.THINK
 
     @property

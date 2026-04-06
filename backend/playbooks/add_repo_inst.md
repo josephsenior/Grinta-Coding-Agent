@@ -10,7 +10,7 @@ inputs:
     description: 'Folder name of the repository to document (relative to the working directory)'
 ---
 
-Please browse the current repository under /workspace/{{ REPO_FOLDER_NAME }}, look at the documentation and relevant code, and understand the purpose of this repository.
+Please browse the current repository under `./{{ REPO_FOLDER_NAME }}` (relative to the working directory), look at the documentation and relevant code, and understand the purpose of this repository.
 
 Specifically, I want you to create a `.grinta/playbooks/repo.md` file. This file should contain succinct information that summarizes (1) the purpose of this repository, (2) the general setup of this repo, and (3) a brief description of the structure of this repo.
 

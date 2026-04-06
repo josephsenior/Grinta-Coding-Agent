@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================
-# APP - Quick Start Script (Unix/macOS/WSL)
+# GRINTA - Quick Start Script (Unix/macOS/WSL)
 # ============================================
 set -e
 
@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${CYAN}🚀 Starting App Setup...${NC}"
+echo -e "${CYAN}🚀 Starting Grinta Setup...${NC}"
 
 # Step 0: Pre-flight checks
 echo -e "${YELLOW}🔍 Step 0: Pre-flight checks...${NC}"
@@ -53,8 +53,8 @@ echo -e "${YELLOW}🤖 Step 3: Discovering local models (Ollama/LM Studio/vLLM).
 uv run python3 -m backend.llm.discover_models aliases
 echo -e "${GREEN}✅ Model discovery complete.${NC}"
 
-echo -e "\n${GREEN}✅ Setup complete! Launching App...${NC}"
-echo -e "${CYAN}   Open http://localhost:3000 when the server is ready.${NC}"
+echo -e "\n${GREEN}✅ Setup complete! Launching Grinta CLI...${NC}"
+echo -e "${CYAN}   Project-local state will be stored under .grinta/storage.${NC}"
 echo ""
 
-uv run app serve
+uv run python -m backend.cli.entry

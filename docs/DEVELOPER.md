@@ -1,6 +1,6 @@
-# App Developer Guide
+# Grinta Developer Guide
 
-Internal reference for contributors working on App internals.
+Internal reference for contributors working on Grinta internals.
 
 For **user-facing** documentation, see [USER_GUIDE.md](USER_GUIDE.md).
 For **architecture overview**, see [ARCHITECTURE.md](ARCHITECTURE.md).
@@ -22,7 +22,7 @@ For **contribution workflow**, see [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Project Layout
 
 ```text
-client/                # Python HTTP + Socket.IO client (AppClient) for tests/scripts
+client/                # Python HTTP + Socket.IO client (GrintaClient) for tests/scripts
 backend/
 ├── gateway/           # FastAPI app, routes, middleware, sessions, adapters
 │   ├── adapters/      # I/O and serialization adapters
@@ -47,7 +47,7 @@ backend/
 │   ├── conversation_memory.py  # Event→LLM message conversion
 │   ├── message_formatting.py   # Type-check utils & message formatting
 │   ├── context_tracking.py     # Decision/anchor/vector memory tracking
-│   └── compactor/strategies/   # 13 compactor strategies incl. auto-selector
+│   └── compactor/strategies/   # 8 compactor strategies incl. auto-selector
 ├── execution/         # Local command execution and runtime policy enforcement
 ├── inference/         # LLM abstraction (direct SDK clients)
 ├── knowledge/         # Knowledge base logic (RAG)
@@ -62,7 +62,7 @@ backend/
 
 ```text
 User Input (Web UI / client)
-  → AppClient.send_message()
+  → GrintaClient.send_message()
     → Socket.IO / HTTP POST /api/conversations/{id}/messages
       → SessionManager.get_or_create_session()
         → SessionOrchestrator.run_loop()
@@ -183,7 +183,7 @@ Event
 
 ### Direct Client Architecture
 
-App uses **direct SDK clients** (not litellm) for stability:
+Grinta uses **direct SDK clients** (not litellm) for stability:
 
 ```text
 LLM (backend/inference/llm.py)
@@ -223,23 +223,18 @@ When context exceeds limits, compactors compress history:
 Full History → Compactor → Compressed History → LLM
 ```
 
-**13 available compactor strategies:**
+**8 available compactor strategies:**
 
 | Type | Strategy | Cost | Quality |
 | --- | --- | --- | --- |
 | `noop` | Keep everything | Free | Perfect (until overflow) |
 | `recent` | Sliding window | Free | Loses old context |
 | `observation_masking` | Mask old observations | Free | Preserves structure |
-| `llm` | LLM summarization | $ | Good summaries |
 | `smart` | Auto-select best | Varies | Adaptive |
 | `auto` | Task-signal-based selection | Varies | Context-aware |
 | `amortized` | Gradual pruning | Free | Balanced |
-| `llm_attention` | LLM-scored relevance | $$ | Best quality |
-| `semantic` | Embedding similarity | $ | Context-aware |
-| `hybrid` | Multi-strategy | $$ | Most robust |
+| `structured` | LLM structured summary | $$ | Best quality |
 | `pipeline` | Chained compactors | Varies | Composable |
-| `block_compress` | Block-level compression | $ | Efficient |
-| `attention` | Attention scoring | $ | Focus-aware |
 
 ### Adding a New Compactor
 
@@ -304,7 +299,7 @@ Layer 3: Detection (StuckDetector)
 
 ## Testing Guide
 
-App maintains a high standard of code quality with a focus on comprehensive unit test coverage for core modules. Recent efforts have achieved **95%+ coverage** across the `backend/core` infrastructure:
+Grinta maintains a high standard of code quality with a focus on comprehensive unit test coverage for core modules. Recent efforts have achieved **95%+ coverage** across the `backend/core` infrastructure:
 
 - `backend/core/loop.py`: **100%**
 - `backend/core/logger.py`: **~95%**
@@ -332,7 +327,7 @@ backend/tests/
 │   ├── security/      # Security & command analysis tests
 │   ├── telemetry/     # Telemetry tests
 │   ├── tools/         # Tool tests
-│   ├── client/        # Tests for client.AppClient
+│   ├── client/        # Tests for client.GrintaClient
 │   ├── utils/         # Utility tests
 │   └── validation/    # Validation and code-quality tests
 ├── integration/       # Multi-component integration tests
@@ -402,9 +397,9 @@ class TestMyFeature:
 
 ### 1. Model Context Protocol (MCP)
 
-App's internal MCP logic lives under `backend/gateway/integrations/mcp/`. Always import
-from App's integration package (not the bare `mcp` SDK package) when using
-App-specific client or tool-registry utilities.
+Grinta's internal MCP logic lives under `backend/gateway/integrations/mcp/`. Always import
+from Grinta's integration package (not the bare `mcp` SDK package) when using
+Grinta-specific client or tool-registry utilities.
 
 ### 2. Event Loop Management
 
@@ -434,7 +429,7 @@ use `tmp_path` fixture to avoid polluting the repo.
 
 ## Async Scheduling Rules
 
-App mixes synchronous callbacks, async coroutines, and background-thread
+Grinta mixes synchronous callbacks, async coroutines, and background-thread
 dispatch.  Getting the threading/loop boundary wrong is the single most
 common source of "agent stuck" bugs.  **Every contributor must follow the
 rules below.**
@@ -535,7 +530,7 @@ EventStream._dispatch_event()  # current implementation name
 
 ## Windows Platform Notes
 
-App runs on Windows with `ProactorEventLoop` (Python 3.12 default).
+Grinta runs on Windows with `ProactorEventLoop` (Python 3.12 default).
 Several areas need special attention:
 
 ### MCP stdio Servers
@@ -556,8 +551,8 @@ commands for Windows.
 ### Running the E2E Test Suite on Windows
 
 ```powershell
-# Start the server
-python start_server.py
+# Start the raw HTTP backend
+.\start_backend.ps1
 
 # In another terminal:
 python -m pytest backend/tests/e2e/test_agent_loop_e2e.py -m integration -v

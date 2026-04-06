@@ -11,6 +11,7 @@ from backend.core.workspace_resolution import (
     is_reserved_user_app_data_dir,
     is_workspace_not_open_error,
     normalize_user_workspace_path,
+    resolve_cli_workspace_directory,
     resolve_existing_directory,
 )
 
@@ -25,7 +26,7 @@ def test_is_workspace_not_open_error_rejects_other_valueerror() -> None:
 
 
 def test_workspace_constants_stable() -> None:
-    assert 'Open workspace' in WORKSPACE_NOT_OPEN_MESSAGE
+    assert 'project folder' in WORKSPACE_NOT_OPEN_MESSAGE.lower()
     assert WORKSPACE_NOT_OPEN_ERROR_ID.startswith('WORKSPACE$')
 
 
@@ -51,11 +52,58 @@ def test_reserved_user_app_data_dir_matches_dot_app() -> None:
     assert is_reserved_user_app_data_dir(Path.home() / '.grinta') is True
 
 
-def test_apply_workspace_to_config_uses_project_local_storage(tmp_path) -> None:
+def test_resolve_cli_workspace_directory_uses_cwd_when_unset(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv('PROJECT_ROOT', raising=False)
+    monkeypatch.delenv('APP_PROJECT_ROOT', raising=False)
+
+    class _Cfg:
+        project_root = None
+
+    assert resolve_cli_workspace_directory(_Cfg()) == tmp_path.resolve()
+
+
+def test_resolve_cli_workspace_directory_prefers_project_root_env(
+    tmp_path, monkeypatch
+) -> None:
+    other = tmp_path / 'other'
+    other.mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv('PROJECT_ROOT', str(other))
+
+    class _Cfg:
+        project_root = None
+
+    assert resolve_cli_workspace_directory(_Cfg()) == other.resolve()
+
+
+def test_workspace_storage_id_stable_for_path(tmp_path) -> None:
+    from backend.core.workspace_resolution import workspace_storage_id
+
+    p = tmp_path / 'my' / 'repo'
+    p.mkdir(parents=True)
+    a = workspace_storage_id(p)
+    b = workspace_storage_id(p)
+    assert len(a) == 32
+    assert a == b
+    assert a.isalnum()
+
+
+def test_apply_workspace_to_config_uses_project_local_storage(
+    tmp_path, monkeypatch
+) -> None:
+    fake = tmp_path / 'HOME'
+    fake.mkdir()
+    monkeypatch.setenv('HOME', str(fake))
+    monkeypatch.setenv('USERPROFILE', str(fake))
     config = type('Config', (), {'project_root': None, 'local_data_root': None})()
 
     resolved = apply_workspace_to_config(config, tmp_path)
 
+    from backend.core.workspace_resolution import workspace_storage_id
+
+    wid = workspace_storage_id(tmp_path)
+    expected = fake / '.grinta' / 'workspaces' / wid / 'storage'
     assert resolved == str(tmp_path)
     assert config.project_root == str(tmp_path)
-    assert config.local_data_root == str(tmp_path / '.grinta' / 'storage')
+    assert config.local_data_root == str(expected)

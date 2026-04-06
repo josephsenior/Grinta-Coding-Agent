@@ -1,26 +1,38 @@
-"""User-selected project folder (workspace) only.
+"""Project/workspace directory resolution.
 
-The workspace path is whatever folder the user sets via **Open workspace** (and optional
-persisted ``~/.app/active_workspace.json``). There is no fallback to ``cwd()`` or
-``~/.app`` as a project root.
+Where the workspace comes from:
 
-Machine-local session files use :func:`backend.core.app_paths.get_app_settings_root` when
-no workspace is open (see ``AppState``).
+1. ``AppConfig.project_root`` after :func:`backend.core.config.load_app_config`
+   (from ``PROJECT_ROOT`` / ``settings.json`` / UI persistence).
+2. **Terminal use:** if nothing is configured, the current working directory is the
+   project folder (same as ``cd`` into the repo and run ``grinta``).
+
+``~/.grinta`` alone is treated as app data, not a code workspace.
+
+Per-project persistence (sessions, KB, etc.) lives under
+``~/.grinta/workspaces/<id>/storage`` where ``<id>`` is derived from the resolved
+workspace path — see :func:`workspace_grinta_root`. That keeps agent-visible repos
+free of a bulky ``<repo>/.grinta/storage`` tree.
+
+For storage roots see :func:`resolve_cli_workspace_directory` (env → config → cwd).
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 logger = logging.getLogger(__name__)
 
-# Stable text + id for tool/runtime errors when no project folder is open (UI may toast once).
+# Stable text + id for tool/runtime errors when no project folder is available.
 WORKSPACE_NOT_OPEN_MESSAGE = (
-    'No project folder is open. Choose a folder via Open workspace first.'
+    'No project folder is configured. Run grinta from your project directory, '
+    'use grinta --project PATH, or set project_root in settings.'
 )
 WORKSPACE_NOT_OPEN_ERROR_ID = 'WORKSPACE$NOT_OPEN'
 
@@ -47,6 +59,39 @@ def is_reserved_user_app_data_dir(path: Path) -> bool:
     except (OSError, ValueError):
         return False
     return False
+
+
+def workspace_storage_id(project_root: str | Path) -> str:
+    """Stable id for *project_root* (hex digest, filesystem-safe).
+
+    Uses the resolved path with OS-appropriate case normalization so the same
+    folder maps to one bucket on case-insensitive volumes.
+    """
+    p = Path(project_root).expanduser().resolve()
+    key = os.path.normcase(str(p))
+    return hashlib.sha256(key.encode('utf-8')).hexdigest()[:32]
+
+
+def workspace_grinta_root(project_root: str | Path) -> Path:
+    """``~/.grinta/workspaces/<id>`` for app data tied to this workspace."""
+    wid = workspace_storage_id(project_root)
+    return Path.home() / '.grinta' / 'workspaces' / wid
+
+
+def workspace_agent_state_dir(project_root: str | Path | None = None) -> Path:
+    """Agent-internal durable state: ``~/.grinta/workspaces/<id>/agent/``.
+
+    For one-off moves from old in-repo layouts use ``grinta --cleanup-storage``.
+    """
+    if project_root is None:
+        root = require_effective_workspace_root()
+    else:
+        root = Path(project_root).expanduser().resolve()
+    bucket = workspace_grinta_root(root)
+    bucket.mkdir(parents=True, exist_ok=True)
+    agent = bucket / 'agent'
+    agent.mkdir(parents=True, exist_ok=True)
+    return agent
 
 
 def load_persisted_workspace_path() -> str | None:
@@ -127,14 +172,65 @@ def apply_workspace_to_config(config, root: Path) -> str:
     return s
 
 
+def _workspace_path_from_raw(raw: str | None) -> Path | None:
+    if not raw or not str(raw).strip():
+        return None
+    try:
+        p = Path(str(raw).strip()).expanduser().resolve()
+    except OSError:
+        return None
+    if not p.is_dir() or is_reserved_user_app_data_dir(p):
+        return None
+    return p
+
+
+def resolve_cli_workspace_directory(config: object | None = None) -> Path | None:
+    """Directory treated as the open project for ``cd repo && grinta``.
+
+    This is the *storage* anchor: LocalFileStore defaults to
+    ``~/.grinta/workspaces/<id>/storage`` for this directory. Resolution order:
+
+    1. ``PROJECT_ROOT`` then ``APP_PROJECT_ROOT`` (CLI pins the former to the cwd
+       or ``--project`` before loading config).
+    2. ``project_root`` on *config* when it is a non-empty string (e.g. from
+       ``settings.json``).
+    3. :func:`os.getcwd` — the normal case when you run Grinta from your repo.
+
+    ``~/.grinta`` is never used as a code workspace here (reserved app data home).
+    """
+    import os
+
+    for key in ('PROJECT_ROOT', 'APP_PROJECT_ROOT'):
+        got = _workspace_path_from_raw(os.environ.get(key))
+        if got is not None:
+            return got
+    if config is not None:
+        pr = getattr(config, 'project_root', None)
+        if isinstance(pr, str) and pr.strip():
+            got = _workspace_path_from_raw(pr)
+            if got is not None:
+                return got
+    try:
+        cwd = Path.cwd().resolve()
+    except OSError:
+        return None
+    if is_reserved_user_app_data_dir(cwd):
+        return None
+    return cwd
+
+
 def get_effective_workspace_root() -> Path | None:
-    """Return the open project folder, or ``None`` if the user has not chosen one."""
+    """Return the project folder, or ``None`` if it cannot be determined safely.
+
+    Order: ``PROJECT_ROOT`` env (CLI pins this to the directory you launched from),
+    ``APP_PROJECT_ROOT``, then :attr:`AppConfig.project_root`, then the process cwd.
+    """
+    import os
+
     from backend.core.config.config_loader import load_app_config
 
-    wb = (load_app_config(set_logging_levels=False).project_root or '').strip()
-    if wb:
-        return Path(wb).expanduser().resolve()
-    return None
+    cfg = load_app_config(set_logging_levels=False)
+    return resolve_cli_workspace_directory(cfg)
 
 
 def require_effective_workspace_root() -> Path:

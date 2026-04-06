@@ -9,20 +9,28 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 
 
 class Blackboard:
     """Thread- and async-safe key-value store for sub-agent coordination."""
 
+    def _path(self) -> str:
+        from backend.core.workspace_resolution import workspace_agent_state_dir
+
+        return str(workspace_agent_state_dir() / 'blackboard.json')
+
     def _save(self) -> None:
-        path = '.grinta/blackboard.json'
+        path = self._path()
+        import os
+
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(self._data, f)
 
     def _load(self) -> None:
-        path = '.grinta/blackboard.json'
+        import os
+
+        path = self._path()
         if os.path.exists(path):
             try:
                 with open(path, 'r', encoding='utf-8') as f:

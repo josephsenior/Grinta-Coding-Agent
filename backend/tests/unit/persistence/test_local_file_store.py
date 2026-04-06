@@ -29,6 +29,11 @@ class TestLocalFileStoreInit:
         # On a real tilde path, expanduser would resolve it
         assert os.path.isdir(store.root)
 
+    def test_get_base_path_matches_root(self, tmp_path):
+        root = str(tmp_path / 'r')
+        store = LocalFileStore(root)
+        assert store.get_base_path() == store.root
+
 
 class TestWriteAndRead:
     def test_write_string(self, store):

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class ContextWindowMiddleware(ToolInvocationMiddleware):
     """Emits proactive context-window utilization warnings at 70 % and 90 %.
 
-    Mirrors the cost-threshold pattern used by ``BudgetGuardService`` but
+    Mirrors the agent's budget-threshold handling but
     tracks token utilisation instead of dollar spend.  Fires at most once
     per threshold per session to avoid alert fatigue.
 
@@ -95,3 +95,20 @@ class ContextWindowMiddleware(ToolInvocationMiddleware):
                 self.controller.id,
                 exc_info=True,
             )
+
+        # Proactively signal memory pressure at 70% so condensation can begin
+        # preparing before the 90%+ emergency threshold.  This avoids the latency
+        # hit of a surprise condensation LLM call when the window is nearly full.
+        if threshold <= 0.70:
+            try:
+                state = getattr(self.controller, 'state', None)
+                if state is not None and hasattr(state, 'set_memory_pressure'):
+                    state.set_memory_pressure(
+                        'WARNING', source='ContextWindowMiddleware'
+                    )
+            except Exception:
+                logger.debug(
+                    'Failed to signal proactive memory pressure for session %s',
+                    self.controller.id,
+                    exc_info=True,
+                )

@@ -7,7 +7,6 @@ critical information during compaction, preventing loss of key insights.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -171,9 +170,9 @@ class SmartCompactor(BaseLLMCompactor):
 
     def _load_in_progress_task_ids(self) -> set[str]:
         """Load in-progress task IDs from .app/active_plan.json, or empty set."""
-        plan_path = (
-            Path(os.environ.get('APP_WORKSPACE_DIR', '.')) / '.grinta' / 'active_plan.json'
-        )
+        from backend.core.workspace_resolution import workspace_agent_state_dir
+
+        plan_path = workspace_agent_state_dir() / 'active_plan.json'
         tasks = self._parse_tasks_from_plan(plan_path)
         return self._extract_in_progress_ids(tasks)
 

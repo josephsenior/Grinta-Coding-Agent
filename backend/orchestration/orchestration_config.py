@@ -25,7 +25,6 @@ from backend.orchestration.services import (
     ActionExecutionService,
     ActionService,
     AutonomyService,
-    BudgetGuardService,
     CircuitBreakerService,
     ConfirmationService,
     EventRouterService,
@@ -33,7 +32,6 @@ from backend.orchestration.services import (
     IterationGuardService,
     IterationService,
     LifecycleService,
-    MetricsService,
     ObservationService,
     OrchestrationContext,
     PendingActionService,
@@ -46,7 +44,6 @@ from backend.orchestration.services import (
     StepPrerequisiteService,
     StuckDetectionService,
     TaskValidationService,
-    TelemetryService,
 )
 from backend.orchestration.state.state import State
 
@@ -87,7 +84,6 @@ class OrchestrationServices:
         self.iteration_guard = IterationGuardService(self.context)
         self.step_guard = StepGuardService(self.context)
         self.step_prerequisites = StepPrerequisiteService(self.context)
-        self.budget_guard = BudgetGuardService(self.context)
         self.safety = SafetyService(self.context)
         self.pending_action = PendingActionService(
             self.context, controller.PENDING_ACTION_TIMEOUT
@@ -101,8 +97,6 @@ class OrchestrationServices:
         )
         self.action_execution = ActionExecutionService(self.context)
         self.state = StateTransitionService(self.context)
-        self.telemetry = TelemetryService(self.context)
-        self.metrics = MetricsService(self.context)
         self.retry = RetryService(self.context)
         self.recovery = RecoveryService(self.context)
         self.circuit_breaker = CircuitBreakerService(self.context)

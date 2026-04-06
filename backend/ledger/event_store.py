@@ -23,6 +23,13 @@ if TYPE_CHECKING:
     from backend.persistence.files import FileStore
 
 
+def _file_store_fs_root(file_store: FileStore) -> str | None:
+    """Sync with :func:`backend.ledger.persistence._file_store_fs_root`."""
+    from backend.ledger.persistence import _file_store_fs_root as _root
+
+    return _root(file_store)
+
+
 @dataclass(frozen=True)
 class _CachePage:
     events: list[dict[str, Any]] | None
@@ -79,15 +86,15 @@ class EventStore(EventStoreABC):
             try:
                 from backend.persistence.sqlite_event_store import SQLiteEventStore
 
-                events_dir = get_conversation_events_dir(self.sid, self.user_id)
-                db_path = os.path.join(
-                    self.file_store.get_base_path()
-                    if hasattr(self.file_store, 'get_base_path')
-                    else '.',
-                    events_dir,
-                    'events.db',
-                )
-                self._sqlite_store = SQLiteEventStore(db_path=db_path)
+                fs_root = _file_store_fs_root(self.file_store)
+                if fs_root:
+                    events_dir = get_conversation_events_dir(self.sid, self.user_id)
+                    db_path = os.path.join(
+                        fs_root,
+                        events_dir,
+                        'events.db',
+                    )
+                    self._sqlite_store = SQLiteEventStore(db_path=db_path)
             except Exception as exc:
                 logger.warning('Failed to init SQLite store in EventStore: %s', exc)
 

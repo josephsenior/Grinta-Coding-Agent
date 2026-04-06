@@ -1,9 +1,9 @@
 # ============================================
-# APP - Quick Start Script
+# GRINTA - Quick Start Script
 # ============================================
-# Run this script in PowerShell to start App
+# Run this script in PowerShell to start Grinta
 
-Write-Host "🚀 Starting App..." -ForegroundColor Cyan
+Write-Host "🚀 Starting Grinta..." -ForegroundColor Cyan
 Write-Host ""
 
 # Change to project directory
@@ -53,13 +53,13 @@ Write-Host "✅ Model aliases updated in settings.json" -ForegroundColor Green
 Write-Host "✅ Dependencies synced!" -ForegroundColor Green
 Write-Host ""
 
-# Step 2: Launch App (web UI)
-Write-Host "🚀 Step 2: Starting App server..." -ForegroundColor Yellow
-Write-Host "   Open http://localhost:3000 in your browser when uvicorn is ready." -ForegroundColor Cyan
+# Step 2: Launch Grinta CLI
+Write-Host "🚀 Step 2: Starting Grinta CLI..." -ForegroundColor Yellow
+Write-Host "   Project-local state will be stored under .grinta/storage." -ForegroundColor Cyan
 Write-Host ""
 
-uv run app serve
+uv run python -m backend.cli.entry
 
 Write-Host ""
-Write-Host "✅ App session ended." -ForegroundColor Green
+Write-Host "✅ Grinta session ended." -ForegroundColor Green
 pause

@@ -1,6 +1,6 @@
-# App Agent Engines
+# Grinta Agent Engines
 
-App ships with five specialized AI engines, each optimized for different
+Grinta ships with five specialized AI engines, each optimized for different
 task types. The **Orchestrator** is the default and handles most coding tasks.
 
 ---

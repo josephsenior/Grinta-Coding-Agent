@@ -165,7 +165,7 @@ class TestCircuitBreakerService(unittest.TestCase):
         test_error = ValueError('Test error')
         self.service.record_error(test_error)
 
-        mock_cb.record_error.assert_called_once_with(test_error)
+        mock_cb.record_error.assert_called_once_with(test_error, tool_name='')
 
     def test_record_error_without_circuit_breaker(self):
         """Test record_error() does nothing when circuit breaker not configured."""

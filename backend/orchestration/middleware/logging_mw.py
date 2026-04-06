@@ -19,13 +19,6 @@ class LoggingMiddleware(ToolInvocationMiddleware):
     def __init__(self, controller: SessionOrchestrator) -> None:
         self.controller = controller
 
-    async def plan(self, ctx: ToolInvocationContext) -> None:
-        self.controller.log(
-            'debug',
-            f'[PLAN] {type(ctx.action).__name__}',
-            extra={'msg_type': 'PIPELINE_PLAN'},
-        )
-
     async def execute(self, ctx: ToolInvocationContext) -> None:
         self.controller.log(
             'debug',

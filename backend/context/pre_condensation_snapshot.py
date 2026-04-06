@@ -2,7 +2,7 @@
 
 When condensation fires, the LLM loses all tool outputs and file contents.
 This module extracts the most important context from the about-to-be-pruned
-events and persists it to ``.app/pre_condensation_snapshot.json``.
+events and persists it under ``~/.grinta/workspaces/<id>/agent/pre_condensation_snapshot.json``.
 
 The snapshot is then injected into the post-condensation recovery sequence,
 giving the LLM a structured summary of what was lost — without requiring
@@ -18,7 +18,6 @@ Extracted context:
 from __future__ import annotations
 
 import json
-import os
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -28,9 +27,6 @@ from backend.core.logger import app_logger as logger
 if TYPE_CHECKING:
     from backend.ledger.event import Event
 
-_WORKSPACE_ROOT = os.environ.get('APP_WORKSPACE_DIR', '.')
-_SNAPSHOT_FILE = '.grinta/pre_condensation_snapshot.json'
-
 # Limits to prevent the snapshot from becoming too large
 _MAX_ERRORS = 10
 _MAX_DECISIONS = 15
@@ -39,7 +35,9 @@ _MAX_CONTENT_LENGTH = 500
 
 
 def _snapshot_path() -> Path:
-    return Path(_WORKSPACE_ROOT) / _SNAPSHOT_FILE
+    from backend.core.workspace_resolution import workspace_agent_state_dir
+
+    return workspace_agent_state_dir() / 'pre_condensation_snapshot.json'
 
 
 _MAX_ATTEMPTED_APPROACHES = 20

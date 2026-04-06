@@ -258,7 +258,7 @@ class TestBaseLLMCompactor:
             'see /tmp/app_workspace_sid_123/src/main.py for details'
         )
 
-        assert result == 'see /workspace for details'
+        assert result == 'see [project] for details'
 
 
 # ===================================================================

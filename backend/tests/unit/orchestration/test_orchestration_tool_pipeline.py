@@ -51,16 +51,6 @@ class TestToolInvocationContextPipeline:
 
 
 class TestToolInvocationMiddlewareBase:
-    def test_default_plan_is_noop(self) -> None:
-        mw = ToolInvocationMiddleware()
-        result = asyncio.run(mw.plan(MagicMock()))
-        assert result is None
-
-    def test_default_verify_is_noop(self) -> None:
-        mw = ToolInvocationMiddleware()
-        result = asyncio.run(mw.verify(MagicMock()))
-        assert result is None
-
     def test_default_execute_is_noop(self) -> None:
         mw = ToolInvocationMiddleware()
         result = asyncio.run(mw.execute(MagicMock()))
@@ -86,29 +76,6 @@ class TestToolInvocationPipelineCore:
         assert ctx.action is action
         assert ctx.state is state
         assert ctx.blocked is False
-
-    @pytest.mark.asyncio
-    async def test_run_plan_calls_middlewares(self):
-        mw = MagicMock(spec=ToolInvocationMiddleware)
-        mw.plan = AsyncMock()
-        pipeline = ToolInvocationPipeline(MagicMock(), [mw])
-        ctx = ToolInvocationContext(
-            controller=MagicMock(), action=MagicMock(), state=MagicMock()
-        )
-        await pipeline.run_plan(ctx)
-        mw.plan.assert_called_once_with(ctx)
-
-    @pytest.mark.asyncio
-    async def test_run_verify_skips_when_blocked(self):
-        mw = MagicMock(spec=ToolInvocationMiddleware)
-        mw.verify = AsyncMock()
-        pipeline = ToolInvocationPipeline(MagicMock(), [mw])
-        ctx = ToolInvocationContext(
-            controller=MagicMock(), action=MagicMock(), state=MagicMock()
-        )
-        ctx.blocked = True
-        await pipeline.run_verify(ctx)
-        mw.verify.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_run_execute_skips_when_blocked(self):
@@ -142,18 +109,18 @@ class TestToolInvocationPipelineCore:
         async def block(ctx):
             ctx.block('mw1 blocked')
 
-        mw1.plan = block
+        mw1.execute = block
 
         mw2 = MagicMock(spec=ToolInvocationMiddleware)
-        mw2.plan = AsyncMock()
+        mw2.execute = AsyncMock()
 
         pipeline = ToolInvocationPipeline(MagicMock(), [mw1, mw2])
         ctx = ToolInvocationContext(
             controller=MagicMock(), action=MagicMock(), state=MagicMock()
         )
-        await pipeline.run_plan(ctx)
+        await pipeline.run_execute(ctx)
         assert ctx.blocked is True
-        mw2.plan.assert_not_called()
+        mw2.execute.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_multiple_middlewares_run_in_order(self):
@@ -161,23 +128,23 @@ class TestToolInvocationPipelineCore:
 
         mw1 = MagicMock(spec=ToolInvocationMiddleware)
 
-        async def plan1(ctx):
+        async def execute1(ctx):
             order.append(1)
 
-        mw1.plan = plan1
+        mw1.execute = execute1
 
         mw2 = MagicMock(spec=ToolInvocationMiddleware)
 
-        async def plan2(ctx):
+        async def execute2(ctx):
             order.append(2)
 
-        mw2.plan = plan2
+        mw2.execute = execute2
 
         pipeline = ToolInvocationPipeline(MagicMock(), [mw1, mw2])
         ctx = ToolInvocationContext(
             controller=MagicMock(), action=MagicMock(), state=MagicMock()
         )
-        await pipeline.run_plan(ctx)
+        await pipeline.run_execute(ctx)
         assert order == [1, 2]
 
 
@@ -244,17 +211,6 @@ class TestCircuitBreakerMiddlewarePipeline:
 
 
 class TestLoggingMiddlewarePipeline:
-    @pytest.mark.asyncio
-    async def test_plan_logs(self):
-        controller = MagicMock()
-        mw = LoggingMiddleware(controller)
-        ctx = ToolInvocationContext(
-            controller=controller, action=MagicMock(), state=MagicMock()
-        )
-        await mw.plan(ctx)
-        controller.log.assert_called_once()
-        assert 'PLAN' in controller.log.call_args[0][1]
-
     @pytest.mark.asyncio
     async def test_execute_logs(self):
         controller = MagicMock()

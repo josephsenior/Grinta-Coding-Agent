@@ -17,7 +17,7 @@ This script handles everything:
 - Checks for `uv` and Python versions
 - Syncs dependencies
 - Discover local models (Ollama/LM Studio)
-- Starts the App server (web UI at http://localhost:3000)
+- Starts the Grinta terminal CLI
 
 ## Option 2: Manual start
 
@@ -27,30 +27,24 @@ This script handles everything:
 uv sync
 ```
 
-### 2) Start the server
+### 2) Start the CLI
 
 ```powershell
-uv run python start_server.py
+uv run python -m backend.cli.entry
 ```
 
-This is the canonical local server path. `uv run app serve` now delegates to the same entrypoint.
+This is the canonical local startup path.
 
-Equivalent aliases:
+If you need the raw HTTP backend for API/OpenAPI tooling, use [start_backend.ps1](../start_backend.ps1)
+on Windows or run:
 
 ```powershell
-uv run app serve
-uv run app all
-uv run app start
+uv run python -m backend.execution.action_execution_server 3000 --working-dir .
 ```
-
-Then open **http://localhost:3000** in a browser.
-
-Startup now prints a preflight summary showing the resolved app root, settings path,
-host, port, reload mode, and readiness URL.
 
 ## Security profile
 
-App's default local runtime is not sandboxed. If you want a stricter local policy mode, set `security.execution_profile` to `hardened_local` in your configuration.
+Grinta's default local runtime is not sandboxed. If you want a stricter local policy mode, set `security.execution_profile` to `hardened_local` in your configuration.
 
 `hardened_local` blocks or constrains:
 - commands that execute outside the workspace
@@ -62,11 +56,12 @@ App's default local runtime is not sandboxed. If you want a stricter local polic
 
 This is policy hardening, not host isolation.
 
-## URLs
+## Optional HTTP Backend
 
-- Web UI: http://localhost:3000
-- Backend API: http://localhost:3000/api
-- API docs: http://localhost:3000/docs
+If you start the raw backend, the OpenAPI spec is exposed at:
+
+- OpenAPI JSON: http://localhost:3000/openapi.json
+- Server info: http://localhost:3000/server_info
 
 ## Common issues
 
@@ -84,10 +79,9 @@ Ensure **Ollama** or **LM Studio** is running. App auto-discovers them on startu
 
 ### Port already in use
 
-Change the backend port via environment variable `APP_PORT`.
-
-The canonical local server will also auto-select the next free port in a small range
-and print the resolved port in the startup preflight.
+This only applies to the raw HTTP backend. Use `-Port` with [start_backend.ps1](../start_backend.ps1)
+or change the positional port argument when launching
+`backend.execution.action_execution_server` directly.
 
 ### Health and startup status
 

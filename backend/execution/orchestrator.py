@@ -66,6 +66,7 @@ class RuntimeOrchestrator:
         event_stream: EventStream | None = None,
         env_vars: dict[str, str] | None = None,
         user_id: str | None = None,
+        inline_event_delivery: bool = False,
     ) -> RuntimeAcquireResult:
         from backend.core.bootstrap.setup import (
             create_runtime,  # lazy import to avoid cycles
@@ -99,6 +100,7 @@ class RuntimeOrchestrator:
             event_stream=event_stream,
             env_vars=env_vars,
             user_id=user_id,
+            inline_event_delivery=inline_event_delivery,
         )
         repo_dir = repo_initializer(runtime) if repo_initializer else None
         self._telemetry.record_acquire(key, reused=False)

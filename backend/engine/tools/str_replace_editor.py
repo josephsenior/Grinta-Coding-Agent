@@ -14,13 +14,18 @@ _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editin
 * `create_file`: create new file (fails if exists). Requires `file_text`.
 * `replace_text`: replace exact match of `old_str` with `new_str`. Must be unique in file. Include 3-5 context lines.
 * `insert_text`: insert `new_str` after `insert_line`.
-* `undo_last_edit`: revert last edit at `path`.
+* `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
 * `view_and_replace`: view + replace in one call. `view_range` scopes both display and match.
 * `batch_replace`: atomic multi-file edits. Provide `edits` array of {path, old_str, new_str}. All succeed or all roll back.
 
-Use absolute paths. `normalize_ws: true` ignores whitespace differences when matching.
+Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
+`normalize_ws: true` ignores whitespace differences when matching.
 """
-_SHORT_STR_REPLACE_EDITOR_DESCRIPTION = 'File viewing, creation, and editing tool. Commands: view_file, create_file, replace_text, insert_text, undo_last_edit, view_and_replace, batch_replace. Use absolute paths. old_str must match exactly and uniquely.\n'
+_SHORT_STR_REPLACE_EDITOR_DESCRIPTION = (
+    'File viewing, creation, and editing tool. Commands: view_file, create_file, replace_text, '
+    'insert_text, undo_last_edit, view_and_replace, batch_replace. Use project-relative paths. '
+    'old_str must match exactly and uniquely.\n'
+)
 
 
 def create_str_replace_editor_tool(
@@ -57,7 +62,8 @@ def create_str_replace_editor_tool(
                 ],
             ),
             'path': get_path_param(
-                'Absolute path to file or directory, e.g. `/workspace/file.py` or `/workspace`.'
+                'Path to file or directory, relative to the project root (e.g. `README.md`, '
+                '`src/main.py`) or an absolute path under that root.'
             ),
             'file_text': {
                 'description': 'Required for `create_file`. Content of the file to create.',

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ============================================
-# App - Docker Quick Start
+# Grinta - Docker Quick Start
 # ============================================
 
 set -e
 
-echo "🚀 Starting app in Docker..."
+echo "🚀 Starting Grinta in Docker..."
 
 NO_DATABASE=0
 DETACHED=0
@@ -33,14 +33,7 @@ if [ ! -f "settings.json" ]; then
 fi
 
 # Run docker compose
-echo "🐳 Running Docker Compose (default: Redis + Postgres + app)..."
-
-if [ "$NO_DATABASE" -eq 1 ]; then
-    export APP_KB_STORAGE_TYPE=file
-    echo "⚠ Emergency mode enabled: APP_KB_STORAGE_TYPE=file"
-else
-    export APP_KB_STORAGE_TYPE=database
-fi
+echo "🐳 Running Docker Compose (local file-backed Grinta)..."
 
 if [ "$DETACHED" -eq 1 ]; then
     docker compose up --build -d

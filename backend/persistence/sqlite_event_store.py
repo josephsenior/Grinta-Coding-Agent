@@ -49,16 +49,19 @@ CREATE TABLE IF NOT EXISTS metadata (
 class SQLiteEventStore:
     """Thread-safe SQLite store for conversation events.
 
-    Each instance manages a single database file. Writes are serialised
-    via WAL mode and a per-instance lock so multiple async workers can
-    safely share the same store.
+    Each instance manages a single database file. WAL mode enables concurrent
+    readers alongside a single writer.  Writes are serialised via ``_write_lock``
+    while reads use a separate ``_read_conn`` without holding any Python-level
+    lock, allowing concurrent read operations.
     """
 
     def __init__(self, db_path: str | Path) -> None:
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._lock = threading.Lock()
+        self._write_lock = threading.Lock()
         self._conn: sqlite3.Connection | None = None
+        # Dedicated read connection — WAL mode allows concurrent readers
+        self._read_conn: sqlite3.Connection | None = None
         self._ensure_schema()
 
     # ------------------------------------------------------------------
@@ -78,8 +81,22 @@ class SQLiteEventStore:
             self._conn.row_factory = sqlite3.Row
         return self._conn
 
+    def _get_read_conn(self) -> sqlite3.Connection:
+        """Return a read-only connection for concurrent queries."""
+        if self._read_conn is None:
+            self._read_conn = sqlite3.connect(
+                str(self._db_path),
+                check_same_thread=False,
+                timeout=10.0,
+            )
+            self._read_conn.execute('PRAGMA journal_mode=WAL')
+            self._read_conn.execute('PRAGMA query_only=ON')
+            self._read_conn.execute('PRAGMA busy_timeout=5000')
+            self._read_conn.row_factory = sqlite3.Row
+        return self._read_conn
+
     def _ensure_schema(self) -> None:
-        with self._lock:
+        with self._write_lock:
             conn = self._get_conn()
             conn.executescript(_CREATE_SQL)
             # Record schema version
@@ -90,8 +107,11 @@ class SQLiteEventStore:
             conn.commit()
 
     def close(self) -> None:
-        """Close the database connection."""
-        with self._lock:
+        """Close the database connections."""
+        with self._write_lock:
+            if self._read_conn is not None:
+                self._read_conn.close()
+                self._read_conn = None
             if self._conn is not None:
                 self._conn.close()
                 self._conn = None
@@ -114,7 +134,7 @@ class SQLiteEventStore:
         event_type = event_dict.get('action', event_dict.get('observation', 'unknown'))
         source = event_dict.get('source')
 
-        with self._lock:
+        with self._write_lock:
             conn = self._get_conn()
             conn.execute(
                 'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
@@ -125,24 +145,29 @@ class SQLiteEventStore:
     def write_events_batch(self, events: list[tuple[int, dict[str, Any]]]) -> None:
         """Persist multiple events in a single transaction.
 
+        Uses executemany for efficient bulk insertion.
+
         Args:
             events: List of ``(event_id, event_dict)`` pairs.
         """
         import time as _time
 
-        with self._lock:
+        rows = []
+        for event_id, event_dict in events:
+            payload = json.dumps(event_dict, ensure_ascii=False)
+            timestamp = event_dict.get('timestamp', _time.time())
+            event_type = event_dict.get(
+                'action', event_dict.get('observation', 'unknown')
+            )
+            source = event_dict.get('source', None)
+            rows.append((event_id, timestamp, event_type, source, payload))
+
+        with self._write_lock:
             conn = self._get_conn()
-            for event_id, event_dict in events:
-                payload = json.dumps(event_dict, ensure_ascii=False)
-                timestamp = event_dict.get('timestamp', _time.time())
-                event_type = event_dict.get(
-                    'action', event_dict.get('observation', 'unknown')
-                )
-                source = event_dict.get('source', None)
-                conn.execute(
-                    'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
-                    (event_id, timestamp, event_type, source, payload),
-                )
+            conn.executemany(
+                'INSERT OR REPLACE INTO events (id, timestamp, event_type, source, payload) VALUES (?, ?, ?, ?, ?)',
+                rows,
+            )
             conn.commit()
 
     # ------------------------------------------------------------------
@@ -152,14 +177,15 @@ class SQLiteEventStore:
     def read_event(self, event_id: int) -> dict[str, Any] | None:
         """Read a single event by ID.
 
+        Uses the dedicated read connection — no write lock contention.
+
         Returns:
             Parsed event dict, or ``None`` if not found.
         """
-        with self._lock:
-            conn = self._get_conn()
-            row = conn.execute(
-                'SELECT payload FROM events WHERE id = ?', (event_id,)
-            ).fetchone()
+        conn = self._get_read_conn()
+        row = conn.execute(
+            'SELECT payload FROM events WHERE id = ?', (event_id,)
+        ).fetchone()
         if row is None:
             return None
         return json.loads(row['payload'])
@@ -202,24 +228,21 @@ class SQLiteEventStore:
             sql += ' LIMIT ?'
             params.append(limit)
 
-        with self._lock:
-            conn = self._get_conn()
-            rows = conn.execute(sql, params).fetchall()
+        conn = self._get_read_conn()
+        rows = conn.execute(sql, params).fetchall()
 
         return [json.loads(r['payload']) for r in rows]
 
     def count(self) -> int:
         """Return the total number of persisted events."""
-        with self._lock:
-            conn = self._get_conn()
-            row = conn.execute('SELECT COUNT(*) AS cnt FROM events').fetchone()
+        conn = self._get_read_conn()
+        row = conn.execute('SELECT COUNT(*) AS cnt FROM events').fetchone()
         return row['cnt'] if row else 0
 
     def max_id(self) -> int:
         """Return the highest event ID, or -1 if empty."""
-        with self._lock:
-            conn = self._get_conn()
-            row = conn.execute('SELECT MAX(id) AS m FROM events').fetchone()
+        conn = self._get_read_conn()
+        row = conn.execute('SELECT MAX(id) AS m FROM events').fetchone()
         val = row['m'] if row else None
         return val if val is not None else -1
 
@@ -229,7 +252,7 @@ class SQLiteEventStore:
 
     def delete_event(self, event_id: int) -> None:
         """Delete a single event."""
-        with self._lock:
+        with self._write_lock:
             conn = self._get_conn()
             conn.execute('DELETE FROM events WHERE id = ?', (event_id,))
             conn.commit()
@@ -240,7 +263,7 @@ class SQLiteEventStore:
         Returns:
             Number of deleted rows.
         """
-        with self._lock:
+        with self._write_lock:
             conn = self._get_conn()
             cursor = conn.execute('DELETE FROM events WHERE id >= ?', (start_id,))
             conn.commit()

@@ -11,8 +11,6 @@ import pytest
 from backend.core.config import LLMConfig
 from backend.inference.cost_tracker import (
     get_completion_cost,
-    record_llm_cost_from_metrics,
-    record_llm_cost_from_response,
 )
 from backend.inference.metrics import Metrics
 
@@ -84,64 +82,3 @@ class TestGetCompletionCostCatalog:
             assert cost == pytest.approx(expected)
 
 
-# ---------------------------------------------------------------------------
-# record_llm_cost_from_metrics
-# ---------------------------------------------------------------------------
-
-
-class TestRecordLLMCostFromMetrics:
-    def test_records_accumulated_cost(self):
-        metrics = cast(Metrics, SimpleNamespace(accumulated_cost=1.23))
-        mock_record = MagicMock()
-        with patch.dict(
-            'sys.modules',
-            {
-                'backend.telemetry.cost_recording': MagicMock(
-                    record_llm_cost=mock_record
-                )
-            },
-        ):
-            record_llm_cost_from_metrics('user:42', metrics)
-        mock_record.assert_called_once_with('user:42', 1.23)
-
-    def test_zero_cost_not_recorded(self):
-        metrics = cast(Metrics, SimpleNamespace(accumulated_cost=0.0))
-        # Should not raise even if the import is missing
-        record_llm_cost_from_metrics('user:1', metrics)
-
-    def test_missing_import_handled_gracefully(self):
-        """If the telemetry module is absent, no error is raised."""
-        metrics = cast(Metrics, SimpleNamespace(accumulated_cost=5.0))
-        with patch(
-            'builtins.__import__',
-            side_effect=ImportError('no module'),
-        ):
-            # Should not raise
-            record_llm_cost_from_metrics('user:1', metrics)
-
-
-# ---------------------------------------------------------------------------
-# record_llm_cost_from_response
-# ---------------------------------------------------------------------------
-
-
-class TestRecordLLMCostFromResponse:
-    @patch('backend.inference.cost_tracker.get_completion_cost', return_value=0.50)
-    def test_records_cost_from_usage(self, mock_cost):
-        response = {'usage': {'prompt_tokens': 100, 'completion_tokens': 50}}
-        with patch('backend.telemetry.cost_recording.record_llm_cost') as mock_record:
-            record_llm_cost_from_response('ip:127', response, 'gpt-4o')
-        mock_cost.assert_called_once()
-        mock_record.assert_called_once_with('ip:127', 0.50)
-
-    def test_missing_usage_does_not_crash(self):
-        """Empty response dict should not raise."""
-        record_llm_cost_from_response('ip:1', {}, 'gpt-4o')
-
-    def test_import_error_swallowed(self):
-        response = {'usage': {'prompt_tokens': 100, 'completion_tokens': 50}}
-        with patch(
-            'builtins.__import__',
-            side_effect=ImportError('gone'),
-        ):
-            record_llm_cost_from_response('u:1', response, 'gpt-4o')

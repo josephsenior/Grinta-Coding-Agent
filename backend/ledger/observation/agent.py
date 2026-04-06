@@ -46,6 +46,7 @@ class AgentThinkObservation(Observation):
     """
 
     observation: ClassVar[str] = ObservationType.THINK
+    suppress_cli: bool = False
 
     @property
     def message(self) -> str:

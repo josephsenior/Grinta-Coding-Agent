@@ -53,16 +53,17 @@ class TaskValidationService:
         if not lesson or not str(lesson).strip():
             return
 
-        import os
         from datetime import datetime
+        from pathlib import Path
 
-        # Path to project-level session memory
+        from backend.core.workspace_resolution import workspace_agent_state_dir
+
         file_store = self._context.get_controller().config.file_store
-        project_root = file_store.root if file_store else '.'
-        memories_path = os.path.join(project_root, '.grinta', 'lessons.md')
+        project_root = Path(file_store.root) if file_store else None
+        memories_path = workspace_agent_state_dir(project_root) / 'lessons.md'
 
         try:
-            os.makedirs(os.path.dirname(memories_path), exist_ok=True)
+            memories_path.parent.mkdir(parents=True, exist_ok=True)
 
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
             initial_task = self._context.get_controller()._get_initial_task()

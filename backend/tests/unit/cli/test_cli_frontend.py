@@ -32,7 +32,21 @@ from backend.cli.repl import (
 from backend.core.config import AppConfig
 from backend.core.enums import ActionSecurityRisk, AgentState, EventSource
 from backend.inference.metrics import Metrics, ResponseLatency, TokenUsage
-from backend.ledger.action import CmdRunAction, MessageAction, StreamingChunkAction
+from backend.ledger.action import (
+    AgentThinkAction,
+    CmdRunAction,
+    FileEditAction,
+    FileReadAction,
+    MessageAction,
+    StreamingChunkAction,
+)
+from backend.persistence.locations import get_project_local_data_root
+from backend.ledger.observation import (
+    AgentThinkObservation,
+    CmdOutputObservation,
+    ErrorObservation,
+    TaskTrackingObservation,
+)
 
 
 def _make_console(*, width: int = 120) -> Console:
@@ -47,6 +61,11 @@ def _console_output(console: Console) -> str:
     file_obj = console.file
     assert isinstance(file_obj, io.StringIO)
     return file_obj.getvalue()
+
+
+def _transcript_needle_count(console: Console, needle: str) -> int:
+    """Count occurrences of *needle* in rendered console output (committed lines)."""
+    return _console_output(console).count(needle)
 
 
 @pytest.mark.asyncio
@@ -85,6 +104,121 @@ async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
     # Agent reply printed to console (no Live active).
     output = _console_output(console)
     assert 'Hello' in output
+
+
+@pytest.mark.asyncio
+async def test_event_renderer_emits_each_duplicate_command_line() -> None:
+    """Each CmdRunAction produces a Ran row; command is shown when observation or next action arrives."""
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console,
+        hud,
+        ReasoningDisplay(),
+        loop=asyncio.get_running_loop(),
+    )
+    renderer.start_live()
+    run1 = CmdRunAction(command='ls -F')
+    run1.source = EventSource.AGENT
+    run2 = CmdRunAction(command='ls -F')
+    run2.source = EventSource.AGENT
+    renderer._process_event_data(run1)
+    renderer._process_event_data(run2)
+    # run1 is flushed when run2 arrives (orphan flush); run2 is still buffered
+    assert _transcript_needle_count(console, '$ ls -F') == 1
+
+    renderer._process_event_data(CmdOutputObservation('', command='ls -F'))
+    run3 = CmdRunAction(command='ls -F')
+    run3.source = EventSource.AGENT
+    renderer._process_event_data(run3)
+    # CmdOutputObservation printed run2’s combined card; run3 is buffered (flushed when run4 or obs arrives)
+    assert _transcript_needle_count(console, '$ ls -F') == 2
+
+
+@pytest.mark.asyncio
+async def test_event_renderer_repeats_identical_file_read_rows() -> None:
+    """Same read path after another tool still gets a new activity row each time."""
+    console = _make_console()
+    renderer = CLIEventRenderer(
+        console,
+        HUDBar(),
+        ReasoningDisplay(),
+        loop=asyncio.get_running_loop(),
+    )
+    renderer.start_live()
+    r1 = FileReadAction(path='pkg/a.py')
+    r1.source = EventSource.AGENT
+    other = FileEditAction(path='pkg/b.py', command='insert_text')
+    other.source = EventSource.AGENT
+    r2 = FileReadAction(path='pkg/a.py')
+    r2.source = EventSource.AGENT
+    renderer._process_event_data(r1)
+    renderer._process_event_data(other)
+    renderer._process_event_data(r2)
+    assert _transcript_needle_count(console, 'pkg/a.py') == 2
+    assert _transcript_needle_count(console, 'Viewed') == 2
+
+
+@pytest.mark.asyncio
+async def test_event_renderer_message_action_between_reads_both_emit_rows() -> None:
+    """Assistant MessageAction between two identical reads does not suppress either row."""
+    console = _make_console()
+    renderer = CLIEventRenderer(
+        console,
+        HUDBar(),
+        ReasoningDisplay(),
+        loop=asyncio.get_running_loop(),
+    )
+    renderer.start_live()
+    r1 = FileReadAction(path='x.py')
+    r1.source = EventSource.AGENT
+    msg = MessageAction(content='Thinking out loud…', wait_for_response=False)
+    msg.source = EventSource.AGENT
+    r2 = FileReadAction(path='x.py')
+    r2.source = EventSource.AGENT
+    renderer._process_event_data(r1)
+    renderer._process_event_data(msg)
+    renderer._process_event_data(r2)
+    assert _transcript_needle_count(console, 'x.py') == 2
+
+
+@pytest.mark.asyncio
+async def test_event_renderer_repeat_command_after_error_still_two_rows() -> None:
+    """Errors flush buffered command; second run shows up after its own observation."""
+    console = _make_console()
+    renderer = CLIEventRenderer(
+        console,
+        HUDBar(),
+        ReasoningDisplay(),
+        loop=asyncio.get_running_loop(),
+    )
+    renderer.start_live()
+    run1 = CmdRunAction(command='ls -la')
+    run1.source = EventSource.AGENT
+    renderer._process_event_data(run1)
+    renderer._process_event_data(ErrorObservation(content='oops'))
+    run2 = CmdRunAction(command='ls -la')
+    run2.source = EventSource.AGENT
+    renderer._process_event_data(run2)
+    # run1 was flushed (orphan) by ErrorObservation; run2 is printed by its matching observation
+    renderer._process_event_data(CmdOutputObservation('output', exit_code=0, command='ls -la'))
+    assert _transcript_needle_count(console, '$ ls -la') == 2
+
+
+def test_hud_shows_mcp_server_count_when_set() -> None:
+    hud = HUDBar()
+    assert 'MCP servers —' in hud._format().plain
+    hud.update_mcp_servers(3)
+    assert '3 MCP servers' in hud._format().plain
+    n_skills = HUDBar.count_bundled_playbook_skills()
+    assert f'{n_skills} skill' in hud._format().plain or f'{n_skills} skills' in hud._format().plain
+
+
+def test_hud_singular_mcp_label() -> None:
+    hud = HUDBar()
+    hud.update_mcp_servers(1)
+    assert '1 MCP server' in hud._format().plain
+    assert '1 MCP servers' not in hud._format().plain
 
 
 def test_confirmation_uses_backend_security_risk() -> None:
@@ -200,11 +334,10 @@ def test_show_grinta_splash_renders_logo_text() -> None:
     show_grinta_splash(console)
     output = _console_output(console)
 
-    # Banner uses block-char art — just verify the subtitle lines are present.
-    assert 'think' in output
-    assert 'code' in output
-    assert 'ship' in output
-    assert 'Type a task or press Tab after / for commands' in output
+    # Non-TTY StringIO console: static frame with tagline + hint (see show_grinta_splash).
+    assert 'AI agent' in output
+    assert 'Pure grit' in output
+    assert 'Type /help to explore commands' in output
 
 
 def test_prompt_session_requires_tty_streams() -> None:
@@ -363,7 +496,7 @@ async def test_renderer_handles_error_observation() -> None:
 
 @pytest.mark.asyncio
 async def test_start_stop_live_flushes_items_to_console() -> None:
-    """add_system_message should print inline to console (not buffer in _live_items)."""
+    """During Live, system messages print immediately; stop_live clears the live region."""
     console = _make_console()
     hud = HUDBar()
     renderer = CLIEventRenderer(
@@ -372,8 +505,6 @@ async def test_start_stop_live_flushes_items_to_console() -> None:
 
     renderer.start_live()
     renderer.add_system_message('Working…', title='grinta')
-    # _print_or_buffer prints inline (via suspend_live), NOT into _live_items
-    assert len(renderer._live_items) == 0
     renderer.stop_live()
 
     output = _console_output(console)
@@ -459,7 +590,8 @@ def test_autonomy_command_shows_current_level() -> None:
 
 def test_prompt_toolbar_reflects_state_and_autonomy() -> None:
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
-    repl.set_renderer(type('RendererStub', (), {'current_state': AgentState.PAUSED})())
+    # PAUSED is collapsed to STOPPED in CLI — label shows "Stopped"
+    repl.set_renderer(type('RendererStub', (), {'current_state': AgentState.STOPPED})())
 
     autonomy_controller = MagicMock()
     autonomy_controller.autonomy_level = 'full'
@@ -469,7 +601,7 @@ def test_prompt_toolbar_reflects_state_and_autonomy() -> None:
 
     toolbar = repl._prompt_toolbar_text()
 
-    assert 'Paused' in toolbar
+    assert 'Stopped' in toolbar
     assert 'full autonomy' in toolbar
     assert 'Tab for commands' in toolbar
 
@@ -655,12 +787,16 @@ def test_grinta_main_runs_cleanup_storage_without_asyncio() -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_main_defaults_workspace_to_cwd(tmp_path: Path) -> None:
+async def test_async_main_defaults_workspace_to_cwd(tmp_path: Path, monkeypatch) -> None:
     config = AppConfig()
     config.get_llm_config().model = 'openai/gpt-4.1'
 
     repl = MagicMock()
     repl.run = AsyncMock()
+    sim_home = tmp_path / 'SIM_HOME'
+    sim_home.mkdir()
+    monkeypatch.setenv('HOME', str(sim_home))
+    monkeypatch.setenv('USERPROFILE', str(sim_home))
 
     with patch('backend.core.config.load_app_config', return_value=config):
         with patch('backend.cli.main.Console', return_value=_make_console()):
@@ -675,8 +811,8 @@ async def test_async_main_defaults_workspace_to_cwd(tmp_path: Path) -> None:
 
     resolved = str(tmp_path.resolve())
     assert config.project_root == resolved
-    # local_data_root stays at global ~/.grinta/storage (not workspace-specific)
-    assert '~/.grinta/storage' in config.local_data_root or 'grinta' in config.local_data_root
+    assert config.local_data_root == get_project_local_data_root(tmp_path)
+    assert 'workspaces' in config.local_data_root
     assert config.get_agent_config(config.default_agent).cli_mode is True
     repl.run.assert_awaited_once()
 
@@ -716,11 +852,15 @@ async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_async_main_keeps_explicit_project_override(tmp_path: Path) -> None:
+async def test_async_main_keeps_explicit_project_override(tmp_path: Path, monkeypatch) -> None:
     config = AppConfig()
     config.get_llm_config().model = 'openai/gpt-4.1'
     repl = MagicMock()
     repl.run = AsyncMock()
+    sim_home = tmp_path / 'SIM_HOME'
+    sim_home.mkdir()
+    monkeypatch.setenv('HOME', str(sim_home))
+    monkeypatch.setenv('USERPROFILE', str(sim_home))
 
     with patch('backend.core.config.load_app_config', return_value=config):
         with patch('backend.cli.main.Console', return_value=_make_console()):
@@ -734,8 +874,8 @@ async def test_async_main_keeps_explicit_project_override(tmp_path: Path) -> Non
 
     resolved = str(tmp_path.resolve())
     assert config.project_root == resolved
-    # local_data_root stays at global ~/.grinta/storage (not workspace-specific)
-    assert '~/.grinta/storage' in config.local_data_root or 'grinta' in config.local_data_root
+    assert config.local_data_root == get_project_local_data_root(tmp_path)
+    assert 'workspaces' in config.local_data_root
     assert config.get_agent_config(config.default_agent).cli_mode is True
 
 
@@ -840,8 +980,6 @@ async def test_wait_for_agent_idle_drains_late_final_message() -> None:
     await repl._wait_for_agent_idle(controller, None)
     await emit_task
 
-    for item in renderer._live_items:
-        console.print(item)
     output = _console_output(console)
     assert 'Final answer' in output
 
@@ -886,6 +1024,92 @@ async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
     # (the old "grinta ready" message was removed — the splash covers that).
     init_msgs = [e for e in events if e != 'bootstrap']
     assert any('nitializ' in m for m in init_msgs) or len(events) >= 1
+
+
+@pytest.mark.asyncio
+async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> None:
+    config = AppConfig()
+    console = Console(file=io.StringIO(), force_terminal=False)
+    repl = Repl(config, console)
+    event_stream = MagicMock()
+    event_stream.sid = 'session-1'
+    runtime = MagicMock()
+    runtime.event_stream = event_stream
+    memory = MagicMock()
+    controller = MagicMock()
+    agent = MagicMock()
+    agent.config.enable_mcp = True
+    agent.mcp_capability_status = {'connected_client_count': 0}
+    llm_registry = MagicMock()
+    conversation_stats = MagicMock()
+    acquire_result = 'runtime-handle'
+    first_message_dispatched = asyncio.Event()
+    allow_mcp_finish = asyncio.Event()
+    queued_inputs: asyncio.Queue[str] = asyncio.Queue()
+    await queued_inputs.put('hello\n')
+
+    def add_event(action, source):
+        del source
+        if isinstance(action, MessageAction) and action.content == 'hello':
+            first_message_dispatched.set()
+
+    async def fake_read() -> str:
+        return await queued_inputs.get()
+
+    async def fake_setup_mcp(*_args, **_kwargs) -> None:
+        await allow_mcp_finish.wait()
+        agent.mcp_capability_status = {'connected_client_count': 2}
+
+    event_stream.add_event.side_effect = add_event
+
+    with (
+        patch('backend.cli.repl.get_current_model', return_value='test-model'),
+        patch('backend.cli.repl._supports_prompt_session', return_value=False),
+        patch.object(repl, '_read_non_interactive_input', side_effect=fake_read),
+        patch.object(
+            repl,
+            '_ensure_controller_loop',
+            new=AsyncMock(return_value=(controller, None)),
+        ),
+        patch.object(
+            repl,
+            '_wait_for_agent_idle',
+            new=AsyncMock(return_value=None),
+        ),
+        patch(
+            'backend.core.bootstrap.main._initialize_session_components',
+            return_value=(
+                'session-1',
+                llm_registry,
+                conversation_stats,
+                config,
+                agent,
+            ),
+        ),
+        patch(
+            'backend.core.bootstrap.main._setup_runtime_for_controller',
+            return_value=(runtime, None, acquire_result),
+        ),
+        patch(
+            'backend.core.bootstrap.main._setup_memory',
+            new=AsyncMock(return_value=memory),
+        ) as mock_setup_memory,
+        patch(
+            'backend.core.bootstrap.main._setup_mcp_tools',
+            new=AsyncMock(side_effect=fake_setup_mcp),
+        ) as mock_setup_mcp,
+        patch('backend.execution.runtime_orchestrator.release') as mock_release,
+    ):
+        run_task = asyncio.create_task(repl.run())
+        await asyncio.wait_for(first_message_dispatched.wait(), timeout=1)
+        assert not allow_mcp_finish.is_set()
+        allow_mcp_finish.set()
+        await queued_inputs.put('')
+        await run_task
+
+    mock_setup_memory.assert_awaited_once()
+    mock_setup_mcp.assert_awaited_once()
+    mock_release.assert_called_once_with(acquire_result)
 
 
 # ── New tests: Reasoning elapsed time ────────────────────────────────────
@@ -1140,7 +1364,8 @@ async def test_streaming_preview_renders_streaming_panel() -> None:
     console.print(renderer._render_streaming_preview())
     output = _console_output(console)
 
-    # _render_streaming_preview returns Markdown + cursor — no title/label
+    # _render_streaming_preview uses a titled panel so live draft text is visually separated.
+    assert 'Draft reply' in output
     assert 'Hello' in output
 
 
@@ -1160,9 +1385,10 @@ async def test_renderer_shows_command_context_for_output() -> None:
     obs = CmdOutputObservation(content='2 passed', command='python -m pytest -q')
     await renderer.handle_event(obs)
 
-    # Command output is hidden from the chat view (display-only choice).
+    # exit_code defaults to -1 (unknown), so renderer shows a dim error line with content snippet.
     output = _console_output(console)
-    assert output == ''
+    assert 'exit -1' in output
+    assert '2 passed' in output
 
 
 # ── New tests: Session resume command ────────────────────────────────────
@@ -1204,9 +1430,16 @@ def test_resume_command_with_session_id() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resume_session_uses_persisted_session_index(tmp_path: Path) -> None:
+async def test_resume_session_uses_persisted_session_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """resume_session should resolve numeric indexes from the real session storage layout."""
-    sessions_root = tmp_path / '.grinta' / 'storage' / 'sessions'
+    fake = tmp_path / 'USER_HOME'
+    fake.mkdir()
+    monkeypatch.setenv('HOME', str(fake))
+    monkeypatch.setenv('USERPROFILE', str(fake))
+    data_root = Path(get_project_local_data_root(tmp_path))
+    sessions_root = data_root / 'sessions'
     older = sessions_root / 'session-old'
     newer = sessions_root / 'session-new'
     older.mkdir(parents=True)
@@ -1222,7 +1455,7 @@ async def test_resume_session_uses_persisted_session_index(tmp_path: Path) -> No
 
     config = AppConfig(
         project_root=str(tmp_path),
-        local_data_root=str(tmp_path / '.grinta' / 'storage'),
+        local_data_root=str(data_root),
     )
     repl = Repl(config, _make_console())
     renderer = MagicMock()
@@ -1311,9 +1544,10 @@ async def test_renderer_handles_file_read_action() -> None:
     action = FileReadAction(path='/workspace/src/main.py')
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
-    # FileReadAction updates reasoning panel only — no console output
-    assert renderer._reasoning.active
-    assert 'main.py' in renderer._reasoning._current_action
+    # FileReadAction now prints a persistent tool-call label to console
+    assert not renderer._reasoning.active
+    output = _console_output(console)
+    assert 'main.py' in output
 
 
 @pytest.mark.asyncio
@@ -1327,9 +1561,9 @@ async def test_renderer_handles_file_read_observation() -> None:
     )
     obs = FileReadObservation(content='line1\nline2\nline3', path='/workspace/test.py')
     await renderer.handle_event(obs)
-    # FileReadObservation stops reasoning; no console output
+    # FileReadObservation shows a dim stats continuation (path was on the action row).
     output = _console_output(console)
-    assert output == ''
+    assert '3 lines' in output
 
 
 @pytest.mark.asyncio
@@ -1344,9 +1578,11 @@ async def test_renderer_handles_mcp_action() -> None:
     action = MCPAction(name='search_code', arguments={'query': 'test'})
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
-    # MCPAction updates reasoning panel only — no console output
-    assert renderer._reasoning.active
-    assert 'search_code' in renderer._reasoning._current_action
+    # MCPAction prints a friendly verb + query detail
+    assert not renderer._reasoning.active
+    output = _console_output(console)
+    assert 'Searched' in output
+    assert 'test' in output
 
 
 @pytest.mark.asyncio
@@ -1377,9 +1613,10 @@ async def test_renderer_handles_delegate_task_action() -> None:
     action = DelegateTaskAction(task_description='Write unit tests')
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
-    # DelegateTaskAction updates reasoning panel only — no console output
-    assert renderer._reasoning.active
-    assert 'Delegating' in renderer._reasoning._current_action
+    # DelegateTaskAction prints a friendly activity row
+    assert not renderer._reasoning.active
+    output = _console_output(console)
+    assert 'Delegated' in output
 
 
 @pytest.mark.asyncio
@@ -1417,6 +1654,118 @@ async def test_renderer_handles_task_tracking_action() -> None:
 
 
 @pytest.mark.asyncio
+async def test_renderer_task_tracking_observation_replaces_previous_panel() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    renderer.start_live()
+
+    await renderer.handle_event(
+        TaskTrackingObservation(
+            content='created',
+            command='plan',
+            task_list=[
+                {
+                    'id': '1',
+                    'description': 'Analyze manifest structure',
+                    'status': 'pending',
+                }
+            ],
+        )
+    )
+    await renderer.handle_event(
+        TaskTrackingObservation(
+            content='updated',
+            command='update',
+            task_list=[
+                {
+                    'id': '1',
+                    'description': 'Analyze manifest structure',
+                    'status': 'in_progress',
+                }
+            ],
+        )
+    )
+
+    assert renderer._task_panel is not None
+
+    renderer.stop_live()
+    output = _console_output(console)
+    assert output.count('Tasks (1)') == 1
+    assert '[PENDING]' not in output
+    assert '[DOING]' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_shows_noop_task_tracker_message_for_update() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    renderer.start_live()
+
+    await renderer.handle_event(
+        TaskTrackingObservation(
+            content=(
+                '[TASK_TRACKER] Update skipped because the plan is unchanged. '
+                'Do a concrete next action now.'
+            ),
+            command='update',
+            task_list=[
+                {
+                    'id': '1',
+                    'description': 'Analyze manifest structure',
+                    'status': 'in_progress',
+                }
+            ],
+        )
+    )
+
+    renderer.stop_live()
+    output = _console_output(console)
+    assert 'plan is unchanged' in output
+    assert 'Tasks (1)' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_hides_internal_tool_thought_payloads() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    reasoning = ReasoningDisplay()
+    renderer = CLIEventRenderer(
+        console, hud, reasoning, loop=asyncio.get_running_loop()
+    )
+    action = AgentThinkAction(
+        thought='[READ_SYMBOL_DEFINITION]\n{\n  "entities": {\n    "foo.py": "missing"\n  }\n}'
+    )
+    action.source = EventSource.AGENT
+
+    await renderer.handle_event(action)
+
+    assert reasoning.active
+    assert 'symbol' in reasoning._current_action.lower()
+    assert reasoning._thought_lines == []
+
+
+@pytest.mark.asyncio
+async def test_renderer_ignores_agent_think_acknowledgement() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    reasoning = ReasoningDisplay()
+    renderer = CLIEventRenderer(
+        console, hud, reasoning, loop=asyncio.get_running_loop()
+    )
+
+    await renderer.handle_event(AgentThinkObservation(content='Your thought has been logged.'))
+
+    assert reasoning._thought_lines == []
+    assert _console_output(console) == ''
+
+
+@pytest.mark.asyncio
 async def test_renderer_handles_user_reject_with_content() -> None:
     from backend.ledger.observation import UserRejectObservation
 
@@ -1448,6 +1797,32 @@ async def test_renderer_handles_agent_condensation_observation() -> None:
 
 
 @pytest.mark.asyncio
+async def test_renderer_prefers_actionable_npm_error_line() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    obs = CmdOutputObservation(
+        content=(
+            "npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, "
+            "open 'C:\\Users\\GIGABYTE\\Desktop\\react-app\\package.json'\n"
+            'npm error enoent This is related to npm not being able to find a file.\n'
+            'npm error A complete log of this run can be found in: '
+            'C:\\Users\\GIGABYTE\\AppData\\Local\\npm-cache\\_logs\\debug.log'
+        ),
+        command='npm create vite@latest . -- --template react && npm install',
+        metadata={'exit_code': 38},
+    )
+
+    await renderer.handle_event(obs)
+
+    output = _console_output(console)
+    assert 'Could not read package.json' in output
+    assert 'A complete log of this run can be found in' not in output
+
+
+@pytest.mark.asyncio
 async def test_renderer_cmd_output_head_tail_truncation() -> None:
     """CmdOutputObservation is hidden from chat — no console output regardless of length."""
     from backend.ledger.observation import CmdOutputObservation
@@ -1461,7 +1836,8 @@ async def test_renderer_cmd_output_head_tail_truncation() -> None:
     obs = CmdOutputObservation(content=long_output, command='cat bigfile.txt', exit_code=0)
     await renderer.handle_event(obs)
     output = _console_output(console)
-    assert output == ''
+    # exit_code=0: renderer shows first output line (truncated) on a dim continuation row
+    assert output.count('A') >= 120
 
 
 @pytest.mark.asyncio

@@ -17,7 +17,7 @@ def _extract_payload(thought: str) -> dict:
 def test_save_checkpoint_success_and_structured_payload(
     monkeypatch, tmp_path: Path
 ) -> None:
-    cp_file = tmp_path / '.grinta' / 'checkpoints.json'
+    cp_file = tmp_path / 'checkpoints.json'
     monkeypatch.setattr(checkpoint, '_checkpoints_path', lambda: cp_file)
 
     action = checkpoint.build_checkpoint_action(
@@ -35,7 +35,7 @@ def test_save_checkpoint_success_and_structured_payload(
 
 
 def test_save_checkpoint_duplicate_is_noop(monkeypatch, tmp_path: Path) -> None:
-    cp_file = tmp_path / '.grinta' / 'checkpoints.json'
+    cp_file = tmp_path / 'checkpoints.json'
     monkeypatch.setattr(checkpoint, '_checkpoints_path', lambda: cp_file)
 
     first = checkpoint.build_checkpoint_action(
@@ -69,7 +69,7 @@ def test_save_checkpoint_missing_label_returns_failed_payload() -> None:
 
 
 def test_clear_when_empty_returns_noop(monkeypatch, tmp_path: Path) -> None:
-    cp_file = tmp_path / '.grinta' / 'checkpoints.json'
+    cp_file = tmp_path / 'checkpoints.json'
     monkeypatch.setattr(checkpoint, '_checkpoints_path', lambda: cp_file)
 
     action = checkpoint.build_checkpoint_action({'command': 'clear'})

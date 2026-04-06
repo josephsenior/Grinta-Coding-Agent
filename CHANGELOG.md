@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to App will be documented in this file.
+All notable changes to Grinta will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Removed the Textual TUI; the React web UI is the sole interactive interface. Extracted
-  `AppClient` into the top-level `client` package for tests and scripts.
+  `GrintaClient` into the top-level `client` package for tests and scripts.
 - **BREAKING**: All API endpoints migrated from `/api/*` to `/api/v1/*` for versioning
   - Update client code to use `/api/v1/` base URL (e.g., `/api/conversations` → `/api/v1/conversations`)
 - Removed all cloud runtime dependencies (e2b, modal, runloop-api-client, daytona) for local-first architecture
@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Hardened local execution policy: interactive terminals, command cwd, uploads, and file access now stay workspace-scoped under `security.execution_profile = "hardened_local"`
 - Crash recovery now fails closed more often, tracks restore provenance, and uses persisted control-event evidence to distinguish stale WAL from ambiguous recovery
 - Startup and status flows now use one canonical local server path, with the resolved startup plan visible in the UI and API
-- Security documentation now explicitly describes App as local policy hardening without sandbox or process isolation
+- Security documentation now explicitly describes Grinta as local policy hardening without sandbox or process isolation
 
 ### Deprecated
 

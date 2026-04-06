@@ -2,6 +2,11 @@
 
 Common issues, their causes, and proven solutions.
 
+Canonical local startup is `uv run python -m backend.cli.entry`. Any older
+references to `start_server.py`, `app.py`, or `uv run app serve` are obsolete.
+If you intentionally need the raw HTTP backend for API/OpenAPI tooling, use
+`start_backend.ps1` or `python -m backend.execution.action_execution_server 3000 --working-dir <project>`.
+
 ---
 
 ## Table of Contents
@@ -67,6 +72,8 @@ The agent needs Git for version tracking and diff operations.
 
 **Symptom:** `Address already in use: port 3000`
 
+This only applies if you are intentionally running the raw HTTP backend.
+
 **Fix:**
 ```bash
 # Find the process using port 3000
@@ -81,9 +88,9 @@ kill -9 <pid>
 
 Or change the port:
 ```bash
-python start_server.py --port 3001
+python -m backend.execution.action_execution_server 3001 --working-dir /path/to/your/project
 ```
-Then open `http://localhost:3001` in your browser.
+Then use `http://localhost:3001/openapi.json` to verify the backend is up.
 
 ### Config file errors
 
@@ -267,20 +274,20 @@ timeout = 300   # Increase from default 120
 
 **Fix:** Check the workspace path in your config or specify it:
 ```bash
-python start_server.py --workspace /path/to/your/project
+python -m backend.execution.action_execution_server 3000 --working-dir /path/to/your/project
 ```
 
 ---
 
-## Web UI Issues
+## Browser / Raw Backend Issues
 
 ### Browser shows connection refused
 
-**Symptom:** `Connection refused` or blank page at `http://localhost:3000`
+**Symptom:** `Connection refused` at `http://localhost:3000`
 
 **Fix:**
-1. Ensure the backend is running: `python start_server.py` or `uv run app serve`
-2. Use the same host/port printed in the server logs (default **3000**)
+1. Ensure the raw backend is running: `./start_backend.ps1` or `python -m backend.execution.action_execution_server 3000 --working-dir /path/to/your/project`
+2. Use `http://localhost:3000/openapi.json` or `http://localhost:3000/server_info` to confirm it is reachable
 3. Verify no firewall is blocking localhost
 
 ### Page loads but Socket.IO disconnects
@@ -381,8 +388,11 @@ uv --version
 # Verify Git
 git --version
 
-# Check if server starts
-python start_server.py --help
+# Check CLI help
+python -m backend.cli.entry --help
+
+# Check raw backend help
+python -m backend.execution.action_execution_server --help
 
 # Run tests
 uv run pytest backend/tests/unit/ --tb=short -q
@@ -391,11 +401,11 @@ uv run pytest backend/tests/unit/ --tb=short -q
 ### Check server status
 
 ```bash
-# API health check
-curl http://localhost:3000/api/health
+# Fetch OpenAPI from the raw backend
+curl http://localhost:3000/openapi.json
 
-# Check API docs
-# Open http://localhost:3000/docs in browser
+# Server info
+curl http://localhost:3000/server_info
 ```
 
 ### Check logs
@@ -403,7 +413,7 @@ curl http://localhost:3000/api/health
 ```bash
 # Backend logs are printed to stdout by default.
 # For verbose logging:
-LOG_LEVEL=DEBUG python start_server.py
+LOG_LEVEL=DEBUG python -m backend.cli.entry
 ```
 
 ### Reset to defaults

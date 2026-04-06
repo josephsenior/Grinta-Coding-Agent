@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.logger import app_logger as logger
+from backend.core.workspace_resolution import workspace_agent_state_dir
 
 
 @dataclass
@@ -92,7 +93,7 @@ class RollbackManager:
         self.checkpoints_dir = (
             Path(checkpoints_dir)
             if checkpoints_dir
-            else self.workspace_path / '.grinta' / 'checkpoints'
+            else workspace_agent_state_dir(self.workspace_path) / 'rollback_checkpoints'
         )
         self.max_checkpoints = max_checkpoints
         self.auto_cleanup = auto_cleanup

@@ -132,20 +132,19 @@ session types need different compression strategies — code-heavy sessions
 benefit from observation masking, while research sessions need semantic
 filtering.
 
-**Decision:** Implement 12 compactor strategies behind a common interface,
+**Decision:** Implement 8 compactor strategies behind a common interface,
 with a `smart` default that adapts automatically. Users can select and
 configure compactors per agent. The current code/config surface may still use
 `condenser` during the migration window.
 
-**Compactors:** smart, llm, observation_masking, recent, amortized,
-llm_attention, semantic, structured_summary, browser_output,
-conversation_window, no_op, pipeline.
+**Compactors:** smart, observation_masking, recent, amortized,
+structured_summary, no_op, pipeline, auto.
 
 **Consequences:**
 - ✅ Optimal strategy for each use case
 - ✅ Pipeline compactor allows chaining
 - ✅ Smart default requires no configuration
-- ⚠️ 12 implementations to maintain
+- ⚠️ 8 implementations to maintain
 
 ---
 

@@ -66,4 +66,29 @@ def prepare_kwargs(
     if system_msg is not None:
         model = kwargs.get('model', default_model)
         kwargs['system'] = _apply_system_cache_control(system_msg, model, kwargs)
+    # Mark the last tool definition with cache_control so Anthropic caches the
+    # entire system + tools prefix.  Tool definitions are stable across turns,
+    # making them ideal cache breakpoints (saves 3K-10K input tokens per call).
+    _apply_tools_cache_control(kwargs)
     return filtered, kwargs
+
+
+def _apply_tools_cache_control(kwargs: dict[str, Any]) -> None:
+    """Add cache_control to the last tool definition for Anthropic prompt caching.
+
+    Anthropic caches everything up to and including the last block with
+    ``cache_control``.  By marking the final tool, the entire system message +
+    tool definitions block is cached, saving significant input tokens on
+    subsequent calls within the same session.
+    """
+    from backend.inference.prompt_caching import model_supports_prompt_cache_hints
+
+    tools = kwargs.get('tools')
+    if not tools or not isinstance(tools, list):
+        return
+    model = kwargs.get('model', '')
+    if not model_supports_prompt_cache_hints(model):
+        return
+    last_tool = tools[-1]
+    if isinstance(last_tool, dict):
+        last_tool['cache_control'] = {'type': 'ephemeral'}

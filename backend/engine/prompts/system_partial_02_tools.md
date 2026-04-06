@@ -1,18 +1,15 @@
 <EDITOR_GUIDE>
-Follow the routing ladder first. Prefer **ast_code_editor** for function/class bodies (`edit_function`, `rename_symbol`, `find_symbol`). **str_replace_editor**: `create_file`, single-line fixes, `view_and_replace`, `preview: true` / `confidence` (<0.7 → preview). **ast_code_editor** also: `replace_range`, `insert_text`, `undo_last_edit`. No `edit_file` — use ast or multiple str_replace passes.
+Follow the routing ladder first. Prefer **ast_code_editor** for function/class bodies (`edit_function`, `rename_symbol`, `find_symbol`). **str_replace_editor**: `create_file`, single-line fixes, `view_and_replace`, `preview: true` / `confidence` (<0.7 → preview). **ast_code_editor** also: `replace_range`, `insert_text`, `undo_last_edit` (session-local; use **checkpoint** / **revert_to_checkpoint** for coarse rollback). No `edit_file` — use ast or multiple str_replace passes.
 Greenfield: `str_replace_editor(command="create_file", path="...", file_text="...")`.
 </EDITOR_GUIDE>
-
-<SEARCH_GUIDE>
-Follow the routing ladder first. Prefer **search_code** over shell grep for literal text or unknown-location search. Use **lsp_query** for precise definition/reference lookup when you already know the file and symbol position. Use **explore_tree_structure** / **read_symbol_definition** for architecture (upstream/downstream, full symbol body).
-</SEARCH_GUIDE>
 
 <CODE_QUALITY>
 Minimal comments; minimal diff unless asked; explore before large edits; imports at top unless circular logic requires otherwise.
 </CODE_QUALITY>
 
 <FILE_OPERATIONS>
-**Always use editor tools to create/write files — never** `mkdir+touch`, `cat>`, `echo>`, heredocs, `tee`, `>` for file content. Editors create parent dirs and normalize paths.
+**Always use editor tools to create/write files — never** `mkdir+touch`, `cat>`, `echo>`, heredocs, `tee`, `>` for file content. **Do not use shell to read project files**—use editor view / file-read tools. Editors create parent dirs and normalize paths.
+Editor `path` arguments are relative to the project root (see runtime working directory) or valid absolute paths on disk.
 {confirm_paths} Edit the path the user gave; no shadow copies (file_v2.py); remove temp files when done.
 </FILE_OPERATIONS>
 

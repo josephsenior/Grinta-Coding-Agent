@@ -32,15 +32,15 @@ reliability-gate-integration: pretest
 
 .PHONY: docker-up
 docker-up:
-	@APP_KB_STORAGE_TYPE=database docker compose up --build
+	@docker compose up --build
 
 .PHONY: docker-up-detached
 docker-up-detached:
-	@APP_KB_STORAGE_TYPE=database docker compose up --build -d
+	@docker compose up --build -d
 
 .PHONY: docker-up-no-db
 docker-up-no-db:
-	@APP_KB_STORAGE_TYPE=file docker compose up --build
+	@docker compose up --build
 
 # Makefile for App project
 SHELL=/usr/bin/env bash

@@ -1,13 +1,8 @@
-# App Vocabulary
+# Grinta Vocabulary
 
-This document defines the canonical App architecture language.
-
-The codebase still contains older implementation names. This document is the
-reference contract for future renames across docs, protocols, package
-decisions, and code symbols.
-
-This canonical set is the vocabulary lock to use before implementation
-planning. If it changes, update this document and ADR-016 first.
+This document defines the canonical Grinta architecture language and tracks
+the migration status of each term. It serves as both reference contract and
+implementation status tracker.
 
 ## Principles
 
@@ -15,85 +10,56 @@ planning. If it changes, update this document and ADR-016 first.
 - Name concepts by semantic role, not implementation detail.
 - Keep the vocabulary model-agnostic and OS-agnostic.
 - Preserve concepts that are already clear and broadly understood.
-- Lock the language before large implementation planning or rename waves.
-- Change the inherited conceptual shell first, not the strong mechanisms underneath it.
 
-## Canonical Terms
+## Canonical Terms — Migration Status
 
-| Current code term | Canonical App term | Notes |
-| --- | --- | --- |
-| `Agent` | `Agent` | Keep |
-| `AgentController` / bare `Controller` | `SessionOrchestrator` | Central control-plane component |
-| `Action` | `Operation` | Intent emitted by the agent or client |
-| `Observation` | `Outcome` | Chosen over `Result` or `Effect` because it fits ledger semantics without implying mutation only |
-| `Event` | `Record` | Envelope concept spanning operations and outcomes |
-| `EventStream` | `Ledger` | Durable ordered record flow |
-| `EventStore` | `LedgerStore` | Persistence backend for ledger records |
-| backend `Session` | `Run` | Internal execution unit |
-| user-facing `Conversation` | `Conversation` | Keep on product surfaces |
-| `State` | `RunState` | Internal execution state |
-| `Checkpoint` | `Snapshot` | Persisted run-state capture |
-| `Trajectory` | `Transcript` | Exported or replayed record history |
-| `ActionExecutor` | `RuntimeExecutor` | Runtime-side execution entry point |
-| `PendingAction` | `OpenOperation` | In-flight operation awaiting an outcome |
-| `Autonomy` | `ExecutionPolicy` | Degree of review, confirmation, and governance |
-| `Condenser` | `Compactor` | Context compression mechanism |
-| `ConversationMemory` / generic memory layer | `ContextMemory` | Run-scoped context management layer |
-| `ToolInvocationPipeline` | `OperationPipeline` | Validation and execution pipeline |
-| `Review` | `Governance` | Critique and guardrail layer |
+| Code term | Canonical term | Status | Notes |
+| --- | --- | --- | --- |
+| `Agent` | `Agent` | ✅ Kept | No rename needed |
+| `AgentController` | `SessionOrchestrator` | ✅ Complete | `backend/orchestration/session_orchestrator.py` |
+| `Condenser` | `Compactor` | ✅ Complete | 40+ files use `Compactor` exclusively |
+| `Review` | `Governance` | ✅ Complete | Package is `backend/governance/` |
+| `Action` | `Action` | ✅ Kept | Rename to `Operation` deferred — term is clear and broadly understood |
+| `Observation` | `Observation` | ✅ Kept | Rename to `Outcome` deferred — same rationale |
+| `Event` | `Event` | ✅ Kept | Rename to `Record` deferred — foundational base class |
+| `EventStream` | `EventStream` | ✅ Kept | Rename to `Ledger` deferred — the package is already `backend/ledger/` |
+| `State` | `State` | ✅ Kept | Rename to `RunState` deferred — universally understood |
+| `Checkpoint` | `Checkpoint` | ✅ Kept | Rename to `Snapshot` deferred — used across rollback and state layers |
+| `Trajectory` | `Trajectory` | ✅ Kept | Rename to `Transcript` deferred — config and test integration deep |
+| `ToolInvocationPipeline` | `ToolInvocationPipeline` | ✅ Kept | Rename to `OperationPipeline` deferred |
+| `PendingAction` | `PendingAction` | ✅ Kept | Rename to `OpenOperation` deferred |
+| `Autonomy` | `ExecutionPolicy` | 🔄 Conceptual | Docs use execution policy; code uses autonomy level |
+| `ConversationMemory` | `ContextMemory` | 🔄 Conceptual | Package is `backend/context/`; class is `ContextMemoryManager` |
 
 ## Terms Intentionally Preserved
 
 These terms are already clear and should not be renamed for distinctness alone.
 
-- `Agent`
-- `Runtime`
-- `Playbook`
-- `Tool`
+- `Agent`, `Runtime`, `Playbook`, `Tool`
 - `Conversation` on user-facing surfaces
-- `Core`
-- `Security`
-- `Telemetry`
-- `Validation`
-- `Utils`
+- `Core`, `Security`, `Telemetry`, `Validation`, `Utils`
+- `Action`, `Observation`, `Event`, `State`, `Checkpoint` — clear, broadly understood
 
 ## Terms To Avoid
 
-Avoid these naming patterns in future work:
-
-- Metaphor-heavy names like `cognition`, `perception`, `scrutiny`, `chronicle`, `anvil`, `workshop`
-- Overloaded bare names like `controller`
-- ML-jargon like `trajectory`
-- Ambiguous infra nouns like bare `session` and bare `memory`
+- Metaphor-heavy names (`cognition`, `perception`, `scrutiny`, `chronicle`, `anvil`, `workshop`)
+- Overloaded bare names (`controller`)
+- ML-jargon (`trajectory` in new code — existing uses are grandfathered)
+- Ambiguous infra nouns (bare `session`, bare `memory`)
 - Provider-specific or OS-specific core concepts
 
-## Implementation Package Notes
-
-Canonical vocabulary and package layout are related, but they are not the same
-contract. The current implementation package state is:
+## Package Layout
 
 | Legacy package | Current package | Notes |
-| --- | --- |
+| --- | --- | --- |
 | `backend/controller` | `backend/orchestration` | Aligns with `SessionOrchestrator` |
-| `backend/events` | `backend/ledger` | Aligns with `Ledger` |
+| `backend/events` | `backend/ledger` | Durable event stream and persistence |
 | `backend/api` | `backend/gateway` | Gateway terminology is stable |
 | `backend/storage` | `backend/persistence` | Persistence terminology is stable |
-| `backend/memory` | `backend/context` | Supports `ContextMemory` language |
-| `backend/review` | `backend/governance` | Aligns with `Governance` |
-| `backend/llm` | `backend/inference` | Distinct model/provider layer |
+| `backend/memory` | `backend/context` | Context memory and compaction |
+| `backend/review` | `backend/governance` | Critique and guardrail layer |
+| `backend/llm` | `backend/inference` | Model and provider layer |
 | `backend/knowledge_base` | `backend/knowledge` | Shorter stable term |
-| `backend/playbook_engine` | `backend/playbooks/engine` | Preserves `Playbook` while separating engine internals |
-| `backend/adapters` | `backend/gateway/adapters` | Gateway-scoped integration surface |
-| `backend/mcp_client` | `backend/gateway/integrations/mcp` | Gateway integration surface |
-| `backend/cli` | `backend/gateway/cli` | Gateway-facing CLI surface |
-| `backend/runtime` | `backend/execution` | Current package path; the canonical system term remains `Runtime` |
-| `backend/engines/orchestrator` | `backend/engine` | Current engine package shape; the locked vocabulary does not introduce `reasoning` |
-
-## Transition Rule
-
-Until the migration lands:
-
-- Docs should use the canonical App term first.
-- Current code names can appear in backticks for orientation.
-- When prose and package paths differ, use the canonical term in prose and the actual package path in backticks.
-- New symbols, docs, and public contracts should prefer the canonical term unless a migration constraint blocks it.
+| `backend/playbook_engine` | `backend/playbooks/engine` | Playbook execution internals |
+| `backend/runtime` | `backend/execution` | Canonical system term remains `Runtime` |
+| `backend/engines/orchestrator` | `backend/engine` | Agent engine (planner, executor, memory, safety) |

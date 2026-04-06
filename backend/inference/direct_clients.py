@@ -17,6 +17,7 @@ from anthropic import Anthropic, AsyncAnthropic
 from google import genai
 from openai import AsyncOpenAI, OpenAI
 
+from backend.cli.tool_call_display import flatten_tool_call_for_history
 from backend.core import json_compat as json
 from backend.core.logger import app_logger as logger
 
@@ -358,7 +359,7 @@ def _normalize_cross_family_tool_messages(
                 fn = tc.get('function') or {}
                 name = str(fn.get('name') or 'tool')
                 arguments = str(fn.get('arguments') or '{}')
-                tool_lines.append(f'[Tool call] {name}({arguments})')
+                tool_lines.append(flatten_tool_call_for_history(name, arguments))
             normalized = {k: v for k, v in msg.items() if k != 'tool_calls'}
             normalized['content'] = '\n'.join(
                 part for part in [text, *tool_lines] if part

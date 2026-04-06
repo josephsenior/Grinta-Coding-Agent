@@ -139,14 +139,12 @@ class SessionOrchestrator:
         'recovery_service': 'recovery',
         'stuck_service': 'stuck',
         'circuit_breaker_service': 'circuit_breaker',
-        'telemetry_service': 'telemetry',
         'observation_service': 'observation',
         'task_validation_service': 'task_validation',
         # Attributes whose names already match the OrchestrationServices field:
         'iteration_guard': 'iteration_guard',
         'step_guard': 'step_guard',
         'step_prerequisites': 'step_prerequisites',
-        'budget_guard': 'budget_guard',
         'exception_handler': 'exception_handler',
         'event_router': 'event_router',
         'step_decision': 'step_decision',
@@ -173,10 +171,6 @@ class SessionOrchestrator:
     @property
     def circuit_breaker_service(self):
         return self.services.circuit_breaker
-
-    @property
-    def telemetry_service(self):
-        return self.services.telemetry
 
     @property
     def observation_service(self):
@@ -256,8 +250,79 @@ class SessionOrchestrator:
             config.budget_per_task_delta,
         )
         self.services.autonomy.initialize(config.agent)
-        self.services.telemetry.initialize_operation_pipeline()
+        self._initialize_operation_pipeline()
         self.services.retry.initialize()
+
+    def _initialize_operation_pipeline(self) -> None:
+        """Build the default tool pipeline directly on the controller."""
+        from backend.orchestration.file_state_tracker import FileStateMiddleware
+        from backend.orchestration.pre_exec_diff import PreExecDiffMiddleware
+        from backend.orchestration.rollback_middleware import RollbackMiddleware
+        from backend.orchestration.tool_pipeline import (
+            AutoCheckMiddleware,
+            BlackboardMiddleware,
+            CircuitBreakerMiddleware,
+            ContextWindowMiddleware,
+            CostQuotaMiddleware,
+            LoggingMiddleware,
+            SafetyValidatorMiddleware,
+            TelemetryMiddleware,
+        )
+        from backend.orchestration.tool_result_validator import ToolResultValidator
+
+        middlewares = [
+            SafetyValidatorMiddleware(self),
+            BlackboardMiddleware(self),
+            CircuitBreakerMiddleware(self),
+            CostQuotaMiddleware(self),
+            ContextWindowMiddleware(self),
+            RollbackMiddleware(),
+            PreExecDiffMiddleware(),
+            AutoCheckMiddleware(),
+        ]
+        file_state_mw = FileStateMiddleware()
+        middlewares.append(file_state_mw)
+        self._file_state_tracker = file_state_mw.tracker
+        middlewares.extend([LoggingMiddleware(self), TelemetryMiddleware(self)])
+        middlewares.append(ToolResultValidator())
+        self.services.context.initialize_operation_pipeline(middlewares)
+
+    def handle_blocked_invocation(
+        self,
+        action: Action,
+        ctx: ToolInvocationContext,
+    ) -> None:
+        """Clean up and emit a user-visible error when middleware blocks a tool."""
+        from backend.ledger.observation_cause import attach_observation_cause
+        from backend.orchestration.tool_telemetry import ToolTelemetry
+
+        self._cleanup_action_context(ctx, action=action)
+
+        try:
+            ToolTelemetry.get_instance().on_blocked(ctx, reason=ctx.block_reason)
+        except Exception:
+            logger.debug('Failed to record telemetry for blocked action', exc_info=True)
+
+        if not ctx.metadata.get('handled'):
+            error_content = ctx.block_reason or 'Action blocked by middleware pipeline.'
+            error_obs = ErrorObservation(
+                content=error_content,
+                error_id='TOOL_PIPELINE_BLOCKED',
+            )
+            attach_observation_cause(
+                error_obs,
+                action,
+                context='session_orchestrator.handle_blocked_invocation',
+            )
+            self.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
+
+        self.services.pending_action.set(None)
+
+    def _sync_budget_flag_with_metrics(self) -> None:
+        """Keep the budget control flag aligned with accumulated metrics."""
+        tracker = getattr(self, 'state_tracker', None)
+        if tracker and hasattr(tracker, 'sync_budget_flag_with_metrics'):
+            tracker.sync_budget_flag_with_metrics()
 
     def _register_action_context(
         self, action: Action, ctx: ToolInvocationContext
@@ -581,7 +646,7 @@ class SessionOrchestrator:
             return
 
         self._log_step_info()
-        self.budget_guard.sync_with_metrics()
+        self._sync_budget_flag_with_metrics()
 
         if not await self.step_guard.ensure_can_step():
             return
@@ -616,23 +681,22 @@ class SessionOrchestrator:
         # is set, so we can immediately process the next queued action without
         # waiting for the full polling cycle.
         #
-        # P2-B: First, try to execute all pending read-only actions in parallel.
-        # If all are reads/searches, asyncio.gather runs them concurrently,
-        # saving turns on research-heavy tasks. Falls back to serial if mixed.
+        # P2-B: If all remaining queued actions are parallel-safe (reads, thinks,
+        # searches), execute them concurrently via asyncio.gather. The pending
+        # action service already tracks multiple outstanding actions by stream ID,
+        # so concurrent execute_action calls are safe as long as each action gets
+        # a unique ID (guaranteed by EventStream.add_event).
         self._draining_batch = True
         try:
-            if not await self._try_parallel_read_batch():
+            if not self._pending_action and not await self._try_parallel_read_batch():
+                # Fall through to serial drain for mixed workloads.
                 while self._can_drain_pending():
                     action = await self.action_execution.get_next_action()
                     if action is None:
                         break
                     await self.action_execution.execute_action(action)
-                    # Yield to the event loop so that _on_event background tasks
-                    # (which add events to state.history) run before the next
+                    # Yield so _on_event tasks update state.history before the next
                     # get_next_action() → astep() → condense_history() check.
-                    # Without this, state.history may be stale (missing the just-
-                    # executed CondensationAction), causing the compactor to see
-                    # the pre-condensation view and fire again — creating a loop.
                     await asyncio.sleep(0)
                     await self._handle_post_execution()
         finally:
@@ -668,6 +732,11 @@ class SessionOrchestrator:
         concurrently via asyncio.gather instead of sequentially. Only activates when
         every queued action is verified parallel-safe.
 
+        The PendingActionService already tracks multiple outstanding actions by
+        stream ID (dict[int, tuple[Action, float]]), so concurrent execute_action
+        calls safely register independent pending entries that get resolved by
+        their matching observations.
+
         Returns True if batch was executed (caller should skip the serial drain),
         False if any action is not parallel-safe (fall through to serial execution).
         """
@@ -686,13 +755,17 @@ class SessionOrchestrator:
             '[P2-B] Parallel read batch: executing %d read-only actions concurrently',
             len(batch),
         )
-        try:
-            await asyncio.gather(
-                *(self.action_execution.execute_action(a) for a in batch),
-                return_exceptions=True,
-            )
-        except Exception as exc:
-            logger.warning('[P2-B] Parallel batch encountered error: %s', exc)
+        results = await asyncio.gather(
+            *(self.action_execution.execute_action(a) for a in batch),
+            return_exceptions=True,
+        )
+        for i, result in enumerate(results):
+            if isinstance(result, BaseException):
+                action_type = getattr(batch[i], 'action', type(batch[i]).__name__)
+                logger.warning(
+                    '[P2-B] Parallel batch action %d (%s) failed: %s',
+                    i, action_type, result,
+                )
         await self._handle_post_execution()
         return True
 

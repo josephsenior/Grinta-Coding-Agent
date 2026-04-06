@@ -291,30 +291,13 @@ _store: KnowledgeBaseStore | Any | None = None
 def get_knowledge_base_store() -> KnowledgeBaseStore | Any:
     """Get the global knowledge base store instance.
 
-    Storage backend is determined by APP_KB_STORAGE_TYPE environment variable:
-    - "database" or "db": Use PostgreSQL database storage
-    - "file" or unset: Use file-based storage (default)
+    The CLI agent uses a local file-backed store by default.
     """
     global _store
     if _store is None:
-        # Check if database storage is requested
-        storage_type = os.getenv('APP_KB_STORAGE_TYPE', 'file').lower()
-        if storage_type in ('database', 'db'):
-            # Use database-backed store
-            from backend.persistence.knowledge_base.database_knowledge_base_store import (
-                DatabaseKnowledgeBaseStore,
-            )
-            from backend.persistence.knowledge_base.database_store_adapter import (
-                DatabaseStoreAdapter,
-            )
-
-            db_store = DatabaseKnowledgeBaseStore()
-            _store = DatabaseStoreAdapter(db_store)
+        storage_dir = os.getenv('APP_KB_STORAGE_PATH')
+        if storage_dir:
+            _store = KnowledgeBaseStore(storage_dir=Path(storage_dir))
         else:
-            # File-based store (default)
-            storage_dir = os.getenv('APP_KB_STORAGE_PATH')
-            if storage_dir:
-                _store = KnowledgeBaseStore(storage_dir=Path(storage_dir))
-            else:
-                _store = KnowledgeBaseStore(storage_dir=None)
+            _store = KnowledgeBaseStore(storage_dir=None)
     return _store

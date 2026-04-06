@@ -33,6 +33,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.state.metrics.accumulated_token_usage = MagicMock()
         self.mock_controller.log = MagicMock()
         self.mock_controller.event_stream = MagicMock()
+        self.mock_controller.handle_blocked_invocation = MagicMock()
 
         self.mock_pending_service = MagicMock()
         self.mock_confirmation_service = MagicMock()
@@ -70,7 +71,6 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         mock_ctx.action_id = None
 
         mock_pipeline = MagicMock()
-        mock_pipeline.run_verify = AsyncMock()
         mock_pipeline.run_execute = AsyncMock()
         self.mock_controller.operation_pipeline = mock_pipeline
         # Override default cost for this specific test
@@ -78,15 +78,12 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
 
         await self.service.run(mock_action, mock_ctx)
 
-        # Should run verify
-        mock_pipeline.run_verify.assert_called_once_with(mock_ctx)
-
         # Should evaluate action
         self.mock_confirmation_service.evaluate_action.assert_called_once_with(
             mock_action
         )
 
-        # Should set pending
+        # Should set pending (action is runnable)
         self.mock_pending_service.set.assert_called()
 
         # Should handle confirmation
@@ -95,8 +92,8 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         # Should run execute
         mock_pipeline.run_execute.assert_called_once_with(mock_ctx)
 
-    async def test_run_blocked_during_verify(self):
-        """Test run stops when action is blocked during verify."""
+    async def test_run_blocked_during_execute(self):
+        """Test run stops when action is blocked during execute."""
         mock_action = MagicMock(spec=Action)
         mock_action.runnable = True
 
@@ -107,13 +104,15 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
             mock_ctx.blocked = True
 
         mock_pipeline = MagicMock()
-        mock_pipeline.run_verify = AsyncMock(side_effect=set_blocked)
+        mock_pipeline.run_execute = AsyncMock(side_effect=set_blocked)
         self.mock_controller.operation_pipeline = mock_pipeline
 
         await self.service.run(mock_action, mock_ctx)
 
-        # Should stop after verify
-        self.mock_confirmation_service.evaluate_action.assert_not_called()
+        # Should stop after execute blocks
+        self.mock_controller.handle_blocked_invocation.assert_called_once_with(
+            mock_action, mock_ctx
+        )
 
     async def test_run_blocked_after_runnable(self):
         """Test run handles blocked action after runnable processing."""
@@ -126,58 +125,15 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         mock_ctx.action_id = None
 
         mock_pipeline = MagicMock()
-        mock_pipeline.run_verify = AsyncMock()
         mock_pipeline.run_execute = AsyncMock()
         self.mock_controller.operation_pipeline = mock_pipeline
-        self.mock_controller.telemetry_service = MagicMock()
-
-        # Set blocked after verify
-        async def set_blocked(*args):
-            pass
-
-        mock_pipeline.run_verify.side_effect = set_blocked
 
         await self.service.run(mock_action, mock_ctx)
 
-        # Context is still not blocked during runnable handling
+        # evaluate_action is still called (blocking happens in execute, not before)
         self.mock_confirmation_service.evaluate_action.assert_called_once()
 
     async def test_run_null_action_skips_finalize(self):
-        """Test run skips finalization for NullAction."""
-        mock_action = MagicMock(spec=NullAction)
-        mock_action.runnable = False
-
-        mock_ctx = MagicMock()
-        mock_ctx.blocked = False
-
-        await self.service.run(mock_action, mock_ctx)
-
-        # Should not call handle_pending_confirmation for NullAction
-        self.mock_confirmation_service.handle_pending_confirmation.assert_not_called()
-
-    async def test_run_blocked_during_execute(self):
-        """Test run handles blocked action during execute phase."""
-        mock_action = MagicMock(spec=Action)
-        mock_action.runnable = True
-
-        mock_ctx = MagicMock()
-
-        mock_pipeline = MagicMock()
-        mock_pipeline.run_verify = AsyncMock()
-
-        async def set_blocked(*args):
-            mock_ctx.blocked = True
-
-        mock_pipeline.run_execute = AsyncMock(side_effect=set_blocked)
-        self.mock_controller.operation_pipeline = mock_pipeline
-        self.mock_controller.telemetry_service = MagicMock()
-
-        await self.service.run(mock_action, mock_ctx)
-
-        # Should handle blocked invocation
-        self.mock_controller.telemetry_service.handle_blocked_invocation.assert_called()
-
-    async def test_run_no_pipeline(self):
         """Test run handles missing tool_pipeline gracefully."""
         mock_action = MagicMock(spec=Action)
         mock_action.runnable = True

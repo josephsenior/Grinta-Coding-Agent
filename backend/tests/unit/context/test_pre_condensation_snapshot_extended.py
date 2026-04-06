@@ -15,16 +15,18 @@ from backend.ledger.observation.files import FileEditObservation
 
 
 class TestPreCondensationSnapshot(unittest.TestCase):
-    def test_snapshot_path_uses_app_dir(self):
-        original = snapshot_module._WORKSPACE_ROOT
-        try:
-            snapshot_module._WORKSPACE_ROOT = 'C:/tmp/workspace'
+    def test_snapshot_path_uses_agent_state_dir(self):
+        from unittest.mock import patch
+
+        agent = Path('C:/tmp/agent')
+        with patch(
+            'backend.core.workspace_resolution.workspace_agent_state_dir',
+            return_value=agent,
+        ):
             self.assertEqual(
                 snapshot_module._snapshot_path(),
-                Path('C:/tmp/workspace') / '.grinta' / 'pre_condensation_snapshot.json',
+                agent / 'pre_condensation_snapshot.json',
             )
-        finally:
-            snapshot_module._WORKSPACE_ROOT = original
 
     def test_extract_snapshot_attempted_approaches(self):
         # Setup events

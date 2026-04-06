@@ -1,13 +1,13 @@
-# App Architecture
+# Grinta Architecture
 
-This document provides a high-level overview of App's architecture for contributors and maintainers.
+This document provides a high-level overview of Grinta's architecture for contributors and maintainers.
 
 ## Canonical Vocabulary
 
-App is standardizing its architecture language. Historical code names still
-appear in a few places, but the canonical App vocabulary going forward is:
+Grinta is standardizing its architecture language. Historical code names still
+appear in a few places, but the canonical Grinta vocabulary going forward is:
 
-| Current code term | Canonical App term |
+| Current code term | Canonical Grinta term |
 | --- | --- |
 | `AgentController` / bare `Controller` | session orchestrator |
 | `Action` | operation |
@@ -59,7 +59,7 @@ paths still live under `backend/execution/`.
 └───────────────────────────────────────────────────────┘
 ```
 
-Runtime note: App currently uses a local in-process runtime. The optional `hardened_local` profile adds stricter local execution policy, but it is not sandboxing or process isolation.
+Runtime note: Grinta currently uses a local in-process runtime. The optional `hardened_local` profile adds stricter local execution policy, but it is not sandboxing or process isolation.
 
 ## Backend Architecture
 
@@ -98,7 +98,7 @@ Context memory is managed via the compactor system. The codebase and persisted c
 
 ### Runtime (`backend/execution/` in the current codebase)
 
-App currently uses a local in-process runtime layer that:
+Grinta currently uses a local in-process runtime layer that:
 
 - Executes operations against the local workspace
 - Applies policy enforcement and confirmation gates
@@ -137,7 +137,7 @@ Abstract `FileStore` interface with implementations:
 ## Clients
 
 The React web app and automation/tests share the same REST + Socket.IO protocol.
-The Python package `client` provides :class:`~client.AppClient`
+The Python package `client` provides :class:`~client.GrintaClient`
 (httpx + Socket.IO) for scripts and unit tests.
 
 ## API Surface

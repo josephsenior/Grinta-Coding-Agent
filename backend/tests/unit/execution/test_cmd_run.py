@@ -86,6 +86,25 @@ async def test_cmd_run_grep_pattern_no_match(mock_executor):
 
 
 @pytest.mark.asyncio
+async def test_cmd_run_preserves_path_with_workspace_segment(mock_executor):
+    """Relative dirs named ``workspace`` must not be rewritten (no virtual /workspace alias)."""
+    mock_session = MagicMock()
+    mock_obs = CmdOutputObservation(
+        content='ok\n', command_id=0, command='ls -F components/workspace/'
+    )
+    mock_session.execute.return_value = mock_obs
+    mock_executor.session_manager.get_session.return_value = mock_session
+
+    cmd = 'ls -F components/workspace/'
+    action = CmdRunAction(command=cmd)
+    await mock_executor.run(action)
+
+    mock_session.execute.assert_called_once()
+    passed = mock_session.execute.call_args[0][0]
+    assert passed.command == cmd
+
+
+@pytest.mark.asyncio
 async def test_cmd_run_grep_pattern_invalid_regex(mock_executor):
     """Test grep_pattern with invalid regex."""
     mock_session = MagicMock()
@@ -218,6 +237,58 @@ async def test_repeated_identical_failures_add_pivot_hint(mock_executor):
 
     assert 'REPEATED_COMMAND_FAILURE' not in first.content
     assert 'REPEATED_COMMAND_FAILURE' in second.content
+
+
+@pytest.mark.asyncio
+async def test_powershell_syntax_in_bash_adds_shell_mismatch_guidance(mock_executor):
+    mock_session = MagicMock()
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_executor.session_manager.tool_registry = MagicMock(
+        has_bash=True,
+        has_powershell=True,
+    )
+    mock_session.cwd = '/tmp'
+    mock_session.execute.return_value = CmdOutputObservation(
+        content='[ERROR STREAM]\n/bin/bash: line 1: Get-Content: command not found',
+        command='Write-Output "=== FILE: src/repomentor/index.py ===" ; Get-Content "src/repomentor/index.py" -Encoding UTF8',
+        metadata={'exit_code': 127},
+    )
+
+    action = CmdRunAction(
+        command='Write-Output "=== FILE: src/repomentor/index.py ===" ; Get-Content "src/repomentor/index.py" -Encoding UTF8'
+    )
+
+    obs = await mock_executor.run(action)
+
+    assert 'SHELL_MISMATCH' in obs.content
+    assert 'Get-Content is a PowerShell command' in obs.content
+    assert 'MISSING_TOOL' not in obs.content
+
+
+@pytest.mark.asyncio
+async def test_chained_scaffold_failure_adds_scaffold_guidance(mock_executor):
+    mock_session = MagicMock()
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_session.cwd = '/tmp'
+    mock_session.execute.return_value = CmdOutputObservation(
+        content=(
+            "npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, "
+            "open '/tmp/react-app/package.json'\n"
+            'npm error A complete log of this run can be found in: /tmp/npm-debug.log'
+        ),
+        command='npm create vite@latest . -- --template react && npm install',
+        metadata={'exit_code': 38},
+    )
+
+    action = CmdRunAction(
+        command='npm create vite@latest . -- --template react && npm install'
+    )
+
+    obs = await mock_executor.run(action)
+
+    assert 'SCAFFOLD_SETUP_FAILED' in obs.content
+    assert 'Run the generator by itself first' in obs.content
+    assert 'MISSING_TOOL' not in obs.content
 
 
 @pytest.mark.asyncio

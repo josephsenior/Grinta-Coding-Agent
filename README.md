@@ -1,32 +1,32 @@
-# App
+# Grinta
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-> **Aider edits files. App finishes tasks.**
+> **Aider edits files. Grinta finishes tasks.**
 
-**App** is an open-source autonomous coding agent that plans, implements, tests, and validates work end-to-end — not just edits files and hands back control.
+**Grinta** is an open-source autonomous coding agent that plans, implements, tests, and validates work end-to-end — not just edits files and hands back control.
 
-Give it a task like *"Add Stripe payment support"* and App will: read the codebase, write a multi-step plan, implement the changes across files, run the tests, check the budget, and only declare done when everything checks out.
+Give it a task like *"Add Stripe payment support"* and Grinta will: read the codebase, write a multi-step plan, implement the changes across files, run the tests, check the budget, and only declare done when everything checks out.
 
 ---
 
-## Why App?
+## Why Grinta?
 
-Most AI coding tools stop at the file edit. App keeps going:
+Most AI coding tools stop at the file edit. Grinta keeps going:
 
-- **Task Completion, Not File Edits:** A structured planner breaks work into steps; a critic system scores the result before declaring done. You get a finished task, not a pile of edits to review.
-- **Self-Correcting:** If tests fail after an edit, App detects it and tries again. If it gets stuck in a loop, a 6-strategy circuit breaker pauses it for your review — not silently burns your budget.
+- **Task Completion, Not File Edits:** A structured planner breaks work into steps and validates completion before declaring done. You get a finished task, not a pile of edits to review.
+- **Self-Correcting:** If tests fail after an edit, Grinta detects it and tries again. If it gets stuck in a loop, a 6-strategy circuit breaker pauses it for your review — not silently burns your budget.
 - **Built for Long Tasks:** Event-sourced session persistence, Write-Ahead Logging, and 12 context compactors mean a 500-step session stays coherent as a 50-step one.
-- **Budget-Aware:** Per-task cost caps and a `BudgetCritic` on every completion keep spend predictable — ideal for unattended overnight runs.
+- **Budget-Aware:** Per-task cost caps and inline cost tracking keep spend predictable — ideal for unattended overnight runs.
 - **Safety First:** Per-action risk assessment, rollback checkpoints (no git required), and multi-trip circuit breakers before any destructive action.
 - **Local-First:** Native Ollama and OpenAI-compatible support. Zero cloud required.
 
-## App Vocabulary
+## Grinta Vocabulary
 
-App is standardizing on a distinct internal architecture language. The codebase
+Grinta is standardizing on a distinct internal architecture language. The codebase
 still contains older implementation names, but the canonical set is locked in
 [docs/VOCABULARY.md](docs/VOCABULARY.md). The highest-signal mappings are:
 
@@ -47,15 +47,15 @@ still contains older implementation names, but the canonical set is locked in
 - governance: currently `Review`
 - runtime, playbook, tool, core, security, telemetry, validation, and utils stay as they are
 
-The goal is to make App read like what it already is: a local-first execution
+The goal is to make Grinta read like what it already is: a local-first execution
 platform with durable run history, governed automation, and adaptive context
 management.
 
 ## Security Boundary
 
-App currently runs actions on the local host. The `hardened_local` execution profile adds stricter local policy gates for commands, file access, workspace scoping, and interactive terminals, but it is not a sandbox and it is not process isolation.
+Grinta currently runs actions on the local host. The `hardened_local` execution profile adds stricter local policy gates for commands, file access, workspace scoping, and interactive terminals, but it is not a sandbox and it is not process isolation.
 
-Use App as a trusted local agent for your own development workflows. Do not treat the current runtime as safe for hostile repositories or untrusted code.
+Use Grinta as a trusted local agent for your own development workflows. Do not treat the current runtime as safe for hostile repositories or untrusted code.
 
 ---
 
@@ -102,7 +102,7 @@ graph TB
     ES --> Checkpoints
 ```
 
-See the [Architecture Deep Dive](docs/ARCHITECTURE.md) for a full walkthrough of the current implementation and the [App Vocabulary](docs/VOCABULARY.md) for the naming contract.
+See the [Architecture Deep Dive](docs/ARCHITECTURE.md) for a full walkthrough of the current implementation and the [Grinta Vocabulary](docs/VOCABULARY.md) for the naming contract.
 
 ---
 
@@ -118,7 +118,7 @@ Run the helper script to setup config and launch:
 .\DOCKER_START.ps1  # Windows
 ```
 
-Default Docker flow starts the full Linux runtime stack: App + Redis + PostgreSQL.
+Default Docker flow starts the database-backed Grinta runtime stack.
 
 Emergency fallback (file-backed mode):
 
@@ -141,19 +141,21 @@ Run the bootstrap script at the repository root. It installs dependencies, sets 
 1. **Prerequisites:** Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 2. **Install:** `uv sync`
 3. **Setup Config:** `cp settings.template.json settings.json`
-4. **Start:** `uv run python start_server.py`
+4. **Start:** `uv run python -m backend.cli.entry`
 
-`uv run app serve`, `uv run app start`, and `uv run app all` delegate to the same canonical local startup path.
+This is the canonical local startup path for the terminal CLI. If you specifically
+need the raw HTTP backend for API or OpenAPI tooling, use [start_backend.ps1](start_backend.ps1)
+on Windows or run `uv run python -m backend.execution.action_execution_server 3000 --working-dir "$PWD"`.
 
 ---
 
 ## 🤖 LLM Support
 
-App features an **Intelligent Provider Resolver** that handles routing, local discovery, and model aliases automatically.
+Grinta features an **Intelligent Provider Resolver** that handles routing, local discovery, and model aliases automatically.
 
 ### Cloud Models
 
-Configure in `settings.json`. App auto-resolves providers (OpenAI, Anthropic, Gemini, etc.):
+Configure in `settings.json`. Grinta auto-resolves providers (OpenAI, Anthropic, Gemini, etc.):
 
 - **Anthropic**: `claude-3-7-sonnet` (Native SDK, no prefix needed)
 - **OpenAI**: `gpt-4o`, `gpt-4o-mini`
@@ -161,11 +163,11 @@ Configure in `settings.json`. App auto-resolves providers (OpenAI, Anthropic, Ge
 
 ### Local Models & Auto-Discovery
 
-App automatically discovers running local providers (Ollama, LM Studio, vLLM):
+Grinta automatically discovers running local providers (Ollama, LM Studio, vLLM):
 
 1. Start your local provider (e.g., `ollama serve`).
 2. Set `llm_model = "ollama/llama3.2"` (or `lmstudio/...`) in `settings.json`.
-3. App probes localhost ports (:11434, :1234, :8000) and routes locally with ZERO manual configuration.
+3. Grinta probes localhost ports (:11434, :1234, :8000) and routes locally with ZERO manual configuration.
 
 ### Model identifiers
 
@@ -177,23 +179,17 @@ Use the provider’s canonical model id in `llm_model` (and in LLM config), for 
 
 ### The Full Task Loop
 
-App doesn't just edit files — it runs a complete loop: **plan → implement → test → review → done**.
+Grinta doesn't just edit files — it runs a complete loop: **plan → implement → test → validate → done**.
 
-The orchestrator writes a structured plan, tracks step completion, and before marking a task finished it runs three critics:
-
-- **`AgentFinishedCritic`** — Did the agent actually emit a finish action, or did it wander off?
-- **`SuitePassCritic`** — Do the tests for touched files still pass?
-- **`BudgetCritic`** — Was the spend below the configured cap?
-
-All three scores are logged at completion. If tests fail, the task validation layer can reject the finish and send the agent back to fix things.
+The orchestrator writes a structured plan, tracks step completion, and validates that a finish action is justified before ending the task. If tests fail, the task validation layer can reject the finish and send the agent back to fix things.
 
 ### Playbook Engine
 
-Tasks can be codified as [Playbooks](docs/USER_GUIDE.md) — YAML files that define goals, constraints, and step templates. App matches incoming requests to playbooks by keyword and semantic similarity, then executes the plan with full execution policy controls.
+Tasks can be codified as [Playbooks](docs/USER_GUIDE.md) — YAML files that define goals, constraints, and step templates. Grinta matches incoming requests to playbooks by keyword and semantic similarity, then executes the plan with full execution policy controls.
 
 ### 12 Context Compactors
 
-Stop running out of tokens. App uses specialized compactors to compress conversation history. The codebase and persisted config now both use `compactor` terminology throughout.
+Stop running out of tokens. Grinta uses specialized compactors to compress conversation history. The codebase and persisted config now both use `compactor` terminology throughout.
 
 - **Smart/Auto**: Dynamically switches strategies based on task signals.
 - **LLM Summary**: Uses a cheaper model to intelligently summarize history.
@@ -206,11 +202,11 @@ From `str_replace_editor` (tree-sitter aware) to `browser` automation and `datab
 
 ### 6-Strategy Stuck Detection
 
-App detects if the agent is looping by analyzing action patterns, semantic intent, cost acceleration, and token repetition. The circuit breaker then safely pauses the agent for your review.
+Grinta detects if the agent is looping by analyzing action patterns, semantic intent, cost acceleration, and token repetition. The circuit breaker then safely pauses the agent for your review.
 
 ### Rollback Without Git
 
-`checkpoint` and `revert_to_safe_state` save per-file backups to `.app/checkpoints.json` — sub-commit granularity rollback that works even if the project has no git history.
+`checkpoint` and `revert_to_safe_state` save per-file backups to `.grinta/checkpoints.json` — sub-commit granularity rollback that works even if the project has no git history.
 
 ---
 
@@ -218,7 +214,7 @@ App detects if the agent is looping by analyzing action patterns, semantic inten
 
 - [User Guide](docs/USER_GUIDE.md) — LLM setup, execution policies, playbooks, and web UI usage.
 - [Architecture](docs/ARCHITECTURE.md) — Deeper dive into the controller, events, and engine layers.
-- [Vocabulary](docs/VOCABULARY.md) — Canonical App terminology and package taxonomy.
+- [Vocabulary](docs/VOCABULARY.md) — Canonical Grinta terminology and package taxonomy.
 - [Developer Guide](docs/DEVELOPER.md) — For contributors: project layout, internals, and patterns.
 - [API Reference](openapi.json) — Full OpenAPI 3.1 spec for the backend.
 - [Contributing](CONTRIBUTING.md) — How to add new tools, compactors, or features.

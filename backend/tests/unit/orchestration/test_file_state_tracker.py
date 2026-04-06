@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-import os
+import pytest
 
-from backend.orchestration.file_state_tracker import _MANIFEST_PATH, FileStateTracker
+from backend.orchestration.file_state_tracker import FileStateTracker, file_manifest_path
 
 
-def test_manifest_path_uses_app_dir() -> None:
-    assert _MANIFEST_PATH == os.path.join('.grinta', 'file_manifest.json')
+def test_manifest_path_uses_agent_state_dir(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        'backend.core.workspace_resolution.workspace_agent_state_dir',
+        lambda project_root=None: tmp_path,
+    )
+    assert file_manifest_path() == tmp_path / 'file_manifest.json'
 
 
 def test_record_keeps_highest_priority_action() -> None:

@@ -272,7 +272,6 @@ class TestExecuteAction:
         tool_ctx = MagicMock()
         tool_ctx.blocked = False
         pipeline.create_context.return_value = tool_ctx
-        pipeline.run_plan = AsyncMock()
         ctx.tool_pipeline = pipeline
 
         svc = ActionExecutionService(ctx)
@@ -282,20 +281,20 @@ class TestExecuteAction:
             await svc.execute_action(action)
 
         pipeline.create_context.assert_called_once()
-        pipeline.run_plan.assert_called_once_with(tool_ctx)
         ctx.run_action.assert_called_once_with(action, tool_ctx)
 
     @pytest.mark.asyncio
     async def test_blocked_action_not_run(self):
+        """After pipeline refactor, blocking happens inside run_execute (action_service).
+        execute_action itself always calls run_action; blocking is handled downstream."""
         ctx = _make_context()
         action = MagicMock()
         action.runnable = True
 
         pipeline = MagicMock()
         tool_ctx = MagicMock()
-        tool_ctx.blocked = True
+        tool_ctx.blocked = False  # No pre-blocking in execute_action anymore
         pipeline.create_context.return_value = tool_ctx
-        pipeline.run_plan = AsyncMock()
         ctx.tool_pipeline = pipeline
 
         svc = ActionExecutionService(ctx)
@@ -304,8 +303,8 @@ class TestExecuteAction:
             mock_reg.return_value.dispatch_action_pre = AsyncMock(return_value=action)
             await svc.execute_action(action)
 
-        ctx.run_action.assert_not_called()
-        ctx.telemetry_service.handle_blocked_invocation.assert_called_once()
+        # run_action is always called; blocking happens inside action_service.run_execute
+        ctx.run_action.assert_called_once_with(action, tool_ctx)
 
     @pytest.mark.asyncio
     async def test_plugin_exception_swallowed(self):

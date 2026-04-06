@@ -20,6 +20,15 @@ _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
     'LspQueryObservation',
 )
 
+# Tool fallback map — when a tool fails, suggest the next alternative so the
+# model can pivot in the same turn instead of stopping to explain.
+_TOOL_FALLBACK_MAP: dict[str, list[str]] = {
+    'ast_code_editor': ['str_replace_editor', 'apply_patch'],
+    'str_replace_editor': ['apply_patch'],
+    'search_code': ['lsp_query'],
+    'lsp_query': ['search_code'],
+}
+
 
 class CircuitBreakerMiddleware(ToolInvocationMiddleware):
     """Records circuit breaker telemetry across execute/observe stages."""
@@ -41,10 +50,21 @@ class CircuitBreakerMiddleware(ToolInvocationMiddleware):
             return
         from backend.ledger.observation import ErrorObservation
 
+        # Extract tool name from the action's metadata for per-tool tracking
+        tool_name = ''
+        tcm = getattr(ctx.action, 'tool_call_metadata', None)
+        if tcm is not None:
+            tool_name = getattr(tcm, 'function_name', '') or ''
+
         if isinstance(observation, ErrorObservation):
-            service.record_error(RuntimeError(observation.content))
+            # Inject fallback hint so the model knows which tool to try next
+            if tool_name and tool_name in _TOOL_FALLBACK_MAP:
+                fallbacks = _TOOL_FALLBACK_MAP[tool_name]
+                hint = f'\n\n[TOOL_FALLBACK] `{tool_name}` failed. Try: {", ".join(f"`{t}`" for t in fallbacks)} instead — pivot immediately.'
+                observation.content = (observation.content or '') + hint
+            service.record_error(RuntimeError(observation.content), tool_name=tool_name)
         else:
-            service.record_success()
+            service.record_success(tool_name=tool_name)
             # Meaningful progress actions reduce stuck-detection pressure
             obs_type = type(observation).__name__
             if obs_type in _PROGRESS_OBSERVATION_TYPES:

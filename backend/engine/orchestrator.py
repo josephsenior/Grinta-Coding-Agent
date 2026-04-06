@@ -447,20 +447,27 @@ class Orchestrator(Agent):
         This typically means the LLM returned pure-text (e.g. a final answer
         or a refusal). We surface it as a ``MessageAction`` so the controller
         can decide whether to continue or stop.
+
+        When the model truly emitted no visible text, return ``NullAction`` so
+        the session does not hard-fail and the CLI shows nothing (same as an
+        empty assistant message).
         """
+        from backend.ledger.action import NullAction
+
         message_text = ''
         if result.response and getattr(result.response, 'choices', None):
             first_choice = result.response.choices[0]
             message = getattr(first_choice, 'message', None)
             if message is not None:
-                message_text = getattr(message, 'content', '') or ''
+                raw = getattr(message, 'content', '') or ''
+                message_text = raw if isinstance(raw, str) else str(raw)
 
         if not message_text.strip():
-            raise ModelProviderError(
-                'LLM returned an empty response with no tool calls'
-            )
+            silent = NullAction()
+            silent.source = EventSource.AGENT
+            return silent
 
-        fallback = MessageAction(content=message_text)
+        fallback = MessageAction(content=message_text, wait_for_response=True)
         fallback.source = EventSource.AGENT
         return fallback
 
@@ -553,21 +560,3 @@ class Orchestrator(Agent):
                 pm.mcp_tool_descriptions = descriptions
             if hasattr(pm, 'mcp_server_hints'):
                 pm.mcp_server_hints = self._mcp_server_prompt_hints()
-        # Surface any MCP connection failures before the first user response so the
-        # agent immediately knows which tools are unavailable, avoiding wasted turns
-        # diagnosing connectivity issues at call-time.
-        from backend.integrations.mcp.error_collector import mcp_error_collector
-
-        errors = mcp_error_collector.get_errors()
-        if errors:
-            lines = [
-                'WARNING: Some MCP servers failed to connect. '
-                'The following tools may be unavailable:',
-            ]
-            for err in errors:
-                lines.append(
-                    f'  - {err.server_name} ({err.server_type}): {err.error_message}'
-                )
-            lines.append('Do not attempt to call these tools. Plan accordingly.')
-            think = AgentThinkAction(thought='\n'.join(lines))
-            self.pending_actions.appendleft(think)

@@ -43,33 +43,25 @@ def get_completion_cost(
 
 
 def record_llm_cost_from_metrics(user_key: str, metrics: Metrics) -> None:
-    """Record LLM cost from metrics object.
+    """Log LLM cost from a metrics object.
 
     Args:
         user_key: User quota key (user:id or ip:address)
         metrics: LLM metrics object containing cost information
 
     """
-    try:
-        from backend.telemetry.cost_recording import record_llm_cost
+    if not hasattr(metrics, 'accumulated_cost'):
+        return
 
-        # Get accumulated cost from metrics
-        if hasattr(metrics, 'accumulated_cost'):
-            cost = metrics.accumulated_cost
-            if cost > 0:
-                record_llm_cost(user_key, cost)
-                logger.debug('Recorded LLM cost $%.4f for %s', cost, user_key)
-    except ImportError:
-        # Cost quota middleware not available
-        pass
-    except Exception as e:
-        logger.error('Failed to record LLM cost: %s', e)
+    cost = metrics.accumulated_cost
+    if cost > 0:
+        logger.debug('LLM cost for %s: $%.4f', user_key, cost)
 
 
 def record_llm_cost_from_response(
     user_key: str, response: dict, model: str, config: LLMConfig | None = None
 ) -> None:
-    """Record LLM cost from API response.
+    """Log LLM cost derived from an API response.
 
     Args:
         user_key: User quota key
@@ -78,30 +70,19 @@ def record_llm_cost_from_response(
         config: LLM configuration for cost overrides
 
     """
-    try:
-        from backend.telemetry.cost_recording import record_llm_cost
+    usage = response.get('usage', {})
+    prompt_tokens = usage.get('prompt_tokens', 0)
+    completion_tokens = usage.get('completion_tokens', 0)
 
-        usage = response.get('usage', {})
-        prompt_tokens = usage.get('prompt_tokens', 0)
-        completion_tokens = usage.get('completion_tokens', 0)
+    cost = get_completion_cost(model, prompt_tokens, completion_tokens, config)
 
-        cost = get_completion_cost(model, prompt_tokens, completion_tokens, config)
-
-        if cost > 0:
-            record_llm_cost(user_key, cost)
-            logger.debug(
-                'Recorded LLM cost $%.4f for %s using %s', cost, user_key, model
-            )
-        else:
-            logger.debug(
-                'LLM usage for %s using %s: %d prompt, %d completion',
-                user_key,
-                model,
-                prompt_tokens,
-                completion_tokens,
-            )
-
-    except ImportError:
-        pass
-    except Exception as e:
-        logger.error('Failed to record LLM cost from response: %s', e)
+    if cost > 0:
+        logger.debug('LLM cost for %s using %s: $%.4f', user_key, model, cost)
+    else:
+        logger.debug(
+            'LLM usage for %s using %s: %d prompt, %d completion',
+            user_key,
+            model,
+            prompt_tokens,
+            completion_tokens,
+        )

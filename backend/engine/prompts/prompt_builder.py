@@ -44,16 +44,16 @@ def _choose(is_windows: bool, win: str, unix: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _render_routing(is_windows: bool) -> str:
-    ls_cmd = _choose(is_windows, "`Get-ChildItem -Force`", "`ls -F`")
     batch_cmds = _choose(
         is_windows,
-        "Combine `Get-ChildItem`, `Get-Content`, `Select-String` in one shell where possible.",
-        "Combine `ls && cat && grep` in one bash line where possible.",
+        "Use **PowerShell** only for environment actions (install, build, test, git, processes). "
+        "For repo layout and file content, use **`analyze_project_structure`**, **`search_code`**, "
+        "and **`str_replace_editor` (`view_file`)**—not `Get-Content`/`Select-String` pipelines for source trees.",
+        "Use **bash** only for environment actions (install, build, test, git, processes). "
+        "For repo layout and file content, use **`analyze_project_structure`**, **`search_code`**, "
+        "and **`str_replace_editor` (`view_file`)**—not `ls && cat && grep` chains for project files.",
     )
-    return _load("system_partial_00_routing.md").format(
-        ls_command=ls_cmd,
-        batch_commands=batch_cmds,
-    )
+    return _load("system_partial_00_routing.md").format(batch_commands=batch_cmds)
 
 
 # ---------------------------------------------------------------------------
@@ -90,8 +90,12 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
 
     if level == "full":
         autonomy = (
-            f"<AUTONOMY>\nFULL AUTONOMOUS MODE: Execute routine work without confirmation; "
-            f"auto-retry recoverable errors; ask only when critically ambiguous; complete end-to-end.{cp_line}\n</AUTONOMY>"
+            f"<AUTONOMY>\nFULL AUTONOMOUS MODE: Execute all planned steps end-to-end without "
+            f"confirmation. On tool failure, pivot to alternative tools immediately within the "
+            f"same turn (e.g. ast_code_editor → str_replace_editor → apply_patch). Auto-retry "
+            f"recoverable errors. Report back only after completing the full plan or after "
+            f"exhausting all tool alternatives on a blocking sub-task. Ask only when critically "
+            f"ambiguous.{cp_line}\n</AUTONOMY>"
         )
     elif level == "supervised":
         autonomy = (
@@ -103,10 +107,14 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
             f"<AUTONOMY>\nBALANCED MODE: Routine ops autonomous; confirm high-risk / irreversible actions only.{cp_line}\n</AUTONOMY>"
         )
 
-    ls_cmd = _choose(is_windows, "Get-ChildItem", "ls/find")
+    path_hint = _choose(
+        is_windows,
+        "run `analyze_project_structure` / `search_code`, or list with `Get-ChildItem` only if no tool fits",
+        "run `analyze_project_structure` (`tree`) or `search_code`—avoid blind `cat` of guessed paths",
+    )
     return _load("system_partial_01_autonomy.md").format(
         autonomy_block=autonomy,
-        ls_command=ls_cmd,
+        path_discovery_hint=path_hint,
     )
 
 
@@ -115,7 +123,11 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
 # ---------------------------------------------------------------------------
 
 def _render_tool_reference(is_windows: bool) -> str:
-    confirm_cmd = _choose(is_windows, "Confirm paths with `Get-ChildItem` when unsure.", "Confirm with `ls` when unsure.")
+    confirm_cmd = _choose(
+        is_windows,
+        "If unsure where a file lives, use `analyze_project_structure` (`tree`) or `search_code` before opening it—not only `Get-ChildItem`.",
+        "If unsure where a file lives, use `analyze_project_structure` (`tree`) or `search_code` before opening it—not only `ls`.",
+    )
     proc_find = _choose(
         is_windows,
         "Find: `Get-Process | Where-Object { $_.ProcessName -like '*name*' }`; kill: `Stop-Process -Id <PID>`.",
@@ -349,6 +361,18 @@ def build_workspace_context(
         wd = getattr(runtime_info, "working_dir", "") or ""
         if wd:
             ri_lines.append(f"The current working directory is {wd}")
+            ri_lines.append(
+                "The open project lives in that directory. Use file and shell paths relative to "
+                "it, or absolute paths on disk that stay under it."
+            )
+            ri_lines.append(
+                "There is no `/workspace` virtual path — tools and shell commands use real paths only."
+            )
+            ri_lines.append(
+                "This message does not list project files—do not assume paths like "
+                "`tailwind.config.*` exist. Use `analyze_project_structure` (tree) or `search_code` to discover layout, "
+                "then read with editor/view tools."
+            )
 
         hosts = getattr(runtime_info, "available_hosts", None) or {}
         if hosts:
@@ -386,8 +410,10 @@ def build_workspace_context(
         parts.append("\n".join(ri_lines))
 
         conv = conversation_instructions
-        if conv and getattr(conv, "content", ""):
-            parts.append(f"<CONVERSATION_INSTRUCTIONS>\n{conv.content}\n</CONVERSATION_INSTRUCTIONS>")
+        if conv is not None and conv.content:
+            parts.append(
+                f"<CONVERSATION_INSTRUCTIONS>\n{conv.content}\n</CONVERSATION_INSTRUCTIONS>"
+            )
 
     return "\n".join(parts).strip()
 

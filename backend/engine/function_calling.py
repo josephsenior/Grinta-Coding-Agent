@@ -59,6 +59,8 @@ from backend.engine.tools.lsp_query import (
 from backend.engine.tools.memory_manager import (
     MEMORY_MANAGER_TOOL_NAME,
 )
+from backend.engine.tools.note import build_note_action, build_recall_action
+from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.revert_to_checkpoint import (
     REVERT_TO_CHECKPOINT_TOOL_NAME,
@@ -181,6 +183,11 @@ def _require_tool_argument(
 
 def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
     """Handle CmdRunTool (Bash) tool call."""
+    from backend.engine.tools.bash import (
+        windows_drive_glued_hint,
+        windows_drive_glued_in_command,
+    )
+
     tool_name = create_cmd_run_tool()['function']['name']
     command = _require_tool_argument(arguments, 'command', tool_name)
     raw_is_input = arguments.get('is_input', False)
@@ -188,12 +195,19 @@ def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
     is_background = _parse_bool_argument(arguments.get('is_background', False))
     grep_pattern = arguments.get('grep_pattern')
 
+    glue_hint = (
+        windows_drive_glued_hint()
+        if windows_drive_glued_in_command(command)
+        else ''
+    )
+
     action = CmdRunAction(
         command=command,
         is_input=is_input,
         is_background=is_background,
         grep_pattern=grep_pattern,
         truncation_strategy=arguments.get('truncation_strategy'),
+        thought=glue_hint,
     )
     if 'timeout' in arguments:
         try:
@@ -855,13 +869,15 @@ def _handle_task_tracker_tool(arguments: dict) -> Action:
         and normalized_task_list
         and normalized_task_list == existing_normalized_task_list
     ):
-        logger.info('Ignoring no-op task_tracker update: unchanged task_list')
-        return AgentThinkAction(
+        logger.info('Converting no-op task_tracker update into a no-op task action')
+        return TaskTrackingAction(
+            command=command,
+            task_list=normalized_task_list,
             thought=(
                 '[TASK_TRACKER] Update skipped because the plan is unchanged. '
                 'Do a concrete next action now (edit, run command/tests, or read a targeted file), '
                 'and refresh tracking only after status/result changes.'
-            )
+            ),
         )
 
     if command == 'update':
@@ -1056,7 +1072,7 @@ def _handle_insert_text_command(path: str, arguments: dict) -> Action:
 
 
 def _handle_undo_last_edit_command(path: str, _arguments: dict | None = None) -> Action:
-    """Handle undo_last_edit command — reverts last edit to file."""
+    """Handle undo_last_edit — restores last snapshot for *path* in runtime FileEditor."""
     return FileEditAction(
         path=path,
         command='undo_last_edit',
@@ -1223,6 +1239,8 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         ]: _handle_summarize_context_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
         MEMORY_MANAGER_TOOL_NAME: _handle_memory_manager_tool,
+        NOTE_TOOL_NAME: lambda args: build_note_action(args['key'], args['value']),
+        RECALL_TOOL_NAME: lambda args: build_recall_action(args['key']),
         create_apply_patch_tool()['function']['name']: _handle_apply_patch_tool,
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         'check_tool_status': lambda args: _handle_check_tool_status_tool(args, {}),
@@ -1315,6 +1333,18 @@ def _set_tool_call_metadata(
 
 def _create_message_action_from_content(content) -> list[Action]:
     """Create message action from content when no tool calls are present."""
-    from backend.engine.common import strip_thinking_tags
-    content_str = strip_thinking_tags(str(content)) if content else ''
-    return [MessageAction(content=content_str, wait_for_response=True)]
+    from backend.engine.common import (
+        extract_redacted_thinking_inner,
+        strip_thinking_tags,
+    )
+
+    raw = str(content) if content else ''
+    cot = extract_redacted_thinking_inner(raw).strip()
+    content_str = strip_thinking_tags(raw)
+    return [
+        MessageAction(
+            content=content_str,
+            thought=cot,
+            wait_for_response=bool(content_str.strip()),
+        )
+    ]

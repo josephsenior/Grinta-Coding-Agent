@@ -360,7 +360,7 @@ class TestHandleTaskTrackerTool:
         action = cast(TaskTrackingAction, _handle_task_tracker_tool(args))
         assert action.command == 'update'
 
-    def test_duplicate_update_returns_think_action(self, tmp_path, monkeypatch):
+    def test_duplicate_update_returns_noop_task_action(self, tmp_path, monkeypatch):
         monkeypatch.setenv('APP_WORKSPACE_DIR', str(tmp_path))
         args = {
             'command': 'update',
@@ -371,7 +371,7 @@ class TestHandleTaskTrackerTool:
         assert isinstance(first, TaskTrackingAction)
 
         second = _handle_task_tracker_tool(args)
-        assert isinstance(second, AgentThinkAction)
+        assert isinstance(second, TaskTrackingAction)
         assert 'unchanged' in second.thought.lower()
 
 

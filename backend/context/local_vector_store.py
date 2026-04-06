@@ -62,10 +62,14 @@ class VectorBackend(ABC):
 class ChromaDBBackend(VectorBackend):
     """Local ChromaDB backend for vector storage."""
 
+    backend_name = 'ChromaDB (Local)'
+
     def __init__(
         self,
         collection_name: str = 'APP_memory',
         persist_directory: Path | None = None,
+        *,
+        warm_model_in_background: bool = True,
     ) -> None:
         r"""Initialize ChromaDB local vector store.
 
@@ -90,6 +94,7 @@ class ChromaDBBackend(VectorBackend):
         self._model_name = os.getenv('EMBEDDING_MODEL', 'nomic-ai/nomic-embed-text-v1.5')
         self._model: Any | None = None
         self._model_lock = threading.Lock()
+        self._model_loader_thread: threading.Thread | None = None
 
         # Load or create collection, handling embedding model changes
         self._collection_name = collection_name
@@ -111,8 +116,8 @@ class ChromaDBBackend(VectorBackend):
         except Exception:
             self.collection = self._create_collection(collection_name)
 
-        # Start background model loading so it's ready by first user message
-        threading.Thread(target=self._load_model, daemon=True).start()
+        if warm_model_in_background:
+            self.warm_model_in_background()
 
     def _create_collection(self, name: str) -> Any:
         """Create a new ChromaDB collection with model metadata."""
@@ -127,15 +132,46 @@ class ChromaDBBackend(VectorBackend):
         """Load the embedding model. Thread-safe, called from background thread."""
         with self._model_lock:
             if self._model is None:
-                logger.info("Loading embedding model '%s'…", self._model_name)
+                logger.info("Loading embedding model '%s' (local-only)…", self._model_name)
+                snapshot_fn: Any = None
+                try:
+                    from huggingface_hub import snapshot_download as snapshot_fn
+                except Exception:
+                    pass
                 from sentence_transformers import SentenceTransformer
+
+                # Resolve a local snapshot path first; require prebundled artifacts.
+                model_source = self._model_name
+                if snapshot_fn is not None:
+                    try:
+                        local_path = snapshot_fn(repo_id=self._model_name, local_files_only=True)
+                        model_source = local_path
+                    except Exception as e:
+                        logger.error(
+                            'Required prebundled embedding model %s not found locally: %s',
+                            self._model_name,
+                            e,
+                        )
+                        raise RuntimeError(f'Embedding model {self._model_name} not available locally') from e
 
                 with contextlib.redirect_stderr(io.StringIO()), \
                      contextlib.redirect_stdout(io.StringIO()):
-                    self._model = SentenceTransformer(
-                        self._model_name, trust_remote_code=True,
-                    )
-                logger.info('Embedding model loaded')
+                    self._model = SentenceTransformer(model_source, trust_remote_code=True)
+                logger.info('Embedding model loaded from %s', model_source)
+
+    def warm_model_in_background(self) -> None:
+        """Start loading the embedding model in a daemon thread when not already running."""
+        if self._model is not None:
+            return
+        thread = self._model_loader_thread
+        if thread is not None and thread.is_alive():
+            return
+        self._model_loader_thread = threading.Thread(
+            target=self._load_model,
+            daemon=True,
+            name=f'chroma-model-warmup-{self._collection_name}',
+        )
+        self._model_loader_thread.start()
 
     @property
     def model(self) -> Any:
@@ -250,12 +286,16 @@ class ChromaDBBackend(VectorBackend):
             return 0
 
     def stats(self) -> dict[str, Any]:
-        """Return metadata about the local ChromaDB collection."""
-        return {
-            'backend': 'ChromaDB (Local)',
+        """Return metadata about the local ChromaDB collection without forcing model load."""
+        stats: dict[str, Any] = {
+            'backend': self.backend_name,
             'num_documents': self.collection.count(),
-            'embedding_dim': self.model.get_sentence_embedding_dimension(),
+            'embedding_model': self._model_name,
+            'model_loaded': self._model is not None,
         }
+        if self._model is not None:
+            stats['embedding_dim'] = self._model.get_sentence_embedding_dimension()
+        return stats
 
     @staticmethod
     def _prepare_text(rationale: str | None, content: str) -> str:

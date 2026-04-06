@@ -249,10 +249,12 @@ class OrchestratorPromptManager(PromptManager):
         try:
             from backend.core.workspace_resolution import get_effective_workspace_root
 
+            from backend.core.workspace_resolution import workspace_agent_state_dir
+
             root = get_effective_workspace_root()
             if root is None:
                 return content
-            lessons_path = root / '.grinta' / 'lessons.md'
+            lessons_path = workspace_agent_state_dir(root) / 'lessons.md'
             if not lessons_path.is_file():
                 lessons_path = root / 'memories' / 'repo' / 'lessons.md'
                 if not lessons_path.is_file():

@@ -75,9 +75,9 @@ def create_working_memory_tool() -> ChatCompletionToolParam:
 
 
 def _memory_path() -> Path:
-    from backend.core.workspace_resolution import require_effective_workspace_root
+    from backend.core.workspace_resolution import workspace_agent_state_dir
 
-    return require_effective_workspace_root() / '.grinta' / 'working_memory.json'
+    return workspace_agent_state_dir() / 'working_memory.json'
 
 
 def _load_memory() -> dict[str, str]:

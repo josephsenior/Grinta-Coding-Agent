@@ -52,9 +52,13 @@ debug_*.py
 
 diag_*.txt
 
+# Mistaken / legacy Grinta workspace-root session trees (use .grinta/storage/sessions/)
+sessions/
+
 # Runtime user data
 backend/prompts/
 backend/snippets/
+backend/sessions/
 backend/workspace/
 workspace/users/
 workspace/sessions/

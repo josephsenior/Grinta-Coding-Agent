@@ -95,10 +95,25 @@ class ReRanker:
         """Lazy load the model."""
         if self._model is None:
             try:
-                logger.info('Loading re-ranker model: %s', self.model_name)
+                logger.info('Loading re-ranker model (local-only): %s', self.model_name)
+                snapshot_fn: Any = None
+                try:
+                    from huggingface_hub import snapshot_download as snapshot_fn
+                except Exception:
+                    pass
                 from sentence_transformers import CrossEncoder
 
-                self._model = CrossEncoder(self.model_name)
+                model_source = self.model_name
+                if snapshot_fn is not None:
+                    try:
+                        local_path = snapshot_fn(repo_id=self.model_name, local_files_only=True)
+                        model_source = local_path
+                    except Exception as e:
+                        logger.warning('Required local re-ranker model %s not found: %s', self.model_name, e)
+                        self.enabled = False
+                        return
+
+                self._model = CrossEncoder(model_source)
             except Exception as e:
                 logger.warning('Failed to load re-ranker: %s', e)
                 self.enabled = False
@@ -171,6 +186,7 @@ class EnhancedVectorStore:
         enable_reranking: bool = True,
         cache_size: int = 10000,
         cache_ttl: int = 3600,
+        warm_embeddings_in_background: bool = True,
     ) -> None:
         """Initialize enhanced vector store.
 
@@ -185,7 +201,10 @@ class EnhancedVectorStore:
         """
         from .local_vector_store import ChromaDBBackend
 
-        self.backend: ChromaDBBackend = ChromaDBBackend(collection_name)
+        self.backend: ChromaDBBackend = ChromaDBBackend(
+            collection_name,
+            warm_model_in_background=warm_embeddings_in_background,
+        )
         self.bm25_backend = SQLiteBM25Backend(collection_name)
 
         # Initialize cache
@@ -211,10 +230,16 @@ class EnhancedVectorStore:
             '  Backend: %s\n'
             '  Cache: %s\n'
             '  Re-ranking: %s',
-            self.backend.stats()['backend'],
+            getattr(self.backend, 'backend_name', type(self.backend).__name__),
             'enabled' if enable_cache else 'disabled',
             'enabled' if enable_reranking else 'disabled',
         )
+
+    def start_background_warmup(self) -> None:
+        """Kick off any optional backend warmup without blocking startup."""
+        starter = getattr(self.backend, 'warm_model_in_background', None)
+        if callable(starter):
+            starter()
 
     def add(
         self,

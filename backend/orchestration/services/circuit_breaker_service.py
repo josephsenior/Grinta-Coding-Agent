@@ -95,15 +95,15 @@ class CircuitBreakerService:
             return None
         return self._circuit_breaker.check(getattr(self.controller, 'state', None))
 
-    def record_error(self, error: Exception) -> None:
+    def record_error(self, error: Exception, tool_name: str = '') -> None:
         """Record an error with the circuit breaker."""
         if self._circuit_breaker:
-            self._circuit_breaker.record_error(error)
+            self._circuit_breaker.record_error(error, tool_name=tool_name)
 
-    def record_success(self) -> None:
+    def record_success(self, tool_name: str = '') -> None:
         """Record successful execution."""
         if self._circuit_breaker:
-            self._circuit_breaker.record_success()
+            self._circuit_breaker.record_success(tool_name=tool_name)
 
     def record_high_risk_action(self, security_risk) -> None:
         """Record a high-risk action."""

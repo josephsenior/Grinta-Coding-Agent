@@ -33,11 +33,7 @@ def rebuild_config_models() -> None:
 
     from backend.core.config.compactor_config import (
         AmortizedPruningCompactorConfig,
-        BrowserOutputCompactorConfig,
         CompactorPipelineConfig,
-        ConversationWindowCompactorConfig,
-        LLMAttentionCompactorConfig,
-        LLMSummarizingCompactorConfig,
         NoOpCompactorConfig,
         ObservationMaskingCompactorConfig,
         RecentEventsCompactorConfig,
@@ -72,14 +68,10 @@ def rebuild_config_models() -> None:
     for compactor_cls in (
         NoOpCompactorConfig,
         ObservationMaskingCompactorConfig,
-        BrowserOutputCompactorConfig,
         RecentEventsCompactorConfig,
-        LLMSummarizingCompactorConfig,
         AmortizedPruningCompactorConfig,
-        LLMAttentionCompactorConfig,
         StructuredSummaryCompactorConfig,
         CompactorPipelineConfig,
-        ConversationWindowCompactorConfig,
         SmartCompactorConfig,
     ):
         compactor_cls.model_rebuild(_types_namespace=compactor_ns)

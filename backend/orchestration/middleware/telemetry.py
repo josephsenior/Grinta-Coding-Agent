@@ -20,9 +20,6 @@ class TelemetryMiddleware(ToolInvocationMiddleware):
         self.controller = controller
         self.telemetry = ToolTelemetry.get_instance()
 
-    async def plan(self, ctx: ToolInvocationContext) -> None:
-        self.telemetry.on_plan(ctx)
-
     async def execute(self, ctx: ToolInvocationContext) -> None:
         if ctx.blocked:
             return

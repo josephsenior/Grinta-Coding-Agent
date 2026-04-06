@@ -1,0 +1,34 @@
+[
+  {
+    "id": "1",
+    "description": "Create calc_project/calculator.py with Calculator class.",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "2",
+    "description": "Create calc_project/test_calculator.py with pytest tests.",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "3",
+    "description": "Run pytest to verify tests pass.",
+    "status": "in_progress",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  },
+  {
+    "id": "4",
+    "description": "Create calc_project/README.md.",
+    "status": "pending",
+    "result": null,
+    "tags": [],
+    "subtasks": []
+  }
+]

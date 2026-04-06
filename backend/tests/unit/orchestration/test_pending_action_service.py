@@ -70,6 +70,38 @@ class TestSetGet:
         svc.set(cast(Any, a1))
         svc.set(cast(Any, a2))
         assert svc.get() is a2
+        assert svc.pop_for_cause(1) is a1
+        assert svc.pop_for_cause(2) is a2
+        assert svc.get() is None
+
+    def test_multiple_in_flight_peek_and_pop_by_cause(self):
+        """Regression: older observations must match after a newer pending id is set."""
+        svc = PendingActionService(_make_context(), timeout=300.0)
+        a218 = _make_action(218)
+        a219 = _make_action(219)
+        svc.set(cast(Any, a218))
+        svc.set(cast(Any, a219))
+        assert svc.peek_for_cause(218) is a218
+        assert svc.peek_for_cause(219) is a219
+        assert svc.get() is a219
+        assert svc.pop_for_cause(218) is a218
+        assert svc.peek_for_cause(218) is None
+        assert svc.get() is a219
+
+    def test_has_outstanding_for_cause_tracks_outstanding_map(self):
+        svc = PendingActionService(_make_context(), timeout=300.0)
+        a218 = _make_action(218)
+        svc.set(cast(Any, a218))
+        assert svc.has_outstanding_for_cause(218) is True
+        assert svc.has_outstanding_for_cause('218') is True
+        assert svc.has_outstanding_for_cause(219) is False
+        svc.pop_for_cause(218)
+        assert svc.has_outstanding_for_cause(218) is False
+
+    def test_has_outstanding_for_cause_none_and_unparseable(self):
+        svc = PendingActionService(_make_context(), timeout=300.0)
+        assert svc.has_outstanding_for_cause(None) is False
+        assert svc.has_outstanding_for_cause('not-int') is False
 
 
 # ── timeout ──────────────────────────────────────────────────────────
@@ -82,7 +114,7 @@ class TestTimeout:
         action = _make_action()
         svc.set(cast(Any, action))
         # Manually backdate the stored timestamp so elapsed > timeout
-        svc._pending = cast(Any, (action, time.time() - 10.0))
+        svc._outstanding[1] = cast(Any, (action, time.time() - 10.0))
         result = svc.get()
         assert result is None
 
@@ -92,7 +124,7 @@ class TestTimeout:
         svc = PendingActionService(ctx, timeout=5.0)
         action = _make_action(42)
         svc.set(cast(Any, action))
-        svc._pending = cast(Any, (action, time.time() - 10.0))
+        svc._outstanding[42] = cast(Any, (action, time.time() - 10.0))
         svc.get()  # triggers timeout
         controller.event_stream.add_event.assert_called_once()
         obs = controller.event_stream.add_event.call_args[0][0]
@@ -104,7 +136,7 @@ class TestTimeout:
         svc = PendingActionService(ctx, timeout=5.0)
         action = _make_action(77)
         svc.set(cast(Any, action))
-        svc._pending = cast(Any, (action, time.time() - 10.0))
+        svc._outstanding[77] = cast(Any, (action, time.time() - 10.0))
         svc.get()
         obs = controller.event_stream.add_event.call_args[0][0]
         assert obs.cause == 77
@@ -115,7 +147,7 @@ class TestTimeout:
         svc = PendingActionService(ctx, timeout=5.0)
         action = SimpleNamespace(id='not-an-int')
         svc.set(cast(Any, action))
-        svc._pending = cast(Any, (action, time.time() - 10.0))
+        svc._legacy_pending = cast(Any, (action, time.time() - 10.0))
         svc.get()
         obs = controller.event_stream.add_event.call_args[0][0]
         assert obs.cause is None
@@ -133,13 +165,12 @@ class TestSlowPendingLogging:
         action = _make_action()
         svc.set(cast(Any, action))
         # Patch the stored timestamp to 90s ago and make elapsed divisible by 30
-        svc._pending = cast(Any, (action, time.time() - 90.0))
+        old_ts = time.time() - 90.0
+        svc._outstanding[1] = cast(Any, (action, old_ts))
         with patch(
             'backend.orchestration.services.pending_action_service.time'
         ) as mock_time:
-            pending = svc._pending
-            assert pending is not None
-            mock_time.time.return_value = pending[1] + 90.0
+            mock_time.time.return_value = old_ts + 90.0
             svc.get()
         # controller.log should have been called for the slow warning
         calls = [c for c in controller.log.call_args_list if 'active for' in str(c)]

@@ -10,6 +10,7 @@ from backend.engine.common import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
     extract_assistant_message,
+    extract_redacted_thinking_inner,
     extract_thought_from_message,
     get_common_path_param,
     get_common_pattern_param,
@@ -56,9 +57,9 @@ class TestExtractAssistantMessage:
 
 
 class TestExtractThoughtFromMessage:
-    def test_string_content(self):
+    def test_plain_string_without_tags_is_not_thinking(self):
         msg = SimpleNamespace(content='Thinking about this...')
-        assert extract_thought_from_message(msg) == 'Thinking about this...'
+        assert extract_thought_from_message(msg) == ''
 
     def test_none_content(self):
         msg = SimpleNamespace(content=None)
@@ -68,7 +69,7 @@ class TestExtractThoughtFromMessage:
         msg = SimpleNamespace()
         assert extract_thought_from_message(msg) == ''
 
-    def test_list_content(self):
+    def test_list_content_without_tags_is_not_thinking(self):
         msg = SimpleNamespace(
             content=[
                 {'type': 'text', 'text': 'Part 1'},
@@ -76,24 +77,54 @@ class TestExtractThoughtFromMessage:
                 {'type': 'text', 'text': ' Part 2'},
             ]
         )
-        assert extract_thought_from_message(msg) == 'Part 1 Part 2'
+        assert extract_thought_from_message(msg) == ''
 
     def test_empty_list(self):
         msg = SimpleNamespace(content=[])
         assert extract_thought_from_message(msg) == ''
 
-    def test_output_text_variant_is_supported(self):
+    def test_output_text_variant_without_tags_is_not_thinking(self):
         msg = SimpleNamespace(
             content=[
                 {'type': 'output_text', 'text': 'Hello'},
                 {'type': 'text', 'text': ' world'},
             ]
         )
-        assert extract_thought_from_message(msg) == 'Hello world'
+        assert extract_thought_from_message(msg) == ''
 
-    def test_list_of_strings_is_supported(self):
+    def test_list_of_strings_without_tags_is_not_thinking(self):
         msg = SimpleNamespace(content=['Part A', ' + Part B'])
-        assert extract_thought_from_message(msg) == 'Part A + Part B'
+        assert extract_thought_from_message(msg) == ''
+
+    def test_redacted_thinking_inner_only(self):
+        msg = SimpleNamespace(
+            content='<redacted_thinking>plan step one</redacted_thinking>'
+        )
+        assert extract_thought_from_message(msg) == 'plan step one'
+
+    def test_redacted_thinking_ignores_surface_prose(self):
+        msg = SimpleNamespace(
+            content=(
+                '<redacted_thinking>inner reasoning</redacted_thinking>\n\n'
+                'Here is the answer.'
+            )
+        )
+        assert extract_thought_from_message(msg) == 'inner reasoning'
+
+
+# ── extract_redacted_thinking_inner ──────────────────────────────────
+
+
+class TestExtractRedactedThinkingInner:
+    def test_two_blocks_joined(self):
+        raw = (
+            '<redacted_thinking>a</redacted_thinking>'
+            '<redacted_thinking>b</redacted_thinking>'
+        )
+        assert extract_redacted_thinking_inner(raw) == 'a\n\nb'
+
+    def test_empty(self):
+        assert extract_redacted_thinking_inner('no tags') == ''
 
 
 # ── parse_tool_call_arguments ────────────────────────────────────────

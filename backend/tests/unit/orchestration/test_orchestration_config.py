@@ -138,7 +138,6 @@ class TestOrchestrationServices:
         assert services.iteration_guard is not None
         assert services.step_guard is not None
         assert services.step_prerequisites is not None
-        assert services.budget_guard is not None
         assert services.safety is not None
         assert services.pending_action is not None
         assert services.observation is not None
@@ -146,8 +145,6 @@ class TestOrchestrationServices:
         assert services.action is not None
         assert services.action_execution is not None
         assert services.state is not None
-        assert services.telemetry is not None
-        assert services.metrics is not None
         assert services.retry is not None
         assert services.recovery is not None
         assert services.circuit_breaker is not None
@@ -158,7 +155,7 @@ class TestOrchestrationServices:
         assert services.exception_handler is not None
 
     def test_service_count_matches_documentation(self):
-        """Test creates exactly 25 unique services as documented."""
+        """Test creates exactly 22 unique services as documented."""
         mock_controller = MagicMock()
         mock_controller.PENDING_ACTION_TIMEOUT = 30
 
@@ -171,7 +168,7 @@ class TestOrchestrationServices:
             if not attr.startswith('_') and not callable(getattr(services, attr))
         ]
 
-        assert len({id(service) for service in service_attrs}) == 25
+        assert len({id(service) for service in service_attrs}) == 22
 
     def test_services_receive_controller_reference(self):
         """Test some services receive direct controller reference."""
@@ -193,15 +190,10 @@ class TestOrchestrationServices:
         services = OrchestrationServices(mock_controller)
 
         # Services built on context
-        from backend.orchestration.services import (
-            BudgetGuardService,
-            IterationService,
-            SafetyService,
-        )
+        from backend.orchestration.services import IterationService, SafetyService
 
         assert isinstance(services.iteration, IterationService)
         assert isinstance(services.safety, SafetyService)
-        assert isinstance(services.budget_guard, BudgetGuardService)
 
     def test_pending_action_receives_timeout(self):
         """Test PendingActionService receives timeout from controller."""

@@ -1,6 +1,6 @@
-﻿# Contributing to App
+# Contributing to Grinta
 
-Thank you for your interest in contributing to App! This guide will help you get started.
+Thank you for your interest in contributing to Grinta! This guide will help you get started.
 
 ## Development Setup
 
@@ -15,7 +15,7 @@ Thank you for your interest in contributing to App! This guide will help you get
 ```bash
 # Clone
 git clone https://github.com/josephsenior/App.git
-cd App
+cd Grinta
 
 # Backend
 uv sync
@@ -59,8 +59,8 @@ uv run app serve
 
 **Python API client (`client`):**
 
-- Keep `AppClient` as the single place for httpx + Socket.IO to the backend
-- Prefer extending `AppClient` over ad hoc httpx/socketio in scripts or tests
+- Keep `GrintaClient` as the single place for httpx + Socket.IO to the backend
+- Prefer extending `GrintaClient` over ad hoc httpx/socketio in scripts or tests
 
 ### Commit Convention
 

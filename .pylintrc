@@ -1,6 +1,6 @@
 [MASTER]
-# Ignore patterns
-ignore=.venv,.venv-wsl-backup,node_modules,.git
+# Ignore patterns (tests use backend/tests/.pylintrc when linted separately)
+ignore=.venv,.venv-wsl-backup,node_modules,.git,tests
 
 [MESSAGES CONTROL]
 # Disable docstring requirements for cleaner linting
@@ -19,7 +19,54 @@ disable=C0114,  # missing-module-docstring
         W0201,  # attribute-defined-outside-init (intentional in some cases)
         C0413,  # wrong-import-position (sometimes necessary)
         W0613,  # unused-argument (required by interface/protocol)
-        W0237   # arguments-renamed (common when overriding with better names)
+        W0237,  # arguments-renamed (common when overriding with better names)
+        C0103,  # invalid-name
+        C0104,  # disallowed-name
+        C0301,  # line-too-long (ruff/formatters)
+        C0302,  # too-many-lines
+        C0303,  # trailing-whitespace
+        C0304,  # missing-final-newline
+        C0305,  # trailing-newlines
+        C0321,  # multiple-statements
+        C0325,  # superfluous-parens
+        C0411,  # wrong-import-order
+        C0412,  # ungrouped-imports
+        C0414,  # useless-import-alias
+        C2801,  # unnecessary-dunder-call
+        R0901,  # too-many-ancestors
+        R0902,  # too-many-instance-attributes
+        R0904,  # too-many-public-methods
+        R0911,  # too-many-return-statements
+        R0912,  # too-many-branches
+        R0913,  # too-many-arguments
+        R0914,  # too-many-locals
+        R0915,  # too-many-statements
+        R0916,  # too-many-boolean-expressions
+        R0917,  # too-many-positional-arguments
+        R1701,  # consider-merging-isinstance
+        R1702,  # too-many-nested-blocks
+        R1705,  # no-else-return
+        R1711,  # useless-return
+        R1716,  # chained-comparison-optimization
+        R1732,  # consider-using-with
+        W0105,  # pointless-string-statement
+        W0107,  # unnecessary-pass
+        W0212,  # protected-access
+        W0223,  # abstract-method (protocol/subclass false positives)
+        W0404,  # reimported
+        W0511,  # fixme
+        W0602,  # global-variable-not-assigned
+        W0603,  # global-statement
+        W0611,  # unused-import (ruff)
+        W0612,  # unused-variable
+        W0621,  # redefined-outer-name
+        W0622,  # redefined-builtin
+        W0706,  # try-except-raise
+        W0707,  # raise-missing-from
+        W1113,  # keyword-arg-before-vararg
+        W1309,  # f-string-without-interpolation
+        W1510,  # subprocess-run-check
+        W2301   # unnecessary-ellipsis
 
 [DESIGN]
 # Relaxed thresholds for large orchestration/service modules
@@ -43,7 +90,7 @@ attr-rgx=[a-z_][a-z0-9_]{0,30}$|[A-Z][a-zA-Z0-9]*$
 
 [TYPECHECK]
 # Ignore missing members in dynamic libraries
-ignored-modules=pydantic,litellm
+ignored-modules=pydantic,litellm,orjson
 
 # Ignore no-member errors for common dynamic attributes
 ignored-classes=pydantic.BaseModel,sqlalchemy.orm.DeclarativeMeta

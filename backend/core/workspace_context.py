@@ -1,17 +1,9 @@
 """Workspace context helpers — project memory, changelog, and fingerprinting.
 
-Three responsibilities
-----------------------
-1. **Project memory**: reads/writes ``.app/context.md`` — a human-editable
-   file the agent receives at the start of every session.
-2. **Workspace fingerprinting**: detects the project type by probing well-known
-   sentinel files so the UI can display it and pre-populate the context template.
-3. **Agent changelog**: appends newline-delimited JSON entries to
-    ``.app/changelog.jsonl`` for optional end-of-day / summary tooling.
+Project memory and changelog live under
+``~/.grinta/workspaces/<id>/project_context/`` (not in the repo tree).
 
-The ``.app/`` directory is created automatically on first write.
-A ``.gitignore`` inside it excludes ``changelog.jsonl`` by default
-(the context file is intentionally committed so the whole team benefits).
+Workspace fingerprinting still probes the **code** directory (open project).
 """
 
 from __future__ import annotations
@@ -43,7 +35,7 @@ _FINGERPRINTS: list[tuple[str, str]] = [
     ('.github', 'GitHub project'),
 ]
 
-_PROJECT_STATE_DIR = '.grinta'
+_PROJECT_CONTEXT_SEGMENT = 'project_context'
 _CONTEXT_FILE = 'context.md'
 _CHANGELOG_FILE = 'changelog.jsonl'
 
@@ -80,18 +72,45 @@ _CONTEXT_TEMPLATE = """\
 # ── Directory helpers ────────────────────────────────────────────────
 
 
+def _workspace_anchor(cwd: Path | None) -> Path:
+    """Filesystem anchor for the *code* project (used to derive workspace id).
+
+    Explicit *cwd* wins so call sites can target a project dir; otherwise use the
+    open workspace from config / env, then process CWD.
+    """
+    from backend.core.workspace_resolution import get_effective_workspace_root
+
+    if cwd is not None:
+        try:
+            return Path(cwd).resolve()
+        except OSError:
+            return Path(cwd)
+    ws = get_effective_workspace_root()
+    if ws is not None:
+        try:
+            return Path(ws).resolve()
+        except OSError:
+            return Path(ws)
+    try:
+        return Path.cwd().resolve()
+    except OSError:
+        return Path.cwd()
+
+
 def get_project_state_dir(cwd: Path | None = None) -> Path:
-    """Return the path to the ``.app/`` directory for *cwd* (or CWD)."""
-    return (cwd or Path.cwd()) / _PROJECT_STATE_DIR
+    """Return ``~/.grinta/workspaces/<id>/project_context`` for the open project."""
+    from backend.core.workspace_resolution import workspace_grinta_root
+
+    anchor = _workspace_anchor(cwd)
+    return workspace_grinta_root(anchor) / _PROJECT_CONTEXT_SEGMENT
 
 
 def ensure_project_state_dir(cwd: Path | None = None) -> Path:
-    """Create ``.app/`` (and its ``.gitignore``) if they don't exist."""
+    """Create project context dir (and ``.gitignore``) if missing."""
     project_state_dir = get_project_state_dir(cwd)
-    project_state_dir.mkdir(exist_ok=True)
+    project_state_dir.mkdir(parents=True, exist_ok=True)
     gitignore = project_state_dir / '.gitignore'
     if not gitignore.exists():
-        # Ignore volatile files; context.md should be committed.
         gitignore.write_text('changelog.jsonl\ndownloads/\n', encoding='utf-8')
     return project_state_dir
 

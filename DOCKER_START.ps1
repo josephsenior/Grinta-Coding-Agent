@@ -1,5 +1,5 @@
 # ============================================
-# App - Docker Quick Start
+# Grinta - Docker Quick Start
 # ============================================
 
 param(
@@ -7,7 +7,7 @@ param(
     [switch]$Detached
 )
 
-Write-Host "🚀 Starting app in Docker..." -ForegroundColor Cyan
+Write-Host "🚀 Starting Grinta in Docker..." -ForegroundColor Cyan
 
 # Ensure settings.json exists so it can be mounted
 if (-not (Test-Path "settings.json")) {
@@ -21,13 +21,7 @@ if (-not (Test-Path "settings.json")) {
 }
 
 # Run docker compose
-Write-Host "🐳 Running Docker Compose (default: Redis + Postgres + app)..." -ForegroundColor Green
-
-$env:APP_KB_STORAGE_TYPE = if ($NoDatabase) { "file" } else { "database" }
-
-if ($NoDatabase) {
-    Write-Host "⚠ Emergency mode enabled: APP_KB_STORAGE_TYPE=file" -ForegroundColor Yellow
-}
+Write-Host "🐳 Running Docker Compose (local file-backed Grinta)..." -ForegroundColor Green
 
 if ($Detached) {
     docker compose up --build -d

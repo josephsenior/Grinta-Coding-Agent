@@ -188,19 +188,27 @@ class EventStream(EventStore):
         )
 
         # ---- Queue / threading setup --------------------------------------
+        # inline_delivery=True: all events are delivered synchronously in the
+        # same call chain as add_event(), like USER events always are.
+        # This eliminates the thread-pool race that causes action ID mismatches
+        # in single-session CLI use. Set automatically when worker_count=0.
+        _wc = int(worker_count if worker_count is not None else event_defaults.workers)
+        self._inline_delivery: bool = _wc == 0
         self._queue_loop: asyncio.AbstractEventLoop | None = None
         self._async_queue: asyncio.Queue[Event | object] | None = None
         self._queue_ready = threading.Event()
-        self._worker_count = max(
-            1,
-            int(worker_count if worker_count is not None else event_defaults.workers),
-        )
+        self._worker_count = max(1, _wc) if not self._inline_delivery else 1
         self._delivery_pool = ThreadPoolExecutor(max_workers=self._worker_count)
         self._workers: list[asyncio.Task[Any]] = []
         self._stop_event: asyncio.Event | None = None
         self._stop_sentinel = object()
-        self._queue_thread = threading.Thread(target=self._run_queue_loop, daemon=True)
-        self._queue_thread.start()
+        if not self._inline_delivery:
+            self._queue_thread = threading.Thread(target=self._run_queue_loop, daemon=True)
+            self._queue_thread.start()
+        else:
+            # In inline mode the queue thread is not used; mark ready immediately.
+            self._queue_thread = threading.Thread(target=lambda: None, daemon=True)
+            self._queue_ready.set()
 
         # ---- Subscribers / secrets -----------------------------------------
         self._subscribers = {}
@@ -248,22 +256,23 @@ class EventStream(EventStore):
         if hasattr(self, '_finalizer'):
             self._finalizer.detach()
         self._stop_flag.set()
-        if self._queue_loop and self._stop_event:
-            future = asyncio.run_coroutine_threadsafe(
-                self._initiate_shutdown(), self._queue_loop
-            )
-            try:
-                future.result(timeout=5)
-            except Exception as exc:  # pragma: no cover - defensive
-                logger.debug('Error shutting down event queue: %s', exc)
-        if self._queue_thread.is_alive():
-            # Never block forever during teardown; the thread is daemonized.
-            self._queue_thread.join(timeout=5)
-            if self._queue_thread.is_alive():
-                logger.debug(
-                    "EventStream '%s' queue thread did not stop within timeout; continuing",
-                    self.sid,
+        if not self._inline_delivery:
+            if self._queue_loop and self._stop_event:
+                future = asyncio.run_coroutine_threadsafe(
+                    self._initiate_shutdown(), self._queue_loop
                 )
+                try:
+                    future.result(timeout=5)
+                except Exception as exc:  # pragma: no cover - defensive
+                    logger.debug('Error shutting down event queue: %s', exc)
+            if self._queue_thread.is_alive():
+                # Never block forever during teardown; the thread is daemonized.
+                self._queue_thread.join(timeout=5)
+                if self._queue_thread.is_alive():
+                    logger.debug(
+                        "EventStream '%s' queue thread did not stop within timeout; continuing",
+                        self.sid,
+                    )
         self._subscribers.clear()
         self._activity_listeners.clear()
         self._persist.close()
@@ -392,7 +401,7 @@ class EventStream(EventStore):
         if sanitized_event.id is not None:
             self._persist.persist_event(payload, sanitized_event.id, cache_payload)
 
-        if source == EventSource.USER:
+        if source == EventSource.USER or self._inline_delivery:
             self._dispatch_event_inline(sanitized_event)
         else:
             self._enqueue_serialized_event(sanitized_event)

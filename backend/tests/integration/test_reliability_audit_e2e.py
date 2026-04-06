@@ -16,7 +16,6 @@ from backend.orchestration.agent_circuit_breaker import (
 )
 from backend.orchestration.rate_governor import LLMRateGovernor
 from backend.orchestration.safety_validator import ExecutionContext, SafetyValidator
-from backend.orchestration.services.budget_guard_service import BudgetGuardService
 from backend.security.safety_config import SafetyConfig
 
 
@@ -33,24 +32,6 @@ def mock_controller_context():
 
 class TestReliabilityGuardrailsIntegration:
     """Rigorous audit of App's behavioral and token safety constraints."""
-
-    @pytest.mark.asyncio
-    async def test_budget_exhaustion_interception(self, mock_controller_context):
-        """EDGE CASE: Verify that a massive influx of cost triggers the budget guard
-        before the next action can proceed.
-        """
-        budget_guard = BudgetGuardService(mock_controller_context)
-
-        # Simulate normal cost
-        mock_controller_context.state.metrics.get_total_cost.return_value = 1.00
-        budget_guard._check_budget_thresholds()
-
-        # Simulate abrupt cost blowout (e.g., runaway context window)
-        mock_controller_context.state.metrics.get_total_cost.return_value = 15.00
-
-        # We need to trace if the control flags were synchronized
-        budget_guard.sync_with_metrics()
-        mock_controller_context.state_tracker.sync_budget_flag_with_metrics.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_rate_governor_adaptive_backoff(self):

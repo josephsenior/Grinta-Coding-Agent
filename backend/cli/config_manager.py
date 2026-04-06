@@ -609,6 +609,16 @@ def update_budget(budget: float) -> None:
     _save_raw_settings(settings)
 
 
+def update_cli_tool_icons(enabled: bool) -> None:
+    settings = _load_raw_settings()
+    settings['cli_tool_icons'] = bool(enabled)
+    _save_raw_settings(settings)
+
+
+def get_cli_tool_icons_enabled(config: AppConfig) -> bool:
+    return bool(getattr(config, 'cli_tool_icons', True))
+
+
 def get_budget(config: AppConfig) -> str:
     budget = getattr(config, 'max_budget_per_task', None)
     if budget is None:

@@ -5,9 +5,7 @@ from pydantic import ValidationError
 
 from backend.core.config.compactor_config import (
     AmortizedPruningCompactorConfig,
-    BrowserOutputCompactorConfig,
     CompactorPipelineConfig,
-    ConversationWindowCompactorConfig,
     NoOpCompactorConfig,
     ObservationMaskingCompactorConfig,
     RecentEventsCompactorConfig,
@@ -42,13 +40,6 @@ class TestObservationMaskingConfig:
     def test_rejects_zero_window(self):
         with pytest.raises(ValidationError):
             ObservationMaskingCompactorConfig(attention_window=0)
-
-
-class TestBrowserOutputCompactorConfig:
-    def test_default(self):
-        c = BrowserOutputCompactorConfig()
-        assert c.type == 'browser_output_masking'
-        assert c.attention_window >= 1
 
 
 class TestRecentEventsConfig:
@@ -90,12 +81,6 @@ class TestCompactorPipelineConfig:
     def test_legacy_condensers_field_rejected(self):
         with pytest.raises(ValidationError):
             CompactorPipelineConfig.model_validate({'condensers': [{'type': 'noop'}]})
-
-
-class TestConversationWindowConfig:
-    def test_default(self):
-        c = ConversationWindowCompactorConfig()
-        assert c.type == 'conversation_window'
 
 
 class TestSmartCompactorConfig:
@@ -143,12 +128,6 @@ class TestCreateCompactorConfig:
         )
         assert isinstance(cfg, ObservationMaskingCompactorConfig)
 
-    def test_conversation_window(self):
-        cfg = create_compactor_config(
-            'conversation_window', {'type': 'conversation_window'}
-        )
-        assert isinstance(cfg, ConversationWindowCompactorConfig)
-
     def test_smart(self):
         cfg = create_compactor_config('smart', {'type': 'smart'})
         assert isinstance(cfg, SmartCompactorConfig)
@@ -189,9 +168,9 @@ class TestCompactorConfigFromTomlSection:
         assert isinstance(result['compactor'], NoOpCompactorConfig)
 
     def test_llm_config_missing_falls_back_to_noop(self):
-        """LLM compactor referencing missing config should fall back to NoOp."""
+        """Smart compactor referencing missing llm config should fall back to NoOp."""
         result = compactor_config_from_toml_section(
-            {'type': 'llm', 'llm_config': 'nonexistent_llm'},
+            {'type': 'smart', 'llm_config': 'nonexistent_llm'},
             llm_configs={'other_llm': object()},
         )
         assert 'compactor' in result

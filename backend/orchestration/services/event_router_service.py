@@ -6,7 +6,8 @@ all event dispatch logic that was previously inline in SessionOrchestrator._on_e
 
 from __future__ import annotations
 
-import os
+import os as _os
+
 from typing import TYPE_CHECKING
 
 from backend.core.schemas import AgentState
@@ -160,56 +161,8 @@ class EventRouterService:
         await self._run_critics()
 
     async def _run_critics(self) -> None:
-        """Run all critics against the completed task's event history and log scores.
-
-        Scores are stored in ``state.extra_data["critic_scores"]`` and logged.
-        Critics are informational — a failure here must never prevent task completion.
-        Disabled when the environment variable ``ENABLE_REVIEW_CRITICS`` is set to
-        any value other than ``"true"`` (case-insensitive).
-        """
-        # User defaults: Critics are ON by default as an opinionated choice
-        if os.environ.get('ENABLE_REVIEW_CRITICS', 'true').lower() != 'true':
-            self._ctrl.log(
-                'debug', 'Review critics skipped (ENABLE_REVIEW_CRITICS=false)'
-            )
-            return
-
-        from backend.governance import (
-            AgentFinishedCritic,
-            BudgetCritic,
-            SuitePassCritic,
-        )
-
-        events = list(self._ctrl.state.history)
-        critics = [
-            AgentFinishedCritic(),
-            BudgetCritic(),
-            SuitePassCritic(),
-        ]
-        scores: dict[str, dict] = {}
-        for critic in critics:
-            name = type(critic).__name__
-            try:
-                result = critic.evaluate(events)
-                scores[name] = {'score': result.score, 'message': result.message}
-                if result.message:
-                    self._ctrl.log(
-                        'info',
-                        f'Critic [{name}]: score={result.score:.2f} — {result.message}',
-                        extra={
-                            'critic': name,
-                            'critic_score': result.score,
-                        },
-                    )
-            except Exception as exc:
-                scores[name] = {'score': None, 'message': f'error: {exc}'}
-                self._ctrl.log(
-                    'warning',
-                    f'Critic [{name}] failed: {exc}',
-                )
-
-        # Persist scores on the session state so the API / audit can surface them.
-        self._ctrl.state.extra_data['critic_scores'] = scores
+        """Retained lifecycle hook after finish; review critics were removed."""
+        return
 
     async def _handle_reject_action(self, action: AgentRejectAction) -> None:
         """Handle agent reject action."""
@@ -226,7 +179,7 @@ class EventRouterService:
 
     async def _handle_user_message(self, action: MessageAction) -> None:
         """Handle user message: log, create recall, set pending, start agent."""
-        log_level = 'info' if os.getenv('LOG_ALL_EVENTS') in ('true', '1') else 'debug'
+        log_level = 'info' if _os.getenv('LOG_ALL_EVENTS') in ('true', '1') else 'debug'
         self._ctrl.log(
             log_level,
             str(action),
@@ -246,16 +199,30 @@ class EventRouterService:
         recall_type = RecallType.WORKSPACE_CONTEXT if is_first else RecallType.KNOWLEDGE
         recall_action = RecallAction(query=action.content, recall_type=recall_type)
 
-        # Assign stream id before pending so pending always references a stable id
-        # (recall observations arrive later, after async recall work).
+        # Assign stream id before pending so pending always references a stable id.
         self._ctrl.event_stream.add_event(recall_action, EventSource.USER)
+
+        # Only block the agent loop on WORKSPACE_CONTEXT recall (first message).
+        # KNOWLEDGE recalls (follow-up messages) run in the background while the
+        # agent steps — can_step() already returns True for them. Setting them as
+        # pending causes an ID mismatch when the next real action gets a new ID
+        # before the RecallObservation arrives.
         pending_service = getattr(self._ctrl, 'pending_action_service', None)
-        if pending_service is not None:
-            pending_service.set(recall_action)
+        if recall_type == RecallType.WORKSPACE_CONTEXT:
+            if pending_service is not None:
+                pending_service.set(recall_action)
+            else:
+                action_service = getattr(self._ctrl, 'action_service', None)
+                if action_service is not None:
+                    action_service.set_pending_action(recall_action)
         else:
-            action_service = getattr(self._ctrl, 'action_service', None)
-            if action_service is not None:
-                action_service.set_pending_action(recall_action)
+            # KNOWLEDGE recall (second+ messages): the previous turn's MessageAction
+            # is still pending (it was set in _finalize_action but never cleared by
+            # an observation because AGENT_LEVEL_ACTIONS skip runtime execution).
+            # Clear it now so can_step() returns True for this new turn.
+            if pending_service is not None:
+                pending_service.set(None)
+
         if self._ctrl.get_agent_state() != AgentState.RUNNING:
             await self._ctrl.set_agent_state_to(AgentState.RUNNING)
 

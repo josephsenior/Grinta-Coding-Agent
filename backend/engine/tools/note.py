@@ -18,7 +18,8 @@ from backend.ledger.action import AgentThinkAction
 
 _NOTE_DESCRIPTION = (
     'Store a persistent note in your scratchpad. '
-    'Notes are written to .app/agent_notes.json inside the workspace root '
+    'Notes are written under your user Grinta data dir '
+    '(~/.grinta/workspaces/<id>/agent/agent_notes.json), not in the repo, '
     'and survive context condensation — use them to remember decisions, '
     'constraints, or interim findings across a long session.\n\n'
     "Examples: key='auth_decision', value='using JWT with 1-hour expiry'.\n"
@@ -30,7 +31,7 @@ _RECALL_DESCRIPTION = (
     'Pass a specific key to get one value, or key="all" to dump the entire scratchpad.'
 )
 
-_NOTES_RELPATH = os.path.join('.grinta', 'agent_notes.json')
+_AGENT_NOTES_NAME = 'agent_notes.json'
 _SCRATCHPAD_META_KEY = '__app_scratchpad_meta__'
 
 
@@ -73,9 +74,9 @@ def create_recall_tool() -> ChatCompletionToolParam:
 
 def _notes_path() -> Path:
     """Return the absolute path to the scratchpad JSON file."""
-    from backend.core.workspace_resolution import require_effective_workspace_root
+    from backend.core.workspace_resolution import workspace_agent_state_dir
 
-    return require_effective_workspace_root() / _NOTES_RELPATH
+    return workspace_agent_state_dir() / _AGENT_NOTES_NAME
 
 
 def _read_notes_blob() -> dict:
