@@ -281,10 +281,6 @@ RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH']
 # ── UX / Error Presentation ─────────────────────────────────────────
 # ErrorSeverity, ErrorCategory enums live in backend.core.enums
 
-# ── Browser Gym ─────────────────────────────────────────────────────
-BROWSER_EVAL_GET_GOAL_ACTION = 'GET_EVAL_GOAL'
-BROWSER_EVAL_GET_REWARDS_ACTION = 'GET_EVAL_REWARDS'
-
 # ── Command Output ──────────────────────────────────────────────────
 CMD_OUTPUT_PS1_BEGIN = '\n###PS1JSON###\n'
 CMD_OUTPUT_PS1_END = '\n###PS1END###'

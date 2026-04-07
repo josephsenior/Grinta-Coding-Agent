@@ -133,6 +133,11 @@ class ChromaDBBackend(VectorBackend):
         with self._model_lock:
             if self._model is None:
                 logger.info("Loading embedding model '%s' (local-only)…", self._model_name)
+
+                # Force fully offline — never phone home to HuggingFace.
+                os.environ.setdefault('HF_HUB_OFFLINE', '1')
+                os.environ.setdefault('TRANSFORMERS_OFFLINE', '1')
+
                 snapshot_fn: Any = None
                 try:
                     from huggingface_hub import snapshot_download as snapshot_fn

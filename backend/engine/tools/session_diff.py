@@ -63,4 +63,4 @@ def build_session_diff_action(arguments: dict) -> CmdRunAction:
         f'git diff HEAD{stat_flag} {safe_path} 2>/dev/null || '
         f"echo '(not a git repository — use workspace_status or file manifest for change tracking)'"
     )
-    return CmdRunAction(command=cmd)
+    return CmdRunAction(command=cmd, display_label='Reviewing session changes')

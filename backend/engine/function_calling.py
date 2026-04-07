@@ -36,9 +36,6 @@ from backend.engine.tools.blackboard import (
     BLACKBOARD_TOOL_NAME,
     build_blackboard_action,
 )
-from backend.engine.tools.check_tool_status import (
-    build_check_tool_status_action,
-)
 from backend.engine.tools.checkpoint import (
     CHECKPOINT_TOOL_NAME,
     build_checkpoint_action,
@@ -53,7 +50,7 @@ from backend.engine.tools.explore_code import (
     build_read_symbol_definition_action,
 )
 from backend.engine.tools.lsp_query import (
-    LSP_QUERY_TOOL_NAME,
+    CODE_INTELLIGENCE_TOOL_NAME,
     build_lsp_query_action,
 )
 from backend.engine.tools.memory_manager import (
@@ -782,13 +779,6 @@ def _handle_batch_replace_command(arguments: dict) -> CmdRunAction:
     )
 
 
-def _handle_check_tool_status_tool(
-    arguments: dict, mcp_tools: dict[str, Any]
-) -> AgentThinkAction:
-    """Handle check_tool_status tool call."""
-    return build_check_tool_status_action(arguments, mcp_tools)
-
-
 def _handle_think_tool(arguments: dict) -> AgentThinkAction:
     """Handle ThinkTool tool call."""
     tool_name = create_think_tool()['function']['name']
@@ -1243,12 +1233,11 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         RECALL_TOOL_NAME: lambda args: build_recall_action(args['key']),
         create_apply_patch_tool()['function']['name']: _handle_apply_patch_tool,
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
-        'check_tool_status': lambda args: _handle_check_tool_status_tool(args, {}),
         WORKSPACE_STATUS_TOOL_NAME: _handle_workspace_status_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         VERIFY_FILE_LINES_TOOL_NAME: _handle_verify_file_lines_tool,
         DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
-        LSP_QUERY_TOOL_NAME: build_lsp_query_action,
+        CODE_INTELLIGENCE_TOOL_NAME: build_lsp_query_action,
         SIGNAL_PROGRESS_TOOL_NAME: build_signal_progress_action,
         BLACKBOARD_TOOL_NAME: build_blackboard_action,
         TERMINAL_MANAGER_TOOL_NAME: handle_terminal_manager_tool,
@@ -1271,9 +1260,6 @@ def response_to_actions(
     """Convert LLM response to agent actions."""
 
     def process_with_mcp_tools(tc, args):
-        # Allow passing mcp_tools to specific tool handlers
-        if tc.function.name == 'check_tool_status':
-            return _handle_check_tool_status_tool(args, mcp_tools or {})
         return _process_single_tool_call(tc, args)
 
     return common_response_to_actions(

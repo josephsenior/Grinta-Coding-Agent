@@ -380,6 +380,12 @@ class StreamingChunkActionSchema(ActionSchemaV1):
     tool_call_name: str = Field(
         default='', description='Name of the tool being called'
     )
+    thinking_chunk: str = Field(
+        default='', description='New thinking/reasoning token from the model'
+    )
+    thinking_accumulated: str = Field(
+        default='', description='All thinking text accumulated so far'
+    )
 
 
 class TaskTrackingActionSchema(ActionSchemaV1):

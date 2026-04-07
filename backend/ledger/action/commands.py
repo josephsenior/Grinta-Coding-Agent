@@ -32,6 +32,14 @@ class CmdRunAction(Action):
     is_static: bool = False
     cwd: str | None = None
     hidden: bool = False
+    #: When set, the CLI renders this friendly label as an activity row instead of
+    #: showing the raw shell command in a terminal block.  Only LLM-generated
+    #: commands (execute_bash / execute_powershell) leave this empty.
+    display_label: str = ''
+    #: When set, the CLI renders this friendly label as an activity row instead of
+    #: showing the raw shell command in a terminal block.  Only LLM-generated
+    #: commands (execute_bash / execute_powershell) leave this empty.
+    display_label: str = ''
     stdin: str | None = None
     is_background: bool = False
     truncation_strategy: str | None = None

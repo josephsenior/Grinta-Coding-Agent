@@ -124,8 +124,7 @@ class OrchestratorPlanner:
         from backend.engine.tools.note import create_note_tool, create_recall_tool
         from backend.engine.tools.think import create_think_tool
 
-        if getattr(self._config, 'enable_cmd', True):
-            tools.append(create_cmd_run_tool())
+        tools.append(create_cmd_run_tool())
         if getattr(self._config, 'enable_think', True):
             tools.append(create_think_tool())
         if getattr(self._config, 'enable_finish', True):
@@ -157,10 +156,9 @@ class OrchestratorPlanner:
             tools.append(create_apply_patch_tool())
         if getattr(self._config, 'enable_internal_task_tracker', True):
             tools.append(create_task_tracker_tool())
-        if getattr(self._config, 'enable_search_code', True):
-            tools.append(create_search_code_tool())
-            tools.append(create_explore_tree_structure_tool())
-            tools.append(create_read_symbol_definition_tool())
+        tools.append(create_search_code_tool())
+        tools.append(create_explore_tree_structure_tool())
+        tools.append(create_read_symbol_definition_tool())
 
     def _add_terminal_and_special_tools(self, tools: list) -> None:
         """Add terminal, optional feature tools (web search, delegate, etc.), and meta-cognition tools."""
@@ -179,8 +177,8 @@ class OrchestratorPlanner:
 
     def _add_optional_feature_tools(self, tools: list) -> None:
         """Add workspace_status, delegate, analyze_project_structure, etc."""
-        from backend.engine.tools.check_tool_status import (
-            create_check_tool_status_tool,
+        from backend.engine.tools.analyze_project_structure import (
+            create_analyze_project_structure_tool,
         )
         from backend.engine.tools.delegate_task import (
             create_delegate_task_tool,
@@ -190,8 +188,7 @@ class OrchestratorPlanner:
             create_signal_progress_tool,
         )
 
-        if getattr(self._config, 'enable_check_tool_status', False):
-            tools.append(create_check_tool_status_tool())
+        tools.append(create_analyze_project_structure_tool())
 
         if getattr(self._config, 'enable_lsp_query', False):
             from backend.utils.lsp_client import _detect_pylsp
@@ -207,6 +204,21 @@ class OrchestratorPlanner:
 
         if getattr(self._config, 'enable_blackboard', False):
             tools.append(create_blackboard_tool())
+
+        if getattr(self._config, 'enable_checkpoints', False):
+            from backend.engine.tools.checkpoint import create_checkpoint_tool
+            from backend.engine.tools.revert_to_checkpoint import (
+                create_revert_to_checkpoint_tool,
+            )
+
+            tools.append(create_checkpoint_tool())
+            tools.append(create_revert_to_checkpoint_tool())
+
+        if getattr(self._config, 'enable_session_diff', False):
+            from backend.engine.tools.session_diff import create_session_diff_tool
+
+            tools.append(create_session_diff_tool())
+
         self._add_lazy_import_tools(
             tools,
             [
@@ -215,12 +227,6 @@ class OrchestratorPlanner:
                     False,
                     'workspace_status',
                     'create_workspace_status_tool',
-                ),
-                (
-                    'enable_analyze_project_structure',
-                    False,
-                    'analyze_project_structure',
-                    'create_analyze_project_structure_tool',
                 ),
                 (
                     'enable_verify_file_lines',
@@ -256,9 +262,19 @@ class OrchestratorPlanner:
             tools.append(create_communicate_tool())
 
     def _add_browsing_tool(self, tools: list) -> None:
-        if getattr(self._config, 'enable_browsing', False):
-            # We now rely on external MCP (like browser-use)
-            pass
+        if not getattr(self._config, 'enable_browsing', False):
+            return
+        # Only expose verify_ui_change when the browser-use MCP server is actually configured.
+        try:
+            mcp = getattr(self._config, 'mcp', None)
+            servers = list(getattr(mcp, 'servers', None) or [])
+            server_names = {getattr(s, 'name', '') for s in servers}
+        except TypeError:
+            server_names = set()
+        if 'browser-use' in server_names:
+            from backend.engine.tools.verify_ui import create_verify_ui_change_tool
+
+            tools.append(create_verify_ui_change_tool())
 
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):

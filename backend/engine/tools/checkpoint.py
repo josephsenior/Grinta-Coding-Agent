@@ -151,6 +151,26 @@ def _save_checkpoint(label: str, files_modified: str) -> AgentThinkAction:
     }
     if normalized_files:
         entry['files'] = normalized_files
+
+    # Create a RollbackManager file snapshot so revert_to_checkpoint can actually
+    # restore files when given this integer ID.
+    try:
+        from backend.core.rollback.rollback_manager import RollbackManager
+        from backend.core.workspace_resolution import require_effective_workspace_root
+
+        _manager = RollbackManager(
+            workspace_path=str(require_effective_workspace_root()),
+            max_checkpoints=30,
+            auto_cleanup=True,
+        )
+        entry['rollback_id'] = _manager.create_checkpoint(
+            description=label,
+            checkpoint_type='manual',
+            metadata={'files': normalized_files, 'checkpoint_tool_id': entry['id']},
+        )
+    except Exception:
+        pass  # non-fatal — metadata checkpoint still saves cleanly
+
     checkpoints.append(entry)
     try:
         _save_checkpoints(checkpoints)
@@ -297,5 +317,6 @@ def _checkpoint_result(
         payload['data'] = data
 
     return AgentThinkAction(
-        thought=f'{human_message}\n[CHECKPOINT_RESULT] {json.dumps(payload, ensure_ascii=False)}'
+        thought=f'{human_message}\n[CHECKPOINT_RESULT] {json.dumps(payload, ensure_ascii=False)}',
+        source_tool='checkpoint',
     )

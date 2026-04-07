@@ -23,6 +23,10 @@ class HUDState:
     llm_calls: int = 0
     #: None until engine bootstrap (incl. MCP) has finished; then connected MCP client count.
     mcp_servers: int | None = None
+    #: Agent lifecycle state label shown in the branded row (e.g. 'Running', 'Ready').
+    agent_state_label: str = 'Ready'
+    #: Autonomy level label (e.g. 'balanced', 'full', 'supervised').
+    autonomy_level: str = 'balanced'
 
 
 class HUDBar:
@@ -74,12 +78,31 @@ class HUDBar:
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         width = options.max_width
-        bar = self._format_compact() if width < 80 else self._format()
+        # Use compact if terminal is narrow or if the full bar would overflow.
+        use_compact = width < 80 or self._full_bar_length() > width - 2
+        bar = self._format_compact() if use_compact else self._format()
+        yield bar
 
-        pad = max(0, width - len(bar.plain))
-        line = bar + Text(' ' * pad)
-        line.stylize('on grey11')
-        yield line
+    def _full_bar_length(self) -> int:
+        """Approximate character length of the full-format HUD bar."""
+        ctx = self._format_tokens(self.state.context_tokens)
+        lim = (
+            self._format_tokens(self.state.context_limit)
+            if self.state.context_limit else '?'
+        )
+        token_display = f'{ctx} tokens' if self.state.context_limit == 0 else f'{ctx}/{lim}'
+        mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
+        skills_label = self._format_skills_label(self._bundled_skill_count)
+        parts = [
+            f' model: {self.state.model}',
+            f'  •  {token_display}',
+            f'  •  ${self.state.cost_usd:.4f}',
+            f'  •  {self.state.llm_calls} calls',
+            f'  •  {mcp_label}',
+            f'  •  {skills_label}',
+            f'  •  {self.state.ledger_status}',
+        ]
+        return sum(len(p) for p in parts) + 1  # +1 for leading space
 
     def _format(self) -> Text:
         ctx = self._format_tokens(self.state.context_tokens)
@@ -90,26 +113,29 @@ class HUDBar:
         )
         # Show a clean placeholder before the first LLM call.
         if self.state.context_tokens == 0 and self.state.context_limit == 0:
-            token_display = '0 tkns'
+            token_display = '0 tokens'
         elif self.state.context_limit == 0:
-            token_display = f'{ctx} tkns'
+            token_display = f'{ctx} tokens'
         else:
             token_display = f'{ctx}/{lim}'
         mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
         skills_label = self._format_skills_label(self._bundled_skill_count)
+        SEP = ('  •  ', '#2f465b')
         parts = [
-            (self.state.model, 'bright_black'),
-            (' │ ', 'grey27'),
-            (token_display, 'bright_black'),
-            (' │ ', 'grey27'),
-            (f'${self.state.cost_usd:.4f}', 'bright_black'),
-            (' │ ', 'grey27'),
-            (f'{self.state.llm_calls} calls', 'bright_black'),
-            (' │ ', 'grey27'),
-            (mcp_label, 'bright_black'),
-            (' │ ', 'grey27'),
-            (skills_label, 'bright_black'),
-            (' │ ', 'grey27'),
+            (' ', ''),
+            ('model: ', '#4a6b82'),
+            (self.state.model, 'bold #dbe7f3'),
+            SEP,
+            (token_display, '#b4c4d5'),
+            SEP,
+            (f'${self.state.cost_usd:.4f}', '#b4c4d5'),
+            SEP,
+            (f'{self.state.llm_calls} calls', '#b4c4d5'),
+            SEP,
+            (mcp_label, '#b4c4d5'),
+            SEP,
+            (skills_label, '#b4c4d5'),
+            SEP,
             (self.state.ledger_status, self._ledger_style()),
         ]
         txt = Text()
@@ -168,12 +194,12 @@ class HUDBar:
 
     def _ledger_style(self) -> str:
         if self.state.ledger_status in {'Healthy', 'Ready', 'Idle', 'Starting'}:
-            return 'bright_black'
+            return '#8fdfb1 bold'
         if self.state.ledger_status == 'Review':
-            return 'yellow'
+            return '#fcd34d bold'
         if self.state.ledger_status == 'Paused':
-            return 'bright_black'
-        return 'red'
+            return '#fcd34d'
+        return '#fca5a5 bold'
 
     @staticmethod
     def _format_tokens(n: int) -> str:
@@ -201,6 +227,14 @@ class HUDBar:
     def update_mcp_servers(self, count: int) -> None:
         """Set connected MCP server count (0 when MCP is enabled but none connected)."""
         self.state.mcp_servers = max(0, int(count))
+
+    def update_agent_state(self, label: str) -> None:
+        """Update the agent state label shown in the branded row."""
+        self.state.agent_state_label = label
+
+    def update_autonomy(self, level: str) -> None:
+        """Update the autonomy level shown in the branded row."""
+        self.state.autonomy_level = level
 
     @staticmethod
     def _has_usage_signal(usage: Any) -> bool:

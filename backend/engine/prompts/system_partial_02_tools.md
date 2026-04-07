@@ -1,5 +1,5 @@
 <EDITOR_GUIDE>
-Follow the routing ladder first. Prefer **ast_code_editor** for function/class bodies (`edit_function`, `rename_symbol`, `find_symbol`). **str_replace_editor**: `create_file`, single-line fixes, `view_and_replace`, `preview: true` / `confidence` (<0.7 → preview). **ast_code_editor** also: `replace_range`, `insert_text`, `undo_last_edit` (session-local; use **checkpoint** / **revert_to_checkpoint** for coarse rollback). No `edit_file` — use ast or multiple str_replace passes.
+Follow the routing ladder first. Prefer **ast_code_editor** for function/class bodies (`edit_function`, `rename_symbol`, `find_symbol`). **str_replace_editor**: `create_file`, single-line fixes, `view_and_replace`, `preview: true` / `confidence` (<0.7 → preview). **ast_code_editor** also: `replace_range`, `insert_text`, `undo_last_edit` (session-local{checkpoint_rollback_hint}). No `edit_file` — use ast or multiple str_replace passes.
 Greenfield: `str_replace_editor(command="create_file", path="...", file_text="...")`.
 </EDITOR_GUIDE>
 

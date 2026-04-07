@@ -27,10 +27,6 @@ class TestAgentConfigDefaults:
         cfg = AgentConfig()
         assert isinstance(cfg.enable_browsing, bool)
 
-    def test_default_enable_cmd(self):
-        cfg = AgentConfig()
-        assert isinstance(cfg.enable_cmd, bool)
-
     def test_default_compactor_config(self):
         cfg = AgentConfig()
         assert isinstance(cfg.compactor_config, AutoCompactorConfig)
@@ -153,14 +149,14 @@ class TestSeparateBaseAndCustomSections:
     def test_simple(self):
         data = {
             'name': 'test',
-            'enable_cmd': True,
-            'Navigator': {'name': 'nav', 'enable_cmd': False},
+            'enable_browsing': True,
+            'Navigator': {'name': 'nav', 'enable_browsing': False},
         }
         base, custom = AgentConfig._separate_base_and_custom_sections(data)
         assert base['name'] == 'test'
-        assert base['enable_cmd'] is True
+        assert base['enable_browsing'] is True
         assert 'Navigator' in custom
-        assert custom['Navigator']['enable_cmd'] is False
+        assert custom['Navigator']['enable_browsing'] is False
 
     def test_llm_config_not_custom(self):
         """llm_config dict should stay in base, not be treated as custom section."""
@@ -213,10 +209,10 @@ class TestCreateCustomConfig:
     def test_override_fields(self):
         base = AgentConfig()
         custom = AgentConfig._create_custom_config(
-            'MyAgent', base, {'enable_cmd': False}
+            'MyAgent', base, {'enable_browsing': True}
         )
         assert custom.name == 'MyAgent'
-        assert custom.enable_cmd is False
+        assert custom.enable_browsing is True
 
     def test_unknown_overrides_ignored(self):
         base = AgentConfig()
@@ -238,10 +234,10 @@ class TestCreateCustomConfig:
 
 class TestFromTomlSection:
     def test_simple_section(self):
-        data = {'name': 'default_agent', 'enable_cmd': True}
+        data = {'name': 'default_agent', 'enable_browsing': True}
         mapping = AgentConfig.from_toml_section(data)
         assert 'agent' in mapping
-        assert mapping['agent'].enable_cmd is True
+        assert mapping['agent'].enable_browsing is True
 
     def test_with_custom_agent(self):
         data = {
@@ -284,7 +280,7 @@ class TestFromTomlSection:
         data = {
             'name': 'base',
             'BadAgent1': {'enable_browsing': True},
-            'BadAgent2': {'enable_cmd': False},
+            'BadAgent2': {'enable_browsing': False},
         }
 
         # Mock to raise for both custom agents

@@ -1,7 +1,7 @@
 {autonomy_block}
 
 <TASK_MANAGEMENT>
-**task_tracker** (3+ concrete steps): `plan` once with title + task_list; `update` one task at a time when state changes ; `view` after condensation if lost. Skip for single-step tasks.
+**task_tracker** (3+ concrete steps): `plan` once with title + task_list; `update` one task at a time when state changes; `view` after condensation if lost. Skip for single-step tasks. Mark a task `done` **only** after the corresponding tool call returned a success observation — never from planning or reasoning alone.
 
 **Multi-file creation:** List all paths in first thought; create sequentially with editor tools only; verify once after all writes (no shell `ls`/`cat` between each).
 </TASK_MANAGEMENT>
@@ -13,7 +13,7 @@ Read CMD_OUTPUT errors (note error_type). Classify: permissions → ownership; m
 - `ast_code_editor` fails → retry with `str_replace_editor` → then `apply_patch`
 - `str_replace_editor` fails → try `apply_patch` (or fix match string)
 - shell install fails → detect lockfile (`pnpm-lock.yaml` → `pnpm install`; `yarn.lock` → `yarn`; `package-lock.json` → `npm install`)
-- `search_code` returns nothing → try `lsp_query` → then shell grep as last resort
+{code_intelligence_fallback}
 
 Do NOT explain the failure to the user mid-task — just pivot. A tool failure + immediate pivot to an alternate tool counts as **one** attempt, not two.
 

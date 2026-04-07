@@ -39,21 +39,36 @@ def _choose(is_windows: bool, win: str, unix: str) -> str:
     return win if is_windows else unix
 
 
+def _explore_hint(_config: Any = None) -> str:
+    """Return the canonical layout-discovery tool hint (analyze_project_structure is always present)."""
+    return '`analyze_project_structure` (`tree`) and/or `search_code`'
+
+
 # ---------------------------------------------------------------------------
 # system_partial_00_routing
 # ---------------------------------------------------------------------------
 
-def _render_routing(is_windows: bool) -> str:
+def _render_routing(is_windows: bool, config: Any = None) -> str:
+    explore = _explore_hint(config)
     batch_cmds = _choose(
         is_windows,
-        "Use **PowerShell** only for environment actions (install, build, test, git, processes). "
-        "For repo layout and file content, use **`analyze_project_structure`**, **`search_code`**, "
+        f"Use **PowerShell** only for environment actions (install, build, test, git, processes). "
+        f"For repo layout and file content, use **{explore}** "
         "and **`str_replace_editor` (`view_file`)**—not `Get-Content`/`Select-String` pipelines for source trees.",
-        "Use **bash** only for environment actions (install, build, test, git, processes). "
-        "For repo layout and file content, use **`analyze_project_structure`**, **`search_code`**, "
+        f"Use **bash** only for environment actions (install, build, test, git, processes). "
+        f"For repo layout and file content, use **{explore}** "
         "and **`str_replace_editor` (`view_file`)**—not `ls && cat && grep` chains for project files.",
     )
-    return _load("system_partial_00_routing.md").format(batch_commands=batch_cmds)
+    lsp_enabled = getattr(config, 'enable_lsp_query', False)
+    code_intelligence_routing = (
+        "- **Known file + symbol position, precise definition/references/hover** → `code_intelligence`"
+        if lsp_enabled else ""
+    )
+    return _load("system_partial_00_routing.md").format(
+        batch_commands=batch_cmds,
+        code_intelligence_routing=code_intelligence_routing,
+        explore_layout_hint=explore,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -109,12 +124,19 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
 
     path_hint = _choose(
         is_windows,
-        "run `analyze_project_structure` / `search_code`, or list with `Get-ChildItem` only if no tool fits",
-        "run `analyze_project_structure` (`tree`) or `search_code`—avoid blind `cat` of guessed paths",
+        f"run {_explore_hint(config)}, or list with `Get-ChildItem` only if no tool fits",
+        f"run {_explore_hint(config)}—avoid blind `cat` of guessed paths",
+    )
+    lsp_enabled = getattr(config, 'enable_lsp_query', False)
+    code_intelligence_fallback = (
+        "- `search_code` returns nothing → try `code_intelligence` → then shell grep as last resort"
+        if lsp_enabled
+        else "- `search_code` returns nothing → use shell grep as last resort"
     )
     return _load("system_partial_01_autonomy.md").format(
         autonomy_block=autonomy,
         path_discovery_hint=path_hint,
+        code_intelligence_fallback=code_intelligence_fallback,
     )
 
 
@@ -122,20 +144,27 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
 # system_partial_02_tool_reference
 # ---------------------------------------------------------------------------
 
-def _render_tool_reference(is_windows: bool) -> str:
+def _render_tool_reference(is_windows: bool, config: Any = None) -> str:
+    explore = _explore_hint(config)
     confirm_cmd = _choose(
         is_windows,
-        "If unsure where a file lives, use `analyze_project_structure` (`tree`) or `search_code` before opening it—not only `Get-ChildItem`.",
-        "If unsure where a file lives, use `analyze_project_structure` (`tree`) or `search_code` before opening it—not only `ls`.",
+        f"If unsure where a file lives, use {explore} before opening it—not only `Get-ChildItem`.",
+        f"If unsure where a file lives, use {explore} before opening it—not only `ls`.",
     )
     proc_find = _choose(
         is_windows,
         "Find: `Get-Process | Where-Object { $_.ProcessName -like '*name*' }`; kill: `Stop-Process -Id <PID>`.",
         "Never `pkill -f` broadly — `ps`/`grep` then `kill <PID>`.",
     )
+    checkpoints = getattr(config, 'enable_checkpoints', False)
+    checkpoint_rollback_hint = (
+        "; use **checkpoint** / **revert_to_checkpoint** for coarse rollback"
+        if checkpoints else ""
+    )
     return _load("system_partial_02_tools.md").format(
         confirm_paths=confirm_cmd,
         process_management=proc_find,
+        checkpoint_rollback_hint=checkpoint_rollback_hint,
     )
 
 
@@ -208,8 +237,20 @@ def _render_mcp_and_permissions(
             parts.append(_render_permissions(config, perm))
 
     # Static tail sections
+    meta_cognition = getattr(config, 'enable_meta_cognition', False)
+    communicate_tool_section = (
+        "<COMMUNICATE_TOOL>\n"
+        "Use `communicate_with_user` to ask for clarification, flag uncertainty, propose options "
+        "before risky actions, or escalate after 3 failed attempts on a sub-task. Do not generate "
+        "free-form questions as plain text mid-task — always go through this tool so the turn ends "
+        "cleanly and waits for user input.\n"
+        "</COMMUNICATE_TOOL>"
+        if meta_cognition else ""
+    )
     parts.append("")
-    parts.append(_load("system_partial_03_tail.md"))
+    parts.append(_load("system_partial_03_tail.md").format(
+        communicate_tool_section=communicate_tool_section,
+    ))
 
     return "\n".join(parts)
 
@@ -303,13 +344,13 @@ def build_system_prompt(
         "When asked who built you or who you are, you are Grinta, built by Youssef Mejdi.\n\n"
         f"Configured model id: `{model_id}`",
         # Routing
-        _render_routing(is_windows),
+        _render_routing(is_windows, config),
         # Security
         _render_security(cli_mode),
         # Autonomy & execution
         _render_autonomy(config, is_windows),
         # Tool reference
-        _render_tool_reference(is_windows),
+        _render_tool_reference(is_windows, config),
         # MCP & permissions tail
         _render_mcp_and_permissions(
             mcp_tool_names or [],
@@ -370,7 +411,7 @@ def build_workspace_context(
             )
             ri_lines.append(
                 "This message does not list project files—do not assume paths like "
-                "`tailwind.config.*` exist. Use `analyze_project_structure` (tree) or `search_code` to discover layout, "
+                "`tailwind.config.*` exist. Use `search_code` to discover layout, "
                 "then read with editor/view tools."
             )
 

@@ -16,7 +16,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from binaryornot.check import is_binary
 from fastapi import FastAPI
@@ -88,8 +88,7 @@ from backend.persistence.locations import get_workspace_downloads_dir
 from backend.utils.async_utils import call_sync_from_async
 from backend.utils.regex_limits import try_compile_user_regex
 
-if TYPE_CHECKING:
-    from backend.execution.browser.browser_env import BrowserEnv
+
 
 
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m')
@@ -147,7 +146,7 @@ class RuntimeExecutor:
         self._initial_cwd = work_dir
         self.max_memory_gb: int | None = None  # Will be set during ainit if available
         self.enable_browser = enable_browser
-        self.browser: BrowserEnv | None = None
+        self.browser = None
 
         self.tool_registry = tool_registry
 
@@ -1326,7 +1325,7 @@ class RuntimeExecutor:
                 available=bool(result.available),
             )
             obs.tool_result = {
-                'tool': 'lsp_query',
+                'tool': 'code_intelligence',
                 'command': action.command,
                 'file': action.file,
                 'latency_ms': latency_ms,
@@ -1347,7 +1346,7 @@ class RuntimeExecutor:
                 f'LSP query failed: {e}. Check if python-lsp-server is installed.'
             )
             err.tool_result = {
-                'tool': 'lsp_query',
+                'tool': 'code_intelligence',
                 'command': action.command,
                 'file': action.file,
                 'latency_ms': latency_ms,

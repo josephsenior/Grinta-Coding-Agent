@@ -188,7 +188,7 @@ def _build_status_action(arguments: dict):
     else:
         cmd = _build_bash_command(include_git, include_tree, tree_depth)
 
-    return CmdRunAction(command=cmd, thought='Gathering workspace status snapshot')
+    return CmdRunAction(command=cmd, thought='Gathering workspace status snapshot', display_label='Gathering workspace status')
 
 
 def _build_diff_action(arguments: dict):
@@ -206,7 +206,7 @@ def _build_diff_action(arguments: dict):
         cmd = _build_powershell_diff_command(stat_flag, safe_path)
     else:
         cmd = _build_bash_diff_command(stat_flag, safe_path)
-    return CmdRunAction(command=cmd)
+    return CmdRunAction(command=cmd, display_label='Reviewing session changes')
 
 
 def _build_checkpoint_action(sub_command: str, arguments: dict):

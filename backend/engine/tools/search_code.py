@@ -133,7 +133,8 @@ def build_search_code_action(
             cmd = f'{find_prefix} -type f -name {safe_glob} -print | head -n {max_results}'
         else:
             cmd = f'{find_prefix} -type f -print | head -n {max_results}'
-        return CmdRunAction(command=cmd)
+        label = f'Listing files in {path}' if path and path != '.' else 'Listing files'
+        return CmdRunAction(command=cmd, display_label=label)
 
     # Search mode — build rg command with grep fallback, then wrap in structured XML
     safe_pattern = shlex.quote(pattern)
@@ -186,4 +187,6 @@ def build_search_code_action(
         f'( {raw_search} ) && '
         f'echo "</search_results>"'
     )
-    return CmdRunAction(command=cmd)
+    trunc_pat = pattern[:50] + '…' if len(pattern) > 50 else pattern
+    scope = f' in {path}' if path and path != '.' else ''
+    return CmdRunAction(command=cmd, display_label=f'Searching for {trunc_pat!r}{scope}')

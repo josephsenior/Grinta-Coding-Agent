@@ -27,15 +27,23 @@ _INTERNAL_THINK_TAG_RE = re.compile(
     re.DOTALL,
 )
 _INTERNAL_THINK_LABELS = {
-    'CHECK_TOOL_STATUS': 'Checking tool status…',
+    'CHECKPOINT': 'Saving checkpoint…',
+    'CHECKPOINT_RESULT': 'Checkpoint…',
     'EXPLORE_TREE_STRUCTURE': 'Exploring code graph…',
     'PREVIEW': 'Preparing preview…',
     'READ_SYMBOL_DEFINITION': 'Reading symbol definitions…',
+    'ROLLBACK': 'Reverting…',
     'SCRATCHPAD': 'Updating scratchpad…',
     'VERIFY_FILE_LINES': 'Verifying file lines…',
     'VIEW_AND_REPLACE': 'Preparing edit…',
     'WORKING_MEMORY': 'Updating working memory…',
 }
+# Strip structured JSON payloads embedded in think-action thoughts.
+_THINK_RESULT_JSON_RE = re.compile(
+    r'\n?\[(?:CHECKPOINT_RESULT|REVERT_RESULT|ROLLBACK|TASK_TRACKER)\]'
+    r'\s*\{.*',
+    re.DOTALL,
+)
 _TASK_STATUS_LABELS = {
     'completed': 'done',
     'done': 'done',
@@ -97,6 +105,7 @@ from backend.cli.tool_call_display import (
     format_tool_activity_rows,
     looks_like_streaming_tool_arguments,
     mcp_result_user_preview,
+    redact_internal_result_markers,
     redact_streamed_tool_call_markers,
     redact_task_list_json_blobs,
     tool_headline,
@@ -186,6 +195,11 @@ def _normalize_reasoning_text(text: str) -> tuple[str | None, str | None]:
     """Split internal tagged thoughts into a user-facing action label and optional short text."""
     stripped = (text or '').strip()
     if not stripped or stripped == 'Your thought has been logged.':
+        return None, None
+
+    # Strip structured JSON payloads from multi-line thoughts (e.g. checkpoint results).
+    stripped = _THINK_RESULT_JSON_RE.sub('', stripped).strip()
+    if not stripped:
         return None, None
 
     match = _INTERNAL_THINK_TAG_RE.match(stripped)
@@ -605,6 +619,9 @@ class CLIEventRenderer:
         self._pending_shell_command: str | None = None
         #: Buffered (verb, label) from CmdRunAction — printed as a combined card on CmdOutputObservation.
         self._pending_shell_action: tuple[str, str] | None = None
+        #: True when the buffered shell action is from an internal tool (display_label set).
+        #: CmdOutputObservation renders only a brief result line instead of a terminal block.
+        self._pending_shell_is_internal: bool = False
         #: First tool/shell row each turn prints a small section marker for scanability.
         self._activity_turn_header_emitted: bool = False
 
@@ -703,9 +720,11 @@ class CLIEventRenderer:
         """Snapshot metrics and mark the agent as running."""
         self._pending_shell_command = None
         self._pending_shell_action = None
+        self._pending_shell_is_internal = False
         self._activity_turn_header_emitted = False
         self._current_state = AgentState.RUNNING
         self._hud.update_ledger('Healthy')
+        self._hud.update_agent_state('Running')
         self._state_event.clear()
         self._turn_start_cost = self._hud.state.cost_usd
         self._turn_start_tokens = self._hud.state.context_tokens
@@ -726,6 +745,7 @@ class CLIEventRenderer:
     def clear_history(self) -> None:
         self._pending_shell_command = None
         self._pending_shell_action = None
+        self._pending_shell_is_internal = False
         self._activity_turn_header_emitted = False
         self._task_panel = None
         self._task_panel_signature = None
@@ -884,7 +904,9 @@ class CLIEventRenderer:
 
         if live_sections:
             body_items.append(spacer_live_section())
-        body_items.append(frame_transcript_body(self._hud))
+        # Render HUD at full terminal width — no left/right inset so the bar
+        # never wraps and aligns visually with the prompt_toolkit bottom toolbar.
+        body_items.append(self._hud)
 
         yield Group(*body_items)
 
@@ -902,8 +924,10 @@ class CLIEventRenderer:
                 self._reasoning.update_thought(cot)
             self._stop_reasoning()
             self._clear_streaming_preview()
-            display_content = redact_streamed_tool_call_markers(
-                (action.content or '').strip()
+            display_content = redact_internal_result_markers(
+                redact_streamed_tool_call_markers(
+                    (action.content or '').strip()
+                )
             ).strip()
             if display_content:
                 file_urls = getattr(action, 'file_urls', None) or []
@@ -964,7 +988,42 @@ class CLIEventRenderer:
             if getattr(action, 'suppress_cli', False):
                 self.refresh()
                 return
+            source_tool = getattr(action, 'source_tool', '') or ''
             thought = getattr(action, 'thought', '') or getattr(action, 'content', '')
+            if source_tool:
+                # Tool-sourced think actions get a proper activity row instead of
+                # generic reasoning text.  Strip internal JSON payloads from the
+                # human-readable summary.
+                cleaned = _THINK_RESULT_JSON_RE.sub('', thought).strip()
+                # Strip leading [TAG] markers to get the human message.
+                tag_m = _INTERNAL_THINK_TAG_RE.match(cleaned)
+                human_msg = (tag_m.group('payload') or '').strip() if tag_m else cleaned
+                if source_tool == 'checkpoint':
+                    verb, title = 'Saved', 'Checkpoint'
+                    # Use the tag's human message or a user-friendly default.
+                    detail = human_msg or 'checkpoint'
+                elif source_tool == 'revert_to_checkpoint':
+                    verb, title = 'Reverted', 'Checkpoint'
+                    detail = human_msg or 'workspace reverted'
+                else:
+                    verb = source_tool.replace('_', ' ').title()
+                    title = 'Tool'
+                    detail = human_msg or source_tool
+                self._emit_activity_turn_header()
+                kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
+                self._print_or_buffer(
+                    Padding(
+                        format_activity_block(
+                            verb, detail,
+                            secondary=None,
+                            secondary_kind=kind,
+                            title=title,
+                        ),
+                        pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+                    )
+                )
+                self.refresh()
+                return
             self._apply_reasoning_text(thought)
             self.refresh()
             return
@@ -977,6 +1036,18 @@ class CLIEventRenderer:
             # Flush any previous buffered command that never received an observation
             if self._pending_shell_action is not None:
                 self._flush_pending_shell_action()
+            display_label = (getattr(action, 'display_label', '') or '').strip()
+            if display_label:
+                # Internal tool command — buffer with friendly label; CmdOutputObservation
+                # will render a compact result row (no raw terminal block).  Do NOT forward
+                # the thought to the reasoning display — the display_label already acts as
+                # the activity label and showing the thought too creates a duplicate.
+                self._pending_shell_command = None
+                self._pending_shell_action = ('Ran', display_label)
+                self._pending_shell_is_internal = True
+                self.refresh()
+                return
+            self._pending_shell_is_internal = False
             cmd_display = (action.command or '').strip()
             if len(cmd_display) > 12_000:
                 cmd_display = cmd_display[:11_997] + '…'
@@ -1295,6 +1366,14 @@ class CLIEventRenderer:
             self.refresh()
             return
 
+        # First-class thinking field: if the provider streamed reasoning tokens
+        # via the dedicated thinking channel, display them immediately.
+        if action.thinking_accumulated:
+            self._ensure_reasoning()
+            self._reasoning.set_streaming_thought(action.thinking_accumulated)
+
+        # Fallback: extract <redacted_thinking> tags embedded in content text
+        # (backward compat for models that embed thinking in the main stream).
         think_match = _THINK_EXTRACT_RE.search(raw)
         if think_match:
             thinking_text = think_match.group(1)
@@ -1303,12 +1382,16 @@ class CLIEventRenderer:
                 self._reasoning.set_streaming_thought(thinking_text)
             # Strip thinking from the streaming preview.
             display_text = _THINK_STRIP_RE.sub('', raw).strip()
-            self._streaming_accumulated = redact_task_list_json_blobs(
-                redact_streamed_tool_call_markers(display_text)
+            self._streaming_accumulated = redact_internal_result_markers(
+                redact_task_list_json_blobs(
+                    redact_streamed_tool_call_markers(display_text)
+                )
             )
         else:
-            self._streaming_accumulated = redact_task_list_json_blobs(
-                redact_streamed_tool_call_markers(raw)
+            self._streaming_accumulated = redact_internal_result_markers(
+                redact_task_list_json_blobs(
+                    redact_streamed_tool_call_markers(raw)
+                )
             )
 
         self._streaming_final = action.is_final
@@ -1346,8 +1429,10 @@ class CLIEventRenderer:
             content = strip_tool_result_validation_annotations(raw)
             # Retrieve buffered action (verb + label) set by CmdRunAction
             pending = self._pending_shell_action
+            is_internal = self._pending_shell_is_internal
             self._pending_shell_action = None
             self._pending_shell_command = None
+            self._pending_shell_is_internal = False
             verb = pending[0] if pending else 'Ran'
             label = pending[1] if pending else '$ (command)'
             if exit_code is not None and exit_code != 0:
@@ -1364,9 +1449,18 @@ class CLIEventRenderer:
                 msg = None
                 result_kind = 'neutral'
             self._emit_activity_turn_header()  # noqa: not a duplicate
-            inner = format_activity_shell_block(
-                verb, label, result_message=msg, result_kind=result_kind
-            )
+            if is_internal:
+                # Internal tool — compact activity row, no raw terminal block
+                inner = format_activity_block(
+                    verb, label,
+                    secondary=msg,
+                    secondary_kind=result_kind,
+                    title='Shell',
+                )
+            else:
+                inner = format_activity_shell_block(
+                    verb, label, result_message=msg, result_kind=result_kind
+                )
             self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
             return
 
@@ -1571,7 +1665,9 @@ class CLIEventRenderer:
             if task_list is None or cmd not in ('plan', 'update'):
                 body = content
             elif content.startswith('[TASK_TRACKER]'):
-                body = content
+                # Suppress noop "plan unchanged" messages — they add noise.
+                if 'Update skipped' not in content:
+                    body = content
             if body:
                 for line in body.splitlines():
                     self._append_history(
@@ -1615,19 +1711,26 @@ class CLIEventRenderer:
         # Update HUD ledger indicator on terminal states.
         if state in (AgentState.ERROR, AgentState.REJECTED):
             self._hud.update_ledger('Error')
+            self._hud.update_agent_state('Needs attention')
         elif state == AgentState.AWAITING_USER_CONFIRMATION:
             self._hud.update_ledger('Review')
+            self._hud.update_agent_state('Needs approval')
         elif state == AgentState.AWAITING_USER_INPUT:
             self._hud.update_ledger('Ready')
+            self._hud.update_agent_state('Ready')
         elif state == AgentState.PAUSED:
             # PAUSED is treated as STOPPED in CLI — collapse to same UX
             state = AgentState.STOPPED
             self._current_state = state
             self._hud.update_ledger('Idle')
+            self._hud.update_agent_state('Stopped')
         elif state in (AgentState.FINISHED, AgentState.STOPPED):
             self._hud.update_ledger('Idle')
+            label = 'Done' if state == AgentState.FINISHED else 'Stopped'
+            self._hud.update_agent_state(label)
         elif state == AgentState.RUNNING:
             self._hud.update_ledger('Healthy')
+            self._hud.update_agent_state('Running')
 
         if state == AgentState.AWAITING_USER_CONFIRMATION:
             self._stop_reasoning()
@@ -1797,10 +1900,15 @@ class CLIEventRenderer:
         if self._pending_shell_action is None:
             return
         verb, label = self._pending_shell_action
+        is_internal = self._pending_shell_is_internal
         self._pending_shell_action = None
         self._pending_shell_command = None
+        self._pending_shell_is_internal = False
         self._emit_activity_turn_header()  # noqa: not a duplicate
-        inner = format_activity_shell_block(verb, label)
+        if is_internal:
+            inner = format_activity_block(verb, label, title='Shell')
+        else:
+            inner = format_activity_shell_block(verb, label)
         self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
 
     def _print_tool_call(self, label: str) -> None:

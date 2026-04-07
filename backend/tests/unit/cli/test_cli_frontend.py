@@ -602,7 +602,7 @@ def test_prompt_toolbar_reflects_state_and_autonomy() -> None:
     toolbar = repl._prompt_toolbar_text()
 
     assert 'Stopped' in toolbar
-    assert 'full autonomy' in toolbar
+    assert 'autonomy:full' in toolbar
     assert 'Tab for commands' in toolbar
 
 
@@ -1726,7 +1726,8 @@ async def test_renderer_shows_noop_task_tracker_message_for_update() -> None:
 
     renderer.stop_live()
     output = _console_output(console)
-    assert 'plan is unchanged' in output
+    # Noop "plan is unchanged" messages are now suppressed in the renderer.
+    assert 'plan is unchanged' not in output
     assert 'Tasks (1)' in output
 
 

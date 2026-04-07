@@ -696,6 +696,11 @@ class OpenAIClient(DirectLLMClient):
         # OpenAI-compatible APIs require stream=True for token streaming.
         kwargs['stream'] = True
         kwargs.pop('model', None)
+        # Request usage data in the final chunk so the HUD can display real
+        # token counts during streaming. Most OpenAI-compatible providers
+        # (xAI, LM Studio, vLLM, …) honour this option; those that don't
+        # simply ignore the field and we fall back to zero counts.
+        kwargs.setdefault('stream_options', {'include_usage': True})
         try:
             stream = await self.async_client.chat.completions.create(
                 model=self.model_name,
@@ -876,7 +881,20 @@ class AnthropicClient(DirectLLMClient):
                 system=system_msg,  # type: ignore[arg-type]
                 **kwargs,
             ) as stream:
+                # Track usage from Anthropic usage events so we can yield a
+                # provider-normalised usage chunk at the end for the HUD.
+                _input_tokens: int = 0
+                _output_tokens: int = 0
                 async for event in stream:
+                    # Capture token counts for the final usage chunk.
+                    if event.type == 'message_start':
+                        _usage = getattr(getattr(event, 'message', None), 'usage', None)
+                        if _usage is not None:
+                            _input_tokens = int(getattr(_usage, 'input_tokens', 0) or 0)
+                    elif event.type == 'message_delta':
+                        _delta_usage = getattr(event, 'usage', None)
+                        if _delta_usage is not None:
+                            _output_tokens = int(getattr(_delta_usage, 'output_tokens', 0) or 0)
                     # Convert Anthropic events to OpenAI-like chunks for compatibility
                     if (
                         event.type == 'content_block_start'
@@ -925,6 +943,22 @@ class AnthropicClient(DirectLLMClient):
                                 }
                             ]
                         }
+                    elif (
+                        event.type == 'content_block_delta'
+                        and event.delta.type == 'thinking_delta'
+                    ):
+                        yield {
+                            'choices': [
+                                {
+                                    'delta': {
+                                        'reasoning_content': getattr(
+                                            event.delta, 'thinking', ''
+                                        )
+                                    },
+                                    'finish_reason': None,
+                                }
+                            ]
+                        }
                     elif event.type == 'content_block_delta':
                         yield {
                             'choices': [
@@ -937,6 +971,17 @@ class AnthropicClient(DirectLLMClient):
                             ]
                         }
                     elif event.type == 'message_stop':
+                        # Yield a normalised usage chunk before finish so the
+                        # executor can update HUD token/cost counters.
+                        if _input_tokens or _output_tokens:
+                            yield {
+                                'choices': [],
+                                'usage': {
+                                    'prompt_tokens': _input_tokens,
+                                    'completion_tokens': _output_tokens,
+                                    'total_tokens': _input_tokens + _output_tokens,
+                                },
+                            }
                         yield {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}
         except Exception as e:
             raise self._map_anthropic_error(e) from e
@@ -1301,7 +1346,15 @@ class GeminiClient(DirectLLMClient):
             # arriving in separate streaming chunks (one call per chunk) get
             # unique indices rather than all defaulting to 0 via enumerate().
             fc_idx_counter = 0
+            # Track the latest cumulative usage_metadata across chunks so we
+            # can emit a normalised usage chunk at the end for the HUD.
+            _gemini_input_tokens: int = 0
+            _gemini_output_tokens: int = 0
             async for chunk in stream:
+                _um = getattr(chunk, 'usage_metadata', None)
+                if _um is not None:
+                    _gemini_input_tokens = int(getattr(_um, 'prompt_token_count', 0) or 0)
+                    _gemini_output_tokens = int(getattr(_um, 'candidates_token_count', 0) or 0)
                 fcs = getattr(chunk, 'function_calls', None)
                 if fcs:
                     for fc in fcs:
@@ -1363,8 +1416,42 @@ class GeminiClient(DirectLLMClient):
                     yield {
                         'choices': [{'delta': {'content': text}, 'finish_reason': None}]
                     }
+                # Extract thinking/thought content from Gemini models that
+                # support it.  The SDK exposes thought text on individual
+                # ``Part`` objects via a boolean ``thought`` flag.
+                _candidates = getattr(chunk, 'candidates', None)
+                if _candidates:
+                    for _cand in _candidates:
+                        _cand_content = getattr(_cand, 'content', None)
+                        if _cand_content is None:
+                            continue
+                        for _part in getattr(_cand_content, 'parts', []):
+                            if getattr(_part, 'thought', False):
+                                _thought_text = getattr(_part, 'text', '') or ''
+                                if _thought_text:
+                                    yield {
+                                        'choices': [
+                                            {
+                                                'delta': {
+                                                    'reasoning_content': _thought_text
+                                                },
+                                                'finish_reason': None,
+                                            }
+                                        ]
+                                    }
         except Exception as e:
             raise self._map_gemini_error(e) from e
+        # Yield a normalised usage chunk before finish so the executor can
+        # update the HUD token/cost counters for Gemini streaming calls.
+        if _gemini_input_tokens or _gemini_output_tokens:
+            yield {
+                'choices': [],
+                'usage': {
+                    'prompt_tokens': _gemini_input_tokens,
+                    'completion_tokens': _gemini_output_tokens,
+                    'total_tokens': _gemini_input_tokens + _gemini_output_tokens,
+                },
+            }
         yield {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}
 
 

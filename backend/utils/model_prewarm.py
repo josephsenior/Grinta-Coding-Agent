@@ -79,6 +79,10 @@ def ensure_models_available(models: List[str], fail_on_missing: bool = True) -> 
             raise RuntimeError(msg)
         return {}
 
+    # Force fully offline — never reach out to HuggingFace.
+    os.environ.setdefault('HF_HUB_OFFLINE', '1')
+    os.environ.setdefault('TRANSFORMERS_OFFLINE', '1')
+
     results: Dict[str, str] = {}
     for repo_id in models:
         try:

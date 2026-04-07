@@ -35,7 +35,7 @@ class TestToolCallDisplay(unittest.TestCase):
             'str_replace_editor',
             {'command': 'view_file', 'path': 'src/a.py'},
         )
-        self.assertTrue(icon)
+        self.assertIsInstance(icon, str)
         self.assertIn('src/a.py', line)
         self.assertNotIn('{', line)
 
@@ -114,7 +114,7 @@ class TestToolCallDisplay(unittest.TestCase):
         if got is None:
             self.fail('expected formatted tool JSON')
         icon, text = got
-        self.assertTrue(icon)
+        self.assertIsInstance(icon, str)
         self.assertIn('pwd', text)
         self.assertNotIn('tool_calls', text)
 
@@ -133,7 +133,7 @@ class TestToolCallDisplay(unittest.TestCase):
 
     def test_tool_headline_respects_use_icons(self) -> None:
         em, label = tool_headline('execute_bash', use_icons=True)
-        self.assertTrue(em)
+        self.assertEqual(em, '')
         self.assertEqual(label, 'Shell')
         em2, label2 = tool_headline('execute_bash', use_icons=False)
         self.assertEqual(em2, '')

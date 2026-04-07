@@ -14,6 +14,7 @@ from typing import Any
 from rich import box
 from rich.console import Group
 from rich.panel import Panel
+from rich.rule import Rule
 from rich.text import Text
 
 from backend.cli.layout_tokens import CALLOUT_PANEL_PADDING
@@ -67,16 +68,16 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
 
 
 def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> Text:
-    """Brighter continuation row for user-visible results and stats."""
-    styles = {
-        'ok': ('✔', 'bright_green'),
-        'err': ('✘', 'bright_red'),
-        'neutral': ('•', 'bright_black'),
+    """Continuation row for user-visible results — consistent with shell result style."""
+    styles: dict[str, tuple[str, str, str]] = {
+        'ok':      ('✓', 'bold bright_green', 'bright_green'),
+        'err':     ('✗', 'bold bright_red',   'bright_red'),
+        'neutral': ('•', 'bright_black',       'bright_black'),
     }
-    icon, color = styles.get(kind, styles['neutral'])
+    icon, icon_style, text_style = styles.get(kind, styles['neutral'])
     line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
-    line.append(f'{icon} ', style=f'bold {color}')
-    line.append((message or '').strip(), style='bold bright_white' if kind != 'neutral' else 'bright_white')
+    line.append(f'{icon} ', style=icon_style)
+    line.append((message or '').strip(), style=text_style)
     return line
 
 
@@ -94,9 +95,10 @@ def format_activity_block(
         parts.append(format_activity_secondary(secondary, kind=secondary_kind))
     content = Group(*parts)
     if title is not None:
+        panel_title = Text(title, style='bold #9ca3af')
         return Panel(
             content,
-            title=title,
+            title=panel_title,
             title_align='left',
             border_style='bright_black',
             box=box.ROUNDED,
@@ -105,13 +107,9 @@ def format_activity_block(
     return content
 
 
-def format_activity_turn_header() -> Text:
-    """One-line marker before the first tool/shell row each agent turn."""
-    line = Text()
-    line.append('  ', style='')
-    line.append('▸', style='bold cyan')
-    line.append(' Agent activity', style='bold dim cyan')
-    return line
+def format_activity_turn_header() -> Rule:
+    """Section divider before the first tool/shell row each agent turn."""
+    return Rule(title='Agent activity', style='dim cyan', align='left')
 
 
 def format_activity_shell_block(
@@ -123,15 +121,15 @@ def format_activity_shell_block(
     result_message: str | None = None,
     result_kind: str = 'ok',
 ) -> Any:
-    """Rounded Terminal card — delegates to format_activity_block with title='Terminal'."""
+    """Rounded Terminal card — same visual style as other tool cards."""
     parts: list[Text] = [format_activity_primary(verb, detail)]
     if secondary:
         parts.append(format_activity_secondary(secondary, kind=secondary_kind))
     if result_message is not None:
-        parts.append(format_shell_result_secondary(result_message, kind=result_kind))
+        parts.append(format_activity_result_secondary(result_message, kind=result_kind))
     return Panel(
         Group(*parts),
-        title='Terminal',
+        title=Text('Terminal', style='bold #9ca3af'),
         title_align='left',
         border_style='bright_black',
         box=box.ROUNDED,
@@ -140,17 +138,8 @@ def format_activity_shell_block(
 
 
 def format_shell_result_secondary(message: str, *, kind: str = 'ok') -> Text:
-    """Bright success / failure row inside the Terminal card."""
-    styles = {
-        'ok': ('✓', 'bold bright_green', 'bold bright_green'),
-        'err': ('✗', 'bold bright_red', 'bold bright_red'),
-        'neutral': ('•', 'bold bright_black', 'dim'),
-    }
-    icon, icon_style, text_style = styles.get(kind, styles['neutral'])
-    line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
-    line.append(f'{icon} ', style=icon_style)
-    line.append((message or '').strip() or 'done', style=text_style)
-    return line
+    """Alias for format_activity_result_secondary — kept for backward compatibility."""
+    return format_activity_result_secondary(message or 'done', kind=kind)
 
 
 def format_callout_panel(

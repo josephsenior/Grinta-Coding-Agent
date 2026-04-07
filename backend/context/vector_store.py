@@ -95,6 +95,10 @@ class ReRanker:
         """Lazy load the model."""
         if self._model is None:
             try:
+                import os as _os
+                _os.environ.setdefault('HF_HUB_OFFLINE', '1')
+                _os.environ.setdefault('TRANSFORMERS_OFFLINE', '1')
+
                 logger.info('Loading re-ranker model (local-only): %s', self.model_name)
                 snapshot_fn: Any = None
                 try:

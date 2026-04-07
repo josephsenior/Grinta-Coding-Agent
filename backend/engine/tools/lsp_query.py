@@ -1,4 +1,4 @@
-"""lsp_query tool — code navigation via the language server.
+"""code_intelligence tool — code navigation via the language server.
 
 Supports the following commands:
 - ``find_definition``  locate where a symbol is defined
@@ -17,15 +17,15 @@ from typing import Any
 
 from backend.ledger.action.code_nav import LspQueryAction
 
-LSP_QUERY_TOOL_NAME = 'lsp_query'
+CODE_INTELLIGENCE_TOOL_NAME = 'code_intelligence'
 
 
 def create_lsp_query_tool() -> dict[str, Any]:
-    """Return the OpenAI function-calling tool definition for lsp_query."""
+    """Return the OpenAI function-calling tool definition for code_intelligence."""
     return {
         'type': 'function',
         'function': {
-            'name': LSP_QUERY_TOOL_NAME,
+            'name': CODE_INTELLIGENCE_TOOL_NAME,
             'description': (
                 'Code navigation and diagnostics via language server. '
                 'Commands: find_definition, find_references, hover, list_symbols, get_diagnostics. '
@@ -94,11 +94,11 @@ def build_lsp_query_action(arguments: dict) -> LspQueryAction:
 
     if not command:
         raise FunctionCallValidationError(
-            'Missing required argument "command" in tool call lsp_query'
+            'Missing required argument "command" in tool call code_intelligence'
         )
     if not file:
         raise FunctionCallValidationError(
-            'Missing required argument "file" in tool call lsp_query'
+            'Missing required argument "file" in tool call code_intelligence'
         )
 
     return LspQueryAction(

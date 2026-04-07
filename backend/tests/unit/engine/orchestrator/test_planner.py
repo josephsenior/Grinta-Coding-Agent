@@ -18,7 +18,6 @@ from backend.engine.planner import (
 
 def _make_config(**kwargs):
     cfg = MagicMock()
-    cfg.enable_cmd = True
     cfg.enable_think = True
     cfg.enable_finish = True
     cfg.enable_condensation_request = False

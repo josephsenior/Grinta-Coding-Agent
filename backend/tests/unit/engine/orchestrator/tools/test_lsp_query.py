@@ -12,7 +12,7 @@ def test_create_lsp_query_tool():
     tool = create_lsp_query_tool()
 
     assert tool['type'] == 'function'
-    assert tool['function']['name'] == 'lsp_query'
+    assert tool['function']['name'] == 'code_intelligence'
 
     props = tool['function']['parameters']['properties']
     assert 'command' in props

@@ -26,7 +26,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_AUTONOMY_LEVEL,
     DEFAULT_AGENT_BROWSING_ENABLED,
     DEFAULT_AGENT_CLI_MODE,
-    DEFAULT_AGENT_CMD_ENABLED,
     DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
     DEFAULT_AGENT_CONFIRM_ACTIONS,
@@ -138,7 +137,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
 
     # Core tool toggles
-    enable_cmd: bool = Field(default=DEFAULT_AGENT_CMD_ENABLED)
     enable_think: bool = Field(default=DEFAULT_AGENT_THINK_ENABLED)
     enable_finish: bool = Field(default=DEFAULT_AGENT_FINISH_ENABLED)
     enable_condensation_request: bool = Field(
@@ -147,19 +145,17 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     # Agent Tools configuration
     enable_terminal: bool = Field(default=True)
-    enable_search_code: bool = Field(default=True)
     enable_apply_patch: bool = Field(default=True)
     enable_editor: bool = Field(default=True)
     enable_working_memory: bool = Field(default=True)
-    enable_check_tool_status: bool = Field(default=False)
     enable_lsp_query: bool = Field(default=True)
     enable_signal_progress: bool = Field(default=True)
     enable_swarming: bool = Field(default=True)
-    enable_blackboard: bool = Field(default=False)
-    enable_workspace_status: bool = Field(default=False)
-    enable_analyze_project_structure: bool = Field(default=False)
-    enable_verify_file_lines: bool = Field(default=False)
-    enable_meta_cognition: bool = Field(default=False)
+    enable_blackboard: bool = Field(default=True)
+    enable_workspace_status: bool = Field(default=True)
+    enable_verify_file_lines: bool = Field(default=True)
+    enable_meta_cognition: bool = Field(default=True)
+    enable_checkpoints: bool = Field(default=True)
 
     # Advanced capabilities
     enable_history_truncation: bool = Field(
@@ -308,7 +304,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     error_rate_window: int = Field(
         default=DEFAULT_AGENT_ERROR_RATE_WINDOW,
-        ge=3,
+        ge=5,
         description='Rolling window size for circuit breaker error-rate checks',
     )
 

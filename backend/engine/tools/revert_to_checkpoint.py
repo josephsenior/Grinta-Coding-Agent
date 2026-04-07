@@ -40,11 +40,40 @@ def create_revert_to_checkpoint_tool() -> dict:
     }
 
 
+def _resolve_rollback_id(checkpoint_id: str, manager: RollbackManager) -> str | None:
+    """Map a user-facing checkpoint ID to a RollbackManager ID.
+
+    The ``checkpoint`` tool assigns simple integer IDs (1, 2, 3…) and stores a
+    ``rollback_id`` cross-reference in checkpoints.json alongside each entry.
+    RollbackManager uses its own ``cp_<timestamp>_<hex>`` IDs internally.
+    This helper bridges the two so that ``revert_to_checkpoint(1)`` works.
+    """
+    if checkpoint_id.isdigit():
+        import json as _json
+        from backend.engine.tools.checkpoint import _checkpoints_path
+
+        path = _checkpoints_path()
+        if path.exists():
+            try:
+                entries = _json.loads(path.read_text(encoding='utf-8'))
+                if isinstance(entries, list):
+                    for cp in entries:
+                        if str(cp.get('id', '')) == checkpoint_id:
+                            rid = cp.get('rollback_id')
+                            return str(rid) if rid else None
+            except Exception:
+                pass
+        return None
+
+    # Native RollbackManager ID — verify it exists.
+    return checkpoint_id if manager.get_checkpoint(checkpoint_id) else None
+
+
 def build_revert_to_checkpoint_action(arguments: dict) -> AgentThinkAction:
     """Execute the rollback and return a think action describing the result."""
     from backend.core.workspace_resolution import require_effective_workspace_root
 
-    checkpoint_id = arguments.get('checkpoint_id')
+    checkpoint_id = (arguments.get('checkpoint_id') or '').strip()
 
     manager = RollbackManager(
         workspace_path=str(require_effective_workspace_root()),
@@ -56,22 +85,29 @@ def build_revert_to_checkpoint_action(arguments: dict) -> AgentThinkAction:
         latest = manager.get_latest_checkpoint()
         if not latest:
             return AgentThinkAction(
-                thought='[ROLLBACK] Failure: No checkpoints found. Cannot revert to safe state.'
+                thought='[ROLLBACK] Failure: No checkpoints found. Cannot revert to safe state.',
+                source_tool='revert_to_checkpoint',
             )
-        checkpoint_id = latest.id
+        resolved_id = latest.id
     else:
-        # Validate existence if ID was provided
-        if not manager.get_checkpoint(checkpoint_id):
+        resolved_id = _resolve_rollback_id(checkpoint_id, manager)
+        if resolved_id is None:
             return AgentThinkAction(
-                thought=f"[ROLLBACK] Failure: Checkpoint ID '{checkpoint_id}' not found."
+                thought=(
+                    f"[ROLLBACK] Failure: Checkpoint ID '{checkpoint_id}' not found. "
+                    "Use 'checkpoint view' to list available checkpoints."
+                ),
+                source_tool='revert_to_checkpoint',
             )
 
-    success = manager.rollback_to(checkpoint_id)
+    success = manager.rollback_to(resolved_id)
     if success:
         return AgentThinkAction(
-            thought=f'[ROLLBACK] Success: Workspace has been safely reverted to checkpoint {checkpoint_id}.'
+            thought=f'[ROLLBACK] Success: Workspace has been safely reverted to checkpoint {checkpoint_id}.',
+            source_tool='revert_to_checkpoint',
         )
     else:
         return AgentThinkAction(
-            thought=f'[ROLLBACK] Failure: Revert to checkpoint {checkpoint_id} failed. See logs for details.'
+            thought=f'[ROLLBACK] Failure: Revert to checkpoint {checkpoint_id} failed. See logs for details.',
+            source_tool='revert_to_checkpoint',
         )

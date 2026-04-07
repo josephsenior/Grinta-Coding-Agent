@@ -132,7 +132,7 @@ def _build_tree_action(path: str, depth: int) -> CmdRunAction:
         f"-o -type f -printf '%s %p\\n' | sort -k2 | head -200; "
         f'fi'
     )
-    return CmdRunAction(command=cmd)
+    return CmdRunAction(command=cmd, display_label=f'Mapping project structure ({path})')
 
 
 def _build_imports_action(path: str) -> CmdRunAction:
@@ -147,7 +147,8 @@ def _build_imports_action(path: str) -> CmdRunAction:
         f'grep -rl "$basename_no_ext" --include=\'*.py\' . 2>/dev/null | head -30 || '
         f"echo '(no reverse imports found)'"
     )
-    return CmdRunAction(command=cmd)
+    import os as _os
+    return CmdRunAction(command=cmd, display_label=f'Reading imports · {_os.path.basename(path)}')
 
 
 def _build_symbols_action(path: str) -> CmdRunAction:
@@ -159,7 +160,8 @@ def _build_symbols_action(path: str) -> CmdRunAction:
         f"grep -nE '^(class |def |async def |[A-Z_][A-Z_0-9]* *=)' {safe_path} 2>/dev/null | head -100 || "
         f"echo '(no symbols found or file does not exist)'"
     )
-    return CmdRunAction(command=cmd)
+    import os as _os
+    return CmdRunAction(command=cmd, display_label=f'Listing symbols · {_os.path.basename(path)}')
 
 
 def _build_recent_action() -> CmdRunAction:
@@ -169,7 +171,7 @@ def _build_recent_action() -> CmdRunAction:
         "git log --oneline --name-only -20 --pretty=format:'%h %s' 2>/dev/null | head -100 || "
         "echo '(not a git repository or no commits)'"
     )
-    return CmdRunAction(command=cmd)
+    return CmdRunAction(command=cmd, display_label='Reading recent git history')
 
 
 def _build_callers_action(symbol: str, scope: str) -> CmdRunAction:
@@ -190,7 +192,8 @@ def _build_callers_action(symbol: str, scope: str) -> CmdRunAction:
         f'{safe_scope} 2>/dev/null | head -50 || '
         f"echo '(no references found for {safe_symbol})'"
     )
-    return CmdRunAction(command=cmd)
+    trunc_sym = symbol[:40] + '…' if len(symbol) > 40 else symbol
+    return CmdRunAction(command=cmd, display_label=f'Finding callers of {trunc_sym!r}')
 
 
 def _build_test_coverage_action(path: str) -> CmdRunAction:
@@ -225,7 +228,8 @@ def _build_test_coverage_action(path: str) -> CmdRunAction:
         f'find "$dirname_path" -name \'conftest.py\' -type f 2>/dev/null | head -10 || '
         f"echo '(none)'"
     )
-    return CmdRunAction(command=cmd)
+    import os as _os
+    return CmdRunAction(command=cmd, display_label=f'Finding tests for {_os.path.basename(path)}')
 
 
 def _build_semantic_search_action(symbol: str, path: str) -> CmdRunAction:
@@ -241,4 +245,5 @@ def _build_semantic_search_action(symbol: str, path: str) -> CmdRunAction:
     script_path = sa.__file__
 
     cmd = f'{python_exe} {shlex.quote(script_path)} find_references {safe_symbol} {safe_path}'
-    return CmdRunAction(command=cmd)
+    trunc_sym = symbol[:40] + '…' if len(symbol) > 40 else symbol
+    return CmdRunAction(command=cmd, display_label=f'Searching references for {trunc_sym!r}')

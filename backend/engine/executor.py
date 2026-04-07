@@ -204,6 +204,10 @@ class OrchestratorExecutor:
 
         content_accumulate = ''
         tool_calls_dict = {}
+        # Captured from the provider's usage chunk (e.g. OpenAI with
+        # stream_options={include_usage:True}, Anthropic, Gemini).  None until
+        # a usage chunk arrives; used to record real metrics after streaming.
+        streamed_usage: dict[str, int] | None = None
 
         try:
             from backend.cli.tool_call_display import redact_streamed_tool_call_markers
@@ -226,7 +230,8 @@ class OrchestratorExecutor:
                 first_chunk_timeout = 45.0
 
             async def _consume_stream():
-                nonlocal content_accumulate
+                nonlocal content_accumulate, streamed_usage
+                thinking_accumulate = ''
 
                 async def _emit_text_piece(text_piece: str) -> None:
                     nonlocal content_accumulate
@@ -242,10 +247,31 @@ class OrchestratorExecutor:
                             chunk=text_piece,
                             accumulated=display_acc,
                             is_final=False,
+                            thinking_accumulated=thinking_accumulate,
                         )
                         ev.source = EventSource.AGENT
                         event_stream.add_event(ev, EventSource.AGENT)
                         # Yield so Socket.IO / asyncio can flush between chunks.
+                        await asyncio.sleep(0)
+
+                async def _emit_thinking_piece(text_piece: str) -> None:
+                    nonlocal thinking_accumulate
+                    if not text_piece:
+                        return
+
+                    thinking_accumulate += text_piece
+                    if event_stream:
+                        ev = StreamingChunkAction(
+                            chunk='',
+                            accumulated=redact_streamed_tool_call_markers(
+                                content_accumulate
+                            ),
+                            is_final=False,
+                            thinking_chunk=text_piece,
+                            thinking_accumulated=thinking_accumulate,
+                        )
+                        ev.source = EventSource.AGENT
+                        event_stream.add_event(ev, EventSource.AGENT)
                         await asyncio.sleep(0)
 
                 async def _process_delta(delta: dict[str, Any]) -> None:
@@ -267,13 +293,18 @@ class OrchestratorExecutor:
                         text_chunk = ''.join(parts)
 
                     # Some OpenAI-compatible providers stream reasoning under
-                    # alternate keys instead of delta.content.
-                    if not text_chunk:
-                        for alt_key in ('reasoning_content', 'reasoning'):
-                            alt_val = delta.get(alt_key)
-                            if isinstance(alt_val, str) and alt_val:
-                                text_chunk = alt_val
-                                break
+                    # alternate keys instead of delta.content.  Route these to
+                    # the dedicated thinking channel so the UI can display them
+                    # in the reasoning panel rather than as regular content.
+                    reasoning_chunk = ''
+                    for alt_key in ('reasoning_content', 'reasoning'):
+                        alt_val = delta.get(alt_key)
+                        if isinstance(alt_val, str) and alt_val:
+                            reasoning_chunk = alt_val
+                            break
+
+                    if reasoning_chunk:
+                        await _emit_thinking_piece(reasoning_chunk)
 
                     if text_chunk:
                         await _emit_text_piece(text_chunk)
@@ -449,6 +480,11 @@ class OrchestratorExecutor:
                     choices = first_chunk.get('choices', [])
                     if choices:
                         await _process_delta(choices[0].get('delta', {}))
+                    else:
+                        # First chunk might be a provider usage chunk (no choices).
+                        _fc_usage = first_chunk.get('usage')
+                        if _fc_usage and isinstance(_fc_usage, dict):
+                            streamed_usage = _fc_usage
 
                 while True:
                     try:
@@ -473,6 +509,11 @@ class OrchestratorExecutor:
 
                     choices = chunk.get('choices', [])
                     if not choices:
+                        # Capture provider usage chunks (OpenAI stream_options,
+                        # Anthropic message_usage, Gemini usage_metadata).
+                        _chunk_usage = chunk.get('usage')
+                        if _chunk_usage and isinstance(_chunk_usage, dict):
+                            streamed_usage = _chunk_usage
                         continue
                     await _process_delta(choices[0].get('delta', {}))
 
@@ -498,14 +539,43 @@ class OrchestratorExecutor:
                 tool_calls_list = None
 
             model_name = getattr(getattr(self._llm, 'config', None), 'model', 'unknown')
+            if streamed_usage:
+                _resolved_usage = streamed_usage
+            else:
+                # Provider didn't send usage data (e.g. Google Gemini via
+                # OpenAI-compat, OpenRouter, local models).  Estimate tokens
+                # so the HUD still shows meaningful numbers.
+                from backend.inference.llm_utils import get_token_count
+
+                _est_prompt = get_token_count(call_params.get('messages') or [])
+                _est_completion = max(1, len(visible_accum) // 4)
+                # Include tool-call argument text in the estimate.
+                if tool_calls_list:
+                    for _tc in tool_calls_list:
+                        _fn = _tc.get('function', {})
+                        _est_completion += max(0, len(_fn.get('arguments', '')) // 4)
+                _resolved_usage = {
+                    'prompt_tokens': _est_prompt,
+                    'completion_tokens': _est_completion,
+                    'total_tokens': _est_prompt + _est_completion,
+                }
             response = LLMResponse(
                 content=visible_accum,
                 model=model_name,
-                usage={'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0},
+                usage=_resolved_usage,
                 response_id='',
                 finish_reason='stop',
                 tool_calls=tool_calls_list,
             )
+            # Record metrics on the LLM so HUD reflects real token/cost data.
+            _pt = int(_resolved_usage.get('prompt_tokens', 0) or 0)
+            _ct = int(_resolved_usage.get('completion_tokens', 0) or 0)
+            if _pt > 0 or _ct > 0:
+                try:
+                    _stream_latency = time.time() - start_time
+                    self._llm._record_response_metrics(response, _stream_latency)  # type: ignore[attr-defined]
+                except Exception as _me:
+                    logger.debug('Failed to record streaming metrics: %s', _me)
 
         except asyncio.TimeoutError as exc:
             from backend.inference.exceptions import Timeout as LLMTimeout
@@ -775,6 +845,21 @@ class OrchestratorExecutor:
             logger.warning(
                 'Safety pipeline blocked response (hallucination or validation failure)'
             )
+            # Replace the hallucinated text with a corrective message that
+            # instructs the model to use tools.  ``wait_for_response=False``
+            # tells the orchestrator to continue the agent loop so the model
+            # gets another turn to call tools instead of dropping the user
+            # back to the input prompt.
+            from backend.ledger.action.message import MessageAction
+
+            correction = MessageAction(
+                content=(
+                    '[Hallucination guard] I described actions without actually '
+                    'using tools.  Let me retry with real tool calls.'
+                ),
+                wait_for_response=False,
+            )
+            return [correction]
         return validated_actions
 
     def _extract_response_text(self, response: ModelResponse) -> str:

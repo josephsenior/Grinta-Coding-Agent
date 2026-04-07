@@ -8,38 +8,35 @@ from typing import Any
 
 # (icon, short verb phrase for the activity line)
 _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
-    'execute_bash': ('⚡', 'Shell'),
-    'execute_powershell': ('⚡', 'Shell'),
-    'run_terminal_cmd': ('⚡', 'Shell'),
-    'powershell_command': ('⚡', 'Shell'),
-    'str_replace_editor': ('✏️', 'Files'),
-    'apply_patch': ('🩹', 'Apply patch'),
-    'edit_file': ('✏️', 'Edit file'),
-    'ast_code_editor': ('🧩', 'AST edit'),
-    'agent_think': ('💭', 'Think'),
-    'think': ('💭', 'Think'),
-    'finish': ('✅', 'Finish'),
-    'summarize_context': ('🗜️', 'Summarize context'),
-    'memory_manager': ('🧠', 'Memory'),
-    'task_tracker': ('📋', 'Tasks'),
-    'search_code': ('🔍', 'Search code'),
-    'lsp_query': ('🔎', 'Code intelligence'),
-    'explore_tree_structure': ('🌳', 'Explore tree'),
-    'read_symbol_definition': ('📍', 'Symbol'),
-    'workspace_status': ('📁', 'Workspace'),
-    'analyze_project_structure': ('🏗️', 'Analyze project'),
-    'verify_file_lines': ('✔️', 'Verify lines'),
-    'verify_ui_change': ('🖥️', 'Verify UI'),
-    'delegate_task': ('🔀', 'Delegate'),
-    'signal_progress': ('⏳', 'Progress'),
-    'shared_task_board': ('📌', 'Board'),
-    'terminal_manager': ('💻', 'Terminal'),
-    'communicate_with_user': ('💬', 'Message you'),
-    'call_mcp_tool': ('🔧', 'MCP'),
-    'checkpoint': ('📸', 'Checkpoint'),
-    'revert_to_checkpoint': ('⏪', 'Revert'),
-    'session_diff': ('📊', 'Session diff'),
-    'check_tool_status': ('🔧', 'Tool status'),
+    'execute_bash': ('', 'Shell'),
+    'execute_powershell': ('', 'Shell'),
+    'str_replace_editor': ('', 'Files'),
+    'apply_patch': ('', 'Apply patch'),
+    'edit_file': ('', 'Edit file'),
+    'ast_code_editor': ('', 'AST edit'),
+    'agent_think': ('', 'Think'),
+    'think': ('', 'Think'),
+    'finish': ('', 'Finish'),
+    'summarize_context': ('', 'Summarize context'),
+    'memory_manager': ('', 'Memory'),
+    'task_tracker': ('', 'Tasks'),
+    'search_code': ('', 'Search code'),
+    'code_intelligence': ('', 'Code intelligence'),
+    'explore_tree_structure': ('', 'Explore tree'),
+    'read_symbol_definition': ('', 'Symbol'),
+    'workspace_status': ('', 'Workspace'),
+    'analyze_project_structure': ('', 'Analyze project'),
+    'verify_file_lines': ('', 'Verify lines'),
+    'verify_ui_change': ('', 'Verify UI'),
+    'delegate_task': ('', 'Delegate'),
+    'signal_progress': ('', 'Progress'),
+    'shared_task_board': ('', 'Board'),
+    'terminal_manager': ('', 'Terminal'),
+    'communicate_with_user': ('', 'Message you'),
+    'call_mcp_tool': ('�', 'MCP'),
+    'checkpoint': ('', 'Checkpoint'),
+    'revert_to_checkpoint': ('', 'Revert'),
+    'session_diff': ('', 'Session diff'),
 }
 
 
@@ -52,14 +49,13 @@ def tool_headline(
     (professional / ASCII-friendly terminals).
     """
     if not tool_name:
-        return ('⚙️', 'Tool') if use_icons else ('', 'Tool')
+        return '', 'Tool'
     info = _TOOL_HEADLINE.get(tool_name.strip())
     if info:
-        em, headline = info
-        return (em, headline) if use_icons else ('', headline)
+        _em, headline = info
+        return '', headline
     pretty = tool_name.replace('_', ' ').strip() or 'tool'
-    title = pretty.title()
-    return ('⚙️', title) if use_icons else ('', title)
+    return '', pretty.title()
 
 
 def friendly_verb_for_tool(
@@ -79,7 +75,7 @@ def friendly_verb_for_tool(
         if cmd == 'undo_last_edit':
             return 'Reverted'
         return 'Edited'
-    if tn in {'execute_bash', 'execute_powershell', 'run_terminal_cmd', 'powershell_command'}:
+    if tn in {'execute_bash', 'execute_powershell'}:
         return 'Ran'
     mapping = {
         'apply_patch': 'Patched',
@@ -89,10 +85,10 @@ def friendly_verb_for_tool(
         'think': 'Thinking',
         'finish': 'Finished',
         'summarize_context': 'Compressed',
-        'memory_manager': 'Memory',
+        'memory_manager': 'Managed',
         'task_tracker': 'Tracked',
         'search_code': 'Searched',
-        'lsp_query': 'Analyzed',
+        'code_intelligence': 'Analyzed',
         'explore_tree_structure': 'Explored',
         'read_symbol_definition': 'Analyzed',
         'workspace_status': 'Explored',
@@ -100,15 +96,14 @@ def friendly_verb_for_tool(
         'verify_file_lines': 'Verified',
         'verify_ui_change': 'Checked UI',
         'delegate_task': 'Delegated',
-        'signal_progress': 'Progress',
-        'shared_task_board': 'Board',
-        'terminal_manager': 'Terminal',
+        'signal_progress': 'Noted',
+        'shared_task_board': 'Checked',
+        'terminal_manager': 'Opened',
         'communicate_with_user': 'Messaged',
-        'call_mcp_tool': 'Used integration',
+        'call_mcp_tool': 'Invoked',
         'checkpoint': 'Saved',
         'revert_to_checkpoint': 'Reverted',
         'session_diff': 'Compared',
-        'check_tool_status': 'Checked',
     }
     if tn in mapping:
         return mapping[tn]
@@ -151,7 +146,7 @@ def tool_activity_stats_hint(tool_name: str, args: dict[str, Any]) -> str | None
         sym = args.get('symbol') or args.get('name')
         if isinstance(sym, str) and sym.strip():
             return f'symbol: {sym}'
-    if tn == 'lsp_query':
+    if tn in {'code_intelligence', 'lsp_query'}:
         lsp_q = args.get('command') or args.get('query_type')
         if isinstance(lsp_q, str) and lsp_q.strip():
             return lsp_q
@@ -215,7 +210,7 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
     """One or two short lines describing *args* for *tool_name* (no JSON)."""
     tn = (tool_name or '').strip()
 
-    if tn in {'execute_bash', 'execute_powershell', 'run_terminal_cmd', 'powershell_command'}:
+    if tn in {'execute_bash', 'execute_powershell'}:
         shell_cmd = args.get('command')
         if isinstance(shell_cmd, str) and shell_cmd.strip():
             return f'$ {_trunc(shell_cmd, 120)}'
@@ -277,7 +272,7 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
             bits_sc.append(sc_path)
         return ' in '.join(bits_sc) if bits_sc else 'search…'
 
-    if tn == 'lsp_query':
+    if tn == 'code_intelligence':
         lsp_cmd = args.get('command') or args.get('query_type')
         lsp_path = args.get('file') or args.get('path')
         lsp_sym = args.get('symbol') or args.get('name')
@@ -342,9 +337,6 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
 
     if tn == 'session_diff':
         return 'changes since checkpoint'
-
-    if tn == 'check_tool_status':
-        return 'MCP / tools health'
 
     if tn == 'summarize_context':
         return 'compress conversation'
@@ -609,6 +601,29 @@ _TASK_JSON_OBJ_RE = re.compile(
     r'\{[^{}]*"description"\s*:[^{}]*"(?:status|id)"\s*:[^{}]*\}',
     re.DOTALL,
 )
+
+# Internal protocol markers that the LLM sometimes echoes into its text response.
+# These are agent-internal metadata — they should never be shown to the user.
+_INTERNAL_RESULT_MARKER_RE = re.compile(
+    r'\[(?:CHECKPOINT_RESULT|REVERT_RESULT|ROLLBACK|TASK_TRACKER)\]'
+    r'(?:\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}|\s+[^\n]*)',
+)
+
+
+def redact_internal_result_markers(text: str) -> str:
+    """Strip internal ``[TAG] {json}`` or ``[TAG] text`` markers from user-visible text.
+
+    Models sometimes echo ``[CHECKPOINT_RESULT] {…}``, ``[REVERT_RESULT] {…}``,
+    ``[ROLLBACK] Success: …``, or ``[TASK_TRACKER] …`` from their conversation
+    history back into streaming or final assistant text.  These are internal protocol
+    markers — the CLI already displays friendly activity rows for these tools.
+    """
+    if '[' not in text:
+        return text
+    cleaned = _INTERNAL_RESULT_MARKER_RE.sub('', text)
+    # Collapse blank lines left behind.
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    return cleaned.strip()
 
 
 def redact_task_list_json_blobs(text: str) -> str:

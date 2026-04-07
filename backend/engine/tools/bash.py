@@ -37,8 +37,8 @@ def windows_drive_glued_hint() -> str:
 
 _DETAILED_BASH_DESCRIPTION = (
     'Execute a {shell} command in a persistent shell session.\n\n'
-    '* **Discovery & reading project files:** use `analyze_project_structure`, `search_code`, '
-    'or `str_replace_editor` (`view_file`)—not `cat`/`grep`/`find` for source and config under the repo.\n'
+    '* **Discovery & reading project files:** use `search_code` or '
+    '`str_replace_editor` (`view_file`)—not `cat`/`grep`/`find` for source and config under the repo.\n'
     '* One command at a time. Chain with `&&` or `;`.\n'
     '* Persistent: env vars, venvs, cwd persist between calls.\n'
     '* Do NOT use `set -e` / `set -eu` / `set -euo pipefail`.\n'

@@ -655,6 +655,7 @@ async def _execute_direct_tool(
     action: MCPAction, matching_client: MCPClient
 ) -> MCPObservation:
     """Execute a direct MCP tool call and return observation."""
+    from backend.engine.tools.prompt import get_terminal_tool_name as _terminal_tool
     try:
         if cached := get_cached(action.name, action.arguments):
             logger.debug('Cache hit for MCP tool %s', action.name)
@@ -733,7 +734,7 @@ async def _execute_direct_tool(
                     f"MCP tool '{action.name}' returned an error: {e}\n"
                     'You can try:\n'
                     '  1. Re-call the tool with corrected arguments\n'
-                    '  2. Use bash (execute_bash) as a fallback to accomplish the same task\n'
+                    f'  2. Use {_terminal_tool()} as a fallback to accomplish the same task\n'
                     '  3. Use mcp_capabilities_status to check current MCP server health'
                 ),
                 code='MCP_TOOL_ERROR',
@@ -770,7 +771,7 @@ async def _execute_direct_tool(
                     f'{type(e).__name__}: {e}).\n'
                     'The MCP server may be disconnected or experiencing issues.\n'
                     'Fallback options:\n'
-                    '  1. Use bash (execute_bash) to accomplish the same task\n'
+                    f'  1. Use {_terminal_tool()} to accomplish the same task\n'
                     '  2. Use mcp_capabilities_status to inspect current MCP availability\n'
                     '  3. Continue with non-MCP tools'
                 ),
@@ -833,7 +834,7 @@ async def call_tool_mcp(
                     'server.\n'
                     'This may mean the server that provides this tool is disconnected.\n'
                     'Use mcp_capabilities_status to check which tools are currently '
-                    'available, or use bash (execute_bash) as a fallback.'
+                    f'available, or use {_terminal_tool()} as a fallback.'
                 ),
                 code='MCP_TOOL_UNAVAILABLE',
                 retryable=True,
