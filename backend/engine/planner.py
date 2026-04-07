@@ -176,7 +176,7 @@ class OrchestratorPlanner:
             tools.append(create_terminal_manager_tool())
 
     def _add_optional_feature_tools(self, tools: list) -> None:
-        """Add workspace_status, delegate, analyze_project_structure, etc."""
+        """Add delegate, analyze_project_structure, etc."""
         from backend.engine.tools.analyze_project_structure import (
             create_analyze_project_structure_tool,
         )
@@ -222,12 +222,6 @@ class OrchestratorPlanner:
         self._add_lazy_import_tools(
             tools,
             [
-                (
-                    'enable_workspace_status',
-                    False,
-                    'workspace_status',
-                    'create_workspace_status_tool',
-                ),
                 (
                     'enable_verify_file_lines',
                     False,
@@ -518,7 +512,7 @@ class OrchestratorPlanner:
         if current_turn <= 1:
             return (
                 '\n<FIRST_TURN_ORIENTATION>\n'
-                'Optional: call workspace_status() if you lack repo/git context; '
+                'If you lack project context, run `git status` and `analyze_project_structure`; '
                 'then proceed (think/plan as needed).\n'
                 '</FIRST_TURN_ORIENTATION>'
             )

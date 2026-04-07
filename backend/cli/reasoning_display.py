@@ -127,23 +127,23 @@ class ReasoningDisplay:
         header = Table.grid(expand=True)
         header.add_column(width=3)
         header.add_column(ratio=1)
-        header.add_column(justify='right', no_wrap=True)
+        header.add_column(justify='right')
         header.add_row(
-            Spinner('dots', style='bright_black'),
-            Text(action_label, style='bold #e2e8f0'),
-            Text(' · '.join(elapsed_bits), style='bright_black'),
+            Spinner('dots', style='dim'),
+            Text(action_label, style='bold dim'),
+            Text(' · '.join(elapsed_bits), style='dim'),
         )
         rows.append(header)
 
         for line in self._thought_lines:
             t = Text()
             t.append('  ', style='')
-            t.append('· ', style='bright_black')
+            t.append('· ', style='dim')
             t.append(line, style='dim')
             rows.append(t)
 
         return format_callout_panel(
             'Working',
             Group(*rows),
-            accent_style='bright_black',
+            accent_style='dim',
         )

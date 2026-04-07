@@ -3,6 +3,8 @@
 <TASK_MANAGEMENT>
 **task_tracker** (3+ concrete steps): `plan` once with title + task_list; `update` one task at a time when state changes; `view` after condensation if lost. Skip for single-step tasks. Mark a task `done` **only** after the corresponding tool call returned a success observation — never from planning or reasoning alone.
 
+**Checkpoint / revert follow-through:** `checkpoint` and `revert_to_checkpoint` are intermediate control tools, not completion signals. After either one returns, continue the same turn. If a task step changed state, call `task_tracker update` before replying. If the overall task is done, call `finish` with a concise user-facing summary and concrete `next_steps`.
+
 **Multi-file creation:** List all paths in first thought; create sequentially with editor tools only; verify once after all writes (no shell `ls`/`cat` between each).
 </TASK_MANAGEMENT>
 

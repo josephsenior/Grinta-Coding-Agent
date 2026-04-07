@@ -33,7 +33,7 @@ def _risk_label(action: Action) -> tuple[str, str]:
         return ('MEDIUM', 'yellow')
     if risk == ActionSecurityRisk.LOW:
         return ('LOW', 'green')
-    return ('ASK', 'bright_yellow')
+    return ('ASK', 'yellow')
 
 
 def _action_label(action: Action) -> str:
@@ -66,12 +66,12 @@ def render_confirmation(
 
     table = Table(
         title='[bold]Action Approval Required[/bold]',
-        border_style='bright_yellow',
+        border_style='dim',
         show_lines=True,
     )
-    table.add_column('File', style='cyan', min_width=20)
-    table.add_column('Action', style='white', min_width=30)
-    table.add_column('Risk', justify='center', min_width=8)
+    table.add_column('File', style='dim')
+    table.add_column('Action', style='default')
+    table.add_column('Risk', justify='center')
 
     table.add_row(
         _file_label(pending_action),

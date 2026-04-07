@@ -299,3 +299,114 @@ def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
     executor._get_checkpoint(event_stream)
 
     assert 'sid-2' in executor._recovery_blocked_reasons
+
+
+def test_response_to_actions_replaces_explicit_hallucinated_plain_message(
+    monkeypatch,
+):
+    from backend.engine import executor as executor_module
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.ledger.action import MessageAction
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [
+            MessageAction(content="I've created grinta_feedback.md for you.")
+        ],
+    )
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=OrchestratorSafetyManager(),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content="I've created grinta_feedback.md for you.")
+            )
+        ]
+    )
+
+    actions = executor._response_to_actions(response)
+
+    assert len(actions) == 1
+    assert actions[0].content.startswith('[Hallucination guard]')
+    assert actions[0].wait_for_response is False
+
+
+def test_response_to_actions_allows_conversational_plain_message(monkeypatch):
+    from backend.engine import executor as executor_module
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.ledger.action import MessageAction
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [
+            MessageAction(
+                content='I have prepared a rating of the system and the tools for you.'
+            )
+        ],
+    )
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=OrchestratorSafetyManager(),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content='I have prepared a rating of the system and the tools for you.'
+                )
+            )
+        ]
+    )
+
+    actions = executor._response_to_actions(response)
+
+    assert len(actions) == 1
+    assert actions[0].content == 'I have prepared a rating of the system and the tools for you.'
+
+
+def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):
+    from backend.engine import executor as executor_module
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.ledger.action import ProposalAction
+
+    proposal = ProposalAction(
+        options=[{'approach': 'Direct answer', 'pros': [], 'cons': []}],
+        rationale='Prepared options for the user.',
+    )
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: [proposal],
+    )
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=OrchestratorSafetyManager(),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    response = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content="I've prepared two approaches for your feedback.")
+            )
+        ]
+    )
+
+    actions = executor._response_to_actions(response)
+
+    assert actions == [proposal]

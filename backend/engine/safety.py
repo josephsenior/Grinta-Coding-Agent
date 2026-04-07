@@ -4,29 +4,56 @@ import re
 from typing import TYPE_CHECKING
 
 from backend.core.logger import app_logger as logger
+from backend.ledger.action.message import MessageAction
 
 if TYPE_CHECKING:
     from backend.ledger.action import Action
     from backend.orchestration.state.state import State
 
 
-# Phrases that indicate the model *claims* it performed a concrete action.
-# Only matched when the response contains ZERO runnable tool calls — i.e. the
-# model produced pure text instead of actually calling tools.
+# Intentionally conservative: this guard only fires on explicit claims of
+# externally verifiable side effects. It should prefer false negatives over
+# false positives so conversational responses are never trapped in retry loops.
+_FILELIKE_TARGET = (
+    r'(?:[A-Za-z0-9_.-]+(?:[\\/][A-Za-z0-9_.-]+)*\.'
+    r'(?:py|js|ts|tsx|jsx|json|ya?ml|toml|ini|cfg|conf|md|txt|html|css|scss|sql|sh|ps1|psm1|psd1|env))'
+)
+_SIDE_EFFECT_OBJECTS = (
+    r'(?:file|script|module|project|directory|folder|environment|package|dependency|dependencies|'
+    r'config(?:uration)?|server|endpoint|branch|commit|migration|test(?:\s+suite)?|tests)'
+)
+_INSTALL_OBJECTS = r'(?:package|dependency|dependencies|module|library)'
+_EXECUTION_OBJECTS = r'(?:command|script|test(?:\s+suite)?|tests|migration|server)'
+_SIDE_EFFECT_VERBS = (
+    r'(?:created|wrote|written|edited|updated|configured|generated|initialized|deleted|removed|set\s*up)'
+)
+
+# Phrases that indicate the model *claims* it performed a concrete side effect.
+# Only matched when the response contains plain message actions and no structured
+# tool-derived actions.
 _ACTION_CLAIM_PATTERNS: re.Pattern[str] = re.compile(
-    r"(?i)"
-    r"(?:"
-    # File creation / editing claims
-    r"I(?:'ve| have)?\s+(?:created|written|set\s*up|configured|generated|built|made|prepared|initialized)"
-    r"|(?:file|script|module|project|directory|folder|environment|package)\s+(?:has|have)\s+been\s+"
-    r"(?:created|written|set\s*up|configured|generated|built|initialized)"
-    r"|(?:created|wrote|set\s*up)\s+(?:the\s+)?(?:file|script|module|project|directory|folder)"
-    # Installation claims
-    r"|I(?:'ve| have)?\s+installed"
-    r"|(?:package|dependency|dependencies|module)\s+(?:has|have)\s+been\s+installed"
-    # Execution claims
-    r"|I(?:'ve| have)?\s+(?:ran|run|executed)\s+(?:the\s+)?(?:command|script|test)"
-    r")"
+    rf"""
+    \b(?:
+        I(?:'ve|\s+have)?\s+{_SIDE_EFFECT_VERBS}\s+
+        (?:(?:a|an|the|this|that|these|those|new)\s+)?
+        (?:{_SIDE_EFFECT_OBJECTS}|(?:file\s+)?{_FILELIKE_TARGET})
+        |
+        (?:the\s+)?(?:{_SIDE_EFFECT_OBJECTS}|(?:file\s+)?{_FILELIKE_TARGET})\s+
+        (?:has|have)\s+been\s+
+        (?:created|written|edited|updated|configured|generated|initialized|deleted|removed|set\s*up)
+        |
+        I(?:'ve|\s+have)?\s+installed\s+
+        (?:(?:a|an|the|this|that|these|those|new)\s+)?{_INSTALL_OBJECTS}
+        |
+        (?:the\s+)?{_INSTALL_OBJECTS}\s+(?:has|have)\s+been\s+installed
+        |
+        I(?:'ve|\s+have)?\s+(?:ran|run|executed)\s+
+        (?:(?:a|an|the|this|that|these|those)\s+)?{_EXECUTION_OBJECTS}
+        |
+        (?:the\s+)?{_EXECUTION_OBJECTS}\s+(?:has|have)\s+been\s+(?:run|executed)
+    )\b
+    """,
+    re.IGNORECASE | re.VERBOSE,
 )
 
 
@@ -65,14 +92,14 @@ class OrchestratorSafetyManager:
         if not response_text or not actions:
             return True, actions
 
-        # If any action is runnable (FileEditAction, CmdRunAction, etc.),
-        # the model DID call tools — no hallucination.
-        has_tool_calls = any(getattr(a, 'runnable', False) for a in actions)
-        if has_tool_calls:
+        # Any structured action means the model used function calling or an
+        # explicit orchestration action, even if the action itself is not
+        # runnable. Only plain message-only replies are eligible for this guard.
+        if not self._is_plain_message_only(actions):
             self._consecutive_hallucinations = 0
             return True, actions
 
-        # Pure-text response — check for action-claiming language.
+        # Plain-message response — check only for high-confidence side-effect claims.
         if _ACTION_CLAIM_PATTERNS.search(response_text):
             self._consecutive_hallucinations += 1
             if self._consecutive_hallucinations > self._max_retries:
@@ -97,3 +124,12 @@ class OrchestratorSafetyManager:
 
         self._consecutive_hallucinations = 0
         return True, actions
+
+    @staticmethod
+    def _is_plain_message_only(actions: list[Action]) -> bool:
+        """Return True when all actions are plain assistant messages.
+
+        Structured actions from tool/function calling should bypass the
+        hallucination detector, even if they are not runnable.
+        """
+        return all(isinstance(action, MessageAction) for action in actions)

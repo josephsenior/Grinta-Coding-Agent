@@ -24,7 +24,6 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'code_intelligence': ('', 'Code intelligence'),
     'explore_tree_structure': ('', 'Explore tree'),
     'read_symbol_definition': ('', 'Symbol'),
-    'workspace_status': ('', 'Workspace'),
     'analyze_project_structure': ('', 'Analyze project'),
     'verify_file_lines': ('', 'Verify lines'),
     'verify_ui_change': ('', 'Verify UI'),
@@ -91,7 +90,6 @@ def friendly_verb_for_tool(
         'code_intelligence': 'Analyzed',
         'explore_tree_structure': 'Explored',
         'read_symbol_definition': 'Analyzed',
-        'workspace_status': 'Explored',
         'analyze_project_structure': 'Explored',
         'verify_file_lines': 'Verified',
         'verify_ui_change': 'Checked UI',
@@ -291,7 +289,7 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
         bits_rs = [str(x) for x in (rs_sym, rs_path) if x]
         return _trunc(' · '.join(bits_rs), 120) if bits_rs else 'symbol…'
 
-    if tn in {'workspace_status', 'analyze_project_structure'}:
+    if tn == 'analyze_project_structure':
         return 'scan workspace'
 
     if tn == 'verify_file_lines':

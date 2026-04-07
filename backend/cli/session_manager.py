@@ -97,14 +97,14 @@ def list_sessions(
 
     sessions = sessions[:limit]
 
-    table = Table(title='Past Sessions', border_style='bright_black', show_lines=False)
-    table.add_column('#', style='dim', width=3)
-    table.add_column('Session ID', style='cyan', max_width=32)
-    table.add_column('Title', max_width=40)
-    table.add_column('Model', style='blue', max_width=20)
-    table.add_column('Events', justify='right', style='yellow')
-    table.add_column('Cost', justify='right', style='green')
-    table.add_column('Updated', style='dim', max_width=19)
+    table = Table(title='Past Sessions', border_style='dim', show_lines=False)
+    table.add_column('#', style='dim')
+    table.add_column('Session ID', style='dim')
+    table.add_column('Title')
+    table.add_column('Model', style='dim')
+    table.add_column('Events', justify='right', style='dim')
+    table.add_column('Cost', justify='right', style='dim')
+    table.add_column('Updated', style='dim')
 
     for i, (sid, meta, event_count) in enumerate(sessions, 1):
         title = meta.get('title', meta.get('name', '—'))
@@ -117,8 +117,8 @@ def list_sessions(
 
         table.add_row(
             str(i),
-            sid[:32],
-            str(title)[:40] if title else '—',
+            sid,
+            str(title) if title else '—',
             str(model)[:20] if model else '—',
             str(event_count),
             cost_str,

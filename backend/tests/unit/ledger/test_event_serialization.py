@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from backend.ledger.action import MessageAction, NullAction
+from backend.ledger.action import AgentThinkAction, MessageAction, NullAction
 from backend.ledger.event import EventSource
-from backend.ledger.observation import ErrorObservation, LspQueryObservation
+from backend.ledger.observation import AgentThinkObservation, ErrorObservation, LspQueryObservation
 from backend.ledger.serialization.event import (
     event_from_dict,
     event_to_dict,
@@ -110,6 +110,36 @@ class TestEventToDict:
         assert d['observation'] == 'lsp_query_result'
         assert 'LSP unavailable' in d['message']
         assert d['extras']['available'] is False
+
+    def test_tool_backed_think_action_preserves_tool_result_roundtrip(self):
+        action = AgentThinkAction(
+            thought='[CHECKPOINT] Saved #1: phase 1', source_tool='checkpoint'
+        )
+        action.tool_result = {'tool': 'checkpoint', 'ok': True, 'status': 'saved'}
+        action._source = EventSource.AGENT
+
+        data = event_to_dict(action)
+        evt = event_from_dict(data)
+
+        assert data['tool_result'] == action.tool_result
+        assert isinstance(evt, AgentThinkAction)
+        assert evt.tool_result == action.tool_result
+
+    def test_tool_backed_think_observation_preserves_tool_result_roundtrip(self):
+        obs = AgentThinkObservation(content='Your thought has been logged.')
+        obs.tool_result = {
+            'tool': 'revert_to_checkpoint',
+            'ok': True,
+            'status': 'reverted',
+        }
+        obs._source = EventSource.ENVIRONMENT
+
+        data = event_to_dict(obs)
+        evt = event_from_dict(data)
+
+        assert data['tool_result'] == obs.tool_result
+        assert isinstance(evt, AgentThinkObservation)
+        assert evt.tool_result == obs.tool_result
 
 
 # ── event_to_trajectory ─────────────────────────────────────────────

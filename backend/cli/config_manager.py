@@ -256,7 +256,7 @@ def run_onboarding() -> AppConfig:
                 "Let's get you connected to an LLM.\n"
                 '[dim]Settings saved locally — never sent anywhere.[/dim]'
             ),
-            border_style='bright_cyan',
+            border_style='dim',
             padding=(1, 3),
         ),
     )

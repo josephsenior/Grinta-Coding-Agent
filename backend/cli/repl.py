@@ -437,19 +437,6 @@ class Repl:
                     return f'autonomy:{level}'
         return 'autonomy:balanced'
 
-    @staticmethod
-    def _truncate_prompt_value(value: str, max_len: int) -> str:
-        clean = ' '.join(str(value).split())
-        if len(clean) <= max_len:
-            return clean
-        if max_len <= 1:
-            return clean[:max_len]
-        if max_len <= 5:
-            return clean[: max_len - 1] + '…'
-        head = (max_len - 1) // 2
-        tail = max_len - head - 1
-        return f'{clean[:head]}…{clean[-tail:]}'
-
     def _prompt_panel_data(self) -> dict[str, str]:
         hud = self._hud.state
         model = hud.model if hud.model and hud.model != '(not set)' else 'model n/a'
@@ -527,7 +514,7 @@ class Repl:
     def _prompt_stats_row2_fragments(
         self, data: dict[str, str], compact: bool, model: str, width: int = 120
     ) -> list[tuple[str, str]]:
-        """Build row-2 fragments, dropping optional fields from the right when they won't fit."""
+        """Build row-2 fragments, wrapping to a second line when content exceeds width."""
         sep = '  \u2022  '
 
         # Required prefix: model + tokens + cost
@@ -541,22 +528,35 @@ class Repl:
             ('class:prompt.value', data['cost']),
         ]
 
-        # Optional fields in priority order — drop from the right when width is tight.
+        # Optional fields in priority order.
         optionals: list[tuple[str, str]] = [
+            (self._prompt_ledger_style(data['ledger']), data['ledger']),
             ('class:prompt.value', data['calls']),
             ('class:prompt.value', data['mcp']),
             ('class:prompt.value', data['skills']),
-            (self._prompt_ledger_style(data['ledger']), data['ledger']),
         ]
 
         def _len(frags: list[tuple[str, str]]) -> int:
             return sum(len(t) for _, t in frags)
 
-        result = list(base)
+        # Build the full single-line version first.
+        opt_frags: list[tuple[str, str]] = []
         for item_style, item_text in optionals:
-            candidate = [('class:prompt.sep', sep), (item_style, item_text)]
-            if _len(result) + _len(candidate) <= width:
-                result.extend(candidate)
+            opt_frags.extend([('class:prompt.sep', sep), (item_style, item_text)])
+
+        all_frags = list(base) + opt_frags
+        if _len(all_frags) <= width:
+            return all_frags
+
+        # Overflow → wrap: required fields on line 1, optionals on line 2.
+        result = list(base)
+        result.append(('', '\n'))
+        indent = ' ' * 7  # width of "model: " to align under the model value
+        result.append(('class:prompt.dim', indent))
+        for idx, (item_style, item_text) in enumerate(optionals):
+            if idx > 0:
+                result.append(('class:prompt.sep', sep))
+            result.append((item_style, item_text))
 
         return result
 
@@ -571,12 +571,8 @@ class Repl:
         level = data['autonomy_label'].replace('autonomy:', '')
         self._hud.update_autonomy(level)
 
-        # Compute model name budget from what row-2 has left after fixed items.
-        SEP_LEN = 5  # len('  •  ')
-        base_fixed_len = len('model: ') + len(data['token_display']) + len(data['cost']) + SEP_LEN * 2
-        model_budget = max(12, width - base_fixed_len - 2)
-        model_limit = min(model_budget, 40 if not compact else 26)
-        model = self._truncate_prompt_value(data['model'], model_limit)
+        # Compute model name from exactly what it is. No truncation.
+        model = data['model']
 
         fragments: list[tuple[str, str]] = []
 
@@ -592,8 +588,7 @@ class Repl:
             self._append_footer_system_fragments(fragments, add)
             return fragments
 
-        # Bottom border closes the framed input box (top border is in _prompt_panel_message).
-        add('class:prompt.border', '\u2514' + '\u2500' * (width - 2) + '\u2518')
+        add('class:prompt.dim', '\u2500' * width)
         add('', '\n')
         fragments.extend(self._prompt_stats_row1_fragments(data, compact))
         add('', '\n')
@@ -603,16 +598,8 @@ class Repl:
         return fragments
 
     def _prompt_panel_message(self) -> Any:
-        width = shutil.get_terminal_size((110, 24)).columns
-        if width < 72:
-            return self._prompt_message()
-
-        # Top border of the framed input box.  The matching bottom border is drawn
-        # as the first line of the bottom_toolbar so the box is visually closed.
-        top = '\u250c' + '\u2500' * (width - 2) + '\u2510\n\u2502 '
         return [
-            ('class:prompt.border', top),
-            ('class:prompt.arrow', '\u25b6 '),
+            ('class:prompt.arrow', self._prompt_message()),
         ]
 
     def _create_prompt_session(self) -> Any:

@@ -6,6 +6,8 @@ especially when hitting errors after CmdRunAction or FileEditAction.
 
 from __future__ import annotations
 
+import json
+
 from backend.core.rollback.rollback_manager import RollbackManager
 from backend.ledger.action.agent import AgentThinkAction
 
@@ -84,30 +86,105 @@ def build_revert_to_checkpoint_action(arguments: dict) -> AgentThinkAction:
     if not checkpoint_id:
         latest = manager.get_latest_checkpoint()
         if not latest:
-            return AgentThinkAction(
-                thought='[ROLLBACK] Failure: No checkpoints found. Cannot revert to safe state.',
-                source_tool='revert_to_checkpoint',
+            return _revert_result(
+                ok=False,
+                status='failed',
+                reason_code='NO_CHECKPOINTS',
+                reason='No checkpoints found. Cannot revert to a safe state.',
+                retryable=True,
+                changed_state=False,
+                next_best_action='Create a checkpoint after a safe milestone, then retry revert_to_checkpoint.',
+                human_message='[ROLLBACK] Failure: No checkpoints found. Cannot revert to safe state.',
             )
         resolved_id = latest.id
+        target_label = 'latest checkpoint'
     else:
         resolved_id = _resolve_rollback_id(checkpoint_id, manager)
         if resolved_id is None:
-            return AgentThinkAction(
-                thought=(
+            return _revert_result(
+                ok=False,
+                status='failed',
+                reason_code='CHECKPOINT_NOT_FOUND',
+                reason=(
+                    f"Checkpoint ID '{checkpoint_id}' was not found. "
+                    "Use checkpoint view to list available checkpoints."
+                ),
+                retryable=True,
+                changed_state=False,
+                data={'requested_checkpoint_id': checkpoint_id},
+                next_best_action='Call checkpoint view to inspect valid checkpoints, then retry revert_to_checkpoint.',
+                human_message=(
                     f"[ROLLBACK] Failure: Checkpoint ID '{checkpoint_id}' not found. "
                     "Use 'checkpoint view' to list available checkpoints."
                 ),
-                source_tool='revert_to_checkpoint',
             )
+        target_label = f'checkpoint {checkpoint_id}'
 
     success = manager.rollback_to(resolved_id)
     if success:
-        return AgentThinkAction(
-            thought=f'[ROLLBACK] Success: Workspace has been safely reverted to checkpoint {checkpoint_id}.',
-            source_tool='revert_to_checkpoint',
+        return _revert_result(
+            ok=True,
+            status='reverted',
+            reason_code='ROLLBACK_COMPLETED',
+            reason='Workspace rollback completed successfully.',
+            retryable=False,
+            changed_state=True,
+            data={
+                'requested_checkpoint_id': checkpoint_id or None,
+                'resolved_checkpoint_id': resolved_id,
+            },
+            next_best_action='Re-run the next safe step or continue from the restored checkpoint state.',
+            human_message=(
+                f'[ROLLBACK] Success: Workspace has been safely reverted to {target_label}.'
+            ),
         )
     else:
-        return AgentThinkAction(
-            thought=f'[ROLLBACK] Failure: Revert to checkpoint {checkpoint_id} failed. See logs for details.',
-            source_tool='revert_to_checkpoint',
+        return _revert_result(
+            ok=False,
+            status='failed',
+            reason_code='ROLLBACK_FAILED',
+            reason='Rollback failed. See logs for details.',
+            retryable=True,
+            changed_state=False,
+            data={
+                'requested_checkpoint_id': checkpoint_id or None,
+                'resolved_checkpoint_id': resolved_id,
+            },
+            next_best_action='Inspect the rollback logs, then retry revert_to_checkpoint or recover manually.',
+            human_message=(
+                f'[ROLLBACK] Failure: Revert to {target_label} failed. See logs for details.'
+            ),
         )
+
+
+def _revert_result(
+    *,
+    ok: bool,
+    status: str,
+    reason_code: str,
+    reason: str,
+    retryable: bool,
+    changed_state: bool,
+    next_best_action: str,
+    human_message: str,
+    data: dict | None = None,
+) -> AgentThinkAction:
+    payload: dict[str, object] = {
+        'tool': REVERT_TO_CHECKPOINT_TOOL_NAME,
+        'ok': ok,
+        'status': status,
+        'reason_code': reason_code,
+        'reason': reason,
+        'retryable': retryable,
+        'changed_state': changed_state,
+        'next_best_action': next_best_action,
+    }
+    if data is not None:
+        payload['data'] = data
+
+    action = AgentThinkAction(
+        thought=f'{human_message}\n[REVERT_RESULT] {json.dumps(payload, ensure_ascii=False)}',
+        source_tool=REVERT_TO_CHECKPOINT_TOOL_NAME,
+    )
+    action.tool_result = payload
+    return action

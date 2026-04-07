@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from typing import TYPE_CHECKING
 
 from backend.core.message import Message, TextContent
@@ -40,6 +42,8 @@ def convert_observation_to_message(
         Message: A formatted message ready for the LLM
 
     """
+    if _is_tool_backed_think_observation(event):
+        return _handle_tool_backed_think_observation(event, max_message_chars)
     if isinstance(event, FileReadObservation):
         return _handle_file_read_observation(event, max_message_chars)
     if isinstance(event, FileEditObservation):
@@ -59,6 +63,26 @@ def convert_observation_to_message(
 
     # Fallback for generic/simple observations
     return _handle_simple_observation(event, max_message_chars)
+
+
+def _is_tool_backed_think_observation(event: Observation) -> bool:
+    tool_result = getattr(event, 'tool_result', None)
+    return type(event).__name__ == 'AgentThinkObservation' and isinstance(
+        tool_result, dict
+    )
+
+
+def _handle_tool_backed_think_observation(
+    obs: Observation, max_message_chars: int | None
+) -> Message:
+    tool_result = getattr(obs, 'tool_result', None)
+    assert isinstance(tool_result, dict)
+    text = truncate_content(
+        json.dumps(tool_result, ensure_ascii=False),
+        max_message_chars,
+        strategy='balanced',
+    )
+    return Message(role='user', content=[TextContent(text=text)])
 
 
 def _get_observation_content(obs: Observation) -> str:

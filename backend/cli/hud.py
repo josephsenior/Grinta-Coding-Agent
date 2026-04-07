@@ -160,17 +160,17 @@ class HUDBar:
         sk_short = str(min(self._bundled_skill_count, 99))
         parts = [
             (
-                self.state.model.rsplit('/', maxsplit=1)[-1][:12],
-                'bright_black',
-            ),  # last segment, truncated
+                self.state.model.rsplit('/', maxsplit=1)[-1],
+                'dim',
+            ),  # last segment
             (' ', 'grey27'),
-            (token_display, 'bright_black'),
+            (token_display, 'dim'),
             (' ', 'grey27'),
-            (f'${self.state.cost_usd:.3f}', 'bright_black'),
+            (f'${self.state.cost_usd:.3f}', 'dim'),
             (' ', 'grey27'),
-            (f'm{mcp_short}', 'bright_black'),
+            (f'm{mcp_short}', 'dim'),
             (' ', 'grey27'),
-            (f'k{sk_short}', 'bright_black'),
+            (f'k{sk_short}', 'dim'),
             (' ', 'grey27'),
             (self._ledger_icon(), self._ledger_style()),
         ]

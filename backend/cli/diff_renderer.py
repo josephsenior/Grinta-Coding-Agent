@@ -31,7 +31,7 @@ class DiffPanel:
             yield Panel(
                 Text(f'+ new file ({line_count} lines)', style='green'),
                 title=f'[bold green]created[/bold green] {path}',
-                border_style='green',
+                border_style='dim',
                 padding=(1, 2),
             )
             return
@@ -63,7 +63,7 @@ class DiffPanel:
             yield Panel(
                 diff_text,
                 title=f'[bold yellow]edited[/bold yellow] {path}[dim]{stats}[/dim]',
-                border_style='yellow',
+                border_style='dim',
                 padding=(1, 2),
             )
             return
@@ -80,14 +80,14 @@ class DiffPanel:
             yield Panel(
                 Text(diff_str[:3000]),
                 title=f'[bold yellow]edited[/bold yellow] {path}',
-                border_style='yellow',
+                border_style='dim',
                 padding=(1, 2),
             )
         else:
             yield Panel(
                 Text('✓ written', style='green'),
                 title=f'[bold green]wrote[/bold green] {path}',
-                border_style='green',
+                border_style='dim',
                 padding=(1, 2),
             )
 

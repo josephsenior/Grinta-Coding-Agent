@@ -46,7 +46,7 @@ def format_activity_primary(verb: str, detail: str) -> Text:
     line.append(_ACTIVITY_PRIMARY_INDENT, style='')
     line.append(
         f'{(verb or "Did").strip():<{_ACTIVITY_VERB_WIDTH}}',
-        style='bold cyan',
+        style='dim',
     )
     d = (detail or '').strip()
     if d:
@@ -61,7 +61,7 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
     styles = {
         'ok': 'dim green',
         'err': 'dim red',
-        'neutral': 'dim bright_black',
+        'neutral': 'dim',
     }
     line.append(message, style=styles.get(kind, styles['neutral']))
     return line
@@ -70,9 +70,9 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
 def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> Text:
     """Continuation row for user-visible results — consistent with shell result style."""
     styles: dict[str, tuple[str, str, str]] = {
-        'ok':      ('✓', 'bold bright_green', 'bright_green'),
-        'err':     ('✗', 'bold bright_red',   'bright_red'),
-        'neutral': ('•', 'bright_black',       'bright_black'),
+        'ok':      ('✓', 'dim', 'dim'),
+        'err':     ('✗', 'dim red',   'dim red'),
+        'neutral': ('•', 'dim',       'dim'),
     }
     icon, icon_style, text_style = styles.get(kind, styles['neutral'])
     line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
@@ -100,7 +100,7 @@ def format_activity_block(
             content,
             title=panel_title,
             title_align='left',
-            border_style='bright_black',
+            border_style='dim',
             box=box.ROUNDED,
             padding=(0, 1),
         )
@@ -131,7 +131,7 @@ def format_activity_shell_block(
         Group(*parts),
         title=Text('Terminal', style='bold #9ca3af'),
         title_align='left',
-        border_style='bright_black',
+        border_style='dim',
         box=box.ROUNDED,
         padding=(0, 1),
     )
@@ -146,7 +146,7 @@ def format_callout_panel(
     title: str,
     body: Any,
     *,
-    accent_style: str = 'bright_black',
+    accent_style: str = 'dim',
 ) -> Panel:
     """Reusable compact panel for CLI callouts, questions, and live sections."""
     panel_title = Text((title or 'Notice').strip(), style=f'{accent_style} bold')
@@ -163,6 +163,6 @@ def format_callout_panel(
 def format_ground_truth_tool_line(label: str) -> Text:
     """One structured transcript row for a tool invocation (ASCII prefix, no emoji)."""
     line = Text()
-    line.append(_GROUND_PREFIX, style='bright_black')
+    line.append(_GROUND_PREFIX, style='dim')
     line.append((label or '').strip(), style='')
     return line

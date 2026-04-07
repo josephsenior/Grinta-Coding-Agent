@@ -95,9 +95,9 @@ def _render_tab_bar(active: int) -> Text:
 
 def _render_ai_tab(console: Console) -> None:
     config = load_app_config()
-    table = Table(show_header=False, border_style='bright_black', padding=(0, 2))
-    table.add_column('Field', style='bold', min_width=12)
-    table.add_column('Value', min_width=40)
+    table = Table(show_header=False, border_style='dim', padding=(0, 2))
+    table.add_column('Field', style='bold')
+    table.add_column('Value')
 
     table.add_row('Model', get_current_model(config))
     table.add_row('API Key', get_masked_api_key(config))
@@ -106,7 +106,7 @@ def _render_ai_tab(console: Console) -> None:
     table.add_row('Tool icons', icons)
 
     console.print(
-        Panel(table, title='[bold]AI Configuration[/bold]', border_style='cyan')
+        Panel(table, title='[bold]AI Configuration[/bold]', border_style='dim')
     )
     console.print()
     console.print(
@@ -119,11 +119,11 @@ def _render_mcp_tab(console: Console) -> None:
     config = load_app_config()
     servers = get_mcp_servers(config)
 
-    table = Table(border_style='bright_black', padding=(0, 2))
-    table.add_column('#', style='dim', width=4)
-    table.add_column('Name', style='cyan', min_width=20)
-    table.add_column('Type', min_width=8)
-    table.add_column('Endpoint', min_width=30)
+    table = Table(border_style='dim', padding=(0, 2))
+    table.add_column('#', style='dim')
+    table.add_column('Name', style='dim')
+    table.add_column('Type')
+    table.add_column('Endpoint')
 
     if not servers:
         table.add_row('—', '(no servers configured)', '', '')
@@ -215,7 +215,7 @@ def open_settings(console: Console) -> None:
     console.print(
         Panel(
             Text('Settings', style='bold'),
-            border_style='bright_cyan',
+            border_style='dim',
             padding=(0, 2),
         ),
         justify='center',

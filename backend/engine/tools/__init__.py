@@ -28,7 +28,6 @@ from .terminal_manager import create_terminal_manager_tool
 from .think import create_think_tool
 from .verify_file_lines import create_verify_file_lines_tool
 from .verify_ui import create_verify_ui_change_tool
-from .workspace_status import create_workspace_status_tool
 
 __all__ = [
     'create_apply_patch_tool',
@@ -51,7 +50,6 @@ __all__ = [
     'create_structure_editor_tool',
     'create_task_tracker_tool',
     'create_verify_file_lines_tool',
-    'create_workspace_status_tool',
     'create_delegate_task_tool',
     'create_revert_to_checkpoint_tool',
     'create_verify_ui_change_tool',

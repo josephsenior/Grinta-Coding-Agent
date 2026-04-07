@@ -23,7 +23,7 @@ from backend.integrations.mcp.mcp_utils import call_tool_mcp
 from backend.ledger.action import MessageAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.event import EventSource
-from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation import AgentThinkObservation, ErrorObservation
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.tool import ToolCallMetadata
@@ -189,6 +189,32 @@ class TestToolResultPropagation:
         assert payload['error_code'] == 'MCP_NO_CLIENTS'
         assert payload['retryable'] is True
         assert payload['ok'] is False
+
+    def test_agent_think_tool_result_uses_structured_tool_message_content(self):
+        mem = _make_memory()
+        obs = AgentThinkObservation(content='Your thought has been logged.')
+        obs.tool_result = {
+            'tool': 'checkpoint',
+            'ok': True,
+            'status': 'saved',
+            'next_best_action': 'Continue with the next step.',
+        }
+        obs.tool_call_metadata = ToolCallMetadata(
+            function_name='checkpoint',
+            tool_call_id='call_5',
+            model_response={'id': 'resp_5'},
+            total_calls_in_response=1,
+        )
+        tool_messages: dict[str, Message] = {}
+
+        out = mem._process_observation(
+            obs,
+            tool_call_id_to_message=tool_messages,
+            max_message_chars=None,
+        )
+
+        assert out == []
+        assert json.loads(tool_messages['call_5'].content[0].text) == obs.tool_result
 
 
 class TestStaticHelpers:

@@ -59,7 +59,7 @@ _TASK_STATUS_STYLES = {
     'failed': 'red',
     'in_progress': 'yellow',
     'pending': 'cyan',
-    'skipped': 'bright_black',
+    'skipped': 'dim',
     'todo': 'cyan',
 }
 _CMD_SUMMARY_NOISE_PATTERNS = (
@@ -259,30 +259,29 @@ def _summarize_cmd_failure(content: str) -> str:
 def _build_task_panel(task_list: list[dict[str, Any]]) -> Any:
     """Render the current task list as a single reusable panel block."""
     table = Table.grid(expand=True, padding=(0, 1))
-    table.add_column(no_wrap=True)
+    table.add_column()
     table.add_column(ratio=1)
 
     for task_id, status, desc in _task_panel_signature(task_list):
         badge = Text()
-        badge.append('[', style='bright_black')
+        badge.append('[', style='dim')
         badge.append(
             _TASK_STATUS_LABELS.get(status, 'todo').upper(),
-            style=f"bold {_TASK_STATUS_STYLES.get(status, 'cyan')}",
+            style=f"bold {_TASK_STATUS_STYLES.get(status, 'dim')}",
         )
-        badge.append(']', style='bright_black')
+        badge.append(']', style='dim')
 
         body = Text()
         if task_id and task_id != '?':
-            body.append(f'{task_id}  ', style='bright_black')
-        display_desc = desc[:117] + '…' if len(desc) > 120 else desc
-        body.append(display_desc, style='default')
+            body.append(f'{task_id}  ', style='dim')
+        body.append(desc, style='default')
         table.add_row(badge, body)
 
-    empty_state: Any = table if task_list else Text('No tracked tasks yet.', style='bright_black')
+    empty_state: Any = table if task_list else Text('No tracked tasks yet.', style='dim')
     return format_callout_panel(
         f'Tasks ({len(task_list)})',
         empty_state,
-        accent_style='cyan',
+        accent_style='dim',
     )
 
 
@@ -759,7 +758,7 @@ class CLIEventRenderer:
         body = Text((text or '').rstrip(), style='default')
         panel = Panel(
             Padding(body, CALLOUT_PANEL_PADDING),
-            title=Text('You', style='bold cyan'),
+            title=Text('You', style='bold dim'),
             title_align='left',
             box=box.ROUNDED,
             border_style='dim cyan',
@@ -819,7 +818,7 @@ class CLIEventRenderer:
 
         self._print_or_buffer(Text(''))
         self._print_or_buffer(
-            Padding(Rule(title, style='bright_black'), (1, 0, 1, 0), expand=False)
+            Padding(Rule(title, style='dim'), (1, 0, 1, 0), expand=False)
         )
         self._print_or_buffer(Padding(Markdown(text), (0, 0, 1, 0), expand=False))
         self._print_or_buffer(Text(''))
@@ -883,9 +882,10 @@ class CLIEventRenderer:
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        # During Live: task strip, streaming preview, reasoning, HUD. Committed
-        # transcript lines are printed via console.print immediately so Rich does
-        # not clip tall turns (Live vertical_overflow ellipsis).
+        # During Live: task strip, streaming preview, reasoning, and a fake
+        # prompt bar at the bottom so the input area appears to stay visible.
+        # Committed transcript lines are printed via console.print immediately
+        # so Rich does not clip tall turns (Live vertical_overflow ellipsis).
         body_items: list[Any] = []
         live_sections: list[Any] = []
         if self._task_panel is not None:
@@ -904,11 +904,150 @@ class CLIEventRenderer:
 
         if live_sections:
             body_items.append(spacer_live_section())
-        # Render HUD at full terminal width — no left/right inset so the bar
-        # never wraps and aligns visually with the prompt_toolkit bottom toolbar.
-        body_items.append(self._hud)
+        # Render a fake prompt bar at the bottom so the input area, stats, and
+        # HUD remain visually present while the agent works.
+        body_items.append(self._render_fake_prompt(options.max_width))
 
         yield Group(*body_items)
+
+    # -- fake prompt (matches prompt_toolkit bottom toolbar) ----------------
+
+    def _render_fake_prompt(self, width: int) -> Any:
+        """Render a prompt look-alike anchored at the bottom of the Live display.
+
+        Visually matches the prompt_toolkit bottom_toolbar so the transition
+        between Live (agent executing) and prompt_toolkit (user input) is
+        seamless — the input area and stats bar never appear to disappear.
+        """
+        from rich.spinner import Spinner
+
+        hud = self._hud.state
+        items: list[Any] = []
+
+        # -- fake input line (replaces the real ❯ prompt) -------------------
+        input_row = Table.grid()
+        input_row.add_column(width=3)
+        input_row.add_column()
+        input_row.add_row(
+            Spinner('dots', style='bold #7dd3fc'),
+            Text('Agent working… esc to interrupt', style='italic #5d7286'),
+        )
+        items.append(input_row)
+
+        # -- separator (mirrors _prompt_bottom_toolbar) ---------------------
+        items.append(Text('─' * width, style='#5c7287'))
+
+        model = hud.model if hud.model and hud.model != '(not set)' else 'model n/a'
+        state_label = hud.agent_state_label or 'Running'
+        autonomy = hud.autonomy_level or 'balanced'
+
+        if width < 72:
+            # Compact single-line mode for very narrow terminals.
+            model_short = model.rsplit('/', maxsplit=1)[-1]
+            ctx = HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
+            line = Text()
+            line.append(state_label, style='dim')
+            line.append(' · ', style='#2f465b')
+            line.append(f'autonomy:{autonomy}', style='dim')
+            line.append(' · ', style='#2f465b')
+            line.append(model_short, style='dim')
+            line.append(' · ', style='#2f465b')
+            line.append(ctx, style='dim')
+            line.append(' · ', style='#2f465b')
+            line.append(f'${hud.cost_usd:.4f}', style='dim')
+            items.append(line)
+            return Group(*items)
+
+        # -- row 1: brand + state badge + autonomy -------------------------
+        row1 = Text()
+        row1.append('GRINTA', style='bold #7dd3fc')
+        row1.append('  ', style='')
+        _BADGE_STYLES = {
+            'Running': '#93c5fd bold',
+            'Ready': '#86efac bold',
+            'Done': '#86efac bold',
+            'Finished': '#86efac bold',
+            'Needs approval': '#fcd34d bold',
+            'Needs attention': '#fca5a5 bold',
+            'Stopped': '#fca5a5 bold',
+        }
+        row1.append(
+            f' {state_label.upper()} ',
+            style=_BADGE_STYLES.get(state_label, '#93c5fd bold'),
+        )
+        row1.append('  ', style='')
+        auto_style = '#8bd8ff'
+        if 'full' in autonomy:
+            auto_style = '#f1bf63 bold'
+        elif 'supervised' in autonomy:
+            auto_style = '#f0a3ff bold'
+        row1.append(f'autonomy:{autonomy}', style=auto_style)
+        items.append(row1)
+
+        # -- row 2: model · tokens · cost · calls · MCP · skills · ledger --
+        SEP = ('  \u2022  ', '#2f465b')
+
+        ctx = HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
+        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else '?'
+        if hud.context_tokens == 0 and hud.context_limit == 0:
+            token_display = '0 tokens'
+        elif hud.context_limit == 0:
+            token_display = f'{ctx} tokens'
+        else:
+            token_display = f'{ctx}/{lim}'
+
+        mcp_label = HUDBar._format_mcp_servers_label(hud.mcp_servers)
+        skills_label = HUDBar._format_skills_label(self._hud.bundled_skill_count)
+
+        ledger_style = '#8fdfb1 bold'
+        if hud.ledger_status in {'Review', 'Paused'}:
+            ledger_style = '#f1bf63 bold'
+        elif hud.ledger_status not in {'Healthy', 'Ready', 'Idle', 'Starting'}:
+            ledger_style = '#ff9ea8 bold'
+
+        # Build row 2 parts and wrap to a second line if they overflow.
+        parts: list[tuple[str, str]] = [
+            ('model:', '#5c7287'),
+            (' ', ''),
+            (model, 'bold #dbe7f3'),
+            SEP,
+            (token_display, '#b4c4d5'),
+            SEP,
+            (f'${hud.cost_usd:.4f}', '#b4c4d5'),
+        ]
+        optional_parts: list[tuple[str, str]] = [
+            (hud.ledger_status, ledger_style),
+            (f'{hud.llm_calls} calls', '#b4c4d5'),
+            (mcp_label, '#b4c4d5'),
+            (skills_label, '#b4c4d5'),
+        ]
+        for content, style in optional_parts:
+            parts.append(SEP)
+            parts.append((content, style))
+
+        total_len = sum(len(c) for c, _ in parts)
+        if total_len <= width:
+            row2 = Text()
+            for content, style in parts:
+                row2.append(content, style=style)
+            items.append(row2)
+        else:
+            # Split into two lines: required on line 1, optionals on line 2.
+            row2a = Text()
+            for content, style in parts[:7]:  # model: + model + sep + tokens + sep + cost
+                row2a.append(content, style=style)
+            items.append(row2a)
+            row2b = Text()
+            row2b.append('       ', style='')  # indent to align under model value
+            first = True
+            for content, style in optional_parts:
+                if not first:
+                    row2b.append(SEP[0], style=SEP[1])
+                row2b.append(content, style=style)
+                first = False
+            items.append(row2b)
+
+        return Group(*items)
 
     # -- action handlers ---------------------------------------------------
 
@@ -953,14 +1092,14 @@ class CLIEventRenderer:
                 self._append_history(Text(''))
                 self._append_history(
                     Padding(
-                        Text('Assistant', style='bold green'),
-                        (1, 0, 0, 0),
+                        Text('Assistant', style='bold'),
+                        (2, 0, 0, 0),
                         expand=False,
                     )
                 )
                 self._append_history(
                     Padding(
-                        Rule(style='bright_black', characters='─'),
+                        Rule(style='dim', characters='─'),
                         (0, 0, 1, 0),
                         expand=False,
                     )
@@ -1289,7 +1428,7 @@ class CLIEventRenderer:
             uncertainty_parts: list[Any] = []
             for concern in concerns[:5]:
                 line = Text()
-                line.append('• ', style='bright_black')
+                line.append('• ', style='dim')
                 line.append(str(concern), style='dim')
                 uncertainty_parts.append(line)
             if info_needed:
@@ -1978,11 +2117,11 @@ class CLIEventRenderer:
     def _render_streaming_preview(self) -> Any:
         body: list[Any] = [Markdown(self._streaming_accumulated or '')]
         if not self._streaming_final:
-            body.append(Text('streaming…', style='bright_black'))
+            body.append(Text('streaming…', style='dim'))
         return format_callout_panel(
             'Draft reply',
             Group(*body),
-            accent_style='bright_black',
+            accent_style='dim',
         )
 
     @staticmethod

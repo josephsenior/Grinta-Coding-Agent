@@ -32,6 +32,7 @@ def test_save_checkpoint_success_and_structured_payload(
     assert payload['changed_state'] is True
     assert payload['data']['checkpoint_id'] == 1
     assert payload['data']['files'] == ['a.txt', 'b.txt']
+    assert action.tool_result == payload
 
 
 def test_save_checkpoint_duplicate_is_noop(monkeypatch, tmp_path: Path) -> None:
@@ -66,6 +67,7 @@ def test_save_checkpoint_missing_label_returns_failed_payload() -> None:
     assert payload['status'] == 'failed'
     assert payload['reason_code'] == 'MISSING_LABEL'
     assert payload['retryable'] is True
+    assert action.tool_result == payload
 
 
 def test_clear_when_empty_returns_noop(monkeypatch, tmp_path: Path) -> None:
@@ -79,3 +81,4 @@ def test_clear_when_empty_returns_noop(monkeypatch, tmp_path: Path) -> None:
     assert payload['status'] == 'noop'
     assert payload['reason_code'] == 'ALREADY_EMPTY'
     assert payload['changed_state'] is False
+    assert action.tool_result == payload

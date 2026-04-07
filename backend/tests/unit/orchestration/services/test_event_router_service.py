@@ -13,7 +13,9 @@ from backend.ledger.action import (
     PlaybookFinishAction,
     TaskTrackingAction,
 )
-from backend.ledger.observation import Observation
+from backend.ledger.observation import ErrorObservation, Observation
+from backend.ledger.observation.agent import AgentThinkObservation
+from backend.ledger.tool import ToolCallMetadata
 from backend.orchestration.services.event_router_service import EventRouterService
 
 
@@ -174,6 +176,97 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
 
         # Should not change state
         self.mock_controller.set_agent_state_to.assert_not_called()
+
+    async def test_handle_action_message_from_agent_blocks_incomplete_checkpoint_handoff(
+        self,
+    ):
+        checkpoint_obs = AgentThinkObservation(content='Your thought has been logged.')
+        checkpoint_obs.tool_result = {
+            'tool': 'checkpoint',
+            'ok': True,
+            'status': 'saved',
+            'next_best_action': 'Continue with the next planned step.',
+        }
+        checkpoint_obs.tool_call_metadata = ToolCallMetadata(
+            function_name='checkpoint',
+            tool_call_id='call_checkpoint',
+            model_response={'id': 'resp_checkpoint'},
+            total_calls_in_response=1,
+        )
+        action = MessageAction(content='Checkpoint saved.')
+        action.source = EventSource.AGENT
+        action.wait_for_response = True
+        self.mock_controller.state.history = [checkpoint_obs, action]
+
+        await self.service._handle_action(action)
+
+        self.mock_controller.set_agent_state_to.assert_not_called()
+        self.mock_controller.event_stream.add_event.assert_called_once()
+        emitted = self.mock_controller.event_stream.add_event.call_args[0][0]
+        self.assertIsInstance(emitted, ErrorObservation)
+        self.assertEqual(emitted.error_id, 'CHECKPOINT_FLOW_INCOMPLETE')
+        self.assertIn('task_tracker update', emitted.content)
+        self.assertIn('finish', emitted.content)
+
+    async def test_handle_action_message_from_agent_allows_checkpoint_completion_handoff(
+        self,
+    ):
+        checkpoint_obs = AgentThinkObservation(content='Your thought has been logged.')
+        checkpoint_obs.tool_result = {
+            'tool': 'checkpoint',
+            'ok': True,
+            'status': 'saved',
+            'next_best_action': 'Continue with the next planned step.',
+        }
+        checkpoint_obs.tool_call_metadata = ToolCallMetadata(
+            function_name='checkpoint',
+            tool_call_id='call_checkpoint',
+            model_response={'id': 'resp_checkpoint'},
+            total_calls_in_response=1,
+        )
+        action = MessageAction(
+            content='Implementation is complete. Next steps: 1. run the focused tests 2. commit if the results are clean.'
+        )
+        action.source = EventSource.AGENT
+        action.wait_for_response = True
+        self.mock_controller.state.history = [checkpoint_obs, action]
+
+        await self.service._handle_action(action)
+
+        self.mock_controller.set_agent_state_to.assert_called_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+        self.mock_controller.event_stream.add_event.assert_not_called()
+
+    async def test_handle_action_message_from_agent_blocks_incomplete_revert_handoff(
+        self,
+    ):
+        revert_obs = AgentThinkObservation(content='Your thought has been logged.')
+        revert_obs.tool_result = {
+            'tool': 'revert_to_checkpoint',
+            'ok': True,
+            'status': 'reverted',
+            'next_best_action': 'Continue from the restored checkpoint state.',
+        }
+        revert_obs.tool_call_metadata = ToolCallMetadata(
+            function_name='revert_to_checkpoint',
+            tool_call_id='call_revert',
+            model_response={'id': 'resp_revert'},
+            total_calls_in_response=1,
+        )
+        action = MessageAction(content='Rollback completed.')
+        action.source = EventSource.AGENT
+        action.wait_for_response = True
+        self.mock_controller.state.history = [revert_obs, action]
+
+        await self.service._handle_action(action)
+
+        self.mock_controller.set_agent_state_to.assert_not_called()
+        self.mock_controller.event_stream.add_event.assert_called_once()
+        emitted = self.mock_controller.event_stream.add_event.call_args[0][0]
+        self.assertIsInstance(emitted, ErrorObservation)
+        self.assertEqual(emitted.error_id, 'CHECKPOINT_FLOW_INCOMPLETE')
+        self.assertIn('revert_to_checkpoint is an intermediate control tool', emitted.content)
 
     @patch.dict('os.environ', {'LOG_ALL_EVENTS': 'true'})
     async def test_handle_message_action_log_all_events(self):

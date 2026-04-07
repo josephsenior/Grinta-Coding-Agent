@@ -86,17 +86,17 @@ def _configure_redirected_streams(*streams: object | None) -> None:
 
 
 def show_grinta_splash(console: Any | None = None) -> None:
-    """Render the GRINTA boot splash — figlet inside a heavy-border panel."""
+    """Render the GRINTA boot splash."""
     from rich.align import Align
-    from rich.box import HEAVY
+    from rich.box import ROUNDED
     from rich.console import Group
     from rich.panel import Panel
     from rich.text import Text
 
     console = console or Console()
 
-    _R = 'bold #c0152c'
-    _D = '#c0152c'
+    _R = 'bold dim'
+    _D = 'dim'
 
     try:
         import pyfiglet as _pyfiglet
@@ -127,7 +127,7 @@ def show_grinta_splash(console: Any | None = None) -> None:
                 figlet.append(' ' * len(line))
         parts: list = [Align.center(figlet), Text('')]
         if tagline:
-            parts.append(Text(_TAGLINE, style='italic #c0152c', justify='center'))
+            parts.append(Text(_TAGLINE, style='italic dim', justify='center'))
         else:
             parts.append(Text(''))
         return Group(*parts)
@@ -135,9 +135,9 @@ def show_grinta_splash(console: Any | None = None) -> None:
     def _frame(visible: int, *, tagline: bool = False, hint: bool = False) -> Any:
         panel = Panel(
             _body(visible, tagline=tagline),
-            title='[bold #c0152c] >_ [/]',
+            title='[bold dim] >_ [/]',
             border_style=_D,
-            box=HEAVY,
+            box=ROUNDED,
             padding=(1, 4),
         )
         rows: list = [Text(''), Align.center(panel), Text('')]
@@ -239,10 +239,9 @@ async def _async_main(
 
     try:
         term_cols = shutil.get_terminal_size().columns
-        # Narrower render width + inset keeps prose readable on ultra-wide terminals.
-        console = Console(width=max(72, min(116, term_cols - 8)))
     except OSError:
-        console = Console()
+        term_cols = 120
+    console = Console(width=term_cols - 2)
     show_grinta_splash(console)
     initial_input = _read_piped_stdin()
 

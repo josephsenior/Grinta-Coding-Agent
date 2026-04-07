@@ -16,7 +16,7 @@ TRANSCRIPT_LEFT_INSET = 5
 TRANSCRIPT_RIGHT_INSET = 5
 
 # Inner padding for rounded callout-style panels (vertical, horizontal).
-CALLOUT_PANEL_PADDING = (1, 1)
+CALLOUT_PANEL_PADDING = (1, 2)
 
 # Space below each activity block (tool rows) for scanability.
 ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 1, 0)

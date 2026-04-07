@@ -7,6 +7,7 @@ all event dispatch logic that was previously inline in SessionOrchestrator._on_e
 from __future__ import annotations
 
 import os as _os
+import re
 
 from typing import TYPE_CHECKING
 
@@ -30,6 +31,7 @@ from backend.ledger.action.agent import (
 )
 from backend.ledger.action.message import StreamingChunkAction
 from backend.ledger.observation import (
+    ErrorObservation,
     Observation,
 )
 from backend.ledger.observation.agent import DelegateTaskObservation
@@ -38,6 +40,21 @@ from backend.ledger.observation_cause import attach_observation_cause
 if TYPE_CHECKING:
     from backend.ledger.event import Event
     from backend.orchestration.session_orchestrator import SessionOrchestrator
+
+
+_CHECKPOINT_INTERMEDIATE_TOOLS = frozenset({'checkpoint', 'revert_to_checkpoint'})
+_USER_INPUT_HINTS = (
+    re.compile(r'\?\s*$'),
+    re.compile(r'\b(?:can|could|would|should|do)\s+you\b'),
+    re.compile(r'\b(?:please confirm|clarify|let me know|which option|what would you like)\b'),
+)
+_COMPLETION_HANDOFF_MARKERS = (
+    'next step',
+    'next steps',
+    "if you'd like",
+    'if you want',
+    'let me know if',
+)
 
 
 class EventRouterService:
@@ -175,7 +192,80 @@ class EventRouterService:
             await self._handle_user_message(action)
         elif action.source == EventSource.AGENT:
             if action.wait_for_response:
+                if await self._intercept_incomplete_checkpoint_handoff(action):
+                    return
                 await self._ctrl.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+
+    async def _intercept_incomplete_checkpoint_handoff(
+        self, action: MessageAction
+    ) -> bool:
+        recent_tool_result = self._recent_checkpoint_tool_result()
+        if recent_tool_result is None:
+            return False
+
+        content = (action.content or '').strip()
+        if self._message_requests_user_input(content):
+            return False
+        if self._message_provides_completion_handoff(content):
+            return False
+
+        tool_name = str(recent_tool_result.get('tool') or 'checkpoint')
+        next_best_action = str(recent_tool_result.get('next_best_action') or '').strip()
+        guidance_lines = [
+            f'{tool_name} is an intermediate control tool, not a terminal reply.',
+        ]
+        if next_best_action:
+            guidance_lines.append(f'Latest tool guidance: {next_best_action}')
+        guidance_lines.extend(
+            [
+                'Continue in the same turn: execute the next step, or if a plan step changed state call task_tracker update first.',
+                'If the overall task is complete, call finish with a short user-facing summary and concrete next_steps.',
+                'Only wait for user input when you genuinely need clarification or confirmation.',
+            ]
+        )
+
+        observation = ErrorObservation(
+            content='\n'.join(guidance_lines),
+            error_id='CHECKPOINT_FLOW_INCOMPLETE',
+        )
+        attach_observation_cause(
+            observation,
+            action,
+            context='EventRouterService._intercept_incomplete_checkpoint_handoff',
+        )
+        self._ctrl.event_stream.add_event(observation, EventSource.ENVIRONMENT)
+        if self._ctrl.get_agent_state() != AgentState.RUNNING:
+            await self._ctrl.set_agent_state_to(AgentState.RUNNING)
+        return True
+
+    def _recent_checkpoint_tool_result(self) -> dict[str, object] | None:
+        history = getattr(self._ctrl.state, 'history', None) or []
+        if not history:
+            return None
+
+        prior_events = history[:-1] if history and history[-1] is not None else history
+        for event in reversed(prior_events):
+            if isinstance(event, MessageAction) and event.source == EventSource.USER:
+                break
+            tool_result = getattr(event, 'tool_result', None)
+            if not isinstance(tool_result, dict):
+                continue
+            tool_name = str(tool_result.get('tool') or '').strip()
+            if tool_name in _CHECKPOINT_INTERMEDIATE_TOOLS:
+                return tool_result
+        return None
+
+    @staticmethod
+    def _message_requests_user_input(content: str) -> bool:
+        lowered = content.strip().lower()
+        if not lowered:
+            return False
+        return any(pattern.search(lowered) for pattern in _USER_INPUT_HINTS)
+
+    @staticmethod
+    def _message_provides_completion_handoff(content: str) -> bool:
+        lowered = content.strip().lower()
+        return any(marker in lowered for marker in _COMPLETION_HANDOFF_MARKERS)
 
     async def _handle_user_message(self, action: MessageAction) -> None:
         """Handle user message: log, create recall, set pending, start agent."""

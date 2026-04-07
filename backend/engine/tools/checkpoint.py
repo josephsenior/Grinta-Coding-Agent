@@ -316,7 +316,9 @@ def _checkpoint_result(
     if data is not None:
         payload['data'] = data
 
-    return AgentThinkAction(
+    action = AgentThinkAction(
         thought=f'{human_message}\n[CHECKPOINT_RESULT] {json.dumps(payload, ensure_ascii=False)}',
         source_tool='checkpoint',
     )
+    action.tool_result = payload
+    return action

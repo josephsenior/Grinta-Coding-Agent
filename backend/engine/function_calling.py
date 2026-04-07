@@ -89,10 +89,6 @@ from backend.engine.tools.verify_ui import (
     VERIFY_UI_CHANGE_TOOL_NAME,
     build_verify_ui_change_action,
 )
-from backend.engine.tools.workspace_status import (
-    WORKSPACE_STATUS_TOOL_NAME,
-    build_workspace_status_action,
-)
 from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
 from backend.ledger.action import (
     Action,
@@ -303,11 +299,6 @@ def _handle_search_code_tool(arguments: dict) -> CmdRunAction:
         case_sensitive=arguments.get('case_sensitive', 'false'),
         max_results=arguments.get('max_results', 50),
     )
-
-
-def _handle_workspace_status_tool(arguments: dict):
-    """Handle workspace_status tool: status, diff, checkpoints, revert."""
-    return build_workspace_status_action(arguments)
 
 
 def _handle_checkpoint_tool(arguments: dict) -> AgentThinkAction:
@@ -1233,7 +1224,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         RECALL_TOOL_NAME: lambda args: build_recall_action(args['key']),
         create_apply_patch_tool()['function']['name']: _handle_apply_patch_tool,
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
-        WORKSPACE_STATUS_TOOL_NAME: _handle_workspace_status_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         VERIFY_FILE_LINES_TOOL_NAME: _handle_verify_file_lines_tool,
         DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
