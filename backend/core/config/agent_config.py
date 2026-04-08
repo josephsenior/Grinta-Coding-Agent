@@ -269,7 +269,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_first_turn_orientation_prompt: bool = Field(
         default=DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT,
         description=(
-            'Inject a short first-turn orientation block in the per-turn control message'
+            'Inject an opt-in first-turn orientation block in the per-turn control message'
         ),
     )
     merge_control_system_into_primary: bool = Field(

@@ -28,7 +28,7 @@ class TestTaskTrackingMixin(TestCase):
     def test_handle_task_tracking_no_event_stream(self):
         """Test handling task tracking action without event stream."""
         self.mixin.event_stream = None
-        action = TaskTrackingAction(command='plan', task_list=[])
+        action = TaskTrackingAction(command='update', task_list=[])
 
         result = self.mixin._handle_task_tracking_action(action)
 
@@ -36,19 +36,19 @@ class TestTaskTrackingMixin(TestCase):
         self.assertIn('requires an event stream', result.content)
 
     def test_handle_task_tracking_plan_command(self):
-        """Test handling task plan command."""
+        """Test handling task update command."""
         task_list = [
-            {'title': 'Task 1', 'status': 'todo', 'notes': 'Do something'},
-            {'title': 'Task 2', 'status': 'in_progress', 'notes': 'Working on it'},
+            {'description': 'Task 1', 'status': 'todo', 'result': 'Do something'},
+            {'description': 'Task 2', 'status': 'doing', 'result': 'Working on it'},
         ]
-        action = TaskTrackingAction(command='plan', task_list=task_list)
+        action = TaskTrackingAction(command='update', task_list=task_list)
 
         with self.assertPathHandling():
             result = self.mixin._handle_task_tracking_action(action)
 
         self.assertIsInstance(result, TaskTrackingObservation)
         result_obs = cast(TaskTrackingObservation, result)
-        self.assertEqual(result_obs.command, 'plan')
+        self.assertEqual(result_obs.command, 'update')
         self.assertEqual(result_obs.task_list, task_list)
         self.assertIn('2 tasks', result.content)
         self.mixin.event_stream.file_store.write.assert_called_once()
@@ -84,7 +84,7 @@ class TestTaskTrackingMixin(TestCase):
         self.assertEqual(result_obs.command, 'view')
         self.assertEqual(
             result.content,
-            stored_content + '\n\n→ Now implement the first pending (⏳) task.',
+            stored_content + '\n\n→ Now implement the first todo (⏳) task.',
         )
         self.mixin.event_stream.file_store.read.assert_called_once()
 
@@ -96,49 +96,49 @@ class TestTaskTrackingMixin(TestCase):
 
         self.assertIsInstance(result, NullObservation)
 
-    def test_handle_task_plan_action_successful(self):
-        """Test successful task plan action."""
+    def test_handle_task_update_action_successful(self):
+        """Test successful task update action."""
         task_list = [
-            {'title': 'Task 1', 'status': 'todo', 'notes': 'Note 1'},
+            {'description': 'Task 1', 'status': 'todo', 'result': 'Note 1'},
         ]
-        action = TaskTrackingAction(command='plan', task_list=task_list)
+        action = TaskTrackingAction(command='update', task_list=task_list)
         task_file_path = '/path/to/TASKS.md'
 
-        result = self.mixin._handle_task_plan_action(action, task_file_path)
+        result = self.mixin._handle_task_update_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
         result_obs = cast(TaskTrackingObservation, result)
-        self.assertEqual(result_obs.command, 'plan')
+        self.assertEqual(result_obs.command, 'update')
         self.assertEqual(result_obs.task_list, task_list)
         self.assertIn('1 tasks', result.content)
         self.mixin.event_stream.file_store.write.assert_called_once()
 
-    def test_handle_task_plan_action_write_failure(self):
-        """Test task plan action when file write fails."""
-        task_list = [{'title': 'Task 1', 'status': 'todo'}]
-        action = TaskTrackingAction(command='plan', task_list=task_list)
+    def test_handle_task_update_action_write_failure(self):
+        """Test task update action when file write fails."""
+        task_list = [{'description': 'Task 1', 'status': 'todo'}]
+        action = TaskTrackingAction(command='update', task_list=task_list)
         task_file_path = '/path/to/TASKS.md'
         self.mixin.event_stream.file_store.write.side_effect = IOError('Write failed')
 
-        result = self.mixin._handle_task_plan_action(action, task_file_path)
+        result = self.mixin._handle_task_update_action(action, task_file_path)
 
         self.assertIsInstance(result, ErrorObservation)
         self.assertIn('Failed to write', result.content)
         self.assertIn(task_file_path, result.content)
 
-    def test_handle_task_plan_action_empty_task_list(self):
-        """Test task plan action with empty task list."""
-        action = TaskTrackingAction(command='plan', task_list=[])
+    def test_handle_task_update_action_empty_task_list(self):
+        """Test task update action with empty task list."""
+        action = TaskTrackingAction(command='update', task_list=[])
         task_file_path = '/path/to/TASKS.md'
 
-        result = self.mixin._handle_task_plan_action(action, task_file_path)
+        result = self.mixin._handle_task_update_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
         self.assertIn('0 tasks', result.content)
 
-    def test_handle_task_plan_action_noop_update_skips_write(self):
+    def test_handle_task_update_action_noop_update_skips_write(self):
         """No-op task updates should still return a task observation without rewriting TASKS.md."""
-        task_list = [{'id': '1', 'description': 'Task 1', 'status': 'in_progress'}]
+        task_list = [{'id': '1', 'description': 'Task 1', 'status': 'doing'}]
         action = TaskTrackingAction(
             command='update',
             task_list=task_list,
@@ -149,7 +149,7 @@ class TestTaskTrackingMixin(TestCase):
         )
         task_file_path = '/path/to/TASKS.md'
 
-        result = self.mixin._handle_task_plan_action(action, task_file_path)
+        result = self.mixin._handle_task_update_action(action, task_file_path)
 
         self.assertIsInstance(result, TaskTrackingObservation)
         result_obs = cast(TaskTrackingObservation, result)
@@ -172,7 +172,7 @@ class TestTaskTrackingMixin(TestCase):
         self.assertEqual(result_obs.command, 'view')
         self.assertEqual(
             result.content,
-            stored_content + '\n\n→ Now implement the first pending (⏳) task.',
+            stored_content + '\n\n→ Now implement the first todo (⏳) task.',
         )
         self.assertEqual(result_obs.task_list, [])
 
@@ -209,39 +209,36 @@ class TestTaskTrackingMixin(TestCase):
     def test_generate_task_list_content_all_statuses(self):
         """Test task list content generation with all status types."""
         task_list = [
-            {'title': 'Task 1', 'status': 'todo', 'notes': 'Note 1'},
-            {'title': 'Task 2', 'status': 'in_progress', 'notes': 'Note 2'},
-            {'title': 'Task 3', 'status': 'done', 'notes': 'Note 3'},
+            {'description': 'Task 1', 'status': 'todo', 'result': 'Note 1'},
+            {'description': 'Task 2', 'status': 'doing', 'result': 'Note 2'},
+            {'description': 'Task 3', 'status': 'done', 'result': 'Note 3'},
         ]
 
         content = TaskTrackingMixin._generate_task_list_content(task_list)
 
         self.assertIn('# Task List', content)
         self.assertIn('1. ⏳ **Task 1** `[todo]`', content)
-        self.assertIn('2. 🔄 **Task 2** `[in_progress]`', content)
+        self.assertIn('2. 🔄 **Task 2** `[doing]`', content)
         self.assertIn('3. ✅ **Task 3** `[done]`', content)
         self.assertIn('Note 1', content)
         self.assertIn('Note 2', content)
         self.assertIn('Note 3', content)
 
     def test_generate_task_list_content_default_status(self):
-        """Test task list content generation with missing/unknown status."""
+        """Test task list content generation with missing status."""
         task_list = [
-            {'title': 'Task 1'},
-            {'title': 'Task 2', 'status': 'unknown'},
+            {'description': 'Task 1'},
         ]
 
         content = TaskTrackingMixin._generate_task_list_content(task_list)
 
-        # Both should get default todo icon
         self.assertIn('1. ⏳ **Task 1** `[todo]`', content)
-        self.assertIn('2. ⏳ **Task 2** `[unknown]`', content)
 
     def test_generate_task_list_content_missing_fields(self):
         """Test task list content generation with missing title/notes."""
         task_list = [
             {'status': 'todo'},  # No title
-            {'title': 'Task 2', 'status': 'done'},  # No notes
+            {'description': 'Task 2', 'status': 'done'},  # No result
         ]
 
         content = TaskTrackingMixin._generate_task_list_content(task_list)
@@ -259,7 +256,8 @@ class TestTaskTrackingMixin(TestCase):
     def test_generate_task_list_content_numbering(self):
         """Test task list content has correct numbering."""
         task_list = [
-            {'title': f'Task {i}', 'status': 'todo', 'notes': ''} for i in range(1, 6)
+            {'description': f'Task {i}', 'status': 'todo', 'result': ''}
+            for i in range(1, 6)
         ]
 
         content = TaskTrackingMixin._generate_task_list_content(task_list)
@@ -278,7 +276,7 @@ class TestTaskTrackingMixin(TestCase):
 
     def test_task_file_path_construction(self):
         """Test that task file path is correctly constructed."""
-        action = TaskTrackingAction(command='plan', task_list=[])
+        action = TaskTrackingAction(command='update', task_list=[])
 
         with self.assertPathHandling() as mock_get_dir:
             self.mixin._handle_task_tracking_action(action)
@@ -287,10 +285,10 @@ class TestTaskTrackingMixin(TestCase):
             )
 
     def test_multiple_task_operations(self):
-        """Test sequence of plan and view operations."""
-        # First plan some tasks
-        task_list = [{'title': 'Task 1', 'status': 'todo', 'notes': ''}]
-        plan_action = TaskTrackingAction(command='plan', task_list=task_list)
+        """Test sequence of update and view operations."""
+        # First update some tasks
+        task_list = [{'description': 'Task 1', 'status': 'todo', 'result': ''}]
+        plan_action = TaskTrackingAction(command='update', task_list=task_list)
 
         with self.assertPathHandling():
             plan_result = self.mixin._handle_task_tracking_action(plan_action)
@@ -313,9 +311,9 @@ class TestTaskTrackingMixin(TestCase):
         """Test task list content with special characters."""
         task_list = [
             {
-                'title': 'Task with \'quotes\' and "double quotes"',
+                'description': 'Task with \'quotes\' and "double quotes"',
                 'status': 'todo',
-                'notes': 'Notes with <html> & special chars',
+                'result': 'Notes with <html> & special chars',
             }
         ]
 
@@ -330,9 +328,9 @@ class TestTaskTrackingMixin(TestCase):
         """Test task list content with newlines in notes."""
         task_list = [
             {
-                'title': 'Task 1',
+                'description': 'Task 1',
                 'status': 'todo',
-                'notes': 'Line 1\nLine 2\nLine 3',
+                'result': 'Line 1\nLine 2\nLine 3',
             }
         ]
 

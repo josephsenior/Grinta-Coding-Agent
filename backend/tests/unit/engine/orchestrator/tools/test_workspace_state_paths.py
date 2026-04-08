@@ -31,15 +31,24 @@ def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) 
         lambda project_root=None: tmp_path,
     )
     tracker = TaskTracker(tmp_path)
-    task_list = [{'id': '1', 'description': 'Do it', 'status': 'in_progress'}]
+    task_list = [{'id': '1', 'description': 'Do it', 'status': 'doing'}]
 
     tracker.save_to_file(task_list)
 
     assert tracker.path == tmp_path / 'active_plan.json'
-    assert tracker.load_from_file() == task_list
+    assert tracker.load_from_file() == [
+        {
+            'id': '1',
+            'description': 'Do it',
+            'status': 'doing',
+            'result': None,
+            'tags': [],
+            'subtasks': [],
+        }
+    ]
 
 
-def test_smart_compactor_reads_in_progress_ids_from_app_plan(
+def test_smart_compactor_reads_doing_ids_from_app_plan(
     tmp_path, monkeypatch
 ) -> None:
     monkeypatch.setattr(
@@ -50,16 +59,14 @@ def test_smart_compactor_reads_in_progress_ids_from_app_plan(
     plan_file.parent.mkdir(parents=True, exist_ok=True)
     plan_file.write_text(
         json.dumps(
-            {
-                'tasks': [
-                    {'id': '1', 'description': 'one', 'status': 'done'},
-                    {'id': '2', 'description': 'two', 'status': 'in_progress'},
-                ]
-            }
+            [
+                {'id': '1', 'description': 'one', 'status': 'done'},
+                {'id': '2', 'description': 'two', 'status': 'doing'},
+            ]
         ),
         encoding='utf-8',
     )
 
     compactor = SmartCompactor(llm=None)
 
-    assert compactor._load_in_progress_task_ids() == {'2'}
+    assert compactor._load_doing_task_ids() == {'2'}

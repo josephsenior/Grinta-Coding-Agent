@@ -353,16 +353,16 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
             AgentState.RUNNING
         )
 
-    async def test_handle_task_tracking_action_uses_canonical_plan_normalization(self):
-        """Live plan updates should use the same normalization as persisted state reloads."""
+    async def test_handle_task_tracking_action_uses_canonical_plan_payloads(self):
+        """Live plan updates should keep the canonical task payload shape intact."""
         action = TaskTrackingAction(
             command='update',
             task_list=[
                 {
-                    'title': 'Top level',
-                    'status': 'unknown',
-                    'notes': 'legacy note',
-                    'subtasks': [{'title': 'Nested child', 'status': 'completed'}],
+                    'description': 'Top level',
+                    'status': 'doing',
+                    'result': 'progress note',
+                    'subtasks': [{'description': 'Nested child', 'status': 'done'}],
                 }
             ],
         )
@@ -372,11 +372,11 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         plan = self.mock_controller.state.plan
         self.assertEqual(plan.steps[0].id, 'step-1')
         self.assertEqual(plan.steps[0].description, 'Top level')
-        self.assertEqual(plan.steps[0].status, 'pending')
-        self.assertEqual(plan.steps[0].result, 'legacy note')
+        self.assertEqual(plan.steps[0].status, 'doing')
+        self.assertEqual(plan.steps[0].result, 'progress note')
         self.assertEqual(plan.steps[0].subtasks[0].id, 'step-1')
         self.assertEqual(plan.steps[0].subtasks[0].description, 'Nested child')
-        self.assertEqual(plan.steps[0].subtasks[0].status, 'completed')
+        self.assertEqual(plan.steps[0].subtasks[0].status, 'done')
 
     async def test_handle_finish_action_success(self):
         """Test _handle_finish_action marks task as finished."""

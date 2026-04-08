@@ -47,5 +47,5 @@ def create_finish_tool() -> ChatCompletionToolParam:
                 ),
             },
         },
-        required=['message'],
+        required=['message', 'completed', 'next_steps'],
     )

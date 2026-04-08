@@ -101,6 +101,14 @@ def classify_package_command(command: str) -> str | None:
     lowered = command.lower()
     if re.search(r'\b(?:python\s+-m\s+pip|pip(?:3)?)\s+install\b', lowered):
         return 'pip_install'
+    if re.search(r'\buv\s+(?:pip\s+install|add)\b', lowered):
+        return 'uv_install'
+    if re.search(r'\bpoetry\s+add\b', lowered):
+        return 'poetry_add'
+    if re.search(r'\bconda\s+install\b', lowered):
+        return 'conda_install'
+    if re.search(r'\bpipx\s+install\b', lowered):
+        return 'pipx_install'
     if re.search(r'\bnpm\s+install\b', lowered):
         return 'npm_install'
     if re.search(r'\bpnpm\s+add\b', lowered):

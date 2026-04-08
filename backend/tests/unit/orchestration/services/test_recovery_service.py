@@ -130,3 +130,87 @@ class TestRecoveryService:
         await svc.react_to_exception(Timeout('slow'))
 
         state.set_planning_directive.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Task reconciliation directive after survivable errors
+# ---------------------------------------------------------------------------
+
+
+class TestTaskReconciliationDirective:
+    """RecoveryService should inject a planning directive when doing steps exist."""
+
+    @pytest.fixture()
+    def state_with_doing_step(self):
+        step = MagicMock(status='doing', id='2')
+        plan = MagicMock(steps=[step])
+        state = MagicMock()
+        state.turn_signals = MagicMock(planning_directive=None)
+        state.plan = plan
+        state.set_planning_directive = MagicMock()
+        state.history = []
+        return state
+
+    @pytest.mark.asyncio
+    async def test_survivable_error_with_doing_step_injects_directive(
+        self, mock_context, ctrl, state_with_doing_step,
+    ):
+        ctrl.state = state_with_doing_step
+        ctrl.get_agent_state.return_value = AgentState.RUNNING
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(RuntimeError('tool failed'))
+
+        state_with_doing_step.set_planning_directive.assert_called_once()
+        directive = state_with_doing_step.set_planning_directive.call_args[0][0]
+        assert 'task_tracker' in directive
+        assert 'doing' in directive
+
+    @pytest.mark.asyncio
+    async def test_survivable_error_without_doing_step_no_directive(
+        self, mock_context, ctrl,
+    ):
+        step = MagicMock(status='todo', id='1')
+        plan = MagicMock(steps=[step])
+        state = MagicMock()
+        state.turn_signals = MagicMock(planning_directive=None)
+        state.plan = plan
+        state.set_planning_directive = MagicMock()
+        state.history = []
+        ctrl.state = state
+        ctrl.get_agent_state.return_value = AgentState.RUNNING
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(RuntimeError('tool failed'))
+
+        state.set_planning_directive.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_directive_when_existing_directive_present(
+        self, mock_context, ctrl, state_with_doing_step,
+    ):
+        state_with_doing_step.turn_signals.planning_directive = 'already set'
+        ctrl.state = state_with_doing_step
+        ctrl.get_agent_state.return_value = AgentState.RUNNING
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(RuntimeError('tool failed'))
+
+        state_with_doing_step.set_planning_directive.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_directive_when_no_plan_exists(
+        self, mock_context, ctrl,
+    ):
+        state = MagicMock()
+        state.turn_signals = MagicMock(planning_directive=None)
+        state.plan = None
+        state.set_planning_directive = MagicMock()
+        state.history = []
+        ctrl.state = state
+        ctrl.get_agent_state.return_value = AgentState.RUNNING
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(RuntimeError('tool failed'))
+
+        state.set_planning_directive.assert_not_called()

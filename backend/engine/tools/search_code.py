@@ -10,6 +10,7 @@ from __future__ import annotations
 import shlex
 
 from backend.engine.tools.common import create_tool_definition
+from backend.engine.tools.prompt import uses_powershell_terminal
 from backend.ledger.action import CmdRunAction
 
 _SEARCH_EXCLUDED_DIRS = (
@@ -125,6 +126,12 @@ def build_search_code_action(
     max_results = max(1, min(int(max_results), 500))
     is_case_sensitive = str(case_sensitive).lower() == 'true'
 
+    if uses_powershell_terminal():
+        return _build_windows_search_action(
+            pattern, path, file_pattern, context_lines,
+            is_case_sensitive, max_results,
+        )
+
     if not pattern:
         # File-discovery mode: just list matching files
         find_prefix = _build_pruned_find_command(path)
@@ -189,4 +196,82 @@ def build_search_code_action(
     )
     trunc_pat = pattern[:50] + '…' if len(pattern) > 50 else pattern
     scope = f' in {path}' if path and path != '.' else ''
+    return CmdRunAction(command=cmd, display_label=f'Searching for {trunc_pat!r}{scope}')
+
+
+def _ps_quote(value: str) -> str:
+    """Quote a PowerShell string literal safely."""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def _build_windows_search_action(
+    pattern: str,
+    path: str,
+    file_pattern: str,
+    context_lines: int,
+    is_case_sensitive: bool,
+    max_results: int,
+) -> CmdRunAction:
+    """PowerShell-safe search / file-discovery action.
+
+    Prefers ``rg`` when available (cross-platform), falls back to
+    ``Select-String`` + ``Get-ChildItem``.
+    """
+    excluded = ', '.join(_ps_quote(d) for d in _SEARCH_EXCLUDED_DIRS)
+    sp = _ps_quote(path)
+
+    if not pattern:
+        # --- file-discovery mode ---
+        if file_pattern:
+            fp = _ps_quote(file_pattern)
+            cmd = (
+                f"Get-ChildItem -Path {sp} -Filter {fp} -Recurse -File -ErrorAction SilentlyContinue | "
+                f"Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like \"*\\$_\\*\" }}) }} | "
+                f"ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results}"
+            )
+        else:
+            cmd = (
+                f"Get-ChildItem -Path {sp} -Recurse -File -ErrorAction SilentlyContinue | "
+                f"Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like \"*\\$_\\*\" }}) }} | "
+                f"ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results}"
+            )
+        label = f'Listing files in {path}' if path and path != '.' else 'Listing files'
+        return CmdRunAction(command=cmd, display_label=label)
+
+    # --- search mode ---
+    trunc_pat = pattern[:50] + '…' if len(pattern) > 50 else pattern
+    scope = f' in {path}' if path and path != '.' else ''
+
+    # Try ripgrep first (works cross-platform)
+    rg_flags = [
+        f'--context={context_lines}',
+        f'--max-count={max_results}',
+        '--line-number',
+        '--no-heading',
+    ]
+    if not is_case_sensitive:
+        rg_flags.append('--ignore-case')
+    rg_flags.extend(f'--glob=!**/{d}/**' for d in _SEARCH_EXCLUDED_DIRS)
+    if file_pattern:
+        rg_flags.append(f'--glob={_ps_quote(file_pattern)}')
+    rg_flags_str = ' '.join(rg_flags)
+    safe_pattern = _ps_quote(pattern)
+
+    # Select-String fallback
+    case_flag = '' if is_case_sensitive else ' -CaseSensitive:$false'
+    fp_filter = f" -Include {_ps_quote(file_pattern)}" if file_pattern else ''
+
+    cmd = (
+        f"$rg = Get-Command rg -ErrorAction SilentlyContinue; "
+        f"Write-Output '<search_results>'; "
+        f"if ($rg) {{ "
+        f"  rg {rg_flags_str} {safe_pattern} {sp} 2>$null "
+        f"}} else {{ "
+        f"  Get-ChildItem -Path {sp}{fp_filter} -Recurse -File -ErrorAction SilentlyContinue | "
+        f"  Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like \"*\\$_\\*\" }}) }} | "
+        f"  Select-String -Pattern {safe_pattern}{case_flag} -Context {context_lines} -ErrorAction SilentlyContinue | "
+        f"  Select-Object -First {max_results} "
+        f"}}; "
+        f"Write-Output '</search_results>'"
+    )
     return CmdRunAction(command=cmd, display_label=f'Searching for {trunc_pat!r}{scope}')

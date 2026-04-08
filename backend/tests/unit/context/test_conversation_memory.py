@@ -79,7 +79,7 @@ class TestErrorObservationNotifyUiOnly:
             tool_call_id_to_message={},
             max_message_chars=None,
         )
-        assert out == []
+        assert not out
 
     def test_default_error_still_converted_for_llm(self):
         mem = _make_memory()
@@ -114,7 +114,7 @@ class TestToolResultPropagation:
             max_message_chars=None,
         )
 
-        assert out == []
+        assert not out
         assert tool_messages['call_1'].tool_ok is True
 
     def test_tool_result_failure_is_propagated_to_tool_ok(self):
@@ -135,7 +135,7 @@ class TestToolResultPropagation:
             max_message_chars=None,
         )
 
-        assert out == []
+        assert not out
         assert tool_messages['call_2'].tool_ok is False
 
     def test_cmd_output_exit_code_zero_propagates_success(self):
@@ -159,7 +159,7 @@ class TestToolResultPropagation:
             max_message_chars=None,
         )
 
-        assert out == []
+        assert not out
         assert tool_messages['call_3'].tool_ok is True
 
     @pytest.mark.asyncio
@@ -183,7 +183,7 @@ class TestToolResultPropagation:
             max_message_chars=None,
         )
 
-        assert out == []
+        assert not out
         assert tool_messages['call_4'].tool_ok is False
         payload = json.loads(obs.content)
         assert payload['error_code'] == 'MCP_NO_CLIENTS'
@@ -213,7 +213,7 @@ class TestToolResultPropagation:
             max_message_chars=None,
         )
 
-        assert out == []
+        assert not out
         assert json.loads(tool_messages['call_5'].content[0].text) == obs.tool_result
 
 

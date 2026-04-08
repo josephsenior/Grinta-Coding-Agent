@@ -435,6 +435,10 @@ class EventRouterService:
 
                 # --- inherit parent task plan ---
                 try:
+                    from backend.core.task_status import (
+                        TASK_STATUS_PLAN_ICONS,
+                        TASK_STATUS_TODO,
+                    )
                     from backend.engine.tools.task_tracker import (
                         TaskTracker,
                     )
@@ -443,14 +447,11 @@ class EventRouterService:
                     if tasks:
                         task_lines = ['PARENT TASK PLAN (for context):']
                         for t in tasks:
-                            status_icon = {
-                                'completed': '✓',
-                                'in_progress': 'O',
-                                'failed': 'X',
-                            }.get(t.get('status', ''), '-')
+                            status = str(t.get('status') or TASK_STATUS_TODO)
+                            status_icon = TASK_STATUS_PLAN_ICONS.get(status, '-')
                             task_lines.append(
-                                f'  [{status_icon}] {t.get("id", "?")} — {t.get("description", t.get("title", ""))}'
-                                f' ({t.get("status", "pending")})'
+                                f'  [{status_icon}] {t.get("id", "?")} — {t.get("description", "")}'
+                                f' ({status})'
                             )
                         parent_context_lines.append('\n\n' + '\n'.join(task_lines))
                 except Exception as e:

@@ -1,6 +1,7 @@
 """Tests for TaskValidationService."""
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.core.schemas import AgentState
@@ -198,6 +199,46 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(result)
         self.mock_controller.event_stream.add_event.assert_called_once()
+
+    async def test_handle_finish_blocks_when_plan_has_doing_steps(self):
+        action = PlaybookFinishAction(outputs={})
+        self.mock_controller.task_validator = None
+        self.mock_controller.state.plan = SimpleNamespace(
+            steps=[
+                SimpleNamespace(
+                    id='1',
+                    description='Implement CLI interface',
+                    status='doing',
+                    subtasks=[],
+                )
+            ]
+        )
+
+        result = await self.service.handle_finish(action)
+
+        self.assertFalse(result)
+        self.mock_controller.event_stream.add_event.assert_called_once()
+        observation = self.mock_controller.event_stream.add_event.call_args[0][0]
+        self.assertEqual(observation.error_id, 'TASK_TRACKER_INCOMPLETE')
+        self.assertIn('marked `done`', observation.content)
+
+    async def test_handle_finish_allows_terminal_plan_steps(self):
+        action = PlaybookFinishAction(outputs={})
+        self.mock_controller.task_validator = None
+        self.mock_controller.state.plan = SimpleNamespace(
+            steps=[
+                SimpleNamespace(
+                    id='1',
+                    description='Implement CLI interface',
+                    status='done',
+                    subtasks=[],
+                )
+            ]
+        )
+
+        result = await self.service.handle_finish(action)
+
+        self.assertTrue(result)
 
     async def test_build_feedback_complete(self):
         """Test _build_feedback includes all validation details."""

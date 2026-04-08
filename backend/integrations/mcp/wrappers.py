@@ -123,19 +123,6 @@ async def search_components(mcps, args: dict[str, Any], call_tool_func) -> dict:
     }
 
 
-def _windows_stdio_mcp_note() -> str | None:
-    """Explain stdio MCP policy without importing utils at module load (breaks cycles)."""
-    from backend.integrations.mcp.mcp_utils import (
-        _is_windows_stdio_mcp_disabled,
-    )
-
-    if _is_windows_stdio_mcp_disabled():
-        return (
-            'On Windows, stdio MCP servers are skipped unless the environment variable '
-            'APP_ENABLE_WINDOWS_MCP is set (HTTP/SSE/SHTTP servers are still attempted).'
-        )
-    return None
-
 
 def _connected_client_summary(client: Any) -> dict[str, Any]:
     cfg = getattr(client, '_server_config', None)
@@ -185,10 +172,6 @@ async def mcp_capabilities_status(
             'App may still register wrapper tools (see wrapper_tools_registered); '
             'the LLM tool list merges remote tools plus applicable wrappers.'
         )
-
-    win = _windows_stdio_mcp_note()
-    if win:
-        notes.append(win)
 
     payload: dict[str, Any] = {
         'mcp_available': bool(mcps_list),

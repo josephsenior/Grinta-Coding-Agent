@@ -723,8 +723,15 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
 
 
 def _handle_batch_replace_command(arguments: dict) -> CmdRunAction:
-    """Handle batch_replace command — atomic multi-file edits with rollback."""
+    """Handle batch_replace command — atomic multi-file edits with rollback.
+
+    The entire Python script is base64-encoded so the shell command contains no
+    nested quotes, newlines, or special characters.  This makes it safe for
+    PowerShell ``-Command``, bash ``-c``, and cmd ``/c`` alike.
+    """
+    import base64
     import json as _json
+
     edits = arguments.get('edits')
     if not edits or not isinstance(edits, list):
         raise FunctionCallValidationError(
@@ -733,39 +740,54 @@ def _handle_batch_replace_command(arguments: dict) -> CmdRunAction:
     preview = arguments.get('preview', False)
     edits_json = _json.dumps(edits)
     preview_flag = 'True' if preview else 'False'
-    py = (
-        'import json,sys;'
-        f'edits=json.loads({repr(edits_json)});'
-        f'preview={preview_flag};'
-        'backups=[];'
-        'errors=[];'
-        "for i,edit in enumerate(edits):\n"
-        "  path=edit['path'];old=edit['old_str'];new=edit['new_str'];\n"
-        "  try:\n"
-        "    with open(path,'r',encoding='utf-8') as f: content=f.read()\n"
-        "    count=content.count(old)\n"
-        "    if count==0: errors.append(f'Edit {i}: old_str not found in {path}'); break\n"
-        "    if count>1: errors.append(f'Edit {i}: old_str matches {count} locations in {path} — must be unique'); break\n"
-        "    backups.append((path,content));\n"
-        "    if not preview:\n"
-        "      with open(path,'w',encoding='utf-8') as f: f.write(content.replace(old,new,1))\n"
-        "    print(f'  [OK] {path}')\n"
-        "  except Exception as e: errors.append(f'Edit {i}: {e}'); break\n"
-        "if errors:\n"
-        "  for bpath,bcontent in backups:\n"
-        "    try:\n"
-        "      with open(bpath,'w',encoding='utf-8') as f: f.write(bcontent)\n"
-        "    except OSError as e:\n"
-        "      import sys; sys.stderr.write(f'[batch_replace] Rollback failed for {bpath!r}: {e}\\n')\n"
-        "  print('BATCH EDIT FAILED — all changes rolled back.');\n"
-        "  print('Error:',errors[0]); sys.exit(1)\n"
-        "else:\n"
-        "  if preview: print('DRY RUN: all',len(edits),'edits would apply cleanly.')\n"
-        "  else: print('BATCH EDIT OK:',len(edits),'files updated atomically.')"
-    )
+
+    # --- readable Python source that will be base64-transported -----------
+    script = f"""\
+import json, sys
+edits = json.loads({edits_json!r})
+preview = {preview_flag}
+backups = []
+errors = []
+for i, edit in enumerate(edits):
+    path, old, new = edit['path'], edit['old_str'], edit['new_str']
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        count = content.count(old)
+        if count == 0:
+            errors.append(f'Edit {{i}}: old_str not found in {{path}}')
+            break
+        if count > 1:
+            errors.append(f'Edit {{i}}: old_str matches {{count}} locations in {{path}} — must be unique')
+            break
+        backups.append((path, content))
+        if not preview:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(content.replace(old, new, 1))
+        print(f'  [OK] {{path}}')
+    except Exception as e:
+        errors.append(f'Edit {{i}}: {{e}}')
+        break
+if errors:
+    for bpath, bcontent in backups:
+        try:
+            with open(bpath, 'w', encoding='utf-8') as f:
+                f.write(bcontent)
+        except OSError as e:
+            sys.stderr.write(f'[batch_replace] Rollback failed for {{bpath!r}}: {{e}}\\n')
+    print('BATCH EDIT FAILED — all changes rolled back.')
+    print('Error:', errors[0])
+    sys.exit(1)
+else:
+    if preview:
+        print('DRY RUN: all', len(edits), 'edits would apply cleanly.')
+    else:
+        print('BATCH EDIT OK:', len(edits), 'files updated atomically.')
+"""
+    script_b64 = base64.b64encode(script.encode()).decode()
     label = 'dry-run' if preview else 'applying'
     return CmdRunAction(
-        command=f'python -c "{py}"',
+        command=f"python -c \"import base64;exec(base64.b64decode(b'{script_b64}').decode())\"",
         thought=f'[BATCH REPLACE] {label} {len(edits)} edit(s) atomically',
     )
 
@@ -812,8 +834,10 @@ def _normalize_task_tracker_list(raw_list: list) -> list[dict]:
 def _handle_task_tracker_tool(arguments: dict) -> Action:
     """Handle TASK_TRACKER_TOOL tool call."""
     command = _require_tool_argument(arguments, 'command', TASK_TRACKER_TOOL_NAME)
-    if command == 'plan':
-        command = 'update'
+    if command not in {'view', 'update'}:
+        raise FunctionCallValidationError(
+            f'Unsupported command {command!r} for tool call {TASK_TRACKER_TOOL_NAME}'
+        )
 
     if command == 'update' and 'task_list' not in arguments:
         raise FunctionCallValidationError(

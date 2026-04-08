@@ -747,6 +747,7 @@ class Repl:
         """Boot the engine, subscribe to events, and loop on user input."""
         loop = asyncio.get_running_loop()
         agent_task: asyncio.Task | None = None
+        bootstrap_task: asyncio.Task[None] | None = None
 
         # -- imports (always needed) ----------------------------------------
         from backend.core.bootstrap.agent_control_loop import run_agent_until_done
@@ -928,6 +929,7 @@ class Repl:
 
             # -- enter input loop ---------------------------------------------
             controller = None
+            bootstrap_task = None
             end_states = [
                 AgentState.AWAITING_USER_INPUT,
                 AgentState.FINISHED,
@@ -955,10 +957,10 @@ class Repl:
                 except KeyboardInterrupt:
                     continue
                 except EOFError:
-                    self._console.print("EOF Error received in prompt loop.")
+                    self._console.print('EOF Error received in prompt loop.')
                     break
                 except Exception as e:
-                    self._console.print(f"CRASH: {e}")
+                    self._console.print(f'CRASH: {e}')
                     import traceback
                     traceback.print_exc()
                     break

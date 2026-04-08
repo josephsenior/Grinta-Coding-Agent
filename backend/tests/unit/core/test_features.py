@@ -33,10 +33,6 @@ class TestFeatureFlags:
         flags = FeatureFlags()
         assert flags._config is None
 
-    def test_security_risk_always_false(self):
-        flags = FeatureFlags()
-        assert flags.risk_assessment_enabled is False
-
     def test_with_config(self):
         sentinel = object()
         flags = FeatureFlags(config=sentinel)  # type: ignore[arg-type]

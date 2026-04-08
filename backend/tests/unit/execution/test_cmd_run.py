@@ -20,9 +20,6 @@ def mock_executor():
     with (
         patch('os.makedirs'),
         patch('backend.execution.action_execution_server.SessionManager'),
-        patch(
-            'backend.execution.action_execution_server.RuntimeExecutor._init_browser_async'
-        ),
     ):
         executor = RuntimeExecutor(
             plugins_to_load=[],

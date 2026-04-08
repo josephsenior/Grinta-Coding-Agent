@@ -271,7 +271,7 @@ def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_pro
     resolved = executor._get_checkpoint(event_stream)
 
     assert resolved.inspect_recovery().status == 'clean'
-    assert executor._recovery_blocked_reasons == {}
+    assert not executor._recovery_blocked_reasons
 
 
 def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
@@ -301,9 +301,10 @@ def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
     assert 'sid-2' in executor._recovery_blocked_reasons
 
 
-def test_response_to_actions_replaces_explicit_hallucinated_plain_message(
+def test_response_to_actions_passes_through_plain_message_after_guard_disabled(
     monkeypatch,
 ):
+    """Hallucination guard is disabled — plain messages always pass through."""
     from backend.engine import executor as executor_module
     from backend.engine.executor import OrchestratorExecutor
     from backend.ledger.action import MessageAction
@@ -334,8 +335,7 @@ def test_response_to_actions_replaces_explicit_hallucinated_plain_message(
     actions = executor._response_to_actions(response)
 
     assert len(actions) == 1
-    assert actions[0].content.startswith('[Hallucination guard]')
-    assert actions[0].wait_for_response is False
+    assert actions[0].content == "I've created grinta_feedback.md for you."
 
 
 def test_response_to_actions_allows_conversational_plain_message(monkeypatch):

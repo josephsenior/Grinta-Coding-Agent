@@ -127,12 +127,12 @@ def test_streaming_chunk_action_schema():
 def test_task_tracking_action_schema():
     data = {
         'action_type': 'task_tracking',
-        'command': 'add',
-        'task_list': [{'id': '1', 'status': 'pending'}],
+        'command': 'update',
+        'task_list': [{'id': '1', 'status': 'todo'}],
     }
     action = TaskTrackingActionSchema(**data)
     assert action.action_type == 'task_tracking'
-    assert action.command == 'add'
+    assert action.command == 'update'
     assert len(action.task_list) == 1
 
 

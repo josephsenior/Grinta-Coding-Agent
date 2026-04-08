@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 from backend.context.compactor.compactor import BaseLLMCompactor, Compaction
 from backend.context.view import View
 from backend.core.logger import app_logger as logger
+from backend.core.task_status import TASK_STATUS_DOING
 from backend.ledger.action import Action, MessageAction
 from backend.ledger.action.agent import CondensationAction, TaskTrackingAction
 from backend.ledger.event import Event, EventSource
@@ -162,19 +163,19 @@ class SmartCompactor(BaseLLMCompactor):
         event as essential. This creates a hard condensation anchor so the LLM
         always wakes up after condensation knowing exactly which task it was on.
         """
-        in_progress_task_ids = self._load_in_progress_task_ids()
-        if in_progress_task_ids:
-            self._anchor_by_task_ids(events, essential, in_progress_task_ids)
+        doing_task_ids = self._load_doing_task_ids()
+        if doing_task_ids:
+            self._anchor_by_task_ids(events, essential, doing_task_ids)
         else:
             self._anchor_last_task_tracker(events, essential)
 
-    def _load_in_progress_task_ids(self) -> set[str]:
-        """Load in-progress task IDs from .app/active_plan.json, or empty set."""
+    def _load_doing_task_ids(self) -> set[str]:
+        """Load doing task IDs from .app/active_plan.json, or empty set."""
         from backend.core.workspace_resolution import workspace_agent_state_dir
 
         plan_path = workspace_agent_state_dir() / 'active_plan.json'
         tasks = self._parse_tasks_from_plan(plan_path)
-        return self._extract_in_progress_ids(tasks)
+        return self._extract_doing_ids(tasks)
 
     def _parse_tasks_from_plan(self, plan_path: Path) -> list[Any]:
         """Parse tasks from plan JSON. Returns empty list on failure."""
@@ -184,16 +185,14 @@ class SmartCompactor(BaseLLMCompactor):
             plan = json.loads(plan_path.read_text(encoding='utf-8'))
         except (json.JSONDecodeError, OSError):
             return []
-        if isinstance(plan, dict):
-            return plan.get('tasks', [])
         return plan if isinstance(plan, list) else []
 
-    def _extract_in_progress_ids(self, tasks: list[Any]) -> set[str]:
-        """Extract IDs of tasks with status 'in_progress'."""
+    def _extract_doing_ids(self, tasks: list[Any]) -> set[str]:
+        """Extract IDs of tasks with status 'doing'."""
         ids: set[str] = set()
         for task in tasks:
-            if isinstance(task, dict) and task.get('status') == 'in_progress':
-                tid = task.get('id') or task.get('title') or ''
+            if isinstance(task, dict) and task.get('status') == TASK_STATUS_DOING:
+                tid = task.get('id') or task.get('description') or ''
                 if tid:
                     ids.add(str(tid))
         return ids
@@ -201,7 +200,7 @@ class SmartCompactor(BaseLLMCompactor):
     def _anchor_last_task_tracker(
         self, events: list[Event], essential: set[int]
     ) -> None:
-        """Anchor the last TaskTrackingAction when no in-progress tasks exist."""
+        """Anchor the last TaskTrackingAction when no doing tasks exist."""
         for event in reversed(events):
             if isinstance(event, TaskTrackingAction):
                 essential.add(event.id)
@@ -211,16 +210,16 @@ class SmartCompactor(BaseLLMCompactor):
                 break
 
     def _anchor_by_task_ids(
-        self, events: list[Event], essential: set[int], in_progress_task_ids: set[str]
+        self, events: list[Event], essential: set[int], doing_task_ids: set[str]
     ) -> None:
-        """Anchor the most recent TaskTrackingAction that references an in-progress task."""
+        """Anchor the most recent TaskTrackingAction that references a doing task."""
         for event in reversed(events):
             if isinstance(event, TaskTrackingAction):
                 content = getattr(event, 'content', '') or ''
-                if any(tid in content for tid in in_progress_task_ids):
+                if any(tid in content for tid in doing_task_ids):
                     essential.add(event.id)
                     logger.debug(
-                        'SmartCompactor: anchored in-progress TaskTrackingAction id=%s',
+                        'SmartCompactor: anchored doing TaskTrackingAction id=%s',
                         event.id,
                     )
                     return

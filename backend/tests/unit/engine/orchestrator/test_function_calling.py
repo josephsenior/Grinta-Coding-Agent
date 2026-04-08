@@ -296,16 +296,15 @@ class TestHandleMcpTool:
 
 
 class TestHandleTaskTrackerTool:
-    def test_plan_command_with_task_list(self):
+    def test_update_command_with_task_list(self):
         args = {
-            'command': 'plan',
+            'command': 'update',
             'task_list': [
-                {'id': 'task-1', 'description': 'Do X', 'status': 'pending'},
+                {'id': 'task-1', 'description': 'Do X', 'status': 'todo'},
             ],
         }
         action = _handle_task_tracker_tool(args)
         assert isinstance(action, TaskTrackingAction)
-        # Legacy compatibility: "plan" is mapped to "update"
         assert action.command == 'update'
         assert len(action.task_list) == 1
 
@@ -313,47 +312,61 @@ class TestHandleTaskTrackerTool:
         with pytest.raises(FunctionCallValidationError, match='command'):
             _handle_task_tracker_tool({})
 
-    def test_plan_without_task_list_raises(self):
+    def test_update_without_task_list_raises(self):
         with pytest.raises(FunctionCallValidationError, match='task_list'):
-            _handle_task_tracker_tool({'command': 'plan'})
+            _handle_task_tracker_tool({'command': 'update'})
 
     def test_task_list_not_list_raises(self):
         with pytest.raises(FunctionCallValidationError):
-            _handle_task_tracker_tool({'command': 'plan', 'task_list': 'not a list'})
+            _handle_task_tracker_tool({'command': 'update', 'task_list': 'not a list'})
 
     def test_task_item_not_dict_raises(self):
         with pytest.raises(FunctionCallValidationError):
-            _handle_task_tracker_tool({'command': 'plan', 'task_list': ['not a dict']})
+            _handle_task_tracker_tool({'command': 'update', 'task_list': ['not a dict']})
 
     def test_normalizes_missing_task_fields(self):
         args = {
-            'command': 'plan',
+            'command': 'update',
             'task_list': [{'description': 'My task'}],  # missing id, status
         }
         action = cast(TaskTrackingAction, _handle_task_tracker_tool(args))
         task = action.task_list[0]
         assert task['id'] == 'step-1'
-        assert task['status'] == 'pending'
+        assert task['status'] == 'todo'
 
-    def test_normalizes_legacy_task_fields_and_invalid_status(self):
+    def test_normalizes_canonical_task_fields(self):
         args = {
-            'command': 'plan',
+            'command': 'update',
             'task_list': [
                 {
-                    'title': 'Legacy title',
+                    'description': 'Top level',
                     'status': 'todo',
-                    'notes': 'Legacy note',
-                    'subtasks': [{'title': 'Child step', 'status': 'completed'}],
+                    'result': 'In progress note',
+                    'subtasks': [
+                        {'description': 'Child step', 'status': 'done'}
+                    ],
                 }
             ],
         }
         action = cast(TaskTrackingAction, _handle_task_tracker_tool(args))
         task = action.task_list[0]
-        assert task['description'] == 'Legacy title'
-        assert task['status'] == 'pending'
-        assert task['result'] == 'Legacy note'
+        assert task['description'] == 'Top level'
+        assert task['status'] == 'todo'
+        assert task['result'] == 'In progress note'
         assert task['subtasks'][0]['description'] == 'Child step'
-        assert task['subtasks'][0]['status'] == 'completed'
+        assert task['subtasks'][0]['status'] == 'done'
+
+    @pytest.mark.parametrize('legacy_status', ['pending', 'in_progress', 'completed'])
+    def test_rejects_legacy_task_status_aliases(self, legacy_status: str):
+        args = {
+            'command': 'update',
+            'task_list': [
+                {'id': '1', 'description': 'Step 1', 'status': legacy_status},
+            ],
+        }
+
+        with pytest.raises(FunctionCallValidationError, match='Invalid task status'):
+            _handle_task_tracker_tool(args)
 
     def test_non_plan_command_with_empty_task_list(self):
         args = {'command': 'update', 'task_list': []}
@@ -364,7 +377,7 @@ class TestHandleTaskTrackerTool:
         monkeypatch.setenv('APP_WORKSPACE_DIR', str(tmp_path))
         args = {
             'command': 'update',
-            'task_list': [{'id': '1', 'description': 'step', 'status': 'in_progress'}],
+            'task_list': [{'id': '1', 'description': 'step', 'status': 'doing'}],
         }
 
         first = _handle_task_tracker_tool(args)
@@ -804,3 +817,61 @@ class TestHealthCheck:
         ):
             result = run_production_health_check(raise_on_failure=False)
         assert result['overall_status'] == 'CRITICAL_FAILURE'
+
+
+# ---------------------------------------------------------------------------
+# _handle_batch_replace_command — base64 encoding tests
+# ---------------------------------------------------------------------------
+
+
+class TestHandleBatchReplaceCommand:
+    """Verify batch_replace uses base64-encoded payloads, not raw inline JSON."""
+
+    def test_command_uses_base64_encoding(self):
+        from backend.engine.function_calling import _handle_batch_replace_command
+
+        action = _handle_batch_replace_command({
+            'edits': [{'path': 'a.py', 'old_str': 'foo', 'new_str': 'bar'}]
+        })
+        assert isinstance(action, CmdRunAction)
+        assert 'b64decode' in action.command
+        # No raw repr() embedding
+        assert 'repr(' not in action.command
+
+    def test_command_is_single_line(self):
+        from backend.engine.function_calling import _handle_batch_replace_command
+
+        action = _handle_batch_replace_command({
+            'edits': [
+                {'path': 'a.py', 'old_str': 'hello', 'new_str': 'world'},
+                {'path': 'b.py', 'old_str': 'x', 'new_str': 'y'},
+            ]
+        })
+        # The shell command itself must be a single line (no embedded newlines)
+        assert '\n' not in action.command
+
+    def test_command_contains_no_unescaped_json(self):
+        """Edits with special chars should not appear raw in the command."""
+        from backend.engine.function_calling import _handle_batch_replace_command
+
+        action = _handle_batch_replace_command({
+            'edits': [{'path': 'c.py', 'old_str': 'print("hi")', 'new_str': 'print("bye")'}]
+        })
+        # The raw JSON content should NOT appear in the command string
+        assert 'print("hi")' not in action.command
+        assert 'b64decode' in action.command
+
+    def test_preview_mode_sets_flag(self):
+        from backend.engine.function_calling import _handle_batch_replace_command
+
+        action = _handle_batch_replace_command({
+            'edits': [{'path': 'a.py', 'old_str': 'x', 'new_str': 'y'}],
+            'preview': True,
+        })
+        assert 'dry-run' in action.thought.lower()
+
+    def test_empty_edits_raises(self):
+        from backend.engine.function_calling import _handle_batch_replace_command
+
+        with pytest.raises(FunctionCallValidationError):
+            _handle_batch_replace_command({'edits': []})

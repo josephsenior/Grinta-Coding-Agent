@@ -23,7 +23,7 @@ def _make_config(**kwargs):
     cfg.enable_condensation_request = False
     cfg.enable_browsing = False
     cfg.enable_editor = True
-    cfg.enable_first_turn_orientation_prompt = True
+    cfg.enable_first_turn_orientation_prompt = False
     cfg.merge_control_system_into_primary = False
     for k, v in kwargs.items():
         setattr(cfg, k, v)
@@ -436,6 +436,39 @@ class TestBuildLlmParams:
             params = p.build_llm_params(messages, state, tools)
 
         assert params['tools'] == []
+
+    def test_first_turn_orientation_disabled_by_default(self):
+        p = _make_planner()
+        state = _make_state()
+        state.iteration_flag.current_value = 1
+        messages = [{'role': 'user', 'content': 'Please fix the failing backend test'}]
+
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            params = p.build_llm_params(messages, state, [])
+
+        control = next(
+            msg['content']
+            for msg in params['messages']
+            if msg['role'] == 'system' and '<APP_CONTEXT_STATUS' in msg['content']
+        )
+        assert '<FIRST_TURN_ORIENTATION>' not in control
+
+    def test_first_turn_orientation_can_be_opted_in(self):
+        p = _make_planner(config=_make_config(enable_first_turn_orientation_prompt=True))
+        state = _make_state()
+        state.iteration_flag.current_value = 1
+        messages = [{'role': 'user', 'content': 'Please fix the failing backend test'}]
+
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            params = p.build_llm_params(messages, state, [])
+
+        control = next(
+            msg['content']
+            for msg in params['messages']
+            if msg['role'] == 'system' and '<APP_CONTEXT_STATUS' in msg['content']
+        )
+        assert '<FIRST_TURN_ORIENTATION>' in control
+        assert 'analyze_project_structure' in control
 
 
 # ---------------------------------------------------------------------------

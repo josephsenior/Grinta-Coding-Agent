@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from backend.ledger.action.mcp import MCPAction
     from backend.ledger.observation.observation import Observation
     from backend.orchestration.agent import Agent
+from mcp import McpError
+
 from backend.core.config.mcp_config import (
     MCPConfig,
     MCPServerConfig,
@@ -35,7 +37,6 @@ from backend.integrations.mcp.wrappers import (
     wrapper_tool_params,
 )
 from backend.ledger.observation.mcp import MCPObservation
-from mcp import McpError
 
 # Populated by ``convert_mcps_to_tools`` for the current fetch cycle (cleared in ``fetch_mcp_tools_from_config``).
 _last_mcp_conversion_errors: list[str] = []
@@ -55,10 +56,6 @@ def _get_mcp_connect_timeout_sec() -> float:
     except (TypeError, ValueError):
         return 60.0
 
-
-def _is_windows_stdio_mcp_disabled() -> bool:
-    """Always return False (OS agnosticism)."""
-    return False
 
 
 def convert_mcps_to_tools(mcps: list[MCPClient] | None) -> list[dict]:
@@ -822,6 +819,7 @@ async def call_tool_mcp(
         )
 
     # Handle direct tools with graceful fallback on client lookup failure
+    from backend.engine.tools.prompt import get_terminal_tool_name as _terminal_tool
     try:
         matching_client = _find_matching_mcp(mcps, action.name)
     except ValueError:

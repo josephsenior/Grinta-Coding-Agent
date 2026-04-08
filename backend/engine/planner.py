@@ -4,6 +4,7 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any
 
+from backend.core.task_status import TASK_STATUS_PLAN_ICONS
 from backend.inference.catalog_loader import supports_tool_choice
 from backend.inference.llm_utils import check_tools
 
@@ -532,18 +533,26 @@ class OrchestratorPlanner:
     def _format_plan_step(self, step: Any) -> str:
         """Format a single plan step for injection."""
         icon = self._step_status_icon(step.status)
-        out = f'{step.id} [{icon}] {step.description} ({step.status})\n'
+        out = f'{step.id} [{icon}] {step.description} ({self._step_status_label(step.status)})\n'
         if step.result:
             out += f'   Result: {str(step.result)[:200]}...\n'
         for sub in step.subtasks:
-            sub_icon = '✓' if sub.status == 'completed' else '-'
-            out += f'    {sub.id} [{sub_icon}] {sub.description}\n'
+            sub_icon = TASK_STATUS_PLAN_ICONS.get(sub.status, '-')
+            out += (
+                f'    {sub.id} [{sub_icon}] {sub.description} '
+                f'({self._step_status_label(sub.status)})\n'
+            )
         return out
 
     @staticmethod
     def _step_status_icon(status: str) -> str:
         """Map step status to display icon."""
-        return {'completed': '✓', 'failed': 'X', 'in_progress': 'O'}.get(status, '-')
+        return TASK_STATUS_PLAN_ICONS.get(status, '-')
+
+    @staticmethod
+    def _step_status_label(status: str) -> str:
+        """Return user-facing task status labels."""
+        return status
 
     def _apply_control_message(self, messages: list, status: str) -> list:
         """Attach turn control either as a second system message or merged into primary."""

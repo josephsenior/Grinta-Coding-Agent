@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger  # noqa: E402
+from backend.core.task_status import ACTIVE_TASK_STATUSES
 from backend.core.schemas import AgentState  # noqa: E402
 from backend.ledger import EventSource  # noqa: E402
 from backend.ledger.action.agent import PlaybookFinishAction  # noqa: E402
@@ -35,6 +36,9 @@ class TaskValidationService:
         # Save any lessons learned before finishing
         await self._save_lessons_learned(action)
 
+        if not await self._ensure_active_plan_is_terminal(action):
+            return False
+
         if not await self._ensure_completion_validator_available(action):
             return False
 
@@ -42,6 +46,57 @@ class TaskValidationService:
             if not await self._validate_and_handle(action):
                 return False
         return True
+
+    async def _ensure_active_plan_is_terminal(
+        self, action: PlaybookFinishAction
+    ) -> bool:
+        """Block finish when the visible active plan still has tasks in progress."""
+        if getattr(action, 'force_finish', False):
+            return True
+
+        controller = self._context.get_controller()
+        plan = getattr(controller.state, 'plan', None)
+        if plan is None:
+            return True
+
+        active_steps = self._collect_non_terminal_steps(getattr(plan, 'steps', []))
+        if not active_steps:
+            return True
+
+        bullets = '\n'.join(
+            f'- {step_id}: {description} [{status}]'
+            for step_id, description, status in active_steps[:5]
+        )
+        more = ''
+        if len(active_steps) > 5:
+            more = f'\n- ... and {len(active_steps) - 5} more plan step(s)'
+
+        return await self._emit_finish_block(
+            '⚠️ FINISH BLOCKED: The task plan still has active steps. '
+            'Update `task_tracker` so completed work is marked `done` and unfinished work is marked deliberately before finishing.\n\n'
+            f'Active steps:\n{bullets}{more}',
+            error_id='TASK_TRACKER_INCOMPLETE',
+            cause_action=action,
+        )
+
+    def _collect_non_terminal_steps(
+        self, steps: list[Any]
+    ) -> list[tuple[str, str, str]]:
+        """Return visible plan steps that are still todo or doing."""
+        active_steps: list[tuple[str, str, str]] = []
+        for step in steps or []:
+            status = str(getattr(step, 'status', '') or '').strip().lower()
+            if status in ACTIVE_TASK_STATUSES:
+                active_steps.append(
+                    (
+                        str(getattr(step, 'id', '?') or '?'),
+                        str(getattr(step, 'description', 'Untitled step') or 'Untitled step'),
+                        status,
+                    )
+                )
+            subtasks = getattr(step, 'subtasks', None) or []
+            active_steps.extend(self._collect_non_terminal_steps(subtasks))
+        return active_steps
 
     async def _save_lessons_learned(self, action: PlaybookFinishAction) -> None:
         """Persist lessons learned to a repository-level memory file."""

@@ -39,11 +39,6 @@ class FeatureFlags:
         """
         self._config = config
 
-    @property
-    def risk_assessment_enabled(self) -> bool:
-        """Check if security risk assessment is enabled."""
-        return False
-
 
 def get_feature_flags(config: AppConfig | None = None) -> FeatureFlags:
     """Get feature flags instance.

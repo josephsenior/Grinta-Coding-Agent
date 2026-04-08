@@ -25,7 +25,6 @@ from uvicorn import run
 
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.logger import app_logger as logger
-from backend.execution.browser_init import init_browser
 from backend.execution.file_operations import (
     ensure_directory_exists,
     execute_file_editor,
@@ -145,9 +144,6 @@ class RuntimeExecutor:
         self.user_id = user_id
         self._initial_cwd = work_dir
         self.max_memory_gb: int | None = None  # Will be set during ainit if available
-        self.enable_browser = enable_browser
-        self.browser = None
-
         self.tool_registry = tool_registry
 
         # Initialize SessionManager — uses the same work_dir as FileEditor
@@ -157,6 +153,9 @@ class RuntimeExecutor:
             tool_registry=tool_registry,
             max_memory_gb=None,  # Will be updated in ainit
         )
+
+        # Browser attribute kept for compatibility; initialized to None
+        self.browser: Any | None = None
 
         # Keep a separate cancellation service for non-session tasks if needed,
         # or just rely on session manager for shell tasks.
@@ -191,16 +190,6 @@ class RuntimeExecutor:
         """Get the initial working directory for the action execution server."""
         return self._initial_cwd
 
-    async def _init_browser_async(self) -> None:
-        """Initialize the browser asynchronously."""
-        self.browser = await init_browser(self.enable_browser)
-
-    async def _ensure_browser_ready(self) -> None:
-        """Ensure the browser is ready for use."""
-        if self.browser:
-            if not self.browser.check_alive(timeout=5):
-                self.browser.init_browser()
-
     def _create_bash_session(self, cwd: str | None = None):
         """Create a shell session appropriate for the current platform."""
         # Delegated to SessionManager
@@ -209,8 +198,6 @@ class RuntimeExecutor:
     async def hard_kill(self) -> None:
         """Best-effort immediate termination of processes started by this runtime."""
         self.session_manager.close_all()
-        if self.browser:
-            self.browser.close()
 
     async def ainit(self) -> None:
         """Initialize action execution server asynchronously."""
@@ -226,42 +213,19 @@ class RuntimeExecutor:
             self.session_manager.max_memory_gb = self.max_memory_gb
 
             # Step 1: Initialize bash session
-            logger.info('Step 1/5: Initializing default shell session...')
+            logger.info('Step 1/4: Initializing default shell session...')
             self.session_manager.create_session(session_id='default')
 
-            # Step 2: Initialize browser in background if enabled
-            if self.enable_browser:
-                logger.info('Step 2/5: Starting browser initialization (background)...')
-                # We don't await here to parallelize startup, but _init_browser_async handles it
-                # Logic in constructor sets up background task usually?
-                # or await here? original code had `asyncio.create_task` in `main`?
-                # Original `ainit` (Step 238) didn't show task creation.
-                # But `_init_browser_async` was called.
-                # Let's check original `main` logic... no `ainit` called there?
-                # Ah, `lifespan` called `_initialize_background` which called `client.ainit()`.
-                # So we should await here for serial initialization or fire task.
-                # Original `ainit` (Step 238) didn't show code.
-                # I'll fire task to not block if browser is slow?
-                # But subsequent steps might depend on browser? No.
-                # However `_init_browser_async` logs success.
-                # I'll await it if it's fast, or start it.
-                # Ideally start it.
-                self._browser_init_task = asyncio.create_task(
-                    self._init_browser_async()
-                )
-            else:
-                logger.info('Step 2/5: Browser disabled, skipping...')
-
-            # Step 3: Initialize plugins
-            logger.info('Step 3/5: Initializing plugins...')
+            # Step 2: Initialize plugins
+            logger.info('Step 2/4: Initializing plugins...')
             self.plugins = await init_plugins(self.plugins_to_load, self.username)
 
-            # Step 4: Initialize bash commands/aliases
-            logger.info('Step 4/5: Setting up bash commands...')
+            # Step 3: Initialize bash commands/aliases
+            logger.info('Step 3/4: Setting up bash commands...')
             self._init_bash_commands()
 
-            # Step 5: Start memory monitoring
-            logger.info('Step 5/5: Starting memory monitor...')
+            # Step 4: Start memory monitoring
+            logger.info('Step 4/4: Starting memory monitor...')
             self.memory_monitor.start_monitoring()
 
             logger.info('All initialization steps completed successfully')

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from backend.core.task_status import TASK_STATUS_DONE, TASK_STATUS_DOING, TASK_STATUS_TODO
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import (
     create_tool_definition,
@@ -13,8 +14,9 @@ from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
 
 _TASK_TRACKER_DESCRIPTION = (
     'Maintain a structured plan to track progress. '
-    'Use `update` (or `plan`) with a task_list to create or overwrite the plan. '
-    'Use `view` (without a task_list) to read the current plan.'
+    'Use `update` with a task_list to create or overwrite the plan. '
+    'Use `view` (without a task_list) to read the current plan. '
+    'Use only these statuses: `todo`, `doing`, and `done`.'
 )
 
 
@@ -39,15 +41,34 @@ class TaskTracker:
             return []
         try:
             with open(self.path, encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
         except (json.JSONDecodeError, OSError):
+            return []
+
+        if not isinstance(data, list):
+            return []
+
+        from backend.orchestration.state.state import normalize_plan_step_payload
+
+        try:
+            return [
+                normalize_plan_step_payload(task, i + 1)
+                for i, task in enumerate(data)
+            ]
+        except TypeError:
             return []
 
     def save_to_file(self, task_list: list[dict[str, Any]]) -> None:
         """Save the task list to disk."""
+        from backend.orchestration.state.state import normalize_plan_step_payload
+
+        normalized = [
+            normalize_plan_step_payload(task, i + 1)
+            for i, task in enumerate(task_list)
+        ]
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, 'w', encoding='utf-8') as f:
-            json.dump(task_list, f, indent=2, ensure_ascii=False)
+            json.dump(normalized, f, indent=2, ensure_ascii=False)
 
 
 def create_task_tracker_tool() -> ChatCompletionToolParam:
@@ -57,8 +78,8 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
         description=_TASK_TRACKER_DESCRIPTION,
         properties={
             'command': get_command_param(
-                'The command to execute. `view` shows the current plan. `update` (or `plan`) overwrites the entire plan with the new list.',
-                ['view', 'update', 'plan'],
+                'The command to execute. `view` shows the current plan. `update` overwrites the entire plan with the new list.',
+                ['view', 'update'],
             ),
             'task_list': {
                 'type': 'array',
@@ -76,8 +97,26 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
                         },
                         'status': {
                             'type': 'string',
-                            'description': 'Current status.',
-                            'enum': ['pending', 'in_progress', 'done'],
+                            'description': 'Current status. Allowed values: todo | doing | done.',
+                            'enum': [
+                                TASK_STATUS_TODO,
+                                TASK_STATUS_DOING,
+                                TASK_STATUS_DONE,
+                            ],
+                        },
+                        'result': {
+                            'type': 'string',
+                            'description': 'Optional result or note captured for this step.',
+                        },
+                        'tags': {
+                            'type': 'array',
+                            'description': 'Optional tags for this step.',
+                            'items': {'type': 'string'},
+                        },
+                        'subtasks': {
+                            'type': 'array',
+                            'description': 'Optional child steps following the same task item shape.',
+                            'items': {'type': 'object'},
                         },
                     },
                     'required': ['id', 'description', 'status'],

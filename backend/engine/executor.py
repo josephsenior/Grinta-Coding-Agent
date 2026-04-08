@@ -839,27 +839,7 @@ class OrchestratorExecutor:
             )
         )
 
-        response_text = self._extract_response_text(response)
-        proceed, validated_actions = self._safety.apply(response_text, actions)
-        if not proceed:
-            logger.warning(
-                'Safety pipeline blocked response (hallucination or validation failure)'
-            )
-            # Replace the hallucinated text with a corrective message that
-            # instructs the model to use tools.  ``wait_for_response=False``
-            # tells the orchestrator to continue the agent loop so the model
-            # gets another turn to call tools instead of dropping the user
-            # back to the input prompt.
-            from backend.ledger.action.message import MessageAction
-
-            correction = MessageAction(
-                content=(
-                    '[Hallucination guard] I described actions without actually '
-                    'using tools.  Let me retry with real tool calls.'
-                ),
-                wait_for_response=False,
-            )
-            return [correction]
+        _, validated_actions = self._safety.apply(self._extract_response_text(response), actions)
         return validated_actions
 
     def _extract_response_text(self, response: ModelResponse) -> str:

@@ -129,6 +129,7 @@ class RecoveryService:
             'Agent-survivable error (%s): staying RUNNING so model can adapt',
             type(exc).__name__,
         )
+        self._inject_task_reconciliation_directive(controller, exc)
         pause = 1.0
         if isinstance(exc, (InternalServerError, Timeout)):
             pause = 2.0
@@ -188,6 +189,55 @@ class RecoveryService:
                         'Injected planning directive after Timeout due to recent MCP validation error'
                     )
                     return
+
+    def _inject_task_reconciliation_directive(self, controller, exc: Exception) -> None:
+        """Inject a directive requiring task_tracker reconciliation when ``doing`` steps exist.
+
+        After a survivable error the model continues, but if a plan step is
+        still marked ``doing`` the model tends to ignore it.  This directive
+        forces the next turn to explicitly reconcile the plan via
+        ``task_tracker update`` before doing any other work.
+        """
+        from backend.core.task_status import TASK_STATUS_DOING
+
+        state = getattr(controller, 'state', None)
+        if state is None or not hasattr(state, 'set_planning_directive'):
+            return
+
+        # Don't clobber an existing directive (e.g. MCP-validation one).
+        turn_signals = getattr(state, 'turn_signals', None)
+        existing = (
+            getattr(turn_signals, 'planning_directive', None) if turn_signals else None
+        )
+        if existing:
+            return
+
+        plan = getattr(state, 'plan', None)
+        if plan is None:
+            return
+
+        doing_steps = [
+            s for s in getattr(plan, 'steps', [])
+            if getattr(s, 'status', '') == TASK_STATUS_DOING
+        ]
+        if not doing_steps:
+            return
+
+        ids = ', '.join(getattr(s, 'id', '?') for s in doing_steps)
+        directive = (
+            f'A recoverable error just occurred while plan step(s) [{ids}] '
+            f'had status "doing". Before any other work, call task_tracker '
+            f'update to reconcile the plan: move failed steps back to "todo" '
+            f'(with a result note), or keep them "doing" if you intend to '
+            f'retry immediately. Do NOT leave stale "doing" steps unaddressed.'
+        )
+        state.set_planning_directive(
+            directive,
+            source=f'RecoveryService.task_reconciliation({type(exc).__name__})',
+        )
+        logger.info(
+            'Injected task-reconciliation directive for doing steps: %s', ids,
+        )
 
     @staticmethod
     def _format_exception(exc: Exception) -> tuple[str, str, bool]:

@@ -1665,12 +1665,12 @@ async def test_renderer_task_tracking_observation_replaces_previous_panel() -> N
     await renderer.handle_event(
         TaskTrackingObservation(
             content='created',
-            command='plan',
+            command='update',
             task_list=[
                 {
                     'id': '1',
                     'description': 'Analyze manifest structure',
-                    'status': 'pending',
+                    'status': 'todo',
                 }
             ],
         )
@@ -1683,7 +1683,7 @@ async def test_renderer_task_tracking_observation_replaces_previous_panel() -> N
                 {
                     'id': '1',
                     'description': 'Analyze manifest structure',
-                    'status': 'in_progress',
+                    'status': 'doing',
                 }
             ],
         )
@@ -1718,7 +1718,7 @@ async def test_renderer_shows_noop_task_tracker_message_for_update() -> None:
                 {
                     'id': '1',
                     'description': 'Analyze manifest structure',
-                    'status': 'in_progress',
+                    'status': 'doing',
                 }
             ],
         )
@@ -1729,6 +1729,34 @@ async def test_renderer_shows_noop_task_tracker_message_for_update() -> None:
     # Noop "plan is unchanged" messages are now suppressed in the renderer.
     assert 'plan is unchanged' not in output
     assert 'Tasks (1)' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_displays_done_task_state() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    renderer.start_live()
+
+    await renderer.handle_event(
+        TaskTrackingObservation(
+            content='updated',
+            command='update',
+            task_list=[
+                {
+                    'id': '1',
+                    'description': 'Analyze manifest structure',
+                    'status': 'done',
+                }
+            ],
+        )
+    )
+
+    renderer.stop_live()
+    output = _console_output(console)
+    assert '[DONE]' in output
 
 
 @pytest.mark.asyncio

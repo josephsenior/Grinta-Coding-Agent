@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from collections import deque
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -44,24 +45,6 @@ _THINK_RESULT_JSON_RE = re.compile(
     r'\s*\{.*',
     re.DOTALL,
 )
-_TASK_STATUS_LABELS = {
-    'completed': 'done',
-    'done': 'done',
-    'failed': 'failed',
-    'in_progress': 'doing',
-    'pending': 'todo',
-    'skipped': 'skip',
-    'todo': 'todo',
-}
-_TASK_STATUS_STYLES = {
-    'completed': 'green',
-    'done': 'green',
-    'failed': 'red',
-    'in_progress': 'yellow',
-    'pending': 'cyan',
-    'skipped': 'dim',
-    'todo': 'cyan',
-}
 _CMD_SUMMARY_NOISE_PATTERNS = (
     'a complete log of this run can be found in',
     '[below is the output of the previous command.]',
@@ -92,6 +75,11 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
+from backend.core.task_status import (
+    TASK_STATUS_PANEL_STYLES,
+    TASK_STATUS_TODO,
+    normalize_task_status,
+)
 from backend.cli.hud import HUDBar
 from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
@@ -228,8 +216,11 @@ def _task_panel_signature(task_list: list[dict[str, Any]]) -> tuple[tuple[str, s
     """Build a stable signature for the visible task tracker state."""
     rows: list[tuple[str, str, str]] = []
     for item in task_list:
-        status = str(item.get('status') or 'pending').lower()
-        desc = str(item.get('description') or item.get('title') or '…')
+        try:
+            status = normalize_task_status(item.get('status'), default=TASK_STATUS_TODO)
+        except ValueError:
+            status = TASK_STATUS_TODO
+        desc = str(item.get('description') or '…')
         task_id = str(item.get('id') or '?')
         rows.append((task_id, status, desc))
     return tuple(rows)
@@ -266,8 +257,8 @@ def _build_task_panel(task_list: list[dict[str, Any]]) -> Any:
         badge = Text()
         badge.append('[', style='dim')
         badge.append(
-            _TASK_STATUS_LABELS.get(status, 'todo').upper(),
-            style=f"bold {_TASK_STATUS_STYLES.get(status, 'dim')}",
+            status.upper(),
+            style=f"bold {TASK_STATUS_PANEL_STYLES.get(status, 'dim')}",
         )
         badge.append(']', style='dim')
 
@@ -623,6 +614,8 @@ class CLIEventRenderer:
         self._pending_shell_is_internal: bool = False
         #: First tool/shell row each turn prints a small section marker for scanability.
         self._activity_turn_header_emitted: bool = False
+        #: Monotonic timestamp of the last Live refresh (for throttling).
+        self._last_refresh_time: float = 0.0
 
     @property
     def current_state(self) -> AgentState | None:
@@ -662,7 +655,7 @@ class CLIEventRenderer:
         )
         live.start()
         self._live = live
-        self.refresh()
+        self.refresh(force=True)
 
     def stop_live(self) -> None:
         """Stop the Rich Live display."""
@@ -683,14 +676,26 @@ class CLIEventRenderer:
         except Exception:
             logger.debug('Live.stop() failed', exc_info=True)
 
-    def refresh(self) -> None:
-        """Redraw the Live display if active."""
-        if self._live is not None:
-            self._live.update(self, refresh=True)
+    # Minimum seconds between non-forced Live refreshes (~20 fps).
+    _REFRESH_MIN_INTERVAL: float = 0.05
+
+    def refresh(self, *, force: bool = False) -> None:
+        """Redraw the Live display if active.
+
+        When *force* is False the call is throttled so rapid-fire streaming
+        tokens do not saturate the terminal with redraws.
+        """
+        if self._live is None:
+            return
+        now = time.monotonic()
+        if not force and (now - self._last_refresh_time) < self._REFRESH_MIN_INTERVAL:
+            return
+        self._last_refresh_time = now
+        self._live.update(self, refresh=True)
 
     async def handle_event(self, event: Any) -> None:
         self._process_event_data(event)
-        self.refresh()
+        self.refresh(force=True)
 
     def reset_subscription(self) -> None:
         self._subscribed = False
@@ -858,7 +863,7 @@ class CLIEventRenderer:
         while self._pending_events:
             event = self._pending_events.popleft()
             self._process_event_data(event)
-        self.refresh()
+        self.refresh(force=True)
 
     def _process_event_data(self, event: Any) -> None:
         """Update internal state for one event.  Does NOT call refresh()."""
@@ -1536,7 +1541,7 @@ class CLIEventRenderer:
         self._streaming_final = action.is_final
         if action.is_final:
             self._hud.state.llm_calls += 1
-        self.refresh()
+        self.refresh(force=action.is_final)
 
     # -- observation handlers ----------------------------------------------
 
@@ -1795,13 +1800,13 @@ class CLIEventRenderer:
             self._stop_reasoning()
             task_list = getattr(obs, 'task_list', None)
             cmd = getattr(obs, 'command', '')
-            if task_list is not None and cmd in ('plan', 'update'):
+            if task_list is not None and cmd == 'update':
                 self._set_task_panel(task_list)
             content = strip_tool_result_validation_annotations(
                 (getattr(obs, 'content', None) or '').strip()
             )
             body = ''
-            if task_list is None or cmd not in ('plan', 'update'):
+            if task_list is None or cmd != 'update':
                 body = content
             elif content.startswith('[TASK_TRACKER]'):
                 # Suppress noop "plan unchanged" messages — they add noise.
@@ -1963,7 +1968,7 @@ class CLIEventRenderer:
         framed = frame_transcript_body(renderable)
         if self._live is not None:
             self._console.print(framed)
-            self.refresh()
+            self.refresh(force=True)
             return
 
         sess: Any | None = None

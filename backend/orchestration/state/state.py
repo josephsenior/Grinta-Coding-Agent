@@ -13,6 +13,7 @@ import backend
 from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
+from backend.core.task_status import TASK_STATUS_TODO, normalize_task_status
 from backend.inference.metrics import Metrics
 from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import PlaybookFinishAction
@@ -169,14 +170,11 @@ def _apply_state_metrics(state: State, doc: dict) -> None:
             setattr(state, attr, m)
 
 
-VALID_PLAN_STEP_STATUSES = frozenset(
-    {'pending', 'in_progress', 'completed', 'failed', 'skipped'}
-)
-
-
 def _normalize_plan_step_status(raw_status: Any) -> str:
-    status = str(raw_status or 'pending').strip().lower()
-    return status if status in VALID_PLAN_STEP_STATUSES else 'pending'
+    try:
+        return normalize_task_status(raw_status, default=TASK_STATUS_TODO)
+    except ValueError as exc:
+        raise TypeError(str(exc)) from exc
 
 
 def normalize_plan_step_payload(step: Any, idx: int | None = None) -> dict[str, Any]:
@@ -202,11 +200,9 @@ def normalize_plan_step_payload(step: Any, idx: int | None = None) -> dict[str, 
 
     return {
         'id': str(step.get('id') or fallback_id),
-        'description': str(
-            step.get('description') or step.get('title') or 'Untitled step'
-        ),
+        'description': str(step.get('description') or 'Untitled step'),
         'status': _normalize_plan_step_status(step.get('status')),
-        'result': step.get('result', step.get('notes')),
+        'result': step.get('result'),
         'tags': [str(tag) for tag in tags],
         'subtasks': [
             normalize_plan_step_payload(substep, i + 1)
@@ -218,7 +214,7 @@ def normalize_plan_step_payload(step: Any, idx: int | None = None) -> dict[str, 
 def build_plan_step_from_payload(
     step: dict[str, Any], idx: int | None = None
 ) -> PlanStep:
-    """Build a ``PlanStep`` from normalized-or-legacy payload data."""
+    """Build a ``PlanStep`` from canonical task payload data."""
     normalized = normalize_plan_step_payload(step, idx)
     return PlanStep(
         id=normalized['id'],
@@ -286,7 +282,7 @@ class PlanStep:
 
     id: str
     description: str
-    status: str = 'pending'  # pending, in_progress, completed, failed, skipped
+    status: str = TASK_STATUS_TODO
     result: str | None = None
     subtasks: list[PlanStep] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
