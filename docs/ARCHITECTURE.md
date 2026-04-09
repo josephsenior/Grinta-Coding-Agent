@@ -1,6 +1,6 @@
 # Grinta Architecture
 
-This document provides a high-level overview of Grinta's architecture for contributors and maintainers.
+This document provides a high-level overview of Grinta's architecture for contributors and maintainers. For the build history, major pivots, and decision rationale behind the current shape, see [The Book of Grinta](journey/README.md).
 
 ## Canonical Vocabulary
 
@@ -46,7 +46,7 @@ paths still live under `backend/execution/`.
 │                 Backend (Python 3.12)                 │
 │  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐ │
 │  │   Gateway    │  │Session Orch. │  │   Ledger    │ │
-│  │  (FastAPI)   │  │ (22 services)│  │ (records)   │ │
+│  │  (FastAPI)   │  │ (21 services)│  │ (records)   │ │
 │  └──────┬──────┘  └──────┬───────┘  └──────┬──────┘ │
 │         │                │                  │        │
 │  ┌──────▼──────────────▼──────────────────▼──────┐ │
@@ -66,18 +66,20 @@ Runtime note: Grinta currently uses a local in-process runtime. The optional `ha
 ### Orchestration (`backend/orchestration/`)
 
 The session orchestrator (`SessionOrchestrator` in the current codebase, ~770 LOC)
-is the central control-plane component. It delegates to 22 decomposed services,
-each owning a single responsibility:
+is the central control-plane component. It delegates to 21 focused services,
+each owning a narrow piece of the agent loop:
 
 - **Lifecycle**: `LifecycleService` — init, reset, config binding
-- **Execution**: `ActionExecutionService` — get & execute next action
+- **Execution**: `ActionExecutionService`, `ActionService`, `ObservationService`
 - **Validation**: `TaskValidationService` — finish-action validation
-- **Recovery**: `RecoveryService` — exception classification, retry
-- **Safety**: `CircuitBreakerService`, `SafetyService`, `ConfirmationService`
-- **Limits**: `IterationGuardService`, `BudgetGuardService`, `StepGuardService`
-- **State**: `StateTransitionService`, `StepPrerequisiteService`
-- **Detection**: `StuckDetectionService` (6 strategies)
-- **Telemetry**: `TelemetryService`
+- **Recovery**: `RecoveryService`, `RetryService`, `ExceptionHandlerService`
+- **Safety and governance**: `AutonomyService`, `CircuitBreakerService`, `SafetyService`, `ConfirmationService`
+- **Iteration control**: `IterationService`, `IterationGuardService`
+- **State and stepping**: `StateTransitionService`, `StepDecisionService`, `StepGuardService`, `StepPrerequisiteService`
+- **Coordination**: `EventRouterService`, `PendingActionService`
+- **Detection**: `StuckDetectionService` — repetition and no-progress heuristics
+
+For the decomposition story — how the orchestrator grew from a monolith into 21 services — see [The Architectural Gauntlet](journey/03-the-architectural-gauntlet.md). For how `TaskValidationService` prevents false finishes, see [The Verification Tax](journey/14-the-verification-tax.md).
 
 ### Ledger (`backend/ledger/`)
 
@@ -95,6 +97,8 @@ Context memory is managed via the compactor system. The codebase and persisted c
 - Configurable strategies (summarize, sliding window, hybrid)
 - Bounded metadata storage (max 50 batches, oldest evicted)
 - History size caps: 10,000 events AND 200 MB byte-size limit
+
+For the full history of how the compactor subsystem evolved from 2 strategies to 12+ and back down to 9, see [The Context War](journey/04-the-context-war.md).
 
 ### Runtime (`backend/execution/` in the current codebase)
 
@@ -174,3 +178,12 @@ The Python package `client` provides :class:`~client.GrintaClient`
 | Event write-ahead | `.pending` marker files for crash safety |
 | Memory bounding | History: 10K events + 200MB, compactor metadata: 50 batches |
 | Event size cap | 5MB hard limit with field truncation |
+
+## Further Reading
+
+Several subsystems have dedicated journey chapters that go deeper than this reference:
+
+- **Playbooks** (`backend/playbooks/`): Runtime knowledge injection that replaced prompt bloat — [The Hidden Playbooks](journey/13-the-hidden-playbooks.md)
+- **Prompt architecture** (`backend/engine/prompts/`): Why the system prompt is built in Python, not Jinja — [Prompts Are Programs](journey/15-prompts-are-programs.md)
+- **Model-agnostic inference** (`backend/inference/`): The three-client architecture and catalog-driven overrides — [The Model-Agnostic Reckoning](journey/10-model-agnostic-reckoning.md)
+- **Cross-platform execution** (`backend/execution/`): Terminal multiplexing, Windows edge cases, and the semantic execution layer — [The Console Wars](journey/11-the-console-wars.md)

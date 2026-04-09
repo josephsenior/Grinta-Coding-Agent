@@ -5,6 +5,7 @@ Internal reference for contributors working on Grinta internals.
 For **user-facing** documentation, see [USER_GUIDE.md](USER_GUIDE.md).
 For **architecture overview**, see [ARCHITECTURE.md](ARCHITECTURE.md).
 For **contribution workflow**, see [CONTRIBUTING.md](CONTRIBUTING.md).
+For **design history and decision rationale**, see [The Book of Grinta](journey/README.md).
 
 ## Table of Contents
 
@@ -183,7 +184,7 @@ Event
 
 ### Direct Client Architecture
 
-Grinta uses **direct SDK clients** (not litellm) for stability:
+Grinta uses **direct SDK clients** (not litellm) for stability. For the rationale behind this decision, see [The Model-Agnostic Reckoning](journey/10-model-agnostic-reckoning.md).
 
 ```text
 LLM (backend/inference/llm.py)
@@ -217,7 +218,7 @@ LLM (backend/inference/llm.py)
 
 ### Compactor Pipeline
 
-When context exceeds limits, compactors compress history:
+When context exceeds limits, compactors compress history. For the full evolution story, see [The Context War](journey/04-the-context-war.md).
 
 ```text
 Full History → Compactor → Compressed History → LLM
@@ -247,6 +248,8 @@ Full History → Compactor → Compressed History → LLM
 ## Safety Systems
 
 ### Three Layers of Protection
+
+For cross-platform execution challenges that shaped the security layer, see [The Console Wars](journey/11-the-console-wars.md).
 
 ```text
 Layer 1: Pre-execution (CommandAnalyzer)
