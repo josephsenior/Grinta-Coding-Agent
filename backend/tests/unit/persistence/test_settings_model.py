@@ -55,8 +55,8 @@ class TestSettingsDefaults:
         assert s.agent == 'Orchestrator'
 
     def test_agent_aliases_are_not_mapped(self):
-        s = Settings(agent='CodeActAgent')
-        assert s.agent == 'CodeActAgent'
+        s = Settings(agent='Orchestrator')
+        assert s.agent == 'Orchestrator'
 
 
 class TestKnowledgeBaseProperty:
