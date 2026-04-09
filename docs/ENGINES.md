@@ -1,226 +1,153 @@
 # Grinta Agent Engines
 
-Grinta ships with five specialized AI engines, each optimized for different
-task types. The **Orchestrator** is the default and handles most coding tasks.
+Grinta's current tree is centered on **one production agent engine** and **one minimal test-support agent**.
+
+The production system is the **Orchestrator**. Web browsing and other remote capabilities are exposed through tools and MCP integration, not through separate built-in agent engines. The `Echo` agent exists as a deterministic harness for tests and custom-agent examples.
+
+This document reflects the engines that are actually present in the current repository.
 
 ---
 
 ## Engine Overview
 
-| Engine | Purpose | Best For |
-|--------|---------|----------|
-| **Orchestrator** | Full-featured autonomous coding agent | Coding, debugging, refactoring |
-| **MCP Browser** | Remote web browsing via MCP | Web interaction, research |
-| **Locator** | Code navigation via graph | Finding files, symbols, dependencies |
-| **Auditor** | Code review engine | Code quality analysis |
-| **Echo** | Test/debug echo | Testing, development |
+| Engine / Capability | Status | Best For |
+| --- | --- | --- |
+| **Orchestrator** | Production engine | Coding, debugging, refactoring, multi-step task execution |
+| **MCP-powered browsing** | Capability used by the Orchestrator | Web research, browser automation, remote tools |
+| **Echo** | Test-support agent | Deterministic testing, pipeline debugging, custom-agent examples |
 
 ---
 
 ## 1. Orchestrator
 
-**Default engine.** The Orchestrator uses a ReAct (Reasoning + Acting) loop
-to solve coding tasks through iterative observation and action cycles.
+**Default engine.** The Orchestrator is the main agent loop Grinta ships today.
+
+It coordinates planning, tool use, observation handling, safety checks, memory, and finish behavior. If you are using Grinta normally, this is the engine doing the work.
+
+### Execution Loop
+
+At a high level, the Orchestrator runs a deliberate loop:
+
+```text
+Observe -> Plan -> Act -> Observe -> Validate -> Repeat
+```
+
+The exact runtime path depends on the task and enabled tools, but the important point is that the Orchestrator is not just a chat wrapper. It is the control loop around the model.
+
+### Core Modules
+
+These are the main implementation files in `backend/engine/` today:
+
+- `orchestrator.py`: top-level agent orchestration
+- `planner.py`: plan construction and task decomposition
+- `executor.py`: action execution and result handling
+- `safety.py`: risk classification and action policy support
+- `memory_manager.py`: working-memory and retrieval coordination
+- `reflection.py`: optional reflection flow
+- `action_verifier.py`: post-action verification helpers
+- `streaming_checkpoint.py`: checkpointing and recovery support
+- `tool_registry.py`: tool registration and availability
+- `function_calling.py`: tool-call parsing and model I/O glue
+
+### Common Tool Surface
+
+The exact tool list is **configuration-dependent**. A typical Orchestrator session exposes a mix of:
+
+- reasoning and control tools: `think`, `finish`, `task_tracker`
+- project exploration tools: `search_code`, `analyze_project_structure`, `explore_tree_structure`, `read_symbol_definition`
+- editing tools: `str_replace_editor`, `structure_editor`, `apply_patch`
+- execution tools: `bash`, `terminal_manager`
+- memory tools: `memory_manager`, `note`, `recall`
+- external capability bridge: `call_mcp_tool`
+
+Some tools appear only when specific features are enabled, so it is better to think of the Orchestrator as a configurable engine with a stable core rather than a fixed tool count.
+
+### Prompt System
+
+Prompt assembly lives in `backend/engine/prompts/` and is now built through a **pure-Python prompt builder** with markdown partials, not Jinja2 templates.
+
+See:
+
+- `backend/engine/prompts/prompt_builder.py`
+- `backend/engine/README.md`
+- [journey/15-prompts-are-programs.md](journey/15-prompts-are-programs.md)
+
+---
+
+## 2. MCP-Powered Browsing and Remote Capabilities
+
+Browsing is a capability, not a separate built-in agent class in the main engine tree.
+
+The Orchestrator reaches external capabilities through the Model Context Protocol layer in `backend/integrations/mcp/`. That includes browser automation when the appropriate MCP server is configured, but it also includes any other external tool the MCP gateway exposes.
 
 ### How It Works
 
+```text
+Orchestrator -> call_mcp_tool(...) -> MCP integration layer -> connected server -> result back to agent
 ```
-Think → Act → Observe → Repeat
-```
-
-1. **Observe** current project state
-2. **Reason** about the next step
-3. **Act** (edit file, run command, browse web via MCP)
-4. **Observe** the result
-5. **Repeat** until task is complete or budget exhausted
-
-### Available Tools (23)
-
-| Category | Tools |
-|----------|-------|
-| **File editing** | `str_replace_editor`, `llm_based_edit`, `atomic_refactor`, `whitespace_handler` |
-| **Commands** | `bash` |
-| **Browser** | `MCP Browser (browser-use)` |
-| **Reasoning** | `think`, `finish`, `task_tracker`, `summarize_context` |
-| **Code quality** | `smart_errors`, `health_check` |
-| **Security** | `security_utils` |
-| **Utilities** | `prompt`, `server_readiness_helper`, `database` |
-
-### Key Components
-
-- **Planner** (`planner.py`): Decomposes complex tasks into steps
-- **Executor** (`executor.py`): Runs planned actions
-- **Hallucination Detector** (`hallucination_detector.py`): Validates agent outputs
-- **Anti-Hallucination System** (`anti_hallucination_system.py`): Proactive prevention
-- **Safety** (`safety.py`): Action risk classification
-- **Task Complexity** (`task_complexity.py`): Estimates task difficulty
-- **Memory Manager** (`memory_manager.py`): Engine-level context management
-- **File Verification Guard** (`file_verification_guard.py`): Validates file edits
-
-### Configuration
-
-```toml
-[agent]
-default_agent = "Orchestrator"
-enable_editor = true
-enable_cmd = true
-enable_browsing = true
-enable_think = true
-enable_finish = true
-
-```
-
-### Prompt Templates
-
-Located in `backend/engine/prompts/`. Jinja2 templates define
-the system prompt, including role definition, available tools, output format,
-best practices, and few-shot examples.
-
-**See:** [backend/engine/README.md](../backend/engine/README.md)
-
----
-
-## 2. MCP Browser (Remote Browsing)
-
-Web browsing is decoupled from the core App engine via the Model Context
-Protocol. This allows for flexible browsing engines like `browser-use` or
-other MCP-compatible agents.
-
-### How It Works
-
-```
-App → MCP Request → MCP Browser Server → Web Interaction → App
-```
-
-### Key Components
-
-- **MCP Integration** (`mcp_integration/`): Universal protocol bridge
-- **MCP Toolset**: Dynamically discovered tools like `navigate`, `click`, etc.
 
 ### When to Use
 
-- Web research tasks
-- Interacting with web applications
-- Scraping structured data from websites
-- Testing web interfaces
+- web research
+- browser interaction
+- remote tool integration
+- capabilities that do not belong in the native local tool layer
 
-### Configuration
+### Important Clarification
 
-MCP tools are automatically discovered and enabled when the `enable_browsing`
-flag is set and a corresponding MCP server is connected.
-
-```toml
-[agent]
-enable_browsing = true
-```
-
-> **Note:** Remote browsing via MCP provides superior isolation and
-> flexibility compared to in-process browser automation.
+Earlier drafts of this documentation treated "MCP Browser" like a standalone first-class engine. In the current codebase, it is more accurate to describe browsing as a capability surfaced through MCP, not a separate production agent peer to the Orchestrator.
 
 ---
 
-## 3. Locator (Code Navigation)
+## 3. Echo
 
-The Locator implements graph-based code navigation using the
-[Locagent](https://arxiv.org/abs/2503.09089) framework. It parses codebases
-into directed heterogeneous graphs capturing code structures and dependencies.
+`Echo` is a minimal deterministic agent used in test support.
 
-### How It Works
+It lives under:
 
-```
-Parse Codebase → Build Graph → LLM Multi-Hop Reasoning → Locate Target
-```
+- `backend/tests/support/echo/agent.py`
 
-### Built-in Tools
+### What It Does
 
-| Tool | Purpose |
-|------|---------|
-| `search_code_snippets` | Search for code patterns |
-| `read_symbol_definition` | Retrieve entity source code |
-| `explore_tree_structure` | Navigate code hierarchy |
+The Echo agent is not meant to be a user-facing coding engine. It exists to exercise the agent pipeline predictably by emitting predefined actions and observations.
 
-### Key Components
+That makes it useful for:
 
-- **Locator** (`locator.py`): Main localization engine
-- **Graph Cache** (`graph_cache.py`): Cached code graph representation
-- **Function Calling** (`function_calling.py`): LLM tool interface
+- testing event flow
+- validating agent/runtime plumbing
+- debugging integration behavior without a real model in the loop
+- serving as the smallest useful custom-agent example
 
-### When to Use
-
-- Finding specific functions, classes, or symbols
-- Understanding dependency chains
-- Navigating unfamiliar codebases
-- Locating bugs in large projects
+If you want to understand the minimum amount of code required to plug a custom agent into the system, Echo is the right starting point.
 
 ---
 
-## 4. Auditor (Code Review)
+## Engine Selection and Custom Agents
 
-The Auditor engine performs code review by analyzing code quality, identifying
-issues, and suggesting improvements.
+The default agent name in the current codebase is `Orchestrator`.
 
-### Key Components
+Custom agents can be registered through the config loader with a `classpath` entry. The app config stores a dictionary of named agents plus the `default_agent` name that should be used by default.
 
-- **Auditor** (`auditor.py`): Main review engine
-- **Function Calling** (`function_calling.py`): LLM tool interface
-- **Tools**: File cache, glob, grep, semantic search, explorer, view
-
-### Built-in Tools
-
-| Tool | Purpose |
-|------|---------|
-| `file_cache` | Cache and retrieve file contents |
-| `glob` | Pattern-based file discovery |
-| `grep` | Content search across files |
-| `semantic_search` | Semantic code search |
-| `explore_structure` | Navigate project structure |
-| `view` | View file contents |
-
-### When to Use
-
-- Code review automation
-- Quality analysis
-- Finding potential issues across a codebase
-
----
-
-## 5. Echo (Debug)
-
-A minimal echo engine used for testing and development. It echoes back
-inputs with minimal processing.
-
-### When to Use
-
-- Testing the agent pipeline
-- Debugging event flow
-- Development and integration testing
-
----
-
-## Engine Selection
-
-By default, the Orchestrator handles all tasks. To use a specific engine:
+Example pattern:
 
 ```toml
-[core]
-default_agent = "Orchestrator"   # or "Navigator", "Locator", etc.
-```
+default_agent = "MyCustomAgent"
 
-Or configure named agents with specific engines:
-
-```toml
-[agent.CodeReviewAgent]
-classpath = "backend.engine.auditor.auditor.AuditorAgent"
-llm_config = "fast"
-```
-
-## Adding Custom Engines
-
-1. Create the implementation under `backend/engine/` or an adjacent package
-2. Implement the agent interface (see `backend/tests/support/echo/` for a minimal example)
-3. Register via `classpath` in agent config
-
-```toml
 [agent.MyCustomAgent]
 classpath = "my_package.my_module.MyAgent"
 ```
+
+See:
+
+- `backend/core/config/app_config.py`
+- `backend/core/config/config_loader.py`
+
+---
+
+## What Is Not Bundled Today
+
+The current Grinta tree does **not** ship separate built-in `Locator` or `Auditor` engines.
+
+If you want specialized code-navigation or review agents, the right model is to implement them as custom agents and register them through the same `classpath` mechanism used elsewhere in the config system.
+
+That keeps this document aligned with the code that actually exists rather than preserving older architectural sketches as if they were shipping product.

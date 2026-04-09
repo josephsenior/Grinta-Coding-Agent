@@ -351,7 +351,7 @@ Automatically pauses the agent after:
 enable_circuit_breaker = true   # Highly recommended
 ```
 
-### Stuck Detection
+### Long-Session Stuck Detection
 
 The agent detects 6 types of stuck behavior:
 
@@ -458,6 +458,7 @@ together in `settings.json`:
 ```
 
 This configuration ensures:
+
 - **Cost control**: $10 cap with alerts at 50%/80%/90%
 - **Hang recovery**: 2-minute watchdog on every tool call
 - **Error recovery**: Automatic retry with exponential backoff
@@ -502,6 +503,12 @@ detailed examples.
 Grinta includes 16 built-in playbooks that activate automatically when your message matches
 their trigger phrases, injecting specialist guidance into the agent's context window.
 
+Playbooks can come from three places:
+
+- built-in playbooks shipped with Grinta
+- user playbooks in `~/.grinta/playbooks/`
+- repository playbooks in `.grinta/playbooks/`
+
 ### Context Playbooks (auto-triggered)
 
 | Playbook | Trigger phrases |
@@ -518,6 +525,21 @@ their trigger phrases, injecting specialist guidance into the agent's context wi
 | **SSH** | `ssh`, `remote server`, `deploy` |
 | **Add Agent** | `new agent`, `create playbook`, `add playbook` |
 
+### How Trigger Matching Works
+
+Auto-triggered playbooks use a two-tier matcher:
+
+1. **Substring match first**: fast case-insensitive containment check
+2. **Semantic fallback second**: word-overlap similarity when no substring match fires
+
+The fallback is intentionally conservative so short triggers do not activate irrelevant playbooks too easily.
+
+If you want exact substring matching only, set this in the playbook frontmatter:
+
+```yaml
+strict_trigger_matching: true
+```
+
 ### Task Playbooks (invoked by `/command`)
 
 Task playbooks collect variables from you before running:
@@ -529,6 +551,8 @@ Task playbooks collect variables from you before running:
 | `/update_pr_description` | Rewrites the PR description to reflect the current diff |
 
 Run a task playbook by typing the `/command` directly in the chat.
+
+Task playbooks are recognized automatically from their metadata. If a playbook declares `inputs`, Grinta treats it as a task playbook and exposes it through the `/name` invocation pattern.
 
 ### Disabling Playbooks
 
@@ -547,6 +571,52 @@ You can also pass them via the API when creating a conversation.
 Create your own playbooks in `~/.grinta/playbooks/` (user-level) or `.grinta/playbooks/`
 (repo-level) using the same Markdown + frontmatter format. Type
 `add playbook` in chat for a guided template.
+
+### Frontmatter Patterns
+
+The frontmatter determines how Grinta interprets a playbook:
+
+- `triggers` present -> auto-triggered knowledge playbook
+- `inputs` present -> task playbook invoked by `/command`
+- neither present -> repository knowledge playbook
+
+Example auto-triggered playbook:
+
+```markdown
+---
+name: sql-review
+triggers: ["sql", "migration", "query plan"]
+strict_trigger_matching: false
+---
+
+Review migrations carefully. Check rollback safety, indexes, and data backfills.
+```
+
+Example task playbook:
+
+```markdown
+---
+name: address_pr_comments
+inputs:
+   - name: pr_url
+      description: Pull request URL
+   - name: branch
+      description: Branch to update
+---
+
+Resolve reviewer comments, rerun relevant checks, and summarize the changes.
+```
+
+### Auto-Imported Playbooks
+
+Grinta also recognizes a small set of external convention files and imports them as repository-scoped playbooks:
+
+| File | Imported As |
+| --- | --- |
+| `.cursorrules` | repository playbook named `cursorrules` |
+| `agents.md` / `agent.md` | repository playbook named `agents` |
+
+That means teams can carry forward lightweight guidance from adjacent tooling without manually rewriting everything into a new format on day one.
 
 ---
 
