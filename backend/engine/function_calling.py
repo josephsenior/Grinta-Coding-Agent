@@ -8,6 +8,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, cast
 
+from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.errors import (
     FunctionCallNotExistsError,
@@ -56,9 +57,9 @@ from backend.engine.tools.lsp_query import (
 from backend.engine.tools.memory_manager import (
     MEMORY_MANAGER_TOOL_NAME,
 )
-from backend.engine.tools.note import build_note_action, build_recall_action
-from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
+from backend.engine.tools.note import build_note_action, build_recall_action
+from backend.engine.tools.prompt import build_python_exec_command
 from backend.engine.tools.revert_to_checkpoint import (
     REVERT_TO_CHECKPOINT_TOOL_NAME,
     build_revert_to_checkpoint_action,
@@ -627,11 +628,12 @@ def _preview_str_replace_edit(
     except OSError as exc:
         return AgentThinkAction(thought=f'[PREVIEW] Cannot write to {path}: {exc}')
 
-    cmd = (
-        f'python -c "import subprocess, os;'
-        f"subprocess.run(['code', '--wait', '--diff', r'{orig_path}', r'{path}']);"
-        f"os.remove(r'{orig_path}')\""
+    script = (
+        'import os, subprocess;'
+        f"subprocess.run(['code', '--wait', '--diff', {orig_path!r}, {path!r}]);"
+        f'os.remove({orig_path!r})'
     )
+    cmd = build_python_exec_command(script)
 
     return CmdRunAction(
         command=cmd,
@@ -787,7 +789,9 @@ else:
     script_b64 = base64.b64encode(script.encode()).decode()
     label = 'dry-run' if preview else 'applying'
     return CmdRunAction(
-        command=f"python -c \"import base64;exec(base64.b64decode(b'{script_b64}').decode())\"",
+        command=build_python_exec_command(
+            f"import base64;exec(base64.b64decode(b'{script_b64}').decode())"
+        ),
         thought=f'[BATCH REPLACE] {label} {len(edits)} edit(s) atomically',
     )
 

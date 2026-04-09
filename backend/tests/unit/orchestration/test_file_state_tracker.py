@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from backend.orchestration.file_state_tracker import FileStateTracker, file_manifest_path
+from backend.orchestration.file_state_tracker import (
+    FileStateTracker,
+    file_manifest_path,
+)
 
 
 def test_manifest_path_uses_agent_state_dir(

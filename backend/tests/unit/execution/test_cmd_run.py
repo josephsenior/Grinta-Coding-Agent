@@ -258,7 +258,8 @@ async def test_powershell_syntax_in_bash_adds_shell_mismatch_guidance(mock_execu
     obs = await mock_executor.run(action)
 
     assert 'SHELL_MISMATCH' in obs.content
-    assert 'Get-Content is a PowerShell command' in obs.content
+    assert 'Get-Content' in obs.content
+    assert 'PowerShell' in obs.content
     assert 'MISSING_TOOL' not in obs.content
 
 
@@ -286,6 +287,65 @@ async def test_chained_scaffold_failure_adds_scaffold_guidance(mock_executor):
     assert 'SCAFFOLD_SETUP_FAILED' in obs.content
     assert 'Run the generator by itself first' in obs.content
     assert 'MISSING_TOOL' not in obs.content
+
+
+@pytest.mark.asyncio
+async def test_missing_tool_guidance_is_platform_aware_on_windows(mock_executor):
+    mock_session = MagicMock()
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_session.cwd = 'C:/tmp'
+    mock_session.execute.return_value = CmdOutputObservation(
+        content='[ERROR STREAM]\n/bin/bash: line 1: poetry: command not found',
+        command='poetry --version',
+        metadata={'exit_code': 127},
+    )
+
+    action = CmdRunAction(command='poetry --version')
+
+    with patch('backend.execution.action_execution_server.sys.platform', 'win32'):
+        obs = await mock_executor.run(action)
+
+    assert 'MISSING_TOOL' in obs.content
+    assert 'winget install poetry' in obs.content
+    assert 'apt-get install poetry' not in obs.content
+
+
+@pytest.mark.asyncio
+async def test_disk_full_guidance_is_platform_aware_on_windows(mock_executor):
+    mock_session = MagicMock()
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_session.cwd = 'C:/tmp'
+    mock_session.execute.return_value = CmdOutputObservation(
+        content='[ERROR STREAM]\nNo space left on device',
+        command='npm install',
+        metadata={'exit_code': 1},
+    )
+
+    with patch('backend.execution.action_execution_server.sys.platform', 'win32'):
+        obs = await mock_executor.run(CmdRunAction(command='npm install'))
+
+    assert 'DISK_FULL' in obs.content
+    assert 'Get-PSDrive -PSProvider FileSystem' in obs.content
+    assert 'df -h' not in obs.content
+
+
+@pytest.mark.asyncio
+async def test_permission_denied_guidance_is_platform_aware_on_windows(mock_executor):
+    mock_session = MagicMock()
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_session.cwd = 'C:/tmp'
+    mock_session.execute.return_value = CmdOutputObservation(
+        content='[ERROR STREAM]\nPermission denied',
+        command='python write_file.py',
+        metadata={'exit_code': 1},
+    )
+
+    with patch('backend.execution.action_execution_server.sys.platform', 'win32'):
+        obs = await mock_executor.run(CmdRunAction(command='python write_file.py'))
+
+    assert 'PERMISSION_ERROR' in obs.content
+    assert 'ACLs' in obs.content
+    assert 'chmod' not in obs.content
 
 
 @pytest.mark.asyncio

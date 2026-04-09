@@ -363,6 +363,23 @@ class TestPlaybookFinishAction(unittest.TestCase):
         f = PlaybookFinishAction(thought='done')
         self.assertEqual(f.message, 'done')
 
+    def test_message_prefers_final_thought(self):
+        f = PlaybookFinishAction(final_thought='final summary', thought='internal note')
+        self.assertEqual(f.message, 'final summary')
+
+    def test_message_includes_completed_and_next_steps(self):
+        f = PlaybookFinishAction(
+            final_thought='Finished the task.',
+            outputs={
+                'completed': ['Created md_to_html.py'],
+                'next_steps': ['Open sample.html', 'Try a different input file'],
+            },
+        )
+        self.assertIn('Finished the task.', f.message)
+        self.assertIn('Completed:', f.message)
+        self.assertIn('Next steps:', f.message)
+        self.assertIn('Open sample.html', f.message)
+
     def test_message_without_thought(self):
         f = PlaybookFinishAction()
         self.assertIn("What's next", f.message)

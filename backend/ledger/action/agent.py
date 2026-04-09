@@ -42,11 +42,36 @@ class PlaybookFinishAction(Action):
     force_finish: bool = False
     action: ClassVar[str] = ActionType.FINISH
 
+    def _message_sections(self) -> list[str]:
+        sections: list[str] = []
+        summary = (self.final_thought or self.thought or '').strip()
+        if summary:
+            sections.append(summary)
+
+        completed = self.outputs.get('completed')
+        if isinstance(completed, list):
+            items = [str(item).strip() for item in completed if str(item).strip()]
+            if items:
+                sections.append('Completed:\n' + '\n'.join(f'- {item}' for item in items))
+
+        blocked_by = str(self.outputs.get('blocked_by', '') or '').strip()
+        if blocked_by:
+            sections.append(f'Blocked by:\n- {blocked_by}')
+
+        next_steps = self.outputs.get('next_steps')
+        if isinstance(next_steps, list):
+            items = [str(item).strip() for item in next_steps if str(item).strip()]
+            if items:
+                sections.append('Next steps:\n' + '\n'.join(f'- {item}' for item in items))
+
+        return sections
+
     @property
     def message(self) -> str:
         """Get completion message for user."""
-        if self.thought != '':
-            return self.thought
+        sections = self._message_sections()
+        if sections:
+            return '\n\n'.join(sections)
         return "All done! What's next on the agenda?"
 
 

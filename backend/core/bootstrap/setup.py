@@ -27,8 +27,8 @@ from backend.orchestration import SessionOrchestrator
 from backend.orchestration.agent import Agent
 from backend.orchestration.state.state import State
 from backend.persistence import get_file_store
-from backend.persistence.locations import get_local_data_root
 from backend.persistence.data_models.user_secrets import UserSecrets
+from backend.persistence.locations import get_local_data_root
 from backend.utils.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
@@ -39,8 +39,8 @@ if TYPE_CHECKING:
         ProviderType,
     )
     from backend.execution.base import Runtime
-    from backend.orchestration.conversation_stats import ConversationStats
     from backend.ledger.event import Event
+    from backend.orchestration.conversation_stats import ConversationStats
     from backend.playbooks.engine.playbook import BasePlaybook
 
 
@@ -408,6 +408,9 @@ def create_controller(
             pending_action_timeout=config.pending_action_timeout,
         )
     )
+    # Store the runtime so downstream code (worker delegation, middleware)
+    # can access it via controller.runtime.
+    controller.runtime = runtime
     return (controller, initial_state)
 
 

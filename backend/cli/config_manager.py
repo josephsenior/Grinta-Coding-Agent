@@ -14,6 +14,7 @@ from rich.prompt import Prompt
 from rich.text import Text
 
 from backend.core.config import AppConfig, load_app_config
+from backend.core.app_paths import get_app_settings_root
 
 logger = logging.getLogger(__name__)
 
@@ -55,36 +56,8 @@ _PROVIDERS: list[tuple[str, str, str]] = [
 
 
 def _settings_path() -> Path:
-    """Resolve the canonical settings.json path.
-
-    Search order:
-    1. ``APP_ROOT`` environment variable (if set)
-    2. Current working directory
-    3. ``~/.grinta/`` user-level config directory (global fallback)
-
-    For *writing*, we always use location 1/2 (the explicit root or CWD).
-    """
-    # Explicit root override
-    explicit_root = os.environ.get('APP_ROOT')
-    if explicit_root:
-        candidate = Path(explicit_root) / 'settings.json'
-        if candidate.exists():
-            return candidate
-
-    # CWD
-    cwd_candidate = Path.cwd() / 'settings.json'
-    if cwd_candidate.exists():
-        return cwd_candidate
-
-    # User-level fallback (~/.grinta/settings.json)
-    user_candidate = Path.home() / '.grinta' / 'settings.json'
-    if user_candidate.exists():
-        return user_candidate
-
-    # Nothing found — default to CWD for creation
-    if explicit_root:
-        return Path(explicit_root) / 'settings.json'
-    return cwd_candidate
+    """Resolve canonical settings path anchored to repository root."""
+    return Path(get_app_settings_root()) / 'settings.json'
 
 
 def _load_raw_settings() -> dict[str, Any]:
@@ -244,7 +217,7 @@ def run_onboarding() -> AppConfig:
         _console.print(
             '[red]No API key configured and stdin is not interactive.[/red]\n'
             'Run [bold]grinta[/bold] in a terminal to complete setup,\n'
-            'or create [bold]~/.grinta/settings.json[/bold] with your config.'
+            'or create [bold]settings.json[/bold] in the Grinta repo root.'
         )
         raise SystemExit(1)
 
@@ -293,7 +266,13 @@ def run_onboarding() -> AppConfig:
                 '[green bold]✓ Ready to go![/green bold]\n\n'
                 f'  Provider  [bold]{custom_provider_name or provider_key}[/bold]\n'
                 f'  Model     [bold]{full_model}[/bold]\n\n'
-                '[dim]Change anytime with [bold]/settings[/bold][/dim]'
+                '[bold]Next steps[/bold]\n'
+                '  • Describe what you want in plain language, or type [bold]/help[/bold] for commands\n'
+                '  • [bold]grinta -p /path/to/repo[/bold] — pin a project directory (or stay in the current folder)\n'
+                '  • [bold]/autonomy[/bold] — choose supervised, balanced, or full autonomy\n'
+                '  • [bold]/sessions[/bold] — list past sessions; [bold]/resume[/bold] to continue one\n'
+                '  • [bold]/settings[/bold] — change model, API key, or MCP servers anytime\n\n'
+                '[dim]Tip: run [bold]grinta --help[/bold] for CLI flags.[/dim]'
             ),
             border_style='green',
             padding=(1, 3),
@@ -436,8 +415,8 @@ def _validate_connection(model: str, api_key: str, base_url: str | None) -> None
     if not api_key:
         return
 
-    from rich.spinner import Spinner
     from rich.live import Live
+    from rich.spinner import Spinner
 
     spinner = Spinner('dots', text='  Validating connection…', style='cyan')
     try:

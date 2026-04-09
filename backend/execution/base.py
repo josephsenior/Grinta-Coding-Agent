@@ -28,6 +28,7 @@ import httpx
 from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logger import app_logger as logger
+from backend.core.provider_handler import ProviderHandler
 from backend.execution.capabilities import RuntimeCapabilities
 from backend.execution.command_timeout import CommandTimeoutMixin
 from backend.execution.env_manager import EnvManagerMixin
@@ -38,7 +39,6 @@ from backend.execution.security_enforcement import SecurityEnforcementMixin
 from backend.execution.task_tracking import TaskTrackingMixin
 from backend.execution.utils.edit import FileEditRuntimeMixin
 from backend.execution.utils.git_handler import CommandResult, GitHandler
-from backend.core.provider_handler import ProviderHandler
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber
 from backend.ledger.action import (
     Action,

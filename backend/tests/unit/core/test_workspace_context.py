@@ -32,6 +32,8 @@ def grinta_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     fake.mkdir()
     monkeypatch.setenv('HOME', str(fake))
     monkeypatch.setenv('USERPROFILE', str(fake))
+    monkeypatch.delenv('PROJECT_ROOT', raising=False)
+    monkeypatch.delenv('APP_PROJECT_ROOT', raising=False)
 
 
 def _project_context(ws: Path) -> Path:

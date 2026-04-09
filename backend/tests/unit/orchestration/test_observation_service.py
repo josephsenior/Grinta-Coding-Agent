@@ -32,6 +32,27 @@ def _make_context() -> MagicMock:
 def _make_pending_service(action=None) -> MagicMock:
     svc = MagicMock()
     svc.get.return_value = action
+    action_id = getattr(action, 'id', None) if action else None
+
+    def _peek_for_cause(cause):
+        if action is None:
+            return None
+        if cause is None:
+            return None
+        try:
+            if int(cause) == action_id:
+                return action
+        except (TypeError, ValueError):
+            pass
+        return None
+
+    svc.peek_for_cause.side_effect = _peek_for_cause
+    svc.pop_for_cause.return_value = action
+    svc.has_outstanding_for_cause.side_effect = (
+        lambda cause: cause is not None
+        and action_id is not None
+        and int(cause) == action_id
+    )
     svc.set = MagicMock()
     return svc
 
@@ -161,19 +182,15 @@ class TestHandleObservation:
         with patch('backend.core.plugin.get_plugin_registry') as mock_reg:
             mock_reg.return_value.dispatch_action_post = AsyncMock(return_value=obs)
             await svc.handle_observation(obs)
-        pending_svc.set.assert_called_with(None)
+        pending_svc.pop_for_cause.assert_called_with(42)
 
     @pytest.mark.asyncio
-    async def test_non_matching_cause_recovers(self):
+    async def test_non_matching_cause_drops_silently(self):
         ctx = _make_context()
         pending_action = SimpleNamespace(id=42)
         pending_svc = _make_pending_service(action=pending_action)
         svc = ObservationService(ctx, pending_svc)
         obs = _make_observation(content='other', cause=99)  # different cause
         await svc.handle_observation(obs)
-        pending_svc.set.assert_called_once_with(None)
-        ctx.discard_invocation_context_for_action.assert_called_once_with(
-            pending_action
-        )
-        ctx.emit_event.assert_called_once()
-        ctx.trigger_step.assert_called_once_with()
+        # cause=99 is int-like but has no outstanding entry → dropped silently
+        pending_svc.set.assert_not_called()

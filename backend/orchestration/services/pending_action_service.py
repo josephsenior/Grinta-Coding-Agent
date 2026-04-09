@@ -40,8 +40,12 @@ class PendingActionService:
 
     @staticmethod
     def _effective_timeout_seconds(base: float, action: Action) -> float:
-        """MCP tool calls often need longer than the default (cold npx, network)."""
+        """MCP tool calls often need longer than the default (cold npx, network).
+        Delegated tasks run sub-agents that may take many minutes; use infinite timeout.
+        """
         if base <= 0:
+            return math.inf
+        if type(action).__name__ == 'DelegateTaskAction':
             return math.inf
         if type(action).__name__ == 'MCPAction':
             return max(float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR)

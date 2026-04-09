@@ -8,4 +8,3 @@ MANDATORY:
 5. **Never fabricate results** — if a tool call fails, report the failure honestly. Do not pretend it succeeded or describe a successful outcome that did not occur.
 6. MANDATORY: Every task execution MUST conclude with the finish tool. The finish call MUST include a summary of completed items and at least two concrete next_steps for the user.
 </CRITICAL_TOOL_EXECUTION_RULES>
-

@@ -40,6 +40,7 @@ class TokenUsage(BaseModel):
     context_window: int = Field(default=0)
     per_turn_token: int = Field(default=0)
     response_id: str = Field(default='')
+    usage_estimated: bool = Field(default=False)
 
     def __add__(self, other: TokenUsage) -> TokenUsage:
         """Add two TokenUsage instances together."""
@@ -52,6 +53,7 @@ class TokenUsage(BaseModel):
             context_window=max(self.context_window, other.context_window),
             per_turn_token=other.per_turn_token,
             response_id=self.response_id,
+            usage_estimated=self.usage_estimated or other.usage_estimated,
         )
 
 
@@ -196,6 +198,7 @@ class Metrics:
         cache_write_tokens: int,
         context_window: int,
         response_id: str,
+        usage_estimated: bool = False,
     ) -> None:
         """Add a single usage record."""
         per_turn_token = prompt_tokens + completion_tokens
@@ -208,6 +211,7 @@ class Metrics:
             context_window=context_window,
             per_turn_token=per_turn_token,
             response_id=response_id,
+            usage_estimated=usage_estimated,
         )
         self._token_usages.append(usage)
         self._accumulated_token_usage = self.accumulated_token_usage + TokenUsage(
@@ -219,6 +223,7 @@ class Metrics:
             context_window=context_window,
             per_turn_token=per_turn_token,
             response_id='',
+            usage_estimated=usage_estimated,
         )
 
     def merge(self, other: Metrics) -> None:
@@ -298,6 +303,7 @@ class Metrics:
             context_window=current_usage.context_window,
             per_turn_token=0,
             response_id='',
+            usage_estimated=current_usage.usage_estimated,
         )
         return result
 

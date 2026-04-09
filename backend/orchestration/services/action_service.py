@@ -5,7 +5,6 @@ from unittest.mock import Mock
 
 from backend.core.constants import LOG_ALL_EVENTS
 from backend.core.schemas import AgentState
-from backend.inference.metrics import Metrics
 from backend.ledger import EventSource
 from backend.ledger.action import Action, NullAction
 from backend.ledger.action.message import MessageAction

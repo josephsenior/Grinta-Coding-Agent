@@ -13,6 +13,7 @@ from rich.text import Text
 
 from backend.cli.transcript import format_callout_panel
 
+
 class ReasoningDisplay:
     """Renderable reasoning state used inside the main live layout.
 

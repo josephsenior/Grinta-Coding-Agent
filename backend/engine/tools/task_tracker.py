@@ -4,7 +4,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-from backend.core.task_status import TASK_STATUS_DONE, TASK_STATUS_DOING, TASK_STATUS_TODO
+from backend.core.task_status import (
+    TASK_STATUS_DOING,
+    TASK_STATUS_DONE,
+    TASK_STATUS_TODO,
+)
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import (
     create_tool_definition,

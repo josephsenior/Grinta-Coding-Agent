@@ -185,14 +185,11 @@ def build_search_code_action(
         f'fi'
     )
 
-    # Wrap output in structured XML so the LLM can parse results unambiguously.
-    # Format: <search_results pattern="..." path="...">\n...matches...\n</search_results>
-    safe_pattern_display = pattern.replace('"', '\\"')
-    safe_path_display = path.replace('"', '\\"')
+    # Wrap output in simple markers so the shell command stays quote-safe.
     cmd = (
-        f'echo "<search_results pattern="{safe_pattern_display}" path="{safe_path_display}">" && '
+        "printf '%s\n' '<search_results>' && "
         f'( {raw_search} ) && '
-        f'echo "</search_results>"'
+        "printf '%s\n' '</search_results>'"
     )
     trunc_pat = pattern[:50] + '…' if len(pattern) > 50 else pattern
     scope = f' in {path}' if path and path != '.' else ''
@@ -225,15 +222,15 @@ def _build_windows_search_action(
         if file_pattern:
             fp = _ps_quote(file_pattern)
             cmd = (
-                f"Get-ChildItem -Path {sp} -Filter {fp} -Recurse -File -ErrorAction SilentlyContinue | "
-                f"Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like \"*\\$_\\*\" }}) }} | "
-                f"ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results}"
+                f'Get-ChildItem -Path {sp} -Filter {fp} -Recurse -File -ErrorAction SilentlyContinue | '
+                f'Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like "*\\$_\\*" }}) }} | '
+                f'ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results}'
             )
         else:
             cmd = (
-                f"Get-ChildItem -Path {sp} -Recurse -File -ErrorAction SilentlyContinue | "
-                f"Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like \"*\\$_\\*\" }}) }} | "
-                f"ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results}"
+                f'Get-ChildItem -Path {sp} -Recurse -File -ErrorAction SilentlyContinue | '
+                f'Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like "*\\$_\\*" }}) }} | '
+                f'ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results}'
             )
         label = f'Listing files in {path}' if path and path != '.' else 'Listing files'
         return CmdRunAction(command=cmd, display_label=label)
@@ -259,7 +256,7 @@ def _build_windows_search_action(
 
     # Select-String fallback
     case_flag = '' if is_case_sensitive else ' -CaseSensitive:$false'
-    fp_filter = f" -Include {_ps_quote(file_pattern)}" if file_pattern else ''
+    fp_filter = f' -Include {_ps_quote(file_pattern)}' if file_pattern else ''
 
     cmd = (
         f"$rg = Get-Command rg -ErrorAction SilentlyContinue; "

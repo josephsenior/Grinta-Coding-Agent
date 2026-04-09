@@ -12,8 +12,8 @@ from backend.utils.async_utils import run_or_schedule
 
 if TYPE_CHECKING:
     from backend.core.config import AgentConfig, LLMConfig
-    from backend.orchestration.conversation_stats import ConversationStats
     from backend.ledger.event import Event
+    from backend.orchestration.conversation_stats import ConversationStats
     from backend.orchestration.replay import ReplayManager
     from backend.orchestration.state.state_tracker import StateTracker
     from backend.persistence.files import FileStore

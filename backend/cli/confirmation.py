@@ -90,8 +90,13 @@ def render_confirmation(
         )
 
     console.print()
+    console.print(
+        '[dim]Type [bold]y[/bold] to approve or [bold]n[/bold] to reject.[/dim]'
+    )
+    console.print()
     return Confirm.ask(
-        '[bold yellow]Approve this action?[/bold yellow]', console=console
+        '[bold yellow]Approve this action?[/bold yellow] [dim](y/n)[/dim]',
+        console=console,
     )
 
 

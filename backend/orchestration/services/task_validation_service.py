@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger  # noqa: E402
-from backend.core.task_status import ACTIVE_TASK_STATUSES
 from backend.core.schemas import AgentState  # noqa: E402
+from backend.core.task_status import ACTIVE_TASK_STATUSES
 from backend.ledger import EventSource  # noqa: E402
 from backend.ledger.action.agent import PlaybookFinishAction  # noqa: E402
 
@@ -51,9 +51,6 @@ class TaskValidationService:
         self, action: PlaybookFinishAction
     ) -> bool:
         """Block finish when the visible active plan still has tasks in progress."""
-        if getattr(action, 'force_finish', False):
-            return True
-
         controller = self._context.get_controller()
         plan = getattr(controller.state, 'plan', None)
         if plan is None:

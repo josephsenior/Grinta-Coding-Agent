@@ -9,9 +9,9 @@ from backend.orchestration.state.state_tracker import StateTracker
 
 if TYPE_CHECKING:
     from backend.core.config import AgentConfig, LLMConfig
-    from backend.orchestration.conversation_stats import ConversationStats
     from backend.ledger.event import Event
     from backend.orchestration.agent import Agent
+    from backend.orchestration.conversation_stats import ConversationStats
     from backend.orchestration.session_orchestrator import SessionOrchestrator
     from backend.persistence.files import FileStore
 

@@ -12,7 +12,11 @@ from backend.engine.tools.common import (
     get_security_risk_param,
     get_timeout_param,
 )
-from backend.engine.tools.prompt import get_shell_name, get_terminal_tool_name
+from backend.engine.tools.prompt import (
+    get_shell_name,
+    get_terminal_tool_name,
+    is_windows_with_bash,
+)
 
 ChatCompletionToolParam = Any
 
@@ -76,6 +80,15 @@ def create_cmd_run_tool(use_short_description: bool = False):
     description = (
         _SHORT_BASH_DESCRIPTION if use_short_description else _DETAILED_BASH_DESCRIPTION
     ).format(shell=shell)
+
+    # Explicit identity note for Windows + Git Bash to prevent PowerShell confusion
+    if is_windows_with_bash():
+        description += (
+            '\n* **IMPORTANT — Git Bash on Windows:** This terminal runs Git Bash, '
+            'NOT PowerShell. Use only bash commands (ls, cat, grep, find, echo, mkdir, rm). '
+            'Do NOT use PowerShell cmdlets (Get-ChildItem, Get-Process, $PSVersionTable, etc.). '
+            'Use `python` (not `python3`). Windows paths (C:\\...) in output are normal.'
+        )
 
     return create_tool_definition(
         name=tool_name,

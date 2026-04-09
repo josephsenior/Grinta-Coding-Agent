@@ -1,8 +1,7 @@
 """Client-side MCP tool proxy model."""
 
-from pydantic import ConfigDict
-
 from mcp.types import Tool
+from pydantic import ConfigDict
 
 
 class MCPClientTool(Tool):

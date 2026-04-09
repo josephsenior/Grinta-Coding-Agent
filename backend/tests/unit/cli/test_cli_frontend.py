@@ -40,13 +40,13 @@ from backend.ledger.action import (
     MessageAction,
     StreamingChunkAction,
 )
-from backend.persistence.locations import get_project_local_data_root
 from backend.ledger.observation import (
     AgentThinkObservation,
     CmdOutputObservation,
     ErrorObservation,
     TaskTrackingObservation,
 )
+from backend.persistence.locations import get_project_local_data_root
 
 
 def _make_console(*, width: int = 120) -> Console:
@@ -138,6 +138,8 @@ async def test_event_renderer_emits_each_duplicate_command_line() -> None:
 @pytest.mark.asyncio
 async def test_event_renderer_repeats_identical_file_read_rows() -> None:
     """Same read path after another tool still gets a new activity row each time."""
+    from backend.ledger.observation import FileReadObservation
+
     console = _make_console()
     renderer = CLIEventRenderer(
         console,
@@ -153,8 +155,10 @@ async def test_event_renderer_repeats_identical_file_read_rows() -> None:
     r2 = FileReadAction(path='pkg/a.py')
     r2.source = EventSource.AGENT
     renderer._process_event_data(r1)
+    renderer._process_event_data(FileReadObservation(content='a\nb', path='pkg/a.py'))
     renderer._process_event_data(other)
     renderer._process_event_data(r2)
+    renderer._process_event_data(FileReadObservation(content='a\nb', path='pkg/a.py'))
     assert _transcript_needle_count(console, 'pkg/a.py') == 2
     assert _transcript_needle_count(console, 'Viewed') == 2
 
@@ -162,6 +166,8 @@ async def test_event_renderer_repeats_identical_file_read_rows() -> None:
 @pytest.mark.asyncio
 async def test_event_renderer_message_action_between_reads_both_emit_rows() -> None:
     """Assistant MessageAction between two identical reads does not suppress either row."""
+    from backend.ledger.observation import FileReadObservation
+
     console = _make_console()
     renderer = CLIEventRenderer(
         console,
@@ -177,8 +183,10 @@ async def test_event_renderer_message_action_between_reads_both_emit_rows() -> N
     r2 = FileReadAction(path='x.py')
     r2.source = EventSource.AGENT
     renderer._process_event_data(r1)
+    renderer._process_event_data(FileReadObservation(content='alpha', path='x.py'))
     renderer._process_event_data(msg)
     renderer._process_event_data(r2)
+    renderer._process_event_data(FileReadObservation(content='beta', path='x.py'))
     assert _transcript_needle_count(console, 'x.py') == 2
 
 
@@ -212,6 +220,43 @@ def test_hud_shows_mcp_server_count_when_set() -> None:
     assert '3 MCP servers' in hud._format().plain
     n_skills = HUDBar.count_bundled_playbook_skills()
     assert f'{n_skills} skill' in hud._format().plain or f'{n_skills} skills' in hud._format().plain
+
+
+def test_hud_shows_provider_and_model_separately() -> None:
+    hud = HUDBar()
+    hud.update_model('openai/google/gemini-3-flash-preview')
+
+    full = hud._format().plain
+    compact = hud._format_compact().plain
+
+    assert 'provider: google' in full
+    assert 'model: gemini-3-flash-preview' in full
+    assert 'openai/google' not in full
+    assert 'google/gemini-3-flash-preview' in compact
+
+
+def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
+    from backend.cli.settings_tui import _render_ai_tab
+
+    console = _make_console()
+    llm_cfg = MagicMock()
+    llm_cfg.model = 'openai/google/gemini-3-flash-preview'
+    llm_cfg.api_key = None
+
+    config = MagicMock()
+    config.get_llm_config.return_value = llm_cfg
+    config.max_budget_per_task = None
+    config.cli_tool_icons = False
+
+    with patch('backend.cli.settings_tui.load_app_config', return_value=config):
+        _render_ai_tab(console)
+
+    output = _console_output(console)
+    assert 'Provider' in output
+    assert 'google' in output
+    assert 'Model' in output
+    assert 'gemini-3-flash-preview' in output
+    assert 'openai/google' not in output
 
 
 def test_hud_singular_mcp_label() -> None:
@@ -279,6 +324,47 @@ def test_hud_tracks_llm_call_count() -> None:
     assert hud.state.cost_usd == 0.5
 
 
+def test_hud_marks_estimated_token_usage() -> None:
+    hud = HUDBar()
+    metrics = Metrics()
+    metrics.accumulated_cost = 0.1
+    metrics.add_token_usage(
+        prompt_tokens=120,
+        completion_tokens=30,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=8000,
+        response_id='resp-est',
+        usage_estimated=True,
+    )
+
+    hud.update_from_llm_metrics(metrics)
+
+    assert hud.state.token_usage_estimated is True
+    assert 'est' in hud._format().plain
+    assert '~' in hud._format_compact().plain
+
+
+def test_hud_does_not_mark_provider_reported_usage_as_estimated() -> None:
+    hud = HUDBar()
+    metrics = Metrics()
+    metrics.accumulated_cost = 0.1
+    metrics.add_token_usage(
+        prompt_tokens=120,
+        completion_tokens=30,
+        cache_read_tokens=0,
+        cache_write_tokens=0,
+        context_window=8000,
+        response_id='resp-real',
+        usage_estimated=False,
+    )
+
+    hud.update_from_llm_metrics(metrics)
+
+    assert hud.state.token_usage_estimated is False
+    assert ' est' not in hud._format().plain
+
+
 def test_hud_falls_back_to_response_latencies_for_call_count() -> None:
     hud = HUDBar()
     metrics = Metrics()
@@ -305,8 +391,9 @@ def test_diff_panel_new_file() -> None:
     console = _make_console(width=80)
     console.print(panel)
     output = _console_output(console)
-    assert 'created' in output
+    assert 'Created' in output
     assert 'src/main.py' in output
+    assert '+ 2 lines' in output
 
 
 def test_diff_panel_existing_file_with_groups() -> None:
@@ -325,8 +412,10 @@ def test_diff_panel_existing_file_with_groups() -> None:
     console = _make_console(width=80)
     console.print(panel)
     output = _console_output(console)
-    assert 'edited' in output
+    assert 'Edited' in output
     assert 'README.md' in output
+    assert '+ 2 lines' in output
+    assert '- 1 lines' in output
 
 
 def test_show_grinta_splash_renders_logo_text() -> None:
@@ -598,12 +687,15 @@ def test_prompt_toolbar_reflects_state_and_autonomy() -> None:
     controller = MagicMock()
     controller.autonomy_controller = autonomy_controller
     repl.set_controller(controller)
+    repl._hud.update_model('openai/google/gemini-3-flash-preview')
 
     toolbar = repl._prompt_toolbar_text()
 
     assert 'Stopped' in toolbar
     assert 'autonomy:full' in toolbar
     assert 'Tab for commands' in toolbar
+    assert 'provider: google' in toolbar
+    assert 'model: gemini-3-flash-preview' in toolbar
 
 
 def test_unknown_command_suggests_closest_match() -> None:
@@ -1541,13 +1633,18 @@ async def test_renderer_handles_file_read_action() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
+    from backend.ledger.observation import FileReadObservation
+
     action = FileReadAction(path='/workspace/src/main.py')
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
-    # FileReadAction now prints a persistent tool-call label to console
-    assert not renderer._reasoning.active
+    await renderer.handle_event(
+        FileReadObservation(content='line1\nline2', path='/workspace/src/main.py')
+    )
+
     output = _console_output(console)
     assert 'main.py' in output
+    assert '2 lines' in output
 
 
 @pytest.mark.asyncio
@@ -1569,6 +1666,7 @@ async def test_renderer_handles_file_read_observation() -> None:
 @pytest.mark.asyncio
 async def test_renderer_handles_mcp_action() -> None:
     from backend.ledger.action import MCPAction
+    from backend.ledger.observation import MCPObservation
 
     console = _make_console()
     hud = HUDBar()
@@ -1578,11 +1676,12 @@ async def test_renderer_handles_mcp_action() -> None:
     action = MCPAction(name='search_code', arguments={'query': 'test'})
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
-    # MCPAction prints a friendly verb + query detail
-    assert not renderer._reasoning.active
+    await renderer.handle_event(MCPObservation(content='{"text": "found 3 matches"}'))
+
     output = _console_output(console)
     assert 'Searched' in output
     assert 'test' in output
+    assert 'found 3 matches' in output
 
 
 @pytest.mark.asyncio
@@ -1604,6 +1703,7 @@ async def test_renderer_handles_success_observation() -> None:
 @pytest.mark.asyncio
 async def test_renderer_handles_delegate_task_action() -> None:
     from backend.ledger.action import DelegateTaskAction
+    from backend.ledger.observation import DelegateTaskObservation
 
     console = _make_console()
     hud = HUDBar()
@@ -1613,10 +1713,172 @@ async def test_renderer_handles_delegate_task_action() -> None:
     action = DelegateTaskAction(task_description='Write unit tests')
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
-    # DelegateTaskAction prints a friendly activity row
-    assert not renderer._reasoning.active
+    await renderer.handle_event(DelegateTaskObservation(content='done', success=True))
+
     output = _console_output(console)
     assert 'Delegated' in output
+    assert 'Write unit tests' in output
+    assert 'done' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_summarizes_parallel_delegate_task_results() -> None:
+    from backend.ledger.action import DelegateTaskAction
+    from backend.ledger.observation import DelegateTaskObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    action = DelegateTaskAction(
+        parallel_tasks=[
+            {'task_description': 'Analyze existing codebase and script logic'},
+            {'task_description': 'Draft README updates'},
+            {'task_description': 'Add regression tests'},
+        ]
+    )
+    action.source = EventSource.AGENT
+    await renderer.handle_event(action)
+    await renderer.handle_event(
+        DelegateTaskObservation(
+            content=(
+                '[OK] Analyze existing codebase and script logic\n'
+                'Worker completed with status: finished\n\n'
+                '[OK] Draft README updates\n'
+                'Worker completed with status: finished\n\n'
+                '[OK] Add regression tests\n'
+                'Worker completed with status: finished'
+            ),
+            success=True,
+        )
+    )
+
+    output = _console_output(console)
+    assert '3 parallel tasks' in output
+    assert 'all 3 workers completed' in output
+    assert 'Analyze existing codebase and script logic' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_shows_background_delegate_completion_without_pending_card() -> None:
+    from backend.ledger.observation import DelegateTaskObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    await renderer.handle_event(
+        DelegateTaskObservation(
+            content=(
+                '[OK] Write tests\n'
+                'Worker completed with status: finished\n\n'
+                '[FAILED] Update docs\n'
+                'Agent did not finish gracefully (State: error).'
+            ),
+            success=False,
+            error_message='One or more parallel workers failed.',
+        )
+    )
+
+    output = _console_output(console)
+    assert '1/2 workers completed' in output
+    assert 'Update docs' in output
+    assert 'One or more parallel workers failed.' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_updates_worker_panel_from_delegate_progress_status() -> None:
+    from backend.ledger.observation import StatusObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    renderer.start_live()
+
+    await renderer.handle_event(
+        StatusObservation(
+            content='Worker 1 · Starting delegated worker',
+            status_type='delegate_progress',
+            extras={
+                'worker_id': 'worker-1',
+                'worker_label': 'Worker 1',
+                'task_description': 'Write unit tests for the converter',
+                'worker_status': 'starting',
+                'detail': 'Starting delegated worker',
+                'order': 1,
+            },
+        )
+    )
+    await renderer.handle_event(
+        StatusObservation(
+            content='Worker 1 · Viewed requirements.txt',
+            status_type='delegate_progress',
+            extras={
+                'worker_id': 'worker-1',
+                'worker_label': 'Worker 1',
+                'task_description': 'Write unit tests for the converter',
+                'worker_status': 'running',
+                'detail': 'Viewed requirements.txt',
+                'order': 1,
+            },
+        )
+    )
+    await renderer.handle_event(
+        StatusObservation(
+            content='Worker 1 · Completed converter tests',
+            status_type='delegate_progress',
+            extras={
+                'worker_id': 'worker-1',
+                'worker_label': 'Worker 1',
+                'task_description': 'Write unit tests for the converter',
+                'worker_status': 'done',
+                'detail': 'Completed converter tests',
+                'order': 1,
+            },
+        )
+    )
+
+    renderer.stop_live()
+    output = _console_output(console)
+    assert 'Workers (1)' in output
+    assert 'Worker 1' in output
+    assert 'Write unit tests for the converter' in output
+    assert 'Completed converter tests' in output
+    assert '[DONE]' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_renders_finish_action_message_and_next_steps() -> None:
+    from backend.ledger.action import PlaybookFinishAction
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    action = PlaybookFinishAction(
+        final_thought='Completed the Markdown to HTML converter.',
+        outputs={
+            'completed': ['Created md_to_html.py', 'Generated sample.html'],
+            'next_steps': [
+                'Open sample.html in a browser',
+                'Replace sample.md with your real input',
+            ],
+        },
+    )
+    action.source = EventSource.AGENT
+
+    await renderer.handle_event(action)
+
+    output = _console_output(console)
+    assert 'Completed the Markdown to HTML converter.' in output
+    assert 'Next steps' in output
+    assert 'Open sample.html in a browser' in output
 
 
 @pytest.mark.asyncio
@@ -1902,6 +2164,40 @@ async def test_renderer_cmd_run_shows_thought() -> None:
     assert reasoning.active
     assert reasoning._current_action  # action label set in reasoning
     assert reasoning._thought_lines  # thought was passed
+
+
+@pytest.mark.asyncio
+async def test_renderer_internal_cmd_run_uses_origin_tool_title() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    action = CmdRunAction(
+        command='python missing.py',
+        display_label='Mapping project structure (.)',
+    )
+    action.source = EventSource.AGENT
+    action.tool_call_metadata = MagicMock(
+        function_name='analyze_project_structure',
+        tool_call_id='call-1',
+        total_calls_in_response=1,
+    )
+
+    await renderer.handle_event(action)
+    await renderer.handle_event(
+        CmdOutputObservation(
+            content='[MISSING_TOOL] Install with: winget install python',
+            exit_code=127,
+            command='python missing.py',
+        )
+    )
+
+    output = _console_output(console)
+    assert 'Analyze project' in output
+    assert 'Mapping project structure (.)' in output
+    assert 'Shell' not in output
 
 
 def test_reasoning_display_tool_icons() -> None:

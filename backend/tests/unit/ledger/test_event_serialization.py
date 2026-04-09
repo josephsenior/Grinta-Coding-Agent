@@ -6,7 +6,11 @@ import pytest
 
 from backend.ledger.action import AgentThinkAction, MessageAction, NullAction
 from backend.ledger.event import EventSource
-from backend.ledger.observation import AgentThinkObservation, ErrorObservation, LspQueryObservation
+from backend.ledger.observation import (
+    AgentThinkObservation,
+    ErrorObservation,
+    LspQueryObservation,
+)
 from backend.ledger.serialization.event import (
     event_from_dict,
     event_to_dict,

@@ -254,12 +254,15 @@ class TestMainEntryPoints:
                                 # This will execute the body of load_app_config
                                 load_app_config(set_logging_levels=True)
 
-    def test_load_app_config_uses_app_root_for_default_settings(self, tmp_path):
-        settings_root = tmp_path / 'app-root'
+    def test_load_app_config_uses_repo_anchored_settings_path(self, tmp_path):
+        settings_root = tmp_path / 'repo-root'
         settings_root.mkdir()
         expected_settings = settings_root / 'settings.json'
 
-        with patch.dict(os.environ, {'APP_ROOT': str(settings_root)}, clear=False):
+        with patch(
+            'backend.core.config.config_loader.get_canonical_settings_path',
+            return_value=str(expected_settings),
+        ):
             with patch('backend.core.config.config_loader.rebuild_config_models'):
                 with patch(
                     'backend.core.config.config_loader.load_from_json'

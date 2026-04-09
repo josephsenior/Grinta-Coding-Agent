@@ -52,6 +52,7 @@ def _resolve_rollback_id(checkpoint_id: str, manager: RollbackManager) -> str | 
     """
     if checkpoint_id.isdigit():
         import json as _json
+
         from backend.engine.tools.checkpoint import _checkpoints_path
 
         path = _checkpoints_path()

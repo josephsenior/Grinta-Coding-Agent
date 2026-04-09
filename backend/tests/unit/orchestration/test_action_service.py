@@ -27,13 +27,15 @@ def _make_context() -> MagicMock:
         prompt_tokens=0, completion_tokens=0
     )
     # Mock get_combined_metrics to return a proper metrics-like object
-    controller.conversation_stats.get_combined_metrics.return_value = SimpleNamespace(
+    _metrics_ns = SimpleNamespace(
         accumulated_cost=0.5,
         accumulated_token_usage=SimpleNamespace(
             prompt_tokens=100, completion_tokens=50
         ),
         max_budget_per_task=10.0,
     )
+    _metrics_ns.copy = lambda: SimpleNamespace(**vars(_metrics_ns))  # type: ignore[attr-defined]
+    controller.conversation_stats.get_combined_metrics.return_value = _metrics_ns
     controller._bind_action_context = MagicMock()
     ctx = MagicMock()
     ctx.get_controller.return_value = controller

@@ -1,6 +1,7 @@
 """Tests for EventRouterService."""
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.core.schemas import AgentState
@@ -9,14 +10,21 @@ from backend.ledger.action import (
     Action,
     AgentRejectAction,
     ChangeAgentStateAction,
+    CmdRunAction,
+    FileReadAction,
     MessageAction,
     PlaybookFinishAction,
+    SignalProgressAction,
     TaskTrackingAction,
 )
 from backend.ledger.observation import ErrorObservation, Observation
 from backend.ledger.observation.agent import AgentThinkObservation
 from backend.ledger.tool import ToolCallMetadata
-from backend.orchestration.services.event_router_service import EventRouterService
+from backend.orchestration.services.event_router_service import (
+    EventRouterService,
+    _build_delegate_progress_observation,
+    _summarize_delegate_worker_event,
+)
 
 
 class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
@@ -450,6 +458,100 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
 
         # Should schedule the background task
         mock_run_schedule.assert_called_once()
+        scheduled = mock_run_schedule.call_args.args[0]
+        scheduled.close()
+
+    async def test_delegate_workers_use_inline_event_delivery(self):
+        """Delegated worker streams must use inline delivery and _step_inner for execution."""
+        from backend.ledger.action.agent import DelegateTaskAction
+
+        action = DelegateTaskAction(task_description='Build delegated artifact')
+        action.id = 123
+
+        # Parent controller must not auto-create runtime (MagicMock default)
+        # so the runtime bridge code is skipped in this test.
+        self.mock_controller.runtime = None
+
+        self.mock_controller.config = SimpleNamespace(
+            sid='parent-session',
+            file_store=MagicMock(),
+            user_id='user-1',
+            agent_configs={},
+            agent_to_llm_config={},
+            iteration_delta=1,
+            budget_per_task_delta=None,
+            security_analyzer=None,
+            pending_action_timeout=1.0,
+        )
+        self.mock_controller.agent = SimpleNamespace(
+            config=None,
+            llm_registry=MagicMock(),
+        )
+
+        scheduled: list = []
+
+        def _capture(coro):
+            scheduled.append(coro)
+
+        class _FakeWorkerAgent:
+            def __init__(self, config, llm_registry):
+                self.config = config
+                self.llm_registry = llm_registry
+                self.blackboard = None
+                self.tools = []
+                self.planner = SimpleNamespace(build_toolset=lambda: [])
+
+        step_inner_called = False
+
+        class _FakeWorkerController:
+            def __init__(self, config):
+                self.config = config
+                self.event_stream = config.event_stream
+                self.state = SimpleNamespace(outputs={'result': 'ok'})
+                self._states = iter(
+                    [AgentState.RUNNING, AgentState.FINISHED, AgentState.FINISHED]
+                )
+
+            async def set_agent_state_to(self, state):
+                return None
+
+            async def _step_inner(self):
+                nonlocal step_inner_called
+                step_inner_called = True
+
+            def get_agent_state(self):
+                return next(self._states)
+
+            async def close(self, set_stop_state=False):
+                return None
+
+        with patch('backend.utils.async_utils.run_or_schedule', side_effect=_capture):
+            with patch(
+                'backend.orchestration.services.event_router_service.EventStream'
+            ) as mock_event_stream:
+                worker_stream = MagicMock()
+                mock_event_stream.return_value = worker_stream
+                with patch(
+                    'backend.orchestration.agent.Agent.get_cls',
+                    return_value=_FakeWorkerAgent,
+                ):
+                    with patch(
+                        'backend.orchestration.conversation_stats.ConversationStats',
+                        return_value=MagicMock(),
+                    ):
+                        with patch(
+                            'backend.orchestration.session_orchestrator.SessionOrchestrator',
+                            _FakeWorkerController,
+                        ):
+                            await self.service._handle_delegate_task_action(action)
+                            self.assertEqual(len(scheduled), 1)
+                            await scheduled[0]
+
+                # Worker stream must use inline delivery
+                mock_event_stream.assert_called_once()
+                self.assertEqual(mock_event_stream.call_args.kwargs['worker_count'], 0)
+                # Worker loop must call _step_inner directly
+                self.assertTrue(step_inner_called)
 
     async def test_handle_finish_action_calls_run_critics(self):
         """_handle_finish_action must invoke critics after audit log."""
@@ -457,6 +559,43 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         with patch.object(self.service, '_run_critics', new_callable=AsyncMock) as m:
             await self.service._handle_finish_action(action)
         m.assert_called_once()
+
+    def test_summarize_delegate_worker_event_for_tool_actions(self):
+        read_action = FileReadAction(path='src/main.py')
+        assert _summarize_delegate_worker_event(read_action) == (
+            'running',
+            'Viewed src/main.py',
+        )
+
+        cmd_action = CmdRunAction(
+            command='pytest -q', display_label='Running tests for worker'
+        )
+        assert _summarize_delegate_worker_event(cmd_action) == (
+            'running',
+            'Ran Running tests for worker',
+        )
+
+        signal_action = SignalProgressAction(progress_note='Halfway through test setup')
+        assert _summarize_delegate_worker_event(signal_action) == (
+            'running',
+            'Halfway through test setup',
+        )
+
+    def test_build_delegate_progress_observation_is_hidden(self):
+        obs = _build_delegate_progress_observation(
+            worker_id='worker-1',
+            worker_label='Worker 1',
+            task_description='Write integration tests',
+            status='running',
+            detail='Viewed requirements.txt',
+            order=1,
+        )
+
+        assert obs.hidden is True
+        assert obs.status_type == 'delegate_progress'
+        assert obs.extras['worker_id'] == 'worker-1'
+        assert obs.extras['worker_status'] == 'running'
+        assert 'Viewed requirements.txt' in obs.content
 
 
 if __name__ == '__main__':

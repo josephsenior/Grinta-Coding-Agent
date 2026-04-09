@@ -13,7 +13,10 @@ from backend.persistence.conversation.file_conversation_store import (
     FileConversationStore,
 )
 from backend.persistence.knowledge_base.knowledge_base_store import KnowledgeBaseStore
-from backend.persistence.locations import get_local_data_root, get_project_local_data_root
+from backend.persistence.locations import (
+    get_local_data_root,
+    get_project_local_data_root,
+)
 
 
 def _fake_user_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
@@ -22,6 +25,8 @@ def _fake_user_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     fake.mkdir()
     monkeypatch.setenv('HOME', str(fake))
     monkeypatch.setenv('USERPROFILE', str(fake))
+    monkeypatch.delenv('PROJECT_ROOT', raising=False)
+    monkeypatch.delenv('APP_PROJECT_ROOT', raising=False)
     return fake
 
 

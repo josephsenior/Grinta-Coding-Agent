@@ -19,8 +19,8 @@ from backend.persistence.data_models.conversation_metadata_result_set import (
 from backend.persistence.locations import (
     CONVERSATION_BASE_DIR,
     get_conversation_dir,
-    get_local_data_root,
     get_conversation_metadata_filename,
+    get_local_data_root,
 )
 from backend.utils.async_utils import call_sync_from_async
 from backend.utils.search_utils import offset_to_page_id, page_id_to_offset

@@ -53,7 +53,7 @@ def test_spacer_live_section_is_empty_text() -> None:
 
 
 def test_callout_padding_tuple() -> None:
-    assert CALLOUT_PANEL_PADDING == (1, 1)
+    assert CALLOUT_PANEL_PADDING == (1, 2)
 
 
 def test_activity_block_bottom_pad() -> None:

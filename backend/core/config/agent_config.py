@@ -16,7 +16,7 @@ from pydantic import (
 from backend._canonical import CanonicalModelMetaclass
 
 # Import CompactorConfig directly - needed for Pydantic validation
-from backend.core.config.compactor_config import CompactorConfig, AutoCompactorConfig
+from backend.core.config.compactor_config import AutoCompactorConfig, CompactorConfig
 from backend.core.config.config_telemetry import config_telemetry
 from backend.core.constants import (
     CURRENT_AGENT_CONFIG_SCHEMA_VERSION,
@@ -150,8 +150,8 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_working_memory: bool = Field(default=True)
     enable_lsp_query: bool = Field(default=True)
     enable_signal_progress: bool = Field(default=True)
-    enable_swarming: bool = Field(default=True)
-    enable_blackboard: bool = Field(default=True)
+    enable_swarming: bool = Field(default=False)
+    enable_blackboard: bool = Field(default=False)
     enable_verify_file_lines: bool = Field(default=True)
     enable_meta_cognition: bool = Field(default=True)
     enable_checkpoints: bool = Field(default=True)

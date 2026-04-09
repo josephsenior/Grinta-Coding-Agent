@@ -225,8 +225,6 @@ def get_effective_workspace_root() -> Path | None:
     Order: ``PROJECT_ROOT`` env (CLI pins this to the directory you launched from),
     ``APP_PROJECT_ROOT``, then :attr:`AppConfig.project_root`, then the process cwd.
     """
-    import os
-
     from backend.core.config.config_loader import load_app_config
 
     cfg = load_app_config(set_logging_levels=False)

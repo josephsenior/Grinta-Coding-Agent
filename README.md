@@ -18,8 +18,8 @@ Give it a task like *"Add Stripe payment support"* and Grinta will: read the cod
 Most AI coding tools stop at the file edit. Grinta keeps going:
 
 - **Task Completion, Not File Edits:** A structured planner breaks work into steps and validates completion before declaring done. You get a finished task, not a pile of edits to review.
-- **Self-Correcting:** If tests fail after an edit, Grinta detects it and tries again. If it gets stuck in a loop, a 6-strategy circuit breaker pauses it for your review — not silently burns your budget.
-- **Built for Long Tasks:** Event-sourced session persistence, Write-Ahead Logging, and 12 context compactors mean a 500-step session stays coherent as a 50-step one.
+- **Self-Correcting:** If tests fail after an edit, Grinta detects it and tries again. If it gets stuck in a loop, a warning-first circuit breaker and a 10-heuristic stuck detector pause it for your review instead of silently burning your budget.
+- **Built for Long Tasks:** Event-sourced session persistence, Write-Ahead Logging, and 9 live compactor implementations keep a 500-step session coherent instead of letting it drown in its own history.
 - **Budget-Aware:** Per-task cost caps and inline cost tracking keep spend predictable — ideal for unattended overnight runs.
 - **Safety First:** Per-action risk assessment, rollback checkpoints (no git required), and multi-trip circuit breakers before any destructive action.
 - **Local-First:** Native Ollama and OpenAI-compatible support. Zero cloud required.
@@ -82,7 +82,7 @@ graph TB
     end
 
     subgraph Memory["Context Memory"]
-        Condensers["12 Compactors"]
+        Condensers["9 Compactors"]
         GraphRAG[GraphRAG]
     end
 
@@ -187,7 +187,7 @@ The orchestrator writes a structured plan, tracks step completion, and validates
 
 Tasks can be codified as [Playbooks](docs/USER_GUIDE.md) — YAML files that define goals, constraints, and step templates. Grinta matches incoming requests to playbooks by keyword and semantic similarity, then executes the plan with full execution policy controls.
 
-### 12 Context Compactors
+### 8 Context Compactors
 
 Stop running out of tokens. Grinta uses specialized compactors to compress conversation history. The codebase and persisted config now both use `compactor` terminology throughout.
 
@@ -214,6 +214,7 @@ Grinta detects if the agent is looping by analyzing action patterns, semantic in
 
 - [User Guide](docs/USER_GUIDE.md) — LLM setup, execution policies, playbooks, and web UI usage.
 - [Architecture](docs/ARCHITECTURE.md) — Deeper dive into the controller, events, and engine layers.
+- [The Book of Grinta](docs/journey/README.md) — The full build journey, major pivots, removed systems, and architectural reasoning.
 - [Vocabulary](docs/VOCABULARY.md) — Canonical Grinta terminology and package taxonomy.
 - [Developer Guide](docs/DEVELOPER.md) — For contributors: project layout, internals, and patterns.
 - [API Reference](openapi.json) — Full OpenAPI 3.1 spec for the backend.

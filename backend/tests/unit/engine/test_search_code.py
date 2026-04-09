@@ -15,6 +15,15 @@ class TestBuildSearchCodeAction:
         assert '--exclude-dir=.tmp_cli_manual' in action.command
         assert '--binary-files=without-match' in action.command
 
+    def test_search_mode_uses_quote_safe_result_markers(self, monkeypatch) -> None:
+        monkeypatch.setattr(search_code_mod, 'uses_powershell_terminal', lambda: False)
+        action = build_search_code_action(pattern='print("hi")', path='src')
+
+        assert 'printf' in action.command
+        assert '<search_results>' in action.command
+        assert '</search_results>' in action.command
+        assert 'pattern="' not in action.command
+
     def test_file_discovery_prunes_generated_dirs(self, monkeypatch) -> None:
         monkeypatch.setattr(search_code_mod, 'uses_powershell_terminal', lambda: False)
         action = build_search_code_action(file_pattern='*.py')

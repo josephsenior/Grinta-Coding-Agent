@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import importlib
-import os
 import sys
 import warnings
 
@@ -20,11 +19,25 @@ import warnings
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 
+_EPILOG = """examples:
+  grinta
+      Start the interactive REPL in the current directory.
+  grinta -p .
+      Same, with an explicit project root (current directory).
+  grinta -p /path/to/repo -m anthropic/claude-sonnet-4-20250514
+      Use that project folder and override the model for this session only.
+  grinta --cleanup-storage
+      Consolidate legacy storage under .grinta/storage, then exit.
+"""
+
+
 def main() -> None:
     """Parse flags and launch the interactive REPL."""
     parser = argparse.ArgumentParser(
         prog='grinta',
         description='Grinta — AI coding agent for the terminal',
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         '--model',

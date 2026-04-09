@@ -6,9 +6,9 @@ import os
 from datetime import UTC, datetime
 from typing import Literal
 
+from backend.core.auth import get_current_user_id
 from backend.core.config.config_loader import load_app_config
 from backend.core.logger import app_logger as logger
-from backend.core.auth import get_current_user_id
 from backend.persistence.conversation.conversation_store import ConversationStore
 from backend.persistence.data_models.conversation_metadata import ConversationMetadata
 from backend.utils.conversation_summary import get_default_conversation_title

@@ -33,7 +33,7 @@ class TestPendingActionService(unittest.TestCase):
         """Test service initializes with None pending action."""
         self.assertEqual(self.service._context, self.mock_context)
         self.assertEqual(self.service._timeout, 120.0)
-        self.assertIsNone(self.service._pending)
+        self.assertIsNone(self.service._legacy_pending)
 
     def test_set_action(self):
         """Test set() stores action with timestamp."""
@@ -43,9 +43,9 @@ class TestPendingActionService(unittest.TestCase):
 
         self.service.set(mock_action)
 
-        self.assertIsNotNone(self.service._pending)
-        assert self.service._pending is not None
-        action, timestamp = self.service._pending
+        self.assertIsNotNone(self.service._legacy_pending)
+        assert self.service._legacy_pending is not None
+        action, timestamp = self.service._legacy_pending
         self.assertEqual(action, mock_action)
         self.assertIsInstance(timestamp, float)
         self.mock_controller.log.assert_called_once()
@@ -61,7 +61,7 @@ class TestPendingActionService(unittest.TestCase):
         # Then clear it
         self.service.set(None)
 
-        self.assertIsNone(self.service._pending)
+        self.assertIsNone(self.service._legacy_pending)
         # Should have logged clearing
         self.assertEqual(self.mock_controller.log.call_count, 2)  # Set + clear
 
@@ -81,7 +81,7 @@ class TestPendingActionService(unittest.TestCase):
         """Test set(None) when no pending action does nothing."""
         self.service.set(None)
 
-        self.assertIsNone(self.service._pending)
+        self.assertIsNone(self.service._legacy_pending)
         self.mock_controller.log.assert_not_called()
 
     def test_get_returns_action_when_not_timed_out(self):
@@ -117,7 +117,8 @@ class TestPendingActionService(unittest.TestCase):
         action = self.service.get()
 
         self.assertIsNone(action)
-        self.assertIsNone(self.service._pending)
+        self.assertEqual(len(self.service._outstanding), 0)
+        self.assertIsNone(self.service._legacy_pending)
 
         # Should have logged timeout
         self.mock_controller.event_stream.add_event.assert_called_once()
@@ -171,7 +172,7 @@ class TestPendingActionService(unittest.TestCase):
         result = self.service.info()
 
         self.assertIsNone(result)
-        self.assertIsNone(self.service._pending)
+        self.assertIsNone(self.service._legacy_pending)
         self.mock_controller.event_stream.add_event.assert_called_once()
 
     def test_info_returns_none_when_no_pending(self):
@@ -274,8 +275,8 @@ class TestPendingActionService(unittest.TestCase):
         self.assertEqual(self.mock_controller.log.call_count, 2)  # set1 + set2
 
         # Current pending should be action2
-        assert self.service._pending is not None
-        action, timestamp = self.service._pending
+        assert self.service._legacy_pending is not None
+        action, timestamp = self.service._legacy_pending
         self.assertEqual(action, mock_action2)
 
     def test_custom_timeout(self):
@@ -296,7 +297,7 @@ class TestPendingActionService(unittest.TestCase):
 
         self.service.shutdown()
 
-        self.assertIsNone(self.service._pending)
+        self.assertIsNone(self.service._legacy_pending)
         self.assertIsNone(self.service._watchdog_handle)
         fake_handle.cancel.assert_called_once_with()
 
@@ -356,7 +357,7 @@ class TestPendingActionWatchdog(unittest.IsolatedAsyncioTestCase):
         mock_action.id = 'action-123'
 
         mock_time.return_value = 100.0
-        self.service._pending = (mock_action, 100.0)
+        self.service._legacy_pending = (mock_action, 100.0)
 
         mock_time.return_value = 106.0
         self.service._watchdog_fire()

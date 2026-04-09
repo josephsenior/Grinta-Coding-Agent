@@ -286,7 +286,8 @@ class TestExecuteAction:
     @pytest.mark.asyncio
     async def test_blocked_action_not_run(self):
         """After pipeline refactor, blocking happens inside run_execute (action_service).
-        execute_action itself always calls run_action; blocking is handled downstream."""
+        execute_action itself always calls run_action; blocking is handled downstream.
+        """
         ctx = _make_context()
         action = MagicMock()
         action.runnable = True

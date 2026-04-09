@@ -6,9 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import backend
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.text import Text
+
+import backend
 
 
 @dataclass
@@ -27,10 +28,12 @@ class HUDState:
     agent_state_label: str = 'Ready'
     #: Autonomy level label (e.g. 'balanced', 'full', 'supervised').
     autonomy_level: str = 'balanced'
+    #: True when token usage shown in HUD is estimated rather than provider-reported.
+    token_usage_estimated: bool = False
 
 
 class HUDBar:
-    """Renderable footer bar: [Model] | [Context] | [Cost] | [LLM calls] | [State]."""
+    """Renderable footer bar: [Provider / Model] | [Context] | [Cost] | [LLM calls] | [State]."""
 
     def __init__(self) -> None:
         self.state = HUDState()
@@ -72,6 +75,27 @@ class HUDBar:
             return '1 skill'
         return f'{count} skills'
 
+    @staticmethod
+    def describe_model(model: str | None) -> tuple[str, str]:
+        """Return a user-facing provider/model pair from a routing model id."""
+        raw = (model or '').strip()
+        if not raw or raw == '(not set)':
+            return '(not set)', '(not set)'
+
+        try:
+            from backend.inference.provider_resolver import get_resolver
+
+            resolver = get_resolver()
+            stripped = resolver.strip_provider_prefix(raw)
+            provider = resolver.resolve_provider(stripped)
+            display_model = resolver.strip_provider_prefix(stripped)
+            return provider, display_model
+        except Exception:
+            if '/' in raw:
+                provider, display_model = raw.split('/', 1)
+                return provider.lower(), display_model or '(not set)'
+            return '(unknown)', raw
+
     # -- rich renderable protocol ------------------------------------------
 
     def __rich_console__(
@@ -85,16 +109,20 @@ class HUDBar:
 
     def _full_bar_length(self) -> int:
         """Approximate character length of the full-format HUD bar."""
+        provider, model = self.describe_model(self.state.model)
         ctx = self._format_tokens(self.state.context_tokens)
         lim = (
             self._format_tokens(self.state.context_limit)
             if self.state.context_limit else '?'
         )
         token_display = f'{ctx} tokens' if self.state.context_limit == 0 else f'{ctx}/{lim}'
+        if self.state.token_usage_estimated:
+            token_display += ' est'
         mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
         skills_label = self._format_skills_label(self._bundled_skill_count)
         parts = [
-            f' model: {self.state.model}',
+            f' provider: {provider}',
+            f'  •  model: {model}',
             f'  •  {token_display}',
             f'  •  ${self.state.cost_usd:.4f}',
             f'  •  {self.state.llm_calls} calls',
@@ -105,6 +133,7 @@ class HUDBar:
         return sum(len(p) for p in parts) + 1  # +1 for leading space
 
     def _format(self) -> Text:
+        provider, model = self.describe_model(self.state.model)
         ctx = self._format_tokens(self.state.context_tokens)
         lim = (
             self._format_tokens(self.state.context_limit)
@@ -118,13 +147,18 @@ class HUDBar:
             token_display = f'{ctx} tokens'
         else:
             token_display = f'{ctx}/{lim}'
+        if self.state.token_usage_estimated:
+            token_display += ' est'
         mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
         skills_label = self._format_skills_label(self._bundled_skill_count)
         SEP = ('  •  ', '#2f465b')
         parts = [
             (' ', ''),
+            ('provider: ', '#4a6b82'),
+            (provider, 'bold #dbe7f3'),
+            SEP,
             ('model: ', '#4a6b82'),
-            (self.state.model, 'bold #dbe7f3'),
+            (model, 'bold #dbe7f3'),
             SEP,
             (token_display, '#b4c4d5'),
             SEP,
@@ -145,6 +179,7 @@ class HUDBar:
 
     def _format_compact(self) -> Text:
         """Compact format for narrow terminals (< 80 cols)."""
+        provider, model = self.describe_model(self.state.model)
         ctx = self._format_tokens(self.state.context_tokens)
         if self.state.context_tokens == 0 and self.state.context_limit == 0:
             token_display = '0t'
@@ -152,17 +187,23 @@ class HUDBar:
             token_display = f'{ctx}t'
         else:
             token_display = ctx
+        if self.state.token_usage_estimated:
+            token_display += '~'
         mcp_short = (
             '?'
             if self.state.mcp_servers is None
             else str(min(self.state.mcp_servers, 99))
         )
         sk_short = str(min(self._bundled_skill_count, 99))
+        if provider in {'(not set)', '(unknown)'}:
+            model_display = model
+        else:
+            model_display = f'{provider}/{model}'
         parts = [
             (
-                self.state.model.rsplit('/', maxsplit=1)[-1],
+                model_display,
                 'dim',
-            ),  # last segment
+            ),
             (' ', 'grey27'),
             (token_display, 'dim'),
             (' ', 'grey27'),
@@ -313,6 +354,9 @@ class HUDBar:
                 self.state.context_limit = int(
                     getattr(accumulated_usage, 'context_window', 0) or 0
                 )
+                self.state.token_usage_estimated = bool(
+                    getattr(accumulated_usage, 'usage_estimated', False)
+                )
                 return
 
             if usages:
@@ -322,6 +366,9 @@ class HUDBar:
                 ) + int(getattr(latest, 'completion_tokens', 0) or 0)
                 self.state.context_limit = int(
                     getattr(latest, 'context_window', 0) or 0
+                )
+                self.state.token_usage_estimated = bool(
+                    getattr(latest, 'usage_estimated', False)
                 )
             return
 
@@ -351,6 +398,9 @@ class HUDBar:
                     self.state.context_limit = int(
                         accumulated_usage.get('context_window', 0) or 0
                     )
+                    self.state.token_usage_estimated = bool(
+                        accumulated_usage.get('usage_estimated', False)
+                    )
                     return
 
             if usages:
@@ -363,6 +413,9 @@ class HUDBar:
                     self.state.context_tokens = total
                     self.state.context_limit = int(
                         latest.get('context_window', 0) or 0
+                    )
+                    self.state.token_usage_estimated = bool(
+                        latest.get('usage_estimated', False)
                     )
             return
 

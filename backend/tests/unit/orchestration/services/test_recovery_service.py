@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from backend.core.schemas import AgentState
-from backend.inference.exceptions import AuthenticationError, Timeout
+from backend.inference.exceptions import AuthenticationError, RateLimitError, Timeout
 from backend.ledger.observation import ErrorObservation
 from backend.orchestration.services.recovery_service import RecoveryService
 
@@ -37,7 +37,7 @@ def ctrl(mock_context):
 
 class TestRecoveryService:
     @pytest.mark.asyncio
-    async def test_emits_error_and_transitions_to_awaiting_input(
+    async def test_emits_error_and_stays_running_on_timeout(
         self, mock_context, ctrl
     ):
         svc = RecoveryService(mock_context)
@@ -49,11 +49,9 @@ class TestRecoveryService:
         assert isinstance(err_obs, ErrorObservation)
         assert err_obs.error_id == 'LLM_TIMEOUT'
         assert 'Timeout' in err_obs.content
-        ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
-        mock_context.set_agent_state.assert_awaited_once_with(
-            AgentState.AWAITING_USER_INPUT
-        )
-        mock_context.trigger_step.assert_not_called()
+        # Timeout is agent-survivable: no retry queue, no state transition
+        ctrl.retry_service.schedule_retry_after_failure.assert_not_awaited()
+        mock_context.set_agent_state.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_clears_pending_and_discards_context(self, mock_context, ctrl):
@@ -76,12 +74,12 @@ class TestRecoveryService:
         ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
 
         svc = RecoveryService(mock_context)
-        await svc.react_to_exception(Timeout('slow'))
+        await svc.react_to_exception(RateLimitError('rate limited'))
 
+        ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
         mock_context.set_agent_state.assert_awaited_once_with(
             AgentState.AWAITING_USER_INPUT
         )
-        mock_context.trigger_step.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_authentication_sets_notify_ui_only(self, mock_context, ctrl):

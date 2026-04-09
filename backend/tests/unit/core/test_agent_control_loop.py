@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-
 from backend.core.bootstrap.agent_control_loop import (
     _create_status_callback,
     _handle_error_status,

@@ -548,16 +548,34 @@ class OrchestratorExecutor:
                 from backend.inference.llm_utils import get_token_count
 
                 _est_prompt = get_token_count(call_params.get('messages') or [])
-                _est_completion = max(1, len(visible_accum) // 4)
-                # Include tool-call argument text in the estimate.
+                _est_completion = get_token_count(
+                    [{'role': 'assistant', 'content': visible_accum or ''}]
+                )
+                # Include tool-call argument text in the estimate when present.
                 if tool_calls_list:
+                    _tool_payload: list[dict[str, Any]] = []
                     for _tc in tool_calls_list:
                         _fn = _tc.get('function', {})
-                        _est_completion += max(0, len(_fn.get('arguments', '')) // 4)
+                        _tool_payload.append(
+                            {
+                                'role': 'assistant',
+                                'content': '',
+                                'tool_calls': [
+                                    {
+                                        'function': {
+                                            'name': _fn.get('name', ''),
+                                            'arguments': _fn.get('arguments', ''),
+                                        }
+                                    }
+                                ],
+                            }
+                        )
+                    _est_completion += get_token_count(_tool_payload)
                 _resolved_usage = {
                     'prompt_tokens': _est_prompt,
                     'completion_tokens': _est_completion,
                     'total_tokens': _est_prompt + _est_completion,
+                    'is_estimated': True,
                 }
             response = LLMResponse(
                 content=visible_accum,

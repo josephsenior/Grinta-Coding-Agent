@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +26,13 @@ else:
     snapshot_download = _snapshot_download
 
 
-def get_default_models_to_prewarm() -> List[str]:
+def get_default_models_to_prewarm() -> list[str]:
     """Return the default list of model repo ids to prewarm.
 
     Reads common env vars and falls back to sensible defaults used elsewhere in
     the codebase.
     """
-    models: List[str] = []
+    models: list[str] = []
     emb = os.getenv('EMBEDDING_MODEL')
     if emb:
         models.append(emb)
@@ -51,7 +51,7 @@ def get_default_models_to_prewarm() -> List[str]:
 
     # De-duplicate while preserving order
     seen = set()
-    out: List[str] = []
+    out: list[str] = []
     for m in models:
         if m not in seen:
             seen.add(m)
@@ -59,7 +59,7 @@ def get_default_models_to_prewarm() -> List[str]:
     return out
 
 
-def ensure_models_available(models: List[str], fail_on_missing: bool = True) -> Dict[str, str]:
+def ensure_models_available(models: list[str], fail_on_missing: bool = True) -> dict[str, str]:
     """Ensure each model in `models` is present in the local HF snapshot cache.
 
     Args:
@@ -83,7 +83,7 @@ def ensure_models_available(models: List[str], fail_on_missing: bool = True) -> 
     os.environ.setdefault('HF_HUB_OFFLINE', '1')
     os.environ.setdefault('TRANSFORMERS_OFFLINE', '1')
 
-    results: Dict[str, str] = {}
+    results: dict[str, str] = {}
     for repo_id in models:
         try:
             logger.info('Checking local snapshot for model: %s', repo_id)

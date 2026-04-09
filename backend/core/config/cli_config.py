@@ -7,11 +7,10 @@ Contains argument parsing and config-override logic for CLI entry points.
 from __future__ import annotations
 
 import json
-import os
 from typing import TYPE_CHECKING
 
 from backend.core import logger
-from backend.core.app_paths import get_app_settings_root
+from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
 
@@ -67,31 +66,14 @@ def _resolve_llm_config_from_cli(
         )
         return config.llms[llm_config_name]
 
-    llm_config = get_llm_config_arg(llm_config_name, config_file)
-    if llm_config is None:
-        llm_config = _try_user_config_llm(llm_config_name, config_file)
+    canonical_config_file = get_canonical_settings_path()
+    llm_config = get_llm_config_arg(llm_config_name, canonical_config_file)
 
     if llm_config is None:
         msg = f"Cannot find LLM configuration '{llm_config_name}' in any config file"
         raise ValueError(msg)
 
     return llm_config
-
-
-def _try_user_config_llm(llm_config_name: str, config_file: str) -> LLMConfig | None:
-    """Try LLM keys from canonical ``settings.json`` if the primary file had no LLM block."""
-    canonical = os.path.join(get_app_settings_root(), 'settings.json')
-    canonical_abs = os.path.abspath(os.path.normpath(canonical))
-    primary_abs = os.path.abspath(os.path.normpath(config_file))
-    if primary_abs == canonical_abs or not os.path.isfile(canonical_abs):
-        return None
-
-    logger.app_logger.debug(
-        "Trying to load LLM config '%s' from canonical settings: %s",
-        llm_config_name,
-        canonical_abs,
-    )
-    return get_llm_config_arg(llm_config_name, canonical_abs)
 
 
 def apply_llm_config_override(config: AppConfig, args: argparse.Namespace) -> None:

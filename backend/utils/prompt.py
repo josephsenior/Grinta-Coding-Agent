@@ -92,7 +92,9 @@ class PromptManager:
         from backend.engine.prompts.prompt_builder import build_system_prompt
 
         _on_windows = sys.platform == 'win32'
-        context.setdefault('is_windows', _on_windows and not shutil.which('bash'))
+        _has_bash = bool(shutil.which('bash'))
+        context.setdefault('is_windows', _on_windows and not _has_bash)
+        context.setdefault('windows_with_bash', _on_windows and _has_bash)
         system_message = build_system_prompt(**context).strip()
         return system_message
 
@@ -229,7 +231,9 @@ class OrchestratorPromptManager(PromptManager):
         import shutil
 
         _on_windows = sys.platform == 'win32'
-        context.setdefault('is_windows', _on_windows and not shutil.which('bash'))
+        _has_bash = bool(shutil.which('bash'))
+        context.setdefault('is_windows', _on_windows and not _has_bash)
+        context.setdefault('windows_with_bash', _on_windows and _has_bash)
         context.setdefault('mcp_tool_names', self.mcp_tool_names)
         context.setdefault('mcp_tool_descriptions', self.mcp_tool_descriptions)
         context.setdefault('mcp_server_hints', self.mcp_server_hints)
@@ -247,9 +251,10 @@ class OrchestratorPromptManager(PromptManager):
     def _inject_lessons_learned(self, content: str) -> str:
         """Inject lessons learned from .app/lessons.md into the system prompt."""
         try:
-            from backend.core.workspace_resolution import get_effective_workspace_root
-
-            from backend.core.workspace_resolution import workspace_agent_state_dir
+            from backend.core.workspace_resolution import (
+                get_effective_workspace_root,
+                workspace_agent_state_dir,
+            )
 
             root = get_effective_workspace_root()
             if root is None:

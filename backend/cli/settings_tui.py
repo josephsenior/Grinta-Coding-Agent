@@ -10,10 +10,10 @@ from rich.text import Text
 
 from backend.cli.config_manager import (
     _PROVIDERS,
+    _settings_path,
     add_mcp_server,
     get_budget,
     get_cli_tool_icons_enabled,
-    get_current_model,
     get_masked_api_key,
     get_mcp_servers,
     update_api_key,
@@ -21,6 +21,7 @@ from backend.cli.config_manager import (
     update_cli_tool_icons,
     update_model,
 )
+from backend.cli.hud import HUDBar
 from backend.core.config import load_app_config
 
 
@@ -99,7 +100,9 @@ def _render_ai_tab(console: Console) -> None:
     table.add_column('Field', style='bold')
     table.add_column('Value')
 
-    table.add_row('Model', get_current_model(config))
+    provider, model = HUDBar.describe_model(config.get_llm_config().model)
+    table.add_row('Provider', provider)
+    table.add_row('Model', model)
     table.add_row('API Key', get_masked_api_key(config))
     table.add_row('Budget/task', get_budget(config))
     icons = 'on' if get_cli_tool_icons_enabled(config) else 'off'
@@ -133,6 +136,12 @@ def _render_mcp_tab(console: Console) -> None:
             table.add_row(str(i), s['name'], s.get('type', '?'), str(endpoint))
 
     console.print(Panel(table, title='[bold]MCP Servers[/bold]', border_style='cyan'))
+    console.print()
+    settings_path = _settings_path()
+    console.print(
+        f'[dim]Servers are stored as [bold]mcp_config[/bold] in [bold]{settings_path}[/bold] '
+        '(you can also edit that file directly).[/dim]'
+    )
     console.print()
     console.print(
         '[dim]Commands:  [bold]a[/bold] add server  │  [bold]q[/bold] back[/dim]'

@@ -8,6 +8,7 @@ from rich.text import Text
 from backend.cli.layout_tokens import CALLOUT_PANEL_PADDING
 from backend.cli.transcript import (
     format_activity_block,
+    format_activity_delta_secondary,
     format_activity_primary,
     format_activity_secondary,
     format_activity_shell_block,
@@ -62,6 +63,13 @@ def test_format_activity_secondary_kinds() -> None:
     err = format_activity_secondary('exit 1', kind='err')
     assert 'done' in ok.plain
     assert 'exit 1' in err.plain
+
+
+def test_format_activity_delta_secondary_shows_colored_add_remove_counts() -> None:
+    line = format_activity_delta_secondary(added=3, removed=1)
+    assert line is not None
+    assert '+ 3 lines' in line.plain
+    assert '- 1 lines' in line.plain
 
 
 def test_strip_tool_result_validation_annotations() -> None:

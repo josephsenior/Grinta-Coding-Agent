@@ -87,9 +87,6 @@ from backend.persistence.locations import get_workspace_downloads_dir
 from backend.utils.async_utils import call_sync_from_async
 from backend.utils.regex_limits import try_compile_user_regex
 
-
-
-
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m')
 _POWERSHELL_BUILTIN_COMMANDS = frozenset(
     {
@@ -523,8 +520,8 @@ class RuntimeExecutor:
                 observation.content,
             )
             pivot_hint = (
-                'Pivot now: this looks like a PowerShell command running in bash. '
-                'Rewrite it with bash equivalents or switch to a PowerShell terminal.'
+                'Pivot now: this is a PowerShell command running in Git Bash. '
+                'Rewrite it using bash syntax only (ls, cat, grep, find, echo, cd, mkdir, rm).'
                 if self._detect_powershell_in_bash_mismatch(
                     action.command,
                     observation.content,
@@ -556,17 +553,17 @@ class RuntimeExecutor:
         (
             r'(\S+):\s*command not found',
             '[MISSING_TOOL]',
-            'Install with: apt-get install {match} (or check PATH)',
+            '{missing_tool_guidance}',
         ),
         (
             r'No space left on device',
             '[DISK_FULL]',
-            'Free disk space before retrying. Check usage with: df -h',
+            '{disk_full_guidance}',
         ),
         (
             r'Permission denied',
             '[PERMISSION_ERROR]',
-            'Check file ownership/permissions. You may need chmod or to run as a different user.',
+            '{permission_error_guidance}',
         ),
     ]
 
@@ -609,10 +606,58 @@ class RuntimeExecutor:
             if m:
                 # Use the first capture group as {match} if available.
                 match_text = m.group(1) if m.lastindex and m.lastindex >= 1 else ''
-                guidance = guidance_template.format(match=match_text)
+                guidance = guidance_template.format(
+                    match=match_text,
+                    missing_tool_guidance=self._missing_tool_guidance(match_text),
+                    disk_full_guidance=self._disk_full_guidance(),
+                    permission_error_guidance=self._permission_error_guidance(),
+                )
                 observation.content += f'\n\n{tag} {guidance}'
                 # Only annotate the first matching pattern to avoid noise.
                 return
+
+    @staticmethod
+    def _missing_tool_guidance(tool_name: str) -> str:
+        """Return platform-aware guidance for missing shell tools."""
+        normalized = (tool_name or 'the missing tool').strip()
+        if sys.platform == 'win32':
+            return (
+                f'Install with: winget install {normalized} '
+                '(or use choco/scoop, or check PATH)'
+            )
+        if sys.platform == 'darwin':
+            return f'Install with: brew install {normalized} (or check PATH)'
+        return f'Install with: apt-get install {normalized} (or check PATH)'
+
+    @staticmethod
+    def _disk_full_guidance() -> str:
+        """Return platform-aware guidance for disk full errors."""
+        if sys.platform == 'win32':
+            return (
+                'Free disk space before retrying. Check usage in File Explorer '
+                'or in PowerShell with: Get-PSDrive -PSProvider FileSystem'
+            )
+        if sys.platform == 'darwin':
+            return 'Free disk space before retrying. Check usage with: df -h'
+        return 'Free disk space before retrying. Check usage with: df -h'
+
+    @staticmethod
+    def _permission_error_guidance() -> str:
+        """Return platform-aware guidance for permission denied errors."""
+        if sys.platform == 'win32':
+            return (
+                'Check file ACLs or read-only attributes, verify another process '
+                'is not locking the file, and only retry from an elevated shell if appropriate.'
+            )
+        if sys.platform == 'darwin':
+            return (
+                'Check file ownership and permissions with: ls -l. '
+                'You may need chmod or to run as a different user.'
+            )
+        return (
+            'Check file ownership and permissions with: ls -l. '
+            'You may need chmod or to run as a different user.'
+        )
 
     @staticmethod
     def _detect_powershell_in_bash_mismatch(command: str, content: str) -> str | None:
@@ -626,23 +671,27 @@ class RuntimeExecutor:
         if 'command not found' not in lower_content and 'not recognized as' not in lower_content:
             return None
 
+        _bash_fix = (
+            'This terminal is Git Bash — rewrite the command using bash syntax only '
+            '(ls, cat, grep, find, echo, cd, mkdir, rm, pwd). '
+            'Do NOT use any PowerShell cmdlets.'
+        )
+
         missing_match = re.search(r'([A-Za-z][A-Za-z0-9-]*)\s*:\s*command not found', content)
         if missing_match:
             missing_cmd = missing_match.group(1)
             if missing_cmd in _POWERSHELL_BUILTIN_COMMANDS:
                 return (
-                    f'{missing_cmd} is a PowerShell command and was not found because this '
-                    'session is bash. Use bash equivalents like cat/echo/ls/grep/cd, '
-                    'or switch to the PowerShell terminal.'
+                    f'`{missing_cmd}` is a PowerShell cmdlet, not available in bash. '
+                    f'{_bash_fix}'
                 )
 
         command_tokens = set(re.findall(r'\b[A-Za-z][A-Za-z0-9-]*\b', command))
         for token in _POWERSHELL_BUILTIN_COMMANDS:
             if token in command_tokens:
                 return (
-                    f'{token} is PowerShell syntax, not a missing bash package. '
-                    'Rewrite the command with bash equivalents like cat/echo/ls/grep/cd, '
-                    'or switch to the PowerShell terminal.'
+                    f'`{token}` is a PowerShell cmdlet, not available in bash. '
+                    f'{_bash_fix}'
                 )
 
         return None
@@ -1396,8 +1445,8 @@ async def lifespan(app: FastAPI):
     # prebundled model artifacts are missing.
     try:
         from backend.utils.model_prewarm import (
-            get_default_models_to_prewarm,
             ensure_models_available,
+            get_default_models_to_prewarm,
         )
         prebundle_env = os.getenv('PREBUNDLED_MODELS', '')
         models = get_default_models_to_prewarm()

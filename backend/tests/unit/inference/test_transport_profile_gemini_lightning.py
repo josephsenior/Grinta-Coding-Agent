@@ -17,8 +17,6 @@ OpenAI-compatible proxy:
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from backend.inference.direct_clients import (
     GeminiClient,
     OpenAIClient,

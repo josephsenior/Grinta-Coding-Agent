@@ -128,3 +128,31 @@ class TestVerifyAction:
         ok, msg, obs = await verifier.verify_action(action)
         assert ok is False
         assert 'error' in msg.lower()
+
+    @pytest.mark.asyncio
+    async def test_file_verification_uses_encoded_python_transport(self, verifier):
+        action = MagicMock(spec=FileEditAction)
+        action.path = "/tmp/quote'heavy path.py"
+
+        exists_obs = CmdOutputObservation(
+            content='FILE_EXISTS',
+            command='check',
+            command_id=1,
+            metadata=CmdOutputMetadata(exit_code=0),
+        )
+        content_obs = CmdOutputObservation(
+            content='10 lines, 200 bytes',
+            command='check',
+            command_id=2,
+            metadata=CmdOutputMetadata(exit_code=0),
+        )
+        verifier._run_runtime_action = AsyncMock(side_effect=[exists_obs, content_obs])
+
+        await verifier.verify_action(action)
+
+        first_action = verifier._run_runtime_action.await_args_list[0].args[0]
+        second_action = verifier._run_runtime_action.await_args_list[1].args[0]
+        assert 'b64decode' in first_action.command
+        assert 'b64decode' in second_action.command
+        assert action.path not in first_action.command
+        assert action.path not in second_action.command

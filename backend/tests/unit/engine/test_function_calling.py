@@ -123,7 +123,7 @@ class TestHandleCmdRunTool:
 
     def test_glued_windows_drive_sets_thought_hint(self):
         action = _handle_cmd_run_tool(
-            {'command': "ls -F app/dashboard/ && ls -F componentsC:/Users/x/foo/"}
+            {'command': 'ls -F app/dashboard/ && ls -F componentsC:/Users/x/foo/'}
         )
         assert isinstance(action, CmdRunAction)
         assert '[SHELL]' in (action.thought or '')

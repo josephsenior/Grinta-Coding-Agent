@@ -12,13 +12,13 @@ from fastmcp.client.transports import (
     StdioTransport,
     StreamableHttpTransport,
 )
+from mcp import McpError
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from backend.core.config.mcp_config import MCPServerConfig
 from backend.core.logger import app_logger as logger
 from backend.integrations.mcp.error_collector import mcp_error_collector
 from backend.integrations.mcp.tool import MCPClientTool
-from mcp import McpError
 
 if TYPE_CHECKING:
     from mcp.types import CallToolResult

@@ -431,6 +431,7 @@ class LLM(RetryMixin, DebugMixin):
         usage = response.usage
         prompt_tokens = usage.get('prompt_tokens', 0)
         completion_tokens = usage.get('completion_tokens', 0)
+        usage_estimated = bool(usage.get('is_estimated', False))
 
         cost = self.client.get_completion_cost(
             prompt_tokens=prompt_tokens,
@@ -462,6 +463,7 @@ class LLM(RetryMixin, DebugMixin):
             cache_write_tokens=cache_write,
             context_window=self._get_context_window_for_metrics(),
             response_id=response.id,
+            usage_estimated=usage_estimated,
         )
 
     def _get_context_window_for_metrics(self) -> int:

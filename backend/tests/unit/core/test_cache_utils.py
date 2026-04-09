@@ -6,7 +6,6 @@ from types import SimpleNamespace
 
 from backend.core.cache.cache_utils import merge_settings_with_cache
 
-
 # ── merge_settings_with_cache ────────────────────────────────────────
 
 

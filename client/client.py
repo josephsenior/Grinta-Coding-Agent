@@ -24,15 +24,15 @@ from typing import Any, cast
 import httpx
 import socketio  # type: ignore[import-untyped]
 
-logger = logging.getLogger("app.client")
+logger = logging.getLogger('app.client')
 
 
 def _app_settings_json_path() -> Path:
     """Match backend :func:`backend.core.app_paths.get_app_settings_root` / ``settings.json``."""
-    override = (os.environ.get("APP_ROOT") or "").strip()
+    override = (os.environ.get('APP_ROOT') or '').strip()
     if override:
-        return Path(os.path.abspath(os.path.expanduser(override))) / "settings.json"
-    return Path.cwd() / "settings.json"
+        return Path(os.path.abspath(os.path.expanduser(override))) / 'settings.json'
+    return Path.cwd() / 'settings.json'
 
 
 # ---------------------------------------------------------------------------
@@ -61,22 +61,22 @@ class ConversationInfo:
 
     conversation_id: str
     title: str
-    status: str = "unknown"
-    created_at: str = ""
-    last_updated_at: str = ""
+    status: str = 'unknown'
+    created_at: str = ''
+    last_updated_at: str = ''
     tags: tuple[str, ...] = ()
-    project: str = ""
+    project: str = ''
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ConversationInfo:
         return cls(
-            conversation_id=data.get("conversation_id", ""),
-            title=data.get("title", data.get("conversation_id", "Untitled")),
-            status=data.get("status", data.get("conversation_status", "unknown")),
-            created_at=data.get("created_at", ""),
-            last_updated_at=data.get("last_updated_at", data.get("updated_at", "")),
-            tags=tuple(data.get("tags", [])),
-            project=data.get("project", ""),
+            conversation_id=data.get('conversation_id', ''),
+            title=data.get('title', data.get('conversation_id', 'Untitled')),
+            status=data.get('status', data.get('conversation_status', 'unknown')),
+            created_at=data.get('created_at', ''),
+            last_updated_at=data.get('last_updated_at', data.get('updated_at', '')),
+            tags=tuple(data.get('tags', [])),
+            project=data.get('project', ''),
         )
 
 
@@ -84,18 +84,18 @@ class ConversationInfo:
 class ServerConfig:
     """Subset of ``/api/config`` returned by the server."""
 
-    app_mode: str = "oss"
+    app_mode: str = 'oss'
     file_uploads_allowed: bool = True
     max_file_size_mb: int = 0
-    security_model: str = "none"
+    security_model: str = 'none'
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ServerConfig:
         return cls(
-            app_mode=data.get("APP_MODE", "oss"),
-            file_uploads_allowed=data.get("FILE_UPLOADS_ALLOWED", True),
-            max_file_size_mb=data.get("MAX_FILE_SIZE_MB", 0),
-            security_model=data.get("SECURITY_MODEL", "none"),
+            app_mode=data.get('APP_MODE', 'oss'),
+            file_uploads_allowed=data.get('FILE_UPLOADS_ALLOWED', True),
+            max_file_size_mb=data.get('MAX_FILE_SIZE_MB', 0),
+            security_model=data.get('SECURITY_MODEL', 'none'),
         )
 
 
@@ -108,7 +108,7 @@ class ServerConfig:
 class AppClient:
     """Async HTTP + Socket.IO client facade for the app API."""
 
-    base_url: str = "http://localhost:3001"
+    base_url: str = 'http://localhost:3001'
 
     # ── internal state ────────────────────────────────────────────
     _http: httpx.AsyncClient = field(init=False, repr=False)
@@ -120,9 +120,9 @@ class AppClient:
     )
 
     def __post_init__(self) -> None:
-        self.base_url = self.base_url.rstrip("/")
+        self.base_url = self.base_url.rstrip('/')
         self._http = httpx.AsyncClient(
-            base_url=f"{self.base_url}/api/v1",
+            base_url=f'{self.base_url}/api/v1',
             timeout=httpx.Timeout(120.0, connect=10.0),
             follow_redirects=True,
         )
@@ -176,33 +176,33 @@ class AppClient:
     @staticmethod
     def _raise_for_status(resp: httpx.Response) -> None:
         """Raise an error with the server's own detail message when possible."""
-        status_code = int(getattr(resp, "status_code", 0) or 0)
+        status_code = int(getattr(resp, 'status_code', 0) or 0)
         # Mirror httpx.Response.is_success semantics (2xx only)
         if 200 <= status_code < 300:
             return
-        detail: str = ""
+        detail: str = ''
         try:
             body = resp.json()
             detail = (
-                body.get("detail") or body.get("message") or body.get("error") or ""
+                body.get('detail') or body.get('message') or body.get('error') or ''
             )
             if isinstance(detail, list):  # FastAPI validation errors
-                detail = "; ".join(str(e.get("msg", e)) for e in detail)
+                detail = '; '.join(str(e.get('msg', e)) for e in detail)
         except Exception:
-            detail = getattr(resp, "text", "") or getattr(resp, "reason_phrase", "") or ""
+            detail = getattr(resp, 'text', '') or getattr(resp, 'reason_phrase', '') or ''
         code = status_code
         prefix = {
-            400: "Bad request",
-            401: "Unauthorized",
-            403: "Forbidden",
-            404: "Not found",
-            422: "Validation error",
-            500: "Server error",
-            503: "Service unavailable",
-        }.get(code, f"HTTP {code}")
-        reason_phrase = getattr(resp, "reason_phrase", "")
-        msg = f"{prefix}: {detail}" if detail else f"HTTP {code} {reason_phrase}"
-        request = cast(httpx.Request, getattr(resp, "request", None))
+            400: 'Bad request',
+            401: 'Unauthorized',
+            403: 'Forbidden',
+            404: 'Not found',
+            422: 'Validation error',
+            500: 'Server error',
+            503: 'Service unavailable',
+        }.get(code, f'HTTP {code}')
+        reason_phrase = getattr(resp, 'reason_phrase', '')
+        msg = f'{prefix}: {detail}' if detail else f'HTTP {code} {reason_phrase}'
+        request = cast(httpx.Request, getattr(resp, 'request', None))
         raise httpx.HTTPStatusError(msg, request=request, response=resp)
 
     # ── conversations ─────────────────────────────────────────────
@@ -214,10 +214,10 @@ class AppClient:
     ) -> list[ConversationInfo]:
         """GET /api/conversations → list of conversations."""
         data = await self._get(
-            "/conversations",
-            params={"page_id": page_id, "limit": limit},
+            '/conversations',
+            params={'page_id': page_id, 'limit': limit},
         )
-        results = data.get("results", data) if isinstance(data, dict) else data
+        results = data.get('results', data) if isinstance(data, dict) else data
         if not isinstance(results, list):
             results = []
         return [ConversationInfo.from_dict(c) for c in results]
@@ -243,7 +243,7 @@ class AppClient:
             if memory:
                 if conversation_instructions:
                     conversation_instructions = (
-                        memory + "\n\n---\n\n" + conversation_instructions
+                        memory + '\n\n---\n\n' + conversation_instructions
                     )
                 else:
                     conversation_instructions = memory
@@ -252,35 +252,35 @@ class AppClient:
 
         payload: dict[str, Any] = {}
         if initial_message:
-            payload["initial_user_msg"] = initial_message
+            payload['initial_user_msg'] = initial_message
         if conversation_instructions:
-            payload["conversation_instructions"] = conversation_instructions
-        return await self._post("/conversations", json=payload)
+            payload['conversation_instructions'] = conversation_instructions
+        return await self._post('/conversations', json=payload)
 
     async def delete_conversation(self, conversation_id: str) -> bool:
         """DELETE /api/conversations/{id}."""
-        return await self._delete(f"/conversations/{conversation_id}")
+        return await self._delete(f'/conversations/{conversation_id}')
 
     async def start_agent(self, conversation_id: str) -> dict[str, Any]:
         """POST /api/conversations/{id}/start."""
-        return await self._post(f"/conversations/{conversation_id}/start", json={"providers_set": []})
+        return await self._post(f'/conversations/{conversation_id}/start', json={'providers_set': []})
 
     async def stop_agent(self, conversation_id: str) -> dict[str, Any]:
         """POST /api/conversations/{id}/stop."""
-        return await self._post(f"/conversations/{conversation_id}/stop")
+        return await self._post(f'/conversations/{conversation_id}/stop')
 
     # ── server info ───────────────────────────────────────────────
 
     async def get_config(self) -> ServerConfig:
         """GET /api/config."""
-        data = await self._get("/config")
+        data = await self._get('/config')
         return ServerConfig.from_dict(data)
 
     async def get_models(self) -> list[dict[str, Any]]:
         """GET /api/v1/options/models."""
-        models = await self._get("/options/models")
+        models = await self._get('/options/models')
         return [
-            {"id": m, "name": m, "model": m} if isinstance(m, str) else m
+            {'id': m, 'name': m, 'model': m} if isinstance(m, str) else m
             for m in (models or [])
         ]
 
@@ -288,11 +288,11 @@ class AppClient:
 
     async def get_settings(self) -> dict[str, Any]:
         """GET /api/settings."""
-        return await self._get("/settings")
+        return await self._get('/settings')
 
     async def save_settings(self, settings: dict[str, Any]) -> dict[str, Any]:
         """POST /api/settings."""
-        return await self._post("/settings", json=settings)
+        return await self._post('/settings', json=settings)
 
     async def get_budget_limits(self) -> dict[str, float | None]:
         """Return session and daily budget limits from server config.
@@ -301,10 +301,10 @@ class AppClient:
         (both may be None if not configured).
         """
         try:
-            data = await self._get("/options/config")
+            data = await self._get('/options/config')
             return {
-                "session_limit": data.get("max_budget_per_session") or None,
-                "daily_limit": data.get("max_budget_per_day") or None,
+                'session_limit': data.get('max_budget_per_session') or None,
+                'daily_limit': data.get('max_budget_per_day') or None,
             }
         except Exception:
             # Fall back to reading config file directly when server is unavailable
@@ -313,23 +313,23 @@ class AppClient:
 
                 cfg_path = _app_settings_json_path()
                 if cfg_path.exists():
-                    with cfg_path.open(encoding="utf-8") as fh:
+                    with cfg_path.open(encoding='utf-8') as fh:
                         cfg = json.load(fh)
                     core = cfg
                     return {
-                        "session_limit": core.get("max_budget_per_session") or None,
-                        "daily_limit": core.get("max_budget_per_day") or None,
+                        'session_limit': core.get('max_budget_per_session') or None,
+                        'daily_limit': core.get('max_budget_per_day') or None,
                     }
             except Exception:
                 pass
-            return {"session_limit": None, "daily_limit": None}
+            return {'session_limit': None, 'daily_limit': None}
 
 
     # ── secrets ───────────────────────────────────────────────────
 
     async def get_secrets(self) -> dict[str, Any]:
         """GET /api/secrets."""
-        return await self._get("/secrets")
+        return await self._get('/secrets')
 
     async def set_secret(
         self,
@@ -339,19 +339,19 @@ class AppClient:
         host: str | None = None,
     ) -> dict[str, Any]:
         """POST /api/secrets."""
-        payload: dict[str, Any] = {"provider": provider, "token": token}
+        payload: dict[str, Any] = {'provider': provider, 'token': token}
         if host:
-            payload["host"] = host
-        return await self._post("/secrets", json=payload)
+            payload['host'] = host
+        return await self._post('/secrets', json=payload)
 
     # ── files / diffs ─────────────────────────────────────────────
 
     async def get_workspace_changes(self, conversation_id: str) -> list[dict[str, Any]]:
         """GET /api/git/changes?conversation_id=...."""
         data = await self._get(
-            f"/conversations/{conversation_id}/files/git/changes"
+            f'/conversations/{conversation_id}/files/git/changes'
         )
-        return data if isinstance(data, list) else data.get("changes", [])
+        return data if isinstance(data, list) else data.get('changes', [])
 
     async def get_file_diff(
         self,
@@ -360,8 +360,8 @@ class AppClient:
     ) -> dict[str, Any]:
         """GET /api/git/diff?conversation_id=...&path=...."""
         return await self._get(
-            "/git/diff",
-            params={"conversation_id": conversation_id, "path": filepath},
+            '/git/diff',
+            params={'conversation_id': conversation_id, 'path': filepath},
         )
 
     # ── health ────────────────────────────────────────────────────
@@ -369,7 +369,7 @@ class AppClient:
     async def health_check(self) -> bool:
         """Quick liveness probe — GET /alive."""
         try:
-            resp = await self._http.get("/alive")
+            resp = await self._http.get('/alive')
             return resp.is_success
         except Exception:
             return False
@@ -383,20 +383,20 @@ class AppClient:
 
         @self._sio.event
         async def connect() -> None:
-            logger.info("Socket.IO connected")
+            logger.info('Socket.IO connected')
             self._connect_event.set()
             # Auto-rejoin the conversation we were in before disconnect
             cid = self._connected_conversation_id
             if cid:
-                logger.info("Reconnected — auto-rejoining conversation %s", cid)
+                logger.info('Reconnected — auto-rejoining conversation %s', cid)
                 try:
                     await self._sio.emit(
-                        "rejoin",
-                        {"conversation_id": cid},
+                        'rejoin',
+                        {'conversation_id': cid},
                     )
                 except Exception:
                     logger.warning(
-                        "Auto-rejoin emit failed for %s",
+                        'Auto-rejoin emit failed for %s',
                         cid,
                         exc_info=True,
                     )
@@ -407,17 +407,17 @@ class AppClient:
 
         @self._sio.event
         async def disconnect() -> None:
-            logger.info("Socket.IO disconnected")
+            logger.info('Socket.IO disconnected')
             self._connect_event.clear()
             self._stop_heartbeat()
 
-        @self._sio.on("app_event")
+        @self._sio.on('app_event')
         async def on_app_event(data: dict[str, Any]) -> None:
             if self._event_callback:
                 try:
                     await self._event_callback(data)
                 except Exception:
-                    logger.exception("Error in app event callback")
+                    logger.exception('Error in app event callback')
 
     # ── heartbeat ─────────────────────────────────────────────────
 
@@ -430,7 +430,7 @@ class AppClient:
             return
         self._heartbeat_task = loop.create_task(
             self._heartbeat_loop(),
-            name="app-ws-heartbeat",
+            name='app-ws-heartbeat',
         )
 
     def _stop_heartbeat(self) -> None:
@@ -445,9 +445,9 @@ class AppClient:
                 await asyncio.sleep(_HEARTBEAT_INTERVAL)
                 if self._sio.connected:
                     try:
-                        await self._sio.emit("ping", {})
+                        await self._sio.emit('ping', {})
                     except Exception:
-                        logger.debug("Heartbeat ping failed", exc_info=True)
+                        logger.debug('Heartbeat ping failed', exc_info=True)
         except asyncio.CancelledError:
             pass
 
@@ -457,7 +457,7 @@ class AppClient:
         """Buffer an action for later delivery when reconnected."""
         self._offline_queue.append((event, payload))
         logger.debug(
-            "Buffered offline action (queue depth: %d)",
+            'Buffered offline action (queue depth: %d)',
             len(self._offline_queue),
         )
 
@@ -474,10 +474,10 @@ class AppClient:
             except Exception:
                 # Re-queue at the front for next reconnect
                 self._offline_queue.appendleft((event, payload))
-                logger.warning("Failed to flush offline action; re-queued")
+                logger.warning('Failed to flush offline action; re-queued')
                 break
         if flushed:
-            logger.info("Flushed %d buffered offline actions", flushed)
+            logger.info('Flushed %d buffered offline actions', flushed)
 
     async def join_conversation(
         self,
@@ -502,33 +502,33 @@ class AppClient:
             await self._sio.disconnect()
             self._connect_event.clear()
 
-        query = f"conversation_id={conversation_id}&latest_event_id={latest_event_id}"
+        query = f'conversation_id={conversation_id}&latest_event_id={latest_event_id}'
         # Socket.IO python client doesn't support query params in connect() directly —
         # we set them via the URL. We include common headers for robustness.
-        url = f"{self.base_url}?{query}"
-        logger.info("Connecting to Socket.IO at %s", url)
+        url = f'{self.base_url}?{query}'
+        logger.info('Connecting to Socket.IO at %s', url)
 
         try:
             await self._sio.connect(
                 url,
-                socketio_path="/socket.io",
-                transports=["websocket", "polling"],
+                socketio_path='/socket.io',
+                transports=['websocket', 'polling'],
                 wait_timeout=15,
-                namespaces=["/"],
+                namespaces=['/'],
             )
         except Exception as e:
-            logger.error("Failed to connect to Socket.IO: %s", e)
+            logger.error('Failed to connect to Socket.IO: %s', e)
             # Fallback to polling if websocket fails and we haven't tried yet
             if not self._sio.connected:
                 await self._sio.connect(
                     url,
-                    socketio_path="/socket.io",
-                    transports=["polling"],
+                    socketio_path='/socket.io',
+                    transports=['polling'],
                     wait_timeout=15,
                 )
 
         self._connected_conversation_id = conversation_id
-        logger.info("Joined conversation %s via Socket.IO", conversation_id)
+        logger.info('Joined conversation %s via Socket.IO', conversation_id)
 
     async def leave_conversation(self) -> None:
         """Disconnect from the current conversation's event stream."""
@@ -555,18 +555,18 @@ class AppClient:
         """
         timestamp = datetime.now(tz=UTC).isoformat()
         payload = {
-            "action": "message",
-            "args": {
-                "content": content,
-                "image_urls": image_urls or [],
-                "file_urls": [],
-                "timestamp": timestamp,
+            'action': 'message',
+            'args': {
+                'content': content,
+                'image_urls': image_urls or [],
+                'file_urls': [],
+                'timestamp': timestamp,
             },
         }
         if self._sio.connected:
-            await self._sio.emit("app_user_action", payload)
+            await self._sio.emit('app_user_action', payload)
         else:
-            self._buffer_action("app_user_action", payload)
+            self._buffer_action('app_user_action', payload)
 
     async def send_confirmation(self, *, confirm: bool) -> None:
         """Send user confirmation (approve or reject) for a pending action.
@@ -574,15 +574,15 @@ class AppClient:
         Args:
             confirm: ``True`` to approve, ``False`` to reject.
         """
-        action = "user_confirmed" if confirm else "user_rejected"
+        action = 'user_confirmed' if confirm else 'user_rejected'
         payload = {
-            "action": action,
-            "args": {},
+            'action': action,
+            'args': {},
         }
         if self._sio.connected:
-            await self._sio.emit("app_user_action", payload)
+            await self._sio.emit('app_user_action', payload)
         else:
-            self._buffer_action("app_user_action", payload)
+            self._buffer_action('app_user_action', payload)
 
     async def send_stop(self) -> None:
         """Request the agent to stop."""

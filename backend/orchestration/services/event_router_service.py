@@ -6,19 +6,25 @@ all event dispatch logic that was previously inline in SessionOrchestrator._on_e
 
 from __future__ import annotations
 
+import asyncio
 import os as _os
 import re
-
 from typing import TYPE_CHECKING
 
 from backend.core.schemas import AgentState
-from backend.ledger import EventSource, EventStream, RecallType
+from backend.ledger import EventSource, EventStream, EventStreamSubscriber, RecallType
 from backend.ledger.action import (
     Action,
     AgentRejectAction,
     ChangeAgentStateAction,
+    CmdRunAction,
+    FileEditAction,
+    FileReadAction,
+    FileWriteAction,
+    MCPAction,
     MessageAction,
     PlaybookFinishAction,
+    SignalProgressAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import (
@@ -33,8 +39,12 @@ from backend.ledger.action.message import StreamingChunkAction
 from backend.ledger.observation import (
     ErrorObservation,
     Observation,
+    StatusObservation,
 )
-from backend.ledger.observation.agent import DelegateTaskObservation
+from backend.ledger.observation.agent import (
+    AgentStateChangedObservation,
+    DelegateTaskObservation,
+)
 from backend.ledger.observation_cause import attach_observation_cause
 
 if TYPE_CHECKING:
@@ -55,6 +65,96 @@ _COMPLETION_HANDOFF_MARKERS = (
     'if you want',
     'let me know if',
 )
+_DELEGATE_PROGRESS_STATUS = 'delegate_progress'
+
+
+def _truncate_delegate_progress(text: str, limit: int = 120) -> str:
+    collapsed = ' '.join((text or '').split())
+    if len(collapsed) <= limit:
+        return collapsed
+    return collapsed[: max(limit - 1, 0)].rstrip() + '…'
+
+
+def _summarize_delegate_worker_event(event: Action | Observation) -> tuple[str, str] | None:
+    """Return a compact worker-progress summary for parent-side swarm UI."""
+    if isinstance(event, FileReadAction):
+        return 'running', f'Viewed {event.path}'
+
+    if isinstance(event, FileWriteAction):
+        return 'running', f'Created {event.path}'
+
+    if isinstance(event, FileEditAction):
+        command = getattr(event, 'command', '') or ''
+        if command == 'create_file':
+            return 'running', f'Created {event.path}'
+        if command == 'view_file':
+            return 'running', f'Viewed {event.path}'
+        return 'running', f'Edited {event.path}'
+
+    if isinstance(event, CmdRunAction):
+        label = getattr(event, 'display_label', '') or getattr(event, 'command', '')
+        label = _truncate_delegate_progress(label, limit=96)
+        return 'running', f'Ran {label}' if label else 'Ran command'
+
+    if isinstance(event, MCPAction):
+        tool_name = getattr(event, 'name', '') or 'MCP tool'
+        return 'running', f'Called {tool_name}'
+
+    if isinstance(event, SignalProgressAction):
+        note = _truncate_delegate_progress(getattr(event, 'progress_note', '') or '')
+        return 'running', note or 'Reported progress'
+
+    if isinstance(event, PlaybookFinishAction):
+        summary = _truncate_delegate_progress((event.message or '').splitlines()[0], 140)
+        return 'done', summary or 'Completed'
+
+    if isinstance(event, AgentRejectAction):
+        reason = _truncate_delegate_progress(str(event.outputs.get('reason', '') or ''), 140)
+        return 'failed', reason or 'Rejected delegated task'
+
+    if isinstance(event, ErrorObservation):
+        first_line = _truncate_delegate_progress((event.content or '').splitlines()[0], 140)
+        return 'failed', first_line or 'Worker error'
+
+    if isinstance(event, AgentStateChangedObservation):
+        state = str(getattr(event, 'agent_state', '') or '').lower()
+        if state == AgentState.ERROR.value:
+            return 'failed', 'Worker entered error state'
+        if state == AgentState.FINISHED.value:
+            return 'done', 'Completed'
+
+    return None
+
+
+def _build_delegate_progress_observation(
+    *,
+    worker_id: str,
+    worker_label: str,
+    task_description: str,
+    status: str,
+    detail: str,
+    order: int,
+    batch_id: int | None = None,
+) -> StatusObservation:
+    """Create a CLI-only hidden status observation for delegated worker progress."""
+    task_text = _truncate_delegate_progress(task_description, 96)
+    detail_text = _truncate_delegate_progress(detail, 140)
+    content = f'{worker_label} · {detail_text or task_text or status}'
+    obs = StatusObservation(
+        content=content,
+        status_type=_DELEGATE_PROGRESS_STATUS,
+        extras={
+            'worker_id': worker_id,
+            'worker_label': worker_label,
+            'task_description': task_text,
+            'worker_status': status,
+            'detail': detail_text,
+            'order': order,
+            'batch_id': batch_id,
+        },
+    )
+    obs.hidden = True
+    return obs
 
 
 class EventRouterService:
@@ -321,9 +421,9 @@ class EventRouterService:
         import uuid
 
         from backend.core.config.agent_config import AgentConfig
-        from backend.orchestration.conversation_stats import ConversationStats
         from backend.orchestration.agent import Agent
         from backend.orchestration.blackboard import Blackboard
+        from backend.orchestration.conversation_stats import ConversationStats
         from backend.orchestration.orchestration_config import OrchestrationConfig
         from backend.orchestration.session_orchestrator import SessionOrchestrator
         from backend.utils.async_utils import run_or_schedule
@@ -335,8 +435,27 @@ class EventRouterService:
             task_description: str,
             files: list,
             shared_blackboard: Blackboard | None = None,
+            *,
+            worker_label: str = 'Worker',
+            worker_order: int = 1,
+            batch_id: int | None = None,
         ) -> tuple[bool, str, str]:
             """Run one worker agent and return (success, content, error_message)."""
+            worker_id = f'pending_worker_{worker_order}'
+            worker_marked_terminal = False
+
+            def _emit_worker_progress(status: str, detail: str) -> None:
+                progress = _build_delegate_progress_observation(
+                    worker_id=worker_id,
+                    worker_label=worker_label,
+                    task_description=task_description,
+                    status=status,
+                    detail=detail,
+                    order=worker_order,
+                    batch_id=batch_id,
+                )
+                self._ctrl.event_stream.add_event(progress, EventSource.ENVIRONMENT)
+
             try:
                 # Get the base agent config but clear history
                 parent_config = self._ctrl.config
@@ -380,10 +499,34 @@ class EventRouterService:
                         deep=True, update={'llm_config': llm_cfg}
                     )
 
-                # Setup isolated event stream
+                # Delegated workers need inline delivery so finish/reject state
+                # transitions land before the parent inspects worker state.
                 worker_stream = EventStream(
-                    worker_id, file_store=file_store, user_id=user_id
+                    worker_id,
+                    file_store=file_store,
+                    user_id=user_id,
+                    worker_count=0,
                 )
+
+                def _forward_worker_event(event: Action | Observation) -> None:
+                    nonlocal worker_marked_terminal
+                    if isinstance(event, Action) and event.source != EventSource.AGENT:
+                        return
+                    summary = _summarize_delegate_worker_event(event)
+                    if summary is None:
+                        return
+                    status, detail = summary
+                    if status in {'done', 'failed'}:
+                        worker_marked_terminal = True
+                    _emit_worker_progress(status, detail)
+
+                worker_stream.subscribe(
+                    EventStreamSubscriber.MAIN,
+                    _forward_worker_event,
+                    f'delegate_progress_{worker_id}',
+                )
+                _emit_worker_progress('starting', 'Starting delegated worker')
+
                 self._ctrl.log(
                     'info',
                     f'Spawning worker agent {worker_id} for task: {task_description[:50]}...',
@@ -504,14 +647,101 @@ class EventRouterService:
 
                 worker_controller = SessionOrchestrator(worker_config)
 
+                # ── Wire runtime bridge for the worker ──
+                #
+                # The worker controller has its own EventStream but no
+                # Runtime subscribed.  Without a runtime, tool actions
+                # (FileWrite, CmdRun, …) are emitted but nobody executes
+                # them — no observation is ever produced, the pending
+                # action never clears, and the worker hangs.
+                #
+                # We bridge the gap by subscribing a lightweight callback
+                # to the worker stream.  When a runnable Action arrives,
+                # the bridge delegates to the parent runtime's executor
+                # and emits the resulting Observation back on the worker
+                # stream.
+                parent_runtime = getattr(self._ctrl, 'runtime', None)
+                if parent_runtime is not None:
+                    from backend.utils.async_utils import run_or_schedule
+
+                    _worker_stream_ref = worker_stream  # capture for closure
+
+                    def _worker_runtime_bridge(event):
+                        if not isinstance(event, Action):
+                            return
+                        if not getattr(event, 'runnable', False):
+                            return
+
+                        async def _execute():
+                            try:
+                                parent_runtime._set_action_timeout(event)
+                                observation = (
+                                    await parent_runtime._execute_action(event)
+                                )
+                            except Exception as exc:
+                                observation = ErrorObservation(
+                                    content=(
+                                        f'Worker action error: '
+                                        f'{type(exc).__name__}: {exc}'
+                                    )
+                                )
+                            attach_observation_cause(
+                                observation, event, context='worker_runtime_bridge'
+                            )
+                            observation.tool_call_metadata = (
+                                event.tool_call_metadata
+                            )
+                            source = event.source or EventSource.AGENT
+                            _worker_stream_ref.add_event(observation, source)
+
+                        run_or_schedule(_execute())
+
+                    worker_stream.subscribe(
+                        EventStreamSubscriber.RUNTIME,
+                        _worker_runtime_bridge,
+                        worker_stream.sid,
+                    )
+
+                # Disable auto-stepping: we drive the worker loop manually
+                # via _step_inner().  Without this, event callbacks
+                # (on_event → should_step → step()) would schedule
+                # concurrent step tasks that interfere with our loop.
+                worker_controller.step = lambda: None  # type: ignore[assignment]
+
+                # Bootstrap the worker: send the initial user message and
+                # set state to RUNNING.  Both add_event() and
+                # set_agent_state_to() trigger on_event callbacks that
+                # schedule background tasks (via run_or_schedule).  We must
+                # drain those tasks so that state.history contains the
+                # initial message before the first _step_inner() call, and
+                # so the AgentStateChangedObservation is processed.
+                from backend.utils.async_utils import _background_tasks
+
                 init_msg = MessageAction(content='\n'.join(parent_context_lines))
                 worker_controller.event_stream.add_event(init_msg, EventSource.USER)
-
-                # Ensure the worker starts running
                 await worker_controller.set_agent_state_to(AgentState.RUNNING)
 
-                # Emulate the main execution loop for the headless worker.
-                # We reuse the controller's own step() logic.
+                # Drain all background tasks from bootstrap events.
+                for _drain in range(50):
+                    pending = {t for t in _background_tasks if not t.done()}
+                    if not pending:
+                        break
+                    await asyncio.gather(*pending, return_exceptions=True)
+
+                # Drive the worker step loop directly.
+                #
+                # We cannot use the public step() API because it schedules
+                # work via call_soon_threadsafe / run_or_schedule, which
+                # creates background asyncio.Tasks.  In the server path
+                # those tasks are consumed by the event-loop naturally, but
+                # here we are the *only* consumer — so those tasks would
+                # never run and the state transition (RUNNING → FINISHED)
+                # would never land.
+                #
+                # Instead we call _step_inner() directly (we're already
+                # async) and after each step we drain every background task
+                # that event-stream callbacks spawned via run_or_schedule().
+
                 max_steps = max(
                     10, int(getattr(parent_config, 'iteration_delta', 50) or 50)
                 )
@@ -522,13 +752,32 @@ class EventRouterService:
                         AgentState.PAUSED,
                     ):
                         break
-                    worker_controller.step()
-                    step_task = getattr(worker_controller, '_step_task', None)
-                    if step_task is not None:
-                        await step_task
 
-                # Cleanup the worker
-                await worker_controller.close(set_stop_state=False)
+                    # Snapshot tasks before step so we can identify new ones.
+                    pre_tasks = set(_background_tasks)
+
+                    await worker_controller._step_inner()
+
+                    # Drain all background tasks that were spawned during the
+                    # step (typically _on_event coroutines from event-stream
+                    # inline dispatch → on_event → run_or_schedule).  Keep
+                    # draining until no new tasks appear, because each task
+                    # may itself schedule further tasks (e.g. the state-change
+                    # observation triggers another on_event cycle).
+                    for _drain in range(50):
+                        new_tasks = _background_tasks - pre_tasks
+                        pending = {t for t in new_tasks if not t.done()}
+                        if not pending:
+                            break
+                        await asyncio.gather(*pending, return_exceptions=True)
+
+                # Final settle: give any remaining scheduled callbacks a
+                # chance to complete.
+                for _ in range(20):
+                    pending = {t for t in _background_tasks if not t.done()}
+                    if not pending:
+                        break
+                    await asyncio.gather(*pending, return_exceptions=True)
 
                 final_state = worker_controller.get_agent_state()
                 self._ctrl.log(
@@ -536,13 +785,25 @@ class EventRouterService:
                     f'Worker agent {worker_id} finished with state {final_state.value}',
                 )
 
-                success = final_state == AgentState.FINISHED
-
                 # Check for output data
                 outputs = worker_controller.state.outputs
                 extracted_outputs = None
                 if outputs:
                     extracted_outputs = outputs
+
+                success = final_state == AgentState.FINISHED
+                if (
+                    not success
+                    and extracted_outputs is not None
+                    and final_state
+                    in (
+                        AgentState.RUNNING,
+                        AgentState.AWAITING_USER_INPUT,
+                        AgentState.PAUSED,
+                    )
+                ):
+                    success = True
+                    final_state = AgentState.FINISHED
 
                 content = (
                     str(extracted_outputs)
@@ -554,10 +815,19 @@ class EventRouterService:
                     if success
                     else f'Agent did not finish gracefully (State: {final_state.value}).'
                 )
+
+                # Cleanup the worker after capturing final state and outputs.
+                await worker_controller.close(set_stop_state=False)
+
+                if success and not worker_marked_terminal:
+                    _emit_worker_progress('done', 'Completed')
+                elif not success and not worker_marked_terminal:
+                    _emit_worker_progress('failed', error_message)
                 return success, content, error_message
 
             except Exception as e:
                 self._ctrl.log('error', f'Worker execution failed: {e}')
+                _emit_worker_progress('failed', f'Worker execution crashed: {e}')
                 return False, '', f'Worker execution crashed: {e}'
 
         async def _run_subagent():
@@ -577,8 +847,11 @@ class EventRouterService:
                             t.get('task_description', ''),
                             t.get('files', []),
                             blackboard,
+                            worker_label=f'Worker {i + 1}',
+                            worker_order=i + 1,
+                            batch_id=action.id if action.id > 0 else None,
                         )
-                        for t in parallel_tasks
+                        for i, t in enumerate(parallel_tasks)
                     ],
                     return_exceptions=False,
                 )
@@ -608,7 +881,12 @@ class EventRouterService:
             else:
                 # Single worker mode
                 success, content, error_message = await _execute_single_worker(
-                    action.task_description, getattr(action, 'files', []), blackboard
+                    action.task_description,
+                    getattr(action, 'files', []),
+                    blackboard,
+                    worker_label='Worker',
+                    worker_order=1,
+                    batch_id=action.id if action.id > 0 else None,
                 )
                 if blackboard is not None and blackboard.snapshot():
                     content += '\n\n[SHARED BLACKBOARD SNAPSHOT]\n' + '\n'.join(
@@ -640,6 +918,20 @@ class EventRouterService:
             )
             early_obs.tool_call_metadata = action.tool_call_metadata
             self._ctrl.event_stream.add_event(early_obs, EventSource.ENVIRONMENT)
+        else:
+            # Foreground delegation: register the action as pending so the
+            # parent agent blocks (can_step → False) until _run_subagent()
+            # emits a DelegateTaskObservation with cause=action.id that
+            # clears the pending slot.  Without this, _step_inner() sees no
+            # pending action and immediately calls the LLM again — before
+            # workers have finished — producing a hallucinated response.
+            pending_service = getattr(
+                getattr(self._ctrl, 'services', None), 'pending_action', None
+            )
+            if pending_service is not None:
+                pending_service.set(action)
+            else:
+                self._ctrl._pending_action = action
 
         # Run the subagent without blocking
         run_or_schedule(_run_subagent())

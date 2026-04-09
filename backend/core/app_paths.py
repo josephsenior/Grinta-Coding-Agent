@@ -1,34 +1,24 @@
 """Filesystem locations for app data (not the open-folder workspace).
 
 ``AppConfig.project_root`` is the open folder; ``local_data_root`` is the LocalFileStore disk root.
-(sessions, agent files).  LLM settings, secrets, and ``settings.json`` must stay in a
-stable directory — typically the directory where the server was started.
+(sessions, agent files). ``settings.json`` is anchored to the Grinta repository root
+to keep a single source of truth.
 """
 
 from __future__ import annotations
 
-import os
+from pathlib import Path
+
+
+def get_canonical_settings_path() -> str:
+    """Absolute canonical ``settings.json`` path inside the Grinta repository."""
+    return str(Path(get_app_settings_root()) / 'settings.json')
 
 
 def get_app_settings_root() -> str:
-    """Absolute directory containing the canonical ``settings.json``.
+    """Absolute directory containing canonical ``settings.json``.
 
-    Search order:
-    1. ``APP_ROOT`` env var (if set)
-    2. Current working directory (if ``settings.json`` exists there)
-    3. ``~/.grinta/`` user-level config directory (global fallback)
-    4. Current working directory (for creation if nothing found)
+    This is always the repository root (parent of ``backend/``), regardless of
+    process working directory, home directory, or environment overrides.
     """
-    override = (os.environ.get('APP_ROOT') or '').strip()
-    if override:
-        return os.path.abspath(os.path.expanduser(override))
-
-    cwd = os.path.abspath(os.getcwd())
-    if os.path.isfile(os.path.join(cwd, 'settings.json')):
-        return cwd
-
-    user_dir = os.path.join(os.path.expanduser('~'), '.grinta')
-    if os.path.isfile(os.path.join(user_dir, 'settings.json')):
-        return user_dir
-
-    return cwd
+    return str(Path(__file__).resolve().parents[2])

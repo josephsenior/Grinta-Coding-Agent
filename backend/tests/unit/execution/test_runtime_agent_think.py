@@ -4,7 +4,12 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from backend.execution.base import Runtime
-from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction, FileWriteAction
+from backend.ledger.action import (
+    CmdRunAction,
+    FileEditAction,
+    FileReadAction,
+    FileWriteAction,
+)
 from backend.ledger.action.agent import AgentThinkAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.observation import AgentThinkObservation, Observation

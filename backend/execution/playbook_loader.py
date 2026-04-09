@@ -12,13 +12,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from zipfile import ZipFile
 
+from backend.core.workspace_resolution import workspace_grinta_root
 from backend.ledger.action import CmdRunAction, FileReadAction
 from backend.ledger.observation import (
     CmdOutputObservation,
     ErrorObservation,
     FileReadObservation,
 )
-from backend.core.workspace_resolution import workspace_grinta_root
 from backend.playbooks.engine import BasePlaybook, load_playbooks_from_dir
 from backend.utils.async_utils import GENERAL_TIMEOUT, call_async_from_sync
 

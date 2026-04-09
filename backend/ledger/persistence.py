@@ -12,8 +12,8 @@ import time
 from collections import deque
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from backend.core.logger import app_logger as logger
 from backend.core.io_adapters import json
+from backend.core.logger import app_logger as logger
 from backend.ledger.durable_writer import DurableEventWriter, PersistedEvent
 from backend.persistence.locations import get_conversation_events_dir
 

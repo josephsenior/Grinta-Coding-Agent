@@ -15,6 +15,7 @@ from backend.ledger.action import (
     AgentThinkAction,
     CmdRunAction,
     MessageAction,
+    PlaybookFinishAction,
 )
 from backend.ledger.action.message import SystemMessageAction
 from backend.ledger.event import EventSource
@@ -148,6 +149,25 @@ class TestConvertActionToMessages:
         action._source = EventSource.USER
         result = convert_action_to_messages(action, {})
         assert result[0].role == 'user'
+
+    def test_finish_action_prefers_final_thought_and_includes_next_steps(self):
+        action = PlaybookFinishAction(
+            final_thought='Task completed successfully.',
+            outputs={
+                'completed': ['Created md_to_html.py'],
+                'next_steps': ['Open sample.html', 'Try a real markdown file'],
+            },
+        )
+        action._source = EventSource.AGENT
+
+        result = convert_action_to_messages(action, {})
+
+        assert result[0].role == 'assistant'
+        part = result[0].content[0]
+        assert isinstance(part, TextContent)
+        assert 'Task completed successfully.' in part.text
+        assert 'Next steps' in part.text
+        assert 'Open sample.html' in part.text
 
     def test_unknown_action_returns_empty(self):
         """Unrecognized action types produce empty list."""

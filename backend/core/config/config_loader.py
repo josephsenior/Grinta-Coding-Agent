@@ -23,7 +23,7 @@ from uuid import uuid4
 from pydantic import SecretStr, ValidationError
 
 from backend.core import logger
-from backend.core.app_paths import get_app_settings_root
+from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.app_config import AppConfig
 from backend.core.config.cli_config import (
@@ -531,9 +531,15 @@ def load_app_config(
     """
     rebuild_config_models()
 
-    resolved_config_file = config_file
-    if config_file == 'settings.json' and not os.path.isabs(config_file):
-        resolved_config_file = os.path.join(get_app_settings_root(), config_file)
+    # Hard-enforce a single source of truth for configuration.
+    # External config files are ignored by design; only repo-root settings.json is used.
+    resolved_config_file = get_canonical_settings_path()
+    if config_file != 'settings.json':
+        logger.app_logger.warning(
+            'Ignoring external config_file=%s; using canonical settings=%s',
+            config_file,
+            resolved_config_file,
+        )
 
     config = AppConfig()
 
@@ -591,9 +597,7 @@ def setup_config_from_args(args: argparse.Namespace) -> AppConfig:
 
     Configuration precedence (from highest to lowest):
     1. CLI parameters (e.g., -l for LLM config)
-    2. ``settings.json`` from ``--config-file`` (default: relative to process CWD)
-    3. Canonical ``<get_app_settings_root()>/settings.json`` if that path differs and
-       contains LLM keys (see :func:`backend.core.app_paths.get_app_settings_root`)
+    2. Canonical repo-root ``settings.json`` only
     """
     config = load_app_config(config_file=args.config_file)
     apply_llm_config_override(config, args)

@@ -9,6 +9,7 @@ from backend.ledger.action import CmdRunAction
 def test_tree_action_uses_powershell_fallback_on_windows_without_bash(
     monkeypatch,
 ) -> None:
+    monkeypatch.setattr(analyze_project_structure.os, 'name', 'nt', raising=False)
     monkeypatch.setattr(analyze_project_structure, 'uses_powershell_terminal', lambda: True)
 
     action = analyze_project_structure.build_analyze_project_structure_action(
@@ -16,7 +17,8 @@ def test_tree_action_uses_powershell_fallback_on_windows_without_bash(
     )
 
     assert isinstance(action, CmdRunAction)
-    assert 'Get-ChildItem' in action.command
+    assert 'b64decode' in action.command
+    assert 'Get-ChildItem' not in action.command
     assert 'if command -v tree' not in action.command
     assert 'find ' not in action.command
 
@@ -24,6 +26,7 @@ def test_tree_action_uses_powershell_fallback_on_windows_without_bash(
 def test_tree_action_keeps_posix_command_when_bash_is_available(
     monkeypatch,
 ) -> None:
+    monkeypatch.setattr(analyze_project_structure.os, 'name', 'posix', raising=False)
     monkeypatch.setattr(analyze_project_structure, 'uses_powershell_terminal', lambda: False)
 
     action = analyze_project_structure.build_analyze_project_structure_action(

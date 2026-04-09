@@ -10,6 +10,7 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from backend.core.logger import app_logger as logger
+from backend.engine.tools.prompt import build_python_exec_command
 from backend.ledger.action import CmdRunAction, FileEditAction
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation
 
@@ -79,8 +80,12 @@ class ActionVerifier:
             path = action.path
 
             # Verify file exists (cross-platform: works on both bash and PowerShell)
+            exists_script = (
+                'import os; '
+                f"print('FILE_EXISTS' if os.path.isfile({path!r}) else 'FILE_MISSING')"
+            )
             verify_cmd = CmdRunAction(
-                command=f"python3 -c \"import os; print('FILE_EXISTS' if os.path.isfile('{path}') else 'FILE_MISSING')\"",
+                command=build_python_exec_command(exists_script),
                 thought='Verifying file was created/edited',
             )
             verify_obs = await self._run_runtime_action(verify_cmd)
@@ -104,8 +109,15 @@ class ActionVerifier:
                 )
 
             # Verify file has content (cross-platform)
+            content_script = (
+                'import os; '
+                f'p={path!r}; '
+                "lines=sum(1 for _ in open(p, encoding='utf-8')); "
+                "size=os.path.getsize(p); "
+                "print(f'{lines} lines, {size} bytes')"
+            )
             content_cmd = CmdRunAction(
-                command=f"python3 -c \"import os; p='{path}'; lines=sum(1 for _ in open(p, encoding='utf-8')); size=os.path.getsize(p); print(f'{{lines}} lines, {{size}} bytes')\"",
+                command=build_python_exec_command(content_script),
                 thought='Verifying file content',
             )
             content_obs = await self._run_runtime_action(content_cmd)

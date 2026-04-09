@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from typing import cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -12,7 +12,6 @@ from backend.core.config import LLMConfig
 from backend.inference.cost_tracker import (
     get_completion_cost,
 )
-from backend.inference.metrics import Metrics
 
 # ---------------------------------------------------------------------------
 # get_completion_cost — config overrides

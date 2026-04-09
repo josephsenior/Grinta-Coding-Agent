@@ -18,6 +18,7 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller = MagicMock()
         self.mock_controller.state = MagicMock()
         self.mock_controller.state.agent_state = AgentState.RUNNING
+        self.mock_controller.state.plan = None
         self.mock_controller.event_stream = MagicMock()
         self.mock_controller.set_agent_state_to = AsyncMock()
         self.mock_controller._get_initial_task = MagicMock()
@@ -49,6 +50,22 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         # Should return True without validating
         self.assertTrue(result)
         mock_validator.validate_completion.assert_not_called()
+
+    async def test_handle_finish_force_finish_still_blocks_active_plan(self):
+        """Test force_finish does not bypass active task-plan checks."""
+        action = PlaybookFinishAction(outputs={})
+        action.force_finish = True
+        self.mock_controller.state.plan = SimpleNamespace(
+            steps=[SimpleNamespace(id='1', description='Do work', status='doing')]
+        )
+
+        result = await self.service.handle_finish(action)
+
+        self.assertFalse(result)
+        self.mock_controller.event_stream.add_event.assert_called_once()
+        call_args = self.mock_controller.event_stream.add_event.call_args[0]
+        observation = call_args[0]
+        self.assertEqual(observation.error_id, 'TASK_TRACKER_INCOMPLETE')
 
     async def test_handle_finish_validation_passed(self):
         """Test handle_finish proceeds when validation passes."""

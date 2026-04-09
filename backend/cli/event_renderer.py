@@ -75,11 +75,6 @@ from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
-from backend.core.task_status import (
-    TASK_STATUS_PANEL_STYLES,
-    TASK_STATUS_TODO,
-    normalize_task_status,
-)
 from backend.cli.hud import HUDBar
 from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
@@ -101,16 +96,21 @@ from backend.cli.tool_call_display import (
 )
 from backend.cli.transcript import (
     format_activity_block,
-    format_activity_secondary,
+    format_activity_delta_secondary,
     format_activity_result_secondary,
+    format_activity_secondary,
     format_activity_shell_block,
     format_activity_turn_header,
     format_callout_panel,
     format_ground_truth_tool_line,
-    format_shell_result_secondary,
     strip_tool_result_validation_annotations,
 )
 from backend.core.enums import AgentState, EventSource
+from backend.core.task_status import (
+    TASK_STATUS_PANEL_STYLES,
+    TASK_STATUS_TODO,
+    normalize_task_status,
+)
 from backend.ledger import EventStreamSubscriber
 from backend.ledger.action import (
     Action,
@@ -226,6 +226,35 @@ def _task_panel_signature(task_list: list[dict[str, Any]]) -> tuple[tuple[str, s
     return tuple(rows)
 
 
+_DELEGATE_WORKER_STATUS_STYLES = {
+    'starting': 'cyan',
+    'running': 'yellow',
+    'done': 'green',
+    'failed': 'red',
+}
+
+
+def _delegate_worker_panel_signature(
+    workers: dict[str, dict[str, Any]],
+) -> tuple[tuple[int, str, str, str, str], ...]:
+    """Build a stable signature for the visible delegated-worker panel."""
+    rows: list[tuple[int, str, str, str, str]] = []
+    for worker_id, item in workers.items():
+        order = item.get('order', 9999)
+        if not isinstance(order, int):
+            order = 9999
+        rows.append(
+            (
+                order,
+                str(item.get('label') or worker_id),
+                str(item.get('status') or 'running'),
+                str(item.get('task') or 'subtask'),
+                str(item.get('detail') or ''),
+            )
+        )
+    return tuple(sorted(rows, key=lambda row: (row[0], row[1], row[3], row[4])))
+
+
 def _summarize_cmd_failure(content: str) -> str:
     """Pick the most actionable single-line failure summary for the CLI transcript."""
     lines = [line.strip() for line in (content or '').splitlines() if line.strip()]
@@ -245,6 +274,120 @@ def _summarize_cmd_failure(content: str) -> str:
                 return line[:160]
 
     return candidates[-1][:160]
+
+
+def _truncate_activity_detail(text: str, limit: int) -> str:
+    """Collapse whitespace and cap verbose tool details for compact activity cards."""
+    collapsed = ' '.join((text or '').split())
+    if len(collapsed) <= limit:
+        return collapsed
+    return collapsed[: max(limit - 1, 0)].rstrip() + '…'
+
+
+def _summarize_delegate_action(action: DelegateTaskAction) -> tuple[str, str | None]:
+    """Return a compact action label for single-worker and swarm delegations."""
+    parallel_tasks = getattr(action, 'parallel_tasks', []) or []
+    run_in_background = bool(getattr(action, 'run_in_background', False))
+
+    if parallel_tasks:
+        count = len(parallel_tasks)
+        detail = f'{count} parallel task' + ('s' if count != 1 else '')
+        previews = [
+            _truncate_activity_detail(str(item.get('task_description') or ''), 36)
+            for item in parallel_tasks
+            if str(item.get('task_description') or '').strip()
+        ]
+        secondary_parts: list[str] = []
+        if previews:
+            preview = '; '.join(previews[:2])
+            if len(previews) > 2:
+                preview += f'; +{len(previews) - 2} more'
+            secondary_parts.append(preview)
+        if run_in_background:
+            secondary_parts.append('background')
+        return detail, ' · '.join(secondary_parts) or None
+
+    detail = _truncate_activity_detail(getattr(action, 'task_description', '') or '', 80)
+    if not detail:
+        detail = 'subtask'
+
+    secondary_parts = []
+    files = getattr(action, 'files', []) or []
+    if files:
+        secondary_parts.append(f'{len(files)} file' + ('s' if len(files) != 1 else ''))
+    if run_in_background:
+        secondary_parts.append('background')
+    return detail, ' · '.join(secondary_parts) or None
+
+
+def _summarize_delegate_observation(
+    obs: DelegateTaskObservation,
+) -> tuple[str | None, str, list[Text]]:
+    """Summarize delegated-worker results for compact in-card CLI rendering."""
+    success = bool(getattr(obs, 'success', True))
+    error = str(getattr(obs, 'error_message', '') or '').strip()
+    raw_content = strip_tool_result_validation_annotations(
+        str(getattr(obs, 'content', '') or '').strip()
+    )
+    content = raw_content.split('[SHARED BLACKBOARD SNAPSHOT]', 1)[0].strip()
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+    extra_lines: list[Text] = []
+
+    worker_statuses: list[tuple[str, str]] = []
+    for line in lines:
+        match = re.match(r'^\[(OK|FAILED)\]\s*(.+)$', line)
+        if match:
+            worker_statuses.append((match.group(1), match.group(2)))
+
+    if worker_statuses:
+        total = len(worker_statuses)
+        ok_count = sum(status == 'OK' for status, _label in worker_statuses)
+        failed_count = total - ok_count
+        if failed_count == 0:
+            result_message = f'all {total} workers completed'
+            result_kind = 'ok'
+        else:
+            result_message = f'{ok_count}/{total} workers completed'
+            result_kind = 'err'
+
+        for status, label in worker_statuses[:3]:
+            extra_lines.append(
+                format_activity_result_secondary(
+                    _truncate_activity_detail(label, 96),
+                    kind='ok' if status == 'OK' else 'err',
+                )
+            )
+        if total > 3:
+            extra_lines.append(
+                format_activity_result_secondary(
+                    f'+{total - 3} more workers', kind='neutral'
+                )
+            )
+        if failed_count and error:
+            extra_lines.append(
+                format_activity_result_secondary(
+                    _truncate_activity_detail(error, 120),
+                    kind='err',
+                )
+            )
+        return result_message, result_kind, extra_lines
+
+    if raw_content.startswith('Worker(s) started in background'):
+        return _truncate_activity_detail(raw_content, 140), 'neutral', extra_lines
+
+    if not success:
+        if error:
+            return f'delegation failed · {_truncate_activity_detail(error, 120)}', 'err', extra_lines
+        if lines:
+            return f'delegation failed · {_truncate_activity_detail(lines[0], 120)}', 'err', extra_lines
+        return 'delegation failed', 'err', extra_lines
+
+    if not lines:
+        if raw_content:
+            return _truncate_activity_detail(raw_content, 140), 'ok', extra_lines
+        return 'delegation completed', 'ok', extra_lines
+
+    return _truncate_activity_detail(lines[0], 140), 'ok', extra_lines
 
 
 def _build_task_panel(task_list: list[dict[str, Any]]) -> Any:
@@ -276,6 +419,37 @@ def _build_task_panel(task_list: list[dict[str, Any]]) -> Any:
     )
 
 
+def _build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
+    """Render delegated worker progress as a compact reusable panel block."""
+    table = Table.grid(expand=True, padding=(0, 1))
+    table.add_column()
+    table.add_column(ratio=1)
+
+    for order, label, status, task, detail in _delegate_worker_panel_signature(workers):
+        badge = Text()
+        badge.append('[', style='dim')
+        badge.append(
+            status.upper(),
+            style=f"bold {_DELEGATE_WORKER_STATUS_STYLES.get(status, 'dim')}",
+        )
+        badge.append(']', style='dim')
+
+        body = Text()
+        if label:
+            body.append(f'{label}  ', style='dim')
+        body.append(task or 'subtask', style='default')
+        if detail and detail != task:
+            body.append(f'\n{detail}', style='dim')
+        table.add_row(badge, body)
+
+    empty_state: Any = table if workers else Text('No delegated workers yet.', style='dim')
+    return format_callout_panel(
+        f'Workers ({len(workers)})',
+        empty_state,
+        accent_style='dim',
+    )
+
+
 if TYPE_CHECKING:
     from backend.cli.reasoning_display import ReasoningDisplay
     from backend.ledger.stream import EventStream
@@ -302,6 +476,18 @@ class ErrorGuidance:
 
     summary: str
     steps: tuple[str, ...]
+
+
+@dataclass
+class PendingActivityCard:
+    """Buffered non-shell activity card, paired with a later observation."""
+
+    title: str
+    verb: str
+    detail: str
+    secondary: str | None = None
+    kind: str = 'generic'
+    payload: dict[str, Any] | None = None
 
 
 def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
@@ -605,13 +791,26 @@ class CLIEventRenderer:
         self._last_printed_task_panel_signature: (
             tuple[tuple[str, str, str], ...] | None
         ) = None
+        self._delegate_workers: dict[str, dict[str, Any]] = {}
+        self._delegate_batch_id: int | None = None
+        self._delegate_panel: Any | None = None
+        self._delegate_panel_signature: (
+            tuple[tuple[int, str, str, str, str], ...] | None
+        ) = None
+        self._last_printed_delegate_panel_signature: (
+            tuple[tuple[int, str, str, str, str], ...] | None
+        ) = None
         #: Last shell command label; paired with :class:`CmdOutputObservation` for one dim result row.
         self._pending_shell_command: str | None = None
         #: Buffered (verb, label) from CmdRunAction — printed as a combined card on CmdOutputObservation.
         self._pending_shell_action: tuple[str, str] | None = None
+        #: Headline for internal shell-backed tool actions (e.g. Analyze project, Search code).
+        self._pending_shell_title: str | None = None
         #: True when the buffered shell action is from an internal tool (display_label set).
         #: CmdOutputObservation renders only a brief result line instead of a terminal block.
         self._pending_shell_is_internal: bool = False
+        #: Buffered non-shell tool card — printed as a combined card on the matching observation.
+        self._pending_activity_card: PendingActivityCard | None = None
         #: First tool/shell row each turn prints a small section marker for scanability.
         self._activity_turn_header_emitted: bool = False
         #: Monotonic timestamp of the last Live refresh (for throttling).
@@ -671,6 +870,13 @@ class CLIEventRenderer:
         ):
             self._console.print(self._task_panel)
             self._last_printed_task_panel_signature = self._task_panel_signature
+        if (
+            self._delegate_panel is not None
+            and self._delegate_panel_signature
+            != self._last_printed_delegate_panel_signature
+        ):
+            self._console.print(self._delegate_panel)
+            self._last_printed_delegate_panel_signature = self._delegate_panel_signature
         try:
             live.stop()
         except Exception:
@@ -724,7 +930,9 @@ class CLIEventRenderer:
         """Snapshot metrics and mark the agent as running."""
         self._pending_shell_command = None
         self._pending_shell_action = None
+        self._pending_shell_title = None
         self._pending_shell_is_internal = False
+        self._pending_activity_card = None
         self._activity_turn_header_emitted = False
         self._current_state = AgentState.RUNNING
         self._hud.update_ledger('Healthy')
@@ -749,11 +957,18 @@ class CLIEventRenderer:
     def clear_history(self) -> None:
         self._pending_shell_command = None
         self._pending_shell_action = None
+        self._pending_shell_title = None
         self._pending_shell_is_internal = False
+        self._pending_activity_card = None
         self._activity_turn_header_emitted = False
         self._task_panel = None
         self._task_panel_signature = None
         self._last_printed_task_panel_signature = None
+        self._delegate_workers = {}
+        self._delegate_batch_id = None
+        self._delegate_panel = None
+        self._delegate_panel_signature = None
+        self._last_printed_delegate_panel_signature = None
         self._clear_streaming_preview()
         self._reasoning.stop()
         self.refresh()
@@ -895,6 +1110,8 @@ class CLIEventRenderer:
         live_sections: list[Any] = []
         if self._task_panel is not None:
             live_sections.append(self._task_panel)
+        if self._delegate_panel is not None:
+            live_sections.append(self._delegate_panel)
         if self._streaming_accumulated:
             live_sections.append(self._render_streaming_preview())
         if self._reasoning.active:
@@ -928,6 +1145,7 @@ class CLIEventRenderer:
 
         hud = self._hud.state
         items: list[Any] = []
+        provider, model = HUDBar.describe_model(hud.model)
 
         # -- fake input line (replaces the real ❯ prompt) -------------------
         input_row = Table.grid()
@@ -942,13 +1160,16 @@ class CLIEventRenderer:
         # -- separator (mirrors _prompt_bottom_toolbar) ---------------------
         items.append(Text('─' * width, style='#5c7287'))
 
-        model = hud.model if hud.model and hud.model != '(not set)' else 'model n/a'
         state_label = hud.agent_state_label or 'Running'
         autonomy = hud.autonomy_level or 'balanced'
 
         if width < 72:
             # Compact single-line mode for very narrow terminals.
-            model_short = model.rsplit('/', maxsplit=1)[-1]
+            model_short = (
+                model
+                if provider in {'(not set)', '(unknown)'}
+                else f'{provider}/{model}'
+            )
             ctx = HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
             line = Text()
             line.append(state_label, style='dim')
@@ -1012,6 +1233,10 @@ class CLIEventRenderer:
 
         # Build row 2 parts and wrap to a second line if they overflow.
         parts: list[tuple[str, str]] = [
+            ('provider:', '#5c7287'),
+            (' ', ''),
+            (provider, 'bold #dbe7f3'),
+            SEP,
             ('model:', '#5c7287'),
             (' ', ''),
             (model, 'bold #dbe7f3'),
@@ -1039,11 +1264,12 @@ class CLIEventRenderer:
         else:
             # Split into two lines: required on line 1, optionals on line 2.
             row2a = Text()
-            for content, style in parts[:7]:  # model: + model + sep + tokens + sep + cost
+            base_len = 11  # provider: + provider + sep + model: + model + sep + tokens + sep + cost
+            for content, style in parts[:base_len]:
                 row2a.append(content, style=style)
             items.append(row2a)
             row2b = Text()
-            row2b.append('       ', style='')  # indent to align under model value
+            row2b.append('          ', style='')  # indent to align under the provider label
             first = True
             for content, style in optional_parts:
                 if not first:
@@ -1062,6 +1288,7 @@ class CLIEventRenderer:
             return
 
         if isinstance(action, MessageAction):
+            self._flush_pending_tool_cards()
             cot = (getattr(action, 'thought', None) or '').strip()
             if cot:
                 self._ensure_reasoning()
@@ -1091,36 +1318,7 @@ class CLIEventRenderer:
                             kind='neutral',
                         )
                     )
-
-                from rich.rule import Rule
-
-                self._append_history(Text(''))
-                self._append_history(
-                    Padding(
-                        Text('Assistant', style='bold'),
-                        (2, 0, 0, 0),
-                        expand=False,
-                    )
-                )
-                self._append_history(
-                    Padding(
-                        Rule(style='dim', characters='─'),
-                        (0, 0, 1, 0),
-                        expand=False,
-                    )
-                )
-                tool_lines = try_format_message_as_tool_json(
-                    display_content, use_icons=self._cli_tool_icons
-                )
-                if tool_lines is not None:
-                    _icon, friendly = tool_lines
-                    for line in friendly.split('\n'):
-                        self._append_history(Text(line, style='cyan'))
-                else:
-                    self._append_history(Padding(Markdown(display_content), (0, 0, 1, 0)))
-                for att in attachments:
-                    self._append_history(att)
-                self._append_history(Text(''))
+                self._append_assistant_message(display_content, attachments=attachments)
             else:
                 self.refresh()
             return
@@ -1174,6 +1372,7 @@ class CLIEventRenderer:
 
         if isinstance(action, CmdRunAction):
             self._clear_streaming_preview()
+            self._flush_pending_activity_card()
             if getattr(action, 'hidden', False):
                 self.refresh()
                 return
@@ -1186,12 +1385,19 @@ class CLIEventRenderer:
                 # will render a compact result row (no raw terminal block).  Do NOT forward
                 # the thought to the reasoning display — the display_label already acts as
                 # the activity label and showing the thought too creates a duplicate.
+                meta = getattr(action, 'tool_call_metadata', None)
+                function_name = getattr(meta, 'function_name', '') or ''
+                _icon, headline = tool_headline(
+                    function_name, use_icons=self._cli_tool_icons
+                )
                 self._pending_shell_command = None
                 self._pending_shell_action = ('Ran', display_label)
+                self._pending_shell_title = headline or 'Shell'
                 self._pending_shell_is_internal = True
                 self.refresh()
                 return
             self._pending_shell_is_internal = False
+            self._pending_shell_title = None
             cmd_display = (action.command or '').strip()
             if len(cmd_display) > 12_000:
                 cmd_display = cmd_display[:11_997] + '…'
@@ -1206,6 +1412,7 @@ class CLIEventRenderer:
 
         if isinstance(action, FileEditAction):
             self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
             cmd = getattr(action, 'command', '')
             path = action.path
             insert_line = getattr(action, 'insert_line', None)
@@ -1229,7 +1436,13 @@ class CLIEventRenderer:
             else:
                 verb = 'Edited'
                 detail = path
-            self._print_activity(verb, detail, stats, title='File')
+            self._buffer_pending_activity(
+                title='File',
+                verb=verb,
+                detail=detail,
+                secondary=stats,
+                kind='file_edit',
+            )
             thought = getattr(action, 'thought', '') or ''
             _sync_reasoning_after_tool_line(self._reasoning, f'{verb} {detail}', thought)
             self.refresh()
@@ -1237,10 +1450,16 @@ class CLIEventRenderer:
 
         if isinstance(action, FileWriteAction):
             self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
             content = getattr(action, 'content', '') or ''
-            n_lines = content.count('\n') + 1 if content.strip() else 0
-            stats = f'{n_lines:,} lines' if n_lines else None
-            self._print_activity('Created', action.path, stats, title='File')
+            n_lines = len(content.splitlines()) if content else 0
+            self._buffer_pending_activity(
+                title='File',
+                verb='Created',
+                detail=action.path,
+                kind='file_write',
+                payload={'line_count': n_lines},
+            )
             thought = getattr(action, 'thought', '') or ''
             _sync_reasoning_after_tool_line(
                 self._reasoning, f'Created {action.path}', thought
@@ -1250,6 +1469,7 @@ class CLIEventRenderer:
 
         if isinstance(action, RecallAction):
             self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
             query = getattr(action, 'query', '')
             detail = query if query else 'workspace context'
             if len(detail) > 100:
@@ -1261,6 +1481,7 @@ class CLIEventRenderer:
         # -- File read --------------------------------------------------------
         if isinstance(action, FileReadAction):
             self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
             path = getattr(action, 'path', '')
             view_range = getattr(action, 'view_range', None)
             start = getattr(action, 'start', 0)
@@ -1272,7 +1493,12 @@ class CLIEventRenderer:
                 detail = f'{path} · L{start}:{end_str}'
             else:
                 detail = path
-            self._print_activity('Viewed', detail, None, title='File')
+            self._buffer_pending_activity(
+                title='File',
+                verb='Viewed',
+                detail=detail,
+                kind='file_read',
+            )
             thought = getattr(action, 'thought', '') or ''
             _sync_reasoning_after_tool_line(self._reasoning, f'Viewed {path}', thought)
             self.refresh()
@@ -1281,11 +1507,18 @@ class CLIEventRenderer:
         # -- MCP tool call ----------------------------------------------------
         if isinstance(action, MCPAction):
             self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
             name = getattr(action, 'name', 'tool')
             raw_args = getattr(action, 'arguments', None) or {}
             args_dict = raw_args if isinstance(raw_args, dict) else {}
             verb, detail, stats = format_tool_activity_rows(name, args_dict)
-            self._print_activity(verb, detail, stats, title='MCP')
+            self._buffer_pending_activity(
+                title='MCP',
+                verb=verb,
+                detail=detail,
+                secondary=stats,
+                kind='mcp',
+            )
             thought = getattr(action, 'thought', '') or ''
             _sync_reasoning_after_tool_line(
                 self._reasoning, f'{verb} {detail}', thought
@@ -1296,6 +1529,7 @@ class CLIEventRenderer:
         # -- Browser ----------------------------------------------------------
         if isinstance(action, BrowseInteractiveAction):
             self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
             browser_actions = getattr(action, 'browser_actions', '') or ''
             url_match = re.search(r'https?://[^\s\'")\]]+', browser_actions)
             if url_match:
@@ -1312,18 +1546,26 @@ class CLIEventRenderer:
         # -- Code navigation --------------------------------------------------
         if isinstance(action, LspQueryAction):
             self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
             cmd = getattr(action, 'command', 'query')
             file = getattr(action, 'file', '')
             symbol = getattr(action, 'symbol', '')
             detail = symbol if symbol else file
             stats = str(cmd) if cmd else None
-            self._print_activity('Analyzed', detail, stats, title='Code')
+            self._buffer_pending_activity(
+                title='Code',
+                verb='Analyzed',
+                detail=detail,
+                secondary=stats,
+                kind='lsp',
+            )
             self.refresh()
             return
 
         # -- Task tracking ----------------------------------------------------
         if isinstance(action, TaskTrackingAction):
             self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
             self.refresh()
             return
 
@@ -1346,6 +1588,7 @@ class CLIEventRenderer:
         # -- Terminal session -------------------------------------------------
         if isinstance(action, TerminalRunAction):
             self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
             cmd = (getattr(action, 'command', '') or '').strip()
             if len(cmd) > 12_000:
                 cmd = cmd[:11_997] + '…'
@@ -1354,6 +1597,7 @@ class CLIEventRenderer:
             return
 
         if isinstance(action, TerminalInputAction):
+            self._flush_pending_tool_cards()
             inp = getattr(action, 'input', '')
             inp_display = inp[:60] + '…' if len(inp) > 60 else inp
             self._print_activity('Sent input', inp_display, None, title='Terminal')
@@ -1363,21 +1607,33 @@ class CLIEventRenderer:
         # -- Delegation -------------------------------------------------------
         if isinstance(action, DelegateTaskAction):
             self._clear_streaming_preview()
-            desc = getattr(action, 'task_description', '')
-            desc_display = desc[:80] + '…' if len(desc) > 80 else desc
-            self._print_activity('Delegated', desc_display, None, title='Agent')
+            self._flush_pending_tool_cards()
+            self._reset_delegate_panel(batch_id=action.id if action.id > 0 else None)
+            desc_display, secondary = _summarize_delegate_action(action)
+            self._buffer_pending_activity(
+                title='Agent',
+                verb='Delegated',
+                detail=desc_display,
+                secondary=secondary,
+                kind='delegate',
+            )
             self.refresh()
             return
 
         # -- Playbook finish --------------------------------------------------
         if isinstance(action, PlaybookFinishAction):
+            self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
+            finish_text = redact_internal_result_markers((action.message or '').strip()).strip()
+            if finish_text:
+                self._append_assistant_message(finish_text)
             self.refresh()
             return
 
         # -- Escalation to human ----------------------------------------------
         if isinstance(action, EscalateToHumanAction):
+            self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
             reason = getattr(action, 'reason', '')
@@ -1403,6 +1659,7 @@ class CLIEventRenderer:
 
         # -- Clarification request --------------------------------------------
         if isinstance(action, ClarificationRequestAction):
+            self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
             question = getattr(action, 'question', '')
@@ -1428,6 +1685,7 @@ class CLIEventRenderer:
 
         # -- Uncertainty signal -----------------------------------------------
         if isinstance(action, UncertaintyAction):
+            self._flush_pending_tool_cards()
             concerns = getattr(action, 'specific_concerns', []) or []
             info_needed = getattr(action, 'requested_information', '')
             uncertainty_parts: list[Any] = []
@@ -1451,6 +1709,7 @@ class CLIEventRenderer:
 
         # -- Proposal with options --------------------------------------------
         if isinstance(action, ProposalAction):
+            self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
             options = getattr(action, 'options', []) or []
@@ -1561,6 +1820,7 @@ class CLIEventRenderer:
 
         if isinstance(obs, CmdOutputObservation):
             self._stop_reasoning()
+            self._flush_pending_activity_card()
             if getattr(obs, 'hidden', False):
                 self._pending_shell_action = None
                 self._pending_shell_command = None
@@ -1573,9 +1833,11 @@ class CLIEventRenderer:
             content = strip_tool_result_validation_annotations(raw)
             # Retrieve buffered action (verb + label) set by CmdRunAction
             pending = self._pending_shell_action
+            title = self._pending_shell_title
             is_internal = self._pending_shell_is_internal
             self._pending_shell_action = None
             self._pending_shell_command = None
+            self._pending_shell_title = None
             self._pending_shell_is_internal = False
             verb = pending[0] if pending else 'Ran'
             label = pending[1] if pending else '$ (command)'
@@ -1592,14 +1854,14 @@ class CLIEventRenderer:
             else:
                 msg = None
                 result_kind = 'neutral'
-            self._emit_activity_turn_header()  # noqa: not a duplicate
+            self._emit_activity_turn_header()  # not a duplicate
             if is_internal:
                 # Internal tool — compact activity row, no raw terminal block
                 inner = format_activity_block(
                     verb, label,
                     secondary=msg,
                     secondary_kind=result_kind,
-                    title='Shell',
+                    title=title or 'Shell',
                 )
             else:
                 inner = format_activity_shell_block(
@@ -1614,16 +1876,44 @@ class CLIEventRenderer:
             if isinstance(obs, FileEditObservation):
                 from backend.cli.diff_renderer import DiffPanel
 
-                self._append_history(DiffPanel(obs))
-            else:
-                self._append_history(
-                    format_activity_result_secondary(f'wrote · {path}', kind='ok')
+                pending = self._take_pending_activity_card('file_edit')
+                self._emit_activity_turn_header()
+                self._print_or_buffer(
+                    Padding(
+                        DiffPanel(
+                            obs,
+                            verb=pending.verb if pending else None,
+                            detail=pending.detail if pending else path,
+                            secondary=pending.secondary if pending else None,
+                        ),
+                        pad=ACTIVITY_BLOCK_BOTTOM_PAD,
+                    )
                 )
+            else:
+                pending = self._take_pending_activity_card('file_write')
+                extra_lines: list[Any] = []
+                line_count = 0
+                if pending and pending.payload:
+                    raw_line_count = pending.payload.get('line_count', 0)
+                    line_count = raw_line_count if isinstance(raw_line_count, int) else 0
+                delta = format_activity_delta_secondary(added=line_count)
+                if delta is not None:
+                    extra_lines.append(delta)
+                elif path:
+                    extra_lines.append(
+                        format_activity_result_secondary('created', kind='ok')
+                    )
+                if pending is not None:
+                    self._render_pending_activity_card(pending, extra_lines=extra_lines)
+                else:
+                    self._append_history(
+                        format_activity_result_secondary(f'created · {path}', kind='ok')
+                    )
             return
 
         if isinstance(obs, ErrorObservation):
             self._stop_reasoning()
-            self._flush_pending_shell_action()
+            self._flush_pending_tool_cards()
             error_content = getattr(obs, 'content', str(obs))
             self._append_history(
                 _build_error_panel(error_content),
@@ -1632,7 +1922,7 @@ class CLIEventRenderer:
             return
 
         if isinstance(obs, UserRejectObservation):
-            self._flush_pending_shell_action()
+            self._flush_pending_tool_cards()
             content = getattr(obs, 'content', '')
             self._append_history(
                 format_callout_panel(
@@ -1644,6 +1934,7 @@ class CLIEventRenderer:
             return
 
         if isinstance(obs, RecallObservation):
+            self._flush_pending_tool_cards()
             # Show brief recall summary — full content goes to the agent
             recall_type = getattr(obs, 'recall_type', None)
             label = str(recall_type.value) if recall_type else 'context'
@@ -1654,6 +1945,27 @@ class CLIEventRenderer:
             return
 
         if isinstance(obs, StatusObservation):
+            self._flush_pending_tool_cards()
+            if getattr(obs, 'status_type', '') == 'delegate_progress':
+                extras = getattr(obs, 'extras', None) or {}
+                batch_id = extras.get('batch_id')
+                if batch_id is not None and self._delegate_batch_id is not None:
+                    if batch_id != self._delegate_batch_id:
+                        return
+                worker_id = str(extras.get('worker_id') or '').strip()
+                if worker_id:
+                    order = extras.get('order', 9999)
+                    if not isinstance(order, int):
+                        order = 9999
+                    self._delegate_workers[worker_id] = {
+                        'label': str(extras.get('worker_label') or worker_id),
+                        'status': str(extras.get('worker_status') or 'running'),
+                        'task': str(extras.get('task_description') or 'subtask'),
+                        'detail': str(extras.get('detail') or getattr(obs, 'content', '') or ''),
+                        'order': order,
+                    }
+                    self._set_delegate_panel()
+                    return
             content = getattr(obs, 'content', '')
             if content:
                 self._append_history(
@@ -1665,16 +1977,18 @@ class CLIEventRenderer:
         if isinstance(obs, FileReadObservation):
             self._stop_reasoning()
             content = getattr(obs, 'content', '') or ''
-            n_lines = content.count('\n') + 1 if content.strip() else 0
-            n_chars = len(content)
-            if n_lines or n_chars:
-                parts: list[str] = []
-                if n_lines:
-                    parts.append(f'{n_lines:,} lines')
-                if n_chars:
-                    parts.append(f'{n_chars:,} chars')
+            n_lines = len(content.splitlines()) if content else 0
+            pending = self._take_pending_activity_card('file_read')
+            result_message = f'{n_lines:,} lines' if n_lines else 'empty file'
+            if pending is not None:
+                self._render_pending_activity_card(
+                    pending,
+                    result_message=result_message,
+                    result_kind='neutral',
+                )
+            elif n_lines:
                 self._append_history(
-                    format_activity_result_secondary(' · '.join(parts), kind='neutral')
+                    format_activity_result_secondary(result_message, kind='neutral')
                 )
             return
 
@@ -1683,35 +1997,27 @@ class CLIEventRenderer:
             self._stop_reasoning()
             content = getattr(obs, 'content', '')
             friendly = mcp_result_user_preview(content)
-            if friendly:
+            pending = self._take_pending_activity_card('mcp')
+            if pending is not None:
+                self._render_pending_activity_card(
+                    pending,
+                    result_message=friendly if friendly else None,
+                    result_kind='neutral',
+                )
+            elif friendly:
                 self._append_history(
                     format_activity_result_secondary(friendly, kind='neutral')
                 )
-                if len(content) > len(friendly) + 20:
-                    self._append_history(
-                        format_activity_result_secondary(
-                            f'{len(content):,} chars total', kind='neutral'
-                        )
-                    )
             return
 
         # -- Terminal output --------------------------------------------------
         if isinstance(obs, TerminalObservation):
             self._stop_reasoning()
+            self._flush_pending_tool_cards()
             content = getattr(obs, 'content', '')
             if content.strip():
                 display = content[:2000]
-                terminal_parts: list[Any] = [
-                    Syntax(display, 'text', word_wrap=True, theme='ansi_dark'),
-                ]
-                if len(content) > 2000:
-                    terminal_parts.append(
-                        format_activity_result_secondary(
-                            f'{len(content):,} chars total',
-                            kind='neutral',
-                        )
-                    )
-                self._append_history(Group(*terminal_parts))
+                self._append_history(Syntax(display, 'text', word_wrap=True, theme='ansi_dark'))
             return
 
         # -- LSP / code navigation result -------------------------------------
@@ -1719,26 +2025,32 @@ class CLIEventRenderer:
             self._stop_reasoning()
             available = getattr(obs, 'available', True)
             content = getattr(obs, 'content', '') or ''
+            pending = self._take_pending_activity_card('lsp')
+            result_message: str | None = None
             if not available:
-                self._append_history(
-                    format_activity_result_secondary(
-                        'code navigation unavailable',
-                        kind='neutral',
-                    ),
-                )
+                result_message = 'code navigation unavailable'
             elif content.strip():
                 lines = [line for line in content.split('\n') if line.strip()]
                 n = len(lines)
                 if n:
                     preview = lines[0][:80]
                     suffix = f' · {n} lines' if n > 1 else ''
-                    self._append_history(
-                        format_activity_result_secondary(f'{preview}{suffix}', kind='neutral')
-                    )
+                    result_message = f'{preview}{suffix}'
+            if pending is not None:
+                self._render_pending_activity_card(
+                    pending,
+                    result_message=result_message,
+                    result_kind='neutral',
+                )
+            elif result_message:
+                self._append_history(
+                    format_activity_result_secondary(result_message, kind='neutral')
+                )
             return
 
         # -- Server ready -----------------------------------------------------
         if isinstance(obs, ServerReadyObservation):
+            self._flush_pending_tool_cards()
             url = getattr(obs, 'url', '')
             port = getattr(obs, 'port', '')
             label = url or f'port {port}'
@@ -1752,6 +2064,7 @@ class CLIEventRenderer:
 
         # -- Success ----------------------------------------------------------
         if isinstance(obs, SuccessObservation):
+            self._flush_pending_tool_cards()
             content = getattr(obs, 'content', '')
             if content:
                 self._append_history(
@@ -1761,6 +2074,7 @@ class CLIEventRenderer:
 
         # -- Recall failure ---------------------------------------------------
         if isinstance(obs, RecallFailureObservation):
+            self._flush_pending_tool_cards()
             error_msg = getattr(obs, 'error_message', '')
             recall_type = getattr(obs, 'recall_type', None)
             label = str(recall_type.value) if recall_type else 'recall'
@@ -1775,6 +2089,7 @@ class CLIEventRenderer:
 
         # -- File download ----------------------------------------------------
         if isinstance(obs, FileDownloadObservation):
+            self._flush_pending_tool_cards()
             path = getattr(obs, 'file_path', '')
             self._append_history(
                 format_activity_result_secondary(f'downloaded · {path}', kind='neutral'),
@@ -1784,20 +2099,33 @@ class CLIEventRenderer:
         # -- Delegation result ------------------------------------------------
         if isinstance(obs, DelegateTaskObservation):
             self._stop_reasoning()
-            success = getattr(obs, 'success', True)
-            error = getattr(obs, 'error_message', '')
-            if not success:
-                self._append_history(
-                    format_activity_result_secondary(
-                        f'delegation failed · {error}' if error else 'delegation failed',
-                        kind='err',
-                    ),
+            pending = self._take_pending_activity_card('delegate')
+            result_message, result_kind, extra_lines = _summarize_delegate_observation(
+                obs
+            )
+            if pending is not None:
+                self._render_pending_activity_card(
+                    pending,
+                    result_message=result_message,
+                    result_kind=result_kind,
+                    extra_lines=extra_lines,
                 )
+            else:
+                if result_message is not None:
+                    self._append_history(
+                        format_activity_result_secondary(
+                            result_message,
+                            kind=result_kind,
+                        ),
+                    )
+                for line in extra_lines:
+                    self._append_history(line)
             return
 
         # -- Task tracking result ---------------------------------------------
         if isinstance(obs, TaskTrackingObservation):
             self._stop_reasoning()
+            self._flush_pending_tool_cards()
             task_list = getattr(obs, 'task_list', None)
             cmd = getattr(obs, 'command', '')
             if task_list is not None and cmd == 'update':
@@ -1877,6 +2205,7 @@ class CLIEventRenderer:
             self._hud.update_agent_state('Running')
 
         if state == AgentState.AWAITING_USER_CONFIRMATION:
+            self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
             if previous_state != state:
@@ -1890,17 +2219,20 @@ class CLIEventRenderer:
             return
 
         if state == AgentState.AWAITING_USER_INPUT:
+            self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
             self.refresh()
             return
 
         if state == AgentState.FINISHED:
+            self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
             return
 
         if state == AgentState.ERROR:
+            self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
             self._append_history(
@@ -1910,6 +2242,7 @@ class CLIEventRenderer:
 
         # REJECTED collapses to ERROR in CLI
         if state == AgentState.REJECTED:
+            self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
             self._append_history(
@@ -2010,6 +2343,43 @@ class CLIEventRenderer:
 
         await run_in_terminal(_sync_print)
 
+    def _append_assistant_message(
+        self, display_content: str, *, attachments: list[Any] | None = None
+    ) -> None:
+        """Render a committed assistant message block in the transcript."""
+        if not display_content:
+            return
+
+        from rich.rule import Rule
+
+        self._append_history(Text(''))
+        self._append_history(
+            Padding(
+                Text('Assistant', style='bold'),
+                (2, 0, 0, 0),
+                expand=False,
+            )
+        )
+        self._append_history(
+            Padding(
+                Rule(style='dim', characters='─'),
+                (0, 0, 1, 0),
+                expand=False,
+            )
+        )
+        tool_lines = try_format_message_as_tool_json(
+            display_content, use_icons=self._cli_tool_icons
+        )
+        if tool_lines is not None:
+            _icon, friendly = tool_lines
+            for line in friendly.split('\n'):
+                self._append_history(Text(line, style='cyan'))
+        else:
+            self._append_history(Padding(Markdown(display_content), (0, 0, 1, 0)))
+        for attachment in attachments or []:
+            self._append_history(attachment)
+        self._append_history(Text(''))
+
     def _emit_activity_turn_header(self) -> None:
         if self._activity_turn_header_emitted:
             return
@@ -2028,7 +2398,7 @@ class CLIEventRenderer:
         title: str | None = None,
     ) -> None:
         """Primary activity row plus optional dim stats (tool / file / shell)."""
-        self._emit_activity_turn_header()  # noqa: not a duplicate
+        self._emit_activity_turn_header()  # not a duplicate
         if shell_rail:
             inner = format_activity_shell_block(
                 verb, detail, secondary=stats, secondary_kind='neutral'
@@ -2039,18 +2409,83 @@ class CLIEventRenderer:
             )
         self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
 
+    def _buffer_pending_activity(
+        self,
+        *,
+        title: str,
+        verb: str,
+        detail: str,
+        secondary: str | None = None,
+        kind: str = 'generic',
+        payload: dict[str, Any] | None = None,
+    ) -> None:
+        self._flush_pending_activity_card()
+        self._pending_activity_card = PendingActivityCard(
+            title=title,
+            verb=verb,
+            detail=detail,
+            secondary=secondary,
+            kind=kind,
+            payload=payload or {},
+        )
+
+    def _take_pending_activity_card(
+        self, *expected_kinds: str
+    ) -> PendingActivityCard | None:
+        pending = self._pending_activity_card
+        if pending is None:
+            return None
+        if expected_kinds and pending.kind not in expected_kinds:
+            return None
+        self._pending_activity_card = None
+        return pending
+
+    def _render_pending_activity_card(
+        self,
+        pending: PendingActivityCard,
+        *,
+        result_message: str | None = None,
+        result_kind: str = 'neutral',
+        extra_lines: list[Any] | None = None,
+    ) -> None:
+        self._emit_activity_turn_header()
+        inner = format_activity_block(
+            pending.verb,
+            pending.detail,
+            secondary=pending.secondary,
+            secondary_kind='neutral',
+            result_message=result_message,
+            result_kind=result_kind,
+            extra_lines=extra_lines,
+            title=pending.title,
+        )
+        self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
+
+    def _flush_pending_activity_card(self) -> None:
+        pending = self._pending_activity_card
+        if pending is None:
+            return
+        self._pending_activity_card = None
+        self._render_pending_activity_card(pending)
+
+    def _flush_pending_tool_cards(self) -> None:
+        self._flush_pending_activity_card()
+        self._flush_pending_shell_action()
+
     def _flush_pending_shell_action(self) -> None:
         """Print buffered command card without a result (fallback for orphaned CmdRunActions)."""
         if self._pending_shell_action is None:
             return
         verb, label = self._pending_shell_action
+        title = self._pending_shell_title
         is_internal = self._pending_shell_is_internal
         self._pending_shell_action = None
         self._pending_shell_command = None
+        self._pending_shell_title = None
         self._pending_shell_is_internal = False
-        self._emit_activity_turn_header()  # noqa: not a duplicate
+        self._emit_activity_turn_header()  # not a duplicate
         if is_internal:
-            inner = format_activity_block(verb, label, title='Shell')
+            inner = format_activity_block(verb, label, title=title or 'Shell')
         else:
             inner = format_activity_shell_block(verb, label)
         self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
@@ -2086,6 +2521,28 @@ class CLIEventRenderer:
         ):
             self._print_or_buffer(self._task_panel)
             self._last_printed_task_panel_signature = self._task_panel_signature
+
+    def _set_delegate_panel(self) -> None:
+        """Replace the visible delegated-worker panel with the latest known state."""
+        self._delegate_panel = _build_delegate_worker_panel(self._delegate_workers)
+        self._delegate_panel_signature = _delegate_worker_panel_signature(
+            self._delegate_workers
+        )
+        if (
+            self._live is None
+            and self._delegate_panel_signature
+            != self._last_printed_delegate_panel_signature
+        ):
+            self._print_or_buffer(self._delegate_panel)
+            self._last_printed_delegate_panel_signature = self._delegate_panel_signature
+
+    def _reset_delegate_panel(self, *, batch_id: int | None) -> None:
+        """Start a fresh delegated-worker panel for a new delegation batch."""
+        self._delegate_workers = {}
+        self._delegate_batch_id = batch_id
+        self._delegate_panel = None
+        self._delegate_panel_signature = None
+        self._last_printed_delegate_panel_signature = None
 
     def _flush_thinking_block(self) -> None:
         """Print accumulated thoughts as a persistent dim block before they are cleared.

@@ -4,7 +4,7 @@ import unittest
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
-from backend.ledger.action import Action, NullAction
+from backend.ledger.action import Action
 from backend.orchestration.services.action_service import ActionService
 
 
@@ -165,6 +165,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         mock_metrics.accumulated_cost = 15.75
         mock_metrics.accumulated_token_usage = MagicMock()
         mock_metrics.max_budget_per_task = None
+        mock_metrics.copy.return_value = mock_metrics
 
         self.mock_controller.conversation_stats = MagicMock()
         self.mock_controller.conversation_stats.get_combined_metrics.return_value = (
@@ -195,6 +196,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         mock_metrics = MagicMock()
         mock_metrics.accumulated_cost = 10.0
         mock_metrics.accumulated_token_usage = MagicMock()
+        mock_metrics.copy.return_value = mock_metrics
 
         self.mock_controller.conversation_stats = MagicMock()
         self.mock_controller.conversation_stats.get_combined_metrics.return_value = (
@@ -221,6 +223,7 @@ class TestActionService(unittest.IsolatedAsyncioTestCase):
         mock_metrics.accumulated_cost = 5.0
         mock_metrics.accumulated_token_usage = MagicMock()
         mock_metrics.max_budget_per_task = None
+        mock_metrics.copy.return_value = mock_metrics
 
         mock_usage = MagicMock()
         mock_usage.prompt_tokens = 200

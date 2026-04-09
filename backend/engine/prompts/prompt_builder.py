@@ -320,6 +320,7 @@ def build_system_prompt(
     *,
     active_llm_model: str = "",
     is_windows: bool = False,
+    windows_with_bash: bool = False,
     cli_mode: bool = False,
     config: Any = None,
     mcp_tool_names: list[str] | None = None,
@@ -343,6 +344,24 @@ def build_system_prompt(
         "(e.g. \"Claude Sonnet\", \"GPT-4\") unless that exact string is the configured id. "
         "When asked who built you or who you are, you are Grinta, built by Youssef Mejdi.\n\n"
         f"Configured model id: `{model_id}`",
+    ]
+
+    # Shell identity disambiguation for Windows + Git Bash
+    if windows_with_bash:
+        sections.append(
+            "<SHELL_IDENTITY>\n"
+            "Your terminal is **Git Bash** running on Windows. Use **bash syntax exclusively**.\n"
+            "- Correct: `ls`, `cat`, `grep`, `find`, `echo`, `cd`, `mkdir`, `rm`, `pwd`, `which`\n"
+            "- FORBIDDEN: `Get-ChildItem`, `Get-Process`, `Get-Content`, `Select-String`, "
+            "`$PSVersionTable`, `Write-Output`, `Set-Location`, or any other PowerShell cmdlet.\n"
+            "- Windows-style paths (`C:\\Users\\...`) in the working directory are normal "
+            "for Git Bash on Windows.\n"
+            "- Use `which <tool>` to check if a tool (node, npm, etc.) is on PATH before using it.\n"
+            "- Use `python` (not `python3`) to invoke the Python interpreter.\n"
+            "</SHELL_IDENTITY>"
+        )
+
+    sections += [
         # Routing
         _render_routing(is_windows, config),
         # Security

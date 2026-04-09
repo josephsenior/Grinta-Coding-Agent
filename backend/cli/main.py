@@ -270,6 +270,11 @@ async def _async_main(
                 f'  [green]✓[/green] Auto-detected API key from environment '
                 f'([cyan]{detected_provider}[/cyan])',
             )
+            console.print(
+                '  [dim][bold]Next:[/bold] type [bold]/help[/bold] for commands, '
+                '[bold]/settings[/bold] for model and MCP, '
+                '[bold]grinta --help[/bold] for CLI flags.[/dim]',
+            )
             ensure_default_model(config)
         else:
             config = run_onboarding()

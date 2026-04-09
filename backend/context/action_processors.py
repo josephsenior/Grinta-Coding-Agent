@@ -303,7 +303,7 @@ def _handle_agent_finish_action(action: PlaybookFinishAction) -> list[Message]:
     role = _role_from_source(getattr(action, 'source', None))
     _merge_tool_metadata_thought(action)
     content_items: list[TextContent | ImageContent] = [
-        TextContent(text=action.thought or '')
+        TextContent(text=action.message)
     ]
     return [Message(role=role, content=content_items)]
 
@@ -330,11 +330,13 @@ def _merge_tool_metadata_thought(action: PlaybookFinishAction) -> None:
         return
     assistant_msg = cast(Any, choice).message
     content = getattr(assistant_msg, 'content', '') or ''
-    if action.thought:
-        if action.thought != content and content:
-            action.thought += '\n' + content
+    target_attr = 'final_thought' if getattr(action, 'final_thought', '') else 'thought'
+    current = getattr(action, target_attr, '') or ''
+    if current:
+        if current != content and content:
+            setattr(action, target_attr, current + '\n' + content)
     else:
-        action.thought = content
+        setattr(action, target_attr, content)
     setattr(action, 'tool_call_metadata', None)
 
 

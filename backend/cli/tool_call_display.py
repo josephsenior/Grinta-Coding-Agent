@@ -229,7 +229,7 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
     if tn == 'apply_patch':
         patch = args.get('patch') or args.get('diff') or ''
         if isinstance(patch, str) and patch.strip():
-            return f'patch ({len(patch):,} chars)'
+            return 'apply patch'
         return 'apply patch'
 
     if tn in {'think', 'agent_think'}:

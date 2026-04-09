@@ -18,12 +18,11 @@ if TYPE_CHECKING:
 
 from datetime import UTC
 
-from backend.persistence.locations import get_active_local_data_root
-
 from backend.persistence.data_models.knowledge_base import (
     KnowledgeBaseCollection,
     KnowledgeBaseDocument,
 )
+from backend.persistence.locations import get_active_local_data_root
 
 logger = logging.getLogger(__name__)
 

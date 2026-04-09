@@ -81,18 +81,48 @@ def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> 
     return line
 
 
+def format_activity_delta_secondary(
+    *,
+    added: int | None = None,
+    removed: int | None = None,
+    added_label: str = 'lines',
+    removed_label: str = 'lines',
+) -> Text | None:
+    """Compact colored +/- summary line for file and edit results."""
+    if not added and not removed:
+        return None
+
+    line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
+    wrote = False
+    if added:
+        line.append(f'+ {added:,} {added_label}', style='dim green')
+        wrote = True
+    if removed:
+        if wrote:
+            line.append('  ', style='dim')
+        line.append(f'- {removed:,} {removed_label}', style='dim red')
+    return line
+
+
 def format_activity_block(
     verb: str,
     detail: str,
     *,
     secondary: str | None = None,
     secondary_kind: str = 'neutral',
+    result_message: str | None = None,
+    result_kind: str = 'neutral',
+    extra_lines: list[Any] | None = None,
     title: str | None = None,
 ) -> Any:
     """Primary row plus optional secondary dim row, optionally wrapped in a titled card."""
     parts: list[Text] = [format_activity_primary(verb, detail)]
     if secondary:
         parts.append(format_activity_secondary(secondary, kind=secondary_kind))
+    if result_message is not None:
+        parts.append(format_activity_result_secondary(result_message, kind=result_kind))
+    if extra_lines:
+        parts.extend(extra_lines)
     content = Group(*parts)
     if title is not None:
         panel_title = Text(title, style='bold #9ca3af')
@@ -122,18 +152,14 @@ def format_activity_shell_block(
     result_kind: str = 'ok',
 ) -> Any:
     """Rounded Terminal card — same visual style as other tool cards."""
-    parts: list[Text] = [format_activity_primary(verb, detail)]
-    if secondary:
-        parts.append(format_activity_secondary(secondary, kind=secondary_kind))
-    if result_message is not None:
-        parts.append(format_activity_result_secondary(result_message, kind=result_kind))
-    return Panel(
-        Group(*parts),
-        title=Text('Terminal', style='bold #9ca3af'),
-        title_align='left',
-        border_style='dim',
-        box=box.ROUNDED,
-        padding=(0, 1),
+    return format_activity_block(
+        verb,
+        detail,
+        secondary=secondary,
+        secondary_kind=secondary_kind,
+        result_message=result_message,
+        result_kind=result_kind,
+        title='Terminal',
     )
 
 

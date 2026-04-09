@@ -4,12 +4,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from backend.core.message import Message, TextContent
 from backend.engine.tools.prompt import (
+    build_python_exec_command,
+    get_python_shell_command,
     get_shell_name,
     get_terminal_tool_name,
     uses_powershell_terminal,
 )
-from backend.core.message import Message, TextContent
 from backend.utils.prompt import (
     UNINITIALIZED_PROMPT_MANAGER,
     OrchestratorPromptManager,
@@ -60,7 +62,7 @@ class TestPromptManager:
         assert 'The current working directory is /tmp/grinta_project' in ctx
         assert 'relative' in ctx.lower()
         assert 'does not list project files' in ctx
-        assert 'analyze_project_structure' in ctx
+        assert 'search_code' in ctx
 
     def test_build_playbook_info(self, prompt_dir):
         pm = PromptManager(prompt_dir)
@@ -258,23 +260,60 @@ def test_sentinels():
 
 
 def test_terminal_helpers_use_bash_when_available_on_windows():
+    from backend.engine.tools import prompt as prompt_mod
+
+    prompt_mod.uses_powershell_terminal.cache_clear()
     with (
         patch('backend.engine.tools.prompt.sys.platform', 'win32'),
-        patch(
-            'backend.engine.tools.prompt.shutil.which',
-            return_value=r'C:\Program Files\Git\bin\bash.exe',
-        ),
+        patch('backend.engine.tools.prompt._runtime_prefers_powershell', return_value=False),
     ):
         assert uses_powershell_terminal() is False
         assert get_shell_name() == 'bash'
         assert get_terminal_tool_name() == 'execute_bash'
+    prompt_mod.uses_powershell_terminal.cache_clear()
 
 
 def test_terminal_helpers_use_powershell_without_bash_on_windows():
+    from backend.engine.tools import prompt as prompt_mod
+
+    prompt_mod.uses_powershell_terminal.cache_clear()
     with (
         patch('backend.engine.tools.prompt.sys.platform', 'win32'),
-        patch('backend.engine.tools.prompt.shutil.which', return_value=None),
+        patch('backend.engine.tools.prompt._runtime_prefers_powershell', return_value=True),
     ):
         assert uses_powershell_terminal() is True
         assert get_shell_name() == 'powershell'
         assert get_terminal_tool_name() == 'execute_powershell'
+    prompt_mod.uses_powershell_terminal.cache_clear()
+
+
+def test_python_shell_command_prefers_python3_in_bash_mode():
+    with (
+        patch('backend.engine.tools.prompt.uses_powershell_terminal', return_value=False),
+        patch('backend.engine.tools.prompt.sys') as mock_sys,
+    ):
+        mock_sys.platform = 'linux'
+        assert get_python_shell_command() == 'python3'
+
+
+def test_python_shell_command_prefers_python_on_windows():
+    with (
+        patch('backend.engine.tools.prompt.uses_powershell_terminal', return_value=False),
+        patch('backend.engine.tools.prompt.sys') as mock_sys,
+    ):
+        mock_sys.platform = 'win32'
+        assert get_python_shell_command() == 'python'
+
+
+def test_python_shell_command_prefers_python_in_powershell_mode():
+    with patch('backend.engine.tools.prompt.uses_powershell_terminal', return_value=True):
+        assert get_python_shell_command() == 'python'
+
+
+def test_build_python_exec_command_base64_encodes_script():
+    with patch('backend.engine.tools.prompt.get_python_shell_command', return_value='python3'):
+        command = build_python_exec_command('print("hello")')
+
+    assert command.startswith('python3 -c ')
+    assert 'b64decode' in command
+    assert 'print("hello")' not in command

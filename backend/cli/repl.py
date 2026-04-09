@@ -55,6 +55,8 @@ class SlashCommandSpec:
     description: str
     usage: str
     aliases: tuple[str, ...] = ()
+    #: Grouping key for `/help` (see `_HELP_SECTIONS_ORDER`).
+    help_section: str = 'system'
 
 
 _AUTONOMY_LEVEL_HINTS = {
@@ -63,21 +65,43 @@ _AUTONOMY_LEVEL_HINTS = {
     'full': 'Run without confirmation prompts',
 }
 _SLASH_COMMANDS = (
-    SlashCommandSpec('/help', 'Show commands and shortcuts', '/help', aliases=('/?',)),
-    SlashCommandSpec('/settings', 'Open settings (model, API key, MCP)', '/settings'),
-    SlashCommandSpec('/sessions', 'List past sessions', '/sessions'),
-    SlashCommandSpec('/resume', 'Resume a past session by index or ID', '/resume <N|id>'),
+    SlashCommandSpec(
+        '/help',
+        'Show commands and shortcuts',
+        '/help',
+        aliases=('/?',),
+        help_section='system',
+    ),
+    SlashCommandSpec(
+        '/settings',
+        'Open settings (model, API key, MCP)',
+        '/settings',
+        help_section='model',
+    ),
+    SlashCommandSpec('/sessions', 'List past sessions', '/sessions', help_section='session'),
+    SlashCommandSpec(
+        '/resume',
+        'Resume a past session by index or ID',
+        '/resume <N|id>',
+        help_section='session',
+    ),
     SlashCommandSpec(
         '/autonomy',
         'View or set autonomy (supervised/balanced/full)',
         '/autonomy [supervised|balanced|full]',
+        help_section='model',
     ),
-    SlashCommandSpec('/model', 'Show or switch the active model', '/model [provider/model]'),
-    SlashCommandSpec('/compact', 'Condense context to free token budget', '/compact'),
-    SlashCommandSpec('/retry', 'Re-send the last message', '/retry'),
-    SlashCommandSpec('/status', 'Show the current HUD snapshot', '/status'),
-    SlashCommandSpec('/clear', 'Clear the visible transcript', '/clear'),
-    SlashCommandSpec('/exit', 'Quit grinta', '/exit', aliases=('/quit',)),
+    SlashCommandSpec(
+        '/model',
+        'Show or switch the active model',
+        '/model [provider/model]',
+        help_section='model',
+    ),
+    SlashCommandSpec('/compact', 'Condense context to free token budget', '/compact', help_section='control'),
+    SlashCommandSpec('/retry', 'Re-send the last message', '/retry', help_section='control'),
+    SlashCommandSpec('/status', 'Show the current HUD snapshot', '/status', help_section='control'),
+    SlashCommandSpec('/clear', 'Clear the visible transcript', '/clear', help_section='control'),
+    SlashCommandSpec('/exit', 'Quit grinta', '/exit', aliases=('/quit',), help_section='system'),
 )
 
 # Known models surfaced in `/model` tab-completion.
@@ -128,16 +152,40 @@ def _iter_command_completion_entries() -> list[tuple[str, str]]:
     return entries
 
 
+_HELP_SECTIONS_ORDER: tuple[tuple[str, str], ...] = (
+    ('session', 'Session & history'),
+    ('model', 'Model & configuration'),
+    ('control', 'Context & control'),
+    ('system', 'System'),
+)
+
+
 def _build_help_markdown() -> str:
     """Build the slash-command help block from the shared command registry."""
-    lines = ['**Commands**', '']
+    from collections import defaultdict
+
+    by_section: dict[str, list[SlashCommandSpec]] = defaultdict(list)
     for spec in _SLASH_COMMANDS:
-        alias_text = (
-            ' _(aliases: ' + ', '.join(f'`{alias}`' for alias in spec.aliases) + ')_'
-            if spec.aliases
-            else ''
-        )
-        lines.append(f'- `{spec.usage}` — {spec.description}{alias_text}')
+        by_section[spec.help_section].append(spec)
+
+    lines: list[str] = []
+    first_section = True
+    for section_key, title in _HELP_SECTIONS_ORDER:
+        specs = by_section.get(section_key)
+        if not specs:
+            continue
+        if not first_section:
+            lines.append('')
+        first_section = False
+        lines.append(f'**{title}**')
+        lines.append('')
+        for spec in specs:
+            alias_text = (
+                ' _(aliases: ' + ', '.join(f'`{alias}`' for alias in spec.aliases) + ')_'
+                if spec.aliases
+                else ''
+            )
+            lines.append(f'- `{spec.usage}` — {spec.description}{alias_text}')
 
     lines.extend(
         [
@@ -439,7 +487,7 @@ class Repl:
 
     def _prompt_panel_data(self) -> dict[str, str]:
         hud = self._hud.state
-        model = hud.model if hud.model and hud.model != '(not set)' else 'model n/a'
+        provider, model = HUDBar.describe_model(hud.model)
         tokens = HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
         lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else '?'
         if hud.context_tokens == 0 and hud.context_limit == 0:
@@ -453,6 +501,7 @@ class Repl:
         return {
             'state_label': self._prompt_state_label(),
             'autonomy_label': self._prompt_autonomy_label(),
+            'provider': provider,
             'model': model,
             'token_display': token_display,
             'cost': f'${hud.cost_usd:.4f}',
@@ -494,7 +543,7 @@ class Repl:
         autonomy_label = data['autonomy_label']
         controls = f'{state_label}  │  {autonomy_label}  │  Tab for commands'
         telemetry = (
-            f"{data['model']}  │  {data['token_display']}  │  {data['cost']}  │  "
+            f"provider: {data['provider']}  │  model: {data['model']}  │  {data['token_display']}  │  {data['cost']}  │  "
             f"{data['calls']}  │  {data['mcp']}  │  {data['skills']}  │  {data['ledger']}"
         )
         return f' {controls}\n {telemetry} '
@@ -512,16 +561,20 @@ class Repl:
         return frags
 
     def _prompt_stats_row2_fragments(
-        self, data: dict[str, str], compact: bool, model: str, width: int = 120
+        self, data: dict[str, str], compact: bool, width: int = 120
     ) -> list[tuple[str, str]]:
         """Build row-2 fragments, wrapping to a second line when content exceeds width."""
         sep = '  \u2022  '
 
-        # Required prefix: model + tokens + cost
+        # Required prefix: provider + model + tokens + cost
         base: list[tuple[str, str]] = [
+            ('class:prompt.dim', 'provider:'),
+            ('class:prompt.sep', ' '),
+            ('class:prompt.model', data['provider']),
+            ('class:prompt.sep', sep),
             ('class:prompt.dim', 'model:'),
             ('class:prompt.sep', ' '),
-            ('class:prompt.model', model),
+            ('class:prompt.model', data['model']),
             ('class:prompt.sep', sep),
             ('class:prompt.value', data['token_display']),
             ('class:prompt.sep', sep),
@@ -551,7 +604,7 @@ class Repl:
         # Overflow → wrap: required fields on line 1, optionals on line 2.
         result = list(base)
         result.append(('', '\n'))
-        indent = ' ' * 7  # width of "model: " to align under the model value
+        indent = ' ' * 10  # width of "provider: " to align the wrapped row
         result.append(('class:prompt.dim', indent))
         for idx, (item_style, item_text) in enumerate(optionals):
             if idx > 0:
@@ -571,8 +624,12 @@ class Repl:
         level = data['autonomy_label'].replace('autonomy:', '')
         self._hud.update_autonomy(level)
 
-        # Compute model name from exactly what it is. No truncation.
-        model = data['model']
+        # Keep the compact line readable by folding provider/model into one token.
+        model = (
+            data['model']
+            if data['provider'] in {'(not set)', '(unknown)'}
+            else f"{data['provider']}/{data['model']}"
+        )
 
         fragments: list[tuple[str, str]] = []
 
@@ -593,7 +650,7 @@ class Repl:
         fragments.extend(self._prompt_stats_row1_fragments(data, compact))
         add('', '\n')
         # Pass actual terminal width so row 2 never overflows.
-        fragments.extend(self._prompt_stats_row2_fragments(data, compact, model, width=width))
+        fragments.extend(self._prompt_stats_row2_fragments(data, compact, width=width))
         self._append_footer_system_fragments(fragments, add)
         return fragments
 
@@ -1589,9 +1646,10 @@ class Repl:
             parts = text.strip().split(maxsplit=1)
             if len(parts) < 2:
                 current = get_current_model(self._config)
+                provider, model = HUDBar.describe_model(current)
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f'Current model: {current}  (use `/model <provider/model>` to switch)',
+                        f'Current provider: {provider}  model: {model}  (use `/model <provider/model>` to switch)',
                         title='model',
                     )
             else:
@@ -1599,9 +1657,10 @@ class Repl:
                 update_model(new_model)
                 self._config = load_app_config()
                 self._hud.update_model(get_current_model(self._config))
+                provider, model = HUDBar.describe_model(get_current_model(self._config))
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f'Model switched to {new_model}. Changes apply to the next session.',
+                        f'Model switched to provider: {provider}  model: {model}. Changes apply to the next session.',
                         title='model',
                     )
             return True

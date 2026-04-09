@@ -23,6 +23,7 @@ import base64
 from backend.core.constants import APPLY_PATCH_TOOL_NAME
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
+from backend.engine.tools.prompt import build_python_exec_command
 from backend.ledger.action import CmdRunAction
 
 # ---------------------------------------------------------------------------
@@ -108,6 +109,6 @@ def build_apply_patch_action(patch: str, check_only: bool = False) -> CmdRunActi
 
     label = 'dry-run check' if check_only else 'applying patch'
     return CmdRunAction(
-        command=f'python -c "{py}"',
+        command=build_python_exec_command(py),
         thought=f'[APPLY PATCH] {label}',
     )

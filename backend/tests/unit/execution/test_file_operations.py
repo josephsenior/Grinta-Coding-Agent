@@ -317,6 +317,14 @@ class TestDirectoryViewing:
         assert '/workspace' in result
         assert 'hidden' in result.lower()
 
+    def test_format_directory_listing_windows_hidden_hint(self):
+        files = ['subdir/', 'file1.txt']
+        with patch('backend.execution.file_operations.sys.platform', 'win32'):
+            result = _format_directory_listing('/workspace', files, 1)
+
+        assert 'Get-ChildItem -Force /workspace' in result
+        assert 'ls -la' not in result
+
     def test_handle_directory_view(self):
         with tempfile.TemporaryDirectory() as td:
             with open(os.path.join(td, 'readme.md'), 'w', encoding='utf-8') as f:

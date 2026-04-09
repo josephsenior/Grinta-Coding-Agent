@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import os
 import shlex
-import shutil
 
-from backend.engine.tools.prompt import uses_powershell_terminal
+from backend.engine.tools.prompt import (
+    build_python_exec_command,
+    uses_powershell_terminal,
+)
 from backend.ledger.action import AgentThinkAction, CmdRunAction
 
 ANALYZE_PROJECT_STRUCTURE_TOOL_NAME = 'analyze_project_structure'
@@ -124,7 +126,7 @@ def build_analyze_project_structure_action(
 def _build_tree_action(path: str, depth: int) -> CmdRunAction:
     """Directory tree with file sizes, respecting .gitignore."""
     depth = max(1, min(depth, 5))  # Clamp 1-5
-    if uses_powershell_terminal():
+    if os.name == 'nt':
         cmd = _build_windows_tree_command(path, depth)
         return CmdRunAction(command=cmd, display_label=f'Mapping project structure ({path})')
 
@@ -143,28 +145,59 @@ def _build_tree_action(path: str, depth: int) -> CmdRunAction:
 
 
 def _build_windows_tree_command(path: str, depth: int) -> str:
-    """PowerShell-safe tree listing for Windows runtimes without Bash."""
-    safe_path = _quote_powershell_literal(path)
-    return (
-        f'$root = {safe_path}; '
-        f'$maxDepth = {depth}; '
-        "$ignore = @('__pycache__', 'node_modules', '.git', '.venv', 'venv'); "
-        "$rootItem = Get-Item -LiteralPath $root -ErrorAction SilentlyContinue; "
-        "if (-not $rootItem) { Write-Output '(path not found)'; exit 0 }; "
-        "$rootPath = $rootItem.FullName; "
-        "Get-ChildItem -LiteralPath $rootPath -Force -Recurse -Depth $maxDepth | "
-        "Where-Object { "
-        "  $relative = $_.FullName.Substring($rootPath.Length).TrimStart('\\'); "
-        "  if (-not $relative) { return $false } "
-        "  $segments = $relative -split '[\\\\/]'; "
-        "  -not ($segments | Where-Object { $ignore -contains $_ }) "
-        "} | "
-        "Sort-Object FullName | "
-        "ForEach-Object { "
-        "  $relative = $_.FullName.Substring($rootPath.Length).TrimStart('\\'); "
-        "  if ($_.PSIsContainer) { '<dir> {0}' -f $relative } else { '{0} {1}' -f $_.Length, $relative } "
-        "} | Select-Object -First 200"
-    )
+    """Shell-independent tree listing for Windows runtimes.
+
+    Use the current Python interpreter directly so the command works whether
+    the runtime selected Git Bash or PowerShell.
+    """
+    script = f"""
+import os
+import sys
+
+root = os.path.abspath({path!r})
+max_depth = {depth}
+ignore = {{'__pycache__', 'node_modules', '.git', '.venv', 'venv'}}
+
+if not os.path.exists(root):
+    print('(path not found)')
+    raise SystemExit(0)
+
+def rel_depth(relative_path: str) -> int:
+    if relative_path in ('', '.'):
+        return 0
+    return relative_path.count(os.sep) + 1
+
+emitted = 0
+for current_root, dirnames, filenames in os.walk(root):
+    relative_root = os.path.relpath(current_root, root)
+    current_depth = rel_depth(relative_root)
+    dirnames[:] = sorted(name for name in dirnames if name not in ignore)
+    if current_depth > max_depth:
+        dirnames[:] = []
+        continue
+
+    if relative_root not in ('', '.'):
+        print(f"<dir> {{relative_root.replace(os.sep, '/')}}")
+        emitted += 1
+        if emitted >= 200:
+            break
+
+    if current_depth >= max_depth:
+        dirnames[:] = []
+
+    for filename in sorted(name for name in filenames if name not in ignore):
+        full_path = os.path.join(current_root, filename)
+        relative_path = os.path.relpath(full_path, root).replace(os.sep, '/')
+        try:
+            size = os.path.getsize(full_path)
+        except OSError:
+            size = 0
+        print(f"{{size}} {{relative_path}}")
+        emitted += 1
+        if emitted >= 200:
+            raise SystemExit(0)
+""".strip()
+    return build_python_exec_command(script)
 
 
 def _quote_powershell_literal(value: str) -> str:

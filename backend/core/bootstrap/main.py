@@ -24,12 +24,12 @@ if TYPE_CHECKING:
     from backend.context.agent_memory import Memory
     from backend.core.provider_types import ProviderTokenType
     from backend.execution.base import Runtime
-    from backend.orchestration.conversation_stats import ConversationStats
     from backend.inference.llm_registry import LLMRegistry
     from backend.ledger.action.action import Action
     from backend.ledger.event import Event
     from backend.ledger.stream import EventStream
     from backend.orchestration.agent import Agent
+    from backend.orchestration.conversation_stats import ConversationStats
     from backend.orchestration.state.state import State
 
 
@@ -48,6 +48,7 @@ from backend.core.config import (
     setup_config_from_args,
 )
 from backend.core.enums import RuntimeStatus
+from backend.core.io_adapters import read_input, read_task
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.execution import (
@@ -55,7 +56,6 @@ from backend.execution import (
     RuntimeOrchestrator,
     runtime_orchestrator,
 )
-from backend.core.io_adapters import read_input, read_task
 from backend.integrations.mcp import add_mcp_tools_to_agent
 from backend.ledger import EventSource, EventStreamSubscriber
 from backend.ledger.action import MessageAction, NullAction

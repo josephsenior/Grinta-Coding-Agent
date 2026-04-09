@@ -16,8 +16,8 @@ from unittest.mock import Mock, patch
 import pytest
 
 from backend.core.config.app_config import AppConfig
-from backend.orchestration.conversation_stats import ConversationStats
 from backend.inference.llm_registry import LLMRegistry
+from backend.orchestration.conversation_stats import ConversationStats
 from backend.persistence.data_models.settings import Settings
 from backend.utils.core_utils import (
     create_registry_and_conversation_stats,

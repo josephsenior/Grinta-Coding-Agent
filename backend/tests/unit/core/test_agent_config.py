@@ -37,7 +37,7 @@ class TestAgentConfigDefaults:
 
     def test_default_swarming_enabled(self):
         cfg = AgentConfig()
-        assert cfg.enable_swarming is True
+        assert cfg.enable_swarming is False
 
     def test_default_autonomy_level(self):
         cfg = AgentConfig()

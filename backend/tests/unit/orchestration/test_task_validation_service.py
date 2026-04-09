@@ -27,6 +27,7 @@ def _make_context(has_validator: bool = True, initial_task: str | None = 'Do X')
 
     state_mock = MagicMock()
     state_mock.agent_state = 'running'
+    state_mock.plan = None
     controller.state = state_mock
     controller.set_agent_state_to = AsyncMock()
 
@@ -100,6 +101,18 @@ class TestHandleFinish:
         ctx = _make_context(has_validator=True)
         svc = TaskValidationService(ctx)
         assert await svc.handle_finish(_make_action(force_finish=True)) is True
+
+    @pytest.mark.asyncio
+    async def test_force_finish_still_blocks_non_terminal_plan(self):
+        ctx = _make_context(has_validator=True)
+        controller = ctx.get_controller()
+        controller.state.plan = SimpleNamespace(
+            steps=[SimpleNamespace(id='1', description='Still running', status='doing')]
+        )
+        svc = TaskValidationService(ctx)
+
+        assert await svc.handle_finish(_make_action(force_finish=True)) is False
+        controller.event_stream.add_event.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_validation_passes(self):

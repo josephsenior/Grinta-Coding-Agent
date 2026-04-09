@@ -133,8 +133,8 @@ class TestApplyLlmConfigOverride:
             llm_config='nonexistent', config_file=str(tmp_path / 'nonexistent.json')
         )
         with patch(
-            'backend.core.config.cli_config.get_app_settings_root',
-            return_value=str(tmp_path),
+            'backend.core.config.cli_config.get_canonical_settings_path',
+            return_value=str(tmp_path / 'settings.json'),
         ):
             with pytest.raises(ValueError, match='Cannot find'):
                 apply_llm_config_override(config, args)
@@ -148,8 +148,8 @@ class TestApplyLlmConfigOverride:
         canonical.write_text('{"llm_model": "gpt-4-user"}')
 
         with patch(
-            'backend.core.config.cli_config.get_app_settings_root',
-            return_value=str(tmp_path),
+            'backend.core.config.cli_config.get_canonical_settings_path',
+            return_value=str(canonical),
         ):
             config = AppConfig()
             args = Namespace(llm_config='custom', config_file=str(main_config))
