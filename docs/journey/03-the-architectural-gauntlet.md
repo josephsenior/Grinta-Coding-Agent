@@ -73,6 +73,27 @@ You cannot debug a stateful autonomous system effectively if every subsystem is 
 
 Good architecture is not decoration. It is the precondition for diagnosable failure.
 
+### The Art of Code Quality and Codebase Structure
+
+Code quality is not a style preference. In an agent system, it is operational leverage.
+
+When files are small enough to reason about, boundaries are explicit, and responsibilities are local, debugging stays linear. When modules become ambiguous and mixed, debugging becomes archaeological work. You are no longer solving the current bug. You are decoding accidental history.
+
+That is why I treat codebase structure as part of reliability engineering. A clean structure reduces error blast radius, shortens incident resolution time, and makes both humans and agents less likely to introduce regressions while patching the system.
+
+### Cyclomatic vs Cognitive Complexity
+
+Cyclomatic complexity and cognitive complexity are related, but they measure different pain.
+
+- Cyclomatic complexity measures branching surface area: how many execution paths a function can take.
+- Cognitive complexity measures comprehension load: how hard the control flow is for a human to follow.
+
+A function can have acceptable cyclomatic complexity and still be mentally hostile if it is deeply nested, context-switches across multiple concerns, or relies on subtle state transitions. That is why teams that only track cyclomatic complexity often miss the real maintenance risk.
+
+Cognitive complexity is underestimated because it is less visible in dashboards and harder to compress into a single pass/fail gate. But in practice it is often the first thing that breaks velocity. It slows code review, increases misreads during incidents, and makes "small changes" far more dangerous than they look.
+
+Keeping both low is not academic purity. It is how I keep Grinta modifiable under pressure.
+
 ---
 
 ## The 21-Service Orchestrator
@@ -95,7 +116,7 @@ Each service exists because the agent loop is not a single thing. It is a bundle
 
 The decomposition is not random. Each service maps to a specific failure mode I observed while building the system.
 
-The **Step Decision Service** determines whether an incoming event should trigger an agent step at all. User messages always step. Agent messages step unless the system is waiting for user input. Condensation actions always step because the system needs to continue after memory compaction. But state-change observations, recall observations, and error observations never step — they are informational, not action-triggering. That decision tree was not obvious. I built it after watching the agent enter infinite loops where an observation would trigger a step, which would generate another observation, which would trigger another step. Separating "should we step?" from "how do we step?" killed that loop.
+The **Step Decision Service** determines whether an incoming event should trigger an agent step at all. User messages always step. Agent messages step unless the system is waiting for user input. Condensation actions always step because the system needs to continue after memory compaction. But state-change observations, recall observations, and error observations never step — they are informational, not action-triggering. That decision tree was not obvious. I built it after watching the agent enter infinite loops where an observation would trigger a step, which would generate another observation, which would trigger another step. Separating "should I step?" from "how do I step?" killed that loop.
 
 The **Step Guard Service** sits in front of every step and asks whether the agent is in a safe state to continue. It implements a warning-then-trip pattern: the first time a guard condition triggers (circuit breaker, stuck detection), it emits a warning with a planning directive that tells the model to change its strategy. If the same condition triggers again on the same action-reason pair, it trips harder. Only after a configurable number of warnings does the guard actually hard-stop the loop. This graduated response prevents a single transient error from killing an otherwise productive session.
 

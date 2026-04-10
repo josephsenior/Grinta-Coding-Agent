@@ -14,7 +14,7 @@ Studying other systems never felt like a confidence crisis to me. It felt like a
 
 ---
 
-## A Rule Before We Start
+## A Rule Before I Start
 
 There is an important difference between:
 

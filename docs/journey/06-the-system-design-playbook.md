@@ -227,7 +227,7 @@ I had over 600 lines of template spaghetti filled with `{% if config.permissions
 
 You cannot unit test a Jinja template the way you test a Python function. You cannot set a breakpoint inside a `{% block %}`. You cannot trace the rendering path through a debugger when the prompt comes out garbled. Every conditional in the template is a branch you can only verify by rendering the whole thing and eyeballing the output.
 
-We think of prompt engineering as writing instructions. It is actually software architecture.
+I think of prompt engineering as writing instructions. It is actually software architecture.
 
 I ripped out Jinja entirely. Grinta now uses pure Python string formatting (`f-strings`) with static Markdown partials loaded from disk and dynamic sections assembled through simple Python control flow.
 
@@ -635,7 +635,7 @@ The final chapter is about what remains unfinished, experimental, or in motion.
 
 Because this project is not a polished fairytale. It is a real system with known limits, unfinished edges, and a future that still has to be built.
 
-That is where we end.
+That is where I end.
 
 ---
 

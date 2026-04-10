@@ -313,6 +313,23 @@ The answer was clear enough that the dependency strategy changed.
 
 Redis was removed from the core runtime path entirely. It stays only as an optional extra for users who want it in their own projects. The async database driver moved out of the required base and into an optional dependency group.
 
+I removed Redis from the default path because a single-user local CLI does not need distributed coordination by default. Redis is excellent when you need shared caches, cross-process locks, and networked rate limiting across many workers. For Grinta's core use case, it mostly added operational tax: another service to bootstrap, another failure point, and another reason local startup could fail before the first task even runs.
+
+PostgreSQL was a different decision. I did not kill it. I kept it optional.
+
+That distinction matters. PostgreSQL is still the right tool for teams that want durable relational history, stronger transactional guarantees, or integrations that benefit from SQL-native querying. But forcing every local install to carry a database dependency would violate the local-first promise. Optional PostgreSQL gives power users a serious persistence path without making the default experience heavy.
+
+I made the same trade-off in observability. Prometheus and Grafana are great tools. At scale, they are often the right answer. I removed them from the default architecture because Grinta is not shipping a mandatory distributed monitoring platform anymore.
+
+Instead, I kept essential telemetry and observability only:
+
+- structured logs for reproducible debugging
+- event-level counters on critical paths
+- latency and failure visibility around inference and tool execution
+- explicit error traces tied to the event stream
+
+That baseline is enough to diagnose real failures and improve the system without forcing every user to run a time-series database and dashboard stack.
+
 The result: 43 required packages, zero distributed-systems infrastructure in the default install path.
 
 That was not anti-infrastructure dogma. It was architecture matching the product shape.

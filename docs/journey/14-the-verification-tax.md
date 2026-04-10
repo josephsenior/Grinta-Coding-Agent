@@ -73,7 +73,7 @@ Not because plurality is elegant, but because tasks are messy.
 
 The `TaskValidator` abstraction forced me to think correctly about the problem. A validator is not a magical oracle. It is one lens over the evidence available in the task history and current state. Each validator asks a narrower question. Together, they make it harder for the system to promote rhetoric into reality.
 
-That was the right abstraction because it mirrors how serious engineers already think. When we review work, we do not ask one gigantic abstract question. We ask several concrete ones:
+That was the right abstraction because it mirrors how serious engineers already think. When I review work, I do not ask one gigantic abstract question. I ask several concrete ones:
 
 - did the code actually change
 - did the tests pass

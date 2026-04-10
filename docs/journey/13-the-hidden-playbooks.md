@@ -113,7 +113,7 @@ Every repository has its own small culture:
 
 Trying to encode all of that globally is a mistake.
 
-Repository playbooks let a project say, "This is how *we* do things here," without pretending that every repository in the world shares the same conventions. That is also why compatibility with files like `.cursorrules` and `agents.md` mattered. Good tooling should meet real developer ecosystems where they already are instead of demanding ritual conversion into one blessed format.
+Repository playbooks let a project say, "This is how *I* do things here," without pretending that every repository in the world shares the same conventions. That is also why compatibility with files like `.cursorrules` and `agents.md` mattered. Good tooling should meet real developer ecosystems where they already are instead of demanding ritual conversion into one blessed format.
 
 ### Task playbooks
 
@@ -125,7 +125,7 @@ That makes them different from freeform memory.
 Freeform memory says, "Here is something worth remembering."
 Task playbooks say, "Here is a reusable way to frame a class of work."
 
-That is closer to the way good engineers actually operate. We do not just remember facts. We also reuse procedures.
+That is closer to the way good engineers actually operate. I do not just remember facts. I also reuse procedures.
 
 ---
 
