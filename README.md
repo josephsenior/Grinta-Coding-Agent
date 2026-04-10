@@ -1,6 +1,6 @@
 # Grinta
 
-![Grinta logo](logo.png)
+![Grinta logo](logo.webp)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
