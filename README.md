@@ -1,15 +1,27 @@
 # Grinta
 
-![Grinta logo](logo.webp)
+![Grinta logo](logo.png)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-> Aider edits files. Grinta finishes tasks.
+> Autonomous coding that closes the loop: plan, execute, validate, finish.
 
-Grinta is an open-source autonomous coding agent that plans, executes, validates, and only finishes when the work is actually done.
+Grinta is an open-source, local-first autonomous coding agent built for real repository work. It reads code, plans multi-step execution, performs changes and command runs, validates results, and only finishes when completion criteria are satisfied.
+
+## Project Description
+
+Grinta focuses on task completion integrity, not just code generation. The runtime combines orchestration safeguards, local execution policy checks, and durable session state so long-running tasks can recover, self-correct, and stay within clear operating boundaries.
+
+## Core Topics
+
+- Autonomous coding workflows and task completion gates
+- Session orchestration, retries, stuck detection, and circuit breakers
+- Local-first execution with policy-driven safety controls
+- Model-agnostic provider routing (cloud and local)
+- Context compaction and durable run-state recovery for long sessions
 
 ## Why Grinta
 
