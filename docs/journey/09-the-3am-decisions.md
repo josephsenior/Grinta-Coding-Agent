@@ -1,6 +1,6 @@
 # 09. The 3 AM Decisions
 
-There is a specific kind of loneliness in solo engineering that you don't read about in startup blogs. It is not the loneliness of working alone in a room. It is the loneliness of consequence.
+Solo engineering has a loneliness you do not read about in startup blogs. It is not the loneliness of working alone in a room. It is the loneliness of consequence.
 
 Once a system has enough moving parts, you eventually hit the moment when a foundational architectural decision turns out to be wrong.
 
@@ -94,7 +94,7 @@ When you are the only one making the cuts, the resulting system reflects a singl
 
 It has scars. It has clear boundaries. It has an architecture shaped by the painful realization of what happens when you let complexity win.
 
-The loneliness of solo engineering is real. But so is the uncompromising clarity that comes out the other side.
+The loneliness of solo engineering is real. So is the uncompromising clarity that comes out the other side.
 
 ---
 

@@ -1,6 +1,6 @@
 # 12. Open Source Was the Better Business
 
-There is a specific kind of freedom that comes from giving up on a business model.
+Giving up on a business model was one of the most liberating decisions I made on this project.
 
 I spent the first four months of this project building a SaaS. A multi-tenant, Kubernetes-orchestrated, Docker-containerized, React-frontend, PostgreSQL-backed, Stripe-billing, JWT-authenticated machine. I had the domain name. I had the pitch. I had the architecture diagrams.
 
@@ -84,7 +84,7 @@ All of that infrastructure exists because "local" is not simpler than "cloud." I
 
 That is the lesson that took me four months and 20,000 deleted lines to learn.
 
-Open source was not the fallback plan. It was the only architecture that allowed Grinta to be uncompromising.
+Open source was not the fallback plan. It was the only architecture that let Grinta stay uncompromising.
 
 ---
 

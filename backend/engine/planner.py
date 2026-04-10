@@ -366,7 +366,6 @@ class OrchestratorPlanner:
         status = '<APP_CONTEXT_STATUS ' + ' | '.join(parts) + ' />'
         status += self._build_context_pressure_warning(parts, memory_pressure)
         status += self._build_repetition_warning(rep_score)
-        status += self._build_first_turn_orientation(state)
         status += self._build_active_plan_section(state)
         if planning_directive:
             status += f'\n<APP_DIRECTIVE>\n{planning_directive}\n</APP_DIRECTIVE>'
@@ -495,27 +494,14 @@ class OrchestratorPlanner:
                 'Your recent actions show a repeating pattern. You MUST change strategy:\n'
                 "1. STOP and use think() to analyze why your current approach isn't working\n"
                 '2. Try a fundamentally different approach\n'
-                '3. If editing files, re-read the file first with view command\n'
-                '4. Do not repeat unchanged tracking updates\n'
+                '3. Do not repeat unchanged project scans or re-open the same file without a new reason\n'
+                '4. Execute one concrete unfinished step (edit, run test, or run the next command)\n'
                 '5. Optional: think() to step back and re-analyze the problem from scratch'
             )
         if rep_score >= 0.45:
-            return f'\n📊 Mild repetition detected (score={rep_score:.1f}/1.0). Consider varying your approach.'
-        return ''
-
-    def _build_first_turn_orientation(self, state: State) -> str:
-        """Build first-turn workspace orientation block."""
-        if not getattr(self._config, 'enable_first_turn_orientation_prompt', True):
-            return ''
-        iter_flag = getattr(state, 'iteration_flag', None)
-        current_turn = getattr(iter_flag, 'current_value', 0) if iter_flag else 0
-        current_turn = self._safe_int(current_turn)
-        if current_turn <= 1:
             return (
-                '\n<FIRST_TURN_ORIENTATION>\n'
-                'If you lack project context, run `git status` and `analyze_project_structure`; '
-                'then proceed (think/plan as needed).\n'
-                '</FIRST_TURN_ORIENTATION>'
+                f'\n📊 Mild repetition detected (score={rep_score:.1f}/1.0). '
+                'Vary your approach and avoid repeating unchanged read-only scans.'
             )
         return ''
 

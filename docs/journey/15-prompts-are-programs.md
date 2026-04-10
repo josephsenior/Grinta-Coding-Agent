@@ -2,19 +2,13 @@
 
 There is a popular way of talking about prompt engineering that makes it sound like copywriting for machines.
 
-Choose the right words.
-Add a few examples.
-Massage the phrasing.
-Find the secret incantation.
+Choose the right words; add a few examples; massage the phrasing; find the secret incantation.
 
-I understand the appeal of talking about it that way.
-It flatters the mystique.
+I understand the appeal of talking about it that way; it flatters the mystique.
 
 It is also one of the least useful mental models you can carry into a serious agent system.
 
-Because once the prompt stops being a single clever paragraph and starts becoming the control surface for a real tool, it is no longer just wording.
-
-It is software.
+Because once the prompt stops being a single clever paragraph and starts becoming the control surface for a real tool, it is no longer just wording; it is software.
 
 That was one of the most important architecture lessons in Grinta.
 
@@ -317,8 +311,14 @@ That is what happens when a field starts maturing.
 The best prompt system in a serious agent is not the one with the cleverest phrasing.
 It is the one whose rendering path you can still understand when something breaks at 2 AM.
 
-That is when you know the prompt finally became part of the product instead of a pile of ritual text taped to the side of it.
+That is when you know the prompt finally became part of the product, not a pile of ritual text taped to the side.
+
+And once the prompt layer is disciplined, a harder question appears:
+
+what stack choices keep that discipline fast, maintainable, and contributor-friendly in real projects?
+
+That is exactly what the next chapter answers.
 
 ---
 
-← [The Verification Tax](14-the-verification-tax.md) | [The Book of Grinta](README.md) | [The Road Ahead](07-the-road-ahead.md) →
+← [The Verification Tax](14-the-verification-tax.md) | [The Book of Grinta](README.md) | [The Pragmatic Stack](16-the-pragmatic-stack.md) →

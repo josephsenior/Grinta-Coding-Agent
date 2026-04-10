@@ -28,6 +28,14 @@ def _pending_action_for_observation_cause(controller) -> object | None:
     return getattr(controller, '_pending_action', None)
 
 
+def _clear_agent_queued_actions(controller, reason: str) -> None:
+    """Clear queued agent actions when recovery requires a hard strategy reset."""
+    agent = getattr(controller, 'agent', None)
+    clear_fn = getattr(agent, 'clear_queued_actions', None)
+    if callable(clear_fn):
+        clear_fn(reason=reason)
+
+
 class StepGuardService:
     """Ensures controller steps are safe w.r.t. circuit breaker and stuck detection."""
 
@@ -35,7 +43,6 @@ class StepGuardService:
 
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
-        self._in_stuck_episode: bool = False
 
     def _warning_trip_enabled(self) -> bool:
         cfg = getattr(self._context, 'agent_config', None)
@@ -191,17 +198,13 @@ class StepGuardService:
             state.turn_signals.repetition_score = rep_score
 
         if not stuck_service.is_stuck():
-            # Agent broke out of the stuck episode — reset tracker
-            self._in_stuck_episode = False
             return True
 
         cb_service = getattr(controller, 'circuit_breaker_service', None)
         if cb_service:
-            if not self._in_stuck_episode:
-                # New stuck episode — record with circuit breaker
-                cb_service.record_stuck_detection()
-                self._in_stuck_episode = True
-            # else: same ongoing episode, don't re-count
+            # Record each stuck turn so the circuit breaker can escalate and
+            # stop persistent loops instead of warning indefinitely.
+            cb_service.record_stuck_detection()
 
         # Inject a replan directive; let the circuit breaker handle
         # escalation and eventual stopping.
@@ -226,6 +229,8 @@ class StepGuardService:
         """
         state = getattr(controller, 'state', None)
         history = getattr(state, 'history', []) if state else []
+
+        _clear_agent_queued_actions(controller, reason='stuck_loop_recovery')
 
         created_files = self._collect_created_files(history)
         msg, planning = self._build_stuck_recovery_message(created_files)

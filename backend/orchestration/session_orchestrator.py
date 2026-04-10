@@ -543,10 +543,16 @@ class SessionOrchestrator:
 
     def _emit_dropped_agent_actions(self) -> None:
         """Emit ErrorObservations for agent-queued actions dropped by reset."""
-        agent_pending = getattr(self.agent, 'pending_actions', None)
-        if not agent_pending:
+        iter_queued = getattr(self.agent, 'iter_queued_actions', None)
+        if callable(iter_queued):
+            dropped_actions = list(iter_queued())
+        else:
+            agent_pending = getattr(self.agent, 'pending_actions', None)
+            dropped_actions = list(agent_pending or [])
+
+        if not dropped_actions:
             return
-        for dropped in list(agent_pending):
+        for dropped in dropped_actions:
             meta = getattr(dropped, 'tool_call_metadata', None)
             if not meta:
                 continue
@@ -667,11 +673,10 @@ class SessionOrchestrator:
             )
             self.services.retry.reset_retry_metrics()
 
-        if isinstance(action, SignalProgressAction):
-            if hasattr(self.services.circuit_breaker, 'record_progress_signal'):
-                self.services.circuit_breaker.record_progress_signal(
-                    action.progress_note
-                )
+        if isinstance(action, SignalProgressAction) and hasattr(
+            self.services.circuit_breaker, 'record_progress_signal'
+        ):
+            self.services.circuit_breaker.record_progress_signal(action.progress_note)
 
         await self.action_execution.execute_action(action)
         await self._handle_post_execution()

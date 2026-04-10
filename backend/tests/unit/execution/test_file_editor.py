@@ -90,7 +90,8 @@ class TestFileEditorView:
     def test_view_directory_is_error(self):
         (Path(self.tmpdir) / 'subdir').mkdir()
         result = self.editor(command='view_file', path='subdir')
-        assert result.error is not None
+        assert result.error is None
+        assert 'Directory contents' in result.output
 
 
 # ---------------------------------------------------------------------------

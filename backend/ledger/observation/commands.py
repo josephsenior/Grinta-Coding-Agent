@@ -38,7 +38,12 @@ class CmdOutputMetadata(CmdOutputMetadataSchema):
                 'username': '\\u',
                 'hostname': '\\h',
                 'working_dir': '$(pwd)',
-                'py_interpreter_path': '$(which python 2>/dev/null || echo "")',
+                'py_interpreter_path': (
+                    '$(command -v python3 2>/dev/null '
+                    '|| command -v python 2>/dev/null '
+                    '|| command -v py 2>/dev/null '
+                    '|| echo "")'
+                ),
             },
             indent=2,
         )

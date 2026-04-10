@@ -1,6 +1,6 @@
 # 13. The Hidden Playbooks
 
-There is a specific kind of bad architecture that feels responsible while you are building it.
+Bad architecture often feels responsible while you build it.
 
 It tells you that the safest thing to do is to put *everything* in the base prompt.
 Every rule.
@@ -18,7 +18,7 @@ That is what the playbook system solved.
 
 Not by becoming magical, but by becoming timely.
 
-It sits between [04. The Context War](04-the-context-war.md) and [15. Prompts Are Programs](15-prompts-are-programs.md): one chapter is about protecting the model from too much memory, the other is about keeping the core instruction layer sane.
+It sits between [04. The Context War](04-the-context-war.md) and [15. Prompts Are Programs](15-prompts-are-programs.md): one chapter is about protecting the model from too much memory, the other about keeping the core instruction layer sane.
 
 ---
 

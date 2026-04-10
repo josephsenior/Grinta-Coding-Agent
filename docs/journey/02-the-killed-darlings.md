@@ -1,6 +1,6 @@
 # 02. The Killed Darlings
 
-There is a specific kind of engineering maturity that only shows up when you delete something you are proud of.
+Deleting something you are proud of requires a specific kind of engineering maturity.
 
 Not because it was broken, or because you were too lazy to maintain it, or because you could not finish it.
 
@@ -14,7 +14,7 @@ They were not mistakes in the naive sense. Most of them taught me important thin
 
 If the answer was no, they had to go.
 
-That sounds clean when I write it down now. It did not feel clean while I was doing it. Deleting these systems often felt like cutting off proof that I had done hard work. That is part of why I am documenting them this carefully. I do not want the final repo shape to erase the cost of the decisions that made it possible.
+That sounds clean when I write it down now. It did not feel clean while I was doing it. Deleting these systems often felt like cutting off proof that I had done hard work. That is why I am documenting them this carefully. I do not want the final repo shape to erase the cost of the decisions that made it possible.
 
 ---
 

@@ -1,6 +1,6 @@
 # 03. The Architectural Gauntlet
 
-If the previous chapters explain why Grinta changed direction, this chapter explains why it did not collapse under its own complexity.
+If the previous chapters explain why Grinta changed direction, this one explains why it did not collapse under its own complexity.
 
 Because building an agent is one problem.
 Building an agent codebase that can survive months of growth without rotting is a different problem entirely.
@@ -12,7 +12,7 @@ Architecture as survival.
 
 Grinta today is not a single giant loop with random helper files. It is a decomposed system with a serious orchestration layer, event-sourced state, recovery machinery, service boundaries, validation, and discipline around code quality. That shape did not appear automatically. It came from repeatedly feeling the pain of monoliths, debugging deadlocks, and deciding that if the project kept growing, the code had to remain understandable.
 
-This chapter is probably the closest thing in the whole journey to a personality profile. I do not know how to watch a codebase rot without wanting to tear it open and redraw the boundaries. Some people tolerate architectural debt for longer than I can. I start feeling it physically when I open a file and my brain resists reading something I wrote myself.
+This chapter is probably the closest thing in the whole journey to a personality profile. I do not know how to watch a codebase rot without wanting to tear it open and redraw the boundaries. Some people tolerate architectural debt for longer than I can. I feel it physically when I open a file and my brain resists reading something I wrote myself.
 
 ---
 
@@ -144,169 +144,49 @@ And once the code gets sharper, the system becomes easier to trust.
 
 ## Why Event Sourcing Entered the Picture
 
-This was one of the toughest parts of the entire project.
+This was one of the hardest architectural decisions in the whole project.
 
-Grinta uses event-sourced persistence and Write-Ahead Logging because I wanted a system that could survive long-running sessions, interruptions, debugging, and replay.
+I moved Grinta to event-oriented persistence because snapshots alone could not answer the questions that matter during failure:
 
-This decision was influenced in part by seeing how other serious agent systems approached persistence, especially OpenHands. I was impressed by the strength of that idea. But inspiration is not implementation.
+- what happened before the crash
+- which action produced which observation
+- whether replay can reproduce the same behavior
+- whether state transitions are still trustworthy
 
-Once you actually build event-sourced machinery into your own system, you realize very quickly that the elegance of the pattern hides a brutal amount of complexity.
+That shift made the system more operationally serious. It also made the system more expensive to build. Ordering, recovery, and replay correctness all become first-class engineering problems the moment you commit to a durable ledger.
 
-### Why CRUD Was Not Enough
-
-A simple mutable state model looks easier at first. You update the current state in place, persist snapshots occasionally, and move on.
-
-That works until you need answers to harder questions:
-
-- What exactly happened before the crash?
-- Can I replay the session and inspect every action and observation?
-- Can I recover partial work reliably?
-- Can I reason about state transitions from a durable history instead of a potentially corrupted present?
-- Can I debug long-running agent loops without losing causality?
-
-That is where event sourcing wins.
-
-Instead of treating state as a black box that gets overwritten, you treat the session as a sequence of durable events.
-
-That means:
-
-- actions are recorded
-- observations are recorded
-- transitions are reconstructable
-- failures become inspectable
-- recovery has stronger foundations
-
-Underneath that, the persistence path is not just "write a JSON file." There are multiple strategies depending on urgency — a database store for durable ordered history, a background writer that batches events for throughput, and synchronous atomic writes for events that cannot afford to be lost. Critical events like finish, reject, or error are always flushed immediately. The database runs in Write-Ahead Logging mode with separate connections for writing and reading so that replay and live operation do not block each other.
-
-That is the level of operational seriousness hidden behind the nice phrase "event sourcing."
-
-This is one of the reasons Grinta has deeper operational discipline than many simpler coding agents.
+The detailed mechanics now live in [18-surviving-the-crash.md](18-surviving-the-crash.md). This chapter keeps the architectural point: decomposition gave those reliability concerns explicit homes instead of hiding them in one giant controller.
 
 ---
 
-## The WAL Was Not Romantic
+## Recovery and Guardrails Were the Same Problem
 
-Write-Ahead Logging sounds elegant when you read about it.
+At first I treated "recovery" and "safety" as separate ideas.
+In practice they were the same architectural concern: failure containment.
 
-In practice, it can ruin your night.
+The system had to do all of this without collapsing into spaghetti:
 
-This part of the project involved real debugging pain. Not the casual kind. The kind where you are staring at deadlocks and synchronization issues at 3 AM wondering whether the architecture is brilliant or self-inflicted punishment.
+- classify exceptions by recoverability
+- retry only when retrying is rational
+- block false finishes when plan state is incomplete
+- detect loop behavior before it burns a session
+- enforce policy before risky actions hit the environment
 
-Persistence and replay are easy to praise once they work.
-They are much harder to build when you are the one dealing with:
+This is why the service decomposition mattered so much. Once those responsibilities moved into dedicated services, incidents became diagnosable and behavior became testable.
 
-- ordering guarantees
-- state reconstruction issues
-- concurrent activity across session flows
-- event integrity concerns
-- replay correctness
-- deadlocks in the persistence path
-
-Those nights mattered.
-
-Because once you survive that kind of debugging, you stop romanticizing architecture patterns and start respecting their operational cost.
-
-There is also a special kind of humiliation in this phase of engineering: you spend weeks admiring a pattern, then one night you realize that same pattern is the reason you are still awake at 3 AM. I think that was healthy for me. It turned architecture from aesthetic preference into operational accountability.
-
-I still kept event sourcing and WAL because the benefits were worth it.
-But I kept them with more humility than when I started.
+The deeper stuck and circuit-breaker story now lives in [19-circuit-breakers-and-hallucinations.md](19-circuit-breakers-and-hallucinations.md), because that subsystem eventually became large enough to deserve its own chapter.
 
 ---
 
-## Why Recovery Had to Be First-Class
+## Architecture as Failure Containment
 
-An autonomous coding agent that cannot recover from failure is not autonomous. It is just a loop with good branding.
+One of the strongest lessons of this project is that reliability is not mainly a prompting trick.
 
-That is why recovery became a first-class architectural concern in Grinta.
+Reliability is architecture refusing to let a probabilistic model act without supervision from deterministic systems.
 
-The system includes:
+In Grinta, that shows up as explicit state transitions, pending action tracking, validation before finish, middleware gates around execution, and a persistence trail that can be audited after the fact. The goal is simple: make bad behavior visible early, reduce blast radius, and keep sessions recoverable.
 
-- event-based persistence
-- retry services
-- exception classification
-- stuck detection
-- validation before finish
-- checkpointing and rollback patterns
-
-Finish is not trusted blindly either. The task validation service blocks completion if the agent's own plan still has unfinished steps, fails closed if validation is required but no validator is available, and can persist lessons learned into repository memory so later runs inherit something real instead of fake self-improvement theater.
-
-This is not fluff. It is what separates "the model produced an answer" from "the system can work for hours without blindly pretending success."
-
-A lot of AI tooling demos end at generation.
-Real agent systems begin after generation, when the environment answers back with failure.
-
-That is where architecture matters most.
-
----
-
-## The Stuck Problem Forced Better Design
-
-One of the quiet truths of agent engineering is that intelligence is not enough.
-
-Models loop.
-They repeat.
-They inspect without progressing.
-They burn tokens while sounding confident.
-They get trapped in error cycles.
-
-That means the system cannot simply trust the model's sense of progress.
-It needs external structure.
-
-Grinta's stuck and circuit-breaking logic exists because I took that problem seriously.
-
-The architecture includes multiple heuristics for detecting when the agent is no longer meaningfully progressing, including patterns such as:
-
-- repeated action-observation loops
-- repeated action-error cycles
-- monologue loops
-- alternating oscillations
-- context-window-related failure patterns
-- semantic no-progress behavior
-- token-level repetition
-- cost acceleration and thrashing
-- think-only loops
-- read-only inspection spirals
-
-Those are not decorative names. Each one came from watching a real failure mode. The agent repeating the same action four times in a row. The agent cycling between an action and an error three times. The agent spending ten consecutive turns just thinking without doing anything. The agent reading twenty files without making a single edit. Each of these patterns burned real tokens before I built a detector for it.
-
-On top of the detectors, the system adds a warning-first circuit breaker — the agent gets a few chances to self-correct before the system hard-stops it. That matters because sometimes the model genuinely needs a second attempt, and you do not want the safety system to be so aggressive that it kills legitimate recovery.
-
-This is the kind of engineering that rarely shows up in flashy marketing.
-But it is exactly the kind of engineering that makes an agent usable.
-
----
-
-## Architecture as an Anti-Hallucination Strategy
-
-One of the deeper lessons of this project is that reliability is not only about prompting.
-
-It is about system architecture constraining failure.
-
-Grinta tries to reduce false completion and runaway behavior by combining:
-
-- task validation before finish
-- explicit state transitions
-- pending action tracking
-- recovery rules
-- safety gates
-- event logging
-- stuck detection
-- cost awareness
-
-Even tool execution is mediated. The operation pipeline stacks twelve middleware layers — safety, circuit breaking, cost quotas, context window checks, rollback tracking, automated verification, file state management, logging, telemetry, and tool result validation — before an action actually reaches the environment. That is not ceremony. That is the system refusing to let raw model output go straight to the machine without inspection.
-
-Each middleware in the pipeline has a narrow contract: inspect the action, optionally transform or block it, pass it forward, then optionally post-process the result. The safety middleware delegates to the security analyzer. The circuit breaker middleware checks the consecutive error counter and the error rate over a sliding window, and can block execution if thresholds are exceeded. The cost quota middleware tracks cumulative token spend and blocks new LLM calls if the session has exceeded the user's configured budget cap. The context window check ensures the conversation is not about to exceed the model's maximum context, triggering an emergency compaction if it is. The rollback tracker takes a filesystem snapshot before destructive file operations so the agent can undo changes. The automated verification runs post-edit checks — if configured, it can run a lint or test command after every file write to catch regressions immediately.
-
-That pipeline exists because I learned, through painful experience, that any system that lets an LLM's raw output directly modify the filesystem will eventually produce catastrophic results. Not because the LLM is malicious, but because it is probabilistic. A 99% correct action applied 200 times in a session means roughly two bad actions. The middleware pipeline is how those two bad actions get caught before they become two bad files.
-
-The circuit breaker concept itself evolved across versions. The earliest codebase had a standalone circuit breaker with four trip conditions: too many consecutive errors, too many high-risk actions, too many stuck detections, or an error rate above fifty percent over a sliding window. When tripped, it would recommend pausing or stopping. By the time the code reached Grinta, the circuit breaker became one middleware in the pipeline and one guard in the step service — fewer moving parts, same protective intent. That consolidation was not accidental. It came from realizing that having circuit breaker logic in three different places was not defense in depth. It was confusion in depth.
-
-The current circuit breaker is adaptive. Its consecutive error threshold is not a fixed constant — it scales with the task's iteration budget. A task with a 200-iteration budget gets a higher error threshold than a task with a 20-iteration budget, because a longer task naturally encounters more transient errors during exploration. The breaker also implements a half-open probe pattern: after tripping, it does not stay permanently closed. It periodically allows a single action through to test whether the underlying problem has resolved. If that probe succeeds, the breaker resets. If it fails, the breaker re-trips with an extended cooldown. That adaptive behavior prevents the circuit breaker from being either too aggressive (killing a session that would have recovered) or too permissive (letting a session burn tokens indefinitely in a failure loop).
-
-In other words, the system does not merely ask the model to be responsible.
-It builds an environment that makes irresponsibility more visible and less survivable.
-
-That is what good agent architecture should do.
+That is what turned this from a clever prototype into a system I could trust under pressure.
 
 ---
 

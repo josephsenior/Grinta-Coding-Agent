@@ -85,3 +85,43 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result)
         cb.record_stuck_detection.assert_called_once()
         self.controller.event_stream.add_event.assert_called_once()
+
+    async def test_handle_stuck_detection_records_each_stuck_turn(self):
+        stuck_svc = MagicMock()
+        stuck_svc.compute_repetition_score.return_value = 1.0
+        stuck_svc.is_stuck.return_value = True
+        self.controller.stuck_service = stuck_svc
+        self.controller.state = MagicMock()
+        self.controller.event_stream = MagicMock()
+
+        cb = MagicMock()
+        cb.circuit_breaker = MagicMock()
+        self.controller.circuit_breaker_service = cb
+
+        first = await self.service._handle_stuck_detection(self.controller)
+        second = await self.service._handle_stuck_detection(self.controller)
+
+        self.assertTrue(first)
+        self.assertTrue(second)
+        self.assertEqual(cb.record_stuck_detection.call_count, 2)
+        self.assertEqual(self.controller.event_stream.add_event.call_count, 2)
+
+    async def test_handle_stuck_detection_clears_agent_queued_actions(self):
+        stuck_svc = MagicMock()
+        stuck_svc.compute_repetition_score.return_value = 1.0
+        stuck_svc.is_stuck.return_value = True
+        self.controller.stuck_service = stuck_svc
+        self.controller.state = MagicMock()
+        self.controller.event_stream = MagicMock()
+
+        cb = MagicMock()
+        cb.circuit_breaker = MagicMock()
+        self.controller.circuit_breaker_service = cb
+
+        self.controller.agent = MagicMock()
+        self.controller.agent.clear_queued_actions = MagicMock(return_value=3)
+
+        result = await self.service._handle_stuck_detection(self.controller)
+
+        self.assertTrue(result)
+        self.controller.agent.clear_queued_actions.assert_called_once()

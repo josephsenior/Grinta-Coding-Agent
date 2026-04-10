@@ -95,32 +95,29 @@ def build_analyze_project_structure_action(
 
     if command == 'tree':
         return _build_tree_action(path, depth)
-    elif command == 'imports':
+    if command == 'imports':
         return _build_imports_action(path)
-    elif command == 'symbols':
+    if command == 'symbols':
         return _build_symbols_action(path)
-    elif command == 'recent':
+    if command == 'recent':
         return _build_recent_action()
-    elif command == 'callers':
-        symbol = arguments.get('symbol', '')
-        if not symbol:
+    if command == 'callers':
+        if not (symbol := arguments.get('symbol', '')):
             return AgentThinkAction(
                 thought="[ANALYZE_PROJECT_STRUCTURE] 'callers' requires the 'symbol' parameter (function/class name to search for)."
             )
         return _build_callers_action(symbol, path)
-    elif command == 'test_coverage':
+    if command == 'test_coverage':
         return _build_test_coverage_action(path)
-    elif command == 'semantic_search':
-        symbol = arguments.get('symbol', '')
-        if not symbol:
+    if command == 'semantic_search':
+        if not (symbol := arguments.get('symbol', '')):
             return AgentThinkAction(
                 thought="[ANALYZE_PROJECT_STRUCTURE] 'semantic_search' requires the 'symbol' parameter."
             )
         return _build_semantic_search_action(symbol, path)
-    else:
-        return AgentThinkAction(
-            thought=f'[ANALYZE_PROJECT_STRUCTURE] Unknown command: {command}. Use tree/imports/symbols/recent/callers/test_coverage.'
-        )
+    return AgentThinkAction(
+        thought=f'[ANALYZE_PROJECT_STRUCTURE] Unknown command: {command}. Use tree/imports/symbols/recent/callers/test_coverage.'
+    )
 
 
 def _build_tree_action(path: str, depth: int) -> CmdRunAction:
@@ -158,6 +155,18 @@ root = os.path.abspath({path!r})
 max_depth = {depth}
 ignore = {{'__pycache__', 'node_modules', '.git', '.venv', 'venv'}}
 
+# Read .gitignore if available
+gitignore_path = os.path.join(root, '.gitignore')
+if os.path.isfile(gitignore_path):
+    try:
+        with open(gitignore_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.split('#')[0].strip().strip('/')
+                if line and not line.startswith('*'):
+                    ignore.add(line)
+    except Exception:
+        pass
+
 if not os.path.exists(root):
     print('(path not found)')
     raise SystemExit(0)
@@ -177,7 +186,8 @@ for current_root, dirnames, filenames in os.walk(root):
         continue
 
     if relative_root not in ('', '.'):
-        print(f"<dir> {{relative_root.replace(os.sep, '/')}}")
+        dname = relative_root.replace(os.sep, '/')
+        print("<dir> " + dname)
         emitted += 1
         if emitted >= 200:
             break
@@ -186,13 +196,15 @@ for current_root, dirnames, filenames in os.walk(root):
         dirnames[:] = []
 
     for filename in sorted(name for name in filenames if name not in ignore):
+        if filename in ignore or filename.endswith('.pyc'):
+            continue
         full_path = os.path.join(current_root, filename)
         relative_path = os.path.relpath(full_path, root).replace(os.sep, '/')
         try:
-            size = os.path.getsize(full_path)
+            size_bytes = os.path.getsize(full_path)
         except OSError:
-            size = 0
-        print(f"{{size}} {{relative_path}}")
+            size_bytes = 0
+        print(str(size_bytes) + " " + relative_path)
         emitted += 1
         if emitted >= 200:
             raise SystemExit(0)
@@ -262,7 +274,7 @@ def _build_callers_action(symbol: str, scope: str) -> CmdRunAction:
     Uses ripgrep for speed with grep fallback. Searches for word-boundary
     matches to avoid false positives on substrings.
     """
-    trunc_sym = symbol[:40] + '…' if len(symbol) > 40 else symbol
+    trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
     if uses_powershell_terminal():
         return _build_windows_callers_action(symbol, scope, trunc_sym)
     safe_symbol = shlex.quote(symbol)
@@ -421,5 +433,5 @@ def _build_semantic_search_action(symbol: str, path: str) -> CmdRunAction:
     script_path = sa.__file__
 
     cmd = f'{python_exe} {shlex.quote(script_path)} find_references {safe_symbol} {safe_path}'
-    trunc_sym = symbol[:40] + '…' if len(symbol) > 40 else symbol
+    trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
     return CmdRunAction(command=cmd, display_label=f'Searching references for {trunc_sym!r}')

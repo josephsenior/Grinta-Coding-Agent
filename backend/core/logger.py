@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 import traceback
+import contextlib
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 from typing import TYPE_CHECKING, Any, TextIO
@@ -146,14 +147,12 @@ class RollingLogger:
 
 def set_trace_context(ctx: dict[str, object] | None) -> None:
     """Set thread-local trace context (overwrites existing). Pass None to clear."""
-    try:
+    with contextlib.suppress(Exception):
         if ctx is None:
             if hasattr(_TRACE_LOCAL, 'context'):
                 delattr(_TRACE_LOCAL, 'context')
         else:
             _TRACE_LOCAL.context = dict(ctx)
-    except Exception:
-        pass
 
 
 def clear_trace_context() -> None:
@@ -162,11 +161,9 @@ def clear_trace_context() -> None:
     Removes trace context from thread-local storage if it exists.
     Silently handles any exceptions during cleanup.
     """
-    try:
+    with contextlib.suppress(Exception):
         if hasattr(_TRACE_LOCAL, 'context'):
             delattr(_TRACE_LOCAL, 'context')
-    except Exception:
-        pass
 
 
 def get_trace_context() -> dict[str, object]:
@@ -174,12 +171,10 @@ def get_trace_context() -> dict[str, object]:
 
     If no context exists, returns an empty dict. Safe for import anywhere.
     """
-    try:
+    with contextlib.suppress(Exception):
         ctx = getattr(_TRACE_LOCAL, 'context', None)
         if isinstance(ctx, dict):
             return dict(ctx)
-    except Exception:
-        pass
     return {}
 
 
@@ -399,9 +394,9 @@ def _get_llm_file_handler(name: str, log_level: int) -> LlmFileHandler:
 def _setup_llm_logger(name: str, log_level: int) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.propagate = False
-    logger.setLevel(log_level)
+    logger.setLevel(logging.DEBUG) # Force debug
     if LOG_TO_FILE:
-        logger.addHandler(_get_llm_file_handler(name, log_level))
+        logger.addHandler(_get_llm_file_handler(name, logging.DEBUG))
     return logger
 
 

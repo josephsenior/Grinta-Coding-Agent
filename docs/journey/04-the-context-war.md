@@ -15,7 +15,7 @@ A long-running agent is not just constrained by context window size. It is const
 
 This chapter is about how I learned that the hard way.
 
-This was one of the most humbling subsystems in the entire project. It forced me to accept that "more context" and "better memory" are not the same thing, and that a model can be surrounded by information and still act like it has forgotten the plot.
+This was one of the most humbling subsystems in the entire project. It forced me to accept that "more context" and "better memory" are not the same thing, and that a model can be surrounded by information yet still behave like it forgot the plot.
 
 ---
 

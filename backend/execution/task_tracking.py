@@ -106,9 +106,9 @@ class TaskTrackingMixin:
         self, action: TaskTrackingAction, task_file_path: str, view_count: int = 1
     ) -> Observation:
         """Handle task view command — read and display task list."""
-        # After 3+ consecutive views without a plan update, give a strong directive
+        # After 2+ consecutive views without a plan update, give a strong directive
         # so the agent breaks out of the view loop and starts implementing.
-        if view_count >= 3:
+        if view_count >= 2:
             try:
                 assert self.event_stream is not None
                 content = self.event_stream.file_store.read(task_file_path)
@@ -120,7 +120,7 @@ class TaskTrackingMixin:
                 '\n\n⚠️ LOOP DETECTED: You have viewed your task list '
                 f'{view_count} times without making progress. '
                 'STOP calling task_tracker view. '
-                'Pick the first todo task and start working on it.'
+                'Pick the first todo task and start working on it directly or you will fail.'
             )
             return TaskTrackingObservation(
                 content=content + intervention,

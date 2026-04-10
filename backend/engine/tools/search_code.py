@@ -134,12 +134,23 @@ def build_search_code_action(
 
     if not pattern:
         # File-discovery mode: just list matching files
-        find_prefix = _build_pruned_find_command(path)
         if file_pattern:
             safe_glob = shlex.quote(file_pattern)
-            cmd = f'{find_prefix} -type f -name {safe_glob} -print | head -n {max_results}'
+            cmd = (
+                f"if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then "
+                f"git ls-files --cached --others --exclude-standard {safe_glob} | head -n {max_results}; "
+                f"else "
+                f"{_build_pruned_find_command(path)} -type f -name {safe_glob} -print | head -n {max_results}; "
+                f"fi"
+            )
         else:
-            cmd = f'{find_prefix} -type f -print | head -n {max_results}'
+            cmd = (
+                f"if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then "
+                f"git ls-files --cached --others --exclude-standard {shlex.quote(path)} | head -n {max_results}; "
+                f"else "
+                f"{_build_pruned_find_command(path)} -type f -print | head -n {max_results}; "
+                f"fi"
+            )
         label = f'Listing files in {path}' if path and path != '.' else 'Listing files'
         return CmdRunAction(command=cmd, display_label=label)
 
@@ -222,15 +233,25 @@ def _build_windows_search_action(
         if file_pattern:
             fp = _ps_quote(file_pattern)
             cmd = (
-                f'Get-ChildItem -Path {sp} -Filter {fp} -Recurse -File -ErrorAction SilentlyContinue | '
-                f'Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like "*\\$_\\*" }}) }} | '
-                f'ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results}'
+                f"$git = Get-Command git -ErrorAction SilentlyContinue; "
+                f"if ($git -and (git rev-parse --is-inside-work-tree 2>$null)) {{ "
+                f"  git ls-files --cached --others --exclude-standard {fp} | Select-Object -First {max_results} "
+                f"}} else {{ "
+                f"  Get-ChildItem -Path {sp} -Filter {fp} -Recurse -File -ErrorAction SilentlyContinue | "
+                f"  Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like \"*\\$_\\*\" }}) }} | "
+                f"  ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results} "
+                f"}}"
             )
         else:
             cmd = (
-                f'Get-ChildItem -Path {sp} -Recurse -File -ErrorAction SilentlyContinue | '
-                f'Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like "*\\$_\\*" }}) }} | '
-                f'ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results}'
+                f"$git = Get-Command git -ErrorAction SilentlyContinue; "
+                f"if ($git -and (git rev-parse --is-inside-work-tree 2>$null)) {{ "
+                f"  git ls-files --cached --others --exclude-standard {sp} | Select-Object -First {max_results} "
+                f"}} else {{ "
+                f"  Get-ChildItem -Path {sp} -Recurse -File -ErrorAction SilentlyContinue | "
+                f"  Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like \"*\\$_\\*\" }}) }} | "
+                f"  ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results} "
+                f"}}"
             )
         label = f'Listing files in {path}' if path and path != '.' else 'Listing files'
         return CmdRunAction(command=cmd, display_label=label)
@@ -255,8 +276,8 @@ def _build_windows_search_action(
     safe_pattern = _ps_quote(pattern)
 
     # Select-String fallback
-    case_flag = '' if is_case_sensitive else ' -CaseSensitive:$false'
-    fp_filter = f' -Include {_ps_quote(file_pattern)}' if file_pattern else ''
+    case_flag = ' -CaseSensitive' if is_case_sensitive else ''
+    fp_filter = f' -Filter {_ps_quote(file_pattern)}' if file_pattern else ''
 
     cmd = (
         f"$rg = Get-Command rg -ErrorAction SilentlyContinue; "

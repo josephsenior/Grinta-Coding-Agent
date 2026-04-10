@@ -307,9 +307,7 @@ def _summarize_delegate_action(action: DelegateTaskAction) -> tuple[str, str | N
             secondary_parts.append('background')
         return detail, ' · '.join(secondary_parts) or None
 
-    detail = _truncate_activity_detail(getattr(action, 'task_description', '') or '', 80)
-    if not detail:
-        detail = 'subtask'
+    detail = _truncate_activity_detail(getattr(action, 'task_description', '') or '', 80) or 'subtask'
 
     secondary_parts = []
     files = getattr(action, 'files', []) or []
@@ -1471,7 +1469,7 @@ class CLIEventRenderer:
             self._clear_streaming_preview()
             self._flush_pending_tool_cards()
             query = getattr(action, 'query', '')
-            detail = query if query else 'workspace context'
+            detail = query or 'workspace context'
             if len(detail) > 100:
                 detail = detail[:97] + '…'
             self._print_activity('Recalled', detail, None, title='Memory')
@@ -1550,7 +1548,7 @@ class CLIEventRenderer:
             cmd = getattr(action, 'command', 'query')
             file = getattr(action, 'file', '')
             symbol = getattr(action, 'symbol', '')
-            detail = symbol if symbol else file
+            detail = symbol or file
             stats = str(cmd) if cmd else None
             self._buffer_pending_activity(
                 title='Code',
@@ -1841,19 +1839,47 @@ class CLIEventRenderer:
             self._pending_shell_is_internal = False
             verb = pending[0] if pending else 'Ran'
             label = pending[1] if pending else '$ (command)'
+
+            # Always initialize; some branches omit previews.
+            extra_lines = None
+
+            # CmdOutputObservation defaults to exit_code=-1 when unknown.
+            # Treat any non-zero exit code as an error line (including -1 unknown).
             if exit_code is not None and exit_code != 0:
                 err_line = _summarize_cmd_failure(content)
                 msg = f'exit {exit_code}'
                 if err_line:
                     msg += f' · {err_line}'
                 result_kind = 'err'
-            elif exit_code == 0:
-                first_line = content.split('\n')[0].strip()[:220] if content else ''
-                msg = first_line if first_line and len(first_line) > 2 else 'done'
-                result_kind = 'ok'
             else:
-                msg = None
-                result_kind = 'neutral'
+                raw_lines = (
+                    [ln.strip() for ln in content.split('\n') if ln.strip()]
+                    if content
+                    else []
+                )
+                if not raw_lines:
+                    msg = 'done' if exit_code == 0 else None
+                else:
+                    msg = raw_lines[0][:220] if len(raw_lines[0]) > 2 else 'done'
+                    if len(raw_lines) > 1:
+                        from backend.cli.transcript import _ACTIVITY_SECONDARY_INDENT
+
+                        extra_lines = []
+                        max_preview = 12
+                        for ln in raw_lines[1:max_preview]:
+                            t = Text(_ACTIVITY_SECONDARY_INDENT, style='')
+                            t.append(f'  {ln[:200]}', style='dim')
+                            extra_lines.append(t)
+                        if len(raw_lines) > max_preview:
+                            t = Text(_ACTIVITY_SECONDARY_INDENT, style='')
+                            t.append(
+                                f'  ... and {len(raw_lines) - max_preview} more entries',
+                                style='dim italic',
+                            )
+                            extra_lines.append(t)
+
+                result_kind = 'ok' if exit_code == 0 else 'neutral'
+
             self._emit_activity_turn_header()  # not a duplicate
             if is_internal:
                 # Internal tool — compact activity row, no raw terminal block
@@ -1861,11 +1887,12 @@ class CLIEventRenderer:
                     verb, label,
                     secondary=msg,
                     secondary_kind=result_kind,
+                    extra_lines=extra_lines,
                     title=title or 'Shell',
                 )
             else:
                 inner = format_activity_shell_block(
-                    verb, label, result_message=msg, result_kind=result_kind
+                    verb, label, result_message=msg, result_kind=result_kind, extra_lines=extra_lines,
                 )
             self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
             return
@@ -1949,9 +1976,12 @@ class CLIEventRenderer:
             if getattr(obs, 'status_type', '') == 'delegate_progress':
                 extras = getattr(obs, 'extras', None) or {}
                 batch_id = extras.get('batch_id')
-                if batch_id is not None and self._delegate_batch_id is not None:
-                    if batch_id != self._delegate_batch_id:
-                        return
+                if (
+                    batch_id is not None
+                    and self._delegate_batch_id is not None
+                    and batch_id != self._delegate_batch_id
+                ):
+                    return
                 worker_id = str(extras.get('worker_id') or '').strip()
                 if worker_id:
                     order = extras.get('order', 9999)
@@ -2001,7 +2031,7 @@ class CLIEventRenderer:
             if pending is not None:
                 self._render_pending_activity_card(
                     pending,
-                    result_message=friendly if friendly else None,
+                    result_message=friendly or None,
                     result_kind='neutral',
                 )
             elif friendly:

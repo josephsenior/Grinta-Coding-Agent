@@ -32,6 +32,11 @@ def _make_controller():
 
     # Services container
     ctrl.services = MagicMock()
+    # Provide explicit async mocks for methods awaited in normal flows:
+    ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
+    ctrl.services.exception_handler.handle_step_exception = AsyncMock()
+    ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
+    ctrl.services.exception_handler.handle_step_exception = AsyncMock()
 
     # State tracker
     ctrl.state_tracker = MagicMock()
@@ -743,6 +748,7 @@ class TestReset(unittest.TestCase):
     def test_reset_dropped_agent_actions(self):
         """Test ErrorObservations for dropped agent actions (393-403)."""
         self.ctrl.services.pending_action.get.return_value = None
+        self.ctrl.agent.iter_queued_actions = None
 
         dropped = MagicMock()
         dropped.tool_call_metadata = 'meta'

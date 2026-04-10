@@ -14,7 +14,7 @@ That would be dishonest.
 
 Grinta is strong because I stopped lying to myself about that kind of thing.
 
-There was definitely a version of me that wanted this chapter to sound more triumphant than it does. I trust this version more. If someone is going to spend time studying this system, they deserve the unfinished truth, not the polished founder version of the story.
+There was definitely a version of me that wanted this chapter to sound more triumphant than it does. I trust this version more. If someone is going to spend time studying this system, they deserve the unfinished truth, not the polished founder version: I have hit a wall solo. Parts of this are broken. I am releasing it now before I break down, because I need your help to build the rest of the vision.
 
 ---
 
@@ -117,6 +117,14 @@ That means one continuing challenge is making the system behave coherently acros
 
 This is part architecture, part evaluation, part product discipline.
 
+### 6. The True AI Vision: Swarms and the Blackboard
+
+The single-agent loop I ended up with works. It survives the "architectural gauntlet." But the true vision for Grinta extends beyond a solo agent acting iteratively.
+
+The earlier codebase—and my original ambition—included a robust multi-agent swarm and a shared state mechanism called "the blackboard." The idea is that specialized agents can hand off tasks, leave hints for each other, and predict conflict zones before they execute code. I got those concepts working initially, but the complexity cost for one person maintaining it was crushing. It had become a product inside a product, so I disabled them (and spun some parts out to Metasop).
+
+But they are not dead. They are experimental, and temporarily shelved because I ran out of stamina. Adding them back into this hardened core stack is part of the vision, but it is precisely where I need structural help from the open-source community to build it *right*.
+
 ---
 
 ## What I Removed and May Revisit Differently
@@ -132,11 +140,9 @@ I do not think the value of specialized planning agents is fake. I think the ROI
 
 The earlier codebase still has the receipts: over 20,000 lines of MetaSOP code — a planning orchestrator with provenance hashing, artifact chains, memory retrieval, structured role profiles, and an internal roadmap document that cataloged ten categories of planned improvements. That was not handwaving. It was a system that had already begun eating its own roadmap. The earliest version had even more: a conflict predictor that used an LLM to warn about clashing roles, an execution planner that optimized step ordering for parallelism, and a patch scoring system that judged the quality of generated code changes. The problem was that it was becoming a product inside a product.
 
-That concept still has value, but it needs to live where detailed planning itself is the product, not where hours-long autonomous repository execution is the main goal.
+That concept still has value, but it needs to live where detailed planning itself is the product, not where hours-long autonomous repository execution is the main goal. 
 
-That is why I moved that energy into [Metasop](https://github.com/josephsenior/Metasop) instead of forcing it to remain inside Grinta.
-
-I do not see that move as exile. I see it as honesty. Some ideas deserve a different home instead of being contorted to fit a product they keep weakening.
+That is why I moved the *pure planning* energy into [Metasop](https://github.com/josephsenior/Metasop) for now, instead of forcing it to remain inside Grinta's core loop while I work alone. I do not see that move as permanent exile. It is an honest admission of limits. With enough open-source collaboration, I want to see Swarming and the Blackboard re-introduced as optional, heavy-duty plugins for Grinta's orchestration. But some ideas deserve a different home until the foundation is strong enough (and the community large enough) to hold them without collapsing.
 
 ### Self-improving context systems
 
@@ -287,4 +293,4 @@ It will look like what it really is:
 
 ---
 
-← [Prompts Are Programs](15-prompts-are-programs.md) | [The Book of Grinta](README.md)
+← [Prompts Are Programs](15-prompts-are-programs.md) | [The Book of Grinta](README.md) | [The First Fixed Issue](08-the-first-fixed-issue.md) →

@@ -266,14 +266,41 @@ class FileEditor:
             )
 
         if file_path.is_dir():
-            return ToolResult(
-                output='',
-                error=f'Path is a directory: {file_path}',
-                old_content=None,
-                new_content=None,
-            )
+            return self._view_directory(file_path)
 
         return self._read_file(file_path)
+
+    def _view_directory(self, path: Path, max_depth: int = 2) -> ToolResult:
+        """List directory contents."""
+        import os
+        output = [f"Directory contents of {path}:"]
+        path_str = str(path)
+        base_level = path_str.rstrip(os.sep).count(os.sep)
+
+        for root, dirs, files in os.walk(path_str):
+            level = root.count(os.sep) - base_level
+            if level >= max_depth:
+                del dirs[:]
+                continue
+
+            # Skip hidden and __pycache__
+            dirs[:] = [
+                d for d in dirs if not d.startswith('.') and d != '__pycache__'
+            ]
+            files = [f for f in files if not f.startswith('.')]
+
+            indent = '  ' * level
+            output.append(f'{indent}{os.path.basename(root)}/')
+            subindent = '  ' * (level + 1)
+            for f in files:
+                output.append(f'{subindent}{f}')
+
+        return ToolResult(
+            output='\n'.join(output),
+            error=None,
+            old_content=None,
+            new_content=None,
+        )
 
     def _format_view_output(self, lines: list[str]) -> str:
         """Format lines with line numbers (cat -n style)."""

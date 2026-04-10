@@ -453,7 +453,7 @@ class TestBuildLlmParams:
         )
         assert '<FIRST_TURN_ORIENTATION>' not in control
 
-    def test_first_turn_orientation_can_be_opted_in(self):
+    def test_first_turn_orientation_is_not_injected_even_when_opted_in(self):
         p = _make_planner(config=_make_config(enable_first_turn_orientation_prompt=True))
         state = _make_state()
         state.iteration_flag.current_value = 1
@@ -467,8 +467,30 @@ class TestBuildLlmParams:
             for msg in params['messages']
             if msg['role'] == 'system' and '<APP_CONTEXT_STATUS' in msg['content']
         )
-        assert '<FIRST_TURN_ORIENTATION>' in control
-        assert 'analyze_project_structure' in control
+        assert '<FIRST_TURN_ORIENTATION>' not in control
+
+    def test_first_turn_orientation_never_appears_across_retries(self):
+        p = _make_planner(config=_make_config(enable_first_turn_orientation_prompt=True))
+        state = _make_state()
+        state.iteration_flag.current_value = 1
+        messages = [{'role': 'user', 'content': 'Please fix one failing test'}]
+
+        with patch('backend.engine.planner.check_tools', return_value=[]):
+            first = p.build_llm_params(messages, state, [])
+            second = p.build_llm_params(messages, state, [])
+
+        first_control = next(
+            msg['content']
+            for msg in first['messages']
+            if msg['role'] == 'system' and '<APP_CONTEXT_STATUS' in msg['content']
+        )
+        second_control = next(
+            msg['content']
+            for msg in second['messages']
+            if msg['role'] == 'system' and '<APP_CONTEXT_STATUS' in msg['content']
+        )
+        assert '<FIRST_TURN_ORIENTATION>' not in first_control
+        assert '<FIRST_TURN_ORIENTATION>' not in second_control
 
 
 # ---------------------------------------------------------------------------

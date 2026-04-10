@@ -302,7 +302,7 @@ def test_python_shell_command_prefers_python_on_windows():
         patch('backend.engine.tools.prompt.sys') as mock_sys,
     ):
         mock_sys.platform = 'win32'
-        assert get_python_shell_command() == 'python'
+        assert get_python_shell_command() == 'python3'
 
 
 def test_python_shell_command_prefers_python_in_powershell_mode():
@@ -311,9 +311,29 @@ def test_python_shell_command_prefers_python_in_powershell_mode():
 
 
 def test_build_python_exec_command_base64_encodes_script():
-    with patch('backend.engine.tools.prompt.get_python_shell_command', return_value='python3'):
+    with patch('backend.engine.tools.prompt.uses_powershell_terminal', return_value=False):
         command = build_python_exec_command('print("hello")')
 
-    assert command.startswith('python3 -c ')
+    assert 'python3 -c' in command
     assert 'b64decode' in command
     assert 'print("hello")' not in command
+
+
+def test_build_python_exec_command_includes_shell_fallbacks_for_bash():
+    with patch('backend.engine.tools.prompt.uses_powershell_terminal', return_value=False):
+        command = build_python_exec_command('print("hello")')
+
+    assert 'command -v python3' in command
+    assert 'command -v python' in command
+    assert "command -v py" in command
+    assert '[MISSING_TOOL] python/python3/py not found in PATH' in command
+
+
+def test_build_python_exec_command_includes_shell_fallbacks_for_powershell():
+    with patch('backend.engine.tools.prompt.uses_powershell_terminal', return_value=True):
+        command = build_python_exec_command('print("hello")')
+
+    assert 'Get-Command python' in command
+    assert 'Get-Command py' in command
+    assert 'Get-Command python3' in command
+    assert '[MISSING_TOOL] python/python3/py not found in PATH' in command

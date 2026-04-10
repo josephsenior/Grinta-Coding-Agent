@@ -50,8 +50,12 @@ def _resolve_terminal_command_tool(
 
 
 def _explore_hint(_config: Any = None) -> str:
-    """Return the canonical layout-discovery tool hint (analyze_project_structure is always present)."""
-    return '`analyze_project_structure` (`tree`) and/or `search_code`'
+    """Return the canonical layout-discovery tool hint."""
+    return (
+        '`search_code` (preferred) and `explore_tree_structure`; '
+        'use `analyze_project_structure` only when needed and avoid repeating '
+        'the same call with unchanged arguments'
+    )
 
 
 # ---------------------------------------------------------------------------

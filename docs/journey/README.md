@@ -12,7 +12,7 @@ Posting a GitHub repository is not enough.
 
 A repo shows the *result*. It doesn't show the 3 AM debugging sessions where the Write-Ahead Log deadlocked and the entire event system collapsed. It doesn't show the moment I deleted a fully working Kubernetes infrastructure because I couldn't afford to market it. It doesn't show the week I spent building a multi-agent software engineering team — Product Manager, Architect, QA, DevOps, Security, UI Designer, Engineer — only to watch it burn through $40 of tokens on a single task that a capable solo agent could finish for $2.
 
-This documentation is my proof of work. Not the polished, corporate kind. The real kind — where I explain every decision, every removal, every heartbreak, and every lesson that turned a university student's side project into a system with 21 orchestration services, 9 compactor implementations after a wider exploration that peaked at 12 or 13, 10 stuck-detection heuristics, event-sourced crash recovery with Write-Ahead Logging, support for 18 LLM providers, and a 12-middleware tool pipeline — all in a codebase that has been decomposed aggressively enough to stay readable after months of growth.
+This documentation is my proof of work. Not the polished, corporate kind. The real kind — where I explain every decision, every removal, every heartbreak, and every lesson that turned a university student's side project into a deeply decomposed agent system with durable recovery, model-agnostic inference, strict validation, and an operation pipeline built to survive long real-world sessions.
 
 If you want a perfect tool with a $100M marketing budget, go buy a subscription. If you want to understand what it actually takes to build an autonomous coding agent from scratch — the architecture, the failures, and the trade-offs that no whitepaper will ever tell you — keep reading.
 
@@ -44,7 +44,7 @@ Seven months. Three distinct phases. One principle.
 
 **Month 6 (February 2026):** The Pivot. I deleted the cloud. I removed Redis from the core runtime. I moved the async database driver into an optional dependency group. I removed the Textual TUI. I removed the cloud runtime providers. I stripped Grinta down to its engine — 43 required packages, zero cloud dependencies — and shipped the foundation release.
 
-**Month 7 (March–April 2026):** The Refinement. Decomposing monoliths into focused modules — the orchestration layer alone became 22 files, with the largest service handling event routing, worker delegation, and parallel task spawning. Consolidating a context subsystem that had grown to roughly 12 or 13 moving parts down to 9 live compactor implementations, while keeping the lessons from the discarded variants in the architecture and docs. Hardening the local security profile. Building the CLI with tab completion, fuzzy command matching, slash commands, and an animated ASCII splash screen. Writing this document.
+**Month 7 (March–April 2026):** The Refinement. Decomposing monoliths into focused modules, pushing orchestration responsibilities into clearer service boundaries, and consolidating the context subsystem after a wave of exploratory variants. Hardening the local security profile. Building the CLI with tab completion, fuzzy command matching, slash commands, and an animated ASCII splash screen. Writing this document.
 
 ---
 
@@ -56,17 +56,20 @@ Each chapter is both a story and a technical deep-dive. Read them in order for t
 
 The file names stay stable for repository sanity, but the strongest reading arc is grouped into acts:
 
+- **Preface — Start Here If We Have Never Met:** [Preface](preface-why-this-story-matters.md)
 - **Act I — Identity and Scale:** [00](00-the-meaning-of-grinta.md), [01](01-the-saas-fortress.md)
 - **Act II — The Things I Had to Kill:** [02](02-the-killed-darlings.md)
 - **Act III — Architecture Under Pressure:** [03](03-the-architectural-gauntlet.md), [04](04-the-context-war.md), [05](05-the-giants-playbook.md), [06](06-the-system-design-playbook.md)
 - **Act IV — Proof, Cost, and Consequence:** [08](08-the-first-fixed-issue.md), [09](09-the-3am-decisions.md), [10](10-model-agnostic-reckoning.md), [11](11-the-console-wars.md), [12](12-open-source-was-the-better-business.md)
-- **Act V — Hidden Systems:** [13](13-the-hidden-playbooks.md), [14](14-the-verification-tax.md), [15](15-prompts-are-programs.md)
+- **Act V — Hidden Systems:** [13](13-the-hidden-playbooks.md), [14](14-the-verification-tax.md), [15](15-prompts-are-programs.md), [16](16-the-pragmatic-stack.md), [17](17-the-mind-of-the-agent.md)
+- **Act VI — Reliability Under Fire:** [18](18-surviving-the-crash.md), [19](19-circuit-breakers-and-hallucinations.md), [20](20-the-safety-sandbox-is-not-optional.md), [21](21-who-grades-the-agent.md), [22](22-the-middleware-contract.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
 
 | # | Chapter | What You'll Learn |
 | --- | --- | --- |
+| [Preface](preface-why-this-story-matters.md) | **Why This Story Matters** | Why a stranger should care, what makes this journey different from AI marketing narratives, and how to read the book for maximum value. |
 | [00](00-the-meaning-of-grinta.md) | **The Meaning of Grinta** | Why the name matters, what survived the deletions, and what kind of engineering character this project was built to express. |
 | [01](01-the-saas-fortress.md) | **The SaaS Fortress** | How I built a full multi-tenant cloud platform — Kubernetes, Docker, React, Redis, PostgreSQL — and why I burned it all down. |
 | [02](02-the-killed-darlings.md) | **The Killed Darlings** | The features I loved and deleted: a multi-agent software engineering team, a self-improving context framework, an auto-tuning prompt system, and a containerized runtime. Each one taught me something the industry doesn't talk about. |
@@ -82,6 +85,13 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [13](13-the-hidden-playbooks.md) | **The Hidden Playbooks** | Why the right knowledge should arrive at the right moment, how playbooks evolved out of earlier micro-agent ideas, and why runtime expertise beats prompt bloat. |
 | [14](14-the-verification-tax.md) | **The Verification Tax** | Why autonomous agents cannot be allowed to grade their own homework, how validators, replay, and auditability make false finishes harder, and why testing the infrastructure matters more than congratulating the model. |
 | [15](15-prompts-are-programs.md) | **Prompts Are Programs** | Why prompt engineering became a software-design problem, how Python replaced Jinja, and why the system prompt had to become debuggable, modular, and platform-aware. |
+| [16](16-the-pragmatic-stack.md) | **The Pragmatic Stack** | Why Grinta chose practical defaults over trend-chasing: `uv`, JSON-first config, and Python with strict architectural discipline. |
+| [17](17-the-mind-of-the-agent.md) | **The Mind of the Agent** | The cognitive architecture behind tool use and memory: what was removed, what stayed optional, and what made autonomous behavior more reliable. |
+| [18](18-surviving-the-crash.md) | **Surviving the Crash** | How event streams, WAL markers, backpressure policy, and replay semantics make long agent sessions recoverable after real failures. |
+| [19](19-circuit-breakers-and-hallucinations.md) | **Circuit Breakers and Hallucinations** | Why stuck detection became multi-heuristic, how adaptive breaker thresholds work, and how Grinta limits runaway loops before they burn budget. |
+| [20](20-the-safety-sandbox-is-not-optional.md) | **The Safety Sandbox Is Not Optional** | Why command-risk analysis and policy-driven validation are foundational in local-first agents, not optional polish. |
+| [21](21-who-grades-the-agent.md) | **Who Grades the Agent** | Why finish is a gated contract, how task validation blocks false completion, and why autonomous systems must not grade their own homework. |
+| [22](22-the-middleware-contract.md) | **The Middleware Contract** | Why middleware order is execution governance, how rollback became first-class in the pipeline, and why timing is architecture in autonomous systems. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
 ---

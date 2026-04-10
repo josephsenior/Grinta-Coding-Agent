@@ -1,6 +1,6 @@
 # 08. The First Fixed Issue
 
-There is a specific kind of silence that happens when something you built actually works.
+There is a specific kind of silence when something you built actually works.
 
 Not "runs without crashing" works. Not "the tests pass" works. The kind of works where you type a natural language instruction into a terminal, walk away, come back, and the problem is solved. The code is changed. The tests pass. The diff is clean. The agent wrote a message explaining what it did and why.
 
@@ -133,7 +133,7 @@ The hard part is everything around the model. How do you give it the right infor
 
 The first fixed issue was the proof that all of those "how do you" questions had working answers. Not perfect answers. Working answers.
 
-And in engineering, working answers that you can iterate on are worth more than perfect designs that never ship.
+And in engineering, working answers you can iterate on are worth more than perfect designs that never ship.
 
 ---
 

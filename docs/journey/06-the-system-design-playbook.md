@@ -10,7 +10,7 @@ Grinta is not just a set of prompts attached to tools. It is a software system w
 
 This chapter is about those choices and why they matter.
 
-It is personal to me in a quieter way than the others. Models are the glamorous part. The decisions in this chapter are the ones that made me feel like I was doing real engineering instead of building prompt theater.
+It is personal to me in a quieter way than the others. Models are the glamorous part. The decisions in this chapter are the ones that made me feel like I was doing real engineering, not building prompt theater.
 
 ---
 

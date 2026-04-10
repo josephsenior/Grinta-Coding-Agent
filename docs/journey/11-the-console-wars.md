@@ -1,6 +1,6 @@
 # 11. The Console Wars
 
-There is a specific kind of pain that comes from cross-platform portability.
+Cross-platform portability looks elegant until you build a terminal layer that has to survive real developer machines.
 
 Usually, you pretend it does not exist. You write your Python code on a Mac or a Linux machine, you use `subprocess.run()`, you pass in some bash commands, and you assume the world works the same way everywhere.
 
@@ -108,7 +108,7 @@ The analyzer also detects chain escalation. A single command like `echo "harmles
 
 On Python file writes, the security layer performs a separate check: AST-level validation. It parses the Python code the agent is about to write, walks the abstract syntax tree, and looks for dangerous patterns — `exec()`, `eval()`, `__import__('os').system()`, subprocess calls with `shell=True`, and other injection vectors. If the code is syntactically invalid Python, it flags that too, because invalid code that the agent writes is either a bug (which should be caught before it reaches the filesystem) or an injection attempt.
 
-That is the difference between a prototype and a tool.
+That is the difference between a prototype and a real tool.
 
 ---
 

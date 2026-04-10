@@ -165,7 +165,23 @@ def build_recall_action(key: str) -> AgentThinkAction:
         return AgentThinkAction(thought=f'[SCRATCHPAD] All notes:\n{body}')
     if key in notes:
         return AgentThinkAction(thought=f'[SCRATCHPAD] [{key}] = {notes[key]!r}')
-    return AgentThinkAction(thought=f'[SCRATCHPAD] (no note for [{key}])')
+    if key == 'lessons':
+        # Bootstrap the canonical lessons key once so routing guidance does not
+        # repeatedly trigger not-found recall loops in early turns.
+        notes_with_meta, updated = _parse_notes_blob(_read_notes_blob())
+        notes_with_meta[key] = ''
+        updated[key] = time.time()
+        _write_notes_blob(notes_with_meta, updated)
+        return AgentThinkAction(
+            thought=(
+                "[SCRATCHPAD] Initialized ['lessons'] as empty. "
+                'No stored lessons yet; continue the task and avoid recalling '
+                'this key again until you write to it with note.'
+            )
+        )
+    return AgentThinkAction(
+        thought=f'[SCRATCHPAD] Note {key!r} not found. Stop trying to recall it unless you create it first.'
+    )
 
 
 __all__ = [

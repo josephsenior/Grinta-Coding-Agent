@@ -1,6 +1,6 @@
 # 10. The Model-Agnostic Reckoning
 
-There is a specific kind of arrogance in building an AI agent around one language model.
+There is a certain arrogance in building an AI agent around one language model.
 
 It assumes the current king of the benchmarks will stay king forever. Worse, it treats one model's quirks as if they were universal intelligence.
 
@@ -125,7 +125,7 @@ The decision to build the inference layer this way was expensive. It took weeks 
 
 But the alternative — depending on a framework's abstraction or a single provider's SDK — creates a dependency that compounds over time. Every month that passes, every new model that launches, every pricing change that drops, validates the investment. Grinta can switch from Claude to GPT to Gemini to a local Ollama model with a single config change. No code change. No adapter. No migration.
 
-Grinta is model-agnostic because it is the only way to build an agent that will survive next year.
+Grinta is model-agnostic because it is the only way to build an agent that can survive next year.
 
 ---
 

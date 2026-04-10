@@ -1,7 +1,6 @@
 # 01. The SaaS Fortress
 
 I did not start Grinta as a CLI.
-
 I started it as a business.
 
 The original vision was not "a local coding agent for developers who want full control." It was a much heavier idea: a multi-tenant AI engineering platform with a proper frontend, a backend orchestration layer, containerized execution, database-backed state, isolation, real-time updates, and the kind of infrastructure you would expect from a serious SaaS product.
@@ -10,7 +9,7 @@ That version of Grinta was real. It was not a fantasy diagram or a Notion plan. 
 
 And then I deleted most of it.
 
-This chapter explains what that system looked like, why I built it that way, why I pivoted, and why that decision was one of the hardest and most important decisions of the entire project.
+This chapter explains what that system looked like, why I built it that way, why I pivoted, and why that decision became one of the hardest and most important in the entire project.
 
 ---
 
@@ -299,7 +298,7 @@ That includes:
 Those are not side notes.
 They are some of the most important engineering lessons in the entire project.
 
-The next chapter is about those features.
+The next chapter is where those deletions become real.
 
 ---
 

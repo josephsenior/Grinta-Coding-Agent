@@ -150,6 +150,7 @@ def format_activity_shell_block(
     secondary_kind: str = 'neutral',
     result_message: str | None = None,
     result_kind: str = 'ok',
+    extra_lines: list[Any] | None = None,
 ) -> Any:
     """Rounded Terminal card — same visual style as other tool cards."""
     return format_activity_block(
@@ -159,6 +160,7 @@ def format_activity_shell_block(
         secondary_kind=secondary_kind,
         result_message=result_message,
         result_kind=result_kind,
+        extra_lines=extra_lines,
         title='Terminal',
     )
 

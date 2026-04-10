@@ -12,6 +12,7 @@ Architecture notes (preserve these strengths):
 
 from __future__ import annotations
 
+import asyncio
 import os
 from collections import deque
 from typing import TYPE_CHECKING, Any
@@ -59,6 +60,7 @@ class Orchestrator(Agent):
     """Production orchestrator agent with modular planner–executor–memory architecture."""
 
     VERSION = '2.2'
+    _MAX_QUEUED_ACTIONS_PER_RESPONSE = 2
     runtime_plugins: list[PluginRequirement] = [
         AgentSkillsRequirement(name='agent_skills'),
     ]
@@ -73,6 +75,7 @@ class Orchestrator(Agent):
         self.plugin_requirements = plugin_requirements or []
 
         self.pending_actions: deque[Action] = deque()
+        self.deferred_actions: deque[Action] = deque()
         self.event_stream: EventStream | None = None
 
         # Safety / hallucination systems
@@ -180,6 +183,7 @@ class Orchestrator(Agent):
     def reset(self, state: State | None = None) -> None:
         super().reset()
         self.pending_actions.clear()
+        self.deferred_actions.clear()
         self._consecutive_context_errors = 0
 
     def step(self, state: State) -> Action:
@@ -205,6 +209,12 @@ class Orchestrator(Agent):
             if exit_action:
                 self._consecutive_context_errors = 0
                 return exit_action
+
+            if (
+                not self.pending_actions
+                and self.deferred_actions
+            ):
+                self._promote_deferred_actions()
 
             pending = self._consume_pending_action()
             if pending:
@@ -367,13 +377,16 @@ class Orchestrator(Agent):
         )
         self._set_prompt_tier_from_recent_history(state)
 
-        messages = self.memory_manager.build_messages(
-            condensed_history=condensed.events,
-            initial_user_message=initial_user_message,
-            llm_config=self.llm.config,
-        )
-        serialized_messages = message_serializer.serialize_messages(messages)
-        params = self.planner.build_llm_params(serialized_messages, state, self.tools)
+        def _prepare_params() -> dict[str, Any]:
+            messages = self.memory_manager.build_messages(
+                condensed_history=condensed.events,
+                initial_user_message=initial_user_message,
+                llm_config=self.llm.config,
+            )
+            serialized_messages = message_serializer.serialize_messages(messages)
+            return self.planner.build_llm_params(serialized_messages, state, self.tools)
+
+        params = await asyncio.to_thread(_prepare_params)
         self._sync_executor_llm()
 
         result = await self.executor.async_execute(params, self.event_stream)
@@ -472,8 +485,42 @@ class Orchestrator(Agent):
         return fallback
 
     def _queue_additional_actions(self, actions: list[Action]) -> None:
+        overflow = 0
         for pending in actions:
-            self.pending_actions.append(pending)
+            if len(self.pending_actions) < self._MAX_QUEUED_ACTIONS_PER_RESPONSE:
+                self.pending_actions.append(pending)
+            else:
+                self.deferred_actions.append(pending)
+                overflow += 1
+
+        if overflow > 0:
+            logger.debug(
+                'Deferred %d queued actions (pending=%d, deferred=%d)',
+                overflow,
+                len(self.pending_actions),
+                len(self.deferred_actions),
+            )
+
+    def _promote_deferred_actions(self) -> None:
+        """Promote a bounded set of deferred actions into the active queue."""
+        while (
+            self.deferred_actions
+            and len(self.pending_actions) < self._MAX_QUEUED_ACTIONS_PER_RESPONSE
+        ):
+            self.pending_actions.append(self.deferred_actions.popleft())
+
+    def clear_queued_actions(self, reason: str = '') -> int:
+        """Clear pending/deferred queues explicitly (used by stuck recovery)."""
+        removed = len(self.pending_actions) + len(self.deferred_actions)
+        self.pending_actions.clear()
+        self.deferred_actions.clear()
+        if removed > 0:
+            logger.warning('Cleared %d queued actions (%s)', removed, reason or 'no reason')
+        return removed
+
+    def iter_queued_actions(self) -> list[Action]:
+        """Return a snapshot of all queued actions, pending first then deferred."""
+        return [*self.pending_actions, *self.deferred_actions]
 
     def _queue_post_condensation_recovery(self, task_text: str = '') -> None:
         """Queue a brief think action after condensation to break the re-condensation loop.
