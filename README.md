@@ -10,7 +10,7 @@
 **Grinta** is an open-source autonomous coding agent that plans, implements, tests, and validates work end-to-end — not just edits files and hands back control.
 
 Give it a task like *"Add Stripe payment support"* and Grinta will: read the codebase, write a multi-step plan, implement the changes across files, run the tests, check the budget, and only declare done when everything checks out.
-C:\Users\GIGABYTE\Desktop\Grinta\logo.png
+
 ---
 
 ## Why Grinta?
