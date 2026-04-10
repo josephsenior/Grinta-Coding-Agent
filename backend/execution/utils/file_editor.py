@@ -320,7 +320,10 @@ class FileEditor:
         """Apply a line range filter to the view output."""
         start, end = view_range[0], view_range[1]
         start_idx = max(0, start - 1)
-        end_idx = min(len(lines), end)
+        if end < 0:
+            end_idx = len(lines)
+        else:
+            end_idx = min(len(lines), end)
 
         # Re-format only the selected lines
         selected_lines = []
