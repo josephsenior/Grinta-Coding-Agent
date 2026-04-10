@@ -13,10 +13,6 @@ Editor `path` arguments are relative to the project root (see runtime working di
 {confirm_paths} Edit the path the user gave; no shadow copies (file_v2.py); remove temp files when done.
 </FILE_OPERATIONS>
 
-<VERSION_CONTROL>
-Default author: app <app@app.ai> + Co-authored-by trailer. `git status` before commit; `git commit -a` when suitable. Never commit node_modules, .env, build artifacts, huge binaries. No force-push to main/master without request. No push/PR unless asked.
-</VERSION_CONTROL>
-
 <ENVIRONMENT_SETUP>
 Prefer requirements.txt / package.json / pyproject.toml — install in one go when present.
 </ENVIRONMENT_SETUP>

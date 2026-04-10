@@ -90,11 +90,13 @@ class PromptManager:
         import shutil
 
         from backend.engine.prompts.prompt_builder import build_system_prompt
+        from backend.engine.tools.prompt import get_terminal_tool_name
 
         _on_windows = sys.platform == 'win32'
         _has_bash = bool(shutil.which('bash'))
         context.setdefault('is_windows', _on_windows and not _has_bash)
         context.setdefault('windows_with_bash', _on_windows and _has_bash)
+        context.setdefault('terminal_tool_name', get_terminal_tool_name())
         system_message = build_system_prompt(**context).strip()
         return system_message
 

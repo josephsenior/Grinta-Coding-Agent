@@ -77,6 +77,8 @@ _fn_call_parse_counters: dict[str, int] = {
     key: 0 for key in _FN_CALL_PARSE_COUNTER_KEYS
 }
 
+TERMINAL_EXAMPLE_KEY = 'terminal_command'
+
 
 def _increment_parse_counter(counter_name: str) -> None:
     """Increment one parse telemetry counter in a threadsafe way."""
@@ -101,7 +103,7 @@ def reset_fn_call_parse_telemetry_counters() -> None:
 
 
 TOOL_EXAMPLES = {
-    'execute_bash': {
+    TERMINAL_EXAMPLE_KEY: {
         'check_dir': '\nASSISTANT: Sure! Let me first check the current directory:\n<function=execute_bash>\n<parameter=command>\npwd && ls\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\n/workspace\nApp@runtime:~/workspace$\n',
         'run_server': "\nASSISTANT:\nLet me run the Python file for you:\n<function=execute_bash>\n<parameter=command>\npython3 app.py > server.log 2>&1 &\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\n[1] 121\n[1]+  Exit 1                  python3 app.py > server.log 2>&1\n\nASSISTANT:\nLooks like the server was running with PID 121 then crashed. Let me check the server log:\n<function=execute_bash>\n<parameter=command>\ncat server.log\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\nTraceback (most recent call last):\n  File \"/workspace/app.py\", line 2, in <module>\n    from flask import Flask\nModuleNotFoundError: No module named 'flask'\n\nASSISTANT:\nLooks like the server crashed because the `flask` module is not installed. Let me install the `flask` module for you:\n<function=execute_bash>\n<parameter=command>\npip3 install flask\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\nDefaulting to user installation because normal site-packages is not writeable\nCollecting flask\n  Using cached flask-3.0.3-py3-none-any.whl (101 kB)\nCollecting blinker>=1.6.2\n  Using cached blinker-1.7.0-py3-none-any.whl (13 kB)\nCollecting Werkzeug>=3.0.0\n  Using cached werkzeug-3.0.2-py3-none-any.whl (226 kB)\nCollecting click>=8.1.3\n  Using cached click-8.1.7-py3-none-any.whl (97 kB)\nCollecting itsdangerous>=2.1.2\n  Using cached itsdangerous-2.2.0-py3-none-any.whl (16 kB)\nRequirement already satisfied: Jinja2>=3.1.2 in /home/App/.local/lib/python3.10/site-packages (from flask) (3.1.3)\nRequirement already satisfied: MarkupSafe>=2.0 in /home/App/.local/lib/python3.10/site-packages (from Jinja2>=3.1.2->flask) (2.1.5)\nInstalling collected packages: Werkzeug, itsdangerous, click, blinker, flask\nSuccessfully installed Werkzeug-3.0.2 blinker-1.7.0 click-8.1.7 flask-3.0.3 itsdangerous-2.2.0\n\nASSISTANT:\nThe `flask` module is installed successfully. Let me run the Python file again:\n<function=execute_bash>\n<parameter=command>\npython3 app.py > server.log 2>&1 &\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\n[1] 124\n\nASSISTANT:\nLet me check the server log again:\n<function=execute_bash>\n<parameter=command>\ncat server.log\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\n* Serving Flask app 'app'\n * Debug mode: off\nWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\n * Running on http://127.0.0.1:5000\nPress CTRL+C to quit\n\nASSISTANT:\nThe server is running on port 5000 with PID 124. You can access the list of numbers by visiting http://127.0.0.1:5000. If you have any further questions, feel free to ask!\n",
         'kill_server': '\nUSER: Now kill the server, make it display the numbers in a table format.\n\nASSISTANT:\nSure! Let me stop the server first:\n<function=execute_bash>\n<parameter=command>\nkill 124\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\n[1]+  Terminated              python3 app.py > server.log 2>&1\n',
@@ -143,7 +145,32 @@ def get_example_for_tools(tools: list[dict]) -> str:
     terminal_tool = get_terminal_tool_name()
     if terminal_tool != 'execute_bash':
         example_str = example_str.replace('execute_bash', terminal_tool)
+    example_str = _adapt_example_commands_to_terminal(example_str, terminal_tool)
 
+    return example_str
+
+
+def _adapt_example_commands_to_terminal(
+    example_str: str,
+    terminal_tool: str,
+) -> str:
+    """Rewrite shell snippets in examples to match the active terminal contract."""
+    if terminal_tool == 'execute_powershell':
+        substitutions = (
+            ('pwd && ls', 'Get-Location; Get-ChildItem'),
+            (
+                'python3 app.py > server.log 2>&1 &',
+                "Start-Process -FilePath python -ArgumentList 'app.py' "
+                "-RedirectStandardOutput 'server.log' "
+                "-RedirectStandardError 'server.log' -PassThru",
+            ),
+            ('cat server.log', 'Get-Content server.log'),
+            ('pip3 install flask', 'pip install flask'),
+            ('kill 124', 'Stop-Process -Id 124'),
+            ('python3 app.py', 'python app.py'),
+        )
+        for old, new in substitutions:
+            example_str = example_str.replace(old, new)
     return example_str
 
 
@@ -166,7 +193,9 @@ def _get_tool_name_mapping() -> dict[str, str]:
     from backend.engine.tools.prompt import get_terminal_tool_name
 
     return {
-        get_terminal_tool_name(): 'execute_bash',
+        get_terminal_tool_name(): TERMINAL_EXAMPLE_KEY,
+        'execute_bash': TERMINAL_EXAMPLE_KEY,
+        'execute_powershell': TERMINAL_EXAMPLE_KEY,
         STR_REPLACE_EDITOR_TOOL_NAME: 'str_replace_editor',
         FINISH_TOOL_NAME: 'finish',
         LLM_BASED_EDIT_TOOL_NAME: 'edit_file',
@@ -226,10 +255,17 @@ class ExampleStepBuilder:
         self._add_finish_step()
         return self.example
 
+    def _has_terminal_tool(self) -> bool:
+        """Return True when any terminal command tool alias is present."""
+        return any(
+            key in self.available_tools
+            for key in (TERMINAL_EXAMPLE_KEY, 'execute_bash', 'execute_powershell')
+        )
+
     def _add_directory_check_step(self) -> None:
-        """Add directory check step if execute_bash is available."""
-        if 'execute_bash' in self.available_tools:
-            self.example += TOOL_EXAMPLES['execute_bash']['check_dir']
+        """Add directory check step if terminal command tool is available."""
+        if self._has_terminal_tool():
+            self.example += TOOL_EXAMPLES[TERMINAL_EXAMPLE_KEY]['check_dir']
 
     def _add_file_creation_step(self) -> None:
         """Add file creation step based on available editors."""
@@ -239,9 +275,9 @@ class ExampleStepBuilder:
             self.example += TOOL_EXAMPLES['edit_file']['create_file']
 
     def _add_server_run_step(self) -> None:
-        """Add server run step if execute_bash is available."""
-        if 'execute_bash' in self.available_tools:
-            self.example += TOOL_EXAMPLES['execute_bash']['run_server']
+        """Add server run step if terminal command tool is available."""
+        if self._has_terminal_tool():
+            self.example += TOOL_EXAMPLES[TERMINAL_EXAMPLE_KEY]['run_server']
 
     def _add_page_view_step(self) -> None:
         """Add page view step if browser is available."""
@@ -249,9 +285,9 @@ class ExampleStepBuilder:
             self.example += TOOL_EXAMPLES['browser']['view_page']
 
     def _add_server_kill_step(self) -> None:
-        """Add server kill step if execute_bash is available."""
-        if 'execute_bash' in self.available_tools:
-            self.example += TOOL_EXAMPLES['execute_bash']['kill_server']
+        """Add server kill step if terminal command tool is available."""
+        if self._has_terminal_tool():
+            self.example += TOOL_EXAMPLES[TERMINAL_EXAMPLE_KEY]['kill_server']
 
     def _add_file_edit_step(self) -> None:
         """Add file edit step based on available editors."""
@@ -261,9 +297,9 @@ class ExampleStepBuilder:
             self.example += TOOL_EXAMPLES['edit_file']['edit_file']
 
     def _add_server_rerun_step(self) -> None:
-        """Add server rerun step if execute_bash is available."""
-        if 'execute_bash' in self.available_tools:
-            self.example += TOOL_EXAMPLES['execute_bash']['run_server_again']
+        """Add server rerun step if terminal command tool is available."""
+        if self._has_terminal_tool():
+            self.example += TOOL_EXAMPLES[TERMINAL_EXAMPLE_KEY]['run_server_again']
 
     def _add_finish_step(self) -> None:
         """Add finish step if finish tool is available."""

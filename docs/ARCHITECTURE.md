@@ -1,189 +1,161 @@
 # Grinta Architecture
 
-This document provides a high-level overview of Grinta's architecture for contributors and maintainers. For the build history, major pivots, and decision rationale behind the current shape, see [The Book of Grinta](journey/README.md).
+This document describes the current Grinta architecture for maintainers.
+For design history and major pivots, see `docs/journey/README.md`.
 
-## Canonical Vocabulary
+## High-Level Shape
 
-Grinta is standardizing its architecture language. Historical code names still
-appear in a few places, but the canonical Grinta vocabulary going forward is:
+Grinta is a local-first autonomous coding agent with three core layers:
 
-| Current code term | Canonical Grinta term |
-| --- | --- |
-| `AgentController` / bare `Controller` | session orchestrator |
-| `Action` | operation |
-| `Observation` | outcome |
-| `Event` | record |
-| `EventStream` | ledger |
-| `EventStore` | ledger store |
-| backend `Session` | run |
-| `State` | run state |
-| `Checkpoint` | snapshot |
-| `Trajectory` | transcript |
-| `ActionExecutor` | runtime executor |
-| `PendingAction` | open operation |
-| `Autonomy` | execution policy |
-| `Condenser` | compactor |
-| `ConversationMemory` / generic memory layer | context memory |
-| `ToolInvocationPipeline` | operation pipeline |
-| `Review` | governance |
+1. Orchestration: session loop, safeguards, retries, finish validation.
+2. Execution: local runtime actions (commands, file ops, tool interaction).
+3. Durability: event stream and persisted state for recovery/replay.
 
-Until the code migration lands, this document uses the canonical term first and
-mentions current implementation names where needed. The full term map lives in
-[VOCABULARY.md](VOCABULARY.md).
+Optional raw HTTP backend exists for API/OpenAPI workflows, but CLI remains the canonical interface.
 
-Runtime remains the canonical system term even where implementation package
-paths still live under `backend/execution/`.
+## Runtime Boundary
+
+Grinta executes on the local host.
+
+- Default runtime is in-process local execution.
+- `hardened_local` applies stricter policy checks.
+- `hardened_local` is not sandboxing or host isolation.
+
+Use Grinta in trusted environments.
 
 ## System Overview
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│           Web UI (React) + API clients               │
-│  Browser SPA  ·  client (httpx + Socket.IO)          │
-└──────────────┬──────────────────┬────────────────────┘
-               │ REST (FastAPI)   │ WebSocket (Socket.IO)
-┌──────────────▼──────────────────▼────────────────────┐
-│                 Backend (Python 3.12)                 │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐ │
-│  │   Gateway    │  │Session Orch. │  │   Ledger    │ │
-│  │  (FastAPI)   │  │ (21 services)│  │ (records)   │ │
-│  └──────┬──────┘  └──────┬───────┘  └──────┬──────┘ │
-│         │                │                  │        │
-│  ┌──────▼──────────────▼──────────────────▼──────┐ │
-│  │          Core (Config, Schemas, Logging)        │ │
-│  └──────┬──────────────┬──────────────────┬──────┘ │
-│  ┌──────▼──────┐  ┌───▼────┐  ┌──────────▼─────┐  │
-│  │Persistence  │  │Context  │  │    Runtime      │  │
-│  │ (File/DB)   │  │ Memory  │  │(backend/execution)│
-│  └─────────────┘  └────────┘  └────────────────┘  │
-└───────────────────────────────────────────────────────┘
+User (CLI)
+  -> backend.cli.entry
+    -> SessionOrchestrator
+      -> Engine (planning + tool intent)
+      -> Operation pipeline and safety checks
+      -> RuntimeExecutor (commands/files/tools)
+      -> Observations
+      -> EventStream (durable history)
+      -> Task validation before finish
 ```
 
-Runtime note: Grinta currently uses a local in-process runtime. The optional `hardened_local` profile adds stricter local execution policy, but it is not sandboxing or process isolation.
+## Package Topology
 
-## Backend Architecture
+```text
+backend/
+  cli/            CLI entrypoints and rendering
+  context/        Memory and compaction
+  core/           Config, constants, logging, shared utilities
+  engine/         Agent reasoning and prompt assembly
+  execution/      Local runtime and optional raw HTTP action server
+  inference/      Provider routing and direct LLM clients
+  integrations/   External integration adapters
+  knowledge/      Optional retrieval and knowledge features
+  ledger/         Event types, serialization, stream infrastructure
+  orchestration/  Session orchestrator and focused services
+  persistence/    Storage and state persistence
+  playbooks/      Playbook definitions and helpers
+  security/       Command risk analysis and policies
+  telemetry/      Lightweight instrumentation
+  tools/          Tool implementations and schemas
+  validation/     Completion and quality validation
+```
 
-### Orchestration (`backend/orchestration/`)
+## Orchestration Layer
 
-The session orchestrator (`SessionOrchestrator` in the current codebase, ~770 LOC)
-is the central control-plane component. It delegates to 21 focused services,
-each owning a narrow piece of the agent loop:
+The orchestrator delegates to focused services under `backend/orchestration/services/`.
+Current service modules include:
 
-- **Lifecycle**: `LifecycleService` — init, reset, config binding
-- **Execution**: `ActionExecutionService`, `ActionService`, `ObservationService`
-- **Validation**: `TaskValidationService` — finish-action validation
-- **Recovery**: `RecoveryService`, `RetryService`, `ExceptionHandlerService`
-- **Safety and governance**: `AutonomyService`, `CircuitBreakerService`, `SafetyService`, `ConfirmationService`
-- **Iteration control**: `IterationService`, `IterationGuardService`
-- **State and stepping**: `StateTransitionService`, `StepDecisionService`, `StepGuardService`, `StepPrerequisiteService`
-- **Coordination**: `EventRouterService`, `PendingActionService`
-- **Detection**: `StuckDetectionService` — repetition and no-progress heuristics
+- `action_execution_service.py`
+- `action_service.py`
+- `autonomy_service.py`
+- `circuit_breaker_service.py`
+- `confirmation_service.py`
+- `event_router_service.py`
+- `exception_handler_service.py`
+- `iteration_guard_service.py`
+- `iteration_service.py`
+- `lifecycle_service.py`
+- `observation_service.py`
+- `orchestration_context.py`
+- `pending_action_service.py`
+- `recovery_service.py`
+- `retry_service.py`
+- `safety_service.py`
+- `state_transition_service.py`
+- `step_decision_service.py`
+- `step_guard_service.py`
+- `step_prerequisite_service.py`
+- `stuck_detection_service.py`
+- `task_validation_service.py`
 
-For the decomposition story — how the orchestrator grew from a monolith into 21 services — see [The Architectural Gauntlet](journey/03-the-architectural-gauntlet.md). For how `TaskValidationService` prevents false finishes, see [The Verification Tax](journey/14-the-verification-tax.md).
+Design intent:
 
-### Ledger (`backend/ledger/`)
+- split control-plane concerns into testable units
+- classify errors into recoverable vs terminal paths
+- prevent false completion with explicit task validation
 
-All records flow through the ledger (`EventStream` in the current codebase), which provides:
+## Execution Layer
 
-- **Backpressure**: Caps in-flight events, applies flow control
-- **Persistence**: Records written to `FileStore` with write-ahead intent markers
-- **Size limits**: 5 MB hard cap with intelligent field truncation
-- **Subscriber model**: `EventStreamSubscriber` for decoupled consumption
+Execution is implemented in `backend/execution/`.
 
-### Context Memory (`backend/context/`)
+Important components:
 
-Context memory is managed via the compactor system. The codebase and persisted config both use `Compactor` terminology:
+- `action_execution_server.py`: runtime executor and FastAPI app bootstrap
+- `server_routes.py`: raw HTTP routes (`/execute_action`, `/list_files`, etc.)
+- `security_enforcement.py`: policy checks for command/path behavior
+- `utils/`: command helpers, diffing, session handling, monitoring
 
-- Configurable strategies (summarize, sliding window, hybrid)
-- Bounded metadata storage (max 50 batches, oldest evicted)
-- History size caps: 10,000 events AND 200 MB byte-size limit
+## Durability Layer
 
-For the full history of how the compactor subsystem evolved from 2 strategies to 12+ and back down to 9, see [The Context War](journey/04-the-context-war.md).
+Events flow through `backend/ledger/` and persistence modules.
 
-### Runtime (`backend/execution/` in the current codebase)
+Key properties:
 
-Grinta currently uses a local in-process runtime layer that:
+- event-oriented state history
+- replay-friendly serialization
+- backpressure and stream controls
+- persistence support for reliable recovery paths
 
-- Executes operations against the local workspace
-- Applies policy enforcement and confirmation gates
-- Supports stricter `hardened_local` controls without claiming sandbox isolation
+## Configuration Model
 
-### Run-State Persistence (`backend/orchestration/state/`)
+Default local setup uses:
 
-- Run states serialized as versioned JSON (schema v1)
-- **Snapshot system**: Timestamped state snapshots, last 3 retained
-- **Crash recovery**: Falls back to newest valid snapshot if primary is corrupt
-- Pickle fallback for legacy compatibility (read-only)
+- `settings.json` for user-facing model/provider keys
+- environment variables for automation and secret injection
 
-### Configuration (`backend/core/config/`)
+Minimal fields in `settings.template.json`:
 
-Pydantic v2 Settings cascading dynamically from:
+- `llm_provider`
+- `llm_model`
+- `llm_api_key`
+- `llm_base_url`
 
-1. Environment variables (`.env`, `.env.local`)
-2. **`settings.json`** in the app root (directory from `APP_ROOT`, or the process working directory when the server starts — not the per-folder workspace root)
-3. Internal defaults
+## Optional Raw HTTP Backend
 
-Provides safe merging.
+The raw action backend is available for automation and OpenAPI tooling.
 
-- `AppConfig` — server-level: budget ($5 default), API keys
-- `AgentConfig` — per-agent: circuit breaker (ON), graceful shutdown (ON)
-- Startup warnings for insecure defaults (dev API key, unlimited budget)
+Start:
 
-### Persistence (`backend/persistence/`)
+```bash
+uv run python -m backend.execution.action_execution_server 3000 --working-dir .
+```
 
-Abstract `FileStore` interface with implementations:
+Main endpoints:
 
-- Local filesystem
-- In-memory (testing)
-- S3
-- Google Cloud Storage
+- `GET /openapi.json`
+- `GET /server_info`
+- `POST /execute_action`
+- `POST /update_mcp_server`
+- `POST /upload_file`
+- `GET /download_files`
+- `POST /list_files`
 
-## Clients
+## Reliability and Safety
 
-The React web app and automation/tests share the same REST + Socket.IO protocol.
-The Python package `client` provides :class:`~client.GrintaClient`
-(httpx + Socket.IO) for scripts and unit tests.
+Core runtime protections include:
 
-## API Surface
+- retry and recovery services
+- circuit breaker and stuck detection
+- task validation before finish
+- security policy checks in execution path
 
-### REST Endpoints
-
-| Endpoint | Purpose |
-| --- | --- |
-| `GET /api/health/live` | Kubernetes liveness probe |
-| `GET /api/health/ready` | Kubernetes readiness probe |
-| `GET /api/monitoring/health` | Detailed health snapshot |
-| `GET /api/monitoring/metrics` | JSON system metrics |
-| `GET /api/monitoring/cost-summary` | Per-session cost breakdown |
-| `GET /api/monitoring/metrics-prom` | Prometheus-format metrics |
-| `GET /api/options/models` | Available LLM models |
-| `GET /api/options/agents` | Available agent types |
-| `GET /api/options/config` | Current configuration |
-
-### WebSocket Events
-
-- `app_event` — streamed records and outcomes delivered to clients
-- `app_action` / `app_user_action` — incoming client operations
-- `connect` / `disconnect` / `reconnect` — Connection lifecycle
-
-## Reliability Features
-
-| Feature | Mechanism |
-| --- | --- |
-| Budget safety | $5 default cap, 50%/80%/90% warnings |
-| Circuit breaker | Trips after consecutive errors |
-| Stuck detection | 6 strategies (loop, action repeat, etc.) |
-| Graceful shutdown | Configurable, ON by default |
-| Run-state snapshots | Last 3 timestamped snapshots |
-| Event write-ahead | `.pending` marker files for crash safety |
-| Memory bounding | History: 10K events + 200MB, compactor metadata: 50 batches |
-| Event size cap | 5MB hard limit with field truncation |
-
-## Further Reading
-
-Several subsystems have dedicated journey chapters that go deeper than this reference:
-
-- **Playbooks** (`backend/playbooks/`): Runtime knowledge injection that replaced prompt bloat — [The Hidden Playbooks](journey/13-the-hidden-playbooks.md)
-- **Prompt architecture** (`backend/engine/prompts/`): Why the system prompt is built in Python, not Jinja — [Prompts Are Programs](journey/15-prompts-are-programs.md)
-- **Model-agnostic inference** (`backend/inference/`): The three-client architecture and catalog-driven overrides — [The Model-Agnostic Reckoning](journey/10-model-agnostic-reckoning.md)
-- **Cross-platform execution** (`backend/execution/`): Terminal multiplexing, Windows edge cases, and the semantic execution layer — [The Console Wars](journey/11-the-console-wars.md)
+These controls are designed to reduce false-success runs and uncontrolled loops while keeping the local workflow fast.

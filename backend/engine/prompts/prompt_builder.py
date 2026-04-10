@@ -39,6 +39,16 @@ def _choose(is_windows: bool, win: str, unix: str) -> str:
     return win if is_windows else unix
 
 
+def _resolve_terminal_command_tool(
+    is_windows: bool,
+    terminal_tool_name: str | None,
+) -> str:
+    """Resolve the active terminal command tool for prompt rendering."""
+    if terminal_tool_name:
+        return terminal_tool_name
+    return 'execute_powershell' if is_windows else 'execute_bash'
+
+
 def _explore_hint(_config: Any = None) -> str:
     """Return the canonical layout-discovery tool hint (analyze_project_structure is always present)."""
     return '`analyze_project_structure` (`tree`) and/or `search_code`'
@@ -165,6 +175,13 @@ def _render_tool_reference(is_windows: bool, config: Any = None) -> str:
         confirm_paths=confirm_cmd,
         process_management=proc_find,
         checkpoint_rollback_hint=checkpoint_rollback_hint,
+    )
+
+
+def _render_critical(terminal_command_tool: str) -> str:
+    """Render last-mile critical execution rules with dynamic terminal tool naming."""
+    return _load('system_partial_04_critical.md').format(
+        terminal_command_tool=terminal_command_tool
     )
 
 
@@ -326,6 +343,7 @@ def build_system_prompt(
     mcp_tool_names: list[str] | None = None,
     mcp_tool_descriptions: dict[str, str] | None = None,
     mcp_server_hints: list[dict[str, str]] | None = None,
+    terminal_tool_name: str | None = None,
     **_extra: object,
 ) -> str:
     """Assemble the full system prompt from partials.
@@ -333,6 +351,12 @@ def build_system_prompt(
     Drop-in replacement for the old ``system_prompt`` rendering.
     """
     model_id = active_llm_model or "unknown"
+    resolved_terminal_tool = _resolve_terminal_command_tool(
+        is_windows=is_windows,
+        terminal_tool_name=terminal_tool_name,
+    )
+    # Drive shell-specific prompt wording from the active terminal tool contract.
+    shell_is_powershell = resolved_terminal_tool == 'execute_powershell'
 
     sections = [
         # Identity
@@ -363,13 +387,13 @@ def build_system_prompt(
 
     sections += [
         # Routing
-        _render_routing(is_windows, config),
+        _render_routing(shell_is_powershell, config),
         # Security
         _render_security(cli_mode),
         # Autonomy & execution
-        _render_autonomy(config, is_windows),
+        _render_autonomy(config, shell_is_powershell),
         # Tool reference
-        _render_tool_reference(is_windows, config),
+        _render_tool_reference(shell_is_powershell, config),
         # MCP & permissions tail
         _render_mcp_and_permissions(
             mcp_tool_names or [],
@@ -378,7 +402,7 @@ def build_system_prompt(
             config,
         ),
         # Critical rules (last for recency)
-        _load("system_partial_04_critical.md"),
+        _render_critical(resolved_terminal_tool),
     ]
 
     return "\n\n".join(sections)

@@ -1,65 +1,69 @@
 # Grinta Vocabulary
 
-This document defines the canonical Grinta architecture language and tracks
-the migration status of each term. It serves as both reference contract and
-implementation status tracker.
+Canonical terminology for current Grinta docs and contributor communication.
 
 ## Principles
 
-- Use industrial, precise names rather than cute or mystical metaphors.
-- Name concepts by semantic role, not implementation detail.
-- Keep the vocabulary model-agnostic and OS-agnostic.
-- Preserve concepts that are already clear and broadly understood.
+- Prefer clear engineering terms over metaphors.
+- Prefer terms that map directly to current modules.
+- Keep user-facing terms stable unless behavior changes.
 
-## Canonical Terms — Migration Status
+## Core Terms
 
-| Code term | Canonical term | Status | Notes |
-| --- | --- | --- | --- |
-| `Agent` | `Agent` | ✅ Kept | No rename needed |
-| `AgentController` | `SessionOrchestrator` | ✅ Complete | `backend/orchestration/session_orchestrator.py` |
-| `Condenser` | `Compactor` | ✅ Complete | 40+ files use `Compactor` exclusively |
-| `Review` | `Governance` | ✅ Complete | Package is `backend/governance/` |
-| `Action` | `Action` | ✅ Kept | Rename to `Operation` deferred — term is clear and broadly understood |
-| `Observation` | `Observation` | ✅ Kept | Rename to `Outcome` deferred — same rationale |
-| `Event` | `Event` | ✅ Kept | Rename to `Record` deferred — foundational base class |
-| `EventStream` | `EventStream` | ✅ Kept | Rename to `Ledger` deferred — the package is already `backend/ledger/` |
-| `State` | `State` | ✅ Kept | Rename to `RunState` deferred — universally understood |
-| `Checkpoint` | `Checkpoint` | ✅ Kept | Rename to `Snapshot` deferred — used across rollback and state layers |
-| `Trajectory` | `Trajectory` | ✅ Kept | Rename to `Transcript` deferred — config and test integration deep |
-| `ToolInvocationPipeline` | `ToolInvocationPipeline` | ✅ Kept | Rename to `OperationPipeline` deferred |
-| `PendingAction` | `PendingAction` | ✅ Kept | Rename to `OpenOperation` deferred |
-| `Autonomy` | `ExecutionPolicy` | 🔄 Conceptual | Docs use execution policy; code uses autonomy level |
-| `ConversationMemory` | `ContextMemory` | 🔄 Conceptual | Package is `backend/context/`; class is `ContextMemoryManager` |
-
-## Terms Intentionally Preserved
-
-These terms are already clear and should not be renamed for distinctness alone.
-
-- `Agent`, `Runtime`, `Playbook`, `Tool`
-- `Conversation` on user-facing surfaces
-- `Core`, `Security`, `Telemetry`, `Validation`, `Utils`
-- `Action`, `Observation`, `Event`, `State`, `Checkpoint` — clear, broadly understood
-
-## Terms To Avoid
-
-- Metaphor-heavy names (`cognition`, `perception`, `scrutiny`, `chronicle`, `anvil`, `workshop`)
-- Overloaded bare names (`controller`)
-- ML-jargon (`trajectory` in new code — existing uses are grandfathered)
-- Ambiguous infra nouns (bare `session`, bare `memory`)
-- Provider-specific or OS-specific core concepts
-
-## Package Layout
-
-| Legacy package | Current package | Notes |
+| Term | Meaning | Current Status |
 | --- | --- | --- |
-| `backend/controller` | `backend/orchestration` | Aligns with `SessionOrchestrator` |
-| `backend/events` | `backend/ledger` | Durable event stream and persistence |
-| `backend/api` | `backend/gateway` | Gateway terminology is stable |
-| `backend/storage` | `backend/persistence` | Persistence terminology is stable |
-| `backend/memory` | `backend/context` | Context memory and compaction |
-| `backend/review` | `backend/governance` | Critique and guardrail layer |
-| `backend/llm` | `backend/inference` | Model and provider layer |
-| `backend/knowledge_base` | `backend/knowledge` | Shorter stable term |
-| `backend/playbook_engine` | `backend/playbooks/engine` | Playbook execution internals |
-| `backend/runtime` | `backend/execution` | Canonical system term remains `Runtime` |
-| `backend/engines/orchestrator` | `backend/engine` | Agent engine (planner, executor, memory, safety) |
+| Session orchestrator | Main control loop for a run | Active (`backend/orchestration`) |
+| Action | Intended operation proposed by agent | Active (`backend/ledger/action`) |
+| Observation | Result of an action | Active (`backend/ledger/observation`) |
+| Event stream | Ordered flow/storage of runtime records | Active (`backend/ledger`) |
+| Compactor | Context compression strategy | Active (`backend/context`) |
+| Runtime executor | Local action execution engine | Active (`backend/execution`) |
+| Execution policy | Safety/autonomy constraints for runtime behavior | Active (autonomy + security policy paths) |
+| Task validation | Finish gate ensuring work is actually complete | Active (`task_validation_service`) |
+
+## Terms Intentionally Kept
+
+These are already clear and broadly understood in the codebase:
+
+- `Action`
+- `Observation`
+- `Event`
+- `State`
+- `Runtime`
+- `Playbook`
+- `Tool`
+
+## Package Vocabulary
+
+| Package | Meaning |
+| --- | --- |
+| `backend/cli` | Terminal interface and command loop |
+| `backend/context` | Memory and compaction |
+| `backend/core` | Config, constants, shared foundations |
+| `backend/engine` | Agent decision and prompt orchestration |
+| `backend/execution` | Local runtime and raw action server |
+| `backend/inference` | Model/provider routing and LLM clients |
+| `backend/integrations` | External integration adapters |
+| `backend/knowledge` | Retrieval and knowledge subsystems |
+| `backend/ledger` | Actions, observations, event stream |
+| `backend/orchestration` | Session orchestrator and services |
+| `backend/persistence` | Durable storage and state persistence |
+| `backend/playbooks` | Playbook assets and loaders |
+| `backend/security` | Command risk analysis and policy checks |
+| `backend/telemetry` | Lightweight instrumentation |
+| `backend/tools` | Tool implementations |
+| `backend/validation` | Validation and quality checks |
+
+## Naming Guidance for New Code
+
+Prefer:
+
+- explicit names (`task_validation_service`, `event_router_service`)
+- subsystem-aligned names (`inference`, `execution`, `orchestration`)
+- behavior-based terms (`retry`, `recovery`, `safety`)
+
+Avoid:
+
+- renamed aliases that do not map to real modules
+- metaphor-heavy names that hide responsibilities
+- introducing parallel terms for the same concept

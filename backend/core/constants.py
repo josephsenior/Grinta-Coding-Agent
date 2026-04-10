@@ -294,7 +294,8 @@ BASH_TIMEOUT_MESSAGE_TEMPLATE = (
     "You may wait longer to see additional output by sending empty command '', "
     'send other commands to interact with the current process, '
     'send keys ("C-c", "C-z", "C-d") to interrupt/kill the previous command '
-    'before sending your new command, or use the timeout parameter in execute_bash '
+    'before sending your new command, or use the timeout parameter in the active terminal tool '
+    '(execute_bash or execute_powershell, depending on runtime) '
     'for future commands.'
 )
 

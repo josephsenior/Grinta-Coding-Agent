@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADRs)
 
-This document records the key architectural decisions made in the App project,
+This document records the key architectural decisions made in the Grinta project,
 their context, and rationale.
 
 ---
@@ -150,7 +150,7 @@ structured_summary, no_op, pipeline, auto.
 
 ## ADR-008: Socket.IO over Plain WebSocket
 
-**Status:** Accepted  
+**Status:** Historical (legacy server phase)  
 **Date:** 2024-12  
 **Context:** Need real-time bidirectional communication between UI clients/frontend
 and backend for streaming agent actions.
@@ -167,6 +167,8 @@ and backend for streaming agent actions.
 - ✅ Room-based message routing
 - ⚠️ Additional library dependency
 - ⚠️ Not compatible with plain WebSocket clients
+
+**Note (current state):** Grinta is now CLI-first for primary usage. The raw HTTP action backend remains available for API/OpenAPI tooling, while real-time UI assumptions are no longer the default architecture anchor.
 
 ---
 
@@ -191,26 +193,22 @@ edits respect syntactic boundaries.
 
 ---
 
-## ADR-010: TOML Configuration over YAML/JSON
+## ADR-010: JSON Settings as Default Local Config Surface
 
-**Status:** Accepted  
+**Status:** Superseded (legacy TOML-first decision replaced)  
 **Date:** 2024-12  
-**Context:** Need a human-editable configuration format that supports
-comments, hierarchical structure, and type coercion.
+**Context:** Early builds used TOML-heavy examples and guidance, which diverged
+from the actual local onboarding path and created user confusion.
 
-**Decision:** Use TOML as the primary configuration format with environment
-variable overrides.
-
-**Alternatives considered:**
-- YAML: More complex, indentation-sensitive, security issues (arbitrary code execution)
-- JSON: No comments, verbose
-- .env: Flat, no hierarchy
+**Decision (current):** Use `settings.json` as the default user-facing local
+configuration surface, with environment variables still supported for overrides
+and automation.
 
 **Consequences:**
-- ✅ Human-readable with comments
-- ✅ Hierarchical sections map cleanly to config classes
-- ✅ Strong typing via Pydantic validation
-- ⚠️ Less familiar than YAML for some users
+- ✅ Onboarding is simpler and consistent with starter templates
+- ✅ LLM-facing tooling and scripts can read/write one familiar format
+- ✅ Environment-based secret handling remains available
+- ⚠️ Advanced nested tuning still requires deeper config knowledge
 
 ---
 
@@ -259,11 +257,12 @@ and API request/response models.
 **Status:** Accepted  
 **Date:** 2025-06  
 **Context:** The agent ecosystem is moving toward the Model Context Protocol
-(MCP) as a standard for tool integration. Supporting MCP allows App to
+(MCP) as a standard for tool integration. Supporting MCP allows Grinta to
 leverage a growing ecosystem of tool servers.
 
 **Decision:** Implement MCP client support with cached wrapper tools.
-MCP servers are configured in `config.toml` and their tools appear
+MCP servers are configured through current config surfaces (`settings.json` and
+environment-backed config loading) and their tools appear
 alongside built-in tools.
 
 **Consequences:**
@@ -280,7 +279,7 @@ alongside built-in tools.
 **Status:** Accepted  
 **Date:** 2024-12  
 **Context:** Need a high-performance async HTTP framework that integrates
-well with Socket.IO and provides automatic API documentation.
+well with ASGI middleware patterns and provides automatic API documentation.
 
 **Decision:** Use FastAPI with Uvicorn ASGI server.
 
@@ -295,17 +294,16 @@ well with Socket.IO and provides automatic API documentation.
 
 ## ADR-015: Textual TUI over Web Frontend
 
-**Status:** Superseded — the Textual TUI was removed; the **React web UI** is the
-primary interface. The Python package **`client`** retains
-`AppClient` for tests and automation.
+**Status:** Superseded — Grinta is CLI-first in current local workflows. The
+Python package **`client`** remains for tests and automation.
 
 **Date:** 2025-01 (superseded 2026-03)  
 **Context:** Developers using a coding agent likely prefer a terminal-native
 interface over a browser-based one. A TUI avoids Node.js dependencies and
 integrates naturally into terminal workflows.
 
-**Decision (historical):** Build the primary UI as a Textual TUI. A web frontend exists
-as an alternative but the TUI is the recommended interface.
+**Decision (historical):** Build the primary UI as a Textual TUI. A web frontend existed
+as an alternative during that phase.
 
 **Consequences (historical):**
 - ✅ Zero Node.js/browser dependency for TUI users
@@ -316,18 +314,18 @@ as an alternative but the TUI is the recommended interface.
 
 ---
 
-## ADR-016: App Vocabulary Contract
+## ADR-016: Grinta Vocabulary Contract
 
 **Status:** Accepted  
 **Date:** 2026-03  
-**Context:** App has evolved far beyond its original shell, but parts of its
+**Context:** Grinta has evolved far beyond its original shell, but parts of its
 top-level language still undersell what the system actually is. The strongest
-App characteristics are durable run history, governed execution, adaptive
+Grinta characteristics are durable run history, governed execution, adaptive
 context management, and local-first runtime control. Without a canonical
 vocabulary, future renames will drift, public docs will stay inconsistent, and
 the codebase will keep reading more inherited than it really is.
 
-**Decision:** Standardize on a App-first vocabulary contract and use it as
+**Decision:** Standardize on a Grinta-first vocabulary contract and use it as
 the reference language for future documentation, public protocols, package
 decisions, and code symbol migration. This vocabulary lock should be set before
 any large implementation-planning pass or rename wave.
@@ -335,27 +333,12 @@ any large implementation-planning pass or rename wave.
 `Outcome` is preferred over `Result` or `Effect` because it fits ledger
 semantics cleanly without implying that only world-state mutations matter.
 
-**Canonical terms:**
+**Canonical terms (current):**
 
-- `Agent` stays `Agent`
-- `AgentController` and bare `Controller` become `SessionOrchestrator`
-- `Action` becomes `Operation`
-- `Observation` becomes `Outcome`
-- `Event` becomes `Record`
-- `EventStream` becomes `Ledger`
-- `EventStore` becomes `LedgerStore`
-- backend `Session` becomes `Run`
-- user-facing `Conversation` stays `Conversation`
-- `State` becomes `RunState`
-- `Checkpoint` becomes `Snapshot`
-- `Trajectory` becomes `Transcript`
-- `ActionExecutor` becomes `RuntimeExecutor`
-- `PendingAction` becomes `OpenOperation`
-- `Autonomy` becomes `ExecutionPolicy`
-- `Condenser` becomes `Compactor`
-- `ConversationMemory` / generic memory layer becomes `ContextMemory`
-- `ToolInvocationPipeline` becomes `OperationPipeline`
-- `Review` becomes `Governance`
+- Keep clear baseline terms: `Action`, `Observation`, `Event`, `State`, `Runtime`
+- Keep `Compactor` as the canonical context-compression term
+- Use `SessionOrchestrator` for orchestrator-level control language in docs
+- Use `ExecutionPolicy` as conceptual language while code may still reference autonomy
 
 **Terms intentionally preserved:**
 
@@ -376,9 +359,9 @@ semantics cleanly without implying that only world-state mutations matter.
 
 **Consequences:**
 
-- ✅ App now has one explicit language contract for future renames
+- ✅ Grinta now has one explicit language contract for future renames
 - ✅ Implementation planning can evaluate changes against one stable vocabulary lock
-- ✅ Documentation can describe App in terms that match its actual strengths
+- ✅ Documentation can describe Grinta in terms that match its actual strengths
 - ✅ Package and protocol changes can be evaluated against one stable reference
 - ⚠️ During transition, docs may reference both canonical names and current code names
 - ⚠️ A later implementation sweep must migrate symbols, packages, and persisted schemas carefully

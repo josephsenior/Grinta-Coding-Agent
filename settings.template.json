@@ -2,6 +2,5 @@
   "llm_provider": "",
   "llm_model": "",
   "llm_api_key": "",
-  "llm_base_url": "",
-  "max_budget_per_task": 5.0
+  "llm_base_url": ""
 }
