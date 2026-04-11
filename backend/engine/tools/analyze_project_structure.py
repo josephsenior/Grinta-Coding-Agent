@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from backend.engine.tools.ignore_filter import get_ignore_spec, prune_ignored_dirs, is_ignored_file
 from backend.ledger.action import AgentThinkAction
 
 ANALYZE_PROJECT_STRUCTURE_TOOL_NAME = 'analyze_project_structure'
@@ -120,18 +121,8 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
     """Directory tree with file sizes, respecting .gitignore."""
     depth = max(1, min(depth, 5))
     root = os.path.abspath(path)
-    ignore = {'__pycache__', 'node_modules', '.git', '.venv', 'venv'}
-
-    gitignore_path = os.path.join(root, '.gitignore')
-    if os.path.isfile(gitignore_path):
-        try:
-            with open(gitignore_path, 'r', encoding='utf-8') as f:
-                for line in f:
-                    line = line.split('#')[0].strip().strip('/')
-                    if line and not line.startswith('*'):
-                        ignore.add(line)
-        except Exception:
-            pass
+    root = os.path.abspath(path)
+    spec = get_ignore_spec(root)
 
     if not os.path.exists(root):
         return AgentThinkAction(thought=f'[ANALYZE_PROJECT_STRUCTURE] Path not found: {path}')
@@ -146,7 +137,10 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
     for current_root, dirnames, filenames in os.walk(root):
         relative_root = os.path.relpath(current_root, root)
         current_depth = rel_depth(relative_root)
-        dirnames[:] = sorted(name for name in dirnames if name not in ignore)
+        
+        # Prune ignored directories using pathspec
+        prune_ignored_dirs(root, current_root, dirnames, spec)
+        dirnames.sort()
         if current_depth > depth:
             dirnames[:] = []
             continue
@@ -161,8 +155,8 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
         if current_depth >= depth:
             dirnames[:] = []
 
-        for filename in sorted(name for name in filenames if name not in ignore):
-            if filename in ignore or filename.endswith('.pyc'):
+        for filename in sorted(filenames):
+            if is_ignored_file(root, current_root, filename, spec):
                 continue
             full_path = os.path.join(current_root, filename)
             relative_path = os.path.relpath(full_path, root).replace(os.sep, '/')
@@ -219,12 +213,17 @@ def _build_imports_action(path: str) -> AgentThinkAction:
         # Fallback to python traversal
         count = 0
         import_re = re.compile(f'(import|from).*{re.escape(basename)}')
+        root = os.getcwd() # Or some relevant root
+        spec = get_ignore_spec(root)
+        
         for root_dir, dirs, files in os.walk('.'):
-            if '__pycache__' in dirs: dirs.remove('__pycache__')
-            if 'node_modules' in dirs: dirs.remove('node_modules')
-            if '.venv' in dirs: dirs.remove('.venv')
+            # Use same robust filtering
+            prune_ignored_dirs(root, root_dir, dirs, spec)
+            
             for f in files:
                 if f.endswith('.py'):
+                    if is_ignored_file(root, root_dir, f, spec):
+                        continue
                     fpath = os.path.join(root_dir, f)
                     try:
                         with open(fpath, 'r', encoding='utf-8', errors='ignore') as fl:
@@ -288,12 +287,15 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
     import shutil
     rg = shutil.which('rg')
     safe_scope = scope if scope and scope != '.' else '.'
+    root = os.path.abspath('.')
+    spec = get_ignore_spec(root)
     
     if rg:
         try:
             res = subprocess.run([
                 rg, '-n', '--word-regexp', symbol,
                 '--type', 'py', '--type', 'js', '--type', 'ts',
+                # relies on .gitignore, but add failsafes
                 '--glob', '!__pycache__', '--glob', '!node_modules', '--glob', '!.git',
                 safe_scope
             ], capture_output=True, text=True, check=False)
@@ -304,15 +306,14 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
             pass
             
     # Python fallback
-    sym_re = re.compile(rf'\\b{re.escape(symbol)}\\b')
+    sym_re = re.compile(rf'\b{re.escape(symbol)}\b')
     count = 0
     for root_dir, dirs, files in os.walk(safe_scope):
-        if '__pycache__' in dirs: dirs.remove('__pycache__')
-        if 'node_modules' in dirs: dirs.remove('node_modules')
-        if '.git' in dirs: dirs.remove('.git')
-        if '.venv' in dirs: dirs.remove('.venv')
+        prune_ignored_dirs(root, root_dir, dirs, spec)
         
         for f in files:
+            if is_ignored_file(root, root_dir, f, spec):
+                continue
             if f.endswith(('.py', '.js', '.ts', '.tsx', '.jsx')):
                 fpath = os.path.join(root_dir, f)
                 try:
@@ -343,13 +344,18 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
         "--- Tests by naming convention ---"
     ]
     
-    name_re = re.compile(rf'^(test_{re.escape(basename)}\\.py|{re.escape(basename)}_test\\.py)$')
+    root = os.path.abspath('.')
+    spec = get_ignore_spec(root)
+    
+    name_re = re.compile(rf'^(test_{re.escape(basename)}\.py|{re.escape(basename)}_test\.py)$')
     count = 0
     test_files = []
     
     for root_dir, dirs, files in os.walk('.'):
-        if '__pycache__' in dirs: dirs.remove('__pycache__')
+        prune_ignored_dirs(root, root_dir, dirs, spec)
         for f in files:
+            if is_ignored_file(root, root_dir, f, spec):
+                continue
             if name_re.match(f):
                 test_files.append(os.path.join(root_dir, f))
                 count += 1
@@ -367,8 +373,10 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
     import_test_files = []
     
     for root_dir, dirs, files in os.walk('.'):
-        if '__pycache__' in dirs: dirs.remove('__pycache__')
+        prune_ignored_dirs(root, root_dir, dirs, spec)
         for f in files:
+            if is_ignored_file(root, root_dir, f, spec):
+                continue
             if f.startswith('test_') or f.endswith('_test.py'):
                 fpath = os.path.join(root_dir, f)
                 if fpath in test_files:
@@ -392,8 +400,10 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
     count = 0
     conftest_files = []
     for root_dir, dirs, files in os.walk(dirname):
-        if '__pycache__' in dirs: dirs.remove('__pycache__')
+        prune_ignored_dirs(root, root_dir, dirs, spec)
         for f in files:
+            if is_ignored_file(root, root_dir, f, spec):
+                continue
             if f == 'conftest.py':
                 conftest_files.append(os.path.join(root_dir, f))
                 count += 1

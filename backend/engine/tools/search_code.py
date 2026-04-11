@@ -10,20 +10,7 @@ from __future__ import annotations
 from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action import AgentThinkAction
 
-_SEARCH_EXCLUDED_DIRS = (
-    '.git',
-    '.venv',
-    '.mypy_cache',
-    '.pytest_cache',
-    '.ruff_cache',
-    '__pycache__',
-    'node_modules',
-    '.tmp_cli_manual',
-    'logs',
-    'storage',
-    'build',
-    'dist',
-)
+from backend.engine.tools.ignore_filter import get_ignore_spec, prune_ignored_dirs, is_ignored_file
 
 _SEARCH_CODE_DESCRIPTION = """\
 Search for text patterns, symbols, or file paths in the codebase using ripgrep (falls back to Python traversal).
@@ -160,7 +147,9 @@ def _search_with_ripgrep(
     ]
     if not is_case_sensitive:
         args.append('--ignore-case')
-    for d in _SEARCH_EXCLUDED_DIRS:
+    # Let ripgrep handle .gitignore naturally, but enforce a few fail-safes
+    # if the user forgot them in .gitignore
+    for d in ['.venv', 'node_modules', '__pycache__', '.git']:
         args.extend(['--glob', f'!**/{d}/**'])
     if file_pattern:
         args.extend(['--glob', file_pattern])
@@ -212,15 +201,22 @@ def _search_with_python(
             return AgentThinkAction(thought=f"<search_results>\\nInvalid regex pattern: {e}\
 </search_results>")
 
+    # Setup spec
+    spec = get_ignore_spec(path)
+
     # Collect files
     target_files = []
     if os.path.isfile(path):
-        target_files.append(path)
+        if not is_ignored_file(os.path.dirname(path), os.path.dirname(path), os.path.basename(path), spec):
+            target_files.append(path)
     else:
         for root, dirs, files in os.walk(path):
-            # Prune excluded dirs
-            dirs[:] = [d for d in dirs if d not in _SEARCH_EXCLUDED_DIRS]
+            # Prune excluded dirs via pathspec
+            prune_ignored_dirs(path, root, dirs, spec)
+            
             for f in files:
+                if is_ignored_file(path, root, f, spec):
+                    continue
                 if file_pattern and not fnmatch.fnmatch(f, file_pattern):
                     continue
                 file_path = os.path.join(root, f)
