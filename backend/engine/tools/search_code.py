@@ -141,12 +141,14 @@ def _search_with_ripgrep(
         try:
             result = subprocess.run(args, capture_output=True, text=True, check=False)
             lines = result.stdout.splitlines()[:max_results]
-            out = '\\n'.join(lines)
+            out = '\n'.join(lines)
             if not out:
                 out = "No matching files found."
-            return AgentThinkAction(thought=f'<search_results>\\n{out}\\n</search_results>')
+            return AgentThinkAction(thought=f'<search_results>\\n{out}\
+</search_results>')
         except Exception as e:
-            return AgentThinkAction(thought=f'<search_results>\\nError running ripgrep: {e}\\n</search_results>')
+            return AgentThinkAction(thought=f'<search_results>\\nError running ripgrep: {e}\
+</search_results>')
 
     # Search mode
     args = [
@@ -171,12 +173,14 @@ def _search_with_ripgrep(
         out = result.stdout
         limit = max_results * (context_lines * 2 + 1) + 10
         lines = out.splitlines()[:limit]
-        out_limited = '\\n'.join(lines)
+        out_limited = '\n'.join(lines)
         if not out_limited:
             out_limited = "No matches found."
-        return AgentThinkAction(thought=f'<search_results>\\n{out_limited}\\n</search_results>')
+        return AgentThinkAction(thought=f'<search_results>\\n{out_limited}\
+</search_results>')
     except Exception as e:
-         return AgentThinkAction(thought=f'<search_results>\\nError running ripgrep: {e}\\n</search_results>')
+         return AgentThinkAction(thought=f'<search_results>\\nError running ripgrep: {e}\
+</search_results>')
 
 
 def _search_with_python(
@@ -193,7 +197,8 @@ def _search_with_python(
     import fnmatch
     
     if not os.path.exists(path):
-        return AgentThinkAction(thought=f"<search_results>\\nPath does not exist: {path}\\n</search_results>")
+        return AgentThinkAction(thought=f"<search_results>\\nPath does not exist: {path}\
+</search_results>")
         
     results = []
     
@@ -204,7 +209,8 @@ def _search_with_python(
         try:
             regex = re.compile(pattern, flags)
         except re.error as e:
-            return AgentThinkAction(thought=f"<search_results>\\nInvalid regex pattern: {e}\\n</search_results>")
+            return AgentThinkAction(thought=f"<search_results>\\nInvalid regex pattern: {e}\
+</search_results>")
 
     # Collect files
     target_files = []
@@ -223,10 +229,11 @@ def _search_with_python(
     if not pattern:
         # File discovery mode
         lines = target_files[:max_results]
-        out = '\\n'.join(lines)
+        out = '\n'.join(lines)
         if not out:
             out = "No matching files found."
-        return AgentThinkAction(thought=f'<search_results>\\n{out}\\n</search_results>')
+        return AgentThinkAction(thought=f'<search_results>\\n{out}\
+</search_results>')
         
     # Search mode
     match_count = 0
@@ -251,7 +258,7 @@ def _search_with_python(
                 for j in range(start, end):
                     prefix = f"{j+1}:" if j == i else f"{j+1}-"
                     block.append(f"{fpath}:{prefix}{lines[j].rstrip()}")
-                file_matches.append('\\n'.join(block))
+                file_matches.append('\n'.join(block))
                 
                 match_count += 1
                 if match_count >= max_results:
@@ -261,7 +268,8 @@ def _search_with_python(
             results.extend(file_matches)
             results.append("--")
             
-    out = '\\n'.join(results)
+    out = '\n'.join(results)
     if not out:
         out = "No matches found."
-    return AgentThinkAction(thought=f'<search_results>\\n{out}\\n</search_results>')
+    return AgentThinkAction(thought=f'<search_results>\\n{out}\
+</search_results>')

@@ -175,23 +175,15 @@ def _require_tool_argument(
     return arguments[key]
 
 
-def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction | AgentThinkAction:
+def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
     """Handle CmdRunTool (Bash) tool call."""
     from backend.engine.tools.bash import (
         windows_drive_glued_hint,
         windows_drive_glued_in_command,
     )
-    from backend.engine.tools.prompt import uses_powershell_terminal
-    from backend.engine.tools.shell_validator import validate_shell_command
 
     tool_name = create_cmd_run_tool()['function']['name']
     command = _require_tool_argument(arguments, 'command', tool_name)
-
-    # --- Shell command validation: reject wrong-shell commands immediately ---
-    shell_error = validate_shell_command(command, is_powershell=uses_powershell_terminal())
-    if shell_error:
-        return AgentThinkAction(thought=shell_error)
-
     raw_is_input = arguments.get('is_input', False)
     is_input = _parse_bool_argument(raw_is_input)
     is_background = _parse_bool_argument(arguments.get('is_background', False))

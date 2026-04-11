@@ -177,7 +177,7 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
         if emitted >= 200:
             break
             
-    return AgentThinkAction(thought='\\n'.join(lines))
+    return AgentThinkAction(thought='\n'.join(lines))
 
 def _build_imports_action(path: str) -> AgentThinkAction:
     """Show what a file imports AND what other files import it."""
@@ -240,7 +240,7 @@ def _build_imports_action(path: str) -> AgentThinkAction:
         if count == 0:
             out.append("(no reverse imports found)")
             
-    return AgentThinkAction(thought='\\n'.join(out))
+    return AgentThinkAction(thought='\n'.join(out))
 
 def _build_symbols_action(path: str) -> AgentThinkAction:
     """List classes, functions, and top-level assignments in a file."""
@@ -262,7 +262,7 @@ def _build_symbols_action(path: str) -> AgentThinkAction:
             out.append(f"(error reading file: {e})")
     else:
         out.append('(file not found)')
-    return AgentThinkAction(thought='\\n'.join(out))
+    return AgentThinkAction(thought='\n'.join(out))
 
 def _build_recent_action() -> AgentThinkAction:
     """Recently modified files via git log."""
@@ -278,7 +278,7 @@ def _build_recent_action() -> AgentThinkAction:
             out.append('(no commits or not a git repository)')
     except Exception:
         out.append('(git not available or error running git)')
-    return AgentThinkAction(thought='\\n'.join(out))
+    return AgentThinkAction(thought='\n'.join(out))
 
 def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
     """Find all files that reference a given symbol (function, class, variable)."""
@@ -299,7 +299,7 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
             ], capture_output=True, text=True, check=False)
             if res.stdout.strip():
                 out.extend(res.stdout.splitlines()[:50])
-                return AgentThinkAction(thought='\\n'.join(out))
+                return AgentThinkAction(thought='\n'.join(out))
         except Exception:
             pass
             
@@ -332,7 +332,7 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
             
     if count == 0:
         out.append(f"(no references found for {trunc_sym})")
-    return AgentThinkAction(thought='\\n'.join(out))
+    return AgentThinkAction(thought='\n'.join(out))
 
 def _build_test_coverage_action(path: str) -> AgentThinkAction:
     """Find test files that likely cover a given source file."""
@@ -404,7 +404,7 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
     if not conftest_files:
         out.append("(none)")
         
-    return AgentThinkAction(thought='\\n'.join(out))
+    return AgentThinkAction(thought='\n'.join(out))
 
 def _build_semantic_search_action(symbol: str, path: str) -> AgentThinkAction:
     """Robust AST-based reference search using the semantic_analyzer script."""
