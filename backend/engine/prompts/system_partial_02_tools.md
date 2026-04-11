@@ -8,7 +8,7 @@ Minimal comments; minimal diff unless asked; explore before large edits; imports
 </CODE_QUALITY>
 
 <FILE_OPERATIONS>
-**Always use editor tools to create/write files — never** `mkdir+touch`, `cat>`, `echo>`, heredocs, `tee`, `>` for file content. **Do not use shell to read project files**—use editor view / file-read tools. Editors create parent dirs and normalize paths.
+**Always use editor tools to create/write files — never** use shell commands for file content. **Do not use shell to read project files**—use editor view / file-read tools. Editors create parent dirs and normalize paths.
 Editor `path` arguments are relative to the project root (see runtime working directory) or valid absolute paths on disk.
 {confirm_paths} Edit the path the user gave; no shadow copies (file_v2.py); remove temp files when done.
 </FILE_OPERATIONS>

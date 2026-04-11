@@ -32,15 +32,27 @@ class ToolRegistry:
 
     This class detects tools once at initialization and caches the results
     for performance. It provides a consistent interface for checking tool
-    availability and getting fallback strategies.
+    availability and getting fallback strategies. It is implemented as a Singleton.
     """
+
+    _instance = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(ToolRegistry, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
 
     def __init__(self) -> None:
         """Initialize and detect all tools."""
+        if getattr(self, '_initialized', False):
+            return
+        
         self._tools: dict[str, ToolInfo] = {}
         self._is_container = self._detect_container_runtime()
         self._is_wsl = self._detect_wsl_runtime()
         self._detect_all_tools()
+        self._initialized = True
 
     def _detect_container_runtime(self) -> bool:
         if os.getenv('APP_RUNTIME_IS_CONTAINER', '').strip().lower() in {

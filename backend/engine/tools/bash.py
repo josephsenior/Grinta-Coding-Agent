@@ -16,6 +16,7 @@ from backend.engine.tools.prompt import (
     get_shell_name,
     get_terminal_tool_name,
     is_windows_with_bash,
+    uses_powershell_terminal,
 )
 
 ChatCompletionToolParam = Any
@@ -81,13 +82,27 @@ def create_cmd_run_tool(use_short_description: bool = False):
         _SHORT_BASH_DESCRIPTION if use_short_description else _DETAILED_BASH_DESCRIPTION
     ).format(shell=shell)
 
-    # Explicit identity note for Windows + Git Bash to prevent PowerShell confusion
-    if is_windows_with_bash():
+    # Explicit identity note for Windows + Git Bash / PowerShell to prevent shell confusion
+    if uses_powershell_terminal():
+        description += (
+            '\n* **IMPORTANT — PowerShell on Windows:** This terminal runs PowerShell, '
+            'NOT Bash. DO NOT use these FORBIDDEN commands: grep, ls, cat, find, echo, mkdir, rm, pwd, which, chmod, sed, awk. '
+            'Use PowerShell native cmdlets or Python. Windows paths (C:\\...) are normal.'
+        )
+    elif is_windows_with_bash():
         description += (
             '\n* **IMPORTANT — Git Bash on Windows:** This terminal runs Git Bash, '
-            'NOT PowerShell. Use only bash commands (ls, cat, grep, find, echo, mkdir, rm). '
-            'Do NOT use PowerShell cmdlets (Get-ChildItem, Get-Process, $PSVersionTable, etc.). '
+            'NOT PowerShell. Use only bash commands. DO NOT use these FORBIDDEN PowerShell '
+            'cmdlets: Get-ChildItem, Get-Process, Get-Content, Select-String, Write-Output, '
+            'Set-Location, ForEach-Object, Where-Object, $PSVersionTable. '
             'Use `python` (not `python3`). Windows paths (C:\\...) in output are normal.'
+        )
+    else:
+        description += (
+            '\n* **IMPORTANT — Bash:** This terminal runs Bash, NOT PowerShell. '
+            'DO NOT use these FORBIDDEN PowerShell cmdlets: Get-ChildItem, Get-Process, '
+            'Get-Content, Select-String, Write-Output, Set-Location, ForEach-Object, '
+            'Where-Object, $PSVersionTable.'
         )
 
     return create_tool_definition(

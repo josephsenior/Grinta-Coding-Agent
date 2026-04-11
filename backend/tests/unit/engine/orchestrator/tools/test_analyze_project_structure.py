@@ -1,107 +1,42 @@
-"""Unit tests for backend.engine.tools.analyze_project_structure."""
-
 from __future__ import annotations
 
-from backend.engine.tools import analyze_project_structure
-from backend.ledger.action import CmdRunAction
+import os
+from backend.engine.tools.analyze_project_structure import build_analyze_project_structure_action
 
+def test_analyze_project_structure_tree(tmp_path) -> None:
+    # Build some nested structure
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "main.py").write_text("print('hello')", encoding="utf-8")
+    
+    action = build_analyze_project_structure_action({
+        "command": "tree",
+        "path": str(tmp_path)
+    })
+    
+    assert "src/main.py" in action.thought
+    assert "<dir> src" in action.thought
 
-def test_tree_action_uses_powershell_fallback_on_windows_without_bash(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(analyze_project_structure.os, 'name', 'nt', raising=False)
-    monkeypatch.setattr(analyze_project_structure, 'uses_powershell_terminal', lambda: True)
+def test_analyze_project_structure_imports(tmp_path) -> None:
+    test_file = tmp_path / "module.py"
+    test_file.write_text("import os\nfrom pathlib import Path\n", encoding="utf-8")
+    
+    action = build_analyze_project_structure_action({
+        "command": "imports",
+        "path": str(test_file)
+    })
+    
+    assert "import os" in action.thought
+    assert "from pathlib import Path" in action.thought
 
-    action = analyze_project_structure.build_analyze_project_structure_action(
-        {'command': 'tree', 'path': '.', 'depth': 2}
-    )
-
-    assert isinstance(action, CmdRunAction)
-    assert 'b64decode' in action.command
-    assert 'Get-ChildItem' not in action.command
-    assert 'if command -v tree' not in action.command
-    assert 'find ' not in action.command
-
-
-def test_tree_action_keeps_posix_command_when_bash_is_available(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(analyze_project_structure.os, 'name', 'posix', raising=False)
-    monkeypatch.setattr(analyze_project_structure, 'uses_powershell_terminal', lambda: False)
-
-    action = analyze_project_structure.build_analyze_project_structure_action(
-        {'command': 'tree', 'path': '.', 'depth': 2}
-    )
-
-    assert isinstance(action, CmdRunAction)
-    assert 'if command -v tree' in action.command
-    assert 'Get-ChildItem' not in action.command
-
-
-# ------------------------------------------------------------------ #
-#  PowerShell branch tests for non-tree modes
-# ------------------------------------------------------------------ #
-
-
-def test_imports_action_uses_powershell_on_windows(monkeypatch) -> None:
-    monkeypatch.setattr(analyze_project_structure, 'uses_powershell_terminal', lambda: True)
-    action = analyze_project_structure.build_analyze_project_structure_action(
-        {'command': 'imports', 'path': 'foo/bar.py'}
-    )
-    assert isinstance(action, CmdRunAction)
-    assert 'Select-String' in action.command
-    assert 'grep' not in action.command
-    assert 'basename' not in action.command
-
-
-def test_imports_action_uses_bash_when_available(monkeypatch) -> None:
-    monkeypatch.setattr(analyze_project_structure, 'uses_powershell_terminal', lambda: False)
-    action = analyze_project_structure.build_analyze_project_structure_action(
-        {'command': 'imports', 'path': 'foo/bar.py'}
-    )
-    assert isinstance(action, CmdRunAction)
-    assert 'grep' in action.command
-
-
-def test_symbols_action_uses_powershell_on_windows(monkeypatch) -> None:
-    monkeypatch.setattr(analyze_project_structure, 'uses_powershell_terminal', lambda: True)
-    action = analyze_project_structure.build_analyze_project_structure_action(
-        {'command': 'symbols', 'path': 'foo/bar.py'}
-    )
-    assert isinstance(action, CmdRunAction)
-    assert 'Select-String' in action.command
-    assert 'grep' not in action.command
-
-
-def test_callers_action_uses_powershell_on_windows(monkeypatch) -> None:
-    monkeypatch.setattr(analyze_project_structure, 'uses_powershell_terminal', lambda: True)
-    action = analyze_project_structure.build_analyze_project_structure_action(
-        {'command': 'callers', 'symbol': 'my_func', 'path': '.'}
-    )
-    assert isinstance(action, CmdRunAction)
-    cmd = action.command
-    assert 'Get-Command rg' in cmd or 'Select-String' in cmd
-    assert 'grep' not in cmd
-
-
-def test_test_coverage_action_uses_powershell_on_windows(monkeypatch) -> None:
-    monkeypatch.setattr(analyze_project_structure, 'uses_powershell_terminal', lambda: True)
-    action = analyze_project_structure.build_analyze_project_structure_action(
-        {'command': 'test_coverage', 'path': 'backend/engine/planner.py'}
-    )
-    assert isinstance(action, CmdRunAction)
-    cmd = action.command
-    assert 'Get-ChildItem' in cmd
-    assert 'find ' not in cmd
-    assert 'basename' not in cmd
-    assert 'dirname' not in cmd
-
-
-def test_recent_action_uses_powershell_on_windows(monkeypatch) -> None:
-    monkeypatch.setattr(analyze_project_structure, 'uses_powershell_terminal', lambda: True)
-    action = analyze_project_structure.build_analyze_project_structure_action(
-        {'command': 'recent'}
-    )
-    assert isinstance(action, CmdRunAction)
-    assert 'Write-Output' in action.command
-    assert 'echo ' not in action.command.lower().split('write-output')[0]
+def test_analyze_project_structure_symbols(tmp_path) -> None:
+    test_file = tmp_path / "module.py"
+    test_file.write_text("class MyClass:\n    pass\n\ndef my_func():\n    pass\n\nMY_VAR = 1\n", encoding="utf-8")
+    
+    action = build_analyze_project_structure_action({
+        "command": "symbols",
+        "path": str(test_file)
+    })
+    
+    assert "class MyClass:" in action.thought
+    assert "def my_func():" in action.thought
+    assert "MY_VAR =" in action.thought

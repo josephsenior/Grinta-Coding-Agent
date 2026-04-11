@@ -8,16 +8,11 @@ LLM wouldn't otherwise know about.
 from __future__ import annotations
 
 import os
-import shlex
-
-from backend.engine.tools.prompt import (
-    build_python_exec_command,
-    uses_powershell_terminal,
-)
-from backend.ledger.action import AgentThinkAction, CmdRunAction
+import re
+import subprocess
+from backend.ledger.action import AgentThinkAction
 
 ANALYZE_PROJECT_STRUCTURE_TOOL_NAME = 'analyze_project_structure'
-
 
 def create_analyze_project_structure_tool() -> dict:
     """Return the OpenAI function-calling tool definition for analyze_project_structure."""
@@ -84,14 +79,16 @@ def create_analyze_project_structure_tool() -> dict:
         },
     }
 
-
 def build_analyze_project_structure_action(
     arguments: dict,
-) -> CmdRunAction | AgentThinkAction:
+) -> AgentThinkAction:
     """Build the action for the analyze_project_structure tool call."""
     command = arguments.get('command', 'tree')
     path = arguments.get('path', '.')
-    depth = int(arguments.get('depth', 3))
+    try:
+        depth = int(arguments.get('depth', 3))
+    except (ValueError, TypeError):
+        depth = 3
 
     if command == 'tree':
         return _build_tree_action(path, depth)
@@ -119,319 +116,307 @@ def build_analyze_project_structure_action(
         thought=f'[ANALYZE_PROJECT_STRUCTURE] Unknown command: {command}. Use tree/imports/symbols/recent/callers/test_coverage.'
     )
 
-
-def _build_tree_action(path: str, depth: int) -> CmdRunAction:
+def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
     """Directory tree with file sizes, respecting .gitignore."""
-    depth = max(1, min(depth, 5))  # Clamp 1-5
-    if os.name == 'nt':
-        cmd = _build_windows_tree_command(path, depth)
-        return CmdRunAction(command=cmd, display_label=f'Mapping project structure ({path})')
+    depth = max(1, min(depth, 5))
+    root = os.path.abspath(path)
+    ignore = {'__pycache__', 'node_modules', '.git', '.venv', 'venv'}
 
-    safe_path = shlex.quote(path)
-    # Prefer 'tree' if available, fall back to find
-    cmd = (
-        f'if command -v tree >/dev/null 2>&1; then '
-        f"tree -L {depth} --dirsfirst -s -I '__pycache__|node_modules|.git|.venv|venv' {safe_path} | head -200; "
-        f'else '
-        f'find {safe_path} -maxdepth {depth} '
-        f"\\( -name '__pycache__' -o -name 'node_modules' -o -name '.git' -o -name '.venv' -o -name 'venv' \\) -prune "
-        f"-o -type f -printf '%s %p\\n' | sort -k2 | head -200; "
-        f'fi'
-    )
-    return CmdRunAction(command=cmd, display_label=f'Mapping project structure ({path})')
+    gitignore_path = os.path.join(root, '.gitignore')
+    if os.path.isfile(gitignore_path):
+        try:
+            with open(gitignore_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.split('#')[0].strip().strip('/')
+                    if line and not line.startswith('*'):
+                        ignore.add(line)
+        except Exception:
+            pass
 
+    if not os.path.exists(root):
+        return AgentThinkAction(thought=f'[ANALYZE_PROJECT_STRUCTURE] Path not found: {path}')
 
-def _build_windows_tree_command(path: str, depth: int) -> str:
-    """Shell-independent tree listing for Windows runtimes.
+    def rel_depth(relative_path: str) -> int:
+        if relative_path in ('', '.'):
+            return 0
+        return relative_path.count(os.sep) + 1
 
-    Use the current Python interpreter directly so the command works whether
-    the runtime selected Git Bash or PowerShell.
-    """
-    script = f"""
-import os
-import sys
+    lines = [f"[ANALYZE_PROJECT_STRUCTURE] Mapping project structure ({path})"]
+    emitted = 0
+    for current_root, dirnames, filenames in os.walk(root):
+        relative_root = os.path.relpath(current_root, root)
+        current_depth = rel_depth(relative_root)
+        dirnames[:] = sorted(name for name in dirnames if name not in ignore)
+        if current_depth > depth:
+            dirnames[:] = []
+            continue
 
-root = os.path.abspath({path!r})
-max_depth = {depth}
-ignore = {{'__pycache__', 'node_modules', '.git', '.venv', 'venv'}}
+        if relative_root not in ('', '.'):
+            dname = relative_root.replace(os.sep, '/')
+            lines.append("<dir> " + dname)
+            emitted += 1
+            if emitted >= 200:
+                break
 
-# Read .gitignore if available
-gitignore_path = os.path.join(root, '.gitignore')
-if os.path.isfile(gitignore_path):
-    try:
-        with open(gitignore_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.split('#')[0].strip().strip('/')
-                if line and not line.startswith('*'):
-                    ignore.add(line)
-    except Exception:
-        pass
+        if current_depth >= depth:
+            dirnames[:] = []
 
-if not os.path.exists(root):
-    print('(path not found)')
-    raise SystemExit(0)
-
-def rel_depth(relative_path: str) -> int:
-    if relative_path in ('', '.'):
-        return 0
-    return relative_path.count(os.sep) + 1
-
-emitted = 0
-for current_root, dirnames, filenames in os.walk(root):
-    relative_root = os.path.relpath(current_root, root)
-    current_depth = rel_depth(relative_root)
-    dirnames[:] = sorted(name for name in dirnames if name not in ignore)
-    if current_depth > max_depth:
-        dirnames[:] = []
-        continue
-
-    if relative_root not in ('', '.'):
-        dname = relative_root.replace(os.sep, '/')
-        print("<dir> " + dname)
-        emitted += 1
+        for filename in sorted(name for name in filenames if name not in ignore):
+            if filename in ignore or filename.endswith('.pyc'):
+                continue
+            full_path = os.path.join(current_root, filename)
+            relative_path = os.path.relpath(full_path, root).replace(os.sep, '/')
+            try:
+                size_bytes = os.path.getsize(full_path)
+            except OSError:
+                size_bytes = 0
+            lines.append(f"{size_bytes} {relative_path}")
+            emitted += 1
+            if emitted >= 200:
+                break
         if emitted >= 200:
             break
+            
+    return AgentThinkAction(thought='\\n'.join(lines))
 
-    if current_depth >= max_depth:
-        dirnames[:] = []
-
-    for filename in sorted(name for name in filenames if name not in ignore):
-        if filename in ignore or filename.endswith('.pyc'):
-            continue
-        full_path = os.path.join(current_root, filename)
-        relative_path = os.path.relpath(full_path, root).replace(os.sep, '/')
-        try:
-            size_bytes = os.path.getsize(full_path)
-        except OSError:
-            size_bytes = 0
-        print(str(size_bytes) + " " + relative_path)
-        emitted += 1
-        if emitted >= 200:
-            raise SystemExit(0)
-""".strip()
-    return build_python_exec_command(script)
-
-
-def _quote_powershell_literal(value: str) -> str:
-    """Quote a PowerShell string literal safely."""
-    return "'" + value.replace("'", "''") + "'"
-
-
-def _build_imports_action(path: str) -> CmdRunAction:
+def _build_imports_action(path: str) -> AgentThinkAction:
     """Show what a file imports AND what other files import it."""
-    import os as _os
-    if uses_powershell_terminal():
-        return _build_windows_imports_action(path)
-    safe_path = shlex.quote(path)
-    cmd = (
-        f"echo '=== IMPORTS IN {safe_path} ===' && "
-        f"grep -nE '^(import |from .+ import )' {safe_path} 2>/dev/null || echo '(no imports found)' && "
-        f"echo '' && echo '=== FILES THAT IMPORT THIS MODULE ===' && "
-        f'basename_no_ext=$(basename {safe_path} .py) && '
-        f'rg -l "(import|from).*$basename_no_ext" --type py --glob \'!__pycache__\' 2>/dev/null | head -30 || '
-        f'grep -rl "$basename_no_ext" --include=\'*.py\' . 2>/dev/null | head -30 || '
-        f"echo '(no reverse imports found)'"
-    )
-    return CmdRunAction(command=cmd, display_label=f'Reading imports · {_os.path.basename(path)}')
-
-
-def _build_symbols_action(path: str) -> CmdRunAction:
-    """List classes, functions, and top-level assignments in a file."""
-    import os as _os
-    if uses_powershell_terminal():
-        return _build_windows_symbols_action(path)
-    safe_path = shlex.quote(path)
-    # Use grep to extract class/def/assignment lines — fast and universal
-    cmd = (
-        f"echo '=== SYMBOLS IN {safe_path} ===' && "
-        f"grep -nE '^(class |def |async def |[A-Z_][A-Z_0-9]* *=)' {safe_path} 2>/dev/null | head -100 || "
-        f"echo '(no symbols found or file does not exist)'"
-    )
-    return CmdRunAction(command=cmd, display_label=f'Listing symbols · {_os.path.basename(path)}')
-
-
-def _build_recent_action() -> CmdRunAction:
-    """Recently modified files via git log."""
-    if uses_powershell_terminal():
-        cmd = (
-            "Write-Output '=== RECENTLY MODIFIED FILES (last 20 commits) ==='; "
-            "try { git log --oneline --name-only -20 --pretty=format:'%h %s' 2>$null | "
-            "Select-Object -First 100 } "
-            "catch { Write-Output '(not a git repository or no commits)' }"
-        )
+    out = [f"=== IMPORTS IN {os.path.basename(path)} ==="]
+    if os.path.isfile(path):
+        try:
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                for i, line in enumerate(f, 1):
+                    if line.startswith('import ') or line.startswith('from '):
+                        out.append(f"{i}:{line.rstrip()}")
+        except Exception as e:
+            out.append(f'(error reading file: {e})')
     else:
-        cmd = (
-            "echo '=== RECENTLY MODIFIED FILES (last 20 commits) ===' && "
-            "git log --oneline --name-only -20 --pretty=format:'%h %s' 2>/dev/null | head -100 || "
-            "echo '(not a git repository or no commits)'"
+        out.append('(file not found)')
+        
+    out.append("")
+    out.append("=== FILES THAT IMPORT THIS MODULE ===")
+    basename = os.path.splitext(os.path.basename(path))[0]
+    
+    # Try ripgrep first
+    import shutil
+    rg = shutil.which('rg')
+    found_any = False
+    
+    if rg:
+        try:
+            res = subprocess.run([
+                rg, '-l', f'(import|from).*{basename}',
+                '--type', 'py', '--glob', '!__pycache__'
+            ], capture_output=True, text=True, check=False)
+            if res.stdout.strip():
+                lines = res.stdout.splitlines()[:30]
+                out.extend(lines)
+                found_any = bool(lines)
+        except Exception:
+            pass
+            
+    if not found_any:
+        # Fallback to python traversal
+        count = 0
+        import_re = re.compile(f'(import|from).*{re.escape(basename)}')
+        for root_dir, dirs, files in os.walk('.'):
+            if '__pycache__' in dirs: dirs.remove('__pycache__')
+            if 'node_modules' in dirs: dirs.remove('node_modules')
+            if '.venv' in dirs: dirs.remove('.venv')
+            for f in files:
+                if f.endswith('.py'):
+                    fpath = os.path.join(root_dir, f)
+                    try:
+                        with open(fpath, 'r', encoding='utf-8', errors='ignore') as fl:
+                            if import_re.search(fl.read()):
+                                out.append(fpath)
+                                count += 1
+                                if count >= 30:
+                                    break
+                    except Exception:
+                        pass
+            if count >= 30:
+                break
+        if count == 0:
+            out.append("(no reverse imports found)")
+            
+    return AgentThinkAction(thought='\\n'.join(out))
+
+def _build_symbols_action(path: str) -> AgentThinkAction:
+    """List classes, functions, and top-level assignments in a file."""
+    out = [f"=== SYMBOLS IN {os.path.basename(path)} ==="]
+    if os.path.isfile(path):
+        sym_re = re.compile(r'^(class |def |async def |[A-Z_][A-Z_0-9]* *=)')
+        try:
+            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                count = 0
+                for i, line in enumerate(f, 1):
+                    if sym_re.match(line):
+                        out.append(f"{i}:{line.rstrip()}")
+                        count += 1
+                        if count >= 100:
+                            break
+                if count == 0:
+                    out.append("(no symbols found)")
+        except Exception as e:
+            out.append(f"(error reading file: {e})")
+    else:
+        out.append('(file not found)')
+    return AgentThinkAction(thought='\\n'.join(out))
+
+def _build_recent_action() -> AgentThinkAction:
+    """Recently modified files via git log."""
+    out = ["=== RECENTLY MODIFIED FILES (last 20 commits) ==="]
+    try:
+        res = subprocess.run(
+            ['git', 'log', '--oneline', '--name-only', '-20', '--pretty=format:%h %s'],
+            capture_output=True, text=True, check=False
         )
-    return CmdRunAction(command=cmd, display_label='Reading recent git history')
+        if res.stdout.strip():
+            out.extend(res.stdout.splitlines()[:100])
+        else:
+            out.append('(no commits or not a git repository)')
+    except Exception:
+        out.append('(git not available or error running git)')
+    return AgentThinkAction(thought='\\n'.join(out))
 
-
-def _build_callers_action(symbol: str, scope: str) -> CmdRunAction:
-    """Find all files that reference a given symbol (function, class, variable).
-
-    Uses ripgrep for speed with grep fallback. Searches for word-boundary
-    matches to avoid false positives on substrings.
-    """
+def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
+    """Find all files that reference a given symbol (function, class, variable)."""
     trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
-    if uses_powershell_terminal():
-        return _build_windows_callers_action(symbol, scope, trunc_sym)
-    safe_symbol = shlex.quote(symbol)
-    safe_scope = shlex.quote(scope) if scope and scope != '.' else '.'
-    cmd = (
-        f"echo '=== CALLERS OF {safe_symbol} ===' && "
-        f'rg -n --word-regexp {safe_symbol} --type py --type js --type ts '
-        f"--glob '!__pycache__' --glob '!node_modules' --glob '!.git' "
-        f'{safe_scope} 2>/dev/null | head -50 || '
-        f"grep -rn --word-regexp {safe_symbol} --include='*.py' --include='*.js' "
-        f"--include='*.ts' --include='*.tsx' --include='*.jsx' "
-        f'{safe_scope} 2>/dev/null | head -50 || '
-        f"echo '(no references found for {safe_symbol})'"
-    )
-    return CmdRunAction(command=cmd, display_label=f'Finding callers of {trunc_sym!r}')
-
-
-def _build_test_coverage_action(path: str) -> CmdRunAction:
-    """Find test files that likely cover a given source file.
-
-    Uses three heuristics:
-    1. Naming convention: test_<module>.py, <module>_test.py, test/<module>.py
-    2. Import analysis: test files that import from the module
-    3. Conftest files in the same directory tree
-    """
-    import os as _os
-    if uses_powershell_terminal():
-        return _build_windows_test_coverage_action(path)
-    safe_path = shlex.quote(path)
-    cmd = (
-        f"echo '=== TEST COVERAGE FOR {safe_path} ===' && "
-        # Extract the module basename (e.g., 'planner' from 'backend/engines/orchestrator/planner.py')
-        f'basename_no_ext=$(basename {safe_path} .py) && '
-        f'dirname_path=$(dirname {safe_path}) && '
-        f"echo '--- Tests by naming convention ---' && "
-        # Find test files matching naming conventions
-        f'find . -type f \\( '
-        f'-name "test_${{basename_no_ext}}.py" -o '
-        f'-name "${{basename_no_ext}}_test.py" -o '
-        f'-name "test_${{basename_no_ext}}.*.py" '
-        f"\\) ! -path '*/__pycache__/*' 2>/dev/null | head -20 && "
-        f"echo '' && echo '--- Tests that import this module ---' && "
-        # Find test files that import the module
-        f"rg -l \"(import|from).*${{basename_no_ext}}\" --glob 'test_*.py' --glob '*_test.py' "
-        f"--glob '!__pycache__' 2>/dev/null | head -20 || "
-        f"grep -rl \"${{basename_no_ext}}\" --include='test_*.py' --include='*_test.py' . "
-        f'2>/dev/null | head -20 || '
-        f"echo '(no importing test files found)' && "
-        f"echo '' && echo '--- Conftest files in scope ---' && "
-        f'find "$dirname_path" -name \'conftest.py\' -type f 2>/dev/null | head -10 || '
-        f"echo '(none)'"
-    )
-    return CmdRunAction(command=cmd, display_label=f'Finding tests for {_os.path.basename(path)}')
-
-
-# ------------------------------------------------------------------ #
-#  Windows / PowerShell command builders
-# ------------------------------------------------------------------ #
-
-def _build_windows_imports_action(path: str) -> CmdRunAction:
-    """PowerShell-safe import analysis."""
-    import os as _os
-    sp = _quote_powershell_literal(path)
-    basename = _os.path.splitext(_os.path.basename(path))[0]
-    sb = _quote_powershell_literal(basename)
-    cmd = (
-        f"Write-Output '=== IMPORTS IN {basename} ==='; "
-        f"if (Test-Path {sp}) {{ "
-        f"  Select-String -Pattern '^(import |from .+ import )' -Path {sp} -ErrorAction SilentlyContinue | "
-        f"  ForEach-Object {{ $_.LineNumber.ToString() + ':' + $_.Line }} | Select-Object -First 50 "
-        f"}} else {{ Write-Output '(file not found)' }}; "
-        f"Write-Output ''; Write-Output '=== FILES THAT IMPORT THIS MODULE ==='; "
-        f"Get-ChildItem -Path . -Filter '*.py' -Recurse -File -ErrorAction SilentlyContinue | "
-        f"  Where-Object {{ $_.FullName -notmatch '__pycache__' }} | "
-        f"  Select-String -Pattern ('(import|from).*' + {sb}) -List -ErrorAction SilentlyContinue | "
-        f"  ForEach-Object {{ $_.Path }} | Select-Object -First 30; "
-        f"if (-not $?) {{ Write-Output '(no reverse imports found)' }}"
-    )
-    return CmdRunAction(command=cmd, display_label=f'Reading imports · {_os.path.basename(path)}')
-
-
-def _build_windows_symbols_action(path: str) -> CmdRunAction:
-    """PowerShell-safe symbol listing."""
-    import os as _os
-    sp = _quote_powershell_literal(path)
-    cmd = (
-        f"Write-Output '=== SYMBOLS IN {_os.path.basename(path)} ==='; "
-        f"if (Test-Path {sp}) {{ "
-        f"  Select-String -Pattern '^(class |def |async def |[A-Z_][A-Z_0-9]* *=)' -Path {sp} -ErrorAction SilentlyContinue | "
-        f"  ForEach-Object {{ $_.LineNumber.ToString() + ':' + $_.Line }} | Select-Object -First 100 "
-        f"}} else {{ Write-Output '(no symbols found or file does not exist)' }}"
-    )
-    return CmdRunAction(command=cmd, display_label=f'Listing symbols · {_os.path.basename(path)}')
-
-
-def _build_windows_callers_action(symbol: str, scope: str, trunc_sym: str) -> CmdRunAction:
-    """PowerShell-safe caller search.  Prefers ``rg`` if available."""
-    ss = _quote_powershell_literal(symbol)
+    out = [f"=== CALLERS OF {trunc_sym} ==="]
+    
+    import shutil
+    rg = shutil.which('rg')
     safe_scope = scope if scope and scope != '.' else '.'
-    sp = _quote_powershell_literal(safe_scope)
-    cmd = (
-        f"Write-Output '=== CALLERS OF {trunc_sym} ==='; "
-        f"$rg = Get-Command rg -ErrorAction SilentlyContinue; "
-        f"if ($rg) {{ "
-        f"  rg -n --word-regexp {ss} --type py --type js --type ts "
-        f"  --glob '!__pycache__' --glob '!node_modules' --glob '!.git' "
-        f"  {sp} 2>$null | Select-Object -First 50 "
-        f"}} else {{ "
-        f"  Get-ChildItem -Path {sp} -Include '*.py','*.js','*.ts','*.tsx','*.jsx' -Recurse -File -ErrorAction SilentlyContinue | "
-        f"  Where-Object {{ $_.FullName -notmatch '__pycache__|node_modules|\\.git' }} | "
-        f"  Select-String -Pattern ('\\b' + {ss} + '\\b') -ErrorAction SilentlyContinue | "
-        f"  ForEach-Object {{ $_.Path + ':' + $_.LineNumber.ToString() + ':' + $_.Line }} | "
-        f"  Select-Object -First 50 "
-        f"}}; "
-        f"if (-not $?) {{ Write-Output '(no references found for {trunc_sym})' }}"
-    )
-    return CmdRunAction(command=cmd, display_label=f'Finding callers of {trunc_sym!r}')
+    
+    if rg:
+        try:
+            res = subprocess.run([
+                rg, '-n', '--word-regexp', symbol,
+                '--type', 'py', '--type', 'js', '--type', 'ts',
+                '--glob', '!__pycache__', '--glob', '!node_modules', '--glob', '!.git',
+                safe_scope
+            ], capture_output=True, text=True, check=False)
+            if res.stdout.strip():
+                out.extend(res.stdout.splitlines()[:50])
+                return AgentThinkAction(thought='\\n'.join(out))
+        except Exception:
+            pass
+            
+    # Python fallback
+    sym_re = re.compile(rf'\\b{re.escape(symbol)}\\b')
+    count = 0
+    for root_dir, dirs, files in os.walk(safe_scope):
+        if '__pycache__' in dirs: dirs.remove('__pycache__')
+        if 'node_modules' in dirs: dirs.remove('node_modules')
+        if '.git' in dirs: dirs.remove('.git')
+        if '.venv' in dirs: dirs.remove('.venv')
+        
+        for f in files:
+            if f.endswith(('.py', '.js', '.ts', '.tsx', '.jsx')):
+                fpath = os.path.join(root_dir, f)
+                try:
+                    with open(fpath, 'r', encoding='utf-8', errors='ignore') as fl:
+                        for i, line in enumerate(fl, 1):
+                            if sym_re.search(line):
+                                out.append(f"{fpath}:{i}:{line.rstrip()}")
+                                count += 1
+                                if count >= 50:
+                                    break
+                except Exception:
+                    pass
+            if count >= 50:
+                break
+        if count >= 50:
+            break
+            
+    if count == 0:
+        out.append(f"(no references found for {trunc_sym})")
+    return AgentThinkAction(thought='\\n'.join(out))
 
+def _build_test_coverage_action(path: str) -> AgentThinkAction:
+    """Find test files that likely cover a given source file."""
+    basename = os.path.splitext(os.path.basename(path))[0]
+    dirname = os.path.dirname(path) or '.'
+    out = [
+        f"=== TEST COVERAGE FOR {os.path.basename(path)} ===",
+        "--- Tests by naming convention ---"
+    ]
+    
+    name_re = re.compile(rf'^(test_{re.escape(basename)}\\.py|{re.escape(basename)}_test\\.py)$')
+    count = 0
+    test_files = []
+    
+    for root_dir, dirs, files in os.walk('.'):
+        if '__pycache__' in dirs: dirs.remove('__pycache__')
+        for f in files:
+            if name_re.match(f):
+                test_files.append(os.path.join(root_dir, f))
+                count += 1
+                if count >= 20: break
+        if count >= 20: break
+        
+    out.extend(test_files)
+    if not test_files:
+        out.append("(none)")
+        
+    out.append("")
+    out.append("--- Tests that import this module ---")
+    import_re = re.compile(rf'(import|from).*{re.escape(basename)}')
+    count = 0
+    import_test_files = []
+    
+    for root_dir, dirs, files in os.walk('.'):
+        if '__pycache__' in dirs: dirs.remove('__pycache__')
+        for f in files:
+            if f.startswith('test_') or f.endswith('_test.py'):
+                fpath = os.path.join(root_dir, f)
+                if fpath in test_files:
+                    continue # Already found
+                try:
+                    with open(fpath, 'r', encoding='utf-8', errors='ignore') as fl:
+                        if import_re.search(fl.read()):
+                            import_test_files.append(fpath)
+                            count += 1
+                            if count >= 20: break
+                except Exception:
+                    pass
+        if count >= 20: break
+        
+    out.extend(import_test_files)
+    if not import_test_files:
+        out.append("(no importing test files found)")
+        
+    out.append("")
+    out.append("--- Conftest files in scope ---")
+    count = 0
+    conftest_files = []
+    for root_dir, dirs, files in os.walk(dirname):
+        if '__pycache__' in dirs: dirs.remove('__pycache__')
+        for f in files:
+            if f == 'conftest.py':
+                conftest_files.append(os.path.join(root_dir, f))
+                count += 1
+                if count >= 10: break
+        if count >= 10: break
+        
+    out.extend(conftest_files)
+    if not conftest_files:
+        out.append("(none)")
+        
+    return AgentThinkAction(thought='\\n'.join(out))
 
-def _build_windows_test_coverage_action(path: str) -> CmdRunAction:
-    """PowerShell-safe test-coverage heuristic search."""
-    import os as _os
-    basename = _os.path.splitext(_os.path.basename(path))[0]
-    dirname = _os.path.dirname(path) or '.'
-    sb = _quote_powershell_literal(basename)
-    sd = _quote_powershell_literal(dirname)
-    cmd = (
-        f"Write-Output '=== TEST COVERAGE FOR {_os.path.basename(path)} ==='; "
-        f"Write-Output '--- Tests by naming convention ---'; "
-        f"Get-ChildItem -Path . -Recurse -File -ErrorAction SilentlyContinue | "
-        f"  Where-Object {{ $_.Name -match ('^test_' + {sb} + '\\.py$|^' + {sb} + '_test\\.py$') -and $_.FullName -notmatch '__pycache__' }} | "
-        f"  ForEach-Object {{ $_.FullName }} | Select-Object -First 20; "
-        f"Write-Output ''; Write-Output '--- Tests that import this module ---'; "
-        f"Get-ChildItem -Path . -Include 'test_*.py','*_test.py' -Recurse -File -ErrorAction SilentlyContinue | "
-        f"  Where-Object {{ $_.FullName -notmatch '__pycache__' }} | "
-        f"  Select-String -Pattern ('(import|from).*' + {sb}) -List -ErrorAction SilentlyContinue | "
-        f"  ForEach-Object {{ $_.Path }} | Select-Object -First 20; "
-        f"Write-Output ''; Write-Output '--- Conftest files in scope ---'; "
-        f"Get-ChildItem -Path {sd} -Filter 'conftest.py' -Recurse -File -ErrorAction SilentlyContinue | "
-        f"  ForEach-Object {{ $_.FullName }} | Select-Object -First 10; "
-        f"if (-not $?) {{ Write-Output '(none)' }}"
-    )
-    return CmdRunAction(command=cmd, display_label=f'Finding tests for {_os.path.basename(path)}')
-
-
-def _build_semantic_search_action(symbol: str, path: str) -> CmdRunAction:
+def _build_semantic_search_action(symbol: str, path: str) -> AgentThinkAction:
     """Robust AST-based reference search using the semantic_analyzer script."""
-    import shlex
     import sys
-
     import backend.engine.tools.semantic_analyzer as sa
-
-    safe_symbol = shlex.quote(symbol)
-    safe_path = shlex.quote(path)
-    python_exe = sys.executable or 'python'
+    
     script_path = sa.__file__
-
-    cmd = f'{python_exe} {shlex.quote(script_path)} find_references {safe_symbol} {safe_path}'
-    trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
-    return CmdRunAction(command=cmd, display_label=f'Searching references for {trunc_sym!r}')
+    try:
+        res = subprocess.run(
+            [sys.executable, script_path, 'find_references', symbol, path],
+            capture_output=True, text=True, check=False
+        )
+        return AgentThinkAction(thought=res.stdout if res.stdout.strip() else f"(no output from semantic search for {symbol})")
+    except Exception as e:
+        return AgentThinkAction(thought=f"(error running semantic search: {e})")

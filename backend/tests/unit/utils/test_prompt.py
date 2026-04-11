@@ -262,7 +262,8 @@ def test_sentinels():
 def test_terminal_helpers_use_bash_when_available_on_windows():
     from backend.engine.tools import prompt as prompt_mod
 
-    prompt_mod.uses_powershell_terminal.cache_clear()
+    prompt_mod.set_active_tool_registry(None)
+    prompt_mod._get_global_tool_registry.cache_clear()
     with (
         patch('backend.engine.tools.prompt.sys.platform', 'win32'),
         patch('backend.engine.tools.prompt._runtime_prefers_powershell', return_value=False),
@@ -270,13 +271,15 @@ def test_terminal_helpers_use_bash_when_available_on_windows():
         assert uses_powershell_terminal() is False
         assert get_shell_name() == 'bash'
         assert get_terminal_tool_name() == 'execute_bash'
-    prompt_mod.uses_powershell_terminal.cache_clear()
+    prompt_mod.set_active_tool_registry(None)
+    prompt_mod._get_global_tool_registry.cache_clear()
 
 
 def test_terminal_helpers_use_powershell_without_bash_on_windows():
     from backend.engine.tools import prompt as prompt_mod
 
-    prompt_mod.uses_powershell_terminal.cache_clear()
+    prompt_mod.set_active_tool_registry(None)
+    prompt_mod._get_global_tool_registry.cache_clear()
     with (
         patch('backend.engine.tools.prompt.sys.platform', 'win32'),
         patch('backend.engine.tools.prompt._runtime_prefers_powershell', return_value=True),
@@ -284,7 +287,8 @@ def test_terminal_helpers_use_powershell_without_bash_on_windows():
         assert uses_powershell_terminal() is True
         assert get_shell_name() == 'powershell'
         assert get_terminal_tool_name() == 'execute_powershell'
-    prompt_mod.uses_powershell_terminal.cache_clear()
+    prompt_mod.set_active_tool_registry(None)
+    prompt_mod._get_global_tool_registry.cache_clear()
 
 
 def test_python_shell_command_prefers_python3_in_bash_mode():
@@ -333,7 +337,49 @@ def test_build_python_exec_command_includes_shell_fallbacks_for_powershell():
     with patch('backend.engine.tools.prompt.uses_powershell_terminal', return_value=True):
         command = build_python_exec_command('print("hello")')
 
-    assert 'Get-Command python' in command
-    assert 'Get-Command py' in command
-    assert 'Get-Command python3' in command
-    assert '[MISSING_TOOL] python/python3/py not found in PATH' in command
+    assert command.startswith('python -c "import base64;exec')
+
+
+def test_active_tool_registry_visible_from_worker_thread():
+    """Regression: ThreadPoolExecutor workers must see the runtime ToolRegistry."""
+    from concurrent.futures import ThreadPoolExecutor
+    from unittest.mock import MagicMock
+
+    from backend.engine.tools import prompt as prompt_mod
+
+    prompt_mod.set_active_tool_registry(None)
+    prompt_mod._get_global_tool_registry.cache_clear()
+    mock_reg = MagicMock()
+    mock_reg.has_bash = True
+    prompt_mod.set_active_tool_registry(mock_reg)
+    try:
+
+        def read_prefers_powershell():
+            return prompt_mod._runtime_prefers_powershell()
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            assert pool.submit(read_prefers_powershell).result() is False
+    finally:
+        prompt_mod.set_active_tool_registry(None)
+        prompt_mod._get_global_tool_registry.cache_clear()
+
+
+def test_build_python_exec_command_matches_active_registry_git_bash_on_windows():
+    """Regression: active ToolRegistry with has_bash must emit POSIX shell, not PowerShell."""
+    from unittest.mock import MagicMock
+
+    from backend.engine.tools import prompt as prompt_mod
+
+    prompt_mod.set_active_tool_registry(None)
+    prompt_mod._get_global_tool_registry.cache_clear()
+    mock_reg = MagicMock()
+    mock_reg.has_bash = True
+    prompt_mod.set_active_tool_registry(mock_reg)
+    try:
+        with patch('backend.engine.tools.prompt.sys.platform', 'win32'):
+            command = build_python_exec_command('print("hello")')
+        assert 'command -v python3' in command
+        assert 'Get-Command' not in command
+    finally:
+        prompt_mod.set_active_tool_registry(None)
+        prompt_mod._get_global_tool_registry.cache_clear()

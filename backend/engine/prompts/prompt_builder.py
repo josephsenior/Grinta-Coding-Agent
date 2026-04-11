@@ -143,9 +143,9 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
     )
     lsp_enabled = getattr(config, 'enable_lsp_query', False)
     code_intelligence_fallback = (
-        "- `search_code` returns nothing → try `code_intelligence` → then shell grep as last resort"
+        "- `search_code` returns nothing → try `lsp_query`"
         if lsp_enabled
-        else "- `search_code` returns nothing → use shell grep as last resort"
+        else "- `search_code` returns nothing → try alternate search terms, do not fall back to shell."
     )
     return _load("system_partial_01_autonomy.md").format(
         autonomy_block=autonomy,

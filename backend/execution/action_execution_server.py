@@ -151,6 +151,11 @@ class RuntimeExecutor:
             max_memory_gb=None,  # Will be updated in ainit
         )
 
+        if self.session_manager.tool_registry is not None:
+            from backend.engine.tools.prompt import set_active_tool_registry
+
+            set_active_tool_registry(self.session_manager.tool_registry)
+
         # Browser attribute kept for compatibility; initialized to None
         self.browser: Any | None = None
 

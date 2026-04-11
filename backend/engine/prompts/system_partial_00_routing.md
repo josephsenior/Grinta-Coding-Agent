@@ -18,7 +18,7 @@ Use this order when several tools could fit:
 - **Literal text, unknown file, error string, broad usage search** → `search_code`
 {code_intelligence_routing}
 - **Architecture, dependency traversal, full symbol body** → `read_symbol_definition` / `explore_tree_structure`
-- **Reading file contents** → `str_replace_editor` (`view_file` / `view_range`) or rely on batched file-read tool calls — **not** shell `cat`/`type` for project sources
+- **Reading file contents** → `str_replace_editor` (`view_file` / `view_range`) or rely on batched file-read tool calls — **not** shell tools for project sources
 - **External/vendor/service capabilities** → MCP tools when available
 - **Shell** only for installs, builds, tests, git, processes, or when no repo tool applies
 - **Exact line/file creation or replacement** → `str_replace_editor`

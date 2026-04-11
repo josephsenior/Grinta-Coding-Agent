@@ -232,9 +232,8 @@ def create_shell_session(
         Appropriate shell session implementation
     """
     if tools is None:
-        from backend.execution.utils.tool_registry import ToolRegistry
-
-        tools = cast(ShellToolRegistryLike, ToolRegistry())
+        from backend.engine.tools.prompt import _get_global_tool_registry
+        tools = cast(ShellToolRegistryLike, _get_global_tool_registry())
 
     resolved_tools = tools
     assert resolved_tools is not None

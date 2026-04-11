@@ -59,8 +59,8 @@ def create_working_memory_tool() -> ChatCompletionToolParam:
             },
             'section': {
                 'type': 'string',
-                'enum': list(_VALID_SECTIONS),
-                'description': 'The working memory section to operate on.',
+                'enum': [*list(_VALID_SECTIONS), 'all'],
+                'description': "The working memory section to operate on (or 'all').",
             },
             'content': {
                 'type': 'string',
@@ -117,6 +117,8 @@ def build_working_memory_action(arguments: dict) -> AgentThinkAction:
 
 
 def _update_section(section: str, content: str) -> AgentThinkAction:
+    if section == 'all':
+        return _update_all_sections(content)
     if section not in _VALID_SECTIONS:
         return AgentThinkAction(
             thought=f'[WORKING_MEMORY] Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}'
@@ -130,6 +132,85 @@ def _update_section(section: str, content: str) -> AgentThinkAction:
     memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
     _save_memory(memory)
     return AgentThinkAction(thought=f"[WORKING_MEMORY] Updated '{section}' section.")
+
+
+def _update_all_sections(content: str) -> AgentThinkAction:
+    """Update multiple working-memory sections in one call.
+
+    Accepts either:
+    - JSON object: {"hypothesis": "...", "findings": "...", ...}
+    - A markdown-ish block with headings like "## HYPOTHESIS" or "[HYPOTHESIS]".
+    - Otherwise, stores the entire content into the 'findings' section.
+    """
+    if not content:
+        return AgentThinkAction(thought="[WORKING_MEMORY] 'content' is required for update.")
+
+    memory = _load_memory()
+    updated: list[str] = []
+
+    # 1) Try JSON mapping first.
+    try:
+        maybe = json.loads(content)
+    except json.JSONDecodeError:
+        maybe = None
+
+    if isinstance(maybe, dict):
+        for sec in _VALID_SECTIONS:
+            val = maybe.get(sec)
+            if isinstance(val, str) and val.strip():
+                memory[sec] = val
+                updated.append(sec)
+
+        if updated:
+            memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
+            _save_memory(memory)
+            return AgentThinkAction(
+                thought=f"[WORKING_MEMORY] Updated sections: {', '.join(updated)}."
+            )
+
+    # 2) Parse a simple multi-section text block.
+    # Supported headers:
+    #   ## HYPOTHESIS
+    #   [HYPOTHESIS]
+    # (case-insensitive)
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        header = None
+        if line.startswith('##'):
+            header = line.lstrip('#').strip()
+        elif line.startswith('[') and line.endswith(']'):
+            header = line[1:-1].strip()
+
+        if header:
+            key = header.lower().strip()
+            if key in _VALID_SECTIONS:
+                current = key
+                sections.setdefault(key, [])
+                continue
+
+        if current is not None:
+            sections[current].append(raw_line)
+
+    for sec, lines in sections.items():
+        val = '\n'.join(lines).strip('\n')
+        if val.strip():
+            memory[sec] = val
+            updated.append(sec)
+
+    if updated:
+        memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
+        _save_memory(memory)
+        return AgentThinkAction(thought=f"[WORKING_MEMORY] Updated sections: {', '.join(updated)}.")
+
+    # 3) Fallback: store everything as findings.
+    memory['findings'] = content
+    memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
+    _save_memory(memory)
+    return AgentThinkAction(
+        thought="[WORKING_MEMORY] Updated 'findings' section (fallback from section='all')."
+    )
 
 
 def _get_section(section: str) -> AgentThinkAction:
@@ -159,6 +240,16 @@ def _get_section(section: str) -> AgentThinkAction:
 
 
 def _clear_section(section: str) -> AgentThinkAction:
+    if section == 'all':
+        memory = _load_memory()
+        any_cleared = False
+        for sec in _VALID_SECTIONS:
+            if sec in memory:
+                del memory[sec]
+                any_cleared = True
+        if any_cleared:
+            _save_memory(memory)
+        return AgentThinkAction(thought="[WORKING_MEMORY] Cleared all sections.")
     if section not in _VALID_SECTIONS:
         return AgentThinkAction(
             thought=f'[WORKING_MEMORY] Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}'

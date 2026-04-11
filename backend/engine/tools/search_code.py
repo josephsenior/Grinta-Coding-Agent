@@ -2,16 +2,13 @@
 
 Eliminates the grep→parse→regrep cycle by providing a single
 structured search interface that tries ripgrep first, then falls
-back to grep.
+back to pure Python traversal.
 """
 
 from __future__ import annotations
 
-import shlex
-
 from backend.engine.tools.common import create_tool_definition
-from backend.engine.tools.prompt import uses_powershell_terminal
-from backend.ledger.action import CmdRunAction
+from backend.ledger.action import AgentThinkAction
 
 _SEARCH_EXCLUDED_DIRS = (
     '.git',
@@ -29,7 +26,7 @@ _SEARCH_EXCLUDED_DIRS = (
 )
 
 _SEARCH_CODE_DESCRIPTION = """\
-Search for text patterns, symbols, or file paths in the codebase using ripgrep (falls back to grep).
+Search for text patterns, symbols, or file paths in the codebase using ripgrep (falls back to Python traversal).
 
 Modes:
 1. Text/regex search — set `pattern` to find matching lines across files.
@@ -41,17 +38,7 @@ For dependency traversal, use `explore_tree_structure`.
 
 SEARCH_CODE_TOOL_NAME = 'search_code'
 
-
-def _build_pruned_find_command(path: str) -> str:
-    """Build a find prefix that skips generated and cache directories."""
-    safe_path = shlex.quote(path)
-    prune_terms = ' -o '.join(
-        f'-name {shlex.quote(dir_name)}' for dir_name in _SEARCH_EXCLUDED_DIRS
-    )
-    return f'find {safe_path} \\( {prune_terms} \\) -prune -o'
-
-
-def create_search_code_tool():
+def create_search_code_tool() -> dict:
     """Create the search_code tool definition."""
     return create_tool_definition(
         name=SEARCH_CODE_TOOL_NAME,
@@ -96,7 +83,6 @@ def create_search_code_tool():
         required=[],  # all params optional; tool is flexible
     )
 
-
 def build_search_code_action(
     pattern: str = '',
     path: str = '.',
@@ -104,192 +90,178 @@ def build_search_code_action(
     context_lines: int = 2,
     case_sensitive: str = 'false',
     max_results: int = 50,
-) -> CmdRunAction:
-    """Build a CmdRunAction that performs the code search.
+) -> AgentThinkAction:
+    """Perform the code search directly in pure Python (with ripgrep fast-path).
 
-    Tries ripgrep (rg) first since it is much faster and respects
-    .gitignore automatically.  Falls back to grep -rn.
-
-    Args:
-        pattern: Regex/text pattern to search for.
-        path: Directory or file to search in.
-        file_pattern: Glob to restrict files.
-        context_lines: Context lines around matches.
-        case_sensitive: "true" or "false".
-        max_results: Max results to return.
-
-    Returns:
-        CmdRunAction: The bash command action.
+    Tries ripgrep (rg) via subprocess first since it is much faster and respects
+    .gitignore automatically. Falls back to pure Python traversal.
     """
+    import shutil
+
     path = path or '.'
     context_lines = max(0, min(int(context_lines), 10))
     max_results = max(1, min(int(max_results), 500))
     is_case_sensitive = str(case_sensitive).lower() == 'true'
-
-    if uses_powershell_terminal():
-        return _build_windows_search_action(
-            pattern, path, file_pattern, context_lines,
-            is_case_sensitive, max_results,
+    
+    # 1. Fast path: Ripgrep
+    rg_path = shutil.which('rg')
+    if rg_path:
+        return _search_with_ripgrep(
+            rg_path, pattern, path, file_pattern, context_lines, 
+            is_case_sensitive, max_results
         )
-
-    if not pattern:
-        # File-discovery mode: just list matching files
-        if file_pattern:
-            safe_glob = shlex.quote(file_pattern)
-            cmd = (
-                f"if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then "
-                f"git ls-files --cached --others --exclude-standard {safe_glob} | head -n {max_results}; "
-                f"else "
-                f"{_build_pruned_find_command(path)} -type f -name {safe_glob} -print | head -n {max_results}; "
-                f"fi"
-            )
-        else:
-            cmd = (
-                f"if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then "
-                f"git ls-files --cached --others --exclude-standard {shlex.quote(path)} | head -n {max_results}; "
-                f"else "
-                f"{_build_pruned_find_command(path)} -type f -print | head -n {max_results}; "
-                f"fi"
-            )
-        label = f'Listing files in {path}' if path and path != '.' else 'Listing files'
-        return CmdRunAction(command=cmd, display_label=label)
-
-    # Search mode — build rg command with grep fallback, then wrap in structured XML
-    safe_pattern = shlex.quote(pattern)
-    safe_path = shlex.quote(path)
-
-    rg_flags = [
-        f'--context={context_lines}',
-        f'--max-count={max_results}',
-        '--line-number',
-        '--no-heading',
-    ]
-    grep_flags = [f'-{context_lines}' if context_lines > 0 else '', '-rn']
-
-    if not is_case_sensitive:
-        rg_flags.append('--ignore-case')
-        grep_flags.append('-i')
-
-    rg_flags.extend(f'--glob=!**/{dir_name}/**' for dir_name in _SEARCH_EXCLUDED_DIRS)
-    grep_flags.extend(
-        ['-I', '--binary-files=without-match']
-        + [
-            f'--exclude-dir={shlex.quote(dir_name)}'
-            for dir_name in _SEARCH_EXCLUDED_DIRS
-        ]
+    
+    # 2. Fallback: Pure Python
+    return _search_with_python(
+        pattern, path, file_pattern, context_lines, 
+        is_case_sensitive, max_results
     )
 
-    if file_pattern:
-        safe_glob = shlex.quote(file_pattern)
-        rg_flags.append(f'--glob={safe_glob}')
-        grep_flags.append(f'--include={safe_glob}')
-
-    rg_flags_str = ' '.join(rg_flags)
-    grep_flags_str = ' '.join(f for f in grep_flags if f)
-
-    # Build the raw search command
-    raw_search = (
-        f'if command -v rg >/dev/null 2>&1; then '
-        f'rg {rg_flags_str} {safe_pattern} {safe_path}; '
-        f'else '
-        f'grep {grep_flags_str} {safe_pattern} {safe_path} | head -n {max_results}; '
-        f'fi'
-    )
-
-    # Wrap output in simple markers so the shell command stays quote-safe.
-    cmd = (
-        "printf '%s\n' '<search_results>' && "
-        f'( {raw_search} ) && '
-        "printf '%s\n' '</search_results>'"
-    )
-    trunc_pat = pattern[:50] + '…' if len(pattern) > 50 else pattern
-    scope = f' in {path}' if path and path != '.' else ''
-    return CmdRunAction(command=cmd, display_label=f'Searching for {trunc_pat!r}{scope}')
-
-
-def _ps_quote(value: str) -> str:
-    """Quote a PowerShell string literal safely."""
-    return "'" + value.replace("'", "''") + "'"
-
-
-def _build_windows_search_action(
+def _search_with_ripgrep(
+    rg_path: str,
     pattern: str,
     path: str,
     file_pattern: str,
     context_lines: int,
     is_case_sensitive: bool,
     max_results: int,
-) -> CmdRunAction:
-    """PowerShell-safe search / file-discovery action.
-
-    Prefers ``rg`` when available (cross-platform), falls back to
-    ``Select-String`` + ``Get-ChildItem``.
-    """
-    excluded = ', '.join(_ps_quote(d) for d in _SEARCH_EXCLUDED_DIRS)
-    sp = _ps_quote(path)
-
+) -> AgentThinkAction:
+    """Execute ripgrep directly via subprocess."""
+    import subprocess
+    
     if not pattern:
-        # --- file-discovery mode ---
+        # File discovery mode
+        args = [rg_path, '--files']
+        for d in _SEARCH_EXCLUDED_DIRS:
+            args.extend(['--glob', f'!**/{d}/**'])
         if file_pattern:
-            fp = _ps_quote(file_pattern)
-            cmd = (
-                f"$git = Get-Command git -ErrorAction SilentlyContinue; "
-                f"if ($git -and (git rev-parse --is-inside-work-tree 2>$null)) {{ "
-                f"  git ls-files --cached --others --exclude-standard {fp} | Select-Object -First {max_results} "
-                f"}} else {{ "
-                f"  Get-ChildItem -Path {sp} -Filter {fp} -Recurse -File -ErrorAction SilentlyContinue | "
-                f"  Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like \"*\\$_\\*\" }}) }} | "
-                f"  ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results} "
-                f"}}"
-            )
-        else:
-            cmd = (
-                f"$git = Get-Command git -ErrorAction SilentlyContinue; "
-                f"if ($git -and (git rev-parse --is-inside-work-tree 2>$null)) {{ "
-                f"  git ls-files --cached --others --exclude-standard {sp} | Select-Object -First {max_results} "
-                f"}} else {{ "
-                f"  Get-ChildItem -Path {sp} -Recurse -File -ErrorAction SilentlyContinue | "
-                f"  Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like \"*\\$_\\*\" }}) }} | "
-                f"  ForEach-Object {{ $_.FullName }} | Select-Object -First {max_results} "
-                f"}}"
-            )
-        label = f'Listing files in {path}' if path and path != '.' else 'Listing files'
-        return CmdRunAction(command=cmd, display_label=label)
+            args.extend(['--glob', file_pattern])
+        args.append(path)
+        
+        try:
+            result = subprocess.run(args, capture_output=True, text=True, check=False)
+            lines = result.stdout.splitlines()[:max_results]
+            out = '\\n'.join(lines)
+            if not out:
+                out = "No matching files found."
+            return AgentThinkAction(thought=f'<search_results>\\n{out}\\n</search_results>')
+        except Exception as e:
+            return AgentThinkAction(thought=f'<search_results>\\nError running ripgrep: {e}\\n</search_results>')
 
-    # --- search mode ---
-    trunc_pat = pattern[:50] + '…' if len(pattern) > 50 else pattern
-    scope = f' in {path}' if path and path != '.' else ''
-
-    # Try ripgrep first (works cross-platform)
-    rg_flags = [
+    # Search mode
+    args = [
+        rg_path,
         f'--context={context_lines}',
         f'--max-count={max_results}',
         '--line-number',
         '--no-heading',
     ]
     if not is_case_sensitive:
-        rg_flags.append('--ignore-case')
-    rg_flags.extend(f'--glob=!**/{d}/**' for d in _SEARCH_EXCLUDED_DIRS)
+        args.append('--ignore-case')
+    for d in _SEARCH_EXCLUDED_DIRS:
+        args.extend(['--glob', f'!**/{d}/**'])
     if file_pattern:
-        rg_flags.append(f'--glob={_ps_quote(file_pattern)}')
-    rg_flags_str = ' '.join(rg_flags)
-    safe_pattern = _ps_quote(pattern)
+        args.extend(['--glob', file_pattern])
+        
+    args.append(pattern)
+    args.append(path)
+    
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, check=False)
+        out = result.stdout
+        limit = max_results * (context_lines * 2 + 1) + 10
+        lines = out.splitlines()[:limit]
+        out_limited = '\\n'.join(lines)
+        if not out_limited:
+            out_limited = "No matches found."
+        return AgentThinkAction(thought=f'<search_results>\\n{out_limited}\\n</search_results>')
+    except Exception as e:
+         return AgentThinkAction(thought=f'<search_results>\\nError running ripgrep: {e}\\n</search_results>')
 
-    # Select-String fallback
-    case_flag = ' -CaseSensitive' if is_case_sensitive else ''
-    fp_filter = f' -Filter {_ps_quote(file_pattern)}' if file_pattern else ''
 
-    cmd = (
-        f"$rg = Get-Command rg -ErrorAction SilentlyContinue; "
-        f"Write-Output '<search_results>'; "
-        f"if ($rg) {{ "
-        f"  rg {rg_flags_str} {safe_pattern} {sp} 2>$null "
-        f"}} else {{ "
-        f"  Get-ChildItem -Path {sp}{fp_filter} -Recurse -File -ErrorAction SilentlyContinue | "
-        f"  Where-Object {{ $n = $_.FullName; -not (@({excluded}) | Where-Object {{ $n -like \"*\\$_\\*\" }}) }} | "
-        f"  Select-String -Pattern {safe_pattern}{case_flag} -Context {context_lines} -ErrorAction SilentlyContinue | "
-        f"  Select-Object -First {max_results} "
-        f"}}; "
-        f"Write-Output '</search_results>'"
-    )
-    return CmdRunAction(command=cmd, display_label=f'Searching for {trunc_pat!r}{scope}')
+def _search_with_python(
+    pattern: str,
+    path: str,
+    file_pattern: str,
+    context_lines: int,
+    is_case_sensitive: bool,
+    max_results: int,
+) -> AgentThinkAction:
+    """Execute search using pure Python standard library."""
+    import os
+    import re
+    import fnmatch
+    
+    if not os.path.exists(path):
+        return AgentThinkAction(thought=f"<search_results>\\nPath does not exist: {path}\\n</search_results>")
+        
+    results = []
+    
+    # Compile regex if pattern provided
+    regex = None
+    if pattern:
+        flags = 0 if is_case_sensitive else re.IGNORECASE
+        try:
+            regex = re.compile(pattern, flags)
+        except re.error as e:
+            return AgentThinkAction(thought=f"<search_results>\\nInvalid regex pattern: {e}\\n</search_results>")
+
+    # Collect files
+    target_files = []
+    if os.path.isfile(path):
+        target_files.append(path)
+    else:
+        for root, dirs, files in os.walk(path):
+            # Prune excluded dirs
+            dirs[:] = [d for d in dirs if d not in _SEARCH_EXCLUDED_DIRS]
+            for f in files:
+                if file_pattern and not fnmatch.fnmatch(f, file_pattern):
+                    continue
+                file_path = os.path.join(root, f)
+                target_files.append(file_path)
+
+    if not pattern:
+        # File discovery mode
+        lines = target_files[:max_results]
+        out = '\\n'.join(lines)
+        if not out:
+            out = "No matching files found."
+        return AgentThinkAction(thought=f'<search_results>\\n{out}\\n</search_results>')
+        
+    # Search mode
+    match_count = 0
+    for fpath in target_files:
+        if match_count >= max_results:
+            break
+            
+        try:
+            with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+        except OSError:
+            continue
+            
+        file_matches = []
+        for i, line in enumerate(lines):
+            if regex.search(line):
+                start = max(0, i - context_lines)
+                end = min(len(lines), i + context_lines + 1)
+                
+                # Format match block
+                block = []
+                for j in range(start, end):
+                    prefix = f"{j+1}:" if j == i else f"{j+1}-"
+                    block.append(f"{fpath}:{prefix}{lines[j].rstrip()}")
+                file_matches.append('\\n'.join(block))
+                
+                match_count += 1
+                if match_count >= max_results:
+                    break
+                    
+        if file_matches:
+            results.extend(file_matches)
+            results.append("--")
+            
+    out = '\\n'.join(results)
+    if not out:
+        out = "No matches found."
+    return AgentThinkAction(thought=f'<search_results>\\n{out}\\n</search_results>')
