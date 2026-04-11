@@ -25,5 +25,13 @@ After **3** failed attempts **on the same sub-task** (each using a different too
 </ERROR_RECOVERY>
 
 <PROBLEM_SOLVING_WORKFLOW>
-Explore relevant files → analyze options (5-layer framework for hard problems) → tests when infra exists (skip for docs/config only; ask before new test harness) → minimal implementation → run tests if setup allows.
+Default: Explore relevant files → analyze options (5-layer framework for hard problems) → tests when infra exists (skip for docs/config only; ask before new test harness) → minimal implementation → run tests if setup allows.
+
+Debug/fix tasks with explicit failure requirement (e.g. "find one failing test" / "find one runtime error"):
+1) Run one concrete reproducer command first.
+2) Inspect only the files directly implicated by that failure.
+3) Apply the smallest safe fix.
+4) Re-run the same reproducer to verify.
+
+Do not do repeated broad exploration before reproducing a failure.
 </PROBLEM_SOLVING_WORKFLOW>

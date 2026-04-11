@@ -71,8 +71,8 @@ def create_analyze_project_structure_tool() -> dict:
                     },
                     'depth': {
                         'type': 'integer',
-                        'description': "For 'tree': max depth (default 3).",
-                        'default': 3,
+                        'description': "For 'tree': max depth (default 1).",
+                        'default': 1,
                     },
                 },
                 'required': ['command'],
@@ -87,9 +87,9 @@ def build_analyze_project_structure_action(
     command = arguments.get('command', 'tree')
     path = arguments.get('path', '.')
     try:
-        depth = int(arguments.get('depth', 3))
+        depth = int(arguments.get('depth', 1))
     except (ValueError, TypeError):
-        depth = 3
+        depth = 1
 
     if command == 'tree':
         return _build_tree_action(path, depth)
@@ -121,7 +121,6 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
     """Directory tree with file sizes, respecting .gitignore."""
     depth = max(1, min(depth, 5))
     root = os.path.abspath(path)
-    root = os.path.abspath(path)
     spec = get_ignore_spec(root)
 
     if not os.path.exists(root):
@@ -132,43 +131,151 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
             return 0
         return relative_path.count(os.sep) + 1
 
-    lines = [f"[ANALYZE_PROJECT_STRUCTURE] Mapping project structure ({path})"]
+    def sort_files(filenames: list[str]) -> list[str]:
+        """Sort files with key project files first, then alphabetical."""
+        priority = {
+            'README.md': 0,
+            'pyproject.toml': 1,
+            'package.json': 2,
+            'requirements.txt': 3,
+            'Dockerfile': 4,
+            'Makefile': 5,
+            '.gitignore': 6,
+        }
+        return sorted(
+            filenames,
+            key=lambda name: (0, priority[name])
+            if name in priority
+            else (1, name.lower()),
+        )
+        
+    def extract_ast_summary(filepath: str) -> list[str]:
+        if not filepath.endswith('.py'):
+            return []
+        import ast
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            tree = ast.parse(content)
+            symbols = []
+            for node in tree.body:
+                if isinstance(node, ast.ClassDef):
+                    methods = [m.name for m in node.body if isinstance(m, ast.FunctionDef) and not m.name.startswith('__')]
+                    if methods:
+                        symbols.append(f"      class {node.name} (methods: {', '.join(methods[:3])}{'...' if len(methods)>3 else ''})")
+                    else:
+                        symbols.append(f"      class {node.name}")
+                elif isinstance(node, ast.FunctionDef) and not node.name.startswith('_'):
+                    symbols.append(f"      def {node.name}")
+            return symbols
+        except Exception:
+            return []
+
+    def get_git_files(cwd: str) -> set[str]:
+        """Try to get all tracked and untracked not-ignored files via git."""
+        try:
+            res = subprocess.run(
+                ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                cwd=cwd, capture_output=True, text=False, check=True
+            )
+            return {f.decode('utf-8', errors='ignore') for f in res.stdout.split(b'\0') if f}
+        except Exception:
+            return set()
+
+    git_files = get_git_files(root)
+    use_git = len(git_files) > 0
+
+    lines = [f"[ANALYZE_PROJECT_STRUCTURE] Mapping project semantic structure ({path})"]
+    lines.append("Note: Large directories are truncated. Showing key classes/functions for Python files.")
+    lines.append(
+        "Recovery hint: do not repeat this tool with identical arguments; pick a specific subpath or run a concrete test/build/runtime command next."
+    )
+    
     emitted = 0
+    max_total_items = float('inf')  # No hard limit on total items
+    max_files_per_dir = 50
+    emitted_dirs: set[str] = set()
+
+    def add_dir_header(relative_dir: str) -> None:
+        nonlocal emitted
+        if relative_dir in ('', '.'):
+            return
+        key = relative_dir.replace(os.sep, '/')
+        if key in emitted_dirs:
+            return
+        lines.append('<dir> ' + key)
+        emitted_dirs.add(key)
+        emitted += 1
+    
     for current_root, dirnames, filenames in os.walk(root):
         relative_root = os.path.relpath(current_root, root)
         current_depth = rel_depth(relative_root)
         
-        # Prune ignored directories using pathspec
+        # Prune ignored directories using pathspec to prevent traversing into them
         prune_ignored_dirs(root, current_root, dirnames, spec)
+        # Always manually prune .git since it's typically not in .gitignore
+        if '.git' in dirnames:
+            dirnames.remove('.git')
+            
         dirnames.sort()
+
+        # Surface directories before files so important folder navigation is immediate.
+        if current_depth < depth:
+            for dirname in dirnames:
+                rel_child = (
+                    dirname
+                    if relative_root in ('', '.')
+                    else os.path.join(relative_root, dirname)
+                )
+                add_dir_header(rel_child)
+
         if current_depth > depth:
+            add_dir_header(relative_root)
             dirnames[:] = []
             continue
 
-        if relative_root not in ('', '.'):
-            dname = relative_root.replace(os.sep, '/')
-            lines.append("<dir> " + dname)
-            emitted += 1
-            if emitted >= 200:
-                break
+        add_dir_header(relative_root)
 
-        if current_depth >= depth:
-            dirnames[:] = []
+        # Filter filenames
+        if use_git:
+            valid_filenames = []
+            for f in sort_files(filenames):
+                rel_file = os.path.relpath(os.path.join(current_root, f), root).replace(os.sep, '/')
+                if rel_file in git_files:
+                    valid_filenames.append(f)
+        else:
+            valid_filenames = [
+                f
+                for f in sort_files(filenames)
+                if not is_ignored_file(root, current_root, f, spec)
+            ]
+            
+        shown_files = valid_filenames[:max_files_per_dir]
+        hidden_files = len(valid_filenames) - len(shown_files)
 
-        for filename in sorted(filenames):
-            if is_ignored_file(root, current_root, filename, spec):
-                continue
+        for filename in shown_files:
             full_path = os.path.join(current_root, filename)
             relative_path = os.path.relpath(full_path, root).replace(os.sep, '/')
-            try:
-                size_bytes = os.path.getsize(full_path)
-            except OSError:
-                size_bytes = 0
-            lines.append(f"{size_bytes} {relative_path}")
+            
+            lines.append(f"  {relative_path}")
             emitted += 1
-            if emitted >= 200:
+            
+            # AST extraction purely in Python
+            summary = extract_ast_summary(full_path)
+            for sym in summary:
+                lines.append(sym)
+                emitted += 1
+                
+            if emitted >= max_total_items:
+                lines.append(f"\n(Output truncated at {max_total_items} total items. Try lower depth or a more specific path directory.)")
                 break
-        if emitted >= 200:
+                
+        if hidden_files > 0 and emitted < max_total_items:
+            hint_path = relative_root.replace(os.sep, '/') or '.'
+            lines.append(f"  ... and {hidden_files} more files inside {relative_root or '.'} hidden. Use path='{hint_path}' to explore.")
+            emitted += 1
+
+        if emitted >= max_total_items:
             break
             
     return AgentThinkAction(thought='\n'.join(lines))

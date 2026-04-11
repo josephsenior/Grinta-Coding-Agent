@@ -12,6 +12,22 @@ from backend.ledger.action import AgentThinkAction
 
 from backend.engine.tools.ignore_filter import get_ignore_spec, prune_ignored_dirs, is_ignored_file
 
+_SEARCH_EXCLUDED_DIRS = (
+    '.git',
+    '.venv',
+    'venv',
+    '.mypy_cache',
+    '.pytest_cache',
+    '.ruff_cache',
+    '__pycache__',
+    'node_modules',
+    '.tmp_cli_manual',
+    'logs',
+    'storage',
+    'build',
+    'dist',
+)
+
 _SEARCH_CODE_DESCRIPTION = """\
 Search for text patterns, symbols, or file paths in the codebase using ripgrep (falls back to Python traversal).
 
@@ -201,21 +217,24 @@ def _search_with_python(
             return AgentThinkAction(thought=f"<search_results>\\nInvalid regex pattern: {e}\
 </search_results>")
 
-    # Setup spec
-    spec = get_ignore_spec(path)
+    # Setup spec using a directory root.
+    # If `path` is a file, build ignores from its parent directory.
+    spec_root = path if os.path.isdir(path) else os.path.dirname(path) or '.'
+    spec = get_ignore_spec(spec_root)
 
     # Collect files
     target_files = []
     if os.path.isfile(path):
-        if not is_ignored_file(os.path.dirname(path), os.path.dirname(path), os.path.basename(path), spec):
+        current_root = os.path.dirname(path) or '.'
+        if not is_ignored_file(spec_root, current_root, os.path.basename(path), spec):
             target_files.append(path)
     else:
         for root, dirs, files in os.walk(path):
             # Prune excluded dirs via pathspec
-            prune_ignored_dirs(path, root, dirs, spec)
+            prune_ignored_dirs(spec_root, root, dirs, spec)
             
             for f in files:
-                if is_ignored_file(path, root, f, spec):
+                if is_ignored_file(spec_root, root, f, spec):
                     continue
                 if file_pattern and not fnmatch.fnmatch(f, file_pattern):
                     continue

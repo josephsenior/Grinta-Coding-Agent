@@ -266,6 +266,11 @@ class Orchestrator(Agent):
         except ToolExecutionError as e:
             self._consecutive_context_errors = 0
             logger.warning('Auto-Healing: Tool Execution Error: %s', e)
+            
+            removed = self.clear_queued_actions(reason="Tool execution failed, aborting batched sequence")
+            if removed > 0:
+                logger.info("Batched sequence aborted! Dispelled %d blind follow-up actions.", removed)
+
             return AgentThinkAction(
                 thought=f'I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.',
             )
@@ -485,28 +490,12 @@ class Orchestrator(Agent):
         return fallback
 
     def _queue_additional_actions(self, actions: list[Action]) -> None:
-        overflow = 0
         for pending in actions:
-            if len(self.pending_actions) < self._MAX_QUEUED_ACTIONS_PER_RESPONSE:
-                self.pending_actions.append(pending)
-            else:
-                self.deferred_actions.append(pending)
-                overflow += 1
-
-        if overflow > 0:
-            logger.debug(
-                'Deferred %d queued actions (pending=%d, deferred=%d)',
-                overflow,
-                len(self.pending_actions),
-                len(self.deferred_actions),
-            )
+            self.pending_actions.append(pending)
 
     def _promote_deferred_actions(self) -> None:
         """Promote a bounded set of deferred actions into the active queue."""
-        while (
-            self.deferred_actions
-            and len(self.pending_actions) < self._MAX_QUEUED_ACTIONS_PER_RESPONSE
-        ):
+        while self.deferred_actions:
             self.pending_actions.append(self.deferred_actions.popleft())
 
     def clear_queued_actions(self, reason: str = '') -> int:
