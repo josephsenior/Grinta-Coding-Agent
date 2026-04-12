@@ -547,6 +547,15 @@ def _error_guidance(error_text: str) -> ErrorGuidance | None:
                 'If the session files were removed, start a new task in the current project.',
             ),
         )
+    if 'pending action timed out' in lower:
+        return ErrorGuidance(
+            summary='A tool action ran longer than the pending-action guard window.',
+            steps=(
+                'The command may still be running. Verify current process/output state before retrying.',
+                'For setup/install tasks, run shorter sequential commands instead of one long chained command.',
+                'Increase pending_action_timeout in settings.json if your environment is consistently slow.',
+            ),
+        )
     if _contains_any(lower, ('timeout', 'timed out')):
         return ErrorGuidance(
             summary='The provider did not answer before the CLI gave up waiting.',

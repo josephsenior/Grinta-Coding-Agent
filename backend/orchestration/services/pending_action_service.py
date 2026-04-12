@@ -8,7 +8,10 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, cast
 
-from backend.core.constants import MCP_PENDING_ACTION_TIMEOUT_FLOOR
+from backend.core.constants import (
+    CMD_PENDING_ACTION_TIMEOUT_FLOOR,
+    MCP_PENDING_ACTION_TIMEOUT_FLOOR,
+)
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventSource
 from backend.ledger.action import Action
@@ -47,6 +50,21 @@ class PendingActionService:
             return math.inf
         if type(action).__name__ == 'DelegateTaskAction':
             return math.inf
+        if type(action).__name__ == 'CmdRunAction':
+            # Shell commands have their own runtime timeout model; keep the
+            # pending watchdog from clearing active installs/builds too early.
+            action_timeout = getattr(action, 'timeout', None)
+            try:
+                parsed_action_timeout = (
+                    float(action_timeout) if action_timeout is not None else None
+                )
+            except (TypeError, ValueError):
+                parsed_action_timeout = None
+
+            candidates = [float(base), CMD_PENDING_ACTION_TIMEOUT_FLOOR]
+            if parsed_action_timeout is not None and parsed_action_timeout > 0:
+                candidates.append(parsed_action_timeout)
+            return max(candidates)
         if type(action).__name__ == 'MCPAction':
             return max(float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR)
         return float(base)

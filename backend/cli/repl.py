@@ -1240,6 +1240,12 @@ class Repl:
             _HARD_TIMEOUT = max(30, int(_hard_timeout_raw))
         except (ValueError, TypeError):
             _HARD_TIMEOUT = 300  # 5 minutes absolute ceiling
+
+        _cmd_hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS', '1800')
+        try:
+            _CMD_HARD_TIMEOUT = max(_HARD_TIMEOUT, int(_cmd_hard_timeout_raw))
+        except (ValueError, TypeError):
+            _CMD_HARD_TIMEOUT = max(_HARD_TIMEOUT, 1800)
         _start = time.monotonic()
 
         while True:
@@ -1283,12 +1289,22 @@ class Repl:
                 await renderer.wait_for_state_change(wait_timeout_sec=0.1)
 
             # Hard timeout — surface error and return to prompt instead of
-            # hanging forever (e.g. LLM API unresponsive).
-            if time.monotonic() - _start > _HARD_TIMEOUT:
-                logger.warning('Agent wait exceeded %ds hard timeout', _HARD_TIMEOUT)
+            # hanging forever (e.g. LLM API unresponsive). Allow a longer
+            # budget while a foreground command action is still pending.
+            active_timeout = _HARD_TIMEOUT
+            pending_action = getattr(controller, '_pending_action', None)
+            if pending_action is not None:
+                with contextlib.suppress(Exception):
+                    from backend.ledger.action import CmdRunAction
+
+                    if isinstance(pending_action, CmdRunAction):
+                        active_timeout = _CMD_HARD_TIMEOUT
+
+            if time.monotonic() - _start > active_timeout:
+                logger.warning('Agent wait exceeded %ds hard timeout', active_timeout)
                 if renderer is not None:
                     renderer.add_system_message(
-                        f'Agent timed out after {_HARD_TIMEOUT} seconds. Returning to prompt.',
+                        f'Agent timed out after {active_timeout} seconds. Returning to prompt.',
                         title='⏱ Timeout',
                     )
                     renderer.drain_events()

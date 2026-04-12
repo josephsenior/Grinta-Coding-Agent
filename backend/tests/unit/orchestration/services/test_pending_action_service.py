@@ -4,6 +4,7 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
+from backend.ledger.action.commands import CmdRunAction
 from backend.orchestration.services.pending_action_service import PendingActionService
 
 
@@ -332,6 +333,24 @@ class TestPendingActionService(unittest.TestCase):
 
         self.assertEqual(action, mock_action)
         self.mock_controller.event_stream.add_event.assert_not_called()
+
+    @patch('time.time')
+    def test_cmd_run_action_uses_long_timeout_floor(self, mock_time):
+        """Long-running shell commands should outlive default pending timeout."""
+        service = PendingActionService(self.mock_context, timeout=120.0)
+        action = CmdRunAction(command='python -m venv .venv && pip install -r requirements.txt')
+
+        mock_time.return_value = 100.0
+        service.set(action)
+
+        # Past default pending timeout (120s), command should still be considered pending.
+        mock_time.return_value = 320.0
+        self.assertEqual(service.get(), action)
+
+        # Past long command floor (600s), timeout should trigger.
+        mock_time.return_value = 705.0
+        self.assertIsNone(service.get())
+        self.mock_controller.event_stream.add_event.assert_called_once()
 
 
 if __name__ == '__main__':

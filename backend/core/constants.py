@@ -62,6 +62,9 @@ RECALL_PIPELINE_TIMEOUT_SECONDS = 90.0
 DEFAULT_PENDING_ACTION_TIMEOUT = 120.0
 # MCP (stdio/SSE) can exceed the default (npx cold start, slow servers). Pending actions use max(base, this).
 MCP_PENDING_ACTION_TIMEOUT_FLOOR = 180.0
+# Foreground shell commands (env setup, installs, builds) often run far longer than
+# the default pending-action timeout while still progressing normally.
+CMD_PENDING_ACTION_TIMEOUT_FLOOR = 600.0
 
 # ── Threshold Constants ─────────────────────────────────────────────
 MAX_LINES_TO_EDIT = 300
