@@ -147,11 +147,9 @@ def _search_with_ripgrep(
             out = '\n'.join(lines)
             if not out:
                 out = "No matching files found."
-            return AgentThinkAction(thought=f'<search_results>\\n{out}\
-</search_results>')
+            return AgentThinkAction(source_tool='search_code', thought=f'<search_results>\n{out}\n</search_results>')
         except Exception as e:
-            return AgentThinkAction(thought=f'<search_results>\\nError running ripgrep: {e}\
-</search_results>')
+            return AgentThinkAction(source_tool='search_code', thought=f'<search_results>\nError running ripgrep: {e}\n</search_results>')
 
     # Search mode
     args = [
@@ -181,8 +179,7 @@ def _search_with_ripgrep(
         out_limited = '\n'.join(lines)
         if not out_limited:
             out_limited = "No matches found."
-        return AgentThinkAction(thought=f'<search_results>\\n{out_limited}\
-</search_results>')
+        return AgentThinkAction(source_tool='search_code', thought=f'<search_results>\n{out_limited}\n</search_results>')
     except Exception as e:
          return AgentThinkAction(thought=f'<search_results>\\nError running ripgrep: {e}\
 </search_results>')
@@ -202,8 +199,7 @@ def _search_with_python(
     import fnmatch
     
     if not os.path.exists(path):
-        return AgentThinkAction(thought=f"<search_results>\\nPath does not exist: {path}\
-</search_results>")
+        return AgentThinkAction(source_tool='search_code', thought=f"<search_results>\nPath does not exist: {path}\n</search_results>")
         
     results = []
     
@@ -214,8 +210,7 @@ def _search_with_python(
         try:
             regex = re.compile(pattern, flags)
         except re.error as e:
-            return AgentThinkAction(thought=f"<search_results>\\nInvalid regex pattern: {e}\
-</search_results>")
+            return AgentThinkAction(source_tool='search_code', thought=f"<search_results>\nInvalid regex pattern: {e}\n</search_results>")
 
     # Setup spec using a directory root.
     # If `path` is a file, build ignores from its parent directory.
@@ -236,9 +231,11 @@ def _search_with_python(
             for f in files:
                 if is_ignored_file(spec_root, root, f, spec):
                     continue
-                if file_pattern and not fnmatch.fnmatch(f, file_pattern):
-                    continue
                 file_path = os.path.join(root, f)
+                if file_pattern:
+                    rel_path = os.path.relpath(file_path, spec_root).replace(os.path.sep, '/')
+                    if not fnmatch.fnmatch(f, file_pattern) and not fnmatch.fnmatch(rel_path, file_pattern):
+                        continue
                 target_files.append(file_path)
 
     if not pattern:

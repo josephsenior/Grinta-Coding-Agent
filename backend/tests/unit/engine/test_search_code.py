@@ -35,3 +35,18 @@ class TestBuildSearchCodeAction:
         
         assert "test1.py" in action.thought
         assert "test2.js" not in action.thought
+    def test_nested_file_pattern_with_python_fallback(self, tmp_path, monkeypatch) -> None:
+        monkeypatch.setattr(shutil, 'which', lambda x: None)
+
+        src_dir = tmp_path / "src" / "deep"
+        src_dir.mkdir(parents=True)
+        (src_dir / "nested1.py").touch()
+        (src_dir / "ignore.txt").touch()
+
+        action = build_search_code_action(file_pattern='src/**/*.py', path=str(tmp_path))
+        assert "nested1.py" in action.thought
+        assert "ignore.txt" not in action.thought
+
+        action2 = build_search_code_action(file_pattern='**/*.py', path=str(tmp_path))
+        assert "nested1.py" in action2.thought
+        assert "ignore.txt" not in action2.thought
