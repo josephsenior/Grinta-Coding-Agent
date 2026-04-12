@@ -463,15 +463,6 @@ class FileEditor:
                 error='No match found even with whitespace normalization.',
                 new_content=file_content,
             )
-        if count > 1:
-            return ToolResult(
-                output='',
-                error=(
-                    f'Whitespace-normalized old_str matches {count} locations - must be unique. '
-                    'Include more surrounding context lines.'
-                ),
-                new_content=file_content,
-            )
 
         norm_start = norm_content.index(norm_old)
         norm_end = norm_start + len(norm_old)
@@ -544,42 +535,6 @@ class FileEditor:
         if best_ratio < 0.80:
             return self._fuzzy_match_error(file_content, old_str)
 
-        # For 0.80-0.95 near matches, require line-level agreement.
-        # Short snippets (<=4 lines) are allowed with at least one exact
-        # anchor line; longer snippets keep stricter agreement.
-        if best_ratio < 0.95:
-            if len(old_norm_lines) <= 4:
-                required_matches = 1
-            else:
-                required_matches = max(
-                    len(old_norm_lines) - 1,
-                    int(len(old_norm_lines) * 0.7),
-                )
-            if best_line_matches < required_matches:
-                return self._fuzzy_match_error(file_content, old_str)
-
-        # Ensure the best match is clearly better than alternatives.
-        if best_ratio - second_ratio < 0.04:
-            return ToolResult(
-                output='',
-                error=(
-                    'ERROR: Multiple near-matches found for old_str. '
-                    'Replacement is ambiguous; include more surrounding context lines.'
-                ),
-                new_content=file_content,
-            )
-
-        # Guard against repeating identical block in the file.
-        if file_content.count(best_block) != 1:
-            return ToolResult(
-                output='',
-                error=(
-                    'ERROR: Best fuzzy-matched block appears multiple times in the file. '
-                    'Replacement must be unique; include more context.'
-                ),
-                new_content=file_content,
-            )
-
         return file_content.replace(best_block, new_str, 1)
 
     def _apply_str_replace(
@@ -592,18 +547,8 @@ class FileEditor:
     ) -> str | ToolResult:
         """Apply old_str -> new_str replace with safe tolerant fallback."""
         exact_count = old_content.count(old_str)
-        if exact_count == 1:
+        if exact_count >= 1:
             return old_content.replace(old_str, new_str, 1)
-
-        if exact_count > 1:
-            return ToolResult(
-                output='',
-                error=(
-                    f'ERROR: old_str matches {exact_count} locations in the file. '
-                    'Replacement must be unique. Include 3-5 lines of surrounding context.'
-                ),
-                new_content=old_content,
-            )
 
         # Strict mode: skip tolerant fallback when explicitly disabled.
         if normalize_ws is False:
