@@ -992,6 +992,7 @@ class Repl:
                 AgentState.FINISHED,
                 AgentState.ERROR,
                 AgentState.STOPPED,
+                AgentState.RATE_LIMITED,
             ]
 
             self._hud.update_ledger('Starting')
@@ -1233,6 +1234,7 @@ class Repl:
             AgentState.ERROR,
             AgentState.STOPPED,
             AgentState.REJECTED,
+            AgentState.RATE_LIMITED,  # Keep the loop attached during background retries
         }
 
         # Disabled by default to avoid aborting long-running sessions.

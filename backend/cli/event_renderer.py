@@ -2243,6 +2243,9 @@ class CLIEventRenderer:
         elif state == AgentState.AWAITING_USER_INPUT:
             self._hud.update_ledger('Ready')
             self._hud.update_agent_state('Ready')
+        elif state == AgentState.RATE_LIMITED:
+            self._hud.update_ledger('Backoff')
+            self._hud.update_agent_state('Rate Limited')
         elif state == AgentState.PAUSED:
             # PAUSED is treated as STOPPED in CLI — collapse to same UX
             state = AgentState.STOPPED

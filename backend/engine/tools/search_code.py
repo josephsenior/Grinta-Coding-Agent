@@ -32,8 +32,8 @@ _SEARCH_CODE_DESCRIPTION = """\
 Search for text patterns, symbols, or file paths in the codebase using ripgrep (falls back to Python traversal).
 
 Modes:
-1. Text/regex search — set `pattern` to find matching lines across files.
-2. File discovery — omit `pattern`, set `file_pattern` only to list matching files.
+1. Text/regex search — set `pattern` to a regex pattern to find matching lines inside files.
+2. File discovery — omit `pattern` entirely, and set `file_pattern` to a glob pattern to list matching files.
 
 Use this when target location is unknown. For precise symbol refs at known positions, use `lsp_query`. \
 For dependency traversal, use `explore_tree_structure`.
@@ -50,8 +50,8 @@ def create_search_code_tool() -> dict:
             'pattern': {
                 'type': 'string',
                 'description': (
-                    'Text or regex pattern to search for. '
-                    'Omit (along with file_pattern) to list files only.'
+                    "Regex pattern for text search (e.g., 'function\\s+\\w+'). "
+                    "Leave empty to list files only."
                 ),
             },
             'path': {
@@ -64,9 +64,8 @@ def create_search_code_tool() -> dict:
             'file_pattern': {
                 'type': 'string',
                 'description': (
-                    'Glob pattern to restrict which files are searched '
-                    "(e.g. '*.py', '**/*.ts', 'src/**/*.js'). "
-                    'Leave empty to search all text files.'
+                    "Glob pattern for file filtering (e.g., '*.ts', 'src/**/*.test.js'). "
+                    "Leave empty to search all text files."
                 ),
             },
             'context_lines': {
@@ -106,6 +105,25 @@ def build_search_code_action(
     max_results = max(1, min(int(max_results), 500))
     is_case_sensitive = str(case_sensitive).lower() == 'true'
     
+    # Auto-fix common LLM mistake where they provide `.ext` instead of `*.ext`
+    if file_pattern and not file_pattern.startswith(('*', '?', '!')) and file_pattern.startswith('.'):
+        file_pattern = f'*{file_pattern}'
+
+    # Validate regex pattern early to prevent silent failures and hallucination loops
+    if pattern:
+        import re
+        flags = 0 if is_case_sensitive else re.IGNORECASE
+        try:
+            re.compile(pattern, flags)
+        except re.error as e:
+            return AgentThinkAction(
+                source_tool='search_code',
+                thought=(
+                    f"<search_results>\nInvalid regex in 'pattern': {e}. "
+                    "Did you mean to use 'file_pattern' for glob patterns like '*.ts'?\n</search_results>"
+                )
+            )
+
     # 1. Fast path: Ripgrep
     rg_path = shutil.which('rg')
     if rg_path:

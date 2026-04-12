@@ -116,10 +116,18 @@ class RecoveryService:
 
         if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
             try:
+                from backend.ledger import EventSource
+                from backend.ledger.observation import AgentThinkObservation
+
+                controller.event_stream.add_event(
+                    AgentThinkObservation(content="⚠️ API Rate Limit hit. Pausing execution for exponential backoff..."),
+                    EventSource.ENVIRONMENT,
+                )
+
                 await controller.retry_service.schedule_retry_after_failure(exc)
             except Exception:
                 logger.debug('schedule_retry_after_failure failed', exc_info=True)
-            await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
+            await self._context.set_agent_state(AgentState.RATE_LIMITED)
             return
 
         # Agent-survivable error: brief pause so we don't hammer the provider,
