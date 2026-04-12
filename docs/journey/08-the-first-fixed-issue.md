@@ -8,7 +8,7 @@ That silence is not pride. It is disbelief.
 
 You spend months building event streams, state machines, orchestration layers, compaction strategies, stuck detectors, tool pipelines, prompt architectures. You spend weeks on filesystem safety, terminal abstractions, cross-platform workarounds. You argue with yourself about whether the circuit breaker threshold should be four or six. You delete entire subsystems because they made the agent slower instead of smarter.
 
-And then one afternoon the agent fixes a real bug in real code, and for about thirty seconds you do not know what to feel.
+And then one afternoon the agent fixes a real bug in real code, and for about thirty seconds, you do not know what to feel.
 
 ---
 
@@ -48,7 +48,7 @@ I had spent months building infrastructure so that an AI model could do in ninet
 
 But the real significance was not the speed. It was the shape of the behavior.
 
-The agent did not just produce the right output. It followed the right process. It planned before acting. It validated after changing. It updated its own tracking. It finished deliberately. That process — plan, act, verify, close — was the entire architectural thesis of the project, and watching it actually execute was the first moment where the months of infrastructure stopped feeling like overhead and started feeling like investment.
+The agent did not just produce the right output. It followed the right process. It planned before acting. It validated after changing. It updated its own tracking. It finished deliberately. That process — plan, act, verify, close — was the entire architectural thesis of the project, and watching it execute end-to-end was the first moment when the months of infrastructure stopped feeling like overhead and started feeling like investment.
 
 ---
 

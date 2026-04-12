@@ -2,9 +2,9 @@
 
 Cross-platform portability looks elegant until you build a terminal layer that has to survive real developer machines.
 
-Usually, you pretend it does not exist. You write your Python code on a Mac or a Linux machine, you use `subprocess.run()`, you pass in some bash commands, and you assume the world works the same way everywhere.
+Usually, you pretend this layer does not exist. You write your Python code on a Mac or a Linux machine, you use `subprocess.run()`, you pass in some bash commands, and you assume the world works the same way everywhere.
 
-If you are building a web application, you are probably fine. If you are building a local autonomous coding agent that needs to execute terminal commands on the user’s machine to run tests, start servers, and analyze output... you are in for a nightmare.
+If you are building a web application, you are probably fine. If you are building a local autonomous coding agent that needs to execute terminal commands on the user’s machine to run tests, start servers, and analyze output, you are in for a nightmare.
 
 This chapter is about the reality of the terminal layer in Grinta: Windows vs. Linux vs. Mac is not just a line-ending problem. It is a semantic difference in how the operating system talks to processes.
 

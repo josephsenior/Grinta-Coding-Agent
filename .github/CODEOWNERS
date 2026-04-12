@@ -1,8 +1,4 @@
-# CODEOWNERS file for App repository
-# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# CODEOWNERS
 
-# Evaluation code owners
 /evaluation/ @xingyaoww @neubig
-
-# Documentation code owners
 /docs/ @mamoodi

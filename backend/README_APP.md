@@ -51,6 +51,6 @@ flowchart LR
 
 ## Runtime
 
-Please refer to the [documentation](https://docs.app.dev/usage/architecture/runtime) to learn more about `Runtime`.
+Please refer to [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) to learn more about `Runtime`.
 
 Important: Grinta currently provides local policy hardening, not sandbox isolation. The `hardened_local` profile tightens workspace, command, file, and interactive-terminal behavior, but actions still run with host-user permissions.

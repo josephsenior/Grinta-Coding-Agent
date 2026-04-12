@@ -18,11 +18,11 @@ When you build a SaaS around an LLM, your margins are dictated by how efficientl
 
 An agent does not solve a problem in one call. It solves it in thirty. It reads a file, searches the codebase, realizes it needs a different file, writes a test, watches the test fail, reads the error, patches the file, reruns the test, and only then finishes.
 
-Every one of those thirty calls requires sending the entire conversation history, the active file context, the tool definitions, and the system prompt back to the LLM. The context window grows with every step.
+Every one of those calls requires sending the entire conversation history, the active file context, the tool definitions, and the system prompt back to the LLM. The context window grows with every step.
 
 If you run this as a SaaS, you are paying for all of those tokens. To make the unit economics work, you have to constrain the agent. You have to limit the context window. You have to force it to use cheaper, dumber models for the intermediate reasoning steps. You have to cap the total number of iterations. You have to build complex caching infrastructure because every cache miss eats your margin.
 
-The business model puts you in direct opposition to the agent's capability. You want it to be smart; your AWS bill wants it to be fast and cheap.
+The business model puts you in direct tension with the agent's capability. You want it to be smart; your AWS bill wants it to be fast and cheap.
 
 ## The Privacy Barrier
 

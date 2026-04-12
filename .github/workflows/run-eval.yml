@@ -32,6 +32,8 @@ env:
   # Environment variable for the master GitHub issue number where all evaluation results will be commented
   # This should be set to the issue number where you want all evaluation results to be posted
   MASTER_EVAL_ISSUE_NUMBER: ${{ vars.MASTER_EVAL_ISSUE_NUMBER || '0' }}
+  # Remote evaluation repository workflow target. Defaults to legacy endpoint for compatibility.
+  EVAL_REPOSITORY: ${{ vars.EVAL_REPOSITORY || 'App/evaluation' }}
 
 jobs:
   trigger-job:
@@ -101,7 +103,7 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.PAT_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             -d "{\"ref\": \"main\", \"inputs\": {\"github-repo\": \"${{ steps.eval_params.outputs.repo_url }}\", \"github-branch\": \"${{ steps.eval_params.outputs.eval_branch }}\", \"pr-number\": \"${PR_NUMBER}\", \"eval-instances\": \"${{ steps.eval_params.outputs.eval_instances }}\"}}" \
-            https://api.github.com/repos/App/evaluation/actions/workflows/create-branch.yml/dispatches
+            https://api.github.com/repos/${{ env.EVAL_REPOSITORY }}/actions/workflows/create-branch.yml/dispatches
 
           # Send Slack message
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then

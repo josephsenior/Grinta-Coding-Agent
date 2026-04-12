@@ -82,7 +82,7 @@ I opened the directory. I highlighted the files. I pressed delete.
 
 I didn't deprecate it. I didn't hide it behind a feature flag. I just deleted it.
 
-In solo engineering, your biggest enemy is not technical debt. It is emotional debt—the reluctance to delete something you worked hard on, even when you know it's holding the product back.
+In solo engineering, your biggest enemy is not technical debt. It is emotional debt—the reluctance to delete something you worked hard on, even when you know it is holding the product back.
 
 ## The Payoff
 

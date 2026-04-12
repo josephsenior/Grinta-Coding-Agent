@@ -14,15 +14,14 @@ Thank you for your interest in contributing to Grinta! This guide will help you 
 
 ```bash
 # Clone
-git clone https://github.com/josephsenior/App.git
+git clone https://github.com/josephsenior/Grinta-Agent.git Grinta
 cd Grinta
 
-# Backend
+# Install dependencies
 uv sync
-python start_server.py
 
-# Web UI: start the server, then open http://localhost:3000
-uv run app serve
+# Start the CLI
+uv run python -m backend.cli.entry
 ```
 
 ## How to Contribute
@@ -124,4 +123,4 @@ The `SessionOrchestrator` (~770 LOC) delegates work to these services:
 
 ## Questions?
 
-Open a [Discussion](https://github.com/josephsenior/App/discussions) or file an issue.
+Open a [Discussion](https://github.com/josephsenior/Grinta-Agent/discussions) or file an issue.

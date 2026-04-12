@@ -1,10 +1,10 @@
 # 02. The Killed Darlings
 
-Deleting something you are proud of requires a specific kind of engineering maturity.
+Deleting something you are proud of takes a specific kind of engineering maturity.
 
-Not because it was broken, or because you were too lazy to maintain it, or because you could not finish it.
+Not because it was broken. Not because it was too hard to maintain. Not because you could not finish it.
 
-Because it worked, it was interesting, it was technically impressive, and it still had to die.
+Because it worked, was interesting, was technically impressive, and still had to die.
 
 This chapter is about those features.
 

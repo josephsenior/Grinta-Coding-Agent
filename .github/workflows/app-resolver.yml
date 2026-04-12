@@ -1,4 +1,4 @@
-name: Auto-Fix Tagged Issue with App
+name: Auto-Fix Tagged Issue with Grinta
 
 on:
   workflow_call:
@@ -10,7 +10,7 @@ on:
       macro:
         required: false
         type: string
-        default: "@App-agent"
+        default: "@grinta-agent"
       target_branch:
         required: false
         type: string
@@ -74,12 +74,12 @@ jobs:
       github.event.label.name == 'fix-me-experimental' ||
       (
         ((github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') &&
-        contains(github.event.comment.body, inputs.macro || '@App-agent') &&
+        (contains(github.event.comment.body, inputs.macro || '@grinta-agent') || contains(github.event.comment.body, '@App-agent')) &&
         (github.event.comment.author_association == 'OWNER' || github.event.comment.author_association == 'COLLABORATOR' || github.event.comment.author_association == 'MEMBER')
         ) ||
 
         (github.event_name == 'pull_request_review' &&
-        contains(github.event.review.body, inputs.macro || '@App-agent') &&
+        (contains(github.event.review.body, inputs.macro || '@grinta-agent') || contains(github.event.review.body, '@App-agent')) &&
         (github.event.review.author_association == 'OWNER' || github.event.review.author_association == 'COLLABORATOR' || github.event.review.author_association == 'MEMBER')
         )
       )
@@ -98,11 +98,17 @@ jobs:
 
       - name: Get latest versions and create requirements.txt
         run: |
-          python -m pip index versions App-ai > APP_versions.txt
+          PKG_NAME="grinta-ai"
+          if ! python -m pip index versions "$PKG_NAME" > APP_versions.txt 2>/dev/null; then
+            echo "Could not resolve $PKG_NAME; falling back to App-ai"
+            PKG_NAME="App-ai"
+            python -m pip index versions "$PKG_NAME" > APP_versions.txt
+          fi
+
           APP_VERSION=$(head -n 1 APP_versions.txt | awk '{print $2}' | tr -d '()')
 
           # Create a new requirements.txt locally within the workflow, ensuring no reference to the repo's file
-          echo "App-ai==${APP_VERSION}" > /tmp/requirements.txt
+          echo "${PKG_NAME}==${APP_VERSION}" > /tmp/requirements.txt
           cat /tmp/requirements.txt
 
       - name: Cache pip dependencies
@@ -111,19 +117,19 @@ jobs:
             github.event.label.name == 'fix-me-experimental' ||
             (
               (github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment') &&
-              contains(github.event.comment.body, '@App-agent-exp')
+              (contains(github.event.comment.body, '@grinta-agent-exp') || contains(github.event.comment.body, '@App-agent-exp'))
             ) ||
             (
               github.event_name == 'pull_request_review' &&
-              contains(github.event.review.body, '@App-agent-exp')
+              (contains(github.event.review.body, '@grinta-agent-exp') || contains(github.event.review.body, '@App-agent-exp'))
             )
           )
         uses: actions/cache@v4
         with:
           path: ${{ env.pythonLocation }}/lib/python3.12/site-packages/*
-          key: ${{ runner.os }}-pip-App-resolver-${{ hashFiles('/tmp/requirements.txt') }}
+          key: ${{ runner.os }}-pip-grinta-resolver-${{ hashFiles('/tmp/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-App-resolver-${{ hashFiles('/tmp/requirements.txt') }}
+            ${{ runner.os }}-pip-grinta-resolver-${{ hashFiles('/tmp/requirements.txt') }}
 
       - name: Check required environment variables
         env:
@@ -153,7 +159,7 @@ jobs:
           fi
 
           if [ -z "$PAT_USERNAME" ]; then
-            echo "Warning: PAT_USERNAME is not set, will use App-agent"
+            echo "Warning: PAT_USERNAME is not set, will use grinta-agent"
           fi
 
       - name: Set environment variables
@@ -201,10 +207,10 @@ jobs:
               issue_number: ${{ env.ISSUE_NUMBER }},
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `[App](https://github.com/App/App) started fixing the ${issueType}! You can monitor the progress [here](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`
+              body: `[Grinta](https://github.com/${context.repo.owner}/${context.repo.repo}) started fixing the ${issueType}! You can monitor the progress [here](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`
             });
 
-      - name: Install App
+      - name: Install Grinta
         id: install_app
         uses: actions/github-script@v7
         env:
@@ -222,18 +228,19 @@ jobs:
             const isExperimentalLabel = labelName === "fix-me-experimental";
             const isIssueCommentExperimental =
               (eventName === "issue_comment" || eventName === "pull_request_review_comment") &&
-              commentBody.includes("@App-agent-exp");
+              (commentBody.includes("@grinta-agent-exp") || commentBody.includes("@App-agent-exp"));
             const isReviewCommentExperimental =
-              eventName === "pull_request_review" && reviewBody.includes("@App-agent-exp");
+              eventName === "pull_request_review" &&
+              (reviewBody.includes("@grinta-agent-exp") || reviewBody.includes("@App-agent-exp"));
 
             // Set output variable
             core.setOutput('isExperimental', isExperimentalLabel || isIssueCommentExperimental || isReviewCommentExperimental);
 
             // Perform package installation
             if (isExperimentalLabel || isIssueCommentExperimental || isReviewCommentExperimental) {
-              console.log("Installing experimental app...");
+              console.log("Installing experimental Grinta package from the current repository...");
 
-              await exec.exec("pip install git+https://github.com/App/app.git");
+              await exec.exec(`pip install git+https://github.com/${context.repo.owner}/${context.repo.repo}.git`);
             } else {
               console.log("Installing from requirements.txt...");
 
@@ -243,8 +250,8 @@ jobs:
       - name: Attempt to resolve issue
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
-          GITHUB_USERNAME: ${{ secrets.PAT_USERNAME || 'App-agent' }}
-          GIT_USERNAME: ${{ secrets.PAT_USERNAME || 'App-agent' }}
+          GITHUB_USERNAME: ${{ secrets.PAT_USERNAME || 'grinta-agent' }}
+          GIT_USERNAME: ${{ secrets.PAT_USERNAME || 'grinta-agent' }}
           LLM_MODEL: ${{ secrets.LLM_MODEL || inputs.LLM_MODEL }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
@@ -280,8 +287,8 @@ jobs:
         if: always() # Create PR or branch even if the previous steps fail
         env:
           GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
-          GITHUB_USERNAME: ${{ secrets.PAT_USERNAME || 'App-agent' }}
-          GIT_USERNAME: ${{ secrets.PAT_USERNAME || 'App-agent' }}
+          GITHUB_USERNAME: ${{ secrets.PAT_USERNAME || 'grinta-agent' }}
+          GIT_USERNAME: ${{ secrets.PAT_USERNAME || 'grinta-agent' }}
           LLM_MODEL: ${{ secrets.LLM_MODEL || inputs.LLM_MODEL }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
@@ -334,7 +341,7 @@ jobs:
                 issue_number: issueNumber,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                body: `The workflow to fix this issue encountered an error. App failed to create any code changes.`
+                body: `The workflow to fix this issue encountered an error. Grinta failed to create any code changes.`
               });
               process.env.AGENT_RESPONDED = 'true';
             }

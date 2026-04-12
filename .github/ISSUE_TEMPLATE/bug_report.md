@@ -35,7 +35,7 @@ If applicable, add screenshots to help explain your problem.
 - **Python Version:** [e.g., 3.11.5]
 - **Node Version:** [e.g., 18.17.0]
 - **Docker Version:** [e.g., 24.0.5]
-- **App Version:** [e.g., 1.0.0-beta]
+- **Grinta Version:** [e.g., 0.55.0]
 
 ## Configuration
 
@@ -47,8 +47,8 @@ If applicable, add screenshots to help explain your problem.
 
 Please include relevant logs:
 
-```
-Paste logs here (check logs/App.log)
+```text
+Paste logs here (check logs/llm/default)
 Include request_id if available
 ```
 

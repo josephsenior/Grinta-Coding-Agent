@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and Discussions
+    url: https://github.com/josephsenior/Grinta-Agent/discussions
+    about: Ask usage questions, share ideas, and discuss workflows.
+  - name: Security Vulnerability Report
+    url: https://github.com/josephsenior/Grinta-Agent/security/advisories/new
+    about: Report security issues privately. Do not open public issues for vulnerabilities.
+  - name: Documentation
+    url: https://github.com/josephsenior/Grinta-Agent/tree/main/docs
+    about: Read quick start, architecture, and troubleshooting guides.

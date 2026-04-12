@@ -1077,6 +1077,45 @@ async def test_wait_for_agent_idle_drains_late_final_message() -> None:
 
 
 @pytest.mark.asyncio
+async def test_wait_for_agent_idle_default_timeout_disabled(monkeypatch) -> None:
+    repl = Repl(_make_config(), _make_console())
+    controller = MagicMock()
+
+    states = [
+        AgentState.RUNNING,
+        AgentState.RUNNING,
+        AgentState.AWAITING_USER_INPUT,
+    ]
+
+    def _next_state():
+        return states.pop(0) if states else AgentState.AWAITING_USER_INPUT
+
+    controller.get_agent_state.side_effect = _next_state
+
+    async def never_finish() -> None:
+        await asyncio.sleep(999)
+
+    agent_task = asyncio.create_task(never_finish())
+    tick = {'value': 0.0}
+
+    def _fake_monotonic() -> float:
+        tick['value'] += 10_000.0
+        return tick['value']
+
+    monkeypatch.delenv('APP_AGENT_HARD_TIMEOUT_SECONDS', raising=False)
+    monkeypatch.delenv('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS', raising=False)
+
+    with patch('backend.cli.repl.time.monotonic', side_effect=_fake_monotonic):
+        await repl._wait_for_agent_idle(controller, agent_task)
+
+    assert not agent_task.cancelled()
+
+    agent_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await agent_task
+
+
+@pytest.mark.asyncio
 async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
     events: list[str] = []

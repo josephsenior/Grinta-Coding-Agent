@@ -148,7 +148,6 @@ def format_reasoning_snapshot(lines: list[str]) -> Group:
     if not cleaned:
         return Group()
     return Group(
-        Rule(title='Reasoning', style='dim cyan', align='left'),
         *[format_activity_secondary(line, kind='neutral') for line in cleaned],
     )
 

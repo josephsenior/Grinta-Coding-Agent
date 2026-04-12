@@ -187,7 +187,7 @@ class ReasoningDisplay:
 
         hint = Text()
         hint.append('  ', style='')
-        hint.append('Esc', style='bold dim')
+        hint.append('Ctrl+C', style='bold dim')
         hint.append(' interrupts', style='dim italic')
         rows.append(hint)
 

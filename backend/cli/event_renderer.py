@@ -1174,7 +1174,7 @@ class CLIEventRenderer:
         input_row.add_column()
         input_row.add_row(
             Spinner('dots', style='bold #7dd3fc'),
-            Text('Agent working… esc to interrupt', style='italic #5d7286'),
+            Text('Agent working… ctrl+c to interrupt', style='italic #5d7286'),
         )
         items.append(input_row)
 

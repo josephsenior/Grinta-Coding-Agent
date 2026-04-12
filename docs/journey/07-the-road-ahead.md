@@ -293,4 +293,4 @@ It will look like what it really is:
 
 ---
 
-← [Prompts Are Programs](15-prompts-are-programs.md) | [The Book of Grinta](README.md) | [The First Fixed Issue](08-the-first-fixed-issue.md) →
+← [The Perfect Prompt Illusion](24-the-perfect-prompt-illusion.md) | [The Book of Grinta](README.md)

@@ -1235,17 +1235,24 @@ class Repl:
             AgentState.REJECTED,
         }
 
-        _hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_SECONDS', '300')
+        # Disabled by default to avoid aborting long-running sessions.
+        # Set APP_AGENT_HARD_TIMEOUT_SECONDS / APP_AGENT_HARD_TIMEOUT_CMD_SECONDS
+        # to a positive value to re-enable limits.
+        _hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_SECONDS', '0')
         try:
-            _HARD_TIMEOUT = max(30, int(_hard_timeout_raw))
+            _HARD_TIMEOUT = max(0, int(_hard_timeout_raw))
         except (ValueError, TypeError):
-            _HARD_TIMEOUT = 300  # 5 minutes absolute ceiling
+            _HARD_TIMEOUT = 0
 
-        _cmd_hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS', '1800')
+        _cmd_hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS', '0')
         try:
-            _CMD_HARD_TIMEOUT = max(_HARD_TIMEOUT, int(_cmd_hard_timeout_raw))
+            _CMD_HARD_TIMEOUT = max(0, int(_cmd_hard_timeout_raw))
         except (ValueError, TypeError):
-            _CMD_HARD_TIMEOUT = max(_HARD_TIMEOUT, 1800)
+            _CMD_HARD_TIMEOUT = 0
+
+        # When both are enabled, command-specific timeout should never be lower.
+        if _HARD_TIMEOUT > 0 and _CMD_HARD_TIMEOUT > 0:
+            _CMD_HARD_TIMEOUT = max(_HARD_TIMEOUT, _CMD_HARD_TIMEOUT)
         _start = time.monotonic()
 
         while True:
@@ -1297,10 +1304,10 @@ class Repl:
                 with contextlib.suppress(Exception):
                     from backend.ledger.action import CmdRunAction
 
-                    if isinstance(pending_action, CmdRunAction):
+                    if isinstance(pending_action, CmdRunAction) and _CMD_HARD_TIMEOUT > 0:
                         active_timeout = _CMD_HARD_TIMEOUT
 
-            if time.monotonic() - _start > active_timeout:
+            if active_timeout > 0 and time.monotonic() - _start > active_timeout:
                 logger.warning('Agent wait exceeded %ds hard timeout', active_timeout)
                 if renderer is not None:
                     renderer.add_system_message(
@@ -1343,6 +1350,18 @@ class Repl:
                 await agent_task
             except (asyncio.CancelledError, Exception):
                 pass
+        
+        # Hard kill underlying shells/processes
+        with contextlib.suppress(Exception):
+            from backend.execution.action_execution_server import client as runtime_client
+            if runtime_client is not None:
+                await runtime_client.hard_kill()
+                
+        # Stop orchestrator cleanly
+        if self._controller is not None:
+            with contextlib.suppress(Exception):
+                await self._controller.stop()
+
         self._reasoning.stop()
         if self._renderer is not None:
             self._renderer.add_system_message(

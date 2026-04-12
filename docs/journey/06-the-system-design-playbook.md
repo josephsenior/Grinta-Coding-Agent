@@ -10,7 +10,7 @@ Grinta is not just a set of prompts attached to tools. It is a software system w
 
 This chapter is about those choices and why they matter.
 
-It is personal to me in a quieter way than the others. Models are the glamorous part. The decisions in this chapter are the ones that made me feel like I was doing real engineering, not building prompt theater.
+It is personal to me in a quieter way than the other chapters. Models are the glamorous part of this field. The decisions in this chapter are the ones that made me feel like I was doing real engineering, not building prompt theater.
 
 ---
 
@@ -56,7 +56,7 @@ No single provider should define the identity of the tool.
 
 #### 3. Future resilience
 
-Model quality shifts. APIs change. pricing changes. vendors come and go. A model-agnostic design ages better.
+Model quality shifts. APIs change. Pricing changes. Vendors come and go. A model-agnostic design ages better.
 
 #### 4. Product honesty
 

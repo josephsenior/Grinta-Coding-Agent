@@ -73,9 +73,9 @@ You can still extract patterns:
 
 ### 4. It is an education that university cannot provide
 
-This project was built in the margins—between classes, during exams, and at the expense of sleep. Striving for success as a student while balancing academic obligations against the burning need to build real things is a brutal, silent struggle. 
+This project was built in the margins—between classes, during exams, and at the expense of sleep. Striving for success as a student while balancing academic obligations against the burning need to build real things is a brutal, silent struggle.
 
-University teaches you computer science. It teaches algorithms, discrete math, and theory. But it does not teach you how to survive a failing architecture, how to recover from deleting three weeks of dead-end code, or how to maintain stamina when your system collapses at 3 AM. The most valuable outcome of this entire project isn't the repository itself; it is the scars, the intuition, and the pragmatic engineering survival skills I gained. 
+University teaches you computer science. It teaches algorithms, discrete math, and theory. But it does not teach you how to survive a failing architecture, how to recover from deleting three weeks of dead-end code, or how to maintain stamina when your system collapses at 3 AM. The most valuable outcome of this entire project isn't the repository itself; it is the scars, the intuition, and the pragmatic engineering survival skills I gained.
 
 If you are a student or a junior engineer stuck in that same gap, reading this might save you months of painful trial and error. The lessons extracted here are exactly the kind of things you only usually learn by failing in the real world.
 

@@ -147,13 +147,12 @@ def test_format_reasoning_snapshot_empty() -> None:
     assert len(g.renderables) == 0
 
 
-def test_format_reasoning_snapshot_rule_and_lines() -> None:
+def test_format_reasoning_snapshot_lines() -> None:
     g = format_reasoning_snapshot(['  first line  ', '', 'second'])
     buf = io.StringIO()
     Console(file=buf, width=88, force_terminal=True, color_system=None, legacy_windows=False).print(
         g
     )
     out = buf.getvalue()
-    assert 'Reasoning' in out
     assert 'first line' in out
     assert 'second' in out

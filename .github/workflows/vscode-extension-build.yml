@@ -22,9 +22,60 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect-vscode-assets:
+    name: Detect VSCode extension assets
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.detect.outputs.available }}
+      missing: ${{ steps.detect.outputs.missing }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect required files
+        id: detect
+        shell: bash
+        run: |
+          required=(
+            "build_vscode.py"
+            "app/integrations/vscode/package.json"
+          )
+
+          missing=()
+          for path in "${required[@]}"; do
+            if [ ! -e "$path" ]; then
+              missing+=("$path")
+            fi
+          done
+
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "missing=" >> "$GITHUB_OUTPUT"
+            echo "VSCode extension assets detected."
+          else
+            joined=$(printf "%s, " "${missing[@]}")
+            joined=${joined%, }
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "missing=$joined" >> "$GITHUB_OUTPUT"
+            echo "Missing VSCode extension assets: $joined"
+          fi
+
+  vscode-assets-missing:
+    name: VSCode workflow skipped (assets missing)
+    runs-on: ubuntu-latest
+    needs: detect-vscode-assets
+    if: needs.detect-vscode-assets.outputs.available != 'true'
+    steps:
+      - name: Explain skip
+        run: |
+          echo "Skipping VSCode extension build because required assets are missing."
+          echo "Missing: ${{ needs.detect-vscode-assets.outputs.missing }}"
+
   # Validate VSCode extension builds correctly
   validate-vscode-extension:
     name: Validate VSCode Extension Build
+    needs: detect-vscode-assets
+    if: needs.detect-vscode-assets.outputs.available == 'true'
     runs-on: blacksmith-4vcpu-ubuntu-2204
 
     steps:
@@ -51,17 +102,33 @@ jobs:
           # Ensure we don't skip the build
           SKIP_VSCODE_BUILD: ""
 
+      - name: Discover built .vsix file
+        id: discover_vsix
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(app/integrations/vscode/*.vsix)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No .vsix file found under app/integrations/vscode"
+            exit 1
+          fi
+
+          vsix_path="${files[0]}"
+          vsix_file=$(basename "$vsix_path")
+          echo "vsix_path=$vsix_path" >> "$GITHUB_OUTPUT"
+          echo "vsix_file=$vsix_file" >> "$GITHUB_OUTPUT"
+
       - name: Validate .vsix file
         run: |
           # Verify the .vsix was created and is valid
-          if [ -f "app/integrations/vscode/App-vscode-0.0.1.vsix" ]; then
+          if [ -f "${{ steps.discover_vsix.outputs.vsix_path }}" ]; then
             echo "✅ VSCode extension built successfully"
-            ls -la app/integrations/vscode/App-vscode-0.0.1.vsix
+            ls -la "${{ steps.discover_vsix.outputs.vsix_path }}"
 
             # Basic validation that the .vsix is a valid zip file
             echo "🔍 Validating .vsix structure..."
-            file app/integrations/vscode/App-vscode-0.0.1.vsix
-            unzip -t app/integrations/vscode/App-vscode-0.0.1.vsix
+            file "${{ steps.discover_vsix.outputs.vsix_path }}"
+            unzip -t "${{ steps.discover_vsix.outputs.vsix_path }}"
 
             echo "✅ VSCode extension validation passed"
           else
@@ -73,7 +140,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vscode-extension
-          path: app/integrations/vscode/App-vscode-0.0.1.vsix
+          path: ${{ steps.discover_vsix.outputs.vsix_path }}
           retention-days: 7
 
       - name: Comment on PR with artifact link
@@ -82,10 +149,10 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const path = require('path');
 
             // Get file size for display
-            const vsixPath = 'app/integrations/vscode/App-vscode-0.0.1.vsix';
+            const vsixPath = '${{ steps.discover_vsix.outputs.vsix_path }}';
+            const vsixFile = '${{ steps.discover_vsix.outputs.vsix_file }}';
             const stats = fs.statSync(vsixPath);
             const fileSizeKB = Math.round(stats.size / 1024);
 
@@ -93,7 +160,7 @@ jobs:
 
             The VSCode extension has been built and is ready for testing.
 
-            **📦 Download**: [App-vscode-0.0.1.vsix](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) (${fileSizeKB} KB)
+            **📦 Download**: [${vsixFile}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) (${fileSizeKB} KB)
 
             **🚀 To install**:
             1. Download the artifact from the workflow run above
@@ -137,8 +204,8 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: blacksmith-4vcpu-ubuntu-2204
-    needs: validate-vscode-extension
-    if: startsWith(github.ref, 'refs/tags/ext-v')
+    needs: [validate-vscode-extension, detect-vscode-assets]
+    if: startsWith(github.ref, 'refs/tags/ext-v') && needs.detect-vscode-assets.outputs.available == 'true'
 
     steps:
       - name: Download .vsix artifact

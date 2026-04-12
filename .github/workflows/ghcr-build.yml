@@ -28,7 +28,59 @@ env:
   RELEVANT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
+  detect-docker-assets:
+    name: Detect Docker build assets
+    runs-on: ubuntu-latest
+    outputs:
+      available: ${{ steps.detect.outputs.available }}
+      missing: ${{ steps.detect.outputs.missing }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect required files
+        id: detect
+        shell: bash
+        run: |
+          required=(
+            "containers/build.sh"
+            "containers/runtime"
+            "App/runtime/utils/runtime_build.py"
+          )
+
+          missing=()
+          for path in "${required[@]}"; do
+            if [ ! -e "$path" ]; then
+              missing+=("$path")
+            fi
+          done
+
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "missing=" >> "$GITHUB_OUTPUT"
+            echo "Docker assets detected."
+          else
+            joined=$(printf "%s, " "${missing[@]}")
+            joined=${joined%, }
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "missing=$joined" >> "$GITHUB_OUTPUT"
+            echo "Missing Docker assets: $joined"
+          fi
+
+  docker-assets-missing:
+    name: Docker workflow skipped (assets missing)
+    runs-on: ubuntu-latest
+    needs: detect-docker-assets
+    if: needs.detect-docker-assets.outputs.available != 'true'
+    steps:
+      - name: Explain skip
+        run: |
+          echo "Skipping docker image build/test jobs because required assets are missing."
+          echo "Missing: ${{ needs.detect-docker-assets.outputs.missing }}"
+
   define-matrix:
+    needs: detect-docker-assets
+    if: needs.detect-docker-assets.outputs.available == 'true'
     runs-on: blacksmith
     outputs:
       base_image: ${{ steps.define-base-images.outputs.base_image }}
@@ -55,7 +107,8 @@ jobs:
   ghcr_build_app:
     name: Build App Image
     runs-on: blacksmith-4vcpu-ubuntu-2204
-    if: "!(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ext-v'))"
+    needs: detect-docker-assets
+    if: needs.detect-docker-assets.outputs.available == 'true' && !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ext-v'))
     permissions:
       contents: read
       packages: write
@@ -89,11 +142,11 @@ jobs:
   ghcr_build_runtime:
     name: Build Image
     runs-on: blacksmith-8vcpu-ubuntu-2204
-    if: "!(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ext-v'))"
+    if: needs.detect-docker-assets.outputs.available == 'true' && !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/ext-v'))
     permissions:
       contents: read
       packages: write
-    needs: define-matrix
+    needs: [define-matrix, detect-docker-assets]
     strategy:
       matrix:
         base_image: ${{ fromJson(needs.define-matrix.outputs.base_image) }}
@@ -170,7 +223,8 @@ jobs:
   # Run unit tests with the Docker runtime Docker images as root
   test_runtime_root:
     name: RT Unit Tests (Root)
-    needs: [ghcr_build_runtime, define-matrix]
+    if: needs.detect-docker-assets.outputs.available == 'true'
+    needs: [ghcr_build_runtime, define-matrix, detect-docker-assets]
     runs-on: blacksmith-8vcpu-ubuntu-2204
     strategy:
       fail-fast: false
@@ -229,7 +283,8 @@ jobs:
   test_runtime_oh:
     name: RT Unit Tests (App)
     runs-on: blacksmith-8vcpu-ubuntu-2204
-    needs: [ghcr_build_runtime, define-matrix]
+    if: needs.detect-docker-assets.outputs.available == 'true'
+    needs: [ghcr_build_runtime, define-matrix, detect-docker-assets]
     strategy:
       matrix:
         base_image: ${{ fromJson(needs.define-matrix.outputs.base_image) }}
@@ -307,8 +362,8 @@ jobs:
           exit 1
   update_pr_description:
     name: Update PR Description
-    if: github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'
-    needs: [ghcr_build_runtime]
+    if: needs.detect-docker-assets.outputs.available == 'true' && github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork && github.actor != 'dependabot[bot]'
+    needs: [ghcr_build_runtime, detect-docker-assets]
     runs-on: blacksmith-4vcpu-ubuntu-2204
     steps:
       - name: Checkout

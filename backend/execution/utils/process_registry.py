@@ -115,13 +115,22 @@ class TaskCancellationService:
                     exc,
                 )
 
-        # 1) Kill processes we have handles for (more reliable).
+        # 1) Try to kill the tree directly on Windows first
+        if os.name == 'nt':
+            for pid in pids:
+                try:
+                    self._kill_pid_best_effort(pid)
+                except Exception as exc:
+                    logger.debug(f'Failed to tree-kill {pid} on Windows: {exc}')
+
+        # 2) Standard kill logic for everything else
         for pid, process in processes.items():
             try:
+                # If we're on Windows, it should already be dead, but let's be safe
                 logger.warning('[TaskCancellationService] Terminating pid=%s', pid)
                 process.terminate()
                 try:
-                    process.wait(timeout=1.0)
+                    process.wait(timeout=1.0 if os.name != 'nt' else 0.1)
                 except subprocess.TimeoutExpired:
                     logger.warning(
                         '[TaskCancellationService] Force killing pid=%s', pid
@@ -135,11 +144,12 @@ class TaskCancellationService:
                     exc,
                 )
 
-        # 2) Kill any remaining raw PIDs.
-        for pid in pids:
-            if pid in processes:
-                continue
-            self._kill_pid_best_effort(pid)
+        # 3) Kill remaining raw PIDs (on Non-Windows)
+        if os.name != 'nt':
+            for pid in pids:
+                if pid in processes:
+                    continue
+                self._kill_pid_best_effort(pid)
 
         logger.info('[TaskCancellationService:%s] Hard kill complete', self._label)
 

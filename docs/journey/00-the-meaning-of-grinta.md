@@ -28,4 +28,4 @@ It is also an honest account of what solo engineering really feels like. Not the
 
 ---
 
-[The Book of Grinta](README.md) | [The SaaS Fortress](01-the-saas-fortress.md) →
+← [Preface](preface-why-this-story-matters.md) | [The Book of Grinta](README.md) | [The SaaS Fortress](01-the-saas-fortress.md) →

@@ -4,7 +4,7 @@ Grinta supports a lightweight, hook-based plugin system that allows you to exten
 
 ## 1. Plugin Structure
 
-A App plugin is a Python package that exposes a `app.plugins` entry point.
+A Grinta plugin is a Python package that exposes an `app.plugins` entry point.
 
 ### Minimal Example
 

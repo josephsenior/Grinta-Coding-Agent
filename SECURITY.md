@@ -8,8 +8,9 @@ If you discover a security vulnerability in Grinta, please report it responsibly
 
 ### How to Report
 
-1. Email: security@app.ai (or open a private security advisory on GitHub)
-2. Include:
+1. Email: [security@app.ai](mailto:security@app.ai)
+2. Open a private GitHub Security Advisory: [Create advisory](https://github.com/josephsenior/Grinta-Agent/security/advisories/new)
+3. Include:
    - Description of the vulnerability
    - Steps to reproduce
    - Potential impact
@@ -24,18 +25,20 @@ If you discover a security vulnerability in Grinta, please report it responsibly
 ## Supported Versions
 
 | Version | Supported |
-|---|---|
+| --- | --- |
 | 0.55.x | Yes |
 | < 0.55 | No |
 
 ## Security Architecture
 
 ### Transport
+
 - CORS restricted to localhost by default
 - CSRF protection available (opt-in via `APP_CSRF_ENABLED`)
 - Security headers (CSP, X-Frame-Options, etc.) via middleware
 
 ### Runtime Safety
+
 - Command analysis before execution (`SecurityAnalyzer`)
 - Optional `hardened_local` execution profile for stricter local policy enforcement
 - Budget guards to prevent runaway LLM costs
@@ -43,12 +46,14 @@ If you discover a security vulnerability in Grinta, please report it responsibly
 - Request size limits and timeouts
 
 ### Runtime Boundary
+
 - Grinta does not currently provide sandbox or container isolation for local command execution.
 - The local runtime executes with the permissions of the user running Grinta.
 - `hardened_local` improves local safety with workspace-scoped policy enforcement, but it is not equivalent to a sandbox.
 - Treat the current runtime as appropriate for trusted local development workflows, not hostile repositories.
 
 ### Data Storage
+
 - File-based storage (default): data stays on your machine
 - PostgreSQL (optional): connections use `asyncpg` with pool management
 - No telemetry sent without explicit opt-in

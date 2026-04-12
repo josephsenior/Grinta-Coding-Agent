@@ -3,7 +3,7 @@
 I did not start Grinta as a CLI.
 I started it as a business.
 
-The original vision was not "a local coding agent for developers who want full control." It was a much heavier idea: a multi-tenant AI engineering platform with a proper frontend, a backend orchestration layer, containerized execution, database-backed state, isolation, real-time updates, and the kind of infrastructure you would expect from a serious SaaS product.
+The original vision was not "a local coding agent for developers who want full control." It was much heavier: a multi-tenant AI engineering platform with a proper frontend, a backend orchestration layer, containerized execution, database-backed state, isolation, real-time updates, and the kind of infrastructure you would expect from a serious SaaS product.
 
 That version of Grinta was real. It was not a fantasy diagram or a Notion plan. I built it.
 
@@ -57,7 +57,7 @@ A hosted web app feels like a startup.
 
 So I built the startup version first.
 
-I remember how convincing that version felt while I was inside it. The more infrastructure I added, the more legitimate the project seemed to me. There is an emotional trap in that. Bigger architecture can make you feel like you are winning before you have actually proven that you are solving the right problem.
+I remember how convincing that version felt while I was inside it. The more infrastructure I added, the more legitimate the project seemed to me. There is an emotional trap there. Bigger architecture can make you feel like you are winning before you have proven you are solving the right problem.
 
 ---
 

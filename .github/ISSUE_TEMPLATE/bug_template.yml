@@ -1,5 +1,5 @@
 name: Bug
-description: Report a problem with App
+description: Report a problem with Grinta
 title: '[Bug]: '
 labels: ['bug']
 body:
@@ -28,22 +28,21 @@ body:
   - type: dropdown
     id: installation
     attributes:
-      label: App Installation
-      description: How are you running App?
+      label: Grinta Installation
+      description: How are you running Grinta?
       options:
-        - Docker command in README
-        - GitHub resolver
-        - Development workflow
-        - CLI
-        - app.app.dev
+        - Local CLI (uv run python -m backend.cli.entry)
+        - API server (python start_server.py)
+        - Docker
+        - GitHub Actions workflow
         - Other
       default: 0
 
   - type: input
-    id: App-version
+    id: grinta-version
     attributes:
-      label: App Version
-      description: What version of App are you using?
+      label: Grinta Version
+      description: What version of Grinta are you using?
       placeholder: ex. 0.9.8, main, etc.
 
   - type: input
@@ -58,9 +57,10 @@ body:
     attributes:
       label: Operating System
       options:
+        - Windows
+        - WSL on Windows
         - MacOS
         - Linux
-        - WSL on Windows
 
   - type: textarea
     id: additional-context

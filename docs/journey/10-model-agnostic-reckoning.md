@@ -18,7 +18,7 @@ This chapter is about why that matters, and what model compatibility actually lo
 
 In the beginning, I thought model-agnosticism meant using a library like LiteLLM to route calls. "Just swap the base URL and the model string."
 
-That is naive. It works for a chatbot. It catastrophically fails for an autonomous coding agent.
+That is naive for autonomous systems. It works for a chatbot. It catastrophically fails for an autonomous coding agent.
 
 An autonomous coding agent relies completely on structured outputs, function calling, parameter extraction, and context window management. These are exactly the areas where LLM providers violently disagree on implementation.
 
@@ -123,7 +123,7 @@ If your agent is tied to one model's API syntax, your architecture is renting sp
 
 The decision to build the inference layer this way was expensive. It took weeks to design, test, debug across providers, and ensure error handling was normalized natively. It means maintaining three client implementations plus a fallback, keeping the capability catalog current as models launch, and updating the exception mapper when providers change their error formats.
 
-But the alternative — depending on a framework's abstraction or a single provider's SDK — creates a dependency that compounds over time. Every month that passes, every new model that launches, every pricing change that drops, validates the investment. Grinta can switch from Claude to GPT to Gemini to a local Ollama model with a single config change. No code change. No adapter. No migration.
+But the alternative — depending on a framework's abstraction or a single provider's SDK — creates a dependency that compounds over time. Every month that passes, every new model launch, and every pricing shift validates that investment. Grinta can switch from Claude to GPT to Gemini to a local Ollama model with a single config change. No code change. No adapter. No migration.
 
 Grinta is model-agnostic because it is the only way to build an agent that can survive next year.
 

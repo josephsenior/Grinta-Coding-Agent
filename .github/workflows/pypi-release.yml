@@ -1,4 +1,4 @@
-# Publishes the App PyPi package
+# Publishes the Grinta PyPI package
 name: Publish PyPi Package
 
 # Triggered manually

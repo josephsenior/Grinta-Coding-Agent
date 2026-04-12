@@ -9,7 +9,7 @@ Maybe call it memory.
 
 That is the beginner version of the problem.
 
-The real problem is harder.
+The real problem is much harder.
 
 A long-running agent is not just constrained by context window size. It is constrained by **attention quality**. A model can technically fit a lot of tokens and still behave like it understands much less than what you gave it. That gap between "fits in the window" and "stays cognitively useful" is where most context systems start failing.
 

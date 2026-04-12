@@ -20,7 +20,7 @@ There is an important difference between:
 - inferring design patterns from how commercial systems behave
 - pretending to know the hidden internals of proprietary products
 
-I am only comfortable being direct where there is enough signal.
+I am direct only where there is enough signal.
 
 For open-source systems such as OpenHands, SWE-Agent, Aider, and LangChain, there is enough architecture available to study directly.
 For products like Claude Code, Cursor, Windsurf, and Devin, there is enough public signal to infer patterns from workflows, demos, docs, and ecosystem conventions, but not enough to pretend certainty.
@@ -45,7 +45,7 @@ Devin and SWE-agent approach the environment as a hostile, chaotic place that th
 
 OpenHands was the deepest early inspiration for Grinta, particularly their event stream and persistence model. However, their prompting strategy can easily become heavy, stacking massive role instructions, capabilities, and system rules into the context.
 
-**My Decision:** I adopted the event-driven architecture but violently rejected the prompt bloat. If a rule is structural, I enforce it in Python (like the validation service), not by begging the LLM to obey it in a prompt.
+**My Decision:** I adopted the event-driven architecture but firmly rejected prompt bloat. If a rule is structural, I enforce it in Python (like the validation service), not by begging the LLM to obey it in a prompt.
 
 ### Aider: The Git-Centric Digger
 

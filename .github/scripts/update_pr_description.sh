@@ -7,18 +7,24 @@ set -euxo pipefail
 
 # Get the branch name for the PR
 BRANCH_NAME=$(gh pr view "$PR_NUMBER" --json headRefName --jq .headRefName)
+REPO_SLUG=${REPO:-$(gh repo view --json nameWithOwner --jq .nameWithOwner)}
+REPO_OWNER_LOWER=$(echo "${REPO_SLUG%%/*}" | tr '[:upper:]' '[:lower:]')
+PROJECT_SLUG=$(echo "${REPO_SLUG##*/}" | tr '[:upper:]' '[:lower:]')
+
+RUNTIME_IMAGE="ghcr.io/${REPO_OWNER_LOWER}/runtime:${SHORT_SHA}-nikolaik"
+APP_IMAGE="ghcr.io/${REPO_OWNER_LOWER}/app:${SHORT_SHA}"
 
 # Define the Docker command
 DOCKER_RUN_COMMAND="docker run -it --rm \
   -p 3000:3000 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --add-host host.docker.internal:host-gateway \
-  -e RUNTIME_CONTAINER_IMAGE=docker.app.dev/App/runtime:${SHORT_SHA}-nikolaik \
-  --name App-app-${SHORT_SHA} \
-  docker.app.dev/App/App:${SHORT_SHA}"
+  -e RUNTIME_CONTAINER_IMAGE=${RUNTIME_IMAGE} \
+  --name ${PROJECT_SLUG}-app-${SHORT_SHA} \
+  ${APP_IMAGE}"
 
 # Define the uvx command
-UVX_RUN_COMMAND="uvx --python 3.12 --from git+https://github.com/App/App@${BRANCH_NAME} App"
+UVX_RUN_COMMAND="uvx --python 3.12 --from git+https://github.com/${REPO_SLUG}@${BRANCH_NAME} grinta"
 
 # Get the current PR body
 PR_BODY=$(gh pr view "$PR_NUMBER" --json body --jq .body)

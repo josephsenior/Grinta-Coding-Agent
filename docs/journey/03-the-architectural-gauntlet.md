@@ -12,7 +12,7 @@ Architecture as survival.
 
 Grinta today is not a single giant loop with random helper files. It is a decomposed system with a serious orchestration layer, event-sourced state, recovery machinery, service boundaries, validation, and discipline around code quality. That shape did not appear automatically. It came from repeatedly feeling the pain of monoliths, debugging deadlocks, and deciding that if the project kept growing, the code had to remain understandable.
 
-This chapter is probably the closest thing in the whole journey to a personality profile. I do not know how to watch a codebase rot without wanting to tear it open and redraw the boundaries. Some people tolerate architectural debt for longer than I can. I feel it physically when I open a file and my brain resists reading something I wrote myself.
+This chapter is probably the closest thing in this journey to a personality profile. I do not know how to watch a codebase rot without wanting to tear it open and redraw the boundaries. Some people tolerate architectural debt longer than I can. I feel it physically when I open a file and my brain resists reading something I wrote myself.
 
 ---
 
