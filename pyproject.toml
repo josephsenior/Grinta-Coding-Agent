@@ -66,9 +66,10 @@ dependencies = [
   "prompt_toolkit>=3.0.50,<4",
   "optimum[onnxruntime]>=2.1.0",
   "pyfiglet>=1.0.4",
+  "ripgrep==14.1.0",
 ]
 
-urls = { Repository = "https://github.com/App/App" }
+urls = { Repository = "https://github.com/josephsenior/Grinta-Agent", Issues = "https://github.com/josephsenior/Grinta-Agent/issues", Discussions = "https://github.com/josephsenior/Grinta-Agent/discussions" }
 # Console script disabled — Windows Application Control blocks pip-generated
 # .exe launchers.  Use the grinta.cmd wrapper in Scripts/ instead, or run
 # directly: python -m backend.cli.entry
