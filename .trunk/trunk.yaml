@@ -10,5 +10,6 @@ plugins:
       uri: https://github.com/trunk-io/plugins
 lint:
   enabled:
+    - bandit@1.9.4
     - trufflehog@3.94.3
     - ruff@0.15.10

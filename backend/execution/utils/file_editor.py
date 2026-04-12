@@ -526,7 +526,11 @@ class FileEditor:
             ]
             line_matches = sum(
                 1
-                for old_line, cand_line in zip(old_norm_lines, cand_norm_lines)
+                for old_line, cand_line in zip(
+                    old_norm_lines,
+                    cand_norm_lines,
+                    strict=False,
+                )
                 if old_line and old_line == cand_line
             )
             if ratio > best_ratio:
@@ -540,9 +544,17 @@ class FileEditor:
         if best_ratio < 0.80:
             return self._fuzzy_match_error(file_content, old_str)
 
-        # For 0.88-0.95 near matches, require strong line-level agreement.
+        # For 0.80-0.95 near matches, require line-level agreement.
+        # Short snippets (<=4 lines) are allowed with at least one exact
+        # anchor line; longer snippets keep stricter agreement.
         if best_ratio < 0.95:
-            required_matches = max(len(old_norm_lines) - 1, int(len(old_norm_lines) * 0.7))
+            if len(old_norm_lines) <= 4:
+                required_matches = 1
+            else:
+                required_matches = max(
+                    len(old_norm_lines) - 1,
+                    int(len(old_norm_lines) * 0.7),
+                )
             if best_line_matches < required_matches:
                 return self._fuzzy_match_error(file_content, old_str)
 

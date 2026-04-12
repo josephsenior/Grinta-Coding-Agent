@@ -288,6 +288,33 @@ class TestFileEditorEdit:
         content = (Path(self.tmpdir) / 'logger-medium.test.ts').read_text()
         assert '.not.toHaveBeenCalled()' in content
 
+    def test_replace_auto_fuzzy_short_snippet_single_anchor_line(self):
+        self._write(
+            'logger-short.test.ts',
+            (
+                '            it("should log debug messages in production", () => {\n'
+                '                  logger.debug("Debug message");\n'
+                '                  expect(console.debug).toHaveBeenCalled();\n'
+            ),
+        )
+        result = self.editor(
+            command='edit',
+            path='logger-short.test.ts',
+            old_str=(
+                'it("should not log debug messages in production", () => {\n'
+                '  logger.debug("Debug message");\n'
+                '  expect(console.debug).not.toHaveBeenCalled();\n'
+            ),
+            new_str=(
+                'it("should not log debug messages in production", () => {\n'
+                '  logger.debug("Debug message");\n'
+                '  expect(console.debug).toHaveBeenCalled();\n'
+            ),
+        )
+        assert result.error is None
+        content = (Path(self.tmpdir) / 'logger-short.test.ts').read_text()
+        assert 'should not log debug messages in production' in content
+
     def test_replace_fuzzy_ambiguity_is_rejected(self):
         self._write(
             'ambiguous.ts',
