@@ -9,6 +9,7 @@ from __future__ import annotations
 import importlib
 import importlib.metadata as metadata
 import json
+import os
 import runpy
 import sys
 from pathlib import Path
@@ -63,14 +64,37 @@ def _resolve_entry_file() -> Path | None:
     return wheel_entry if wheel_entry.exists() else None
 
 
+def _prepend_sys_path(path: Path) -> None:
+    """Put *path* at sys.path[0], removing any existing duplicate entry."""
+    target = os.path.normcase(os.path.normpath(str(path)))
+    for idx, existing in enumerate(list(sys.path)):
+        try:
+            normalized = os.path.normcase(os.path.normpath(existing))
+        except Exception:
+            continue
+        if normalized == target:
+            del sys.path[idx]
+            break
+    sys.path.insert(0, str(path))
+
+
+def _entry_project_root(entry_file: Path) -> Path:
+    """Return the package root for backend/cli/entry.py paths."""
+    return entry_file.parent.parent.parent
+
+
 def main() -> None:
     """Launch Grinta CLI in a collision-safe way."""
     entry_file = _resolve_entry_file()
     if entry_file is not None:
+        _prepend_sys_path(_entry_project_root(entry_file))
         runpy.run_path(str(entry_file), run_name='__main__')
         return
 
     # Last-resort fallback; may be vulnerable to package-name collisions.
+    root = _editable_project_root()
+    if root is not None:
+        _prepend_sys_path(root)
     fallback_main = getattr(importlib.import_module('backend.cli.entry'), 'main')
     fallback_main()
 
