@@ -36,6 +36,7 @@ from backend.ledger.observation import (
     Observation,
 )
 from backend.ledger.observation_cause import attach_observation_cause
+from backend.orchestration.action_scheduler import ActionScheduler
 from backend.orchestration.agent import Agent
 from backend.orchestration.memory_pressure import MemoryPressureMonitor
 from backend.orchestration.orchestration_config import (
@@ -75,6 +76,7 @@ class SessionOrchestrator:
     _step_task: asyncio.Task[None] | None = None
     rate_governor: LLMRateGovernor
     memory_pressure: MemoryPressureMonitor
+    action_scheduler: ActionScheduler
     _action_contexts_by_event_id: dict[int, ToolInvocationContext]
     _action_contexts_by_object: dict[int, ToolInvocationContext]
 
@@ -205,6 +207,9 @@ class SessionOrchestrator:
         # Rate governor and memory monitor
         self.rate_governor = LLMRateGovernor()
         self.memory_pressure = MemoryPressureMonitor()
+        self.action_scheduler = ActionScheduler(
+            enabled=bool(getattr(config, 'enable_parallel_tool_scheduling', False))
+        )
 
         # Guard against concurrent step execution across dispatch threads.
         # Uses asyncio.Lock for proper async safety (threading.Lock is fragile
@@ -716,26 +721,11 @@ class SessionOrchestrator:
         if not self._pending_action and self.get_agent_state() == AgentState.RUNNING:
             self.step()
 
-    # Action types that are safe to run concurrently (pure reads, no side effects)
-    _PARALLEL_SAFE_ACTION_TYPES: ClassVar[tuple[str, ...]] = (
-        'read',  # FileReadAction
-        'think',  # AgentThinkAction (non-runnable in runtime)
-        'search_code',  # search_code tool result
-        'explore_tree',  # explore_tree_structure
-        'get_entity',  # get_entity_contents
-    )
-
-    def _is_parallel_safe(self, action: Any) -> bool:
-        """Return True if action type is safe to run concurrently with other reads."""
-        action_type = getattr(action, 'action', '') or ''
-        return any(action_type.startswith(t) for t in self._PARALLEL_SAFE_ACTION_TYPES)
-
     async def _try_parallel_read_batch(self) -> bool:
-        """Attempt to drain ALL pending actions in parallel if every one is read-only.
+        """Attempt to drain pending actions in parallel when scheduler allows.
 
-        P2-B: When the LLM emits multiple reads (e.g. read 3 files), execute them
-        concurrently via asyncio.gather instead of sequentially. Only activates when
-        every queued action is verified parallel-safe.
+        P2-B: When the LLM emits multiple read-only actions, execute the selected
+        batch concurrently via asyncio.gather instead of sequentially.
 
         The PendingActionService already tracks multiple outstanding actions by
         stream ID (dict[int, tuple[Action, float]]), so concurrent execute_action
@@ -743,22 +733,32 @@ class SessionOrchestrator:
         their matching observations.
 
         Returns True if batch was executed (caller should skip the serial drain),
-        False if any action is not parallel-safe (fall through to serial execution).
+        False when parallel scheduling is disabled or unsafe for the current queue.
         """
         pending = getattr(self.agent, 'pending_actions', None)
-        if not pending or len(pending) < 2:
+        if not pending:
             return False
 
-        batch = list(pending)
-        if not all(self._is_parallel_safe(a) for a in batch):
+        scheduler = getattr(self, 'action_scheduler', None)
+        if scheduler is None:
+            return False
+        decision = scheduler.decide_parallel_batch(list(pending))
+        if not decision.should_execute_parallel:
             return False
 
-        # Drain the queue before executing to prevent double-processing
-        pending.clear()
+        batch = list(decision.actions)
+        if not batch:
+            return False
+
+        # Remove only scheduled actions so overflow items remain queued.
+        for action in batch:
+            with contextlib.suppress(ValueError):
+                pending.remove(action)
 
         logger.debug(
-            '[P2-B] Parallel read batch: executing %d read-only actions concurrently',
+            '[scheduler] Parallel tool batch: executing %d actions (%s)',
             len(batch),
+            decision.reason,
         )
         results = await asyncio.gather(
             *(self.action_execution.execute_action(a) for a in batch),

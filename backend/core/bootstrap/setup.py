@@ -406,6 +406,9 @@ def create_controller(
             replay_events=replay_events,
             security_analyzer=runtime.security_analyzer,
             pending_action_timeout=config.pending_action_timeout,
+            enable_parallel_tool_scheduling=bool(
+                getattr(agent.config, 'enable_parallel_tool_scheduling', False)
+            ),
         )
     )
     # Store the runtime so downstream code (worker delegation, middleware)

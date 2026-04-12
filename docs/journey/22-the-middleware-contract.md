@@ -127,8 +127,8 @@ Because in autonomous systems, correctness is not only what you do. It is when y
 
 ## What Comes Next
 
-The next chapter returns to the epilogue perspective: what remains unfinished, where the architecture is still evolving, and what constraints still need better answers.
+The next chapter tackles one of the most tempting mistakes in autonomous agent design: assuming that more speed and parallelization automatically leads to better outcomes, and how I fell into the parallelization trap.
 
 ---
 
-← [Who Grades the Agent](21-who-grades-the-agent.md) | [The Book of Grinta](README.md) | [The Road Ahead](07-the-road-ahead.md) →
+← [Who Grades the Agent](21-who-grades-the-agent.md) | [The Book of Grinta](README.md) | [The Parallelization Trap](23-the-parallelization-trap.md) →

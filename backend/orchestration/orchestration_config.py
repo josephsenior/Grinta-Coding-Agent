@@ -71,6 +71,7 @@ class OrchestrationConfig:
     delegate_task_blackboard_enabled: bool = False
     blackboard: Any = None  # Shared blackboard for worker agents when delegate_task_blackboard_enabled
     pending_action_timeout: float = DEFAULT_PENDING_ACTION_TIMEOUT
+    enable_parallel_tool_scheduling: bool = False
 
 
 class OrchestrationServices:

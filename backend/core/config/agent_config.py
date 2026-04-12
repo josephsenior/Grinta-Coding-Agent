@@ -48,6 +48,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_MIN_ITERATIONS,
     DEFAULT_AGENT_NAME,
     DEFAULT_AGENT_PLAN_MODE_ENABLED,
+    DEFAULT_AGENT_PARALLEL_TOOL_SCHEDULING_ENABLED,
     DEFAULT_AGENT_PLANNING_COMPLEXITY_THRESHOLD,
     DEFAULT_AGENT_PLANNING_MIDDLEWARE_ENABLED,
     DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED,
@@ -155,6 +156,13 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_verify_file_lines: bool = Field(default=True)
     enable_meta_cognition: bool = Field(default=True)
     enable_checkpoints: bool = Field(default=True)
+    enable_parallel_tool_scheduling: bool = Field(
+        default=DEFAULT_AGENT_PARALLEL_TOOL_SCHEDULING_ENABLED,
+        description=(
+            'Enable scheduler-driven parallel execution for tool-action batches '
+            'that are explicitly classified as parallel-safe.'
+        ),
+    )
 
     # Advanced capabilities
     enable_history_truncation: bool = Field(

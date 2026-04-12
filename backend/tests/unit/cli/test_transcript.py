@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import io
+
 import pytest
+from rich.console import Console
 from rich.text import Text
 
 from backend.cli.layout_tokens import CALLOUT_PANEL_PADDING
@@ -15,6 +18,7 @@ from backend.cli.transcript import (
     format_activity_turn_header,
     format_callout_panel,
     format_ground_truth_tool_line,
+    format_reasoning_snapshot,
     format_shell_result_secondary,
     strip_tool_result_validation_annotations,
 )
@@ -136,3 +140,20 @@ def test_format_shell_result_secondary_uses_bright_icon_and_message() -> None:
     line = format_shell_result_secondary('exit 127 · missing tool', kind='err')
     assert '✗' in line.plain
     assert 'exit 127' in line.plain
+
+
+def test_format_reasoning_snapshot_empty() -> None:
+    g = format_reasoning_snapshot([])
+    assert len(g.renderables) == 0
+
+
+def test_format_reasoning_snapshot_rule_and_lines() -> None:
+    g = format_reasoning_snapshot(['  first line  ', '', 'second'])
+    buf = io.StringIO()
+    Console(file=buf, width=88, force_terminal=True, color_system=None, legacy_windows=False).print(
+        g
+    )
+    out = buf.getvalue()
+    assert 'Reasoning' in out
+    assert 'first line' in out
+    assert 'second' in out

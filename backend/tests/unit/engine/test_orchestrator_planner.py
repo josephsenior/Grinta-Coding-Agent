@@ -142,7 +142,7 @@ class TestCondensationRecoveryHandling:
 
 
 class TestQueuedActionThrottling:
-    def test_queue_additional_actions_defers_overflow(self):
+    def test_queue_additional_actions_queues_all(self):
         orch = Orchestrator.__new__(Orchestrator)
         orch.pending_actions = deque()
         orch.deferred_actions = deque()
@@ -150,10 +150,10 @@ class TestQueuedActionThrottling:
         actions = [AgentThinkAction(thought=f'a{i}') for i in range(5)]
         orch._queue_additional_actions(actions)
 
-        assert len(orch.pending_actions) == orch._MAX_QUEUED_ACTIONS_PER_RESPONSE
-        assert len(orch.deferred_actions) == 3
+        assert len(orch.pending_actions) == 5
+        assert len(orch.deferred_actions) == 0
 
-    def test_promote_deferred_actions_respects_queue_cap(self):
+    def test_promote_deferred_actions_processes_all(self):
         orch = Orchestrator.__new__(Orchestrator)
         orch.pending_actions = deque()
         orch.deferred_actions = deque(

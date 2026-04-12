@@ -84,28 +84,36 @@ def build_apply_patch_action(patch: str, check_only: bool = False) -> CmdRunActi
     pb = _b64(patch)
     dry_run_arg = 'True' if check_only else 'False'
 
-    py = (
-        'import base64,os,subprocess,sys,tempfile;'
-        f"patch=base64.b64decode(b'{pb}').decode();"
-        "f=tempfile.NamedTemporaryFile(suffix='.patch',delete=False,mode='w');"
-        'f.write(patch);f.close();'
-        f'dry_run={dry_run_arg};'
-        # Try git apply first
-        "git_args=['git','apply','--whitespace=fix'];"
-        "dry_run and git_args.append('--check');"
-        'git_args.append(f.name);'
-        'r=subprocess.run(git_args,capture_output=True,text=True);'
-        # Fall back to patch if not a git repo
-        "if r.returncode!=0 and 'not a git repository' in r.stderr.lower():"
-        "  patch_args=['patch','-p1'];"
-        "  dry_run and patch_args.insert(1,'--dry-run');"
-        "  patch_args+=['--input',f.name];"
-        '  r=subprocess.run(patch_args,capture_output=True,text=True);'
-        'os.unlink(f.name);'
-        "out=r.stdout or r.stderr or ('Dry run OK, patch applies cleanly.' if dry_run else 'Patch applied successfully.');"
-        'print(out);'
-        'sys.exit(r.returncode)'
-    )
+    py = f"""
+import base64, os, subprocess, sys, tempfile
+
+patch = base64.b64decode(b'{pb}').decode()
+with tempfile.NamedTemporaryFile(suffix='.patch', delete=False, mode='w') as f:
+    f.write(patch)
+    temp_name = f.name
+
+dry_run = {dry_run_arg}
+
+git_args = ['git', 'apply', '--whitespace=fix']
+if dry_run:
+    git_args.append('--check')
+git_args.append(temp_name)
+
+r = subprocess.run(git_args, capture_output=True, text=True)
+
+if r.returncode != 0 and 'not a git repository' in r.stderr.lower():
+    patch_args = ['patch', '-p1']
+    if dry_run:
+        patch_args.insert(1, '--dry-run')
+    patch_args += ['--input', temp_name]
+    r = subprocess.run(patch_args, capture_output=True, text=True)
+
+os.unlink(temp_name)
+
+out = r.stdout or r.stderr or ('Dry run OK, patch applies cleanly.' if dry_run else 'Patch applied successfully.')
+print(out)
+sys.exit(r.returncode)
+"""
 
     label = 'dry-run check' if check_only else 'applying patch'
     return CmdRunAction(

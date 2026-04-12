@@ -10,9 +10,11 @@ Architecture notes (preserve these strengths):
 - The event stream is the sole communication channel between controller and agent.
 """
 
+
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from collections import deque
 from typing import TYPE_CHECKING, Any
@@ -140,20 +142,15 @@ class Orchestrator(Agent):
             system_prompt = 'system_prompt'
 
         resolved_model = ''
-        try:
+        with contextlib.suppress(Exception):
             resolved_model = (self.llm.config.model or '').strip()
-        except Exception:
-            pass
         if not resolved_model and self.llm_registry:
-            try:
+            with contextlib.suppress(Exception):
                 llm_cfg = self.llm_registry.config.get_llm_config_from_agent_config(
                     self.config
                 )
                 if llm_cfg and getattr(llm_cfg, 'model', None):
                     resolved_model = str(llm_cfg.model).strip()
-            except Exception:
-                pass
-
         return OrchestratorPromptManager(
             prompt_dir=prompt_dir,
             system_prompt_filename=system_prompt,
@@ -205,8 +202,7 @@ class Orchestrator(Agent):
     async def astep(self, state: State) -> Action:
         """Async version of step() with hard circuit breaker for consecutive ContextLimitErrors."""
         try:
-            exit_action = self._check_exit_command(state)
-            if exit_action:
+            if exit_action := self._check_exit_command(state):
                 self._consecutive_context_errors = 0
                 return exit_action
 
@@ -216,8 +212,7 @@ class Orchestrator(Agent):
             ):
                 self._promote_deferred_actions()
 
-            pending = self._consume_pending_action()
-            if pending:
+            if pending := self._consume_pending_action():
                 self._consecutive_context_errors = 0
                 return pending
 
@@ -266,10 +261,10 @@ class Orchestrator(Agent):
         except ToolExecutionError as e:
             self._consecutive_context_errors = 0
             logger.warning('Auto-Healing: Tool Execution Error: %s', e)
-            
-            removed = self.clear_queued_actions(reason="Tool execution failed, aborting batched sequence")
+
+            removed = self.clear_queued_actions(reason='Tool execution failed, aborting batched sequence')
             if removed > 0:
-                logger.info("Batched sequence aborted! Dispelled %d blind follow-up actions.", removed)
+                logger.info('Batched sequence aborted! Dispelled %d blind follow-up actions.', removed)
 
             return AgentThinkAction(
                 thought=f'I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.',
@@ -293,11 +288,9 @@ class Orchestrator(Agent):
         if self._is_noop_condensation_action(condensed.pending_action):
             return condensed.pending_action
         task_text = ''
-        try:
+        with contextlib.suppress(Exception):
             initial_msg = self.memory_manager.get_initial_user_message(state.history)
             task_text = (getattr(initial_msg, 'content', '') or '')[:200]
-        except Exception:
-            pass
         self._queue_post_condensation_recovery(task_text=task_text)
         return condensed.pending_action
 
@@ -305,13 +298,11 @@ class Orchestrator(Agent):
     def _is_noop_condensation_action(action: object | None) -> bool:
         if not isinstance(action, CondensationAction):
             return False
-        if action.summary is not None:
-            return False
-        return len(action.pruned) == 0
+        return False if action.summary is not None else len(action.pruned) == 0
 
     def _set_prompt_tier_from_recent_history(self, state: State) -> None:
         """Escalate to debug tier on recent errors or elevated-risk file operations."""
-        try:
+        with contextlib.suppress(Exception):
             from backend.core.enums import ActionSecurityRisk
             from backend.ledger.action import FileEditAction, FileWriteAction
             from backend.ledger.observation import ErrorObservation
@@ -327,8 +318,6 @@ class Orchestrator(Agent):
                         self.prompt_manager.set_prompt_tier('debug')
                         return
             self.prompt_manager.set_prompt_tier('base')
-        except Exception:
-            pass
 
     def _execute_llm_step(self, state: State, condensed: Any) -> Action:
         """Core logic to prepare messages, call LLM, and return the first action."""
@@ -418,7 +407,7 @@ class Orchestrator(Agent):
     # ------------------------------------------------------------------ #
     # Test/mocking helpers
     # ------------------------------------------------------------------ #
-    def set_llm(self, llm) -> None:  # pragma: no cover - used in tests
+    def set_llm(self, llm) -> None:    # pragma: no cover - used in tests
         """Replace the active LLM and propagate to planner/executor.
 
         Some unit tests inject a mock LLM after agent construction. The
@@ -428,15 +417,11 @@ class Orchestrator(Agent):
         """
         self.llm = llm
         if hasattr(self, 'planner') and hasattr(self.planner, '_llm'):
-            try:
+            with contextlib.suppress(Exception):
                 self.planner._llm = llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
-            except Exception:
-                pass
         if hasattr(self, 'executor') and hasattr(self.executor, '_llm'):
-            try:
+            with contextlib.suppress(Exception):
                 self.executor._llm = llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
-            except Exception:
-                pass
 
     def _consume_pending_action(self) -> Action | None:
         if not self.pending_actions:
@@ -445,19 +430,15 @@ class Orchestrator(Agent):
         from .file_reads import try_batch_file_reads
 
         batched = try_batch_file_reads(self.pending_actions)
-        if batched:
-            return batched
-        return self.pending_actions.popleft()
+        return batched if batched else self.pending_actions.popleft()
 
     def _sync_executor_llm(self) -> None:
         if (
             hasattr(self, 'executor')
             and getattr(self.executor, '_llm', None) is not self.llm
         ):
-            try:  # pragma: no cover - defensive assignment
+            with contextlib.suppress(Exception):
                 self.executor._llm = self.llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
-            except Exception:
-                pass
 
     def _build_fallback_action(self, result) -> Action:
         """Create a message action when the LLM returns no tool calls.

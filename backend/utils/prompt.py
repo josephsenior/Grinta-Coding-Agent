@@ -87,15 +87,14 @@ class PromptManager:
 
     def get_system_message(self, **context) -> str:
         """Render system prompt via Python prompt builder and apply refinement."""
-        import shutil
-
         from backend.engine.prompts.prompt_builder import build_system_prompt
-        from backend.engine.tools.prompt import get_terminal_tool_name
+        from backend.engine.tools.prompt import get_terminal_tool_name, is_windows_with_bash
 
         _on_windows = sys.platform == 'win32'
-        _has_bash = bool(shutil.which('bash'))
-        context.setdefault('is_windows', _on_windows and not _has_bash)
-        context.setdefault('windows_with_bash', _on_windows and _has_bash)
+        
+        # Drive prompt environment flags from the exact logic the executor uses
+        context.setdefault('is_windows', _on_windows)
+        context.setdefault('windows_with_bash', is_windows_with_bash())
         context.setdefault('terminal_tool_name', get_terminal_tool_name())
         system_message = build_system_prompt(**context).strip()
         return system_message
@@ -222,24 +221,61 @@ class OrchestratorPromptManager(PromptManager):
                 pass
         return ''
 
+    def _resolve_function_calling_mode(self) -> str:
+        """Return prompt-facing function-calling mode: native, string, or unknown."""
+        if self._app_config is None or self._config is None:
+            return 'unknown'
+
+        try:
+            llm_cfg_fn = getattr(
+                self._app_config,
+                'get_llm_config_from_agent_config',
+                None,
+            )
+            if not callable(llm_cfg_fn):
+                return 'unknown'
+
+            resolved = llm_cfg_fn(self._config)  # pylint: disable=not-callable
+            if not resolved:
+                return 'unknown'
+
+            native_pref = getattr(resolved, 'native_tool_calling', None)
+            if native_pref is True:
+                return 'native'
+            if native_pref is False:
+                return 'string'
+
+            model_id = str(getattr(resolved, 'model', '') or '').strip()
+            if not model_id:
+                return 'unknown'
+
+            from backend.inference.model_features import get_features
+
+            features = get_features(model_id)
+            return 'native' if features.supports_function_calling else 'string'
+        except Exception:
+            return 'unknown'
+
     def get_system_message(self, **context: object) -> str:
         """Render with orchestrator defaults (config, cli_mode, identity prefix)."""
         if self._config is not None:
             context.setdefault('config', self._config)
             context.setdefault('cli_mode', True)
 
-        # On Windows with bash available, tell the prompt to use bash
-        # instructions (is_windows=False) since Git Bash is the active shell.
-        import shutil
+        # Keep prompt shell identity aligned with the same terminal contract
+        # used by runtime execution (execute_bash vs execute_powershell).
+        from backend.engine.tools.prompt import get_terminal_tool_name, is_windows_with_bash
 
         _on_windows = sys.platform == 'win32'
-        _has_bash = bool(shutil.which('bash'))
-        context.setdefault('is_windows', _on_windows and not _has_bash)
-        context.setdefault('windows_with_bash', _on_windows and _has_bash)
+        terminal_tool = get_terminal_tool_name()
+        context.setdefault('is_windows', _on_windows)
+        context.setdefault('windows_with_bash', _on_windows and terminal_tool == 'execute_bash' and is_windows_with_bash())
+        context.setdefault('terminal_tool_name', terminal_tool)
         context.setdefault('mcp_tool_names', self.mcp_tool_names)
         context.setdefault('mcp_tool_descriptions', self.mcp_tool_descriptions)
         context.setdefault('mcp_server_hints', self.mcp_server_hints)
         context.setdefault('active_llm_model', self._active_llm_model_id())
+        context.setdefault('function_calling_mode', self._resolve_function_calling_mode())
         content = super().get_system_message(**context)
         # Avoid duplicating identity: system_prompt already opens with the app identity.
         if not _content_has_app_identity(content):

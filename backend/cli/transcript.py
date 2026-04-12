@@ -142,6 +142,17 @@ def format_activity_turn_header() -> Rule:
     return Rule(title='Agent activity', style='dim cyan', align='left')
 
 
+def format_reasoning_snapshot(lines: list[str]) -> Group:
+    """Transcript block for reasoning that finished (after the live panel closes)."""
+    cleaned = [ln.strip() for ln in lines if (ln or '').strip()]
+    if not cleaned:
+        return Group()
+    return Group(
+        Rule(title='Reasoning', style='dim cyan', align='left'),
+        *[format_activity_secondary(line, kind='neutral') for line in cleaned],
+    )
+
+
 def format_activity_shell_block(
     verb: str,
     detail: str,

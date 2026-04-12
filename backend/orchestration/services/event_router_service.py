@@ -643,6 +643,9 @@ class EventRouterService:
                     security_analyzer=parent_config.security_analyzer,
                     blackboard=shared_blackboard,
                     pending_action_timeout=parent_config.pending_action_timeout,
+                    enable_parallel_tool_scheduling=bool(
+                        getattr(parent_config, 'enable_parallel_tool_scheduling', False)
+                    ),
                 )
 
                 worker_controller = SessionOrchestrator(worker_config)

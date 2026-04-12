@@ -62,7 +62,11 @@ def _explore_hint(_config: Any = None) -> str:
 # system_partial_00_routing
 # ---------------------------------------------------------------------------
 
-def _render_routing(is_windows: bool, config: Any = None) -> str:
+def _render_routing(
+    is_windows: bool,
+    config: Any = None,
+    function_calling_mode: str | None = None,
+) -> str:
     explore = _explore_hint(config)
     batch_cmds = _choose(
         is_windows,
@@ -78,10 +82,27 @@ def _render_routing(is_windows: bool, config: Any = None) -> str:
         "- **Known file + symbol position, precise definition/references/hover** → `code_intelligence`"
         if lsp_enabled else ""
     )
+    mode = (function_calling_mode or 'unknown').strip().lower()
+    if mode == 'native':
+        tool_call_batching_mode = (
+            'Native function-calling mode is active. You may batch independent tool calls '
+            'in one assistant turn when it improves latency; keep dependent calls sequential.'
+        )
+    elif mode == 'string':
+        tool_call_batching_mode = (
+            'Fallback string-parsing mode is active. Emit exactly one tool call per assistant '
+            'message and continue step-by-step.'
+        )
+    else:
+        tool_call_batching_mode = (
+            'Mode is unknown. Use conservative single tool-call turns unless runtime capability '
+            'signals explicitly confirm native multi-call support.'
+        )
     return _load("system_partial_00_routing.md").format(
         batch_commands=batch_cmds,
         code_intelligence_routing=code_intelligence_routing,
         explore_layout_hint=explore,
+        tool_call_batching_mode=tool_call_batching_mode,
     )
 
 
@@ -115,7 +136,7 @@ def _render_security(cli_mode: bool = True) -> str:
 def _render_autonomy(config: Any, is_windows: bool) -> str:
     level = getattr(config, "autonomy_level", "balanced")
     checkpoints = getattr(config, "enable_checkpoints", False)
-    cp_line = " Checkpoints allow rollback of risky ops." if checkpoints else ""
+    cp_line = " Auto-save occurs before large writes; use 'checkpoint' tool to manually save logically safe states." if checkpoints else ""
 
     if level == "full":
         autonomy = (
@@ -203,20 +224,19 @@ def _render_mcp_and_permissions(
 
     if mcp_tool_names:
         total = len(mcp_tool_names)
-        cap = 24
-        show_desc = total <= 12
+        cap = 10
+        show_desc = total <= 10
 
         parts.append(
             f'🔌 **External MCP tools** ({total}): use **`call_mcp_tool(tool_name="...", arguments={{...}})`** '
             f"— argument shapes match the registered tool schema."
         )
-        for name in mcp_tool_names[:cap]:
-            if show_desc and name in mcp_tool_descriptions:
+        if total <= cap:
+            for name in mcp_tool_names:
                 parts.append(f"- `{name}`: {mcp_tool_descriptions[name]}")
-            else:
-                parts.append(f"- `{name}`")
-        if total > cap:
-            parts.append(f"- … and **{total - cap}** more (names in tool list / `call_mcp_tool` only).")
+        else:
+            # Group or just list few core ones
+            parts.append(f"Too many tools to list ({total}). Core ones include: " + ", ".join([f"`{n}`" for n in mcp_tool_names[:cap]]) + f" and {total-cap} more.")
 
         if mcp_server_hints:
             parts.append("")
@@ -348,6 +368,7 @@ def build_system_prompt(
     mcp_tool_descriptions: dict[str, str] | None = None,
     mcp_server_hints: list[dict[str, str]] | None = None,
     terminal_tool_name: str | None = None,
+    function_calling_mode: str | None = None,
     **_extra: object,
 ) -> str:
     """Assemble the full system prompt from partials.
@@ -388,10 +409,27 @@ def build_system_prompt(
             "- Use `python` (not `python3`) to invoke the Python interpreter.\n"
             "</SHELL_IDENTITY>"
         )
+    elif shell_is_powershell:
+        sections.append(
+            "<SHELL_IDENTITY>\n"
+            "Your terminal is **PowerShell** running on Windows. Use **PowerShell syntax exclusively**.\n"
+            "- Correct: `Get-ChildItem`, `Get-Content`, `Select-String`, `Where-Object`, native cmdlets, or cross-platform Node/Python tools.\n"
+            "- FORBIDDEN: `&&`, `||`, `find`, `cat`, `grep`, `head`, `tail`, `touch`, `rm -rf`, `pkill`, `timeout`, `which`.\n"
+            "- To chain commands, use `;` instead of `&&`.\n"
+            "- To ignore errors instead of `|| true`, use `-ErrorAction SilentlyContinue` or a `try-catch` block.\n"
+            "- To background a task, use `Start-Process` or `Start-Job` instead of appending `&` to the end of the line.\n"
+            "</SHELL_IDENTITY>"
+        )
+    elif not is_windows:
+        sections.append(
+            "<SHELL_IDENTITY>\n"
+            "Your terminal is **Bash / Zsh** running on a Unix-like system. Use standard bash syntax.\n"
+            "</SHELL_IDENTITY>"
+        )
 
     sections += [
         # Routing
-        _render_routing(shell_is_powershell, config),
+        _render_routing(shell_is_powershell, config, function_calling_mode),
         # Security
         _render_security(cli_mode),
         # Autonomy & execution

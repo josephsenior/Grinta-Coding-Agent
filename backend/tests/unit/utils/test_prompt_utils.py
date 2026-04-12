@@ -1,5 +1,6 @@
 """Tests for backend.utils.prompt module — data classes and PromptManager basics."""
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -237,3 +238,80 @@ class TestOrchestratorPromptManager:
             result = opm.get_system_message()
             assert 'WORKING_SCRATCHPAD' in result
             assert '[key]: val' in result
+
+    def test_function_calling_mode_native_guidance(self, tmp_path):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        mock_config = MagicMock()
+        mock_config.autonomy_level = 'balanced'
+        mock_config.enable_checkpoints = False
+        mock_config.enable_permissions = False
+        mock_app_config = MagicMock()
+        mock_app_config.get_llm_config_from_agent_config.return_value = SimpleNamespace(
+            model='openai/gpt-4o-mini',
+            native_tool_calling=None,
+        )
+
+        opm = OrchestratorPromptManager(
+            prompt_dir=str(tmp_path),
+            config=mock_config,
+            app_config=mock_app_config,
+        )
+
+        with patch(
+            'backend.inference.model_features.get_features',
+            return_value=SimpleNamespace(supports_function_calling=True),
+        ):
+            result = opm.get_system_message()
+
+        assert 'Tool-call batching mode:' in result
+        assert 'Native function-calling mode is active.' in result
+
+    def test_function_calling_mode_string_guidance_when_disabled(self, tmp_path):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        mock_config = MagicMock()
+        mock_config.autonomy_level = 'balanced'
+        mock_config.enable_checkpoints = False
+        mock_config.enable_permissions = False
+        mock_app_config = MagicMock()
+        mock_app_config.get_llm_config_from_agent_config.return_value = SimpleNamespace(
+            model='openai/gpt-4o-mini',
+            native_tool_calling=False,
+        )
+
+        opm = OrchestratorPromptManager(
+            prompt_dir=str(tmp_path),
+            config=mock_config,
+            app_config=mock_app_config,
+        )
+        result = opm.get_system_message()
+
+        assert 'Tool-call batching mode:' in result
+        assert 'Fallback string-parsing mode is active.' in result
+
+    def test_shell_identity_uses_active_terminal_tool_over_bash_presence(self, tmp_path):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        mock_config = MagicMock()
+        mock_config.autonomy_level = 'balanced'
+        mock_config.enable_checkpoints = False
+        mock_config.enable_permissions = False
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=mock_config)
+
+        with (
+            patch('backend.utils.prompt.sys.platform', 'win32'),
+            patch(
+                'backend.engine.tools.prompt.get_terminal_tool_name',
+                return_value='execute_powershell',
+            ),
+            patch(
+                'backend.engine.tools.prompt.is_windows_with_bash',
+                return_value=True,
+            ),
+        ):
+            result = opm.get_system_message()
+
+        assert 'Your terminal is **PowerShell** running on Windows.' in result
+        assert 'Your terminal is **Git Bash** running on Windows.' not in result
