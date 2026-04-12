@@ -1115,7 +1115,7 @@ async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
     # The first system message before bootstrap should be "Initializing engine…"
     # (the old "grinta ready" message was removed — the splash covers that).
     init_msgs = [e for e in events if e != 'bootstrap']
-    assert any('nitializ' in m for m in init_msgs) or len(events) >= 1
+    assert any('nitializ' in m for m in init_msgs) or events
 
 
 @pytest.mark.asyncio
@@ -1248,7 +1248,7 @@ def test_atomic_settings_write(tmp_path: Path) -> None:
 
         # No stale .tmp files left behind
         tmp_files = list(settings_file.parent.glob('*.tmp'))
-        assert len(tmp_files) == 0
+        assert not tmp_files
 
 
 def test_get_masked_api_key_returns_not_set_when_missing() -> None:

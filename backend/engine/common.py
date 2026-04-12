@@ -4,6 +4,10 @@ import json
 import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
+from backend.core.logger import app_logger as logger
+from backend.inference.tool_types import make_function_chunk, make_tool_param
+from backend.ledger.action import Action
+
 
 _THINK_TAG_RE = re.compile(r'<redacted_thinking>.*?</redacted_thinking>', re.DOTALL | re.IGNORECASE)
 
@@ -32,10 +36,6 @@ def strip_thinking_tags(text: str) -> str:
     """
     stripped = _THINK_TAG_RE.sub('', text)
     return re.sub(r'\n{3,}', '\n\n', stripped).strip()
-
-from backend.core.logger import app_logger as logger
-from backend.inference.tool_types import make_function_chunk, make_tool_param
-from backend.ledger.action import Action
 
 if TYPE_CHECKING:
     from backend.engine.contracts import ChatCompletionToolParam
@@ -199,8 +199,7 @@ def common_response_to_actions(
     validate_response_choices(response)
     assistant_msg = extract_assistant_message(response)
 
-    tool_calls = getattr(assistant_msg, 'tool_calls', None)
-    if tool_calls:
+    if tool_calls := getattr(assistant_msg, 'tool_calls', None):
         # Pass mcp_tool_names through tool_call object for the factory function
         for tc in tool_calls:
             setattr(tc, '_mcp_tool_names', mcp_tool_names)

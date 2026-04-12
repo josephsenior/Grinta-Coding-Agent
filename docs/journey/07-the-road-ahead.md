@@ -140,7 +140,7 @@ I do not think the value of specialized planning agents is fake. I think the ROI
 
 The earlier codebase still has the receipts: over 20,000 lines of MetaSOP code — a planning orchestrator with provenance hashing, artifact chains, memory retrieval, structured role profiles, and an internal roadmap document that cataloged ten categories of planned improvements. That was not handwaving. It was a system that had already begun eating its own roadmap. The earliest version had even more: a conflict predictor that used an LLM to warn about clashing roles, an execution planner that optimized step ordering for parallelism, and a patch scoring system that judged the quality of generated code changes. The problem was that it was becoming a product inside a product.
 
-That concept still has value, but it needs to live where detailed planning itself is the product, not where hours-long autonomous repository execution is the main goal. 
+That concept still has value, but it needs to live where detailed planning itself is the product, not where hours-long autonomous repository execution is the main goal.
 
 That is why I moved the *pure planning* energy into [Metasop](https://github.com/josephsenior/Metasop) for now, instead of forcing it to remain inside Grinta's core loop while I work alone. I do not see that move as permanent exile. It is an honest admission of limits. With enough open-source collaboration, I want to see Swarming and the Blackboard re-introduced as optional, heavy-duty plugins for Grinta's orchestration. But some ideas deserve a different home until the foundation is strong enough (and the community large enough) to hold them without collapsing.
 

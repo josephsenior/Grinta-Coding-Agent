@@ -25,9 +25,7 @@ def _fit_thought_line(text: str, max_width: int | None) -> str:
     budget = max_width - _THOUGHT_PREFIX_CHARS
     if len(line) <= budget:
         return line
-    if budget <= 4:
-        return line[:budget]
-    return line[: budget - 1] + '…'
+    return line[:budget] if budget <= 4 else f'{line[:budget - 1]}…'
 
 
 class ReasoningDisplay:
@@ -82,8 +80,7 @@ class ReasoningDisplay:
     def update_thought(self, text: str) -> None:
         self.start()
         for line in text.splitlines():
-            stripped = line.strip()
-            if stripped:
+            if stripped := line.strip():
                 self._thought_lines.append(stripped)
         # Keep only the last N lines for a compact view.
         if len(self._thought_lines) > self._max_lines:
@@ -94,8 +91,7 @@ class ReasoningDisplay:
         self.start()
         self._thought_lines.clear()
         for line in text.splitlines():
-            stripped = line.strip()
-            if stripped:
+            if stripped := line.strip():
                 self._thought_lines.append(stripped)
         if len(self._thought_lines) > self._max_lines:
             self._thought_lines = self._thought_lines[-self._max_lines :]
@@ -152,7 +148,7 @@ class ReasoningDisplay:
 
         action_label = self._current_action or 'Thinking…'
         if max_width and len(action_label) > max(24, max_width - 24):
-            action_label = action_label[: max(8, max_width - 28)] + '…'
+            action_label = f'{action_label[:max(8, max_width - 28)]}…'
 
         rows: list[Any] = []
 
@@ -167,16 +163,8 @@ class ReasoningDisplay:
         )
         rows.append(header)
 
-        trail = list(self._recent_actions)
-        if trail:
-            # Last two completed steps — helps users see what already happened.
-            tail = trail[-2:]
-            crumb = Text()
-            crumb.append('  ', style='')
-            crumb.append('then ', style='dim italic')
-            crumb.append(' → '.join(tail), style='dim italic')
-            rows.append(crumb)
-
+        if trail := list(self._recent_actions):
+            self._extracted_from_renderable_38(trail, rows)
         visible_thoughts = self._thought_lines
         clipped = False
         if max_lines is not None and max_lines >= 0 and len(visible_thoughts) > max_lines:
@@ -208,3 +196,13 @@ class ReasoningDisplay:
             Group(*rows),
             accent_style='dim cyan',
         )
+
+    # TODO Rename this here and in `renderable`
+    def _extracted_from_renderable_38(self, trail, rows):
+        # Last two completed steps — helps users see what already happened.
+        tail = trail[-2:]
+        crumb = Text()
+        crumb.append('  ', style='')
+        crumb.append('then ', style='dim italic')
+        crumb.append(' → '.join(tail), style='dim italic')
+        rows.append(crumb)

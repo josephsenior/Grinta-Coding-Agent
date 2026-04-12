@@ -678,13 +678,13 @@ class OrchestratorExecutor:
 
     def _raise_if_recovery_blocked(self, event_stream: EventStream | None) -> None:
         session_key = self._checkpoint_session_key(event_stream)
-        reason = self._recovery_blocked_reasons.pop(session_key, None)
-        if not reason:
+        if reason := self._recovery_blocked_reasons.pop(session_key, None):
+            raise ModelProviderError(
+                'Streaming checkpoint recovery requires manual confirmation before continuing.',
+                context={'recovery_reason': reason},
+            )
+        else:
             return
-        raise ModelProviderError(
-            'Streaming checkpoint recovery requires manual confirmation before continuing.',
-            context={'recovery_reason': reason},
-        )
 
     def _get_checkpoint(self, event_stream: EventStream | None) -> StreamingCheckpoint:
         session_key = self._checkpoint_session_key(event_stream)
@@ -950,7 +950,6 @@ class OrchestratorExecutor:
             content = message.get('content', '')
             if role != 'user':
                 continue
-            text = self._content_to_str(content).strip()
-            if text:
+            if text := self._content_to_str(content).strip():
                 return text
         return ''

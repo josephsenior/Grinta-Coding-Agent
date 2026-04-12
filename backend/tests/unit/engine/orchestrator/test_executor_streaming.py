@@ -113,6 +113,7 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
 
     # Build fake async streaming chunks (OpenAI-style format)
     async def fake_astream(**kwargs):
+# sourcery skip: no-loop-in-tests
         for token in ['Hello', ', ', 'world', '!']:
             yield {
                 'id': 'chatcmpl-test',
