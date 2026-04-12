@@ -426,3 +426,19 @@ class TestWhitespaceIntegration:
 
         assert '    x = 1' in cleaned
         assert cleaned.endswith('\n')
+
+
+class TestMatchHelpers:
+    """Tests for tolerant match helper methods."""
+
+    def test_normalize_for_match_tabs_and_trailing_ws(self):
+        text = 'x  \n\tfoo\t  \n'
+        normalized = WhitespaceHandler.normalize_for_match(text)
+        assert normalized == 'x\n    foo\n'
+
+    def test_map_normalized_offset_to_original(self):
+        original = 'a\tb\n'
+        normalized = WhitespaceHandler.normalize_for_match(original)
+        b_idx = normalized.index('b')
+        mapped = WhitespaceHandler.map_normalized_offset_to_original(original, b_idx)
+        assert original[mapped] == 'b'

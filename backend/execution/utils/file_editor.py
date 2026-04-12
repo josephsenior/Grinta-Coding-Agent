@@ -119,6 +119,7 @@ class FileEditor:
         insert_line: int | None = None,
         start_line: int | None = None,
         end_line: int | None = None,
+        normalize_ws: bool | None = None,
         enable_linting: bool = False,
         dry_run: bool = False,
         **_: Any,
@@ -168,6 +169,7 @@ class FileEditor:
                     insert_line,
                     start_line,
                     end_line,
+                    normalize_ws,
                     dry_run=dry_run,
                 )
             if command == 'undo_last_edit':
@@ -352,6 +354,7 @@ class FileEditor:
         insert_line: int | None,
         start_line: int | None,
         end_line: int | None,
+        normalize_ws: bool | None,
         *,
         dry_run: bool = False,
     ) -> ToolResult:
@@ -375,6 +378,7 @@ class FileEditor:
                 insert_line,
                 start_line,
                 end_line,
+                normalize_ws,
             )
             if isinstance(new_content, ToolResult):
                 new_content.old_content = old_content
@@ -425,15 +429,90 @@ class FileEditor:
         )
         return file_text_val, old_str_val, new_str_val
 
-    def _apply_str_replace(
-        self, old_content: str, old_str: str, new_str: str
-    ) -> str | ToolResult:
-        """Apply old_str -> new_str replace. Returns content or fuzzy-match error."""
-        return (
-            old_content.replace(old_str, new_str)
-            if old_str in old_content
-            else self._fuzzy_match_error(old_content, old_str)
+    @staticmethod
+    def _normalize_whitespace_for_match(text: str) -> str:
+        """Normalize whitespace for tolerant matching while preserving line structure."""
+        from backend.engine.tools.whitespace_handler import WhitespaceHandler
+
+        return WhitespaceHandler.normalize_for_match(text)
+
+    @staticmethod
+    def _map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
+        """Map normalized-text offset back to original-text offset."""
+        from backend.engine.tools.whitespace_handler import WhitespaceHandler
+
+        return WhitespaceHandler.map_normalized_offset_to_original(
+            original,
+            norm_offset,
         )
+
+    def _ws_tolerant_replace(
+        self,
+        file_content: str,
+        old_str: str,
+        new_str: str,
+    ) -> str | ToolResult:
+        """Try whitespace-normalized matching for replace_text."""
+        norm_content = self._normalize_whitespace_for_match(file_content)
+        norm_old = self._normalize_whitespace_for_match(old_str)
+
+        count = norm_content.count(norm_old)
+        if count == 0:
+            return ToolResult(
+                output='',
+                error='No match found even with whitespace normalization.',
+                new_content=file_content,
+            )
+        if count > 1:
+            return ToolResult(
+                output='',
+                error=(
+                    f'Whitespace-normalized old_str matches {count} locations - must be unique. '
+                    'Include more surrounding context lines.'
+                ),
+                new_content=file_content,
+            )
+
+        norm_start = norm_content.index(norm_old)
+        norm_end = norm_start + len(norm_old)
+
+        orig_start = self._map_normalized_offset_to_original(file_content, norm_start)
+        orig_end = self._map_normalized_offset_to_original(file_content, norm_end)
+        return file_content[:orig_start] + new_str + file_content[orig_end:]
+
+    def _apply_str_replace(
+        self,
+        old_content: str,
+        old_str: str,
+        new_str: str,
+        *,
+        normalize_ws: bool | None,
+    ) -> str | ToolResult:
+        """Apply old_str -> new_str replace with safe tolerant fallback."""
+        exact_count = old_content.count(old_str)
+        if exact_count == 1:
+            return old_content.replace(old_str, new_str, 1)
+
+        if exact_count > 1:
+            return ToolResult(
+                output='',
+                error=(
+                    f'ERROR: old_str matches {exact_count} locations in the file. '
+                    'Replacement must be unique. Include 3-5 lines of surrounding context.'
+                ),
+                new_content=old_content,
+            )
+
+        # Strict mode: skip tolerant fallback when explicitly disabled.
+        if normalize_ws is False:
+            return self._fuzzy_match_error(old_content, old_str)
+
+        tolerant = self._ws_tolerant_replace(old_content, old_str, new_str)
+        if isinstance(tolerant, ToolResult):
+            if tolerant.error == 'No match found even with whitespace normalization.':
+                return self._fuzzy_match_error(old_content, old_str)
+            return tolerant
+        return tolerant
 
     def _resolve_edit_content(
         self,
@@ -452,6 +531,7 @@ class FileEditor:
         insert_line: int | None,
         start_line: int | None,
         end_line: int | None,
+        normalize_ws: bool | None,
     ) -> str | ToolResult:
         """Determine new content based on provided parameters."""
         if start_line is not None and end_line is not None:
@@ -468,7 +548,12 @@ class FileEditor:
                 insert_line,
             )
         if old_str_val and new_str_val:
-            return self._apply_str_replace(old_content_str, old_str_val, new_str_val)
+            return self._apply_str_replace(
+                old_content_str,
+                old_str_val,
+                new_str_val,
+                normalize_ws=normalize_ws,
+            )
         if file_text_val:
             return file_text_val
         if new_str_val:

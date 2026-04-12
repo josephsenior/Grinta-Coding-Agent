@@ -189,6 +189,41 @@ class TestFileEditorEdit:
         content = (Path(self.tmpdir) / 'insert.py').read_text()
         assert 'inserted' in content
 
+    def test_replace_auto_whitespace_tolerant(self):
+        self._write('code.py', 'if True:\n\tvalue = 1\n')
+        result = self.editor(
+            command='edit',
+            path='code.py',
+            old_str='if True:\n    value = 1\n',
+            new_str='if True:\n    value = 2\n',
+        )
+        assert result.error is None
+        content = (Path(self.tmpdir) / 'code.py').read_text()
+        assert 'value = 2' in content
+
+    def test_replace_normalize_ws_false_keeps_strict_behavior(self):
+        self._write('code.py', 'if True:\n\tvalue = 1\n')
+        result = self.editor(
+            command='edit',
+            path='code.py',
+            old_str='if True:\n    value = 1\n',
+            new_str='if True:\n    value = 2\n',
+            normalize_ws=False,
+        )
+        assert result.error is not None
+        assert 'No exact match for old_str was found' in result.error
+
+    def test_replace_requires_unique_match(self):
+        self._write('dup.py', 'x = 1\ny = 2\nx = 1\n')
+        result = self.editor(
+            command='edit',
+            path='dup.py',
+            old_str='x = 1',
+            new_str='x = 9',
+        )
+        assert result.error is not None
+        assert 'must be unique' in result.error
+
 
 # ---------------------------------------------------------------------------
 # FileEditor — unknown command

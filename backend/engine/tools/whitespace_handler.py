@@ -502,3 +502,67 @@ class WhitespaceHandler:
 
         # Remove multiple consecutive blank lines (max 2)
         return re.sub(r'\n{4,}', '\n\n\n', code)
+
+    @staticmethod
+    def normalize_for_match(text: str) -> str:
+        """Normalize whitespace for tolerant matching.
+
+        Strategy:
+        - convert tabs to 4 spaces
+        - strip trailing spaces/tabs per line
+        - preserve line boundaries
+        """
+        lines = text.splitlines(keepends=True)
+        normalized: list[str] = []
+        for line in lines:
+            line_ending = ''
+            body = line
+            if body.endswith('\r\n'):
+                line_ending = '\r\n'
+                body = body[:-2]
+            elif body.endswith('\n') or body.endswith('\r'):
+                line_ending = body[-1]
+                body = body[:-1]
+
+            body = body.rstrip(' \t').replace('\t', '    ')
+            normalized.append(body + line_ending)
+        return ''.join(normalized)
+
+    @staticmethod
+    def map_normalized_offset_to_original(original: str, normalized_offset: int) -> int:
+        """Map an offset in normalize_for_match(text) back to original text offset."""
+        norm_pos = 0
+        orig_pos = 0
+        while norm_pos < normalized_offset and orig_pos < len(original):
+            ch = original[orig_pos]
+
+            # Trailing spaces/tabs before newline/EOF are stripped by
+            # normalize_for_match, so they do not advance normalized offset.
+            if ch in (' ', '\t'):
+                lookahead = orig_pos
+                while lookahead < len(original) and original[lookahead] in (' ', '\t'):
+                    lookahead += 1
+                if lookahead >= len(original) or original[lookahead] in ('\n', '\r'):
+                    orig_pos = lookahead
+                    continue
+
+            if ch == '\t':
+                norm_pos += 4
+            else:
+                norm_pos += 1
+            orig_pos += 1
+            if ch in (' ', '\t'):
+                while (
+                    orig_pos < len(original)
+                    and original[orig_pos] in (' ', '\t')
+                    and norm_pos < normalized_offset
+                ):
+                    if original[orig_pos] == '\t':
+                        norm_pos += 4
+                    else:
+                        norm_pos += 1
+                    orig_pos += 1
+                    if norm_pos >= normalized_offset:
+                        break
+                continue
+        return orig_pos

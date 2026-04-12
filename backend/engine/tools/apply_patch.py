@@ -108,14 +108,14 @@ if r.returncode != 0 and 'not a git repository' in r.stderr.lower():
     patch_args += ['--input', temp_name]
     r = subprocess.run(patch_args, capture_output=True, text=True)
 
-combined = ((r.stdout or '') + '\n' + (r.stderr or '')).strip()
+combined = ((r.stdout or '') + '\\n' + (r.stderr or '')).strip()
 if r.returncode != 0 and 'corrupt patch' in combined.lower():
     guidance = (
         '[APPLY_PATCH_GUIDANCE] The patch appears malformed or in the wrong format. '
         'This tool expects a standard unified diff (git diff / diff -u), not a custom patch DSL. '
         'Regenerate the patch in unified diff format and retry.'
     )
-    print((combined + '\n\n' + guidance).strip())
+    print((combined + '\\n\\n' + guidance).strip())
     os.unlink(temp_name)
     sys.exit(r.returncode)
 

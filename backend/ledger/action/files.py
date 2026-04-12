@@ -104,6 +104,7 @@ class FileEditAction(Action):
     file_text: str | None = None
     old_str: str | None = None
     new_str: str | None = None
+    normalize_ws: bool | None = None
     insert_line: int | None = None
     view_range: list[int] | None = None
     content: str = ''
@@ -130,6 +131,8 @@ class FileEditAction(Action):
             elif self.command == 'replace_text':
                 ret += f'Old String: ```\n{self.old_str}\n```\n'
                 ret += f'New String: ```\n{self.new_str}\n```\n'
+                if self.normalize_ws is not None:
+                    ret += f'Normalize WS: {self.normalize_ws}\n'
             elif self.command == 'insert_text':
                 ret += f'Insert Line: {self.insert_line}\n'
                 ret += f'New String: ```\n{self.new_str}\n```\n'

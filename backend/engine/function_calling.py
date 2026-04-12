@@ -60,6 +60,7 @@ from backend.engine.tools.memory_manager import (
 from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.note import build_note_action, build_recall_action
 from backend.engine.tools.prompt import build_python_exec_command
+from backend.engine.tools.whitespace_handler import WhitespaceHandler
 from backend.engine.tools.revert_to_checkpoint import (
     REVERT_TO_CHECKPOINT_TOOL_NAME,
     build_revert_to_checkpoint_action,
@@ -394,13 +395,7 @@ def _filter_valid_editor_kwargs(other_kwargs: dict) -> dict:
 
 def _normalize_whitespace(text: str) -> str:
     """Normalize whitespace for fuzzy matching: strip trailing spaces and unify indent chars."""
-    lines = text.splitlines(keepends=True)
-    normalized = []
-    for line in lines:
-        stripped = line.rstrip(' \t')
-        stripped = stripped.replace('\t', '    ')
-        normalized.append(stripped)
-    return ''.join(normalized)
+    return WhitespaceHandler.normalize_for_match(text)
 
 
 def _ws_tolerant_replace(
@@ -434,30 +429,7 @@ def _ws_tolerant_replace(
 
 def _map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
     """Map a character offset in normalized text back to the original text."""
-    norm_pos = 0
-    orig_pos = 0
-    while norm_pos < norm_offset and orig_pos < len(original):
-        ch = original[orig_pos]
-        if ch == '\t':
-            norm_pos += 4
-        else:
-            norm_pos += 1
-        orig_pos += 1
-        if ch in (' ', '\t'):
-            while (
-                orig_pos < len(original)
-                and original[orig_pos] in (' ', '\t')
-                and norm_pos < norm_offset
-            ):
-                if original[orig_pos] == '\t':
-                    norm_pos += 4
-                else:
-                    norm_pos += 1
-                orig_pos += 1
-                if norm_pos >= norm_offset:
-                    break
-            continue
-    return orig_pos
+    return WhitespaceHandler.map_normalized_offset_to_original(original, norm_offset)
 
 
 def _extract_view_replace_params(kwargs: dict) -> tuple[str, str, Any, bool]:

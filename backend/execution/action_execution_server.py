@@ -1134,6 +1134,7 @@ class RuntimeExecutor:
             old_str=action.old_str,
             new_str=action.new_str,
             insert_line=action.insert_line,
+            normalize_ws=action.normalize_ws,
             enable_linting=enable_lint,
         )
         if result_str.startswith('ERROR:'):

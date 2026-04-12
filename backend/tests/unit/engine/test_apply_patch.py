@@ -34,3 +34,14 @@ class TestBuildApplyPatchAction:
 
         script = mock_transport.call_args.args[0]
         assert '[APPLY_PATCH_GUIDANCE]' in script
+
+    def test_script_escapes_newline_literals_for_generated_python(self) -> None:
+        with patch(
+            'backend.engine.tools.apply_patch.build_python_exec_command',
+            return_value='python3 -c "encoded"',
+        ) as mock_transport:
+            build_apply_patch_action('diff --git a/x b/x')
+
+        script = mock_transport.call_args.args[0]
+        assert "+ '\\n' +" in script
+        assert "+ '\\n\\n' + guidance" in script
