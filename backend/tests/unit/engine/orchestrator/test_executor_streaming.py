@@ -242,6 +242,93 @@ def test_async_execute_accumulates_tool_calls(monkeypatch):
     assert tc['function']['arguments'] == '{"path": "/tmp/test.py"}'
 
 
+def test_async_execute_handles_cumulative_tool_call_name_and_args(monkeypatch):
+    """Stream assembly should not duplicate tool names for cumulative chunks."""
+    import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.ledger.action import MessageAction
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+
+    from backend.engine import executor as executor_module
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda response, **kwargs: [
+            MessageAction(content='tool_call_detected', wait_for_response=True)
+        ],
+    )
+
+    async def fake_astream(**kwargs):
+        yield {
+            'id': 'chatcmpl-cum',
+            'model': 'test-model',
+            'choices': [
+                {
+                    'delta': {
+                        'tool_calls': [
+                            {
+                                'index': 0,
+                                'id': 'call_dup',
+                                'function': {
+                                    'name': 'analyze_project_structure',
+                                    'arguments': '{"command": "tree", "path": "."}',
+                                },
+                            }
+                        ]
+                    }
+                }
+            ],
+        }
+        # Provider resends cumulative name + full arguments on next chunk.
+        yield {
+            'id': 'chatcmpl-cum',
+            'model': 'test-model',
+            'choices': [
+                {
+                    'delta': {
+                        'tool_calls': [
+                            {
+                                'index': 0,
+                                'function': {
+                                    'name': 'analyze_project_structure',
+                                    'arguments': '{"command": "tree", "path": ".", "depth": 2}',
+                                },
+                            }
+                        ]
+                    }
+                }
+            ],
+        }
+        yield {
+            'id': 'chatcmpl-cum',
+            'model': 'test-model',
+            'choices': [{'delta': {}, 'finish_reason': 'tool_calls'}],
+        }
+
+    llm = MagicMock()
+    llm.astream = fake_astream
+
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    result = asyncio.run(executor.async_execute({'messages': []}, MagicMock()))
+
+    resp = result.response
+    assert resp is not None
+    assert resp.tool_calls is not None
+    assert len(resp.tool_calls) == 1
+    tc = resp.tool_calls[0]
+    assert tc['id'] == 'call_dup'
+    assert tc['function']['name'] == 'analyze_project_structure'
+    assert tc['function']['arguments'] == '{"command": "tree", "path": ".", "depth": 2}'
+
+
 def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_progress(
     monkeypatch, tmp_path
 ):

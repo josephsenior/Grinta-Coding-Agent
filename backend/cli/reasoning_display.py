@@ -13,6 +13,22 @@ from rich.text import Text
 
 from backend.cli.transcript import format_callout_panel
 
+# Indent + tree glyph + gap — used when fitting thought lines to terminal width.
+_THOUGHT_PREFIX_CHARS = 6
+
+
+def _fit_thought_line(text: str, max_width: int | None) -> str:
+    """Avoid ultra-wide lines in narrow terminals."""
+    line = (text or '').strip()
+    if not line or max_width is None or max_width <= _THOUGHT_PREFIX_CHARS + 12:
+        return line
+    budget = max_width - _THOUGHT_PREFIX_CHARS
+    if len(line) <= budget:
+        return line
+    if budget <= 4:
+        return line[:budget]
+    return line[: budget - 1] + '…'
+
 
 class ReasoningDisplay:
     """Renderable reasoning state used inside the main live layout.
@@ -30,7 +46,8 @@ class ReasoningDisplay:
         self._active = False
         self._thought_lines: list[str] = []
         self._current_action: str = ''
-        self._recent_actions: deque[str] = deque(maxlen=3)
+        # Completed step labels (excludes the current action) for a short breadcrumb.
+        self._recent_actions: deque[str] = deque(maxlen=4)
         self._max_lines: int = 10  # show up to 10 thought lines for real-time stream
         self._start_time: float | None = None
         self._cost_at_start: float = 0.0
@@ -85,9 +102,11 @@ class ReasoningDisplay:
 
     def update_action(self, label: str) -> None:
         self.start()
-        if label and label != self._current_action:
-            self._recent_actions.append(label)
-        self._current_action = label
+        new = (label or '').strip()
+        if new != self._current_action:
+            if self._current_action:
+                self._recent_actions.append(self._current_action)
+            self._current_action = new
 
     def snapshot_thoughts(self) -> list[str]:
         """Return a copy of current thought lines without clearing them."""
@@ -108,9 +127,17 @@ class ReasoningDisplay:
     ) -> RenderResult:
         if not self.active:
             return
-        yield self.renderable()
+        panel_max_lines = None
+        if options.max_height:
+            panel_max_lines = max(3, min(10, options.max_height - 6))
+        yield self.renderable(max_width=options.max_width, max_lines=panel_max_lines)
 
-    def renderable(self) -> Any:
+    def renderable(
+        self,
+        *,
+        max_width: int | None = None,
+        max_lines: int | None = None,
+    ) -> Any:
         elapsed_bits: list[str] = []
         secs = self.elapsed_seconds
         if secs is not None:
@@ -120,9 +147,13 @@ class ReasoningDisplay:
         turn_cost = max(0.0, self._current_cost - self._cost_at_start)
         if turn_cost > 0.0:
             elapsed_bits.append(f'+${turn_cost:.4f}')
-        elapsed_bits.append('esc to interrupt')
+
+        meta_right = ' · '.join(elapsed_bits) if elapsed_bits else ''
 
         action_label = self._current_action or 'Thinking…'
+        if max_width and len(action_label) > max(24, max_width - 24):
+            action_label = action_label[: max(8, max_width - 28)] + '…'
+
         rows: list[Any] = []
 
         header = Table.grid(expand=True)
@@ -130,21 +161,50 @@ class ReasoningDisplay:
         header.add_column(ratio=1)
         header.add_column(justify='right')
         header.add_row(
-            Spinner('dots', style='dim'),
-            Text(action_label, style='bold dim'),
-            Text(' · '.join(elapsed_bits), style='dim'),
+            Spinner('dots', style='cyan'),
+            Text(action_label, style='bold cyan'),
+            Text(meta_right, style='dim') if meta_right else Text(''),
         )
         rows.append(header)
 
-        for line in self._thought_lines:
+        trail = list(self._recent_actions)
+        if trail:
+            # Last two completed steps — helps users see what already happened.
+            tail = trail[-2:]
+            crumb = Text()
+            crumb.append('  ', style='')
+            crumb.append('then ', style='dim italic')
+            crumb.append(' → '.join(tail), style='dim italic')
+            rows.append(crumb)
+
+        visible_thoughts = self._thought_lines
+        clipped = False
+        if max_lines is not None and max_lines >= 0 and len(visible_thoughts) > max_lines:
+            visible_thoughts = visible_thoughts[-max_lines:]
+            clipped = True
+
+        for line in visible_thoughts:
+            fitted = _fit_thought_line(line, max_width)
             t = Text()
             t.append('  ', style='')
-            t.append('· ', style='dim')
-            t.append(line, style='dim')
+            t.append('╰ ', style='dim cyan')
+            t.append(fitted, style='italic dim')
             rows.append(t)
 
+        if clipped:
+            notice = Text()
+            notice.append('  ', style='')
+            notice.append('auto-scroll: showing latest thoughts', style='dim italic')
+            rows.append(notice)
+
+        hint = Text()
+        hint.append('  ', style='')
+        hint.append('Esc', style='bold dim')
+        hint.append(' interrupts', style='dim italic')
+        rows.append(hint)
+
         return format_callout_panel(
-            'Working',
+            'Thinking',
             Group(*rows),
-            accent_style='dim',
+            accent_style='dim cyan',
         )

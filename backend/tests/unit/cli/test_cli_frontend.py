@@ -1461,6 +1461,28 @@ async def test_streaming_preview_renders_streaming_panel() -> None:
     assert 'Hello' in output
 
 
+def test_streaming_preview_auto_scroll_shows_latest_content() -> None:
+    console = _make_console(width=80)
+    renderer = CLIEventRenderer(
+        console,
+        HUDBar(),
+        ReasoningDisplay(),
+        loop=asyncio.new_event_loop(),
+    )
+
+    renderer._streaming_accumulated = '\n'.join(
+        [f'line {idx:03d}' for idx in range(1, 61)]
+    )
+
+    console.print(renderer._render_streaming_preview(max_width=80, max_lines=10))
+    output = _console_output(console)
+
+    assert 'Draft reply' in output
+    assert 'auto-scroll: showing latest content' in output
+    assert 'line 060' in output
+    assert 'line 001' not in output
+
+
 @pytest.mark.asyncio
 async def test_renderer_shows_command_context_for_output() -> None:
     from backend.ledger.observation import CmdOutputObservation
@@ -2207,8 +2229,9 @@ def test_reasoning_display_tool_icons() -> None:
     rd.update_action('Reading file src/main.py')
     panel = rd.renderable()
     assert panel is not None
-    # Verify default max lines
+    # Verify default max lines and recent-step deque capacity
     assert rd._max_lines == 10
+    assert rd._recent_actions.maxlen == 4
 
 
 def test_reasoning_display_budget_burn() -> None:
@@ -2220,6 +2243,21 @@ def test_reasoning_display_budget_burn() -> None:
     # Turn cost is 0.05 which is > 0.01 threshold
     panel = rd.renderable()
     assert panel is not None
+
+
+def test_reasoning_display_auto_scroll_shows_latest_lines() -> None:
+    rd = ReasoningDisplay()
+    rd.start()
+    for i in range(1, 16):
+        rd.update_thought(f'thought {i:02d}')
+
+    console = _make_console(width=90)
+    console.print(rd.renderable(max_width=90, max_lines=4))
+    output = _console_output(console)
+
+    assert 'auto-scroll: showing latest thoughts' in output
+    assert 'thought 15' in output
+    assert 'thought 06' not in output
 
 
 def test_hud_compact_format_for_narrow_terminal() -> None:

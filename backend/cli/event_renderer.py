@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import textwrap
 import time
 from collections import deque
 from collections.abc import Callable
@@ -103,6 +104,7 @@ from backend.cli.transcript import (
     format_activity_turn_header,
     format_callout_panel,
     format_ground_truth_tool_line,
+    format_reasoning_snapshot,
     strip_tool_result_validation_annotations,
 )
 from backend.core.enums import AgentState, EventSource
@@ -1111,9 +1113,21 @@ class CLIEventRenderer:
         if self._delegate_panel is not None:
             live_sections.append(self._delegate_panel)
         if self._streaming_accumulated:
-            live_sections.append(self._render_streaming_preview())
+            stream_max_lines = None
+            if options.max_height:
+                # Keep the streaming preview in a viewport so Live doesn't fall
+                # back to bottom ellipsis clipping when drafts get long.
+                stream_max_lines = max(8, min(24, options.max_height - 10))
+            live_sections.append(
+                self._render_streaming_preview(
+                    max_width=options.max_width,
+                    max_lines=stream_max_lines,
+                )
+            )
         if self._reasoning.active:
-            live_sections.append(self._reasoning.renderable())
+            live_sections.append(
+                self._reasoning.renderable(max_width=options.max_width)
+            )
 
         for index, section in enumerate(live_sections):
             framed = frame_live_body(section)
@@ -2583,14 +2597,7 @@ class CLIEventRenderer:
         thoughts = self._reasoning.snapshot_thoughts()
         if not thoughts:
             return
-        self._print_or_buffer(
-            Group(
-                *[
-                    format_activity_secondary(line, kind='neutral')
-                    for line in thoughts
-                ]
-            )
-        )
+        self._print_or_buffer(format_reasoning_snapshot(thoughts))
 
     def _stop_reasoning(self) -> None:
         """Flush any accumulated thoughts to static output, then stop the spinner.
@@ -2606,8 +2613,53 @@ class CLIEventRenderer:
         self._streaming_final = False
         self.refresh()
 
-    def _render_streaming_preview(self) -> Any:
-        body: list[Any] = [Markdown(self._streaming_accumulated or '')]
+    @staticmethod
+    def _tail_preview_text(content: str, *, max_width: int | None, max_lines: int) -> str:
+        """Return a bottom-follow viewport of *content* constrained by wrapped lines."""
+        if max_lines <= 0 or not content:
+            return content
+
+        # Account for panel padding / gutters so wrapping approximates terminal width.
+        wrap_width = max(20, (max_width or 120) - 8)
+        wrapped: list[str] = []
+        for raw in content.splitlines() or ['']:
+            if not raw:
+                wrapped.append('')
+                continue
+            wrapped.extend(
+                textwrap.wrap(
+                    raw,
+                    width=wrap_width,
+                    replace_whitespace=False,
+                    drop_whitespace=False,
+                )
+                or ['']
+            )
+
+        if len(wrapped) <= max_lines:
+            return content
+
+        tail = wrapped[-max_lines:]
+        return '\n'.join(tail)
+
+    def _render_streaming_preview(
+        self,
+        *,
+        max_width: int | None = None,
+        max_lines: int | None = None,
+    ) -> Any:
+        full = self._streaming_accumulated or ''
+        clipped = full
+        if max_lines is not None:
+            clipped = self._tail_preview_text(
+                full,
+                max_width=max_width,
+                max_lines=max_lines,
+            )
+
+        body: list[Any] = [Markdown(clipped)]
+        if clipped != full:
+            body.append(Text('auto-scroll: showing latest content', style='dim italic'))
         if not self._streaming_final:
             body.append(Text('streaming…', style='dim'))
         return format_callout_panel(

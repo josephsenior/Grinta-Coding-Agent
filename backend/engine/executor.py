@@ -233,6 +233,44 @@ class OrchestratorExecutor:
                 nonlocal content_accumulate, streamed_usage
                 thinking_accumulate = ''
 
+                def _merge_stream_fragment(existing: str, incoming: str) -> str:
+                    """Merge streamed tool-call fragments from mixed provider semantics.
+
+                    Some providers emit true deltas (append-only), while others emit
+                    cumulative snapshots for the current field. This helper handles
+                    both safely and avoids duplicating already-seen content.
+                    """
+                    if not incoming:
+                        return existing
+                    if not existing:
+                        return incoming
+
+                    # Cumulative resend: incoming already contains existing prefix.
+                    if incoming.startswith(existing):
+                        return incoming
+
+                    # Common cumulative JSON pattern: prior chunk is a complete
+                    # smaller object/list, and the new chunk extends it before
+                    # the closing brace/bracket.
+                    if existing.endswith('}') and incoming.startswith(existing[:-1]):
+                        return incoming
+                    if existing.endswith(']') and incoming.startswith(existing[:-1]):
+                        return incoming
+
+                    # Already incorporated.
+                    if existing.startswith(incoming) or existing.endswith(incoming):
+                        return existing
+                    if incoming in existing:
+                        return existing
+
+                    # Merge by maximal suffix/prefix overlap.
+                    max_overlap = min(len(existing), len(incoming))
+                    for overlap in range(max_overlap, 0, -1):
+                        if existing.endswith(incoming[:overlap]):
+                            return existing + incoming[overlap:]
+
+                    return existing + incoming
+
                 async def _emit_text_piece(text_piece: str) -> None:
                     nonlocal content_accumulate
                     if not text_piece:
@@ -320,13 +358,21 @@ class OrchestratorExecutor:
                                 }
 
                             fn = tc_chunk.get('function', {})
-                            if fn.get('name'):
-                                tool_calls_dict[idx]['function']['name'] += fn['name']
+                            raw_name = fn.get('name')
+                            if isinstance(raw_name, str) and raw_name:
+                                current_name = tool_calls_dict[idx]['function']['name']
+                                tool_calls_dict[idx]['function']['name'] = (
+                                    _merge_stream_fragment(current_name, raw_name)
+                                )
 
-                            if fn.get('arguments'):
-                                chunk_args = fn['arguments']
-                                tool_calls_dict[idx]['function']['arguments'] += (
-                                    chunk_args
+                            raw_args = fn.get('arguments')
+                            if isinstance(raw_args, str) and raw_args:
+                                chunk_args = raw_args
+                                current_args = tool_calls_dict[idx]['function'][
+                                    'arguments'
+                                ]
+                                tool_calls_dict[idx]['function']['arguments'] = (
+                                    _merge_stream_fragment(current_args, chunk_args)
                                 )
                                 if event_stream:
                                     logger.debug(
