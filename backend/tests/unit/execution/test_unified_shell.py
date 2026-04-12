@@ -224,7 +224,30 @@ class TestCreateShellSession:
         )
         assert isinstance(session, _DummySession)
 
-    def test_windows_prefers_bash_when_available(self, tmp_path, monkeypatch):
+    def test_windows_prefers_powershell_when_available(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'nt')
+        monkeypatch.setitem(
+            sys.modules,
+            'backend.execution.utils.windows_bash',
+            types.SimpleNamespace(WindowsPowershellSession=_DummySession),
+        )
+
+        tools = _DummyTools(
+            has_bash=True,
+            has_tmux=False,
+            has_powershell=True,
+            shell_type='pwsh',
+        )
+        session = create_shell_session(
+            work_dir=str(tmp_path),
+            tools=tools,
+            cancellation_service=MagicMock(),
+        )
+        assert isinstance(session, _DummySession)
+
+    def test_windows_falls_back_to_bash_when_powershell_unavailable(
+        self, tmp_path, monkeypatch
+    ):
         monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'nt')
         monkeypatch.setitem(
             sys.modules,
@@ -235,8 +258,8 @@ class TestCreateShellSession:
         tools = _DummyTools(
             has_bash=True,
             has_tmux=False,
-            has_powershell=True,
-            shell_type='pwsh',
+            has_powershell=False,
+            shell_type='cmd',
         )
         session = create_shell_session(
             work_dir=str(tmp_path),

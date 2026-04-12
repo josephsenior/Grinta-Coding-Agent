@@ -259,23 +259,7 @@ def test_sentinels():
     assert isinstance(UNINITIALIZED_PROMPT_MANAGER, _UninitializedPromptManager)
 
 
-def test_terminal_helpers_use_bash_when_available_on_windows():
-    from backend.engine.tools import prompt as prompt_mod
-
-    prompt_mod.set_active_tool_registry(None)
-    prompt_mod._get_global_tool_registry.cache_clear()
-    with (
-        patch('backend.engine.tools.prompt.sys.platform', 'win32'),
-        patch('backend.engine.tools.prompt._runtime_prefers_powershell', return_value=False),
-    ):
-        assert uses_powershell_terminal() is False
-        assert get_shell_name() == 'bash'
-        assert get_terminal_tool_name() == 'execute_bash'
-    prompt_mod.set_active_tool_registry(None)
-    prompt_mod._get_global_tool_registry.cache_clear()
-
-
-def test_terminal_helpers_use_powershell_without_bash_on_windows():
+def test_terminal_helpers_prefer_powershell_when_available_on_windows():
     from backend.engine.tools import prompt as prompt_mod
 
     prompt_mod.set_active_tool_registry(None)
@@ -287,6 +271,22 @@ def test_terminal_helpers_use_powershell_without_bash_on_windows():
         assert uses_powershell_terminal() is True
         assert get_shell_name() == 'powershell'
         assert get_terminal_tool_name() == 'execute_powershell'
+    prompt_mod.set_active_tool_registry(None)
+    prompt_mod._get_global_tool_registry.cache_clear()
+
+
+def test_terminal_helpers_fall_back_to_bash_when_powershell_unavailable_on_windows():
+    from backend.engine.tools import prompt as prompt_mod
+
+    prompt_mod.set_active_tool_registry(None)
+    prompt_mod._get_global_tool_registry.cache_clear()
+    with (
+        patch('backend.engine.tools.prompt.sys.platform', 'win32'),
+        patch('backend.engine.tools.prompt._runtime_prefers_powershell', return_value=False),
+    ):
+        assert uses_powershell_terminal() is False
+        assert get_shell_name() == 'bash'
+        assert get_terminal_tool_name() == 'execute_bash'
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()
 
@@ -351,6 +351,7 @@ def test_active_tool_registry_visible_from_worker_thread():
     prompt_mod._get_global_tool_registry.cache_clear()
     mock_reg = MagicMock()
     mock_reg.has_bash = True
+    mock_reg.has_powershell = True
     prompt_mod.set_active_tool_registry(mock_reg)
     try:
 
@@ -358,14 +359,14 @@ def test_active_tool_registry_visible_from_worker_thread():
             return prompt_mod._runtime_prefers_powershell()
 
         with ThreadPoolExecutor(max_workers=1) as pool:
-            assert pool.submit(read_prefers_powershell).result() is False
+            assert pool.submit(read_prefers_powershell).result() is True
     finally:
         prompt_mod.set_active_tool_registry(None)
         prompt_mod._get_global_tool_registry.cache_clear()
 
 
 def test_build_python_exec_command_matches_active_registry_git_bash_on_windows():
-    """Regression: active ToolRegistry with has_bash must emit POSIX shell, not PowerShell."""
+    """Regression: Git Bash-only Windows contract must emit POSIX shell."""
     from unittest.mock import MagicMock
 
     from backend.engine.tools import prompt as prompt_mod
@@ -374,6 +375,7 @@ def test_build_python_exec_command_matches_active_registry_git_bash_on_windows()
     prompt_mod._get_global_tool_registry.cache_clear()
     mock_reg = MagicMock()
     mock_reg.has_bash = True
+    mock_reg.has_powershell = False
     prompt_mod.set_active_tool_registry(mock_reg)
     try:
         with patch('backend.engine.tools.prompt.sys.platform', 'win32'):

@@ -108,6 +108,23 @@ Note on numbering: file names are preserved for repository stability, so both `2
 - **Open-source contributors:** This is the map. Every dead end is marked. Every design constraint is explained. You won't waste weeks rediscovering what I already tried.
 - **Developers learning agentic design:** This is the course nobody teaches. Not "how to call an API" — how to build the infrastructure that makes an AI agent actually finish work.
 
+## Learning First, Business Second
+
+The business experiment was important, but my primary goal through these seven months was learning.
+
+I wanted to learn how to build reliable autonomous systems end-to-end: architecture, validation, tool design, cross-platform execution, cost discipline, and recovery after failure.
+
+What I learned is that reliability wins over hype, deletion is part of progress, and consistent execution over months matters more than short bursts of intensity.
+
+If you are a student and want to follow a similar path:
+
+1. commit to one serious project for at least one semester
+2. document decisions and failed experiments like a research log
+3. prioritize correctness and verification before adding new features
+4. test with real tasks early and often
+5. build in public and ask for feedback before you feel ready
+6. protect your health and schedule; burnout destroys technical judgment
+
 ---
 
 ## A Note on Honesty

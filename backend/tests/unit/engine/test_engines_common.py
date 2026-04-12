@@ -6,6 +6,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from backend.core.errors import (
+    FunctionCallValidationError as CoreFunctionCallValidationError,
+)
 from backend.engine.common import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
@@ -147,9 +150,7 @@ class TestParseToolCallArguments:
 
     def test_missing_attribute(self):
         tc = SimpleNamespace()
-        # AttributeError accessing function.arguments happens in error msg too,
-        # so it propagates as raw AttributeError rather than wrapped
-        with pytest.raises(AttributeError):
+        with pytest.raises(FunctionCallValidationError, match='Failed to parse'):
             parse_tool_call_arguments(tc)
 
 
@@ -159,6 +160,9 @@ class TestParseToolCallArguments:
 class TestExceptionHierarchy:
     def test_validation_error_is_exception(self):
         assert issubclass(FunctionCallValidationError, Exception)
+
+    def test_validation_error_is_core_validation_error(self):
+        assert issubclass(FunctionCallValidationError, CoreFunctionCallValidationError)
 
     def test_not_exists_is_validation_error(self):
         assert issubclass(FunctionCallNotExistsError, FunctionCallValidationError)

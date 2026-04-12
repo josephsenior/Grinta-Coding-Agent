@@ -179,6 +179,19 @@ class TestGetNextAction:
         assert 'Tool validation failed' in args[0].content
 
     @pytest.mark.asyncio
+    async def test_common_function_call_validation_error_returns_none(self):
+        from backend.engine.common import FunctionCallValidationError
+
+        ctx = _make_context()
+        ctx.agent.step.side_effect = FunctionCallValidationError('invalid common args')
+        svc = ActionExecutionService(ctx)
+        result = await svc.get_next_action()
+        assert result is None
+        ctx.event_stream.add_event.assert_called_once()
+        args = ctx.event_stream.add_event.call_args[0]
+        assert 'Tool validation failed' in args[0].content
+
+    @pytest.mark.asyncio
     async def test_api_connection_error_propagates(self):
         from backend.inference.exceptions import APIConnectionError
 

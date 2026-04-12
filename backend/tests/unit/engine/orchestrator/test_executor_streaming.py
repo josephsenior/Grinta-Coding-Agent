@@ -498,3 +498,71 @@ def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):
     actions = executor._response_to_actions(response)
 
     assert actions == [proposal]
+
+
+def test_response_to_actions_converts_core_tool_call_validation_error_to_recoverable_action(
+    monkeypatch,
+):
+    from backend.core.errors import FunctionCallValidationError
+    from backend.engine import executor as executor_module
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.ledger.action import AgentThinkAction
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            FunctionCallValidationError('bad JSON arguments')
+        ),
+    )
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=OrchestratorSafetyManager(),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content='tool call'))]
+    )
+    actions = executor._response_to_actions(response)
+
+    assert len(actions) == 1
+    assert isinstance(actions[0], AgentThinkAction)
+    assert '[TOOL_CALL_RECOVERABLE_ERROR]' in (actions[0].thought or '')
+    assert 'bad JSON arguments' in (actions[0].thought or '')
+
+
+def test_response_to_actions_converts_common_tool_call_validation_error_to_recoverable_action(
+    monkeypatch,
+):
+    from backend.engine import executor as executor_module
+    from backend.engine.common import FunctionCallValidationError
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.ledger.action import AgentThinkAction
+
+    monkeypatch.setattr(
+        executor_module.orchestrator_function_calling,
+        'response_to_actions',
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            FunctionCallValidationError('malformed tool call payload')
+        ),
+    )
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=OrchestratorSafetyManager(),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    response = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content='tool call'))]
+    )
+    actions = executor._response_to_actions(response)
+
+    assert len(actions) == 1
+    assert isinstance(actions[0], AgentThinkAction)
+    assert '[TOOL_CALL_RECOVERABLE_ERROR]' in (actions[0].thought or '')
+    assert 'malformed tool call payload' in (actions[0].thought or '')

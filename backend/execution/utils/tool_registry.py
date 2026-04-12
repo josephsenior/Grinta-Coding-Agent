@@ -16,6 +16,26 @@ from typing import Literal
 from backend.core.logger import app_logger as logger
 
 
+def resolve_windows_powershell_preference(*, has_bash: bool, has_powershell: bool) -> bool:
+    """Return True when Windows terminal contract should use PowerShell.
+
+    Preference is controlled by ``APP_WINDOWS_SHELL_PREFERENCE`` with values:
+
+    - ``powershell`` (default): use PowerShell when available, else bash fallback
+    - ``bash``: prefer Git Bash when available
+    - ``auto``: currently equivalent to ``powershell``
+    """
+    if sys.platform != 'win32':
+        return False
+
+    raw_pref = os.getenv('APP_WINDOWS_SHELL_PREFERENCE', 'powershell').strip().lower()
+    if raw_pref in {'bash', 'git-bash', 'gitbash', 'posix'}:
+        return False if has_bash else has_powershell
+
+    # Default and auto behavior: prefer PowerShell when available.
+    return has_powershell
+
+
 @dataclass
 class ToolInfo:
     """Information about a detected tool."""
@@ -356,6 +376,14 @@ class ToolRegistry:
         """Check if PowerShell is available."""
         shell = self._tools.get('shell', ToolInfo('', False)).name
         return shell in ('pwsh', 'powershell')
+
+    @property
+    def prefers_powershell_on_windows(self) -> bool:
+        """Check whether Windows shell contract should prefer PowerShell."""
+        return resolve_windows_powershell_preference(
+            has_bash=self.has_bash,
+            has_powershell=self.has_powershell,
+        )
 
     @property
     def has_tmux(self) -> bool:

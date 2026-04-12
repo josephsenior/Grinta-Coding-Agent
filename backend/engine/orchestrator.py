@@ -24,6 +24,10 @@ from backend.core.config import AgentConfig
 from backend.core.errors import (
     AgentRuntimeError,
     ContextLimitError,
+    FunctionCallConversionError,
+    FunctionCallNotExistsError,
+    FunctionCallValidationError,
+    LLMMalformedActionError,
     ModelProviderError,
     ToolExecutionError,
 )
@@ -40,6 +44,12 @@ from backend.ledger.event import EventSource
 from backend.orchestration.agent import Agent
 from backend.orchestration.state.state import State
 from backend.utils.prompt import OrchestratorPromptManager, PromptManager
+from backend.engine.common import (
+    FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
+)
+from backend.engine.common import (
+    FunctionCallValidationError as CommonFunctionCallValidationError,
+)
 
 from . import message_serializer
 from .contracts import (
@@ -268,6 +278,35 @@ class Orchestrator(Agent):
 
             return AgentThinkAction(
                 thought=f'I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.',
+            )
+
+        except (
+            FunctionCallValidationError,
+            FunctionCallNotExistsError,
+            CommonFunctionCallValidationError,
+            CommonFunctionCallNotExistsError,
+            FunctionCallConversionError,
+            LLMMalformedActionError,
+        ) as e:
+            self._consecutive_context_errors = 0
+            logger.warning('Recoverable LLM tool-call error: %s', e)
+
+            removed = self.clear_queued_actions(
+                reason='Invalid LLM tool call, aborting batched sequence'
+            )
+            if removed > 0:
+                logger.info(
+                    'Batched sequence aborted! Dispelled %d blind follow-up actions.',
+                    removed,
+                )
+
+            return AgentThinkAction(
+                thought=(
+                    '[TOOL_CALL_RECOVERABLE_ERROR] The previous tool call was invalid and was not executed. '
+                    f'Details: {str(e)}\n'
+                    'I will emit one corrected tool call with valid JSON arguments '
+                    '(double-quoted keys/strings, escaped newlines/quotes, required arguments present).'
+                )
             )
 
         except (ModelProviderError, LLMError):

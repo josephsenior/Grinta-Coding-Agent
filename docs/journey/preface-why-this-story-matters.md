@@ -71,13 +71,36 @@ You can still extract patterns:
 - where abstraction hides failure
 - where a local-first architecture forces better honesty
 
-### 4. It is an education that university cannot provide
+### 4. The business goal was real, but the primary goal was learning
 
-This project was built in the margins—between classes, during exams, and at the expense of sleep. Striving for success as a student while balancing academic obligations against the burning need to build real things is a brutal, silent struggle.
+This project was built in the margins: between classes, during exams, and often at the cost of sleep. I did chase the SaaS path for a while, but my primary goal across these seven months was learning: how to build autonomous systems that survive real usage, not demo usage.
 
-University teaches you computer science. It teaches algorithms, discrete math, and theory. But it does not teach you how to survive a failing architecture, how to recover from deleting three weeks of dead-end code, or how to maintain stamina when your system collapses at 3 AM. The most valuable outcome of this entire project isn't the repository itself; it is the scars, the intuition, and the pragmatic engineering survival skills I gained.
+I wanted to learn:
 
-If you are a student or a junior engineer stuck in that same gap, reading this might save you months of painful trial and error. The lessons extracted here are exactly the kind of things you only usually learn by failing in the real world.
+- how to design resilient architecture under uncertainty
+- how to make verification and reliability first-class, not optional
+- how to stay model-agnostic and OS-agnostic without sacrificing quality
+- how to evaluate trade-offs between cost, speed, and correctness
+- how to recover after bad decisions, dead ends, and full rewrites
+
+What I learned over seven months is simple and hard at the same time:
+
+- reliability is mostly deterministic engineering wrapped around non-deterministic models
+- deleting impressive features is often a higher-skill move than shipping them
+- architecture quality shows up under failure, not in happy-path demos
+- disciplined testing and validation loops are what make autonomy trustworthy
+- consistency beats intensity when you are building while studying
+
+If you are a student and want to do the same, this is my advice:
+
+1. pick one ambitious project and keep it alive for months, not days
+2. keep a decision log: what you tried, why it failed, and what changed
+3. optimize for reliability before novelty
+4. build and run real evaluations early, even when results are embarrassing
+5. treat deletions as progress when complexity no longer pays for itself
+6. protect your energy; burnout is a technical risk, not just a personal one
+
+University teaches foundations. Real projects teach judgment. You need both.
 
 ## Who This Is For
 

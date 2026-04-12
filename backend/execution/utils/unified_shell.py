@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from backend.core.logger import app_logger as logger
+from backend.execution.utils.tool_registry import resolve_windows_powershell_preference
 
 if TYPE_CHECKING:
     from backend.execution.utils.process_registry import TaskCancellationService
@@ -261,15 +262,34 @@ def create_shell_session(
         'cancellation_service': cancellation_service,
     }
 
-    # Windows: Prefer Git Bash (SimpleBashSession) when available.
-    # LLMs generate bash commands natively; running them in bash eliminates
-    # the need for fragile PowerShell translation regexes.
+    # Windows: Prefer PowerShell by default for native compatibility.
+    # Users can force bash with APP_WINDOWS_SHELL_PREFERENCE=bash.
     if os.name == 'nt':
+        prefer_powershell = resolve_windows_powershell_preference(
+            has_bash=resolved_tools.has_bash,
+            has_powershell=resolved_tools.has_powershell,
+        )
+
+        if prefer_powershell and resolved_tools.has_powershell:
+            from backend.execution.utils.windows_bash import WindowsPowershellSession
+
+            logger.info(
+                'Using WindowsPowershellSession (preferred on Windows). '
+                'Set APP_WINDOWS_SHELL_PREFERENCE=bash to prefer Git Bash.'
+            )
+            return WindowsPowershellSession(
+                **session_kwargs,  # type: ignore[arg-type]
+                powershell_exe=(
+                    resolved_tools.shell_type if resolved_tools.has_powershell else None
+                ),
+            )
+
         if resolved_tools.has_bash:
             from backend.execution.utils.simple_bash import SimpleBashSession
 
             logger.info(
-                'Using SimpleBashSession (Linux-style command path via Git Bash on Windows)'
+                'Using SimpleBashSession (Git Bash on Windows). '
+                'Set APP_WINDOWS_SHELL_PREFERENCE=powershell to prefer PowerShell.'
             )
             return SimpleBashSession(**session_kwargs)
 

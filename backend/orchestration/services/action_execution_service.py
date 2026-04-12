@@ -14,6 +14,12 @@ from backend.core.errors import (
     LLMResponseError,
 )
 from backend.core.logger import app_logger as logger
+from backend.engine.common import (
+    FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
+)
+from backend.engine.common import (
+    FunctionCallValidationError as CommonFunctionCallValidationError,
+)
 from backend.inference.exceptions import (
     BadRequestError,
     ContextWindowExceededError,
@@ -165,12 +171,20 @@ class ActionExecutionService:
                 LLMResponseError,
                 FunctionCallValidationError,
                 FunctionCallNotExistsError,
+                CommonFunctionCallValidationError,
+                CommonFunctionCallNotExistsError,
             ) as exc:
                 # Create detailed error observation
                 error_msg = str(exc)
-                if isinstance(exc, FunctionCallValidationError):
+                if isinstance(
+                    exc,
+                    (FunctionCallValidationError, CommonFunctionCallValidationError),
+                ):
                     error_msg = f'Tool validation failed: {exc}\nPlease correct the tool arguments and try again.'
-                if isinstance(exc, FunctionCallNotExistsError):
+                if isinstance(
+                    exc,
+                    (FunctionCallNotExistsError, CommonFunctionCallNotExistsError),
+                ):
                     error_msg = f'Tool not found: {exc}\nPlease use an existing tool from the provided list.'
 
                 obs = ErrorObservation(content=error_msg)

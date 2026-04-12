@@ -166,12 +166,14 @@ async def test_cmd_run_background_spawns_session(mock_executor):
 
 
 @pytest.mark.asyncio
-async def test_windows_with_bash_does_not_rewrite_python3(mock_executor):
-    """When Git Bash is available on Windows, keep python3 command unchanged."""
+async def test_windows_prefers_powershell_rewrites_python3_when_both_available(
+    mock_executor,
+):
+    """When both shells exist on Windows, PowerShell-first contract rewrites python3."""
     mock_session = MagicMock()
     mock_obs = CmdOutputObservation(
         content='ok',
-        command='python3 --version',
+        command='python --version',
         metadata={'exit_code': 0},
     )
     mock_session.execute.return_value = mock_obs
@@ -185,7 +187,7 @@ async def test_windows_with_bash_does_not_rewrite_python3(mock_executor):
     with patch('sys.platform', 'win32'):
         await mock_executor.run(action)
 
-    assert action.command == 'python3 --version'
+    assert action.command == 'python --version'
 
 
 @pytest.mark.asyncio
@@ -242,7 +244,7 @@ async def test_powershell_syntax_in_bash_adds_shell_mismatch_guidance(mock_execu
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_executor.session_manager.tool_registry = MagicMock(
         has_bash=True,
-        has_powershell=True,
+        has_powershell=False,
     )
     mock_session.cwd = '/tmp'
     mock_session.execute.return_value = CmdOutputObservation(

@@ -24,3 +24,13 @@ class TestBuildApplyPatchAction:
         assert 'b64decode' in action.command
         assert 'print("hi")' not in action.command
         assert action.thought == '[APPLY PATCH] applying patch'
+
+    def test_script_contains_corrupt_patch_guidance(self) -> None:
+        with patch(
+            'backend.engine.tools.apply_patch.build_python_exec_command',
+            return_value='python3 -c "encoded"',
+        ) as mock_transport:
+            build_apply_patch_action('diff --git a/x b/x')
+
+        script = mock_transport.call_args.args[0]
+        assert '[APPLY_PATCH_GUIDANCE]' in script

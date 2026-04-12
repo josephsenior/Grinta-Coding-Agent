@@ -21,8 +21,8 @@ def set_active_tool_registry(registry: Any | None) -> None:
     """Bind the ToolRegistry used by ``SessionManager`` / ``create_shell_session``.
 
     When set (from :class:`~backend.execution.action_execution_server.RuntimeExecutor`
-    startup), :func:`uses_powershell_terminal` reads ``registry.has_bash`` so generated
-    shell command strings match the actual shell (Git Bash vs PowerShell).
+    startup), :func:`uses_powershell_terminal` reads runtime registry flags so
+    generated shell command strings match the actual shell contract.
     """
     global _registry_for_process
     _registry_for_process = registry
@@ -46,19 +46,33 @@ def _get_global_tool_registry() -> Any:
 
 def _runtime_prefers_powershell() -> bool:
     """Mirror runtime shell-session selection for prompt-side tool generation."""
+    from backend.execution.utils.tool_registry import (
+        resolve_windows_powershell_preference,
+    )
+
+    def _flag(obj: Any, attr: str) -> bool:
+        value = getattr(obj, attr, False)
+        return value if isinstance(value, bool) else False
+
     active = get_active_tool_registry()
     if active is not None:
-        return not active.has_bash
+        return resolve_windows_powershell_preference(
+            has_bash=_flag(active, 'has_bash'),
+            has_powershell=_flag(active, 'has_powershell'),
+        )
     registry = _get_global_tool_registry()
-    return not registry.has_bash
+    return resolve_windows_powershell_preference(
+        has_bash=registry.has_bash,
+        has_powershell=registry.has_powershell,
+    )
 
 
 def uses_powershell_terminal() -> bool:
     """Return True when the active terminal contract should be PowerShell.
 
     Aligns with ``create_shell_session()`` by asking the same ToolRegistry-
-    based question the runtime uses on Windows: prefer bash when available,
-    otherwise fall back to PowerShell.
+    based question the runtime uses on Windows: prefer PowerShell by default,
+    with bash fallback or explicit override.
     """
     if not sys.platform.lower().startswith('win'):
         return False

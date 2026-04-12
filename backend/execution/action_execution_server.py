@@ -307,22 +307,32 @@ class RuntimeExecutor:
         return _ANSI_ESCAPE_RE.sub('', text)
 
     def _should_rewrite_python3_to_python(self) -> bool:
-        """Return True only when running in Windows PowerShell mode.
+        """Return True only when active Windows terminal contract is PowerShell.
 
-        On Windows with Git Bash available, commands should remain bash-native,
-        and python3 should not be rewritten.
+        On Windows in bash mode, commands should remain bash-native and python3
+        should not be rewritten.
         """
         if sys.platform != 'win32':
             return False
 
         tool_registry = getattr(self.session_manager, 'tool_registry', None)
         if tool_registry is not None:
-            has_bash = bool(getattr(tool_registry, 'has_bash', False))
-            if has_bash:
-                return False
-            has_powershell = bool(getattr(tool_registry, 'has_powershell', False))
-            if has_powershell:
-                return True
+            from backend.execution.utils.tool_registry import (
+                resolve_windows_powershell_preference,
+            )
+
+            has_bash_raw = getattr(tool_registry, 'has_bash', False)
+            has_powershell_raw = getattr(tool_registry, 'has_powershell', False)
+            has_bash = has_bash_raw if isinstance(has_bash_raw, bool) else False
+            has_powershell = (
+                has_powershell_raw if isinstance(has_powershell_raw, bool) else False
+            )
+
+            if has_bash or has_powershell:
+                return resolve_windows_powershell_preference(
+                    has_bash=has_bash,
+                    has_powershell=has_powershell,
+                )
 
         # Fallback when tool registry details are unavailable in tests/mocks.
         default_session = self.session_manager.get_session('default')

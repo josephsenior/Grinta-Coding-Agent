@@ -4,6 +4,12 @@ import json
 import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
+from backend.core.errors import (
+    FunctionCallNotExistsError as CoreFunctionCallNotExistsError,
+)
+from backend.core.errors import (
+    FunctionCallValidationError as CoreFunctionCallValidationError,
+)
 from backend.core.logger import app_logger as logger
 from backend.inference.tool_types import make_function_chunk, make_tool_param
 from backend.ledger.action import Action
@@ -43,11 +49,14 @@ if TYPE_CHECKING:
     from backend.ledger.serialization.event import ToolCallMetadata
 
 
-class FunctionCallValidationError(Exception):
+class FunctionCallValidationError(CoreFunctionCallValidationError):
     """Raised when an LLM response fails validation for function calling."""
 
 
-class FunctionCallNotExistsError(FunctionCallValidationError):
+class FunctionCallNotExistsError(
+    CoreFunctionCallNotExistsError,
+    FunctionCallValidationError,
+):
     """Raised when a model attempts to call a tool that does not exist."""
 
 
@@ -81,12 +90,23 @@ def set_response_id_for_actions(actions: list[Action], response: ModelResponse) 
 
 def parse_tool_call_arguments(tool_call: Any) -> dict[str, Any]:
     """Parse tool call arguments from JSON string to dictionary."""
+    raw_arguments: Any = None
     try:
-        if isinstance(tool_call.function.arguments, dict):
-            return tool_call.function.arguments
-        return json.loads(tool_call.function.arguments)
-    except (json.JSONDecodeError, AttributeError) as e:
-        msg = f'Failed to parse tool call arguments: {e}. Raw arguments: {tool_call.function.arguments}'
+        raw_arguments = tool_call.function.arguments
+        if isinstance(raw_arguments, dict):
+            return raw_arguments
+        if not isinstance(raw_arguments, str):
+            msg = (
+                'Tool call arguments must be a JSON string or dict. '
+                f'Got {type(raw_arguments).__name__}.'
+            )
+            raise TypeError(msg)
+        return json.loads(raw_arguments)
+    except (json.JSONDecodeError, AttributeError, TypeError) as e:
+        msg = (
+            f'Failed to parse tool call arguments: {e}. '
+            f'Raw arguments: {raw_arguments}'
+        )
         raise FunctionCallValidationError(msg) from e
 
 

@@ -893,15 +893,69 @@ class OrchestratorExecutor:
             out.append(action)
         return out
 
-    def _response_to_actions(self, response: ModelResponse) -> list[Action]:
-        mcp_tools = self._mcp_tools_provider()
-        actions = list(
-            orchestrator_function_calling.response_to_actions(
-                response,
-                mcp_tool_names=list(mcp_tools.keys()),
-                mcp_tools=mcp_tools,
+    @staticmethod
+    def _is_recoverable_tool_call_error(exc: Exception) -> bool:
+        """Return True when error came from malformed/invalid LLM tool-call output."""
+        from backend.core.errors import (
+            FunctionCallConversionError,
+            FunctionCallNotExistsError as CoreFunctionCallNotExistsError,
+            FunctionCallValidationError as CoreFunctionCallValidationError,
+            LLMMalformedActionError,
+        )
+        from backend.engine.common import (
+            FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
+            FunctionCallValidationError as CommonFunctionCallValidationError,
+        )
+
+        return isinstance(
+            exc,
+            (
+                CoreFunctionCallValidationError,
+                CoreFunctionCallNotExistsError,
+                FunctionCallConversionError,
+                LLMMalformedActionError,
+                CommonFunctionCallValidationError,
+                CommonFunctionCallNotExistsError,
+            ),
+        )
+
+    @staticmethod
+    def _build_recoverable_tool_call_error_action(exc: Exception) -> Action:
+        """Create a recovery action that feeds precise correction guidance back to the LLM."""
+        from backend.ledger.action import AgentThinkAction
+
+        detail = str(exc).strip() or exc.__class__.__name__
+        if len(detail) > 1200:
+            detail = f'{detail[:1200]}...'
+
+        return AgentThinkAction(
+            thought=(
+                '[TOOL_CALL_RECOVERABLE_ERROR] The previous tool call was invalid and was not executed. '
+                f'Details: {detail}\n'
+                'Recover by emitting one corrected tool call with strict JSON arguments: '
+                'use double-quoted keys/strings, escape embedded newlines/quotes, include required arguments, '
+                'and call an existing tool name only.'
             )
         )
+
+    def _response_to_actions(self, response: ModelResponse) -> list[Action]:
+        mcp_tools = self._mcp_tools_provider()
+        try:
+            actions = list(
+                orchestrator_function_calling.response_to_actions(
+                    response,
+                    mcp_tool_names=list(mcp_tools.keys()),
+                    mcp_tools=mcp_tools,
+                )
+            )
+        except Exception as exc:
+            if not self._is_recoverable_tool_call_error(exc):
+                raise
+            logger.warning(
+                'Recoverable tool-call error from LLM output: %s',
+                exc,
+            )
+            actions = [self._build_recoverable_tool_call_error_action(exc)]
 
         _, validated_actions = self._safety.apply(self._extract_response_text(response), actions)
         return validated_actions
