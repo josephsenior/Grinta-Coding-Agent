@@ -125,7 +125,11 @@ class TestFileEditorCoverageGaps:
         self._write('fuzzy.py', content)
         old_str = "def foo():\n    print('helo')\n    return True\n"
         result = self.editor(
-            command='edit', path='fuzzy.py', old_str=old_str, new_str='something'
+            command='edit',
+            path='fuzzy.py',
+            old_str=old_str,
+            new_str='something',
+            normalize_ws=False,
         )
         assert result.error is not None
         assert 'Did you mean this block' in result.error

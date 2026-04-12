@@ -480,6 +480,96 @@ class FileEditor:
         orig_end = self._map_normalized_offset_to_original(file_content, norm_end)
         return file_content[:orig_start] + new_str + file_content[orig_end:]
 
+    def _fuzzy_unique_replace(
+        self,
+        file_content: str,
+        old_str: str,
+        new_str: str,
+    ) -> str | ToolResult:
+        """Try high-confidence fuzzy block replacement when exact matching misses.
+
+        Safety guards:
+        - only for non-trivial multi-line blocks
+        - require very high similarity
+        - require a clearly unique best candidate
+        """
+        import difflib
+
+        # Avoid risky fuzzy edits for tiny snippets.
+        old_lines = old_str.splitlines(keepends=True)
+        if len(old_lines) < 2 or len(old_str.strip()) < 40:
+            return self._fuzzy_match_error(file_content, old_str)
+
+        lines = file_content.splitlines(keepends=True)
+        window = len(old_lines)
+        if len(lines) < window:
+            return self._fuzzy_match_error(file_content, old_str)
+
+        best_ratio = 0.0
+        second_ratio = 0.0
+        best_block = ''
+        best_line_matches = 0
+
+        old_plain_lines = old_str.splitlines()
+        old_norm_lines = [
+            self._normalize_whitespace_for_match(line).strip()
+            for line in old_plain_lines
+        ]
+
+        for i in range(len(lines) - window + 1):
+            candidate = ''.join(lines[i : i + window])
+            ratio = difflib.SequenceMatcher(None, old_str, candidate).ratio()
+            cand_plain_lines = candidate.splitlines()
+            cand_norm_lines = [
+                self._normalize_whitespace_for_match(line).strip()
+                for line in cand_plain_lines
+            ]
+            line_matches = sum(
+                1
+                for old_line, cand_line in zip(old_norm_lines, cand_norm_lines)
+                if old_line and old_line == cand_line
+            )
+            if ratio > best_ratio:
+                second_ratio = best_ratio
+                best_ratio = ratio
+                best_block = candidate
+                best_line_matches = line_matches
+            elif ratio > second_ratio:
+                second_ratio = ratio
+
+        if best_ratio < 0.80:
+            return self._fuzzy_match_error(file_content, old_str)
+
+        # For 0.88-0.95 near matches, require strong line-level agreement.
+        if best_ratio < 0.95:
+            required_matches = max(len(old_norm_lines) - 1, int(len(old_norm_lines) * 0.7))
+            if best_line_matches < required_matches:
+                return self._fuzzy_match_error(file_content, old_str)
+
+        # Ensure the best match is clearly better than alternatives.
+        if best_ratio - second_ratio < 0.04:
+            return ToolResult(
+                output='',
+                error=(
+                    'ERROR: Multiple near-matches found for old_str. '
+                    'Replacement is ambiguous; include more surrounding context lines.'
+                ),
+                new_content=file_content,
+            )
+
+        # Guard against repeating identical block in the file.
+        if file_content.count(best_block) != 1:
+            return ToolResult(
+                output='',
+                error=(
+                    'ERROR: Best fuzzy-matched block appears multiple times in the file. '
+                    'Replacement must be unique; include more context.'
+                ),
+                new_content=file_content,
+            )
+
+        return file_content.replace(best_block, new_str, 1)
+
     def _apply_str_replace(
         self,
         old_content: str,
@@ -510,7 +600,7 @@ class FileEditor:
         tolerant = self._ws_tolerant_replace(old_content, old_str, new_str)
         if isinstance(tolerant, ToolResult):
             if tolerant.error == 'No match found even with whitespace normalization.':
-                return self._fuzzy_match_error(old_content, old_str)
+                return self._fuzzy_unique_replace(old_content, old_str, new_str)
             return tolerant
         return tolerant
 

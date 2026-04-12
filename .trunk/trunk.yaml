@@ -8,3 +8,7 @@ plugins:
     - id: trunk
       ref: v1.7.6
       uri: https://github.com/trunk-io/plugins
+lint:
+  enabled:
+    - trufflehog@3.94.3
+    - ruff@0.15.10

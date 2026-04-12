@@ -224,6 +224,98 @@ class TestFileEditorEdit:
         assert result.error is not None
         assert 'must be unique' in result.error
 
+    def test_replace_auto_fuzzy_unique_high_similarity(self):
+        self._write(
+            'logger.test.ts',
+            (
+                'describe("Logger", () => {\n'
+                '  it("should log debug messages in production", () => {\n'
+                '    logger.debug("Debug message");\n'
+                '    expect(console.debug).toHaveBeenCalled();\n'
+                '  });\n'
+                '});\n'
+            ),
+        )
+        result = self.editor(
+            command='edit',
+            path='logger.test.ts',
+            old_str=(
+                'it("should not log debug messages in production", () => {\n'
+                '  logger.debug("Debug message");\n'
+                '  expect(console.debug).toHaveBeenCalled();\n'
+                '});\n'
+            ),
+            new_str=(
+                'it("should not log debug messages in production", () => {\n'
+                '  logger.debug("Debug message");\n'
+                '  expect(console.debug).not.toHaveBeenCalled();\n'
+                '});\n'
+            ),
+        )
+        assert result.error is None
+        content = (Path(self.tmpdir) / 'logger.test.ts').read_text()
+        assert '.not.toHaveBeenCalled()' in content
+
+    def test_replace_auto_fuzzy_unique_medium_similarity(self):
+        self._write(
+            'logger-medium.test.ts',
+            (
+                'describe("Logger", () => {\n'
+                '            it("should log debug messages in production", () => {\n'
+                '              logger.debug("Debug message");\n'
+                '              expect(console.debug).toHaveBeenCalled();\n'
+                '            });\n'
+                '});\n'
+            ),
+        )
+        result = self.editor(
+            command='edit',
+            path='logger-medium.test.ts',
+            old_str=(
+                'it("should not log debug messages in production", () => {\n'
+                '  logger.debug("Debug message");\n'
+                '  expect(console.debug).toHaveBeenCalled();\n'
+                '});\n'
+            ),
+            new_str=(
+                'it("should not log debug messages in production", () => {\n'
+                '  logger.debug("Debug message");\n'
+                '  expect(console.debug).not.toHaveBeenCalled();\n'
+                '});\n'
+            ),
+        )
+        assert result.error is None
+        content = (Path(self.tmpdir) / 'logger-medium.test.ts').read_text()
+        assert '.not.toHaveBeenCalled()' in content
+
+    def test_replace_fuzzy_ambiguity_is_rejected(self):
+        self._write(
+            'ambiguous.ts',
+            (
+                'it("should log debug messages in production", () => {\n'
+                '  logger.debug("Debug message");\n'
+                '  expect(console.debug).toHaveBeenCalled();\n'
+                '});\n\n'
+                'it("should log debug messages in production", () => {\n'
+                '  logger.debug("Debug message");\n'
+                '  expect(console.debug).toHaveBeenCalled();\n'
+                '});\n'
+            ),
+        )
+        result = self.editor(
+            command='edit',
+            path='ambiguous.ts',
+            old_str=(
+                'it("should not log debug messages in production", () => {\n'
+                '  logger.debug("Debug message");\n'
+                '  expect(console.debug).toHaveBeenCalled();\n'
+                '});\n'
+            ),
+            new_str='/* replacement */\n',
+        )
+        assert result.error is not None
+        assert 'ambiguous' in result.error.lower()
+
 
 # ---------------------------------------------------------------------------
 # FileEditor — unknown command
