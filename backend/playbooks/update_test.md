@@ -1,5 +1,6 @@
 ---
 name: update_test
+type: task
 version: 1.0.0
 author: App
 agent: Orchestrator
