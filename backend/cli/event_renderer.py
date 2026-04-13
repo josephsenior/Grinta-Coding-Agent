@@ -2562,7 +2562,6 @@ class CLIEventRenderer:
         if not display_content:
             return
 
-        from rich.rule import Rule
 
         # Render assistant content directly (no "Assistant" header).
         # Keep a small top spacer for readability.

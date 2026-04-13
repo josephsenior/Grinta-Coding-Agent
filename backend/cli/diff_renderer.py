@@ -37,17 +37,17 @@ class DiffPanel:
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         obs = self._obs
-        path = getattr(obs, 'path', '?')
-        prev_exist = getattr(obs, 'prev_exist', True)
-        verb = self._verb or ('Created' if not prev_exist else 'Edited')
+        path = getattr(obs, "path", "?")
+        prev_exist = getattr(obs, "prev_exist", True)
+        verb = self._verb or ("Created" if not prev_exist else "Edited")
         parts: list[Any] = [format_activity_primary(verb, self._detail or path)]
         if self._secondary:
-            parts.append(format_activity_secondary(self._secondary, kind='neutral'))
+            parts.append(format_activity_secondary(self._secondary, kind="neutral"))
 
         # New file creation — no diff, just show creation note
         if not prev_exist:
-            new_content = getattr(obs, 'new_content', None) or getattr(
-                obs, 'content', ''
+            new_content = getattr(obs, "new_content", None) or getattr(
+                obs, "content", ""
             )
             line_count = len(new_content.splitlines()) if new_content else 0
             delta = format_activity_delta_secondary(added=line_count)
@@ -55,9 +55,9 @@ class DiffPanel:
                 parts.append(delta)
             yield Panel(
                 Group(*parts),
-                title=Text('File', style='bold #9ca3af'),
-                title_align='left',
-                border_style='dim',
+                title=Text("File", style="bold #9ca3af"),
+                title_align="left",
+                border_style="dim",
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
@@ -65,7 +65,7 @@ class DiffPanel:
 
         # Try get_edit_groups for structured diff
         groups = None
-        if hasattr(obs, 'get_edit_groups'):
+        if hasattr(obs, "get_edit_groups"):
             try:
                 groups = obs.get_edit_groups(n_context_lines=3)
             except Exception:
@@ -74,10 +74,13 @@ class DiffPanel:
         if groups:
             diff_text = self._render_groups(groups)
             added = sum(
-                1 for g in groups for l in g.get('after_edits', []) if l.startswith('+')
+                1 for g in groups for l in g.get("after_edits", []) if l.startswith("+")
             )
             removed = sum(
-                1 for g in groups for l in g.get('before_edits', []) if l.startswith('-')
+                1
+                for g in groups
+                for l in g.get("before_edits", [])
+                if l.startswith("-")
             )
             delta = format_activity_delta_secondary(added=added, removed=removed)
             if delta is not None:
@@ -85,9 +88,9 @@ class DiffPanel:
             parts.append(diff_text)
             yield Panel(
                 Group(*parts),
-                title=Text('File', style='bold #9ca3af'),
-                title_align='left',
-                border_style='dim',
+                title=Text("File", style="bold #9ca3af"),
+                title_align="left",
+                border_style="dim",
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
@@ -95,7 +98,7 @@ class DiffPanel:
 
         # Fallback: visualize_diff or plain content
         diff_str = None
-        if hasattr(obs, 'visualize_diff'):
+        if hasattr(obs, "visualize_diff"):
             try:
                 diff_str = obs.visualize_diff(n_context_lines=3)
             except Exception:
@@ -105,19 +108,19 @@ class DiffPanel:
             parts.append(Text(diff_str[:3000]))
             yield Panel(
                 Group(*parts),
-                title=Text('File', style='bold #9ca3af'),
-                title_align='left',
-                border_style='dim',
+                title=Text("File", style="bold #9ca3af"),
+                title_align="left",
+                border_style="dim",
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
         else:
-            parts.append(format_activity_result_secondary('updated', kind='ok'))
+            parts.append(format_activity_result_secondary("updated", kind="ok"))
             yield Panel(
                 Group(*parts),
-                title=Text('File', style='bold #9ca3af'),
-                title_align='left',
-                border_style='dim',
+                title=Text("File", style="bold #9ca3af"),
+                title_align="left",
+                border_style="dim",
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
@@ -128,13 +131,13 @@ class DiffPanel:
         result = Text()
         for i, group in enumerate(groups):
             if i > 0:
-                result.append('  ···\n', style='dim')
-            for line in group.get('before_edits', []):
-                result.append(line + '\n', style='red')
-            for line in group.get('after_edits', []):
-                result.append(line + '\n', style='green')
+                result.append("  ···\n", style="dim")
+            for line in group.get("before_edits", []):
+                result.append(line + "\n", style="red")
+            for line in group.get("after_edits", []):
+                result.append(line + "\n", style="green")
         # Truncate if too long
         if len(result.plain) > 3000:
             result.truncate(3000)
-            result.append('\n… (truncated)', style='dim')
+            result.append("\n… (truncated)", style="dim")
         return result

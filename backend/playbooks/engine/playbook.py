@@ -372,7 +372,7 @@ class TaskPlaybook(KnowledgePlaybook):
             return
         prompt = "\\n\\nIf the user didn't provide any of these variables, ask the user to provide them first before the agent can proceed with the task."
         content = getattr(self, 'content', '')
-        setattr(self, 'content', content + prompt)
+        self.content = content + prompt
 
     def extract_variables(self, content: str) -> list[str]:
         """Extract variables from the content.
