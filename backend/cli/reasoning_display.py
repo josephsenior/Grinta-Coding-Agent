@@ -11,7 +11,6 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from backend.cli.layout_tokens import ACTIVITY_PANEL_PADDING
 from backend.cli.transcript import format_callout_panel
 
 # Thought lines are rendered without an extra manual prefix so they align with
@@ -195,7 +194,7 @@ class ReasoningDisplay:
             'Thinking',
             Group(*rows),
             accent_style='dim cyan',
-            padding=ACTIVITY_PANEL_PADDING,
+            padding=(0, 0),
         )
 
     def _append_recent_actions_crumb(

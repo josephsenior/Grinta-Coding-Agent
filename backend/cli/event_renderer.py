@@ -33,6 +33,7 @@ from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
     ACTIVITY_PANEL_PADDING,
     CALLOUT_PANEL_PADDING,
+    TRANSCRIPT_RIGHT_INSET,
     frame_live_body,
     frame_transcript_body,
     gap_below_live_section,
@@ -166,6 +167,7 @@ _CMD_SUMMARY_PRIORITY_PATTERNS = (
     re.compile(r'enoent|eacces|eperm|fatal:|exception|traceback|error', re.IGNORECASE),
 )
 _APPLY_PATCH_TITLE = 'apply patch'
+_APPLY_PATCH_STATS_RE = re.compile(r'\[APPLY_PATCH_STATS\]\s*\+(\d+)\s*-(\d+)')
 
 
 def _sync_reasoning_after_tool_line(
@@ -286,24 +288,59 @@ def _is_apply_patch_activity(title: str | None, label: str | None) -> bool:
     return title_text == _APPLY_PATCH_TITLE or 'applying patch' in label_text or 'validating patch' in label_text
 
 
+def _extract_apply_patch_delta(content: str) -> tuple[int | None, int | None]:
+    """Extract patch +/- line counts from stats marker or raw unified diff text."""
+    match = _APPLY_PATCH_STATS_RE.search(content or '')
+    if match:
+        return int(match.group(1)), int(match.group(2))
+
+    added = 0
+    removed = 0
+    saw_patch_lines = False
+    for line in (content or '').splitlines():
+        if line.startswith('diff --git '):
+            continue
+        if line.startswith('index '):
+            continue
+        if line.startswith('+++ '):
+            continue
+        if line.startswith('--- '):
+            continue
+        if line.startswith('@@ '):
+            continue
+        if line.startswith('Binary files '):
+            continue
+        if line.startswith('\\ No newline at end of file'):
+            continue
+        if line.startswith('+'):
+            added += 1
+            saw_patch_lines = True
+        elif line.startswith('-'):
+            removed += 1
+            saw_patch_lines = True
+
+    if not saw_patch_lines:
+        return None, None
+    return added, removed
+
+
 def _compact_apply_patch_result(
     *,
     exit_code: int | None,
     label: str,
-) -> tuple[str, str, list[Any] | None]:
+    content: str,
+) -> tuple[str | None, str, list[Any] | None]:
     """Compact result text for apply_patch to reduce transcript clutter."""
+    added, removed = _extract_apply_patch_delta(content)
+
     if exit_code == 0:
-        is_check_only = 'validating patch' in (label or '').lower()
-        if is_check_only:
-            return 'succeeded', 'ok', None
-        return (
-            'succeeded',
-            'ok',
-            [
-                format_activity_secondary('+....', kind='ok'),
-                format_activity_secondary('-....', kind='err'),
-            ],
-        )
+        line = format_activity_secondary('succeeded', kind='ok')
+        if added is not None and removed is not None:
+            line.append('  ', style='dim')
+            line.append(f'+{added}', style='dim green')
+            line.append('  ', style='dim')
+            line.append(f'-{removed}', style='dim red')
+        return None, 'ok', [line]
 
     if exit_code is None:
         return 'failed', 'err', None
@@ -458,7 +495,7 @@ def _build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
     table.add_column()
     table.add_column(ratio=1)
 
-    for order, label, status, task, detail in _delegate_worker_panel_signature(workers):
+    for _order, label, status, task, detail in _delegate_worker_panel_signature(workers):
         badge = Text()
         badge.append('[', style='dim')
         badge.append(
@@ -1173,13 +1210,20 @@ class CLIEventRenderer:
                     max_lines=stream_max_lines,
                 )
             )
+        reasoning_section: Any | None = None
         if self._reasoning.active:
-            live_sections.append(
-                self._reasoning.renderable(max_width=options.max_width)
-            )
+            reasoning_section = self._reasoning.renderable(max_width=options.max_width)
+            live_sections.append(reasoning_section)
 
         for index, section in enumerate(live_sections):
-            framed = frame_live_body(section)
+            if section is reasoning_section:
+                framed = Padding(
+                    section,
+                    pad=(0, TRANSCRIPT_RIGHT_INSET, 0, 0),
+                    expand=False,
+                )
+            else:
+                framed = frame_live_body(section)
             if index < len(live_sections) - 1:
                 body_items.append(gap_below_live_section(framed))
             else:
@@ -1915,6 +1959,7 @@ class CLIEventRenderer:
                 msg, result_kind, extra_lines = _compact_apply_patch_result(
                     exit_code=exit_code,
                     label=label,
+                    content=content,
                 )
 
             # CmdOutputObservation defaults to exit_code=-1 when unknown.

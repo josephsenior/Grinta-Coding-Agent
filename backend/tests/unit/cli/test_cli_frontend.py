@@ -2301,8 +2301,10 @@ async def test_renderer_apply_patch_output_is_collapsed_on_success() -> None:
     assert 'Apply patch' in output
     assert 'Applying patch' in output
     assert 'succeeded' in output
-    assert '+....' in output
-    assert '-....' in output
+    assert '+1' in output
+    assert '-1' in output
+    assert '+....' not in output
+    assert '-....' not in output
     assert 'diff --git' not in output
 
 
@@ -2349,6 +2351,7 @@ def test_reasoning_display_tool_icons() -> None:
     rd.update_action('Reading file src/main.py')
     panel = rd.renderable()
     assert panel is not None
+    assert panel.padding == (0, 0)
     # Verify default max lines and recent-step deque capacity
     assert rd._max_lines == 10
     assert rd._recent_actions.maxlen == 4

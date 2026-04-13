@@ -57,6 +57,7 @@ class TestBuildApplyPatchAction:
 
         script = mock_transport.call_args.args[0]
         assert '[APPLY_PATCH_GUIDANCE]' in script
+        assert '[APPLY_PATCH_STATS]' in script
 
     def test_script_escapes_newline_literals_for_generated_python(self) -> None:
         with patch(

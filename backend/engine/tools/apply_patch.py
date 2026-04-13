@@ -96,6 +96,29 @@ def build_apply_patch_action(patch: str, check_only: bool = False) -> CmdRunActi
 import base64, os, subprocess, sys, tempfile
 
 patch = base64.b64decode(b'{pb}').decode()
+
+added = 0
+removed = 0
+for raw_line in patch.splitlines():
+    if raw_line.startswith('diff --git '):
+        continue
+    if raw_line.startswith('index '):
+        continue
+    if raw_line.startswith('+++ '):
+        continue
+    if raw_line.startswith('--- '):
+        continue
+    if raw_line.startswith('@@ '):
+        continue
+    if raw_line.startswith('Binary files '):
+        continue
+    if raw_line.startswith('\\ No newline at end of file'):
+        continue
+    if raw_line.startswith('+'):
+        added += 1
+    elif raw_line.startswith('-'):
+        removed += 1
+
 with tempfile.NamedTemporaryFile(suffix='.patch', delete=False, mode='w') as f:
     f.write(patch)
     temp_name = f.name
@@ -130,6 +153,9 @@ if r.returncode != 0 and 'corrupt patch' in combined.lower():
 os.unlink(temp_name)
 
 out = r.stdout or r.stderr or ('Dry run OK, patch applies cleanly.' if dry_run else 'Patch applied successfully.')
+if r.returncode == 0:
+    stats = f'[APPLY_PATCH_STATS] +{{added}} -{{removed}}'
+    out = (out + '\n' + stats).strip() if out else stats
 print(out)
 sys.exit(r.returncode)
 """
