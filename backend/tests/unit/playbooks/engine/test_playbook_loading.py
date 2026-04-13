@@ -36,6 +36,29 @@ class TestFinalizeLoadedPlaybook:
         with pytest.raises(PlaybookValidationError, match='Invalid'):
             _finalize_loaded_playbook({'type': 'bad_type'}, Path('t.md'))
 
+    def test_duplicate_triggers_raise(self):
+        with pytest.raises(PlaybookValidationError, match='duplicate trigger'):
+            _finalize_loaded_playbook(
+                {'triggers': ['/debug', '/DEBUG']},
+                Path('t.md'),
+            )
+
+    def test_empty_trigger_raises(self):
+        with pytest.raises(PlaybookValidationError, match='empty values'):
+            _finalize_loaded_playbook({'triggers': ['/debug', '   ']}, Path('t.md'))
+
+    def test_duplicate_input_names_raise(self):
+        with pytest.raises(PlaybookValidationError, match='duplicate input name'):
+            _finalize_loaded_playbook(
+                {
+                    'inputs': [
+                        {'name': 'PR_URL', 'description': 'd1'},
+                        {'name': 'pr_url', 'description': 'd2'},
+                    ]
+                },
+                Path('t.md'),
+            )
+
 
 # ── _infer_playbook_type ────────────────────────────────────────────
 
@@ -215,6 +238,14 @@ class TestBasePlaybookLoad:
         with pytest.raises(PlaybookValidationError):
             BasePlaybook.load(pb_file, playbook_dir=pb_dir)
 
+    def test_global_code_review_has_roasted_alias_trigger(self):
+        repo_root = Path(__file__).resolve().parents[5]
+        playbook_dir = repo_root / 'backend' / 'playbooks'
+        code_review = playbook_dir / 'code-review.md'
+        result = BasePlaybook.load(code_review, playbook_dir=playbook_dir)
+        assert '/codereview' in result.metadata.triggers
+        assert '/codereview-roasted' in result.metadata.triggers
+
 
 # ── KnowledgePlaybook ───────────────────────────────────────────────
 
@@ -224,11 +255,11 @@ class TestKnowledgePlaybook:
         kb = KnowledgePlaybook(
             name='review',
             content='Review code',
-            metadata=PlaybookMetadata(triggers=['review', 'audit']),
+            metadata=PlaybookMetadata(triggers=['/review', '/audit']),
             source='test.md',
             type=PlaybookType.KNOWLEDGE,
         )
-        assert kb.match_trigger('Please review this') == 'review'
+        assert kb.match_trigger('Please run /review on this') == '/review'
 
     def test_match_trigger_not_found(self):
         kb = KnowledgePlaybook(

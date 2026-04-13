@@ -17,6 +17,13 @@ from backend.core.logger import app_logger as logger
 from backend.playbooks.engine.types import InputMetadata, PlaybookMetadata, PlaybookType
 
 
+AUTO_TRIGGER_ENV_VAR = 'GRINTA_ENABLE_PLAYBOOK_AUTO_TRIGGER'
+AUTO_TRIGGER_ENABLED = (
+    os.environ.get(AUTO_TRIGGER_ENV_VAR, '').strip().lower()
+    in {'1', 'true', 'yes', 'on'}
+)
+
+
 def _finalize_loaded_playbook(metadata_dict, path):
     """Finalize the loaded playbook metadata by ensuring proper types.
 
@@ -34,7 +41,7 @@ def _finalize_loaded_playbook(metadata_dict, path):
         return PlaybookMetadata(**metadata_dict)
     except ValidationError as exc:
         valid_types = {'knowledge', 'repo', 'task'}
-        if metadata_dict.get('type') not in valid_types:
+        if ('type' in metadata_dict) and (metadata_dict.get('type') not in valid_types):
             valid_display = ', '.join(f'"{t}"' for t in sorted(valid_types))
             raise PlaybookValidationError(
                 f'Invalid "type" value: "{metadata_dict.get("type")}". Valid types are: {valid_display}'
@@ -275,34 +282,96 @@ class KnowledgePlaybook(BasePlaybook):
     def match_trigger(self, message: str) -> str | None:
         """Match a trigger in the message.
 
-        Uses a two-tier strategy:
-        1. Fast substring match (exact keyword containment).
-        2. Lightweight semantic match using word-overlap similarity,
-           activated only when no substring match is found.
+        Matching policy:
+        1. Slash command triggers (for example, ``/debug``) always use exact containment.
+        2. Non-slash auto triggers are disabled by default and can be enabled
+           by setting ``GRINTA_ENABLE_PLAYBOOK_AUTO_TRIGGER=1``.
+        3. Semantic word-overlap fallback only runs when auto-trigger is enabled
+           and strict matching is not set.
 
         Returns the first matching trigger, or None.
         """
         message_lower = message.lower()
 
-        # Tier 1: exact substring (fast path)
-        for trigger in self.triggers:
-            if trigger.lower() in message_lower:
+        slash_triggers = [trigger for trigger in self.triggers if trigger.startswith('/')]
+        non_slash_triggers = [
+            trigger for trigger in self.triggers if not trigger.startswith('/')
+        ]
+
+        # Tier 1a: explicit slash command matching.
+        # We parse slash commands first so '/foo' never mistakenly matches
+        # '/foo-bar'.
+        detected_commands = set(re.findall(r'/[a-z0-9][a-z0-9_-]*', message_lower))
+        for trigger in slash_triggers:
+            if trigger.lower() in detected_commands:
+                logger.debug(
+                    "Playbook '%s' matched slash trigger '%s'",
+                    self.name,
+                    trigger,
+                )
                 return trigger
 
+        # Tier 1b: non-slash triggers, gated behind explicit auto-trigger opt-in.
+        for trigger in non_slash_triggers:
+            if trigger.lower() not in message_lower:
+                continue
+
+            if AUTO_TRIGGER_ENABLED:
+                logger.debug(
+                    "Playbook '%s' matched auto trigger '%s' via exact containment",
+                    self.name,
+                    trigger,
+                )
+                return trigger
+
+            logger.debug(
+                "Playbook '%s' ignored non-slash trigger '%s' because auto-trigger is disabled",
+                self.name,
+                trigger,
+            )
+
+        if not AUTO_TRIGGER_ENABLED:
+            logger.debug(
+                "Playbook '%s' had no slash trigger match and auto-trigger is disabled",
+                self.name,
+            )
+            return None
+
         if getattr(self.metadata, 'strict_trigger_matching', False):
+            logger.debug(
+                "Playbook '%s' strict trigger matching is enabled; skipping semantic fallback",
+                self.name,
+            )
             return None
 
         # Tier 2: word-overlap similarity (lightweight semantic fallback)
         threshold = 0.55
-        message_words = set(re.findall(r'\w+', message_lower))
+        try:
+            message_words = set(re.findall(r'\w+', message_lower))
+        except re.error as exc:
+            logger.warning(
+                "Playbook '%s' failed to tokenize message for semantic matching: %s",
+                self.name,
+                exc,
+            )
+            return None
         if not message_words:
             return None
 
         best_trigger: str | None = None
         best_score: float = 0.0
 
-        for trigger in self.triggers:
-            trigger_words = set(re.findall(r'\w+', trigger.lower()))
+        for trigger in non_slash_triggers:
+            try:
+                trigger_words = set(re.findall(r'\w+', trigger.lower()))
+            except re.error as exc:
+                logger.warning(
+                    "Playbook '%s' failed to tokenize trigger '%s': %s",
+                    self.name,
+                    trigger,
+                    exc,
+                )
+                continue
             if not trigger_words:
                 continue
             # Jaccard-like similarity weighted toward trigger coverage
@@ -314,12 +383,32 @@ class KnowledgePlaybook(BasePlaybook):
             # Penalise very short triggers (single-word) to reduce false positives
             length_bonus = min(1.0, len(trigger_words) / 2)
             score = coverage * length_bonus
+            logger.debug(
+                "Playbook '%s' semantic score trigger='%s' score=%.3f threshold=%.2f",
+                self.name,
+                trigger,
+                score,
+                threshold,
+            )
             if score > best_score:
                 best_score = score
                 best_trigger = trigger
 
-        if best_score >= threshold:
+        if best_score >= threshold and best_trigger is not None:
+            logger.debug(
+                "Playbook '%s' matched semantic trigger '%s' with score %.3f",
+                self.name,
+                best_trigger,
+                best_score,
+            )
             return best_trigger
+
+        logger.debug(
+            "Playbook '%s' had no semantic trigger match (best_score=%.3f, threshold=%.2f)",
+            self.name,
+            best_score,
+            threshold,
+        )
 
         return None
 

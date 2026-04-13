@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+from pydantic import ValidationError
+
 from backend.playbooks.engine.types import (
     InputMetadata,
     PlaybookContentResponse,
@@ -86,6 +89,24 @@ class TestPlaybookMetadata:
         m = PlaybookMetadata(name='x', strict_trigger_matching=True)
         m2 = PlaybookMetadata(**m.model_dump())
         assert m2.strict_trigger_matching is True
+
+    def test_duplicate_triggers_rejected(self):
+        with pytest.raises(ValidationError, match='duplicate trigger'):
+            PlaybookMetadata(name='x', triggers=['/debug', '/DEBUG'])
+
+    def test_empty_trigger_rejected(self):
+        with pytest.raises(ValidationError, match='empty values'):
+            PlaybookMetadata(name='x', triggers=['/debug', '   '])
+
+    def test_duplicate_inputs_rejected(self):
+        with pytest.raises(ValidationError, match='duplicate input name'):
+            PlaybookMetadata(
+                name='x',
+                inputs=[
+                    InputMetadata(name='BRANCH_NAME', description='d1'),
+                    InputMetadata(name='branch_name', description='d2'),
+                ],
+            )
 
 
 # ── PlaybookResponse ─────────────────────────────────────────────────

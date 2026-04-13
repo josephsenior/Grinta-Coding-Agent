@@ -9,11 +9,12 @@
 1. **Prefer slash commands** (`/debug`, `/feature`, …) so playbooks fire when the user *asks* for that mode, not on every substring mention (`pytest`, `fastapi`, and other short generic terms can cause noisy injections).
 2. **Optional second triggers** only when they are **long, distinctive phrases** (not single common words).
 3. **Target &lt; ~100 lines** per playbook; examples over rules; one clear workflow per file.
+4. **Auto-trigger is disabled by default for now.** Non-slash triggers only run if `GRINTA_ENABLE_PLAYBOOK_AUTO_TRIGGER=1` is set.
 
 ## Locations
 
 | Source | Path |
-|--------|------|
+| ------ | ---- |
 | Global (shipped) | This directory |
 | Per-user | `~/.grinta/playbooks/` |
 | Per-repo | `.grinta/playbooks/repo.md` (auto context; different loader) |
@@ -21,7 +22,7 @@
 ## Inventory (global)
 
 | File | Intent |
-|------|--------|
+| ---- | ------ |
 | `add_repo_inst.md` | Scaffold `.grinta/playbooks/repo.md` |
 | `address_pr_comments.md` | `/address_pr_comments` workflow |
 | `agent_memory.md` | `/remember` — lessons.md vs vector recall |
