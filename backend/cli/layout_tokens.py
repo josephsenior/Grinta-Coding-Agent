@@ -21,8 +21,9 @@ CALLOUT_PANEL_PADDING = (1, 2)
 # Inner padding for compact activity/live panels so rows align across sections.
 ACTIVITY_PANEL_PADDING = (0, 1)
 
-# Space below each activity block (tool rows) for scanability.
-ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 1, 0)
+# Space below each activity block (tool rows) for scanability. Slightly increased
+# to provide a small visual gap between adjacent activity cards.
+ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 2, 0)
 
 
 def frame_transcript_body(renderable: Any) -> Any:

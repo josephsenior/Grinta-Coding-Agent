@@ -57,4 +57,4 @@ def test_callout_padding_tuple() -> None:
 
 
 def test_activity_block_bottom_pad() -> None:
-    assert ACTIVITY_BLOCK_BOTTOM_PAD == (0, 0, 1, 0)
+    assert ACTIVITY_BLOCK_BOTTOM_PAD == (0, 0, 2, 0)

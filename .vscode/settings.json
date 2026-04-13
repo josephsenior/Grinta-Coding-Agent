@@ -4,6 +4,7 @@
     "snyk.advanced.autoSelectOrganization": true,
     "cSpell.words": [
         "keepends",
-        "notfounderror"
+        "notfounderror",
+        "winget"
     ]
 }

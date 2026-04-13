@@ -147,9 +147,7 @@ def format_reasoning_snapshot(lines: list[str]) -> Group:
     cleaned = [ln.strip() for ln in lines if (ln or '').strip()]
     if not cleaned:
         return Group()
-    return Group(
-        *[format_activity_secondary(line, kind='neutral') for line in cleaned],
-    )
+    return Group(*[Text(line, style='dim italic') for line in cleaned])
 
 
 def format_activity_shell_block(

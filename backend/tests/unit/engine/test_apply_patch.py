@@ -8,7 +8,6 @@ from backend.engine.tools.apply_patch import (
     validate_apply_patch_contract,
 )
 
-
 _VALID_PATCH = (
     "diff --git a/x b/x\n"
     "index 1111111..2222222 100644\n"
@@ -41,7 +40,7 @@ class TestBuildApplyPatchAction:
             "+++ b/x\n"
             "@@ -1 +1 @@\n"
             "-old\n"
-            "+print(\"hi\")\n"
+            '+print("hi")\n'
         )
 
         assert "b64decode" in action.command

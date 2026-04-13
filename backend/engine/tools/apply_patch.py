@@ -251,7 +251,7 @@ os.unlink(temp_name)
 out = r.stdout or r.stderr or ('Dry run OK, patch applies cleanly.' if dry_run else 'Patch applied successfully.')
 if r.returncode == 0:
     stats = f'[APPLY_PATCH_STATS] +{{added}} -{{removed}}'
-    out = (out + '\n' + stats).strip() if out else stats
+    out = (out + '\\n' + stats).strip() if out else stats
 print(out)
 sys.exit(r.returncode)
 """
