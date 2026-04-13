@@ -344,6 +344,16 @@ def _compact_apply_patch_result(
 
     if exit_code is None:
         return 'failed', 'err', None
+
+    marker = '[APPLY_PATCH_GUIDANCE]'
+    if marker in content:
+        detail = content.split(marker, 1)[1].strip().splitlines()[0]
+        if detail:
+            return f'failed · {_truncate_activity_detail(detail, 140)}', 'err', None
+
+    if summary := _summarize_cmd_failure(content):
+        return f'failed · {summary}', 'err', None
+
     return f'failed · exit {exit_code}', 'err', None
 
 

@@ -19,6 +19,7 @@ Each step generates new context and a separate verification round.
 from __future__ import annotations
 
 import base64
+import re
 
 from backend.core.constants import APPLY_PATCH_TOOL_NAME
 from backend.engine.contracts import ChatCompletionToolParam
@@ -82,6 +83,86 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
 # Action builder
 # ---------------------------------------------------------------------------
 
+_DIFF_HEADER_RE = re.compile(r'^diff --git a/.+ b/.+$')
+_INDEX_RE = re.compile(r'^index [0-9a-fA-F]{7,64}\.\.[0-9a-fA-F]{7,64} [0-7]{6}$')
+_HUNK_HEADER_RE = re.compile(r'^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@')
+
+
+def validate_apply_patch_contract(patch: str) -> str | None:
+    """Return a human-readable validation error when patch headers are malformed."""
+    lines = patch.splitlines()
+    if not lines:
+        return 'Patch is empty.'
+
+    starts = [i for i, line in enumerate(lines) if line.startswith('diff --git ')]
+    if not starts:
+        return 'Missing `diff --git a/<file> b/<file>` header.'
+
+    starts.append(len(lines))
+    for block_index in range(len(starts) - 1):
+        start = starts[block_index]
+        end = starts[block_index + 1]
+        block = lines[start:end]
+        if not block:
+            continue
+
+        if not _DIFF_HEADER_RE.match(block[0]):
+            return f'Line {start + 1}: malformed diff header.'
+
+        index_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('index ')), None)
+        if index_rel is None:
+            return (
+                f'Line {start + 1}: missing `index <old_hash>..<new_hash> <mode>` line '
+                'after the diff header.'
+            )
+        if not _INDEX_RE.match(block[index_rel]):
+            return (
+                f'Line {start + index_rel + 1}: malformed index line. '
+                'Expected `index <old_hash>..<new_hash> <mode>`.'
+            )
+
+        minus_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('--- ')), None)
+        plus_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('+++ ')), None)
+        if minus_rel is None or plus_rel is None:
+            return f'Line {start + 1}: missing `---`/`+++` file header lines.'
+        if minus_rel <= index_rel or plus_rel <= minus_rel:
+            return f'Line {start + 1}: header order must be diff --git, index, ---, +++, @@.'
+
+        minus_line = block[minus_rel]
+        plus_line = block[plus_rel]
+        if not (minus_line.startswith('--- a/') or minus_line == '--- /dev/null'):
+            return (
+                f'Line {start + minus_rel + 1}: malformed `---` header; '
+                'expected `--- a/<file>` or `--- /dev/null`.'
+            )
+        if not (plus_line.startswith('+++ b/') or plus_line == '+++ /dev/null'):
+            return (
+                f'Line {start + plus_rel + 1}: malformed `+++` header; '
+                'expected `+++ b/<file>` or `+++ /dev/null`.'
+            )
+
+        hunk_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('@@ ')), None)
+        if hunk_rel is None:
+            return f'Line {start + 1}: missing `@@ -n,m +n,m @@` hunk header.'
+        if hunk_rel <= plus_rel:
+            return f'Line {start + 1}: hunk header must appear after `+++`.'
+        if not _HUNK_HEADER_RE.match(block[hunk_rel]):
+            return (
+                f'Line {start + hunk_rel + 1}: malformed hunk header. '
+                'Expected `@@ -n,m +n,m @@`.'
+            )
+
+    return None
+
+
+def _guidance_message(validation_error: str) -> str:
+    return (
+        '[APPLY_PATCH_GUIDANCE] ' + validation_error + ' '
+        'This tool requires a full git unified diff in this exact order: '
+        'diff --git, index <old_hash>..<new_hash> <mode>, ---, +++, @@. '
+        'Do not auto-correct or strip headers; regenerate the patch via `git diff` and retry.'
+    )
+
 
 def _b64(s: str) -> str:
     return base64.b64encode(s.encode()).decode()
@@ -89,6 +170,21 @@ def _b64(s: str) -> str:
 
 def build_apply_patch_action(patch: str, check_only: bool = False) -> CmdRunAction:
     """Return a CmdRunAction that applies the unified diff to the workspace."""
+    validation_error = validate_apply_patch_contract(patch)
+    if validation_error is not None:
+        py = f"""
+import sys
+
+print({_guidance_message(validation_error)!r})
+sys.exit(2)
+"""
+        label = 'dry-run check' if check_only else 'applying patch'
+        return CmdRunAction(
+            command=build_python_exec_command(py),
+            thought=f'[APPLY PATCH] {label}',
+            display_label='Validating patch' if check_only else 'Applying patch',
+        )
+
     pb = _b64(patch)
     dry_run_arg = 'True' if check_only else 'False'
 
