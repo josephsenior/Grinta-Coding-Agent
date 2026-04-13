@@ -185,6 +185,7 @@ def format_callout_panel(
     body: Any,
     *,
     accent_style: str = 'dim',
+    padding: tuple[int, int] | None = None,
 ) -> Panel:
     """Reusable compact panel for CLI callouts, questions, and live sections."""
     panel_title = Text((title or 'Notice').strip(), style=f'{accent_style} bold')
@@ -194,7 +195,7 @@ def format_callout_panel(
         title_align='left',
         border_style=accent_style,
         box=box.ROUNDED,
-        padding=CALLOUT_PANEL_PADDING,
+        padding=padding if padding is not None else CALLOUT_PANEL_PADDING,
     )
 
 

@@ -112,6 +112,11 @@ def test_format_callout_panel_uses_layout_padding() -> None:
     assert panel.padding == CALLOUT_PANEL_PADDING
 
 
+def test_format_callout_panel_accepts_custom_padding() -> None:
+    panel = format_callout_panel('Title', Text('body'), padding=(0, 1))
+    assert panel.padding == (0, 1)
+
+
 def test_format_activity_shell_block_uses_card_and_command() -> None:
     import io
 

@@ -13,16 +13,16 @@ from rich.text import Text
 
 from backend.cli.transcript import format_callout_panel
 
-# Indent + tree glyph + gap — used when fitting thought lines to terminal width.
-_THOUGHT_PREFIX_CHARS = 6
+# Match format_activity_primary: same inset as tool card body text.
+_THOUGHT_LINE_PREFIX_CHARS = 2
 
 
 def _fit_thought_line(text: str, max_width: int | None) -> str:
     """Avoid ultra-wide lines in narrow terminals."""
     line = (text or '').strip()
-    if not line or max_width is None or max_width <= _THOUGHT_PREFIX_CHARS + 12:
+    if not line or max_width is None or max_width <= _THOUGHT_LINE_PREFIX_CHARS + 12:
         return line
-    budget = max_width - _THOUGHT_PREFIX_CHARS
+    budget = max_width - _THOUGHT_LINE_PREFIX_CHARS
     if len(line) <= budget:
         return line
     return line[:budget] if budget <= 4 else f'{line[:budget - 1]}…'
@@ -153,7 +153,8 @@ class ReasoningDisplay:
         rows: list[Any] = []
 
         header = Table.grid(expand=True)
-        header.add_column(width=3)
+        # Two cells so the action label lines up with tool-card verb rows (pad 1 + 2).
+        header.add_column(width=2)
         header.add_column(ratio=1)
         header.add_column(justify='right')
         header.add_row(
@@ -175,7 +176,6 @@ class ReasoningDisplay:
             fitted = _fit_thought_line(line, max_width)
             t = Text()
             t.append('  ', style='')
-            t.append('╰ ', style='dim cyan')
             t.append(fitted, style='italic dim')
             rows.append(t)
 
@@ -195,6 +195,8 @@ class ReasoningDisplay:
             'Thinking',
             Group(*rows),
             accent_style='dim cyan',
+            # Match activity tool cards (format_activity_block): tighter inset than generic callouts.
+            padding=(0, 1),
         )
 
     # TODO Rename this here and in `renderable`

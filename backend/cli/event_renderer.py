@@ -497,7 +497,13 @@ def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
 
 def _split_error_text(error_text: str) -> tuple[str, str]:
     """Split error text into a short summary line and optional detail block."""
-    stripped = error_text.strip()
+    # Clean up redundant internal engine scaffolding to prevent visual clutter for users
+    cleaned = re.sub(
+        r'<APP_RESULT_VALIDATION>.*?(?:</APP_RESULT_VALIDATION>|$)', '', error_text, flags=re.DOTALL | re.IGNORECASE
+    )
+    cleaned = re.sub(r'\[TOOL_FALLBACK\].*?(?:\n|$)', '', cleaned)
+    stripped = cleaned.strip()
+
     if not stripped:
         return 'Unknown error', ''
     lines = stripped.splitlines()

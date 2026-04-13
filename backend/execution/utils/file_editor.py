@@ -379,6 +379,7 @@ class FileEditor:
                 start_line,
                 end_line,
                 normalize_ws,
+                file_path=file_path,
             )
             if isinstance(new_content, ToolResult):
                 new_content.old_content = old_content
@@ -542,24 +543,43 @@ class FileEditor:
         old_content: str,
         old_str: str,
         new_str: str,
+        file_path: Path | None = None,
         *,
-        normalize_ws: bool | None,
+        normalize_ws: bool | None = None,
     ) -> str | ToolResult:
-        """Apply old_str -> new_str replace with safe tolerant fallback."""
+        """Apply old_str -> new_str replace with relaxed tolerant whitespace fallback, but validate tree-sitter syntax."""
         exact_count = old_content.count(old_str)
-        if exact_count >= 1:
-            return old_content.replace(old_str, new_str, 1)
+        
+        if exact_count == 1:
+            new_content = old_content.replace(old_str, new_str, 1)
+        elif exact_count > 1:
+            return ToolResult(
+                output='',
+                error=f"ERROR: old_str matches {exact_count} times. Must be unique.",
+                new_content=old_content,
+            )
+        else:
+            # Fall back to relaxed whitespace-tolerant match
+            tolerant = self._ws_tolerant_replace(old_content, old_str, new_str)
+            if isinstance(tolerant, ToolResult):
+                # No match found at all
+                return tolerant
+            new_content = tolerant
 
-        # Strict mode: skip tolerant fallback when explicitly disabled.
-        if normalize_ws is False:
-            return self._fuzzy_match_error(old_content, old_str)
+        # Validate syntax after replacement
+        if file_path:
+            from backend.orchestration.middleware.auto_check import _treesitter_syntax_check
+            result = _treesitter_syntax_check(str(file_path), new_content.encode('utf-8'))
+            if result is not None:
+                is_valid, err_msg = result
+                if not is_valid:
+                    return ToolResult(
+                        output='',
+                        error=f"ERROR: The edit introduces a Syntax Error:\n{err_msg}\nEdit rejected.",
+                        new_content=old_content,
+                    )
 
-        tolerant = self._ws_tolerant_replace(old_content, old_str, new_str)
-        if isinstance(tolerant, ToolResult):
-            if tolerant.error == 'No match found even with whitespace normalization.':
-                return self._fuzzy_unique_replace(old_content, old_str, new_str)
-            return tolerant
-        return tolerant
+        return new_content
 
     def _resolve_edit_content(
         self,
@@ -579,6 +599,7 @@ class FileEditor:
         start_line: int | None,
         end_line: int | None,
         normalize_ws: bool | None,
+        file_path: Path | None = None,
     ) -> str | ToolResult:
         """Determine new content based on provided parameters."""
         if start_line is not None and end_line is not None:
@@ -599,6 +620,7 @@ class FileEditor:
                 old_content_str,
                 old_str_val,
                 new_str_val,
+                file_path=file_path,
                 normalize_ws=normalize_ws,
             )
         if file_text_val:

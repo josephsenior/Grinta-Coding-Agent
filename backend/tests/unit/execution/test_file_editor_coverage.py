@@ -120,7 +120,7 @@ class TestFileEditorCoverageGaps:
             # No crash!
 
     def test_fuzzy_match_error_high_ratio(self):
-        """Covers lines 353-372 (difflib suggestion)."""
+        """Covers exact matching error without difflib suggestion check."""
         content = "def foo():\n    print('hello')\n    return True\n"
         self._write('fuzzy.py', content)
         old_str = "def foo():\n    print('helo')\n    return True\n"
@@ -132,7 +132,7 @@ class TestFileEditorCoverageGaps:
             normalize_ws=False,
         )
         assert result.error is not None
-        assert 'Did you mean this block' in result.error
+        assert 'No match found even with whitespace normalization' in result.error
 
     def test_unicode_decode_fallback(self):
         """Covers line 440-449 (UnicodeDecodeError fallback)."""

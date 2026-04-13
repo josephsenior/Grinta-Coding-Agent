@@ -616,11 +616,15 @@ def redact_internal_result_markers(text: str) -> str:
     history back into streaming or final assistant text.  These are internal protocol
     markers — the CLI already displays friendly activity rows for these tools.
     """
-    if '[' not in text:
-        return text
-    cleaned = _INTERNAL_RESULT_MARKER_RE.sub('', text)
+    if '[' in text:
+        text = _INTERNAL_RESULT_MARKER_RE.sub('', text)
+    
+    # Also strip out validation markers added by tool result validator to avoid UI clutter
+    text = re.sub(r'\n?<APP_RESULT_VALIDATION>.*?(?:</APP_RESULT_VALIDATION>|$)', '', text, flags=re.DOTALL | re.IGNORECASE)
+    text = re.sub(r'\[TOOL_FALLBACK\].*?(?:\n|$)', '', text)
+
     # Collapse blank lines left behind.
-    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+    cleaned = re.sub(r'\n{3,}', '\n\n', text)
     return cleaned.strip()
 
 
