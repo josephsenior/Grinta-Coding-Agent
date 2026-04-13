@@ -32,29 +32,30 @@ from backend.ledger.action import CmdRunAction
 # ---------------------------------------------------------------------------
 
 _DESCRIPTION = (
-    '**CRITICAL: Exact Format Required**\n'
-    'You MUST verify the exact target file contents and line numbers using `read_file` or `grep_search` before using this tool.\n'
-    'This tool applies a unified diff (`git diff` / `diff -u` format) to the workspace atomically.\n\n'
-    '**CORRECT USAGE EXAMPLE:**\n'
-    '```diff\n'
-    'diff --git a/path/to/file.py b/path/to/file.py\n'
-    '--- a/path/to/file.py\n'
-    '+++ b/path/to/file.py\n'
-    '@@ -12,4 +12,4 @@\n'
-    ' def my_function():\n'
-    '-    return False\n'
-    '+    return True\n'
-    '```\n\n'
-    '**STRICT REQUIREMENTS:**\n'
-    '- Must start with `diff --git a/<file> b/<file>`\n'
-    '- Followed by `--- a/<file>` (or `/dev/null` for new files)\n'
-    '- Followed by `+++ b/<file>` (or `/dev/null` for deleted files)\n'
-    '- Followed by hunk headers `@@ -n,m +n,m @@`\n'
-    '- Context lines (unchanged) must start with a single space.\n'
-    '- Added lines must start with `+`.\n'
-    '- Removed lines must start with `-`.\n'
-    '- You MUST explicitly set the `i_have_verified_file_contents_and_format` argument to `true`.\n'
+    "**CRITICAL: Exact Format Required**\n"
+    "You MUST verify the exact target file contents and line numbers using `read_file` or `grep_search` before using this tool.\n"
+    "This tool applies a unified diff (`git diff` / `diff -u` format) to the workspace atomically.\n\n"
+    "**CORRECT USAGE EXAMPLE:**\n"
+    "```diff\n"
+    "diff --git a/path/to/file.py b/path/to/file.py\n"
+    "--- a/path/to/file.py\n"
+    "+++ b/path/to/file.py\n"
+    "@@ -12,4 +12,4 @@\n"
+    " def my_function():\n"
+    "-    return False\n"
+    "+    return True\n"
+    "```\n\n"
+    "**STRICT REQUIREMENTS:**\n"
+    "- Must start with `diff --git a/<file> b/<file>`\n"
+    "- Followed by `--- a/<file>` (or `/dev/null` for new files)\n"
+    "- Followed by `+++ b/<file>` (or `/dev/null` for deleted files)\n"
+    "- Followed by hunk headers `@@ -n,m +n,m @@`\n"
+    "- Context lines (unchanged) must start with a single space.\n"
+    "- Added lines must start with `+`.\n"
+    "- Removed lines must start with `-`.\n"
+    "- You MUST explicitly set the `i_have_verified_file_contents_and_format` argument to `true`.\n"
 )
+
 
 def create_apply_patch_tool() -> ChatCompletionToolParam:
     """Create the apply-patch tool definition."""
@@ -62,32 +63,32 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
         name=APPLY_PATCH_TOOL_NAME,
         description=_DESCRIPTION,
         properties={
-            'patch': {
-                'type': 'string',
-                'description': (
-                    'Complete git unified diff to apply (multi-file supported). '
-                    'Must include diff --git, ---/+++, and @@ hunk headers. '
-                    'Index line is optional, but if present it must be valid.'
+            "patch": {
+                "type": "string",
+                "description": (
+                    "Complete git unified diff to apply (multi-file supported). "
+                    "Must include diff --git, ---/+++, and @@ hunk headers. "
+                    "Index line is optional, but if present it must be valid."
                 ),
             },
-            'i_have_verified_file_contents_and_format': {
-                'type': 'boolean',
-                'description': (
-                    'You MUST explicitly set this to `true` to acknowledge that you have '
-                    'recently verify the exact file contents using `read_file` or `grep_search` '
-                    'and reviewed the correct patch format requirements.'
+            "i_have_verified_file_contents_and_format": {
+                "type": "boolean",
+                "description": (
+                    "You MUST explicitly set this to `true` to acknowledge that you have "
+                    "recently verify the exact file contents using `read_file` or `grep_search` "
+                    "and reviewed the correct patch format requirements."
                 ),
             },
-            'check_only': {
-                'type': 'string',
-                'enum': ['true', 'false'],
-                'description': (
+            "check_only": {
+                "type": "string",
+                "enum": ["true", "false"],
+                "description": (
                     "If 'true', validate the patch would apply cleanly without actually "
                     "modifying any files (dry-run). Defaults to 'false'."
                 ),
             },
         },
-        required=['patch', 'i_have_verified_file_contents_and_format'],
+        required=["patch", "i_have_verified_file_contents_and_format"],
     )
 
 
@@ -95,71 +96,53 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
 # Action builder
 # ---------------------------------------------------------------------------
 
-_DIFF_HEADER_RE = re.compile(r'^diff --git a/.+ b/.+$')
-_HUNK_HEADER_RE = re.compile(r'^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@')
+_DIFF_HEADER_RE = re.compile(r"^diff --git a/.+ b/.+$")
+_HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@")
 
 
-def validate_apply_patch_contract(patch: str) -> str | None:
-    """Return a human-readable validation error when patch headers are malformed."""
-    lines = [line for line in patch.splitlines() if not line.startswith('index ')]
+def validate_apply_patch_contract(patch: str) -> str:
+    """Return a human-readable validation error when patch headers are malformed,
+    or the normalized patch text if it looks valid.
+    """
+    lines = [line for line in patch.splitlines() if not line.startswith("index ")]
     if not lines:
-        return 'Patch is empty.'
+        return "Patch is empty."
 
-    starts = [i for i, line in enumerate(lines) if line.startswith('diff --git ')]
-    if not starts:
-        return 'Missing `diff --git a/<file> b/<file>` header.'
+    # Check for any of the standard unified diff markers
+    has_git = any(line.startswith("diff --git ") for line in lines)
+    has_minus = any(line.startswith("--- ") for line in lines)
+    has_plus = any(line.startswith("+++ ") for line in lines)
+    has_hunk = any(line.startswith("@@ ") for line in lines)
 
-    starts.append(len(lines))
-    for block_index in range(len(starts) - 1):
-        start = starts[block_index]
-        end = starts[block_index + 1]
-        block = lines[start:end]
-        if not block:
-            continue
+    if not (has_git or (has_minus and has_plus)) or not has_hunk:
+        return "Missing required diff headers (diff --git, ---/+++, or @@)."
 
-        if not _DIFF_HEADER_RE.match(block[0]):
-            return f'Line {start + 1}: malformed diff header.'
+    # Heuristic to fix common LLM mistakes:
+    # 1. Missing space for context lines
+    # 2. Missing headers if only one file is patched and it's obvious
+    processed_lines = []
 
-        minus_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('--- ')), None)
-        plus_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('+++ ')), None)
-        if minus_rel is None or plus_rel is None:
-            return f'Line {start + 1}: missing `---`/`+++` file header lines.'
-        if plus_rel <= minus_rel:
-            return f'Line {start + 1}: header order must be diff --git, ---, +++, @@.'
+    # Simple case: if it starts with ---/+++ but no diff --git, it's still valid for git apply usually,
+    # but we search for the filenames to be safe.
 
-        minus_line = block[minus_rel]
-        plus_line = block[plus_rel]
-        if not (minus_line.startswith('--- a/') or minus_line == '--- /dev/null'):
-            return (
-                f'Line {start + minus_rel + 1}: malformed `---` header; '
-                'expected `--- a/<file>` or `--- /dev/null`.'
-            )
-        if not (plus_line.startswith('+++ b/') or plus_line == '+++ /dev/null'):
-            return (
-                f'Line {start + plus_rel + 1}: malformed `+++` header; '
-                'expected `+++ b/<file>` or `+++ /dev/null`.'
-            )
+    for line in lines:
+        if line.startswith(("diff ", "--- ", "+++ ", "@@ ", "+", "-", "index ", "\\ ")):
+            processed_lines.append(line)
+        elif line == "":
+            processed_lines.append(" ")
+        else:
+            # If it doesn't start with any marker, it's likely a context line missing its space
+            processed_lines.append(" " + line)
 
-        hunk_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('@@ ')), None)
-        if hunk_rel is None:
-            return f'Line {start + 1}: missing `@@ -n,m +n,m @@` hunk header.'
-        if hunk_rel <= plus_rel:
-            return f'Line {start + 1}: hunk header must appear after `+++`.'
-        if not _HUNK_HEADER_RE.match(block[hunk_rel]):
-            return (
-                f'Line {start + hunk_rel + 1}: malformed hunk header. '
-                'Expected `@@ -n,m +n,m @@`.'
-            )
-
-    return None
+    return "\n".join(processed_lines)
 
 
 def _guidance_message(validation_error: str) -> str:
     return (
-        '[APPLY_PATCH_GUIDANCE] ' + validation_error + ' '
-        'This tool requires a full unified diff in this order: '
-        'diff --git, optional valid index, ---, +++, @@. '
-        'Regenerate the patch via `git diff` and retry.'
+        "[APPLY_PATCH_GUIDANCE] " + validation_error + " "
+        "This tool requires a full unified diff in this order: "
+        "diff --git, optional valid index, ---, +++, @@. "
+        "Regenerate the patch via `git diff` and retry."
     )
 
 
@@ -167,26 +150,36 @@ def _b64(s: str) -> str:
     return base64.b64encode(s.encode()).decode()
 
 
-def build_apply_patch_action(patch: str, check_only: bool = False, i_have_verified_file_contents_and_format: bool = False) -> CmdRunAction:
+def build_apply_patch_action(
+    patch: str,
+    check_only: bool = False,
+    i_have_verified_file_contents_and_format: bool = False,
+) -> CmdRunAction:
     """Return a CmdRunAction that applies the unified diff to the workspace."""
-    patch = '\n'.join(line for line in patch.splitlines() if not line.startswith('index '))
-    validation_error = validate_apply_patch_contract(patch)
-    if validation_error is not None:
+    result = validate_apply_patch_contract(patch)
+    if result.startswith("Missing") or result.startswith("Patch"):
+        validation_error = result
         py = f"""
 import sys
 
 print({_guidance_message(validation_error)!r})
 sys.exit(2)
 """
-        label = 'dry-run check' if check_only else 'applying patch'
+        label = "dry-run check" if check_only else "applying patch"
         return CmdRunAction(
             command=build_python_exec_command(py),
-            thought=f'[APPLY PATCH] {label}',
-            display_label='Validating patch' if check_only else 'Applying patch',
+            thought=f"[APPLY PATCH] {label}",
+            display_label="Validating patch" if check_only else "Applying patch",
         )
 
+    # If validation passed, result contains the normalized patch
+    patch = result
+    patch = "\n".join(
+        line for line in patch.splitlines() if not line.startswith("index ")
+    )
+
     pb = _b64(patch)
-    dry_run_arg = 'True' if check_only else 'False'
+    dry_run_arg = "True" if check_only else "False"
 
     py = f"""
 import base64, os, pathlib, subprocess, sys, tempfile
@@ -222,7 +215,7 @@ for raw_line in patch.splitlines():
 
 
 def _run_git_apply(temp_name, dry_run):
-    git_args = ['git', 'apply', '--whitespace=fix']
+    git_args = ['git', 'apply', '--whitespace=fix', '--recount', '--inaccurate-eof']
     if dry_run:
         git_args.append('--check')
     git_args.append(temp_name)
@@ -402,9 +395,9 @@ print(out)
 sys.exit(r.returncode)
 """
 
-    label = 'dry-run check' if check_only else 'applying patch'
+    label = "dry-run check" if check_only else "applying patch"
     return CmdRunAction(
         command=build_python_exec_command(py),
-        thought=f'[APPLY PATCH] {label}',
-        display_label='Validating patch' if check_only else 'Applying patch',
+        thought=f"[APPLY PATCH] {label}",
+        display_label="Validating patch" if check_only else "Applying patch",
     )

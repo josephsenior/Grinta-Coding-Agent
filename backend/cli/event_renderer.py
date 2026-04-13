@@ -148,9 +148,11 @@ _INTERNAL_THINK_LABELS = {
 }
 # Strip structured JSON payloads embedded in think-action thoughts.
 _THINK_RESULT_JSON_RE = re.compile(
-    r"\n?\[(?:CHECKPOINT_RESULT|REVERT_RESULT|ROLLBACK|TASK_TRACKER)\]" r"\s*\{.*",
+    r"\n?\[(?:CHECKPOINT_RESULT|REVERT_RESULT|ROLLBACK|TASK_TRACKER)\]\s*\{.*",
     re.DOTALL,
 )
+# Strip XML-like tags from tool outputs (e.g. <search_results>, <checkpoint>).
+_TOOL_RESULT_TAG_RE = re.compile(r"</?[a-z_][a-z0-9_]*>", re.IGNORECASE)
 _CMD_SUMMARY_NOISE_PATTERNS = (
     "a complete log of this run can be found in",
     "[below is the output of the previous command.]",
@@ -196,6 +198,10 @@ def _normalize_reasoning_text(text: str) -> tuple[str | None, str | None]:
 
     # Strip structured JSON payloads from multi-line thoughts (e.g. checkpoint results).
     stripped = _THINK_RESULT_JSON_RE.sub("", stripped).strip()
+
+    # Strip XML-like tags from tool outputs.
+    stripped = _TOOL_RESULT_TAG_RE.sub("", stripped).strip()
+
     if not stripped:
         return None, None
 
@@ -1490,9 +1496,12 @@ class CLIEventRenderer:
                 # generic reasoning text.  Strip internal JSON payloads from the
                 # human-readable summary.
                 cleaned = _THINK_RESULT_JSON_RE.sub("", thought).strip()
-                # Strip leading [TAG] markers to get the human message.
+
+                # Strip XML-like tags (e.g. <search_results>) and leading [TAG] markers to get the human message.
                 tag_m = _INTERNAL_THINK_TAG_RE.match(cleaned)
                 human_msg = (tag_m.group("payload") or "").strip() if tag_m else cleaned
+                human_msg = _TOOL_RESULT_TAG_RE.sub("", human_msg).strip()
+
                 if source_tool == "checkpoint":
                     verb, title = "Saved", "Checkpoint"
                     # Use the tag's human message or a user-friendly default.
