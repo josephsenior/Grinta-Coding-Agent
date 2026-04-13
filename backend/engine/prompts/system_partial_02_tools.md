@@ -7,6 +7,7 @@ Editor `path` arguments are relative to the project root (see runtime working di
 You MUST explicitly read a file's contents before you edit it. NEVER edit a file blindly or solely from memory. Always run `read_file` or `grep_search` to verify precise line numbers, code structure, and whitespace before applying changes (especially when using `apply_patch`).
 
 Follow the routing ladder first:
+
 - **ast_code_editor**: Prefer for function/class bodies (`edit_function`, `rename_symbol`), targeted ranges (`replace_range`, `insert_text`), or rollbacks (`undo_last_edit`).
 - **apply_patch**: Best for multi-file edits, complex changes where whitespace is tricky, or generic unified diffs.
 - **str_replace_editor**: Best for `create_file`, simple single-line fixes, or `view_and_replace`. Use `preview: true` if confidence is low (<0.7).
