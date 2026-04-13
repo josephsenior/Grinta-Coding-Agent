@@ -118,6 +118,12 @@ def build_search_code_action(
     ):
         file_pattern = f"*{file_pattern}"
 
+    # Auto-fix where pattern is exactly a wildcard and file_pattern is empty
+    import re
+    if pattern and not file_pattern and re.match(r'^[\w\*\.\-\?]+$', pattern) and pattern.startswith(('*', '?')):
+        file_pattern = pattern
+        pattern = ""
+
     # Validate regex pattern early to prevent silent failures and hallucination loops
     if pattern:
         import re

@@ -96,8 +96,7 @@ class TestBuildApplyPatchAction:
         ) as mock_transport:
             action = build_apply_patch_action(
                 'diff --git a/x b/x\n'
-                'index 0000..e69de29\n'
-                '--- a/x\n'
+                '--- wrong\n'
                 '+++ b/x\n'
                 '@@ -1 +1 @@\n'
                 '-old\n'
@@ -107,7 +106,7 @@ class TestBuildApplyPatchAction:
         script = mock_transport.call_args.args[0]
         assert action.display_label == 'Applying patch'
         assert '[APPLY_PATCH_GUIDANCE]' in script
-        assert 'malformed index line' in script
+        assert 'malformed `---` header' in script
         assert 'NamedTemporaryFile' not in script
         assert 'sys.exit(2)' in script
 
@@ -127,7 +126,7 @@ class TestValidateApplyPatchContract:
     def test_accepts_missing_index_line(self) -> None:
         assert validate_apply_patch_contract(_VALID_PATCH_NO_INDEX) is None
 
-    def test_rejects_malformed_index_line(self) -> None:
+    def test_accepts_malformed_index_line(self) -> None:
         error = validate_apply_patch_contract(
             'diff --git a/x b/x\n'
             'index 0000..e69de29\n'
@@ -138,8 +137,7 @@ class TestValidateApplyPatchContract:
             '+new\n'
         )
 
-        assert error is not None
-        assert 'malformed index line' in error
+        assert error is None
 
     def test_accepts_index_without_mode(self) -> None:
         error = validate_apply_patch_contract(

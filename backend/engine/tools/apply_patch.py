@@ -96,15 +96,12 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
 # ---------------------------------------------------------------------------
 
 _DIFF_HEADER_RE = re.compile(r'^diff --git a/.+ b/.+$')
-_INDEX_RE = re.compile(
-    r'^index [0-9a-fA-F]{7,64}\.\.[0-9a-fA-F]{7,64}(?: [0-7]{6})?$'
-)
 _HUNK_HEADER_RE = re.compile(r'^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@')
 
 
 def validate_apply_patch_contract(patch: str) -> str | None:
     """Return a human-readable validation error when patch headers are malformed."""
-    lines = patch.splitlines()
+    lines = [line for line in patch.splitlines() if not line.startswith('index ')]
     if not lines:
         return 'Patch is empty.'
 
@@ -123,24 +120,12 @@ def validate_apply_patch_contract(patch: str) -> str | None:
         if not _DIFF_HEADER_RE.match(block[0]):
             return f'Line {start + 1}: malformed diff header.'
 
-        index_rel = next(
-            (i for i, line in enumerate(block[1:], start=1) if line.startswith('index ')),
-            None,
-        )
-        if index_rel is not None and not _INDEX_RE.match(block[index_rel]):
-            return (
-                f'Line {start + index_rel + 1}: malformed index line. '
-                'Expected `index <old_hash>..<new_hash> [mode]`.'
-            )
-
         minus_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('--- ')), None)
         plus_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('+++ ')), None)
         if minus_rel is None or plus_rel is None:
             return f'Line {start + 1}: missing `---`/`+++` file header lines.'
-        if index_rel is not None and minus_rel <= index_rel:
-            return f'Line {start + 1}: header order must be diff --git, index (optional), ---, +++, @@.'
         if plus_rel <= minus_rel:
-            return f'Line {start + 1}: header order must be diff --git, optional index, ---, +++, @@.'
+            return f'Line {start + 1}: header order must be diff --git, ---, +++, @@.'
 
         minus_line = block[minus_rel]
         plus_line = block[plus_rel]
@@ -184,6 +169,7 @@ def _b64(s: str) -> str:
 
 def build_apply_patch_action(patch: str, check_only: bool = False, i_have_verified_file_contents_and_format: bool = False) -> CmdRunAction:
     """Return a CmdRunAction that applies the unified diff to the workspace."""
+    patch = '\n'.join(line for line in patch.splitlines() if not line.startswith('index '))
     validation_error = validate_apply_patch_contract(patch)
     if validation_error is not None:
         py = f"""
