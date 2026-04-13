@@ -227,7 +227,7 @@ def _run_git_apply(temp_name, dry_run):
         git_args.append('--check')
     git_args.append(temp_name)
     try:
-        return subprocess.run(git_args, capture_output=True, text=True)
+        return subprocess.run(git_args, capture_output=True, text=True, encoding='utf-8', errors='replace')
     except FileNotFoundError:
         return None
 
@@ -238,7 +238,7 @@ def _run_patch_apply(temp_name, dry_run):
         patch_args.insert(1, '--dry-run')
     patch_args += ['--input', temp_name]
     try:
-        return subprocess.run(patch_args, capture_output=True, text=True)
+        return subprocess.run(patch_args, capture_output=True, text=True, encoding='utf-8', errors='replace')
     except FileNotFoundError:
         return None
 

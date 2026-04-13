@@ -181,7 +181,7 @@ def _search_with_ripgrep(
         args.append(path)
 
         try:
-            result = subprocess.run(args, capture_output=True, text=True, check=False)
+            result = subprocess.run(args, capture_output=True, text=True, encoding='utf-8', errors='replace', check=False)
             lines = result.stdout.splitlines()[:max_results]
             out = "\n".join(lines)
             if not out:
@@ -217,7 +217,7 @@ def _search_with_ripgrep(
     args.append(path)
 
     try:
-        result = subprocess.run(args, capture_output=True, text=True, check=False)
+        result = subprocess.run(args, capture_output=True, text=True, encoding='utf-8', errors='replace', check=False)
         out = result.stdout
         limit = max_results * (context_lines * 2 + 1) + 10
         lines = out.splitlines()[:limit]
