@@ -66,10 +66,10 @@ def execute_file_editor(
     )
 
     if result.error:
-        return f'ERROR:\n{result.error}', (None, None)
+        return f"ERROR:\n{result.error}", (None, None)
     if not result.output:
-        logger.warning('No output from file_editor for %s', path)
-        return '', (None, None)
+        logger.warning("No output from file_editor for %s", path)
+        return "", (None, None)
 
     return result.output, (result.old_content, result.new_content)
 
@@ -122,9 +122,9 @@ def _invoke_editor(
             dry_run=dry_run,
         )
     except ToolError as e:
-        return ToolResult(output='', error=str(e))
+        return ToolResult(output="", error=str(e))
     except TypeError as e:
-        return ToolResult(output='', error=str(e))
+        return ToolResult(output="", error=str(e))
 
 
 def truncate_large_text(value: str, max_chars: int, *, label: str) -> str:
@@ -133,12 +133,12 @@ def truncate_large_text(value: str, max_chars: int, *, label: str) -> str:
         return value
     half = max_chars // 2
     logger.warning(
-        'Truncating oversized %s payload from %s chars to %s chars',
+        "Truncating oversized %s payload from %s chars to %s chars",
         label,
         len(value),
         max_chars,
     )
-    return value[:half] + '\n[... Truncated by app due to size ...]\n' + value[-half:]
+    return value[:half] + "\n[... Truncated by app due to size ...]\n" + value[-half:]
 
 
 # Default max chars for bash command output (configurable via env var).
@@ -149,7 +149,7 @@ def _get_max_cmd_output_chars(max_chars: int | None) -> int:
     """Resolve max_chars from arg or env."""
     if max_chars is not None:
         return max_chars
-    raw = os.environ.get('APP_MAX_CMD_OUTPUT_CHARS', '')
+    raw = os.environ.get("APP_MAX_CMD_OUTPUT_CHARS", "")
     try:
         return int(raw) if raw else _DEFAULT_MAX_CMD_OUTPUT_CHARS
     except (ValueError, TypeError):
@@ -181,11 +181,11 @@ def _extract_truncation_lines(
 
 # Regex for lines that likely contain error/failure context worth surfacing.
 _ERROR_LINE_RE = re.compile(
-    r'\b(?:Error|Exception|Traceback|FAILED|FAIL:'
-    r'|AssertionError|panic|PANIC'
-    r'|ModuleNotFoundError|ImportError|FileNotFoundError'
-    r'|PermissionError|RuntimeError|TypeError|ValueError'
-    r'|KeyError|AttributeError|SyntaxError|IndentationError)\b',
+    r"\b(?:Error|Exception|Traceback|FAILED|FAIL:"
+    r"|AssertionError|panic|PANIC"
+    r"|ModuleNotFoundError|ImportError|FileNotFoundError"
+    r"|PermissionError|RuntimeError|TypeError|ValueError"
+    r"|KeyError|AttributeError|SyntaxError|IndentationError)\b",
     re.IGNORECASE,
 )
 
@@ -235,7 +235,7 @@ def _extract_error_context(
         if chars + len(line) > budget:
             break
         if idx > prev_idx + 1 and result:
-            gap_marker = '  ...\n'
+            gap_marker = "  ...\n"
             if chars + len(gap_marker) + len(line) > budget:
                 break
             result.append(gap_marker)
@@ -273,7 +273,7 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
 
     if max_chars <= 0 or len(output) <= max_chars:
         if test_summary:
-            return test_summary + '\n\n' + output
+            return test_summary + "\n\n" + output
         return output
 
     lines = output.splitlines(keepends=True)
@@ -293,13 +293,13 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
 
     skipped = total_lines - len(head_lines) - len(tail_lines)
     notice = (
-        f'\n[APP: Output truncated — {skipped} lines hidden. '
-        f'Showing first {len(head_lines)} and last {len(tail_lines)} lines]'
+        f"\n[APP: Output truncated — {skipped} lines hidden. "
+        f"Showing first {len(head_lines)} and last {len(tail_lines)} lines]"
     )
-    notice += '\n'
+    notice += "\n"
 
     logger.warning(
-        'Truncated bash output from %d lines (%d chars) → head=%d tail=%d error_ctx=%d',
+        "Truncated bash output from %d lines (%d chars) → head=%d tail=%d error_ctx=%d",
         total_lines,
         len(output),
         len(head_lines),
@@ -307,36 +307,36 @@ def truncate_cmd_output(output: str, max_chars: int | None = None) -> str:
         len(error_context),
     )
 
-    parts = [''.join(head_lines), notice]
+    parts = ["".join(head_lines), notice]
     if error_context:
-        parts.append('[ERROR_CONTEXT from truncated middle]\n')
-        parts.append(''.join(error_context))
-        parts.append('\n')
-    parts.append(''.join(tail_lines))
+        parts.append("[ERROR_CONTEXT from truncated middle]\n")
+        parts.append("".join(error_context))
+        parts.append("\n")
+    parts.append("".join(tail_lines))
 
-    result = ''.join(parts)
+    result = "".join(parts)
 
     # Append test summary AFTER truncation — outside the char budget.
     if test_summary:
-        result = test_summary + '\n\n' + result
+        result = test_summary + "\n\n" + result
 
     return result
 
 
 def get_max_edit_observation_chars() -> int:
     """Read and validate max edit observation payload size from environment."""
-    raw_value = os.environ.get('APP_MAX_EDIT_OBS_CHARS', '200000')
+    raw_value = os.environ.get("APP_MAX_EDIT_OBS_CHARS", "200000")
     try:
         parsed = int(raw_value)
     except (TypeError, ValueError):
         logger.warning(
-            'Invalid APP_MAX_EDIT_OBS_CHARS=%r; using default 200000',
+            "Invalid APP_MAX_EDIT_OBS_CHARS=%r; using default 200000",
             raw_value,
         )
         return 200000
     if parsed <= 0:
         logger.warning(
-            'Non-positive APP_MAX_EDIT_OBS_CHARS=%s; using default 200000',
+            "Non-positive APP_MAX_EDIT_OBS_CHARS=%s; using default 200000",
             parsed,
         )
         return 200000
@@ -371,36 +371,36 @@ def encode_binary_file(
     default_mime: str,
 ) -> str:
     """Encode binary file data as base64 data URL."""
-    encoded_data = base64.b64encode(file_data).decode('utf-8')
+    encoded_data = base64.b64encode(file_data).decode("utf-8")
     effective_mime = mime_type or default_mime
-    return f'data:{effective_mime};base64,{encoded_data}'
+    return f"data:{effective_mime};base64,{encoded_data}"
 
 
 def read_image_file(filepath: str) -> FileReadObservation:
     """Read and encode an image file."""
-    with open(filepath, 'rb') as file:
+    with open(filepath, "rb") as file:
         image_data = file.read()
         mime_type, _ = mimetypes.guess_type(filepath)
-        encoded_image = encode_binary_file(filepath, image_data, mime_type, 'image/png')
+        encoded_image = encode_binary_file(filepath, image_data, mime_type, "image/png")
     return FileReadObservation(path=filepath, content=encoded_image)
 
 
 def read_pdf_file(filepath: str) -> FileReadObservation:
     """Read and encode a PDF file."""
-    with open(filepath, 'rb') as file:
+    with open(filepath, "rb") as file:
         pdf_data = file.read()
         encoded_pdf = encode_binary_file(
-            filepath, pdf_data, 'application/pdf', 'application/pdf'
+            filepath, pdf_data, "application/pdf", "application/pdf"
         )
     return FileReadObservation(path=filepath, content=encoded_pdf)
 
 
 def read_video_file(filepath: str) -> FileReadObservation:
     """Read and encode a video file."""
-    with open(filepath, 'rb') as file:
+    with open(filepath, "rb") as file:
         video_data = file.read()
         mime_type, _ = mimetypes.guess_type(filepath)
-        encoded_video = encode_binary_file(filepath, video_data, mime_type, 'video/mp4')
+        encoded_video = encode_binary_file(filepath, video_data, mime_type, "video/mp4")
     return FileReadObservation(path=filepath, content=encoded_video)
 
 
@@ -419,9 +419,9 @@ def read_text_file(filepath: str, action: FileReadAction) -> FileReadObservation
 
     """
     if os.path.isdir(filepath):
-        raise IsADirectoryError(f'{filepath} is a directory, not a file')
+        raise IsADirectoryError(f"{filepath} is a directory, not a file")
 
-    with open(filepath, encoding='utf-8') as f:
+    with open(filepath, encoding="utf-8") as f:
         all_lines = f.readlines()
 
     start = (action.start or 1) - 1
@@ -431,7 +431,7 @@ def read_text_file(filepath: str, action: FileReadAction) -> FileReadObservation
 
     return FileReadObservation(
         path=filepath,
-        content=''.join(lines),
+        content="".join(lines),
     )
 
 
@@ -439,7 +439,7 @@ def handle_file_read_errors(filepath: str, working_dir: str) -> ErrorObservation
     """Handle file reading errors with appropriate error messages."""
     if not os.path.exists(filepath):
         candidates = os.listdir(working_dir) if os.path.isdir(working_dir) else []
-        hint = ''
+        hint = ""
         if candidates:
             import difflib
 
@@ -448,9 +448,9 @@ def handle_file_read_errors(filepath: str, working_dir: str) -> ErrorObservation
             )
             if matches:
                 hint = f' Did you mean: {", ".join(matches)}?'
-        return ErrorObservation(f'File not found: {filepath}.{hint}')
+        return ErrorObservation(f"File not found: {filepath}.{hint}")
     return ErrorObservation(
-        f'Cannot read file: {filepath} (permission denied or other error)'
+        f"Cannot read file: {filepath} (permission denied or other error)"
     )
 
 
@@ -473,26 +473,26 @@ def write_file_content(
     """
     try:
         if not file_exists:
-            with open(filepath, 'w', encoding='utf-8') as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 f.write(action.content)
         else:
-            with open(filepath, encoding='utf-8') as f:
+            with open(filepath, encoding="utf-8") as f:
                 all_lines = f.readlines()
 
             # Match backend/runtime/utils/files.py behavior for splitting
-            to_insert = action.content.split('\n')
+            to_insert = action.content.split("\n")
 
             start = (action.start or 1) - 1
             end = action.end if action.end is not None else -1
 
             new_lines = insert_lines(to_insert, all_lines, start, end)
 
-            with open(filepath, 'w', encoding='utf-8') as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 f.writelines(new_lines)
 
         return None
     except Exception as e:
-        return ErrorObservation(f'Failed to write file {filepath}: {e}')
+        return ErrorObservation(f"Failed to write file {filepath}: {e}")
 
 
 def set_file_permissions(
@@ -501,21 +501,21 @@ def set_file_permissions(
     file_stat: os.stat_result | None,
 ) -> None:
     """Set file permissions and ownership with preservation for existing files."""
-    if os.name == 'nt':
+    if os.name == "nt":
         return  # Windows doesn't support chmod/chown
 
     if file_exists and file_stat is not None:
         try:
             os.chmod(filepath, file_stat.st_mode)
-            if hasattr(os, 'chown'):
+            if hasattr(os, "chown"):
                 os.chown(filepath, file_stat.st_uid, file_stat.st_gid)
         except (OSError, PermissionError):
-            logger.debug('Could not restore permissions for %s', filepath)
+            logger.debug("Could not restore permissions for %s", filepath)
     else:
         try:
             os.chmod(filepath, 0o664)
         except (OSError, PermissionError):
-            logger.debug('Could not set default permissions for %s', filepath)
+            logger.debug("Could not set default permissions for %s", filepath)
 
 
 def handle_directory_view(full_path: str, display_path: str) -> FileEditObservation:
@@ -531,7 +531,7 @@ def handle_directory_view(full_path: str, display_path: str) -> FileEditObservat
         old_content=None,
         new_content=None,
         impl_source=FileEditSource.FILE_EDITOR,
-        diff='',
+        diff="",
     )
 
 
@@ -539,7 +539,7 @@ def _list_directory_recursive(
     dir_path: str,
     max_depth: int,
     current_depth: int = 0,
-    base_path: str = '',
+    base_path: str = "",
 ) -> tuple[list[str], int]:
     """Recursively list directory entries up to max_depth."""
     if current_depth >= max_depth:
@@ -551,7 +551,7 @@ def _list_directory_recursive(
     try:
         for entry in os.listdir(dir_path):
             # Skip hidden files/directories (starting with .)
-            if entry.startswith('.'):
+            if entry.startswith("."):
                 hidden_count += 1
                 continue
 
@@ -560,7 +560,7 @@ def _list_directory_recursive(
 
             try:
                 if os.path.isdir(entry_path):
-                    entries.append(relative_path + '/')
+                    entries.append(relative_path + "/")
                     # Recursively list subdirectories
                     sub_entries, sub_hidden = _list_directory_recursive(
                         entry_path, max_depth, current_depth + 1, relative_path
@@ -585,43 +585,40 @@ def _format_directory_listing(
     """Format directory listing for display."""
     # Sort: directories first (with /), then files
     directories = sorted(
-        [f for f in file_list if f.endswith('/')], key=lambda s: s.lower()
+        [f for f in file_list if f.endswith("/")], key=lambda s: s.lower()
     )
     files = sorted(
-        [f for f in file_list if not f.endswith('/')], key=lambda s: s.lower()
+        [f for f in file_list if not f.endswith("/")], key=lambda s: s.lower()
     )
     sorted_entries = directories + files
 
-    display_path_normalized = display_path.replace('\\', '/')
+    display_path_normalized = display_path.replace("\\", "/")
     lines = [
         f"Here's the files and directories up to 2 levels deep in {display_path_normalized}, excluding hidden items:"
     ]
 
     # Include the directory itself first (with trailing slash)
-    if not display_path_normalized.endswith('/'):
-        lines.append(f'{display_path_normalized}/')
+    if not display_path_normalized.endswith("/"):
+        lines.append(f"{display_path_normalized}/")
 
     # Then list entries inside the directory
     for entry in sorted_entries:
-        entry_normalized = entry.replace('\\', '/')
-        sep = '' if display_path_normalized.endswith('/') else '/'
-        lines.append(f'{display_path_normalized}{sep}{entry_normalized}')
+        entry_normalized = entry.replace("\\", "/")
+        sep = "" if display_path_normalized.endswith("/") else "/"
+        lines.append(f"{display_path_normalized}{sep}{entry_normalized}")
 
     if hidden_count > 0:
-        lines.append('')
+        lines.append("")
         lines.append(
-            f'{hidden_count} hidden files/directories in this directory are excluded. '
-            f'{_hidden_items_command_hint(display_path_normalized)}'
+            f"{hidden_count} hidden files/directories in this directory are excluded. "
+            f"{_hidden_items_command_hint(display_path_normalized)}"
         )
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def _hidden_items_command_hint(display_path_normalized: str) -> str:
     """Return a platform-aware hint for viewing hidden directory entries."""
-    if sys.platform == 'win32':
-        return (
-            'Use `Get-ChildItem -Force '
-            f'{display_path_normalized}` to see them.'
-        )
+    if sys.platform == "win32":
+        return "Use `Get-ChildItem -Force " f"{display_path_normalized}` to see them."
     return f"You can use 'ls -la {display_path_normalized}' to see them."  # type: ignore

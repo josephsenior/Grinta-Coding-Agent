@@ -500,7 +500,6 @@ class FileEditor:
         best_ratio = 0.0
         second_ratio = 0.0
         best_block = ''
-        best_line_matches = 0
 
         old_plain_lines = old_str.splitlines()
         old_norm_lines = [
@@ -516,7 +515,8 @@ class FileEditor:
                 self._normalize_whitespace_for_match(line).strip()
                 for line in cand_plain_lines
             ]
-            line_matches = sum(
+            # trunk-ignore(ruff/F841)
+            sum(
                 1
                 for old_line, cand_line in zip(
                     old_norm_lines,
@@ -529,7 +529,6 @@ class FileEditor:
                 second_ratio = best_ratio
                 best_ratio = ratio
                 best_block = candidate
-                best_line_matches = line_matches
             elif ratio > second_ratio:
                 second_ratio = ratio
 
