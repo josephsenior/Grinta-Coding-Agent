@@ -418,7 +418,7 @@ class TestMCPConfig:
 
     def test_legacy_server_lists_are_rejected(self):
         with pytest.raises(Exception):
-            MCPConfig(
+            MCPConfig(  # type: ignore
                 enabled=True,
                 stdio_servers=[{'name': 'legacy', 'command': 'npx', 'type': 'stdio'}],
             )

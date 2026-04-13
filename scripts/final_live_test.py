@@ -1,5 +1,7 @@
 
-import urllib.request, json, time, sys;
+import json
+import time
+import urllib.request
 
 base='http://127.0.0.1:3000'
 

@@ -84,7 +84,7 @@ class SafetyService:
     ) -> None:
         """Decide whether to mark the action as awaiting confirmation."""
         autonomy = self._context.autonomy_controller
-        controller = self._context.get_controller()
+        self._context.get_controller()
 
         if autonomy and autonomy.should_request_confirmation(action):
             action.confirmation_state = ActionConfirmationStatus.AWAITING_CONFIRMATION

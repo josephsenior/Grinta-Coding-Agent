@@ -13,8 +13,8 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.text import Text
 
-from backend.core.config import AppConfig, load_app_config
 from backend.core.app_paths import get_app_settings_root
+from backend.core.config import AppConfig, load_app_config
 
 logger = logging.getLogger(__name__)
 
@@ -288,9 +288,9 @@ def _select_provider() -> tuple[str, str | None, str | None]:
     _console.print('[bold]Choose your LLM provider[/bold]\n')
 
     # Group by category
-    cloud = [(k, l) for k, l, c in _PROVIDERS if c == 'cloud']
-    aggregator = [(k, l) for k, l, c in _PROVIDERS if c == 'aggregator']
-    local = [(k, l) for k, l, c in _PROVIDERS if c == 'local']
+    cloud = [(k, l) for k, l, c in _PROVIDERS if c == 'cloud']  # noqa: E741
+    aggregator = [(k, l) for k, l, c in _PROVIDERS if c == 'aggregator']  # noqa: E741
+    local = [(k, l) for k, l, c in _PROVIDERS if c == 'local']  # noqa: E741
 
     idx = 1
     provider_map: dict[int, tuple[str, str]] = {}

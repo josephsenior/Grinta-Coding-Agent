@@ -10,6 +10,7 @@ plugins:
       uri: https://github.com/trunk-io/plugins
 lint:
   enabled:
+    - markdownlint@0.48.0
     - git-diff-check
     - pylint@4.0.5
     - mypy@1.20.1

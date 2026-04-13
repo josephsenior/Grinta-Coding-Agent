@@ -11,7 +11,7 @@ import backend.persistence.knowledge_base.knowledge_base_store as kb_store_modul
 
 
 @pytest.fixture(autouse=True)
-def _reset_store() -> None:
+def _reset_store() -> None:  # type: ignore
     """Reset the cached global knowledge base store between tests."""
     kb_store_module._store = None
     yield

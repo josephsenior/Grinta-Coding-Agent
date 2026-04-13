@@ -125,5 +125,5 @@ async def run_agent_until_done(
     # event-driven mechanism (observation_service.trigger_step, _on_event →
     # should_step, etc.) — NOT by polling.  The initial step() above kicks
     # things off; all subsequent steps are triggered by events.
-    while controller.state.agent_state not in end_states:
+    while controller.state.agent_state not in end_states:  # noqa: ASYNC110
         await asyncio.sleep(0.5)

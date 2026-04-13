@@ -818,7 +818,7 @@ class Repl:
         from backend.core.bootstrap.setup import create_controller
 
         try:
-            bootstrap_task: asyncio.Task[None] | None = None
+            bootstrap_task: asyncio.Task[None] | None = None  # type: ignore
             config = self._config
             self._hud.update_model(get_current_model(config))
 
@@ -1024,7 +1024,7 @@ class Repl:
                     break
 
                 if not self._running:
-                    break
+                    break  # type: ignore
 
                 text = user_input.strip()
                 if not text:
@@ -1352,13 +1352,15 @@ class Repl:
                 await agent_task
             except (asyncio.CancelledError, Exception):
                 pass
-        
+
         # Hard kill underlying shells/processes
         with contextlib.suppress(Exception):
-            from backend.execution.action_execution_server import client as runtime_client
+            from backend.execution.action_execution_server import (
+                client as runtime_client,
+            )
             if runtime_client is not None:
                 await runtime_client.hard_kill()
-                
+
         # Stop orchestrator cleanly
         if self._controller is not None:
             with contextlib.suppress(Exception):

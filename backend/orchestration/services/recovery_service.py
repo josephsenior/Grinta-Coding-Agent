@@ -116,11 +116,13 @@ class RecoveryService:
 
         if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
             try:
-                from backend.ledger import EventSource
+
                 from backend.ledger.observation import AgentThinkObservation
 
                 controller.event_stream.add_event(
-                    AgentThinkObservation(content="⚠️ API Rate Limit hit. Pausing execution for exponential backoff..."),
+                    AgentThinkObservation(
+                        content='⚠️ API Rate Limit hit. Pausing execution for exponential backoff...'
+                    ),
                     EventSource.ENVIRONMENT,
                 )
 
@@ -225,7 +227,8 @@ class RecoveryService:
             return
 
         doing_steps = [
-            s for s in getattr(plan, 'steps', [])
+            s
+            for s in getattr(plan, 'steps', [])
             if getattr(s, 'status', '') == TASK_STATUS_DOING
         ]
         if not doing_steps:
@@ -244,7 +247,8 @@ class RecoveryService:
             source=f'RecoveryService.task_reconciliation({type(exc).__name__})',
         )
         logger.info(
-            'Injected task-reconciliation directive for doing steps: %s', ids,
+            'Injected task-reconciliation directive for doing steps: %s',
+            ids,
         )
 
     @staticmethod

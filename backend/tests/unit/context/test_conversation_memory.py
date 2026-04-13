@@ -214,7 +214,7 @@ class TestToolResultPropagation:
         )
 
         assert not out
-        assert json.loads(tool_messages['call_5'].content[0].text) == obs.tool_result
+        assert json.loads(tool_messages['call_5'].content[0].text) == obs.tool_result  # type: ignore
 
 
 class TestStaticHelpers:

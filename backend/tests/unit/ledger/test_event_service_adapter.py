@@ -26,9 +26,9 @@ def cleanup_adapter_streams():
         original_init(self, *args, **kwargs)
         adapters.append(self)
 
-    EventServiceAdapter.__init__ = wrapped_init
+    EventServiceAdapter.__init__ = wrapped_init  # type: ignore
     yield
-    EventServiceAdapter.__init__ = original_init
+    EventServiceAdapter.__init__ = original_init  # type: ignore
     for adapter in adapters:
         for stream in adapter._streams.values():
             stream.close()

@@ -75,7 +75,7 @@ class TestSmartConfigCache:
 
         assert 'user-1' not in cache._user_settings_cache
         assert cache._global_config_cache is None
-        assert cache._global_config_time == 0
+        assert cache._global_config_time == 0  # type: ignore
 
     def test_get_cache_stats(self):
         cache = mod.SmartConfigCache()

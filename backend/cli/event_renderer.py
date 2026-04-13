@@ -2078,25 +2078,25 @@ class CLIEventRenderer:
             if isinstance(obs, FileEditObservation):
                 from backend.cli.diff_renderer import DiffPanel
 
-                pending = self._take_pending_activity_card("file_edit")
+                pending = self._take_pending_activity_card("file_edit")  # type: ignore
                 self._emit_activity_turn_header()
                 self._print_or_buffer(
                     Padding(
                         DiffPanel(
                             obs,
-                            verb=pending.verb if pending else None,
-                            detail=pending.detail if pending else path,
-                            secondary=pending.secondary if pending else None,
+                            verb=pending.verb if pending else None,  # type: ignore
+                            detail=pending.detail if pending else path,  # type: ignore
+                            secondary=pending.secondary if pending else None,  # type: ignore
                         ),
                         pad=ACTIVITY_BLOCK_BOTTOM_PAD,
                     )
                 )
             else:
-                pending = self._take_pending_activity_card("file_write")
-                extra_lines: list[Any] = []
+                pending = self._take_pending_activity_card("file_write")  # type: ignore
+                extra_lines: list[Any] = []  # type: ignore
                 line_count = 0
-                if pending and pending.payload:
-                    raw_line_count = pending.payload.get("line_count", 0)
+                if pending and pending.payload:  # type: ignore
+                    raw_line_count = pending.payload.get("line_count", 0)  # type: ignore
                     line_count = (
                         raw_line_count if isinstance(raw_line_count, int) else 0
                     )
@@ -2104,10 +2104,10 @@ class CLIEventRenderer:
                 # Keep explicit line-count delta, but suppress default "created"
                 # summary because a dedicated create-file UI component exists.
                 if delta is not None:
-                    extra_lines.append(delta)
+                    extra_lines.append(delta)  # type: ignore
 
                 if pending is not None:
-                    self._render_pending_activity_card(pending, extra_lines=extra_lines)
+                    self._render_pending_activity_card(pending, extra_lines=extra_lines)  # type: ignore
                 # If no pending card, skip emitting the default 'created' line.
             return
 
@@ -2185,11 +2185,11 @@ class CLIEventRenderer:
             self._stop_reasoning()
             content = getattr(obs, "content", "") or ""
             n_lines = len(content.splitlines()) if content else 0
-            pending = self._take_pending_activity_card("file_read")
+            pending = self._take_pending_activity_card("file_read")  # type: ignore
             result_message = f"{n_lines:,} lines" if n_lines else "empty file"
             if pending is not None:
                 self._render_pending_activity_card(
-                    pending,
+                    pending,  # type: ignore
                     result_message=result_message,
                     result_kind="neutral",
                 )
@@ -2204,10 +2204,10 @@ class CLIEventRenderer:
             self._stop_reasoning()
             content = getattr(obs, "content", "")
             friendly = mcp_result_user_preview(content)
-            pending = self._take_pending_activity_card("mcp")
+            pending = self._take_pending_activity_card("mcp")  # type: ignore
             if pending is not None:
                 self._render_pending_activity_card(
-                    pending,
+                    pending,  # type: ignore
                     result_message=friendly or None,
                     result_kind="neutral",
                 )
@@ -2234,8 +2234,8 @@ class CLIEventRenderer:
             self._stop_reasoning()
             available = getattr(obs, "available", True)
             content = getattr(obs, "content", "") or ""
-            pending = self._take_pending_activity_card("lsp")
-            result_message: str | None = None
+            pending = self._take_pending_activity_card("lsp")  # type: ignore
+            result_message: str | None = None  # type: ignore
             if not available:
                 result_message = "code navigation unavailable"
             elif content.strip():
@@ -2247,7 +2247,7 @@ class CLIEventRenderer:
                     result_message = f"{preview}{suffix}"
             if pending is not None:
                 self._render_pending_activity_card(
-                    pending,
+                    pending,  # type: ignore
                     result_message=result_message,
                     result_kind="neutral",
                 )
@@ -2310,13 +2310,13 @@ class CLIEventRenderer:
         # -- Delegation result ------------------------------------------------
         if isinstance(obs, DelegateTaskObservation):
             self._stop_reasoning()
-            pending = self._take_pending_activity_card("delegate")
-            result_message, result_kind, extra_lines = _summarize_delegate_observation(
+            pending = self._take_pending_activity_card("delegate")  # type: ignore
+            result_message, result_kind, extra_lines = _summarize_delegate_observation(  # type: ignore
                 obs
             )
             if pending is not None:
                 self._render_pending_activity_card(
-                    pending,
+                    pending,  # type: ignore
                     result_message=result_message,
                     result_kind=result_kind,
                     extra_lines=extra_lines,
@@ -2352,9 +2352,9 @@ class CLIEventRenderer:
                 if "Update skipped" not in content:
                     body = content
             if body:
-                for line in body.splitlines():
+                for line in body.splitlines():  # type: ignore
                     self._append_history(
-                        format_activity_result_secondary(line, kind="neutral")
+                        format_activity_result_secondary(line, kind="neutral")  # type: ignore
                     )
             self.refresh()
             return

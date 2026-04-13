@@ -85,25 +85,25 @@ async def test_event_renderer_updates_metrics_and_streaming_preview() -> None:
         TokenUsage(prompt_tokens=10, completion_tokens=5, context_window=1000)
     ]
 
-    chunk = StreamingChunkAction(chunk="Hello", accumulated="Hello", is_final=False)
+    chunk = StreamingChunkAction(chunk='Hello', accumulated='Hello', is_final=False)
     chunk.source = EventSource.AGENT
     chunk.llm_metrics = metrics
 
     await renderer.handle_event(chunk)
 
-    assert renderer.streaming_preview == "Hello"
+    assert renderer.streaming_preview == 'Hello'
     assert hud.state.cost_usd == 1.25
     assert hud.state.context_tokens == 15
     assert hud.state.context_limit == 1000
 
-    final_message = MessageAction(content="Hello", wait_for_response=True)
+    final_message = MessageAction(content='Hello', wait_for_response=True)
     final_message.source = EventSource.AGENT
     await renderer.handle_event(final_message)
 
-    assert renderer.streaming_preview == ""
+    assert renderer.streaming_preview == ''
     # Agent reply printed to console (no Live active).
     output = _console_output(console)
-    assert "Hello" in output
+    assert 'Hello' in output
 
 
 @pytest.mark.asyncio
@@ -118,21 +118,21 @@ async def test_event_renderer_emits_each_duplicate_command_line() -> None:
         loop=asyncio.get_running_loop(),
     )
     renderer.start_live()
-    run1 = CmdRunAction(command="ls -F")
+    run1 = CmdRunAction(command='ls -F')
     run1.source = EventSource.AGENT
-    run2 = CmdRunAction(command="ls -F")
+    run2 = CmdRunAction(command='ls -F')
     run2.source = EventSource.AGENT
     renderer._process_event_data(run1)
     renderer._process_event_data(run2)
     # run1 is flushed when run2 arrives (orphan flush); run2 is still buffered
-    assert _transcript_needle_count(console, "$ ls -F") == 1
+    assert _transcript_needle_count(console, '$ ls -F') == 1
 
-    renderer._process_event_data(CmdOutputObservation("", command="ls -F"))
-    run3 = CmdRunAction(command="ls -F")
+    renderer._process_event_data(CmdOutputObservation('', command='ls -F'))
+    run3 = CmdRunAction(command='ls -F')
     run3.source = EventSource.AGENT
     renderer._process_event_data(run3)
     # CmdOutputObservation printed run2’s combined card; run3 is buffered (flushed when run4 or obs arrives)
-    assert _transcript_needle_count(console, "$ ls -F") == 2
+    assert _transcript_needle_count(console, '$ ls -F') == 2
 
 
 @pytest.mark.asyncio
@@ -148,19 +148,19 @@ async def test_event_renderer_repeats_identical_file_read_rows() -> None:
         loop=asyncio.get_running_loop(),
     )
     renderer.start_live()
-    r1 = FileReadAction(path="pkg/a.py")
+    r1 = FileReadAction(path='pkg/a.py')
     r1.source = EventSource.AGENT
-    other = FileEditAction(path="pkg/b.py", command="insert_text")
+    other = FileEditAction(path='pkg/b.py', command='insert_text')
     other.source = EventSource.AGENT
-    r2 = FileReadAction(path="pkg/a.py")
+    r2 = FileReadAction(path='pkg/a.py')
     r2.source = EventSource.AGENT
     renderer._process_event_data(r1)
-    renderer._process_event_data(FileReadObservation(content="a\nb", path="pkg/a.py"))
+    renderer._process_event_data(FileReadObservation(content='a\nb', path='pkg/a.py'))
     renderer._process_event_data(other)
     renderer._process_event_data(r2)
-    renderer._process_event_data(FileReadObservation(content="a\nb", path="pkg/a.py"))
-    assert _transcript_needle_count(console, "pkg/a.py") == 2
-    assert _transcript_needle_count(console, "Viewed") == 2
+    renderer._process_event_data(FileReadObservation(content='a\nb', path='pkg/a.py'))
+    assert _transcript_needle_count(console, 'pkg/a.py') == 2
+    assert _transcript_needle_count(console, 'Viewed') == 2
 
 
 @pytest.mark.asyncio
@@ -176,18 +176,18 @@ async def test_event_renderer_message_action_between_reads_both_emit_rows() -> N
         loop=asyncio.get_running_loop(),
     )
     renderer.start_live()
-    r1 = FileReadAction(path="x.py")
+    r1 = FileReadAction(path='x.py')
     r1.source = EventSource.AGENT
-    msg = MessageAction(content="Thinking out loud…", wait_for_response=False)
+    msg = MessageAction(content='Thinking out loud…', wait_for_response=False)
     msg.source = EventSource.AGENT
-    r2 = FileReadAction(path="x.py")
+    r2 = FileReadAction(path='x.py')
     r2.source = EventSource.AGENT
     renderer._process_event_data(r1)
-    renderer._process_event_data(FileReadObservation(content="alpha", path="x.py"))
+    renderer._process_event_data(FileReadObservation(content='alpha', path='x.py'))
     renderer._process_event_data(msg)
     renderer._process_event_data(r2)
-    renderer._process_event_data(FileReadObservation(content="beta", path="x.py"))
-    assert _transcript_needle_count(console, "x.py") == 2
+    renderer._process_event_data(FileReadObservation(content='beta', path='x.py'))
+    assert _transcript_needle_count(console, 'x.py') == 2
 
 
 @pytest.mark.asyncio
@@ -201,43 +201,43 @@ async def test_event_renderer_repeat_command_after_error_still_two_rows() -> Non
         loop=asyncio.get_running_loop(),
     )
     renderer.start_live()
-    run1 = CmdRunAction(command="ls -la")
+    run1 = CmdRunAction(command='ls -la')
     run1.source = EventSource.AGENT
     renderer._process_event_data(run1)
-    renderer._process_event_data(ErrorObservation(content="oops"))
-    run2 = CmdRunAction(command="ls -la")
+    renderer._process_event_data(ErrorObservation(content='oops'))
+    run2 = CmdRunAction(command='ls -la')
     run2.source = EventSource.AGENT
     renderer._process_event_data(run2)
     # run1 was flushed (orphan) by ErrorObservation; run2 is printed by its matching observation
     renderer._process_event_data(
-        CmdOutputObservation("output", exit_code=0, command="ls -la")
+        CmdOutputObservation('output', exit_code=0, command='ls -la')
     )
-    assert _transcript_needle_count(console, "$ ls -la") == 2
+    assert _transcript_needle_count(console, '$ ls -la') == 2
 
 
 def test_hud_shows_mcp_server_count_when_set() -> None:
     hud = HUDBar()
-    assert "MCP servers —" in hud._format().plain
+    assert 'MCP servers —' in hud._format().plain
     hud.update_mcp_servers(3)
-    assert "3 MCP servers" in hud._format().plain
+    assert '3 MCP servers' in hud._format().plain
     n_skills = HUDBar.count_bundled_playbook_skills()
     assert (
-        f"{n_skills} skill" in hud._format().plain
-        or f"{n_skills} skills" in hud._format().plain
+        f'{n_skills} skill' in hud._format().plain
+        or f'{n_skills} skills' in hud._format().plain
     )
 
 
 def test_hud_shows_provider_and_model_separately() -> None:
     hud = HUDBar()
-    hud.update_model("openai/google/gemini-3-flash-preview")
+    hud.update_model('openai/google/gemini-3-flash-preview')
 
     full = hud._format().plain
     compact = hud._format_compact().plain
 
-    assert "provider: google" in full
-    assert "model: gemini-3-flash-preview" in full
-    assert "openai/google" not in full
-    assert "google/gemini-3-flash-preview" in compact
+    assert 'provider: google' in full
+    assert 'model: gemini-3-flash-preview' in full
+    assert 'openai/google' not in full
+    assert 'google/gemini-3-flash-preview' in compact
 
 
 def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
@@ -245,7 +245,7 @@ def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
 
     console = _make_console()
     llm_cfg = MagicMock()
-    llm_cfg.model = "openai/google/gemini-3-flash-preview"
+    llm_cfg.model = 'openai/google/gemini-3-flash-preview'
     llm_cfg.api_key = None
 
     config = MagicMock()
@@ -253,29 +253,29 @@ def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
     config.max_budget_per_task = None
     config.cli_tool_icons = False
 
-    with patch("backend.cli.settings_tui.load_app_config", return_value=config):
+    with patch('backend.cli.settings_tui.load_app_config', return_value=config):
         _render_ai_tab(console)
 
     output = _console_output(console)
-    assert "Provider" in output
-    assert "google" in output
-    assert "Model" in output
-    assert "gemini-3-flash-preview" in output
-    assert "openai/google" not in output
+    assert 'Provider' in output
+    assert 'google' in output
+    assert 'Model' in output
+    assert 'gemini-3-flash-preview' in output
+    assert 'openai/google' not in output
 
 
 def test_hud_singular_mcp_label() -> None:
     hud = HUDBar()
     hud.update_mcp_servers(1)
-    assert "1 MCP server" in hud._format().plain
-    assert "1 MCP servers" not in hud._format().plain
+    assert '1 MCP server' in hud._format().plain
+    assert '1 MCP servers' not in hud._format().plain
 
 
 def test_confirmation_uses_backend_security_risk() -> None:
-    action = CmdRunAction(command="echo hello")
+    action = CmdRunAction(command='echo hello')
     action.security_risk = ActionSecurityRisk.HIGH
 
-    assert _risk_label(action) == ("HIGH", "bold red")
+    assert _risk_label(action) == ('HIGH', 'bold red')
 
 
 @pytest.mark.asyncio
@@ -339,15 +339,15 @@ def test_hud_marks_estimated_token_usage() -> None:
         cache_read_tokens=0,
         cache_write_tokens=0,
         context_window=8000,
-        response_id="resp-est",
+        response_id='resp-est',
         usage_estimated=True,
     )
 
     hud.update_from_llm_metrics(metrics)
 
     assert hud.state.token_usage_estimated is True
-    assert "est" in hud._format().plain
-    assert "~" in hud._format_compact().plain
+    assert 'est' in hud._format().plain
+    assert '~' in hud._format_compact().plain
 
 
 def test_hud_does_not_mark_provider_reported_usage_as_estimated() -> None:
@@ -360,14 +360,14 @@ def test_hud_does_not_mark_provider_reported_usage_as_estimated() -> None:
         cache_read_tokens=0,
         cache_write_tokens=0,
         context_window=8000,
-        response_id="resp-real",
+        response_id='resp-real',
         usage_estimated=False,
     )
 
     hud.update_from_llm_metrics(metrics)
 
     assert hud.state.token_usage_estimated is False
-    assert " est" not in hud._format().plain
+    assert ' est' not in hud._format().plain
 
 
 def test_hud_falls_back_to_response_latencies_for_call_count() -> None:
@@ -375,7 +375,7 @@ def test_hud_falls_back_to_response_latencies_for_call_count() -> None:
     metrics = Metrics()
     metrics.accumulated_cost = 0.5
     metrics.response_latencies = [
-        ResponseLatency(model="openai/gpt-4.1", latency=0.2, response_id="resp-1")
+        ResponseLatency(model='openai/gpt-4.1', latency=0.2, response_id='resp-1')
     ]
 
     hud.update_from_llm_metrics(metrics)
@@ -387,29 +387,29 @@ def test_hud_falls_back_to_response_latencies_for_call_count() -> None:
 def test_diff_panel_new_file() -> None:
     """DiffPanel should show creation info for new files."""
     obs = MagicMock()
-    obs.path = "src/main.py"
+    obs.path = 'src/main.py'
     obs.prev_exist = False
     obs.new_content = "print('hello')\nprint('world')\n"
-    obs.content = "File created"
+    obs.content = 'File created'
 
     panel = DiffPanel(obs)
     console = _make_console(width=80)
     console.print(panel)
     output = _console_output(console)
-    assert "Created" in output
-    assert "src/main.py" in output
-    assert "+ 2 lines" in output
+    assert 'Created' in output
+    assert 'src/main.py' in output
+    assert '+ 2 lines' in output
 
 
 def test_diff_panel_existing_file_with_groups() -> None:
     """DiffPanel should render edit groups for existing file edits."""
     obs = MagicMock()
-    obs.path = "README.md"
+    obs.path = 'README.md'
     obs.prev_exist = True
     obs.get_edit_groups.return_value = [
         {
-            "before_edits": ["- old line 1"],
-            "after_edits": ["+ new line 1", "+ new line 2"],
+            'before_edits': ['- old line 1'],
+            'after_edits': ['+ new line 1', '+ new line 2'],
         }
     ]
 
@@ -417,10 +417,10 @@ def test_diff_panel_existing_file_with_groups() -> None:
     console = _make_console(width=80)
     console.print(panel)
     output = _console_output(console)
-    assert "Edited" in output
-    assert "README.md" in output
-    assert "+ 2 lines" in output
-    assert "- 1 lines" in output
+    assert 'Edited' in output
+    assert 'README.md' in output
+    assert '+ 2 lines' in output
+    assert '- 1 lines' in output
 
 
 def test_show_grinta_splash_renders_logo_text() -> None:
@@ -429,9 +429,9 @@ def test_show_grinta_splash_renders_logo_text() -> None:
     output = _console_output(console)
 
     # Non-TTY StringIO console: static frame with tagline + hint (see show_grinta_splash).
-    assert "AI agent" in output
-    assert "Pure grit" in output
-    assert "Type /help to explore commands" in output
+    assert 'AI agent' in output
+    assert 'Pure grit' in output
+    assert 'Type /help to explore commands' in output
 
 
 def test_prompt_session_requires_tty_streams() -> None:
@@ -440,7 +440,7 @@ def test_prompt_session_requires_tty_streams() -> None:
     piped_stream = MagicMock()
     piped_stream.isatty.return_value = False
 
-    with patch("backend.cli.repl._prompt_toolkit_available", return_value=True):
+    with patch('backend.cli.repl._prompt_toolkit_available', return_value=True):
         assert _supports_prompt_session(interactive_stream, interactive_stream) is True
     assert _supports_prompt_session(piped_stream, interactive_stream) is False
     assert _supports_prompt_session(interactive_stream, piped_stream) is False
@@ -450,21 +450,21 @@ def test_prompt_session_requires_prompt_toolkit() -> None:
     interactive_stream = MagicMock()
     interactive_stream.isatty.return_value = True
 
-    with patch("backend.cli.repl._prompt_toolkit_available", return_value=False):
+    with patch('backend.cli.repl._prompt_toolkit_available', return_value=False):
         assert _supports_prompt_session(interactive_stream, interactive_stream) is False
 
 
 def test_prompt_toolkit_available_returns_false_when_missing() -> None:
-    original = sys.modules.get("prompt_toolkit")
-    sys.modules.pop("prompt_toolkit", None)
+    original = sys.modules.get('prompt_toolkit')
+    sys.modules.pop('prompt_toolkit', None)
     try:
-        with patch.dict("sys.modules", {"prompt_toolkit": None}):
+        with patch.dict('sys.modules', {'prompt_toolkit': None}):
             assert _prompt_toolkit_available() is False
     finally:
         if original is not None:
-            sys.modules["prompt_toolkit"] = original
+            sys.modules['prompt_toolkit'] = original
         else:
-            sys.modules.pop("prompt_toolkit", None)
+            sys.modules.pop('prompt_toolkit', None)
 
 
 def test_command_completer_suggests_matching_commands() -> None:
@@ -473,12 +473,12 @@ def test_command_completer_suggests_matching_commands() -> None:
     completer = _build_command_completer()
     completions = list(
         completer.get_completions(
-            Document("/s", cursor_position=len("/s")),
+            Document('/s', cursor_position=len('/s')),
             None,
         )
     )
 
-    assert {completion.text for completion in completions} >= {"/status", "/settings"}
+    assert {completion.text for completion in completions} >= {'/status', '/settings'}
 
 
 def test_command_completer_suggests_autonomy_levels() -> None:
@@ -487,12 +487,12 @@ def test_command_completer_suggests_autonomy_levels() -> None:
     completer = _build_command_completer()
     completions = list(
         completer.get_completions(
-            Document("/autonomy b", cursor_position=len("/autonomy b")),
+            Document('/autonomy b', cursor_position=len('/autonomy b')),
             None,
         )
     )
 
-    assert [completion.text for completion in completions] == ["balanced"]
+    assert [completion.text for completion in completions] == ['balanced']
 
 
 def test_command_completer_suggests_resume_targets() -> None:
@@ -500,18 +500,18 @@ def test_command_completer_suggests_resume_targets() -> None:
 
     completer = _build_command_completer(
         lambda: [
-            ("1", "#1 Fix authentication bug"),
-            ("session-123", "Fix authentication bug"),
+            ('1', '#1 Fix authentication bug'),
+            ('session-123', 'Fix authentication bug'),
         ]
     )
     completions = list(
         completer.get_completions(
-            Document("/resume s", cursor_position=len("/resume s")),
+            Document('/resume s', cursor_position=len('/resume s')),
             None,
         )
     )
 
-    assert [completion.text for completion in completions] == ["session-123"]
+    assert [completion.text for completion in completions] == ['session-123']
 
 
 def test_prompt_message_uses_clean_follow_up_prompt() -> None:
@@ -520,7 +520,7 @@ def test_prompt_message_uses_clean_follow_up_prompt() -> None:
     renderer.current_state = AgentState.AWAITING_USER_INPUT
     repl.set_renderer(renderer)
 
-    assert repl._prompt_message() == "❯ "
+    assert repl._prompt_message() == '❯ '
 
 
 def test_configure_redirected_streams_uses_utf8_for_non_tty() -> None:
@@ -534,7 +534,7 @@ def test_configure_redirected_streams_uses_utf8_for_non_tty() -> None:
 
     _configure_redirected_streams(redirected, interactive, None)
 
-    redirected.reconfigure.assert_called_once_with(encoding="utf-8", errors="replace")
+    redirected.reconfigure.assert_called_once_with(encoding='utf-8', errors='replace')
     interactive.reconfigure.assert_not_called()
 
 
@@ -542,28 +542,28 @@ def test_read_piped_stdin_returns_none_for_tty() -> None:
     stdin = MagicMock()
     stdin.isatty.return_value = True
 
-    with patch.object(sys, "stdin", stdin):
+    with patch.object(sys, 'stdin', stdin):
         assert _read_piped_stdin() is None
 
 
 def test_read_piped_stdin_reads_non_tty_once() -> None:
     stdin = MagicMock()
     stdin.isatty.return_value = False
-    stdin.read.return_value = "queued task\n"
+    stdin.read.return_value = 'queued task\n'
 
-    with patch.object(sys, "stdin", stdin):
-        assert _read_piped_stdin() == "queued task\n"
+    with patch.object(sys, 'stdin', stdin):
+        assert _read_piped_stdin() == 'queued task\n'
 
 
 def test_confirmation_handles_all_risk_levels() -> None:
     """All ActionSecurityRisk levels should map to readable labels."""
     for risk_val, expected_label in [
-        (ActionSecurityRisk.HIGH, "HIGH"),
-        (ActionSecurityRisk.MEDIUM, "MEDIUM"),
-        (ActionSecurityRisk.LOW, "LOW"),
-        (ActionSecurityRisk.UNKNOWN, "ASK"),
+        (ActionSecurityRisk.HIGH, 'HIGH'),
+        (ActionSecurityRisk.MEDIUM, 'MEDIUM'),
+        (ActionSecurityRisk.LOW, 'LOW'),
+        (ActionSecurityRisk.UNKNOWN, 'ASK'),
     ]:
-        action = CmdRunAction(command="test")
+        action = CmdRunAction(command='test')
         action.security_risk = risk_val
         label, _ = _risk_label(action)
         assert label == expected_label
@@ -581,14 +581,14 @@ async def test_renderer_handles_error_observation() -> None:
     )
 
     error_obs = ErrorObservation(
-        content="FileNotFoundError: x.py\nTraceback detail here"
+        content='FileNotFoundError: x.py\nTraceback detail here'
     )
     await renderer.handle_event(error_obs)
 
-    assert hud.state.ledger_status == "Error"
+    assert hud.state.ledger_status == 'Error'
     # Error panel printed to console (no Live active).
     output = _console_output(console)
-    assert "FileNotFoundError" in output
+    assert 'FileNotFoundError' in output
 
 
 @pytest.mark.asyncio
@@ -601,11 +601,11 @@ async def test_start_stop_live_flushes_items_to_console() -> None:
     )
 
     renderer.start_live()
-    renderer.add_system_message("Working…", title="grinta")
+    renderer.add_system_message('Working…', title='grinta')
     renderer.stop_live()
 
     output = _console_output(console)
-    assert "Working" in output
+    assert 'Working' in output
 
 
 @pytest.mark.asyncio
@@ -619,14 +619,14 @@ async def test_renderer_error_observation_shows_recovery_steps() -> None:
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
 
-    error_obs = ErrorObservation(content="401 Unauthorized\ninvalid api key")
+    error_obs = ErrorObservation(content='401 Unauthorized\ninvalid api key')
     await renderer.handle_event(error_obs)
 
     # Error panel printed to console (no Live active).
     output = _console_output(console)
-    assert "What you can try" in output
-    assert "/settings" in output
-    assert "update the API key" in output
+    assert 'What you can try' in output
+    assert '/settings' in output
+    assert 'update the API key' in output
 
 
 @pytest.mark.asyncio
@@ -639,13 +639,13 @@ async def test_system_error_message_shows_restart_guidance_for_init_failures() -
     )
 
     renderer.add_system_message(
-        "No API key or model configured.\nAuthenticationError: invalid api key",
-        title="error",
+        'No API key or model configured.\nAuthenticationError: invalid api key',
+        title='error',
     )
 
     output = _console_output(console)
-    assert "Restart grinta" in output
-    assert "settings.json" in output
+    assert 'Restart grinta' in output
+    assert 'settings.json' in output
 
 
 @pytest.mark.asyncio
@@ -661,16 +661,16 @@ async def test_renderer_shows_recall_observation() -> None:
     )
 
     recall_obs = RecallObservation(
-        content="recalled",
+        content='recalled',
         recall_type=RecallType.WORKSPACE_CONTEXT,
     )
     await renderer.handle_event(recall_obs)
 
     # Recall goes to reasoning panel — no console output expected
     output = _console_output(console)
-    assert output == ""
+    assert output == ''
     assert renderer._reasoning.active
-    assert "recalled" in renderer._reasoning._current_action.lower()
+    assert 'recalled' in renderer._reasoning._current_action.lower()
 
 
 def test_autonomy_command_shows_current_level() -> None:
@@ -679,31 +679,31 @@ def test_autonomy_command_shows_current_level() -> None:
     mock_renderer = MagicMock()
     repl.set_renderer(mock_renderer)
 
-    repl.handle_autonomy_command("/autonomy")
+    repl.handle_autonomy_command('/autonomy')
     mock_renderer.add_system_message.assert_called_once()
     call_text = mock_renderer.add_system_message.call_args[0][0]
-    assert "balanced" in call_text
+    assert 'balanced' in call_text
 
 
 def test_prompt_toolbar_reflects_state_and_autonomy() -> None:
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
     # PAUSED is collapsed to STOPPED in CLI — label shows "Stopped"
-    repl.set_renderer(type("RendererStub", (), {"current_state": AgentState.STOPPED})())
+    repl.set_renderer(type('RendererStub', (), {'current_state': AgentState.STOPPED})())
 
     autonomy_controller = MagicMock()
-    autonomy_controller.autonomy_level = "full"
+    autonomy_controller.autonomy_level = 'full'
     controller = MagicMock()
     controller.autonomy_controller = autonomy_controller
     repl.set_controller(controller)
-    repl._hud.update_model("openai/google/gemini-3-flash-preview")
+    repl._hud.update_model('openai/google/gemini-3-flash-preview')
 
     toolbar = repl._prompt_toolbar_text()
 
-    assert "Stopped" in toolbar
-    assert "autonomy:full" in toolbar
-    assert "Tab for commands" in toolbar
-    assert "provider: google" in toolbar
-    assert "model: gemini-3-flash-preview" in toolbar
+    assert 'Stopped' in toolbar
+    assert 'autonomy:full' in toolbar
+    assert 'Tab for commands' in toolbar
+    assert 'provider: google' in toolbar
+    assert 'model: gemini-3-flash-preview' in toolbar
 
 
 def test_unknown_command_suggests_closest_match() -> None:
@@ -711,12 +711,12 @@ def test_unknown_command_suggests_closest_match() -> None:
     mock_renderer = MagicMock()
     repl.set_renderer(mock_renderer)
 
-    result = repl.handle_command("/stat")
+    result = repl.handle_command('/stat')
 
     assert result is True
     message = mock_renderer.add_system_message.call_args[0][0]
-    assert "/status" in message
-    assert "autocomplete" in message
+    assert '/status' in message
+    assert 'autocomplete' in message
 
 
 def test_autonomy_command_sets_level() -> None:
@@ -726,13 +726,13 @@ def test_autonomy_command_sets_level() -> None:
     repl.set_renderer(mock_renderer)
 
     ac = MagicMock()
-    ac.autonomy_level = "balanced"
+    ac.autonomy_level = 'balanced'
     controller = MagicMock()
     controller.autonomy_controller = ac
     repl.set_controller(controller)
 
-    repl.handle_autonomy_command("/autonomy full")
-    assert ac.autonomy_level == "full"
+    repl.handle_autonomy_command('/autonomy full')
+    assert ac.autonomy_level == 'full'
     mock_renderer.add_system_message.assert_called_once()
 
 
@@ -740,7 +740,7 @@ def test_entry_point_rejects_legacy_serve_subcommand() -> None:
     """Entry point should reject the removed serve subcommand."""
     import sys
 
-    with patch.object(sys, "argv", ["app", "serve", "--port", "3030"]):
+    with patch.object(sys, 'argv', ['app', 'serve', '--port', '3030']):
         from backend.cli.entry import main
 
         with pytest.raises(SystemExit) as exc:
@@ -756,13 +756,13 @@ def test_entry_point_parses_model_flag() -> None:
     """--model flag should be forwarded to repl main."""
     import sys
 
-    with patch.object(sys, "argv", ["app", "--model", "openai/gpt-4.1"]):
-        with patch("backend.cli.main.main") as mock_repl:
+    with patch.object(sys, 'argv', ['app', '--model', 'openai/gpt-4.1']):
+        with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
 
             main()
             mock_repl.assert_called_once_with(
-                model="openai/gpt-4.1",
+                model='openai/gpt-4.1',
                 project=None,
                 cleanup_storage=False,
             )
@@ -772,14 +772,14 @@ def test_entry_point_parses_project_flag() -> None:
     """--project flag should be forwarded to repl main."""
     import sys
 
-    with patch.object(sys, "argv", ["app", "--project", "/tmp/myrepo"]):
-        with patch("backend.cli.main.main") as mock_repl:
+    with patch.object(sys, 'argv', ['app', '--project', '/tmp/myrepo']):
+        with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
 
             main()
             mock_repl.assert_called_once_with(
                 model=None,
-                project="/tmp/myrepo",
+                project='/tmp/myrepo',
                 cleanup_storage=False,
             )
 
@@ -788,8 +788,8 @@ def test_entry_point_parses_cleanup_storage_flag() -> None:
     """--cleanup-storage should be forwarded to repl main."""
     import sys
 
-    with patch.object(sys, "argv", ["app", "--cleanup-storage"]):
-        with patch("backend.cli.main.main") as mock_repl:
+    with patch.object(sys, 'argv', ['app', '--cleanup-storage']):
+        with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
 
             main()
@@ -806,16 +806,16 @@ def test_entry_point_parses_both_flags() -> None:
 
     with patch.object(
         sys,
-        "argv",
-        ["app", "-m", "anthropic/claude-sonnet-4-20250514", "-p", "/tmp/proj"],
+        'argv',
+        ['app', '-m', 'anthropic/claude-sonnet-4-20250514', '-p', '/tmp/proj'],
     ):
-        with patch("backend.cli.main.main") as mock_repl:
+        with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
 
             main()
             mock_repl.assert_called_once_with(
-                model="anthropic/claude-sonnet-4-20250514",
-                project="/tmp/proj",
+                model='anthropic/claude-sonnet-4-20250514',
+                project='/tmp/proj',
                 cleanup_storage=False,
             )
 
@@ -825,15 +825,15 @@ def test_entry_point_parses_cleanup_and_project_flags() -> None:
     import sys
 
     with patch.object(
-        sys, "argv", ["app", "--cleanup-storage", "--project", "/tmp/proj"]
+        sys, 'argv', ['app', '--cleanup-storage', '--project', '/tmp/proj']
     ):
-        with patch("backend.cli.main.main") as mock_repl:
+        with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
 
             main()
             mock_repl.assert_called_once_with(
                 model=None,
-                project="/tmp/proj",
+                project='/tmp/proj',
                 cleanup_storage=True,
             )
 
@@ -842,16 +842,16 @@ def test_grinta_main_parses_project_flag() -> None:
     """Grinta should parse --project even when invoked via backend.cli.main."""
     import sys
 
-    with patch.object(sys, "argv", ["grinta", "--project", "/tmp/myrepo"]):
+    with patch.object(sys, 'argv', ['grinta', '--project', '/tmp/myrepo']):
         with patch(
-            "backend.cli.main._async_main", new_callable=MagicMock
+            'backend.cli.main._async_main', new_callable=MagicMock
         ) as mock_async_main:
-            with patch("backend.cli.main.asyncio.run") as mock_asyncio_run:
+            with patch('backend.cli.main.asyncio.run') as mock_asyncio_run:
                 from backend.cli.main import main
 
                 main()
 
-    mock_async_main.assert_called_once_with(model=None, project="/tmp/myrepo")
+    mock_async_main.assert_called_once_with(model=None, project='/tmp/myrepo')
     mock_asyncio_run.assert_called_once()
 
 
@@ -859,8 +859,8 @@ def test_grinta_main_rejects_legacy_serve_subcommand() -> None:
     """Grinta main should reject the removed serve subcommand."""
     import sys
 
-    with patch.object(sys, "argv", ["grinta", "serve", "--port", "3030"]):
-        with patch("backend.cli.main.asyncio.run") as mock_asyncio_run:
+    with patch.object(sys, 'argv', ['grinta', 'serve', '--port', '3030']):
+        with patch('backend.cli.main.asyncio.run') as mock_asyncio_run:
             from backend.cli.main import main
 
             with pytest.raises(SystemExit) as exc:
@@ -874,10 +874,10 @@ def test_grinta_main_runs_cleanup_storage_without_asyncio() -> None:
     """Cleanup mode should run the one-off storage command and exit."""
     import sys
 
-    with patch.object(sys, "argv", ["grinta", "--cleanup-storage"]):
-        with patch("backend.cli.main.asyncio.run") as mock_asyncio_run:
+    with patch.object(sys, 'argv', ['grinta', '--cleanup-storage']):
+        with patch('backend.cli.main.asyncio.run') as mock_asyncio_run:
             with patch(
-                "backend.cli.storage_cleanup.run_storage_cleanup_command",
+                'backend.cli.storage_cleanup.run_storage_cleanup_command',
                 return_value=0,
             ) as mock_cleanup:
                 from backend.cli.main import main
@@ -893,27 +893,27 @@ async def test_async_main_defaults_workspace_to_cwd(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = AppConfig()
-    config.get_llm_config().model = "openai/gpt-4.1"
+    config.get_llm_config().model = 'openai/gpt-4.1'
 
     repl = MagicMock()
     repl.run = AsyncMock()
-    sim_home = tmp_path / "SIM_HOME"
+    sim_home = tmp_path / 'SIM_HOME'
     sim_home.mkdir()
-    monkeypatch.setenv("HOME", str(sim_home))
-    monkeypatch.setenv("USERPROFILE", str(sim_home))
+    monkeypatch.setenv('HOME', str(sim_home))
+    monkeypatch.setenv('USERPROFILE', str(sim_home))
 
-    with patch("backend.core.config.load_app_config", return_value=config):
-        with patch("backend.cli.main.Console", return_value=_make_console()):
-            with patch("backend.cli.repl.Repl", return_value=repl):
+    with patch('backend.core.config.load_app_config', return_value=config):
+        with patch('backend.cli.main.Console', return_value=_make_console()):
+            with patch('backend.cli.repl.Repl', return_value=repl):
                 with patch(
-                    "backend.cli.config_manager.needs_onboarding", return_value=False
+                    'backend.cli.config_manager.needs_onboarding', return_value=False
                 ):
                     with patch(
-                        "backend.cli.config_manager.ensure_default_model",
-                        return_value="openai/gpt-4.1",
+                        'backend.cli.config_manager.ensure_default_model',
+                        return_value='openai/gpt-4.1',
                     ):
-                        with patch("backend.cli.main._setup_logging"):
-                            with patch("pathlib.Path.cwd", return_value=tmp_path):
+                        with patch('backend.cli.main._setup_logging'):
+                            with patch('pathlib.Path.cwd', return_value=tmp_path):
                                 from backend.cli.main import _async_main
 
                                 await _async_main()
@@ -921,7 +921,7 @@ async def test_async_main_defaults_workspace_to_cwd(
     resolved = str(tmp_path.resolve())
     assert config.project_root == resolved
     assert config.local_data_root == get_project_local_data_root(tmp_path)
-    assert "workspaces" in config.local_data_root
+    assert 'workspaces' in config.local_data_root
     assert config.get_agent_config(config.default_agent).cli_mode is True
     repl.run.assert_awaited_once()
 
@@ -929,34 +929,34 @@ async def test_async_main_defaults_workspace_to_cwd(
 @pytest.mark.asyncio
 async def test_async_main_queues_piped_input(tmp_path: Path) -> None:
     config = AppConfig()
-    config.get_llm_config().model = "openai/gpt-4.1"
+    config.get_llm_config().model = 'openai/gpt-4.1'
 
     repl = MagicMock()
     repl.run = AsyncMock()
 
     stdin = MagicMock()
     stdin.isatty.return_value = False
-    stdin.read.return_value = "queued task\n"
+    stdin.read.return_value = 'queued task\n'
 
-    with patch.object(sys, "stdin", stdin):
-        with patch("backend.core.config.load_app_config", return_value=config):
-            with patch("backend.cli.main.Console", return_value=_make_console()):
-                with patch("backend.cli.repl.Repl", return_value=repl):
+    with patch.object(sys, 'stdin', stdin):
+        with patch('backend.core.config.load_app_config', return_value=config):
+            with patch('backend.cli.main.Console', return_value=_make_console()):
+                with patch('backend.cli.repl.Repl', return_value=repl):
                     with patch(
-                        "backend.cli.config_manager.needs_onboarding",
+                        'backend.cli.config_manager.needs_onboarding',
                         return_value=False,
                     ):
                         with patch(
-                            "backend.cli.config_manager.ensure_default_model",
-                            return_value="openai/gpt-4.1",
+                            'backend.cli.config_manager.ensure_default_model',
+                            return_value='openai/gpt-4.1',
                         ):
-                            with patch("backend.cli.main._setup_logging"):
-                                with patch("pathlib.Path.cwd", return_value=tmp_path):
+                            with patch('backend.cli.main._setup_logging'):
+                                with patch('pathlib.Path.cwd', return_value=tmp_path):
                                     from backend.cli.main import _async_main
 
                                     await _async_main()
 
-    repl.queue_initial_input.assert_called_once_with("queued task\n")
+    repl.queue_initial_input.assert_called_once_with('queued task\n')
     repl.run.assert_awaited_once()
 
 
@@ -965,25 +965,25 @@ async def test_async_main_keeps_explicit_project_override(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = AppConfig()
-    config.get_llm_config().model = "openai/gpt-4.1"
+    config.get_llm_config().model = 'openai/gpt-4.1'
     repl = MagicMock()
     repl.run = AsyncMock()
-    sim_home = tmp_path / "SIM_HOME"
+    sim_home = tmp_path / 'SIM_HOME'
     sim_home.mkdir()
-    monkeypatch.setenv("HOME", str(sim_home))
-    monkeypatch.setenv("USERPROFILE", str(sim_home))
+    monkeypatch.setenv('HOME', str(sim_home))
+    monkeypatch.setenv('USERPROFILE', str(sim_home))
 
-    with patch("backend.core.config.load_app_config", return_value=config):
-        with patch("backend.cli.main.Console", return_value=_make_console()):
-            with patch("backend.cli.repl.Repl", return_value=repl):
+    with patch('backend.core.config.load_app_config', return_value=config):
+        with patch('backend.cli.main.Console', return_value=_make_console()):
+            with patch('backend.cli.repl.Repl', return_value=repl):
                 with patch(
-                    "backend.cli.config_manager.needs_onboarding", return_value=False
+                    'backend.cli.config_manager.needs_onboarding', return_value=False
                 ):
                     with patch(
-                        "backend.cli.config_manager.ensure_default_model",
-                        return_value="openai/gpt-4.1",
+                        'backend.cli.config_manager.ensure_default_model',
+                        return_value='openai/gpt-4.1',
                     ):
-                        with patch("backend.cli.main._setup_logging"):
+                        with patch('backend.cli.main._setup_logging'):
                             from backend.cli.main import _async_main
 
                             await _async_main(project=str(tmp_path))
@@ -991,31 +991,31 @@ async def test_async_main_keeps_explicit_project_override(
     resolved = str(tmp_path.resolve())
     assert config.project_root == resolved
     assert config.local_data_root == get_project_local_data_root(tmp_path)
-    assert "workspaces" in config.local_data_root
+    assert 'workspaces' in config.local_data_root
     assert config.get_agent_config(config.default_agent).cli_mode is True
 
 
 @pytest.mark.asyncio
 async def test_repl_non_interactive_uses_queued_input_before_stdin() -> None:
     repl = Repl(_make_config(), _make_console())
-    repl.queue_initial_input("queued task\n")
+    repl.queue_initial_input('queued task\n')
 
     stdin = MagicMock()
-    stdin.readline.return_value = ""
+    stdin.readline.return_value = ''
 
-    with patch.object(sys, "stdin", stdin):
+    with patch.object(sys, 'stdin', stdin):
         result = await repl._read_non_interactive_input()
 
-    assert result == "queued task\n"
+    assert result == 'queued task\n'
     stdin.readline.assert_not_called()
 
 
 def test_find_sessions_root_uses_project_storage_sessions(tmp_path: Path) -> None:
     from backend.cli.session_manager import _find_sessions_root
 
-    sessions = tmp_path / ".grinta" / "storage" / "sessions"
+    sessions = tmp_path / '.grinta' / 'storage' / 'sessions'
     sessions.mkdir(parents=True)
-    config = AppConfig(local_data_root=str(tmp_path / ".grinta" / "storage"))
+    config = AppConfig(local_data_root=str(tmp_path / '.grinta' / 'storage'))
 
     assert _find_sessions_root(config) == sessions
 
@@ -1039,7 +1039,7 @@ async def test_cancel_agent_stops_task() -> None:
 
     assert task.cancelled()
     mock_renderer.add_system_message.assert_called_once()
-    assert "Interrupted" in mock_renderer.add_system_message.call_args[0][0]
+    assert 'Interrupted' in mock_renderer.add_system_message.call_args[0][0]
 
 
 @pytest.mark.asyncio
@@ -1049,16 +1049,16 @@ async def test_repl_run_saves_controller_state_on_exit() -> None:
     repl.set_controller(controller)
 
     async def fake_read() -> str:
-        return ""
+        return ''
 
     with (
         patch(
-            "backend.core.bootstrap.main._initialize_session_components",
-            side_effect=RuntimeError("bootstrap failed"),
+            'backend.core.bootstrap.main._initialize_session_components',
+            side_effect=RuntimeError('bootstrap failed'),
         ),
-        patch("backend.cli.repl.get_current_model", return_value="test-model"),
-        patch.object(repl, "_read_non_interactive_input", side_effect=fake_read),
-        patch("backend.cli.repl.load_app_config"),
+        patch('backend.cli.repl.get_current_model', return_value='test-model'),
+        patch.object(repl, '_read_non_interactive_input', side_effect=fake_read),
+        patch('backend.cli.repl.load_app_config'),
     ):
         await repl.run()
 
@@ -1082,10 +1082,10 @@ async def test_wait_for_agent_idle_drains_late_final_message() -> None:
     controller.get_agent_state.return_value = AgentState.AWAITING_USER_INPUT
 
     await renderer.handle_event(
-        AgentStateChangedObservation("", AgentState.AWAITING_USER_INPUT)
+        AgentStateChangedObservation('', AgentState.AWAITING_USER_INPUT)
     )
 
-    late_message = MessageAction(content="Final answer", wait_for_response=True)
+    late_message = MessageAction(content='Final answer', wait_for_response=True)
     late_message.source = EventSource.AGENT
 
     async def emit_late_message() -> None:
@@ -1097,7 +1097,7 @@ async def test_wait_for_agent_idle_drains_late_final_message() -> None:
     await emit_task
 
     output = _console_output(console)
-    assert "Final answer" in output
+    assert 'Final answer' in output
 
 
 @pytest.mark.asyncio
@@ -1120,16 +1120,16 @@ async def test_wait_for_agent_idle_default_timeout_disabled(monkeypatch) -> None
         await asyncio.sleep(999)
 
     agent_task = asyncio.create_task(never_finish())
-    tick = {"value": 0.0}
+    tick = {'value': 0.0}
 
     def _fake_monotonic() -> float:
-        tick["value"] += 10_000.0
-        return tick["value"]
+        tick['value'] += 10_000.0
+        return tick['value']
 
-    monkeypatch.delenv("APP_AGENT_HARD_TIMEOUT_SECONDS", raising=False)
-    monkeypatch.delenv("APP_AGENT_HARD_TIMEOUT_CMD_SECONDS", raising=False)
+    monkeypatch.delenv('APP_AGENT_HARD_TIMEOUT_SECONDS', raising=False)
+    monkeypatch.delenv('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS', raising=False)
 
-    with patch("backend.cli.repl.time.monotonic", side_effect=_fake_monotonic):
+    with patch('backend.cli.repl.time.monotonic', side_effect=_fake_monotonic):
         await repl._wait_for_agent_idle(controller, agent_task)
 
     assert not agent_task.cancelled()
@@ -1147,28 +1147,28 @@ async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
 
     async def fake_read() -> str:
         await asyncio.sleep(0)
-        return ""
+        return ''
 
-    def record_message(self, message: str, title: str = "system"):
+    def record_message(self, message: str, title: str = 'system'):
         events.append(message)
         return original_add_system_message(self, message, title=title)
 
     def fail_bootstrap(*_args, **_kwargs):
-        events.append("bootstrap")
-        raise RuntimeError("bootstrap failed")
+        events.append('bootstrap')
+        raise RuntimeError('bootstrap failed')
 
     with (
         patch.object(
             CLIEventRenderer,
-            "add_system_message",
+            'add_system_message',
             autospec=True,
             side_effect=record_message,
         ),
-        patch("backend.cli.repl.get_current_model", return_value="test-model"),
-        patch("backend.cli.repl._supports_prompt_session", return_value=False),
-        patch.object(repl, "_read_non_interactive_input", side_effect=fake_read),
+        patch('backend.cli.repl.get_current_model', return_value='test-model'),
+        patch('backend.cli.repl._supports_prompt_session', return_value=False),
+        patch.object(repl, '_read_non_interactive_input', side_effect=fake_read),
         patch(
-            "backend.core.bootstrap.main._initialize_session_components",
+            'backend.core.bootstrap.main._initialize_session_components',
             side_effect=fail_bootstrap,
         ),
     ):
@@ -1177,8 +1177,8 @@ async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
     assert events
     # The first system message before bootstrap should be "Initializing engine…"
     # (the old "grinta ready" message was removed — the splash covers that).
-    init_msgs = [e for e in events if e != "bootstrap"]
-    assert any("nitializ" in m for m in init_msgs) or events
+    init_msgs = [e for e in events if e != 'bootstrap']
+    assert any('nitializ' in m for m in init_msgs) or events
 
 
 @pytest.mark.asyncio
@@ -1187,25 +1187,25 @@ async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> No
     console = Console(file=io.StringIO(), force_terminal=False)
     repl = Repl(config, console)
     event_stream = MagicMock()
-    event_stream.sid = "session-1"
+    event_stream.sid = 'session-1'
     runtime = MagicMock()
     runtime.event_stream = event_stream
     memory = MagicMock()
     controller = MagicMock()
     agent = MagicMock()
     agent.config.enable_mcp = True
-    agent.mcp_capability_status = {"connected_client_count": 0}
+    agent.mcp_capability_status = {'connected_client_count': 0}
     llm_registry = MagicMock()
     conversation_stats = MagicMock()
-    acquire_result = "runtime-handle"
+    acquire_result = 'runtime-handle'
     first_message_dispatched = asyncio.Event()
     allow_mcp_finish = asyncio.Event()
     queued_inputs: asyncio.Queue[str] = asyncio.Queue()
-    await queued_inputs.put("hello\n")
+    await queued_inputs.put('hello\n')
 
     def add_event(action, source):
         del source
-        if isinstance(action, MessageAction) and action.content == "hello":
+        if isinstance(action, MessageAction) and action.content == 'hello':
             first_message_dispatched.set()
 
     async def fake_read() -> str:
@@ -1213,28 +1213,28 @@ async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> No
 
     async def fake_setup_mcp(*_args, **_kwargs) -> None:
         await allow_mcp_finish.wait()
-        agent.mcp_capability_status = {"connected_client_count": 2}
+        agent.mcp_capability_status = {'connected_client_count': 2}
 
     event_stream.add_event.side_effect = add_event
 
     with (
-        patch("backend.cli.repl.get_current_model", return_value="test-model"),
-        patch("backend.cli.repl._supports_prompt_session", return_value=False),
-        patch.object(repl, "_read_non_interactive_input", side_effect=fake_read),
+        patch('backend.cli.repl.get_current_model', return_value='test-model'),
+        patch('backend.cli.repl._supports_prompt_session', return_value=False),
+        patch.object(repl, '_read_non_interactive_input', side_effect=fake_read),
         patch.object(
             repl,
-            "_ensure_controller_loop",
+            '_ensure_controller_loop',
             new=AsyncMock(return_value=(controller, None)),
         ),
         patch.object(
             repl,
-            "_wait_for_agent_idle",
+            '_wait_for_agent_idle',
             new=AsyncMock(return_value=None),
         ),
         patch(
-            "backend.core.bootstrap.main._initialize_session_components",
+            'backend.core.bootstrap.main._initialize_session_components',
             return_value=(
-                "session-1",
+                'session-1',
                 llm_registry,
                 conversation_stats,
                 config,
@@ -1242,24 +1242,24 @@ async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> No
             ),
         ),
         patch(
-            "backend.core.bootstrap.main._setup_runtime_for_controller",
+            'backend.core.bootstrap.main._setup_runtime_for_controller',
             return_value=(runtime, None, acquire_result),
         ),
         patch(
-            "backend.core.bootstrap.main._setup_memory",
+            'backend.core.bootstrap.main._setup_memory',
             new=AsyncMock(return_value=memory),
         ) as mock_setup_memory,
         patch(
-            "backend.core.bootstrap.main._setup_mcp_tools",
+            'backend.core.bootstrap.main._setup_mcp_tools',
             new=AsyncMock(side_effect=fake_setup_mcp),
         ) as mock_setup_mcp,
-        patch("backend.execution.runtime_orchestrator.release") as mock_release,
+        patch('backend.execution.runtime_orchestrator.release') as mock_release,
     ):
         run_task = asyncio.create_task(repl.run())
         await asyncio.wait_for(first_message_dispatched.wait(), timeout=1)
         assert not allow_mcp_finish.is_set()
         allow_mcp_finish.set()
-        await queued_inputs.put("")
+        await queued_inputs.put('')
         await run_task
 
     mock_setup_memory.assert_awaited_once()
@@ -1274,19 +1274,19 @@ def test_reasoning_display_elapsed_time() -> None:
     """ReasoningDisplay should show elapsed time when active."""
     rd = ReasoningDisplay()
     with patch(
-        "backend.cli.reasoning_display.time.monotonic", side_effect=[100.0, 105.0]
+        'backend.cli.reasoning_display.time.monotonic', side_effect=[100.0, 105.0]
     ):
         rd.start()
         console = _make_console(width=80)
         console.print(rd.renderable())
     output = _console_output(console)
-    assert "5s" in output
+    assert '5s' in output
 
 
 def test_reasoning_display_stop_resets_timer() -> None:
     """stop() should reset the start time."""
     rd = ReasoningDisplay()
-    with patch("backend.cli.reasoning_display.time.monotonic", return_value=100.0):
+    with patch('backend.cli.reasoning_display.time.monotonic', return_value=100.0):
         rd.start()
     assert rd.elapsed_seconds is not None
     rd.stop()
@@ -1300,17 +1300,17 @@ def test_atomic_settings_write(tmp_path: Path) -> None:
     """_save_raw_settings should write atomically via tempfile + rename."""
     from backend.cli.config_manager import _load_raw_settings, _save_raw_settings
 
-    settings_file = tmp_path / "settings.json"
-    with patch("backend.cli.config_manager._settings_path", return_value=settings_file):
-        data = {"llm_api_key": "sk-test123", "llm_model": "test/model"}
+    settings_file = tmp_path / 'settings.json'
+    with patch('backend.cli.config_manager._settings_path', return_value=settings_file):
+        data = {'llm_api_key': 'sk-test123', 'llm_model': 'test/model'}
         _save_raw_settings(data)
 
         loaded = _load_raw_settings()
-        assert loaded["llm_api_key"] == "sk-test123"
-        assert loaded["llm_model"] == "test/model"
+        assert loaded['llm_api_key'] == 'sk-test123'
+        assert loaded['llm_model'] == 'test/model'
 
         # No stale .tmp files left behind
-        tmp_files = list(settings_file.parent.glob("*.tmp"))
+        tmp_files = list(settings_file.parent.glob('*.tmp'))
         assert not tmp_files
 
 
@@ -1320,12 +1320,12 @@ def test_get_masked_api_key_returns_not_set_when_missing() -> None:
 
     llm_cfg = MagicMock()
     llm_cfg.api_key = None
-    llm_cfg.model = "openai/gpt-4.1"
+    llm_cfg.model = 'openai/gpt-4.1'
     config = MagicMock()
     config.get_llm_config.return_value = llm_cfg
 
     with patch.dict(os.environ, {}, clear=True):
-        assert get_masked_api_key(config) == "(not set)"
+        assert get_masked_api_key(config) == '(not set)'
 
 
 def test_get_masked_api_key_reads_env_fallback() -> None:
@@ -1334,16 +1334,16 @@ def test_get_masked_api_key_reads_env_fallback() -> None:
 
     llm_cfg = MagicMock()
     llm_cfg.api_key = None
-    llm_cfg.model = ""
+    llm_cfg.model = ''
     config = MagicMock()
     config.get_llm_config.return_value = llm_cfg
 
-    with patch.dict(os.environ, {"LLM_API_KEY": "env-secret-12345678"}, clear=True):
+    with patch.dict(os.environ, {'LLM_API_KEY': 'env-secret-12345678'}, clear=True):
         masked = get_masked_api_key(config)
 
-    assert masked.startswith("env-")
-    assert masked.endswith("5678")
-    assert "•" in masked
+    assert masked.startswith('env-')
+    assert masked.endswith('5678')
+    assert '•' in masked
 
 
 def test_ensure_default_model_sets_model_from_google_key() -> None:
@@ -1355,11 +1355,11 @@ def test_ensure_default_model_sets_model_from_google_key() -> None:
     config = MagicMock()
     config.get_llm_config.return_value = llm_cfg
 
-    with patch.dict(os.environ, {"LLM_API_KEY": "AIzaSyBxxxxxxxxxxxxxxx"}, clear=True):
+    with patch.dict(os.environ, {'LLM_API_KEY': 'AIzaSyBxxxxxxxxxxxxxxx'}, clear=True):
         selected = ensure_default_model(config)
 
-    assert selected == "google/gemini-2.5-flash"
-    assert llm_cfg.model == "google/gemini-2.5-flash"
+    assert selected == 'google/gemini-2.5-flash'
+    assert llm_cfg.model == 'google/gemini-2.5-flash'
 
 
 def test_ensure_default_model_preserves_existing_model() -> None:
@@ -1367,17 +1367,17 @@ def test_ensure_default_model_preserves_existing_model() -> None:
 
     llm_cfg = MagicMock()
     llm_cfg.api_key = None
-    llm_cfg.model = "anthropic/claude-sonnet-4-20250514"
+    llm_cfg.model = 'anthropic/claude-sonnet-4-20250514'
     config = MagicMock()
     config.get_llm_config.return_value = llm_cfg
 
     with patch.dict(
-        os.environ, {"LLM_API_KEY": "sk-test12345678901234567890"}, clear=True
+        os.environ, {'LLM_API_KEY': 'sk-test12345678901234567890'}, clear=True
     ):
         selected = ensure_default_model(config)
 
-    assert selected == "anthropic/claude-sonnet-4-20250514"
-    assert llm_cfg.model == "anthropic/claude-sonnet-4-20250514"
+    assert selected == 'anthropic/claude-sonnet-4-20250514'
+    assert llm_cfg.model == 'anthropic/claude-sonnet-4-20250514'
 
 
 def test_ensure_default_model_uses_provider_specific_env_var() -> None:
@@ -1390,37 +1390,37 @@ def test_ensure_default_model_uses_provider_specific_env_var() -> None:
     config.get_llm_config.return_value = llm_cfg
 
     with patch.dict(
-        os.environ, {"OPENAI_API_KEY": "sk-test12345678901234567890"}, clear=True
+        os.environ, {'OPENAI_API_KEY': 'sk-test12345678901234567890'}, clear=True
     ):
         selected = ensure_default_model(config)
 
-    assert selected == "openai/gpt-4.1"
-    assert llm_cfg.model == "openai/gpt-4.1"
+    assert selected == 'openai/gpt-4.1'
+    assert llm_cfg.model == 'openai/gpt-4.1'
 
 
 def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
     from backend.cli.config_manager import run_onboarding
 
-    settings_file = tmp_path / "settings.json"
+    settings_file = tmp_path / 'settings.json'
     # New flow: 1) provider number (2 = Anthropic), 2) model (accept default), 3) API key
-    entered = iter(["2", "", "sk-ant-api03-test-value"])
+    entered = iter(['2', '', 'sk-ant-api03-test-value'])
     loaded_config = MagicMock()
 
-    with patch("backend.cli.config_manager._settings_path", return_value=settings_file):
+    with patch('backend.cli.config_manager._settings_path', return_value=settings_file):
         with patch(
-            "backend.cli.config_manager.Prompt.ask",
+            'backend.cli.config_manager.Prompt.ask',
             side_effect=lambda *args, **kwargs: next(entered),
         ):
             with patch(
-                "backend.cli.config_manager.load_app_config", return_value=loaded_config
+                'backend.cli.config_manager.load_app_config', return_value=loaded_config
             ):
-                with patch("os.isatty", return_value=True):
+                with patch('os.isatty', return_value=True):
                     result = run_onboarding()
 
-    saved = json.loads(settings_file.read_text(encoding="utf-8"))
-    assert saved["llm_api_key"] == "sk-ant-api03-test-value"
-    assert saved["llm_model"] == "anthropic/claude-sonnet-4-20250514"
-    assert saved["llm_provider"] == "anthropic"
+    saved = json.loads(settings_file.read_text(encoding='utf-8'))
+    assert saved['llm_api_key'] == 'sk-ant-api03-test-value'
+    assert saved['llm_model'] == 'anthropic/claude-sonnet-4-20250514'
+    assert saved['llm_provider'] == 'anthropic'
     assert result is loaded_config
 
 
@@ -1444,7 +1444,7 @@ async def test_budget_warning_at_80_percent() -> None:
     metrics.accumulated_cost = 0.85
     metrics.token_usages = [TokenUsage(prompt_tokens=100, completion_tokens=50)]
 
-    chunk = StreamingChunkAction(chunk="x", accumulated="x", is_final=False)
+    chunk = StreamingChunkAction(chunk='x', accumulated='x', is_final=False)
     chunk.source = EventSource.AGENT
     chunk.llm_metrics = metrics
 
@@ -1454,7 +1454,7 @@ async def test_budget_warning_at_80_percent() -> None:
     assert not renderer.budget_warned_100
     # Budget warning printed to console (no Live active).
     output = _console_output(console)
-    assert "Budget" in output or "budget" in output
+    assert 'Budget' in output or 'budget' in output
 
 
 @pytest.mark.asyncio
@@ -1474,7 +1474,7 @@ async def test_budget_exceeded_at_100_percent() -> None:
     metrics.accumulated_cost = 1.05
     metrics.token_usages = [TokenUsage(prompt_tokens=100, completion_tokens=50)]
 
-    chunk = StreamingChunkAction(chunk="x", accumulated="x", is_final=False)
+    chunk = StreamingChunkAction(chunk='x', accumulated='x', is_final=False)
     chunk.source = EventSource.AGENT
     chunk.llm_metrics = metrics
 
@@ -1499,7 +1499,7 @@ async def test_no_budget_warning_when_no_budget_set() -> None:
     metrics.accumulated_cost = 999.0
     metrics.token_usages = [TokenUsage(prompt_tokens=100, completion_tokens=50)]
 
-    chunk = StreamingChunkAction(chunk="x", accumulated="x", is_final=False)
+    chunk = StreamingChunkAction(chunk='x', accumulated='x', is_final=False)
     chunk.source = EventSource.AGENT
     chunk.llm_metrics = metrics
 
@@ -1520,7 +1520,7 @@ async def test_streaming_preview_renders_streaming_panel() -> None:
         loop=asyncio.get_running_loop(),
     )
 
-    chunk = StreamingChunkAction(chunk="Hello", accumulated="Hello", is_final=False)
+    chunk = StreamingChunkAction(chunk='Hello', accumulated='Hello', is_final=False)
     chunk.source = EventSource.AGENT
 
     await renderer.handle_event(chunk)
@@ -1529,8 +1529,8 @@ async def test_streaming_preview_renders_streaming_panel() -> None:
     output = _console_output(console)
 
     # _render_streaming_preview uses a titled panel so live draft text is visually separated.
-    assert "Draft reply" in output
-    assert "Hello" in output
+    assert 'Draft reply' in output
+    assert 'Hello' in output
 
 
 def test_streaming_preview_auto_scroll_shows_latest_content() -> None:
@@ -1542,17 +1542,17 @@ def test_streaming_preview_auto_scroll_shows_latest_content() -> None:
         loop=asyncio.new_event_loop(),
     )
 
-    renderer._streaming_accumulated = "\n".join(
-        [f"line {idx:03d}" for idx in range(1, 61)]
+    renderer._streaming_accumulated = '\n'.join(
+        [f'line {idx:03d}' for idx in range(1, 61)]
     )
 
     console.print(renderer._render_streaming_preview(max_width=80, max_lines=10))
     output = _console_output(console)
 
-    assert "Draft reply" in output
-    assert "auto-scroll: showing latest content" in output
-    assert "line 060" in output
-    assert "line 001" not in output
+    assert 'Draft reply' in output
+    assert 'auto-scroll: showing latest content' in output
+    assert 'line 060' in output
+    assert 'line 001' not in output
 
 
 @pytest.mark.asyncio
@@ -1568,13 +1568,13 @@ async def test_renderer_shows_command_context_for_output() -> None:
         loop=asyncio.get_running_loop(),
     )
 
-    obs = CmdOutputObservation(content="2 passed", command="python -m pytest -q")
+    obs = CmdOutputObservation(content='2 passed', command='python -m pytest -q')
     await renderer.handle_event(obs)
 
     # exit_code defaults to -1 (unknown), so renderer shows a dim error line with content snippet.
     output = _console_output(console)
-    assert "exit -1" in output
-    assert "2 passed" in output
+    assert 'exit -1' in output
+    assert '2 passed' in output
 
 
 # ── New tests: Session resume command ────────────────────────────────────
@@ -1586,9 +1586,9 @@ def test_resume_command_sets_pending() -> None:
     mock_renderer = MagicMock()
     repl.set_renderer(mock_renderer)
 
-    result = repl.handle_command("/resume 1")
+    result = repl.handle_command('/resume 1')
     assert result is True
-    assert repl.pending_resume == "1"
+    assert repl.pending_resume == '1'
 
 
 def test_resume_command_no_arg_warns() -> None:
@@ -1597,11 +1597,11 @@ def test_resume_command_no_arg_warns() -> None:
     mock_renderer = MagicMock()
     repl.set_renderer(mock_renderer)
 
-    result = repl.handle_command("/resume")
+    result = repl.handle_command('/resume')
     assert result is True
     assert repl.pending_resume is None
     mock_renderer.add_system_message.assert_called_once()
-    assert "Usage" in mock_renderer.add_system_message.call_args[0][0]
+    assert 'Usage' in mock_renderer.add_system_message.call_args[0][0]
 
 
 def test_resume_command_with_session_id() -> None:
@@ -1610,9 +1610,9 @@ def test_resume_command_with_session_id() -> None:
     mock_renderer = MagicMock()
     repl.set_renderer(mock_renderer)
 
-    result = repl.handle_command("/resume abc-def-123")
+    result = repl.handle_command('/resume abc-def-123')
     assert result is True
-    assert repl.pending_resume == "abc-def-123"
+    assert repl.pending_resume == 'abc-def-123'
 
 
 @pytest.mark.asyncio
@@ -1620,23 +1620,23 @@ async def test_resume_session_uses_persisted_session_index(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """resume_session should resolve numeric indexes from the real session storage layout."""
-    fake = tmp_path / "USER_HOME"
+    fake = tmp_path / 'USER_HOME'
     fake.mkdir()
-    monkeypatch.setenv("HOME", str(fake))
-    monkeypatch.setenv("USERPROFILE", str(fake))
+    monkeypatch.setenv('HOME', str(fake))
+    monkeypatch.setenv('USERPROFILE', str(fake))
     data_root = Path(get_project_local_data_root(tmp_path))
-    sessions_root = data_root / "sessions"
-    older = sessions_root / "session-old"
-    newer = sessions_root / "session-new"
+    sessions_root = data_root / 'sessions'
+    older = sessions_root / 'session-old'
+    newer = sessions_root / 'session-new'
     older.mkdir(parents=True)
     newer.mkdir(parents=True)
-    (older / "metadata.json").write_text(
-        json.dumps({"last_updated_at": "2026-03-29T10:00:00"}),
-        encoding="utf-8",
+    (older / 'metadata.json').write_text(
+        json.dumps({'last_updated_at': '2026-03-29T10:00:00'}),
+        encoding='utf-8',
     )
-    (newer / "metadata.json").write_text(
-        json.dumps({"last_updated_at": "2026-03-30T10:00:00"}),
-        encoding="utf-8",
+    (newer / 'metadata.json').write_text(
+        json.dumps({'last_updated_at': '2026-03-30T10:00:00'}),
+        encoding='utf-8',
     )
 
     config = AppConfig(
@@ -1650,11 +1650,11 @@ async def test_resume_session_uses_persisted_session_index(
         agent=MagicMock(),
         llm_registry=MagicMock(),
         conversation_stats=MagicMock(),
-        acquire_result="old-runtime-handle",
+        acquire_result='old-runtime-handle',
     )
 
     event_stream = MagicMock()
-    event_stream.sid = "session-new"
+    event_stream.sid = 'session-new'
     runtime = MagicMock()
     runtime.event_stream = event_stream
     memory = MagicMock()
@@ -1664,21 +1664,21 @@ async def test_resume_session_uses_persisted_session_index(
         await asyncio.sleep(0)
 
     with patch(
-        "backend.core.bootstrap.main._setup_runtime_for_controller",
-        return_value=(runtime, None, "new-runtime-handle"),
+        'backend.core.bootstrap.main._setup_runtime_for_controller',
+        return_value=(runtime, None, 'new-runtime-handle'),
     ) as mock_setup_runtime:
         with patch(
-            "backend.core.bootstrap.main._setup_memory_and_mcp",
+            'backend.core.bootstrap.main._setup_memory_and_mcp',
             new=AsyncMock(return_value=memory),
         ) as mock_setup_memory:
             with patch(
-                "backend.execution.runtime_orchestrator.release"
+                'backend.execution.runtime_orchestrator.release'
             ) as mock_release:
                 create_controller = MagicMock(return_value=(controller, MagicMock()))
                 create_status_callback = MagicMock(return_value=MagicMock())
 
                 resumed = await repl.resume_session(
-                    "1",
+                    '1',
                     config,
                     create_controller,
                     create_status_callback,
@@ -1689,11 +1689,11 @@ async def test_resume_session_uses_persisted_session_index(
     assert resumed is not None
     resumed_controller, agent_task = resumed
     assert resumed_controller is controller
-    assert mock_setup_runtime.call_args[0][2] == "session-new"
+    assert mock_setup_runtime.call_args[0][2] == 'session-new'
     mock_setup_memory.assert_awaited_once()
-    mock_release.assert_called_once_with("old-runtime-handle")
+    mock_release.assert_called_once_with('old-runtime-handle')
     renderer.reset_subscription.assert_called_once()
-    renderer.subscribe.assert_called_once_with(event_stream, "session-new")
+    renderer.subscribe.assert_called_once_with(event_stream, 'session-new')
 
     with suppress(asyncio.CancelledError):
         if not agent_task.done():
@@ -1727,16 +1727,16 @@ async def test_renderer_handles_file_read_action() -> None:
     )
     from backend.ledger.observation import FileReadObservation
 
-    action = FileReadAction(path="/workspace/src/main.py")
+    action = FileReadAction(path='/workspace/src/main.py')
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
     await renderer.handle_event(
-        FileReadObservation(content="line1\nline2", path="/workspace/src/main.py")
+        FileReadObservation(content='line1\nline2', path='/workspace/src/main.py')
     )
 
     output = _console_output(console)
-    assert "main.py" in output
-    assert "2 lines" in output
+    assert 'main.py' in output
+    assert '2 lines' in output
 
 
 @pytest.mark.asyncio
@@ -1748,11 +1748,11 @@ async def test_renderer_handles_file_read_observation() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    obs = FileReadObservation(content="line1\nline2\nline3", path="/workspace/test.py")
+    obs = FileReadObservation(content='line1\nline2\nline3', path='/workspace/test.py')
     await renderer.handle_event(obs)
     # FileReadObservation shows a dim stats continuation (path was on the action row).
     output = _console_output(console)
-    assert "3 lines" in output
+    assert '3 lines' in output
 
 
 @pytest.mark.asyncio
@@ -1765,15 +1765,15 @@ async def test_renderer_handles_mcp_action() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    action = MCPAction(name="search_code", arguments={"query": "test"})
+    action = MCPAction(name='search_code', arguments={'query': 'test'})
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
     await renderer.handle_event(MCPObservation(content='{"text": "found 3 matches"}'))
 
     output = _console_output(console)
-    assert "Searched" in output
-    assert "test" in output
-    assert "found 3 matches" in output
+    assert 'Searched' in output
+    assert 'test' in output
+    assert 'found 3 matches' in output
 
 
 @pytest.mark.asyncio
@@ -1785,10 +1785,10 @@ async def test_renderer_handles_success_observation() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    obs = SuccessObservation(content="File written successfully")
+    obs = SuccessObservation(content='File written successfully')
     await renderer.handle_event(obs)
     output = _console_output(console)
-    assert "File written successfully" in output
+    assert 'File written successfully' in output
     # SuccessObservation renders content as dim text (no '✓' prefix)
 
 
@@ -1802,15 +1802,15 @@ async def test_renderer_handles_delegate_task_action() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    action = DelegateTaskAction(task_description="Write unit tests")
+    action = DelegateTaskAction(task_description='Write unit tests')
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
-    await renderer.handle_event(DelegateTaskObservation(content="done", success=True))
+    await renderer.handle_event(DelegateTaskObservation(content='done', success=True))
 
     output = _console_output(console)
-    assert "Delegated" in output
-    assert "Write unit tests" in output
-    assert "done" in output
+    assert 'Delegated' in output
+    assert 'Write unit tests' in output
+    assert 'done' in output
 
 
 @pytest.mark.asyncio
@@ -1825,9 +1825,9 @@ async def test_renderer_summarizes_parallel_delegate_task_results() -> None:
     )
     action = DelegateTaskAction(
         parallel_tasks=[
-            {"task_description": "Analyze existing codebase and script logic"},
-            {"task_description": "Draft README updates"},
-            {"task_description": "Add regression tests"},
+            {'task_description': 'Analyze existing codebase and script logic'},
+            {'task_description': 'Draft README updates'},
+            {'task_description': 'Add regression tests'},
         ]
     )
     action.source = EventSource.AGENT
@@ -1835,21 +1835,21 @@ async def test_renderer_summarizes_parallel_delegate_task_results() -> None:
     await renderer.handle_event(
         DelegateTaskObservation(
             content=(
-                "[OK] Analyze existing codebase and script logic\n"
-                "Worker completed with status: finished\n\n"
-                "[OK] Draft README updates\n"
-                "Worker completed with status: finished\n\n"
-                "[OK] Add regression tests\n"
-                "Worker completed with status: finished"
+                '[OK] Analyze existing codebase and script logic\n'
+                'Worker completed with status: finished\n\n'
+                '[OK] Draft README updates\n'
+                'Worker completed with status: finished\n\n'
+                '[OK] Add regression tests\n'
+                'Worker completed with status: finished'
             ),
             success=True,
         )
     )
 
     output = _console_output(console)
-    assert "3 parallel tasks" in output
-    assert "all 3 workers completed" in output
-    assert "Analyze existing codebase and script logic" in output
+    assert '3 parallel tasks' in output
+    assert 'all 3 workers completed' in output
+    assert 'Analyze existing codebase and script logic' in output
 
 
 @pytest.mark.asyncio
@@ -1867,20 +1867,20 @@ async def test_renderer_shows_background_delegate_completion_without_pending_car
     await renderer.handle_event(
         DelegateTaskObservation(
             content=(
-                "[OK] Write tests\n"
-                "Worker completed with status: finished\n\n"
-                "[FAILED] Update docs\n"
-                "Agent did not finish gracefully (State: error)."
+                '[OK] Write tests\n'
+                'Worker completed with status: finished\n\n'
+                '[FAILED] Update docs\n'
+                'Agent did not finish gracefully (State: error).'
             ),
             success=False,
-            error_message="One or more parallel workers failed.",
+            error_message='One or more parallel workers failed.',
         )
     )
 
     output = _console_output(console)
-    assert "1/2 workers completed" in output
-    assert "Update docs" in output
-    assert "One or more parallel workers failed." in output
+    assert '1/2 workers completed' in output
+    assert 'Update docs' in output
+    assert 'One or more parallel workers failed.' in output
 
 
 @pytest.mark.asyncio
@@ -1896,54 +1896,54 @@ async def test_renderer_updates_worker_panel_from_delegate_progress_status() -> 
 
     await renderer.handle_event(
         StatusObservation(
-            content="Worker 1 · Starting delegated worker",
-            status_type="delegate_progress",
+            content='Worker 1 · Starting delegated worker',
+            status_type='delegate_progress',
             extras={
-                "worker_id": "worker-1",
-                "worker_label": "Worker 1",
-                "task_description": "Write unit tests for the converter",
-                "worker_status": "starting",
-                "detail": "Starting delegated worker",
-                "order": 1,
+                'worker_id': 'worker-1',
+                'worker_label': 'Worker 1',
+                'task_description': 'Write unit tests for the converter',
+                'worker_status': 'starting',
+                'detail': 'Starting delegated worker',
+                'order': 1,
             },
         )
     )
     await renderer.handle_event(
         StatusObservation(
-            content="Worker 1 · Viewed requirements.txt",
-            status_type="delegate_progress",
+            content='Worker 1 · Viewed requirements.txt',
+            status_type='delegate_progress',
             extras={
-                "worker_id": "worker-1",
-                "worker_label": "Worker 1",
-                "task_description": "Write unit tests for the converter",
-                "worker_status": "running",
-                "detail": "Viewed requirements.txt",
-                "order": 1,
+                'worker_id': 'worker-1',
+                'worker_label': 'Worker 1',
+                'task_description': 'Write unit tests for the converter',
+                'worker_status': 'running',
+                'detail': 'Viewed requirements.txt',
+                'order': 1,
             },
         )
     )
     await renderer.handle_event(
         StatusObservation(
-            content="Worker 1 · Completed converter tests",
-            status_type="delegate_progress",
+            content='Worker 1 · Completed converter tests',
+            status_type='delegate_progress',
             extras={
-                "worker_id": "worker-1",
-                "worker_label": "Worker 1",
-                "task_description": "Write unit tests for the converter",
-                "worker_status": "done",
-                "detail": "Completed converter tests",
-                "order": 1,
+                'worker_id': 'worker-1',
+                'worker_label': 'Worker 1',
+                'task_description': 'Write unit tests for the converter',
+                'worker_status': 'done',
+                'detail': 'Completed converter tests',
+                'order': 1,
             },
         )
     )
 
     renderer.stop_live()
     output = _console_output(console)
-    assert "Workers (1)" in output
-    assert "Worker 1" in output
-    assert "Write unit tests for the converter" in output
-    assert "Completed converter tests" in output
-    assert "[DONE]" in output
+    assert 'Workers (1)' in output
+    assert 'Worker 1' in output
+    assert 'Write unit tests for the converter' in output
+    assert 'Completed converter tests' in output
+    assert '[DONE]' in output
 
 
 @pytest.mark.asyncio
@@ -1956,12 +1956,12 @@ async def test_renderer_renders_finish_action_message_and_next_steps() -> None:
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
     action = PlaybookFinishAction(
-        final_thought="Completed the Markdown to HTML converter.",
+        final_thought='Completed the Markdown to HTML converter.',
         outputs={
-            "completed": ["Created md_to_html.py", "Generated sample.html"],
-            "next_steps": [
-                "Open sample.html in a browser",
-                "Replace sample.md with your real input",
+            'completed': ['Created md_to_html.py', 'Generated sample.html'],
+            'next_steps': [
+                'Open sample.html in a browser',
+                'Replace sample.md with your real input',
             ],
         },
     )
@@ -1970,9 +1970,9 @@ async def test_renderer_renders_finish_action_message_and_next_steps() -> None:
     await renderer.handle_event(action)
 
     output = _console_output(console)
-    assert "Completed the Markdown to HTML converter." in output
-    assert "Next steps" in output
-    assert "Open sample.html in a browser" in output
+    assert 'Completed the Markdown to HTML converter.' in output
+    assert 'Next steps' in output
+    assert 'Open sample.html in a browser' in output
 
 
 @pytest.mark.asyncio
@@ -1989,7 +1989,7 @@ async def test_renderer_handles_condensation_action() -> None:
     await renderer.handle_event(action)
     # CondensationAction updates reasoning panel only — no console output
     assert renderer._reasoning.active
-    assert "compress" in renderer._reasoning._current_action.lower()
+    assert 'compress' in renderer._reasoning._current_action.lower()
 
 
 @pytest.mark.asyncio
@@ -2001,12 +2001,12 @@ async def test_renderer_handles_task_tracking_action() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    action = TaskTrackingAction(command="add", thought="Track progress")
+    action = TaskTrackingAction(command='add', thought='Track progress')
     action.source = EventSource.AGENT
     # TaskTrackingAction just calls refresh() — no console output expected
     await renderer.handle_event(action)
     # No error should be raised; event is silently processed
-    assert _console_output(console) == ""
+    assert _console_output(console) == ''
 
 
 @pytest.mark.asyncio
@@ -2020,26 +2020,26 @@ async def test_renderer_task_tracking_observation_replaces_previous_panel() -> N
 
     await renderer.handle_event(
         TaskTrackingObservation(
-            content="created",
-            command="update",
+            content='created',
+            command='update',
             task_list=[
                 {
-                    "id": "1",
-                    "description": "Analyze manifest structure",
-                    "status": "todo",
+                    'id': '1',
+                    'description': 'Analyze manifest structure',
+                    'status': 'todo',
                 }
             ],
         )
     )
     await renderer.handle_event(
         TaskTrackingObservation(
-            content="updated",
-            command="update",
+            content='updated',
+            command='update',
             task_list=[
                 {
-                    "id": "1",
-                    "description": "Analyze manifest structure",
-                    "status": "doing",
+                    'id': '1',
+                    'description': 'Analyze manifest structure',
+                    'status': 'doing',
                 }
             ],
         )
@@ -2049,9 +2049,9 @@ async def test_renderer_task_tracking_observation_replaces_previous_panel() -> N
 
     renderer.stop_live()
     output = _console_output(console)
-    assert output.count("Tasks (1)") == 1
-    assert "[PENDING]" not in output
-    assert "[DOING]" in output
+    assert output.count('Tasks (1)') == 1
+    assert '[PENDING]' not in output
+    assert '[DOING]' in output
 
 
 @pytest.mark.asyncio
@@ -2066,15 +2066,15 @@ async def test_renderer_shows_noop_task_tracker_message_for_update() -> None:
     await renderer.handle_event(
         TaskTrackingObservation(
             content=(
-                "[TASK_TRACKER] Update skipped because the plan is unchanged. "
-                "Do a concrete next action now."
+                '[TASK_TRACKER] Update skipped because the plan is unchanged. '
+                'Do a concrete next action now.'
             ),
-            command="update",
+            command='update',
             task_list=[
                 {
-                    "id": "1",
-                    "description": "Analyze manifest structure",
-                    "status": "doing",
+                    'id': '1',
+                    'description': 'Analyze manifest structure',
+                    'status': 'doing',
                 }
             ],
         )
@@ -2083,8 +2083,8 @@ async def test_renderer_shows_noop_task_tracker_message_for_update() -> None:
     renderer.stop_live()
     output = _console_output(console)
     # Noop "plan is unchanged" messages are now suppressed in the renderer.
-    assert "plan is unchanged" not in output
-    assert "Tasks (1)" in output
+    assert 'plan is unchanged' not in output
+    assert 'Tasks (1)' in output
 
 
 @pytest.mark.asyncio
@@ -2098,13 +2098,13 @@ async def test_renderer_displays_done_task_state() -> None:
 
     await renderer.handle_event(
         TaskTrackingObservation(
-            content="updated",
-            command="update",
+            content='updated',
+            command='update',
             task_list=[
                 {
-                    "id": "1",
-                    "description": "Analyze manifest structure",
-                    "status": "done",
+                    'id': '1',
+                    'description': 'Analyze manifest structure',
+                    'status': 'done',
                 }
             ],
         )
@@ -2112,7 +2112,7 @@ async def test_renderer_displays_done_task_state() -> None:
 
     renderer.stop_live()
     output = _console_output(console)
-    assert "[DONE]" in output
+    assert '[DONE]' in output
 
 
 @pytest.mark.asyncio
@@ -2131,7 +2131,7 @@ async def test_renderer_hides_internal_tool_thought_payloads() -> None:
     await renderer.handle_event(action)
 
     assert reasoning.active
-    assert "symbol" in reasoning._current_action.lower()
+    assert 'symbol' in reasoning._current_action.lower()
     assert reasoning._thought_lines == []
 
 
@@ -2145,11 +2145,11 @@ async def test_renderer_ignores_agent_think_acknowledgement() -> None:
     )
 
     await renderer.handle_event(
-        AgentThinkObservation(content="Your thought has been logged.")
+        AgentThinkObservation(content='Your thought has been logged.')
     )
 
     assert reasoning._thought_lines == []
-    assert _console_output(console) == ""
+    assert _console_output(console) == ''
 
 
 @pytest.mark.asyncio
@@ -2161,10 +2161,10 @@ async def test_renderer_handles_user_reject_with_content() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    obs = UserRejectObservation(content="Too risky")
+    obs = UserRejectObservation(content='Too risky')
     await renderer.handle_event(obs)
     output = _console_output(console)
-    assert "Too risky" in output
+    assert 'Too risky' in output
 
 
 @pytest.mark.asyncio
@@ -2176,11 +2176,11 @@ async def test_renderer_handles_agent_condensation_observation() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    obs = AgentCondensationObservation(content="condensed")
+    obs = AgentCondensationObservation(content='condensed')
     # AgentCondensationObservation is handled silently (just returns)
     await renderer.handle_event(obs)
     # No error raised; event silently processed
-    assert _console_output(console) == ""
+    assert _console_output(console) == ''
 
 
 @pytest.mark.asyncio
@@ -2198,15 +2198,15 @@ async def test_renderer_prefers_actionable_npm_error_line() -> None:
             "npm error A complete log of this run can be found in: "
             "C:\\Users\\GIGABYTE\\AppData\\Local\\npm-cache\\_logs\\debug.log"
         ),
-        command="npm create vite@latest . -- --template react && npm install",
-        metadata={"exit_code": 38},
+        command='npm create vite@latest . -- --template react && npm install',
+        metadata={'exit_code': 38},
     )
 
     await renderer.handle_event(obs)
 
     output = _console_output(console)
-    assert "Could not read package.json" in output
-    assert "A complete log of this run can be found in" not in output
+    assert 'Could not read package.json' in output
+    assert 'A complete log of this run can be found in' not in output
 
 
 @pytest.mark.asyncio
@@ -2219,14 +2219,14 @@ async def test_renderer_cmd_output_head_tail_truncation() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    long_output = "A" * 5000
+    long_output = 'A' * 5000
     obs = CmdOutputObservation(
-        content=long_output, command="cat bigfile.txt", exit_code=0
+        content=long_output, command='cat bigfile.txt', exit_code=0
     )
     await renderer.handle_event(obs)
     output = _console_output(console)
     # exit_code=0: renderer shows first output line (truncated) on a dim continuation row
-    assert output.count("A") >= 120
+    assert output.count('A') >= 120
 
 
 @pytest.mark.asyncio
@@ -2237,13 +2237,13 @@ async def test_renderer_message_action_shows_attachment_indicators() -> None:
     renderer = CLIEventRenderer(
         console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
-    msg = MessageAction(content="Here is the analysis", wait_for_response=False)
+    msg = MessageAction(content='Here is the analysis', wait_for_response=False)
     msg.source = EventSource.AGENT
-    msg.file_urls = ["file1.txt", "file2.py"]
+    msg.file_urls = ['file1.txt', 'file2.py']
     await renderer.handle_event(msg)
     output = _console_output(console)
-    assert "analysis" in output
-    assert "2 file(s)" in output
+    assert 'analysis' in output
+    assert '2 file(s)' in output
 
 
 @pytest.mark.asyncio
@@ -2255,7 +2255,7 @@ async def test_renderer_cmd_run_shows_thought() -> None:
     renderer = CLIEventRenderer(
         console, hud, reasoning, loop=asyncio.get_running_loop()
     )
-    action = CmdRunAction(command="npm test", thought="Checking if tests pass")
+    action = CmdRunAction(command='npm test', thought='Checking if tests pass')
     action.source = EventSource.AGENT
     await renderer.handle_event(action)
     # CmdRunAction updates the reasoning panel (not console output directly)
@@ -2273,29 +2273,29 @@ async def test_renderer_internal_cmd_run_uses_origin_tool_title() -> None:
     )
 
     action = CmdRunAction(
-        command="python missing.py",
-        display_label="Mapping project structure (.)",
+        command='python missing.py',
+        display_label='Mapping project structure (.)',
     )
     action.source = EventSource.AGENT
     action.tool_call_metadata = MagicMock(
-        function_name="analyze_project_structure",
-        tool_call_id="call-1",
+        function_name='analyze_project_structure',
+        tool_call_id='call-1',
         total_calls_in_response=1,
     )
 
     await renderer.handle_event(action)
     await renderer.handle_event(
         CmdOutputObservation(
-            content="[MISSING_TOOL] Install with: winget install python",
+            content='[MISSING_TOOL] Install with: winget install python',
             exit_code=127,
-            command="python missing.py",
+            command='python missing.py',
         )
     )
 
     output = _console_output(console)
-    assert "Analyze project" in output
-    assert "Mapping project structure (.)" in output
-    assert "Shell" not in output
+    assert 'Analyze project' in output
+    assert 'Mapping project structure (.)' in output
+    assert 'Shell' not in output
 
 
 @pytest.mark.asyncio
@@ -2308,12 +2308,12 @@ async def test_renderer_apply_patch_output_is_collapsed_on_success() -> None:
 
     action = CmdRunAction(
         command='python -c "print("internal")"',
-        display_label="Applying patch",
+        display_label='Applying patch',
     )
     action.source = EventSource.AGENT
     action.tool_call_metadata = MagicMock(
-        function_name="apply_patch",
-        tool_call_id="call-apply-1",
+        function_name='apply_patch',
+        tool_call_id='call-apply-1',
         total_calls_in_response=1,
     )
 
@@ -2321,13 +2321,13 @@ async def test_renderer_apply_patch_output_is_collapsed_on_success() -> None:
     await renderer.handle_event(
         CmdOutputObservation(
             content=(
-                "diff --git a/foo.py b/foo.py\n"
-                "index 1111111..2222222 100644\n"
-                "--- a/foo.py\n"
-                "+++ b/foo.py\n"
-                "@@ -1,1 +1,1 @@\n"
-                "-old\n"
-                "+new\n"
+                'diff --git a/foo.py b/foo.py\n'
+                'index 1111111..2222222 100644\n'
+                '--- a/foo.py\n'
+                '+++ b/foo.py\n'
+                '@@ -1,1 +1,1 @@\n'
+                '-old\n'
+                '+new\n'
             ),
             exit_code=0,
             command='python -c "print("internal")"',
@@ -2335,14 +2335,14 @@ async def test_renderer_apply_patch_output_is_collapsed_on_success() -> None:
     )
 
     output = _console_output(console)
-    assert "Apply patch" in output
-    assert "Applying patch" in output
-    assert "succeeded" in output
-    assert "+1" in output
-    assert "-1" in output
-    assert "+...." not in output
-    assert "-...." not in output
-    assert "diff --git" not in output
+    assert 'Apply patch' in output
+    assert 'Applying patch' in output
+    assert 'succeeded' in output
+    assert '+1' in output
+    assert '-1' in output
+    assert '+....' not in output
+    assert '-....' not in output
+    assert 'diff --git' not in output
 
 
 @pytest.mark.asyncio
@@ -2355,37 +2355,37 @@ async def test_renderer_apply_patch_output_is_collapsed_on_failure() -> None:
 
     action = CmdRunAction(
         command='python -c "print("internal")"',
-        display_label="Applying patch",
+        display_label='Applying patch',
     )
     action.source = EventSource.AGENT
     action.tool_call_metadata = MagicMock(
-        function_name="apply_patch",
-        tool_call_id="call-apply-2",
+        function_name='apply_patch',
+        tool_call_id='call-apply-2',
         total_calls_in_response=1,
     )
 
     await renderer.handle_event(action)
     await renderer.handle_event(
         CmdOutputObservation(
-            content="error: corrupt patch at line 7",
+            content='error: corrupt patch at line 7',
             exit_code=1,
             command='python -c "print("internal")"',
         )
     )
 
     output = _console_output(console)
-    assert "Apply patch" in output
-    assert "Applying patch" in output
-    assert "failed" in output
-    assert "+...." not in output
-    assert "-...." not in output
+    assert 'Apply patch' in output
+    assert 'Applying patch' in output
+    assert 'failed' in output
+    assert '+....' not in output
+    assert '-....' not in output
 
 
 def test_reasoning_display_tool_icons() -> None:
     """ReasoningDisplay should show tool-specific icons."""
     rd = ReasoningDisplay()
     rd.start()
-    rd.update_action("Reading file src/main.py")
+    rd.update_action('Reading file src/main.py')
     panel = rd.renderable()
     assert panel is not None
     assert panel.padding == (0, 0)
@@ -2409,44 +2409,44 @@ def test_reasoning_display_auto_scroll_shows_latest_lines() -> None:
     rd = ReasoningDisplay()
     rd.start()
     for i in range(1, 16):
-        rd.update_thought(f"thought {i:02d}")
+        rd.update_thought(f'thought {i:02d}')
 
     console = _make_console(width=90)
     console.print(rd.renderable(max_width=90, max_lines=4))
     output = _console_output(console)
 
-    assert "auto-scroll: showing latest thoughts" in output
-    assert "thought 15" in output
-    assert "thought 06" not in output
+    assert 'auto-scroll: showing latest thoughts' in output
+    assert 'thought 15' in output
+    assert 'thought 06' not in output
 
 
 def test_hud_compact_format_for_narrow_terminal() -> None:
     """HUD should use compact format for narrow terminals."""
     hud = HUDBar()
-    hud.state.model = "openai/gpt-4.1"
+    hud.state.model = 'openai/gpt-4.1'
     hud.state.context_tokens = 5000
     hud.state.context_limit = 128000
     hud.state.cost_usd = 0.1234
     hud.state.llm_calls = 3
-    hud.state.ledger_status = "Healthy"
+    hud.state.ledger_status = 'Healthy'
 
     full = hud._format()
     compact = hud._format_compact()
     # Compact should be shorter
     assert len(compact.plain) < len(full.plain)
     # Compact should have the status icon
-    assert "●" in compact.plain
+    assert '●' in compact.plain
 
 
 def test_hud_ledger_icon() -> None:
     """HUD ledger icon returns correct single-char indicators."""
     hud = HUDBar()
-    hud.state.ledger_status = "Healthy"
-    assert hud._ledger_icon() == "●"
-    hud.state.ledger_status = "Error"
-    assert hud._ledger_icon() == "✗"
-    hud.state.ledger_status = "Paused"
-    assert hud._ledger_icon() == "⏸"
+    hud.state.ledger_status = 'Healthy'
+    assert hud._ledger_icon() == '●'
+    hud.state.ledger_status = 'Error'
+    assert hud._ledger_icon() == '✗'
+    hud.state.ledger_status = 'Paused'
+    assert hud._ledger_icon() == '⏸'
 
 
 def test_auto_detect_api_keys_finds_env_var() -> None:
@@ -2455,13 +2455,13 @@ def test_auto_detect_api_keys_finds_env_var() -> None:
 
     config = MagicMock()
     llm_cfg = MagicMock()
-    llm_cfg.model = ""
+    llm_cfg.model = ''
     config.get_llm_config.return_value = llm_cfg
 
-    with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test-key-12345"}, clear=False):
+    with patch.dict(os.environ, {'OPENAI_API_KEY': 'sk-test-key-12345'}, clear=False):
         result = auto_detect_api_keys(config)
 
-    assert result == "openai"
+    assert result == 'openai'
 
 
 def test_auto_detect_api_keys_returns_none_when_no_env() -> None:
@@ -2470,19 +2470,19 @@ def test_auto_detect_api_keys_returns_none_when_no_env() -> None:
 
     config = MagicMock()
     llm_cfg = MagicMock()
-    llm_cfg.model = "some-model"
+    llm_cfg.model = 'some-model'
     config.get_llm_config.return_value = llm_cfg
 
     # Clear all known API key env vars
     env_clear = {
-        "OPENAI_API_KEY": "",
-        "ANTHROPIC_API_KEY": "",
-        "GEMINI_API_KEY": "",
-        "XAI_API_KEY": "",
-        "GROQ_API_KEY": "",
-        "OPENROUTER_API_KEY": "",
-        "NVIDIA_API_KEY": "",
-        "LIGHTNING_API_KEY": "",
+        'OPENAI_API_KEY': '',
+        'ANTHROPIC_API_KEY': '',
+        'GEMINI_API_KEY': '',
+        'XAI_API_KEY': '',
+        'GROQ_API_KEY': '',
+        'OPENROUTER_API_KEY': '',
+        'NVIDIA_API_KEY': '',
+        'LIGHTNING_API_KEY': '',
     }
     with patch.dict(os.environ, env_clear, clear=False):
         result = auto_detect_api_keys(config)

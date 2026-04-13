@@ -898,12 +898,18 @@ class OrchestratorExecutor:
         """Return True when error came from malformed/invalid LLM tool-call output."""
         from backend.core.errors import (
             FunctionCallConversionError,
-            FunctionCallNotExistsError as CoreFunctionCallNotExistsError,
-            FunctionCallValidationError as CoreFunctionCallValidationError,
             LLMMalformedActionError,
+        )
+        from backend.core.errors import (
+            FunctionCallNotExistsError as CoreFunctionCallNotExistsError,
+        )
+        from backend.core.errors import (
+            FunctionCallValidationError as CoreFunctionCallValidationError,
         )
         from backend.engine.common import (
             FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
+        )
+        from backend.engine.common import (
             FunctionCallValidationError as CommonFunctionCallValidationError,
         )
 

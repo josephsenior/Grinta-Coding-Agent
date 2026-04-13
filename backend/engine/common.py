@@ -4,6 +4,7 @@ import json
 import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
+
 from backend.core.errors import (
     FunctionCallNotExistsError as CoreFunctionCallNotExistsError,
 )
@@ -13,7 +14,6 @@ from backend.core.errors import (
 from backend.core.logger import app_logger as logger
 from backend.inference.tool_types import make_function_chunk, make_tool_param
 from backend.ledger.action import Action
-
 
 _THINK_TAG_RE = re.compile(r'<redacted_thinking>.*?</redacted_thinking>', re.DOTALL | re.IGNORECASE)
 

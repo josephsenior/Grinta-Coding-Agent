@@ -32,27 +32,29 @@ from backend.ledger.action import CmdRunAction
 # ---------------------------------------------------------------------------
 
 _DESCRIPTION = (
-    'Apply a unified diff patch to the workspace in one atomic operation.\n\n'
-    'When to use:\n'
-    '- Renaming a symbol across multiple files\n'
-    '- Applying a pre-computed diff from `git diff` or `diff -u`\n'
-    '- Making coordinated changes across several files simultaneously\n\n'
-    'CRITICAL: `patch` must be a complete unified diff with standard headers.\n'
-    'Required lines, in order:\n'
-    '1. diff --git a/<file> b/<file>\n'
-    '2. --- a/<file> (or /dev/null for new files)\n'
-    '3. +++ b/<file> (or /dev/null for deleted files)\n'
-    '4. @@ -n,m +n,m @@\n\n'
-    'Optional but validated when present:\n'
-    '- index <old_hash>..<new_hash> [mode]\n\n'
-    'Common errors:\n'
-    '- "malformed index line" means an index header was provided but invalid.\n'
-    '- "patch does not apply" usually means hunk context does not match the file.\n\n'
-    'Always generate patches via `git diff` when possible.\n\n'
-    'After applying, the tool shows which files were modified. '
-    "Use `str_replace_editor command='view_file'` to confirm the result."
+    '**CRITICAL: Exact Format Required**\n'
+    'You MUST verify the exact target file contents and line numbers using `read_file` or `grep_search` before using this tool.\n'
+    'This tool applies a unified diff (`git diff` / `diff -u` format) to the workspace atomically.\n\n'
+    '**CORRECT USAGE EXAMPLE:**\n'
+    '```diff\n'
+    'diff --git a/path/to/file.py b/path/to/file.py\n'
+    '--- a/path/to/file.py\n'
+    '+++ b/path/to/file.py\n'
+    '@@ -12,4 +12,4 @@\n'
+    ' def my_function():\n'
+    '-    return False\n'
+    '+    return True\n'
+    '```\n\n'
+    '**STRICT REQUIREMENTS:**\n'
+    '- Must start with `diff --git a/<file> b/<file>`\n'
+    '- Followed by `--- a/<file>` (or `/dev/null` for new files)\n'
+    '- Followed by `+++ b/<file>` (or `/dev/null` for deleted files)\n'
+    '- Followed by hunk headers `@@ -n,m +n,m @@`\n'
+    '- Context lines (unchanged) must start with a single space.\n'
+    '- Added lines must start with `+`.\n'
+    '- Removed lines must start with `-`.\n'
+    '- You MUST explicitly set the `i_have_verified_file_contents_and_format` argument to `true`.\n'
 )
-
 
 def create_apply_patch_tool() -> ChatCompletionToolParam:
     """Create the apply-patch tool definition."""
@@ -68,6 +70,14 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
                     'Index line is optional, but if present it must be valid.'
                 ),
             },
+            'i_have_verified_file_contents_and_format': {
+                'type': 'boolean',
+                'description': (
+                    'You MUST explicitly set this to `true` to acknowledge that you have '
+                    'recently verify the exact file contents using `read_file` or `grep_search` '
+                    'and reviewed the correct patch format requirements.'
+                ),
+            },
             'check_only': {
                 'type': 'string',
                 'enum': ['true', 'false'],
@@ -77,7 +87,7 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
                 ),
             },
         },
-        required=['patch'],
+        required=['patch', 'i_have_verified_file_contents_and_format'],
     )
 
 
@@ -172,7 +182,7 @@ def _b64(s: str) -> str:
     return base64.b64encode(s.encode()).decode()
 
 
-def build_apply_patch_action(patch: str, check_only: bool = False) -> CmdRunAction:
+def build_apply_patch_action(patch: str, check_only: bool = False, i_have_verified_file_contents_and_format: bool = False) -> CmdRunAction:
     """Return a CmdRunAction that applies the unified diff to the workspace."""
     validation_error = validate_apply_patch_contract(patch)
     if validation_error is not None:

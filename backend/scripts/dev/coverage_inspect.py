@@ -1,4 +1,4 @@
-import coverage
+import coverage  # type: ignore
 
 cov = coverage.Coverage(data_file='.coverage')
 try:

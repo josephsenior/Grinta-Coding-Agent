@@ -10,7 +10,12 @@ from __future__ import annotations
 import os
 import re
 import subprocess
-from backend.engine.tools.ignore_filter import get_ignore_spec, prune_ignored_dirs, is_ignored_file
+
+from backend.engine.tools.ignore_filter import (
+    get_ignore_spec,
+    is_ignored_file,
+    prune_ignored_dirs,
+)
 from backend.ledger.action import AgentThinkAction
 
 ANALYZE_PROJECT_STRUCTURE_TOOL_NAME = 'analyze_project_structure'
@@ -148,7 +153,7 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
             if name in priority
             else (1, name.lower()),
         )
-        
+
     def extract_ast_summary(filepath: str) -> list[str]:
         if not filepath.endswith('.py'):
             return []
@@ -164,9 +169,9 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
                     if methods:
                         symbols.append(f"      class {node.name} (methods: {', '.join(methods[:3])}{'...' if len(methods)>3 else ''})")
                     else:
-                        symbols.append(f"      class {node.name}")
+                        symbols.append(f'      class {node.name}')
                 elif isinstance(node, ast.FunctionDef) and not node.name.startswith('_'):
-                    symbols.append(f"      def {node.name}")
+                    symbols.append(f'      def {node.name}')
             return symbols
         except Exception:
             return []
@@ -175,7 +180,7 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
         """Try to get all tracked and untracked not-ignored files via git."""
         try:
             res = subprocess.run(
-                ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                ['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
                 cwd=cwd, capture_output=True, text=False, check=True
             )
             return {f.decode('utf-8', errors='ignore') for f in res.stdout.split(b'\0') if f}
@@ -185,12 +190,12 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
     git_files = get_git_files(root)
     use_git = len(git_files) > 0
 
-    lines = [f"[ANALYZE_PROJECT_STRUCTURE] Mapping project semantic structure ({path})"]
-    lines.append("Note: Large directories are truncated. Showing key classes/functions for Python files.")
+    lines = [f'[ANALYZE_PROJECT_STRUCTURE] Mapping project semantic structure ({path})']
+    lines.append('Note: Large directories are truncated. Showing key classes/functions for Python files.')
     lines.append(
-        "Recovery hint: do not repeat this tool with identical arguments; pick a specific subpath or run a concrete test/build/runtime command next."
+        'Recovery hint: do not repeat this tool with identical arguments; pick a specific subpath or run a concrete test/build/runtime command next.'
     )
-    
+
     emitted = 0
     max_total_items = float('inf')  # No hard limit on total items
     max_files_per_dir = 50
@@ -206,17 +211,17 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
         lines.append('<dir> ' + key)
         emitted_dirs.add(key)
         emitted += 1
-    
+
     for current_root, dirnames, filenames in os.walk(root):
         relative_root = os.path.relpath(current_root, root)
         current_depth = rel_depth(relative_root)
-        
+
         # Prune ignored directories using pathspec to prevent traversing into them
         prune_ignored_dirs(root, current_root, dirnames, spec)
         # Always manually prune .git since it's typically not in .gitignore
         if '.git' in dirnames:
             dirnames.remove('.git')
-            
+
         dirnames.sort()
 
         # Surface directories before files so important folder navigation is immediate.
@@ -249,27 +254,27 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
                 for f in sort_files(filenames)
                 if not is_ignored_file(root, current_root, f, spec)
             ]
-            
+
         shown_files = valid_filenames[:max_files_per_dir]
         hidden_files = len(valid_filenames) - len(shown_files)
 
         for filename in shown_files:
             full_path = os.path.join(current_root, filename)
             relative_path = os.path.relpath(full_path, root).replace(os.sep, '/')
-            
-            lines.append(f"  {relative_path}")
+
+            lines.append(f'  {relative_path}')
             emitted += 1
-            
+
             # AST extraction purely in Python
             summary = extract_ast_summary(full_path)
             for sym in summary:
                 lines.append(sym)
                 emitted += 1
-                
+
             if emitted >= max_total_items:
-                lines.append(f"\n(Output truncated at {max_total_items} total items. Try lower depth or a more specific path directory.)")
+                lines.append(f'\n(Output truncated at {max_total_items} total items. Try lower depth or a more specific path directory.)')
                 break
-                
+
         if hidden_files > 0 and emitted < max_total_items:
             hint_path = relative_root.replace(os.sep, '/') or '.'
             lines.append(f"  ... and {hidden_files} more files inside {relative_root or '.'} hidden. Use path='{hint_path}' to explore.")
@@ -277,32 +282,32 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
 
         if emitted >= max_total_items:
             break
-            
+
     return AgentThinkAction(thought='\n'.join(lines))
 
 def _build_imports_action(path: str) -> AgentThinkAction:
     """Show what a file imports AND what other files import it."""
-    out = [f"=== IMPORTS IN {os.path.basename(path)} ==="]
+    out = [f'=== IMPORTS IN {os.path.basename(path)} ===']
     if os.path.isfile(path):
         try:
             with open(path, 'r', encoding='utf-8', errors='ignore') as f:
                 for i, line in enumerate(f, 1):
                     if line.startswith('import ') or line.startswith('from '):
-                        out.append(f"{i}:{line.rstrip()}")
+                        out.append(f'{i}:{line.rstrip()}')
         except Exception as e:
             out.append(f'(error reading file: {e})')
     else:
         out.append('(file not found)')
-        
-    out.append("")
-    out.append("=== FILES THAT IMPORT THIS MODULE ===")
+
+    out.append('')
+    out.append('=== FILES THAT IMPORT THIS MODULE ===')
     basename = os.path.splitext(os.path.basename(path))[0]
-    
+
     # Try ripgrep first
     import shutil
     rg = shutil.which('rg')
     found_any = False
-    
+
     if rg:
         try:
             res = subprocess.run([
@@ -315,23 +320,23 @@ def _build_imports_action(path: str) -> AgentThinkAction:
                 found_any = bool(lines)
         except Exception:
             pass
-            
+
     if not found_any:
         # Fallback to python traversal
         count = 0
         import_re = re.compile(f'(import|from).*{re.escape(basename)}')
         root = os.getcwd() # Or some relevant root
         spec = get_ignore_spec(root)
-        
+
         for root_dir, dirs, files in os.walk('.'):
             # Use same robust filtering
             prune_ignored_dirs(root, root_dir, dirs, spec)
-            
-            for f in files:
-                if f.endswith('.py'):
-                    if is_ignored_file(root, root_dir, f, spec):
+
+            for f in files:  # type: ignore
+                if f.endswith('.py'):  # type: ignore
+                    if is_ignored_file(root, root_dir, f, spec):  # type: ignore
                         continue
-                    fpath = os.path.join(root_dir, f)
+                    fpath = os.path.join(root_dir, f)  # type: ignore
                     try:
                         with open(fpath, 'r', encoding='utf-8', errors='ignore') as fl:
                             if import_re.search(fl.read()):
@@ -344,13 +349,13 @@ def _build_imports_action(path: str) -> AgentThinkAction:
             if count >= 30:
                 break
         if count == 0:
-            out.append("(no reverse imports found)")
-            
+            out.append('(no reverse imports found)')
+
     return AgentThinkAction(thought='\n'.join(out))
 
 def _build_symbols_action(path: str) -> AgentThinkAction:
     """List classes, functions, and top-level assignments in a file."""
-    out = [f"=== SYMBOLS IN {os.path.basename(path)} ==="]
+    out = [f'=== SYMBOLS IN {os.path.basename(path)} ===']
     if os.path.isfile(path):
         sym_re = re.compile(r'^(class |def |async def |[A-Z_][A-Z_0-9]* *=)')
         try:
@@ -358,21 +363,21 @@ def _build_symbols_action(path: str) -> AgentThinkAction:
                 count = 0
                 for i, line in enumerate(f, 1):
                     if sym_re.match(line):
-                        out.append(f"{i}:{line.rstrip()}")
+                        out.append(f'{i}:{line.rstrip()}')
                         count += 1
                         if count >= 100:
                             break
                 if count == 0:
-                    out.append("(no symbols found)")
+                    out.append('(no symbols found)')
         except Exception as e:
-            out.append(f"(error reading file: {e})")
+            out.append(f'(error reading file: {e})')
     else:
         out.append('(file not found)')
     return AgentThinkAction(thought='\n'.join(out))
 
 def _build_recent_action() -> AgentThinkAction:
     """Recently modified files via git log."""
-    out = ["=== RECENTLY MODIFIED FILES (last 20 commits) ==="]
+    out = ['=== RECENTLY MODIFIED FILES (last 20 commits) ===']
     try:
         res = subprocess.run(
             ['git', 'log', '--oneline', '--name-only', '-20', '--pretty=format:%h %s'],
@@ -389,14 +394,14 @@ def _build_recent_action() -> AgentThinkAction:
 def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
     """Find all files that reference a given symbol (function, class, variable)."""
     trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
-    out = [f"=== CALLERS OF {trunc_sym} ==="]
-    
+    out = [f'=== CALLERS OF {trunc_sym} ===']
+
     import shutil
     rg = shutil.which('rg')
     safe_scope = scope if scope and scope != '.' else '.'
     root = os.path.abspath('.')
     spec = get_ignore_spec(root)
-    
+
     if rg:
         try:
             res = subprocess.run([
@@ -411,13 +416,13 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
                 return AgentThinkAction(thought='\n'.join(out))
         except Exception:
             pass
-            
+
     # Python fallback
     sym_re = re.compile(rf'\b{re.escape(symbol)}\b')
     count = 0
     for root_dir, dirs, files in os.walk(safe_scope):
         prune_ignored_dirs(root, root_dir, dirs, spec)
-        
+
         for f in files:
             if is_ignored_file(root, root_dir, f, spec):
                 continue
@@ -427,7 +432,7 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
                     with open(fpath, 'r', encoding='utf-8', errors='ignore') as fl:
                         for i, line in enumerate(fl, 1):
                             if sym_re.search(line):
-                                out.append(f"{fpath}:{i}:{line.rstrip()}")
+                                out.append(f'{fpath}:{i}:{line.rstrip()}')
                                 count += 1
                                 if count >= 50:
                                     break
@@ -437,9 +442,9 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
                 break
         if count >= 50:
             break
-            
+
     if count == 0:
-        out.append(f"(no references found for {trunc_sym})")
+        out.append(f'(no references found for {trunc_sym})')
     return AgentThinkAction(thought='\n'.join(out))
 
 def _build_test_coverage_action(path: str) -> AgentThinkAction:
@@ -447,17 +452,17 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
     basename = os.path.splitext(os.path.basename(path))[0]
     dirname = os.path.dirname(path) or '.'
     out = [
-        f"=== TEST COVERAGE FOR {os.path.basename(path)} ===",
-        "--- Tests by naming convention ---"
+        f'=== TEST COVERAGE FOR {os.path.basename(path)} ===',
+        '--- Tests by naming convention ---'
     ]
-    
+
     root = os.path.abspath('.')
     spec = get_ignore_spec(root)
-    
+
     name_re = re.compile(rf'^(test_{re.escape(basename)}\.py|{re.escape(basename)}_test\.py)$')
     count = 0
     test_files = []
-    
+
     for root_dir, dirs, files in os.walk('.'):
         prune_ignored_dirs(root, root_dir, dirs, spec)
         for f in files:
@@ -466,19 +471,19 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
             if name_re.match(f):
                 test_files.append(os.path.join(root_dir, f))
                 count += 1
-                if count >= 20: break
-        if count >= 20: break
-        
+                if count >= 20: break  # noqa: E701
+        if count >= 20: break  # noqa: E701
+
     out.extend(test_files)
     if not test_files:
-        out.append("(none)")
-        
-    out.append("")
-    out.append("--- Tests that import this module ---")
+        out.append('(none)')
+
+    out.append('')
+    out.append('--- Tests that import this module ---')
     import_re = re.compile(rf'(import|from).*{re.escape(basename)}')
     count = 0
     import_test_files = []
-    
+
     for root_dir, dirs, files in os.walk('.'):
         prune_ignored_dirs(root, root_dir, dirs, spec)
         for f in files:
@@ -493,17 +498,17 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
                         if import_re.search(fl.read()):
                             import_test_files.append(fpath)
                             count += 1
-                            if count >= 20: break
+                            if count >= 20: break  # noqa: E701
                 except Exception:
                     pass
-        if count >= 20: break
-        
+        if count >= 20: break  # noqa: E701
+
     out.extend(import_test_files)
     if not import_test_files:
-        out.append("(no importing test files found)")
-        
-    out.append("")
-    out.append("--- Conftest files in scope ---")
+        out.append('(no importing test files found)')
+
+    out.append('')
+    out.append('--- Conftest files in scope ---')
     count = 0
     conftest_files = []
     for root_dir, dirs, files in os.walk(dirname):
@@ -514,26 +519,27 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
             if f == 'conftest.py':
                 conftest_files.append(os.path.join(root_dir, f))
                 count += 1
-                if count >= 10: break
-        if count >= 10: break
-        
+                if count >= 10: break  # noqa: E701
+        if count >= 10: break  # noqa: E701
+
     out.extend(conftest_files)
     if not conftest_files:
-        out.append("(none)")
-        
+        out.append('(none)')
+
     return AgentThinkAction(thought='\n'.join(out))
 
 def _build_semantic_search_action(symbol: str, path: str) -> AgentThinkAction:
     """Robust AST-based reference search using the semantic_analyzer script."""
     import sys
+
     import backend.engine.tools.semantic_analyzer as sa
-    
+
     script_path = sa.__file__
     try:
         res = subprocess.run(
             [sys.executable, script_path, 'find_references', symbol, path],
             capture_output=True, text=True, check=False
         )
-        return AgentThinkAction(thought=res.stdout if res.stdout.strip() else f"(no output from semantic search for {symbol})")
+        return AgentThinkAction(thought=res.stdout if res.stdout.strip() else f'(no output from semantic search for {symbol})')
     except Exception as e:
-        return AgentThinkAction(thought=f"(error running semantic search: {e})")
+        return AgentThinkAction(thought=f'(error running semantic search: {e})')

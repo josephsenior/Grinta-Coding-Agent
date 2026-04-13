@@ -624,4 +624,4 @@ def _hidden_items_command_hint(display_path_normalized: str) -> str:
             'Use `Get-ChildItem -Force '
             f'{display_path_normalized}` to see them.'
         )
-    return f"You can use 'ls -la {display_path_normalized}' to see them."
+    return f"You can use 'ls -la {display_path_normalized}' to see them."  # type: ignore

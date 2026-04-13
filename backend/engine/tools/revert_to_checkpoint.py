@@ -100,9 +100,9 @@ def build_revert_to_checkpoint_action(arguments: dict) -> AgentThinkAction:
         resolved_id = latest.id
         target_label = 'latest checkpoint'
     else:
-        resolved_id = _resolve_rollback_id(checkpoint_id, manager)
+        resolved_id = _resolve_rollback_id(checkpoint_id, manager)  # type: ignore
         if resolved_id is None:
-            return _revert_result(
+            return _revert_result(  # type: ignore
                 ok=False,
                 status='failed',
                 reason_code='CHECKPOINT_NOT_FOUND',

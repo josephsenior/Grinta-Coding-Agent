@@ -34,6 +34,7 @@ class TestImportFrom:
     def test_import_type(self):
         """Test importing a type."""
         result = import_from('typing.List')
+
         import typing
 
         assert result is typing.List

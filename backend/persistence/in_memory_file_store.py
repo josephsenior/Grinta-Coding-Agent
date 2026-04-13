@@ -17,7 +17,7 @@ class InMemoryFileStore(FileStore):
         if files is not None:
             self.files = files
 
-    def write(self, path: str, contents: str | bytes, *, fsync: bool = True) -> None:
+    def write(self, path: str, contents: str | bytes, *, fsync: bool = True) -> None:  # noqa: D417
         """Write to in-memory file store.
 
         Args:

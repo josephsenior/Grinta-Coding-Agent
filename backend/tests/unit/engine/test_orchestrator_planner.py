@@ -148,7 +148,7 @@ class TestQueuedActionThrottling:
         orch.deferred_actions = deque()
 
         actions = [AgentThinkAction(thought=f'a{i}') for i in range(5)]
-        orch._queue_additional_actions(actions)
+        orch._queue_additional_actions(actions)  # type: ignore
 
         assert len(orch.pending_actions) == 5
         assert len(orch.deferred_actions) == 0
@@ -159,7 +159,7 @@ class TestQueuedActionThrottling:
         orch.deferred_actions = deque(
             [AgentThinkAction(thought='a'), AgentThinkAction(thought='b')]
         )
-        orch._deferred_actions_require_replan = False
+        orch._deferred_actions_require_replan = False  # type: ignore
 
         orch._promote_deferred_actions()
 
@@ -182,15 +182,15 @@ def test_execute_llm_step_async_offloads_message_preparation_to_thread():
     orch = Orchestrator.__new__(Orchestrator)
     orch.pending_actions = deque()
     orch.deferred_actions = deque()
-    orch._deferred_actions_require_replan = False
+    orch._deferred_actions_require_replan = False  # type: ignore
     orch.memory_manager = MagicMock()
     orch.memory_manager.get_initial_user_message.return_value = MagicMock()
     orch.memory_manager.build_messages.return_value = []
     orch.planner = MagicMock()
     orch.planner.build_llm_params.return_value = {'messages': []}
     orch.executor = MagicMock()
-    orch._sync_executor_llm = MagicMock()
-    orch._set_prompt_tier_from_recent_history = MagicMock()
+    orch._sync_executor_llm = MagicMock()  # type: ignore
+    orch._set_prompt_tier_from_recent_history = MagicMock()  # type: ignore
     orch.llm = MagicMock()
     orch.llm.config = MagicMock()
     orch.tools = []

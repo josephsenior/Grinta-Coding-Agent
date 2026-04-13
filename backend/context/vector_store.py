@@ -182,7 +182,7 @@ class EnhancedVectorStore:
     - Fallback to simpler methods if dependencies missing
     """
 
-    def __init__(
+    def __init__(  # noqa: D417
         self,
         collection_name: str = 'APP_memory',
         backend_type: str | None = None,

@@ -60,7 +60,6 @@ from backend.engine.tools.memory_manager import (
 from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.note import build_note_action, build_recall_action
 from backend.engine.tools.prompt import build_python_exec_command
-from backend.engine.tools.whitespace_handler import WhitespaceHandler
 from backend.engine.tools.revert_to_checkpoint import (
     REVERT_TO_CHECKPOINT_TOOL_NAME,
     build_revert_to_checkpoint_action,
@@ -91,6 +90,7 @@ from backend.engine.tools.verify_ui import (
     VERIFY_UI_CHANGE_TOOL_NAME,
     build_verify_ui_change_action,
 )
+from backend.engine.tools.whitespace_handler import WhitespaceHandler
 from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
 from backend.ledger.action import (
     Action,

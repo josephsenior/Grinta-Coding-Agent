@@ -16,7 +16,6 @@ from backend.core.errors import PlaybookValidationError
 from backend.core.logger import app_logger as logger
 from backend.playbooks.engine.types import InputMetadata, PlaybookMetadata, PlaybookType
 
-
 AUTO_TRIGGER_ENV_VAR = 'GRINTA_ENABLE_PLAYBOOK_AUTO_TRIGGER'
 AUTO_TRIGGER_ENABLED = (
     os.environ.get(AUTO_TRIGGER_ENV_VAR, '').strip().lower()

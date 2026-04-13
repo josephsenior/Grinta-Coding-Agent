@@ -18,16 +18,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from client import AppClient
 
-BASE_URL = os.environ.get("APP_BASE_URL", "http://127.0.0.1:3000")
+BASE_URL = os.environ.get('APP_BASE_URL', 'http://127.0.0.1:3000')
 APP_ROOT = Path(__file__).resolve().parents[1]
-WORKSPACE_ROOT = Path(r"C:\Users\GIGABYTE\Desktop\New folder")
-EVAL_WORKSPACE = WORKSPACE_ROOT / "agent_eval_workspace"
-RESULTS_PATH = APP_ROOT / "live_server_direct_eval_results.json"
-SERVER_LOG_PATH = APP_ROOT / "live_server_direct_eval_server.log"
+WORKSPACE_ROOT = Path(r'C:\Users\GIGABYTE\Desktop\New folder')
+EVAL_WORKSPACE = WORKSPACE_ROOT / 'agent_eval_workspace'
+RESULTS_PATH = APP_ROOT / 'live_server_direct_eval_results.json'
+SERVER_LOG_PATH = APP_ROOT / 'live_server_direct_eval_server.log'
 
 
 def save_results(results: dict[str, Any]) -> None:
-    RESULTS_PATH.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    RESULTS_PATH.write_text(json.dumps(results, indent=2), encoding='utf-8')
 
 
 @dataclass
@@ -41,21 +41,21 @@ class ScenarioTrace:
 
     def record(self, event: dict[str, Any]) -> None:
         self.events.append(event)
-        event_id = event.get("id")
+        event_id = event.get('id')
         if isinstance(event_id, int):
             self.last_event_id = max(self.last_event_id, event_id)
-        extras = event.get("extras") or {}
-        state = extras.get("agent_state") if isinstance(extras, dict) else None
+        extras = event.get('extras') or {}
+        state = extras.get('agent_state') if isinstance(extras, dict) else None
         if isinstance(state, str) and state:
             self.terminal_state = state.upper()
-        action = str(event.get("action") or "")
+        action = str(event.get('action') or '')
         if action and action not in {
-            "streaming_chunk",
-            "message",
-            "recall",
-            "system_message",
-            "change_agent_state",
-            "add_memory",
+            'streaming_chunk',
+            'message',
+            'recall',
+            'system_message',
+            'change_agent_state',
+            'add_memory',
         }:
             self.tool_actions.append(action)
 
@@ -65,7 +65,7 @@ def print_step(message: str) -> None:
 
 
 def request_json(method: str, path: str, **kwargs: Any) -> dict[str, Any]:
-    response = requests.request(method, f"{BASE_URL}{path}", timeout=60, **kwargs)
+    response = requests.request(method, f'{BASE_URL}{path}', timeout=60, **kwargs)
     response.raise_for_status()
     return response.json()
 
@@ -75,34 +75,34 @@ def wait_for_health(timeout: float = 60.0) -> dict[str, Any]:
     last_error: Exception | None = None
     while time.time() < deadline:
         try:
-            response = requests.get(f"{BASE_URL}/api/health/ready", timeout=5)
+            response = requests.get(f'{BASE_URL}/api/health/ready', timeout=5)
             response.raise_for_status()
             return response.json()
         except Exception as exc:  # pragma: no cover - live probe
             last_error = exc
             time.sleep(1.0)
-    raise RuntimeError(f"Server did not become healthy in {timeout}s: {last_error}")
+    raise RuntimeError(f'Server did not become healthy in {timeout}s: {last_error}')
 
 
 def kill_server_processes() -> list[int]:
     killed: list[int] = []
-    for proc in psutil.process_iter(["pid", "name", "cmdline"]):
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
-            cmdline = " ".join(proc.info.get("cmdline") or []).lower()
-            if proc.info.get("name", "").lower() != "python.exe":
+            cmdline = ' '.join(proc.info.get('cmdline') or []).lower()
+            if proc.info.get('name', '').lower() != 'python.exe':
                 continue
-            if "start_server.py" in cmdline or "uvicorn" in cmdline:
+            if 'start_server.py' in cmdline or 'uvicorn' in cmdline:
                 proc.kill()
-                killed.append(int(proc.info["pid"]))
+                killed.append(int(proc.info['pid']))
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             continue
     return killed
 
 
 def start_server_subprocess() -> subprocess.Popen[str]:
-    with SERVER_LOG_PATH.open("w", encoding="utf-8") as log_file:
+    with SERVER_LOG_PATH.open('w', encoding='utf-8') as log_file:
         proc = subprocess.Popen(
-            [sys.executable, "start_server.py"],
+            [sys.executable, 'start_server.py'],
             cwd=str(APP_ROOT),
             stdout=log_file,
             stderr=log_file,
@@ -134,7 +134,7 @@ def _rmtree_retry(path: Path, retries: int = 8, delay: float = 0.25) -> None:
         except OSError as exc:
             last = exc
             time.sleep(delay)
-    raise OSError(f"Failed to remove {path} after {retries} retries") from last
+    raise OSError(f'Failed to remove {path} after {retries} retries') from last
 
 
 def reset_workspace() -> None:
@@ -148,17 +148,17 @@ def reset_workspace() -> None:
 
 def write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    path.write_text(content, encoding='utf-8')
 
 
 def prepare_complex_refactor() -> None:
     reset_workspace()
     write_text(
-        EVAL_WORKSPACE / "complex_refactor" / "reporting" / "__init__.py",
-        "",
+        EVAL_WORKSPACE / 'complex_refactor' / 'reporting' / '__init__.py',
+        '',
     )
     write_text(
-        EVAL_WORKSPACE / "complex_refactor" / "reporting" / "stats.py",
+        EVAL_WORKSPACE / 'complex_refactor' / 'reporting' / 'stats.py',
         "def moving_average(values, window):\n"
         "    if window <= 0:\n"
         "        raise ValueError('window must be positive')\n"
@@ -177,12 +177,12 @@ def prepare_complex_refactor() -> None:
         "    return {'count': len(values), 'total': total, 'average': average}\n",
     )
     write_text(
-        EVAL_WORKSPACE / "complex_refactor" / "reporting" / "formatting.py",
+        EVAL_WORKSPACE / 'complex_refactor' / 'reporting' / 'formatting.py',
         "def format_summary(summary):\n"
         "    return f\"count={summary['count']} total={summary['total']} average={summary['average']:.2f}\"\n",
     )
     write_text(
-        EVAL_WORKSPACE / "complex_refactor" / "test_reporting.py",
+        EVAL_WORKSPACE / 'complex_refactor' / 'test_reporting.py',
         "import unittest\n\n"
         "from reporting.formatting import format_summary\n"
         "from reporting.stats import moving_average, summarize\n\n\n"
@@ -200,24 +200,24 @@ def prepare_complex_refactor() -> None:
     )
 
 
-def run_unittest(test_dir: str, pattern: str = "test*.py") -> tuple[bool, str]:
+def run_unittest(test_dir: str, pattern: str = 'test*.py') -> tuple[bool, str]:
     # top_level == start_dir so the directory itself is the import root.
     # Tests inside a given scenario dir import from sibling packages, not from
     # the EVAL_WORKSPACE parent — so the top-level must be the scenario dir.
     start_dir = EVAL_WORKSPACE / test_dir
     if not start_dir.is_dir():
-        return False, f"Test directory does not exist: {start_dir}"
+        return False, f'Test directory does not exist: {start_dir}'
     proc = subprocess.run(
         [
             sys.executable,
-            "-m",
-            "unittest",
-            "discover",
-            "-s",
+            '-m',
+            'unittest',
+            'discover',
+            '-s',
             str(start_dir),
-            "-p",
+            '-p',
             pattern,
-            "-t",
+            '-t',
             str(start_dir),
         ],
         cwd=str(start_dir),
@@ -226,15 +226,15 @@ def run_unittest(test_dir: str, pattern: str = "test*.py") -> tuple[bool, str]:
         timeout=60,
         check=False,
     )
-    combined = (proc.stdout or "") + (proc.stderr or "")
+    combined = (proc.stdout or '') + (proc.stderr or '')
     return proc.returncode == 0, combined[-4000:]
 
 
 async def create_conversation(client: AppClient) -> str:
     conv = await asyncio.wait_for(client.create_conversation(), timeout=180)
-    conv_id = str(conv.get("conversation_id") or conv.get("id") or "")
+    conv_id = str(conv.get('conversation_id') or conv.get('id') or '')
     if not conv_id:
-        raise RuntimeError(f"No conversation id in response: {conv}")
+        raise RuntimeError(f'No conversation id in response: {conv}')
     await asyncio.wait_for(client.start_agent(conv_id), timeout=60)
     return conv_id
 
@@ -251,14 +251,14 @@ async def run_prompt(prompt: str, *, disconnect_after_tool: bool = False, discon
     async def on_event(event: dict[str, Any]) -> None:
         nonlocal prompt_sent
         trace.record(event)
-        extras = event.get("extras") or {}
-        state = str(extras.get("agent_state") or "").upper() if isinstance(extras, dict) else ""
-        action = str(event.get("action") or "")
-        if action and action not in {"streaming_chunk", "message", "recall", "system_message", "change_agent_state", "add_memory", "system"}:
+        extras = event.get('extras') or {}
+        state = str(extras.get('agent_state') or '').upper() if isinstance(extras, dict) else ''
+        action = str(event.get('action') or '')
+        if action and action not in {'streaming_chunk', 'message', 'recall', 'system_message', 'change_agent_state', 'add_memory', 'system'}:
             first_tool.set()
-        if not prompt_sent and state == "AWAITING_USER_INPUT":
+        if not prompt_sent and state == 'AWAITING_USER_INPUT':
             initialized.set()
-        elif state in {"AWAITING_USER_INPUT", "FINISHED", "STOPPED", "ERROR", "REJECTED"} or action == "finish":
+        elif state in {'AWAITING_USER_INPUT', 'FINISHED', 'STOPPED', 'ERROR', 'REJECTED'} or action == 'finish':
             terminal.set()
 
     try:
@@ -279,7 +279,7 @@ async def run_prompt(prompt: str, *, disconnect_after_tool: bool = False, discon
         await asyncio.wait_for(terminal.wait(), timeout=300)
         return trace, True
     except Exception as exc:
-        trace.events.append({"error": str(exc)})
+        trace.events.append({'error': str(exc)})
         if trace.conversation_id:
             try:
                 await client.stop_agent(trace.conversation_id)
@@ -293,9 +293,9 @@ async def run_prompt(prompt: str, *, disconnect_after_tool: bool = False, discon
 async def run_server_restart_scenario() -> dict[str, Any]:
     reset_workspace()
     prompt = (
-        "Create a new folder `agent_eval_workspace/resume_suite`. Inside it create a small standard-library Python package with "
-        "`agent_eval_workspace/resume_suite/core.py`, `agent_eval_workspace/resume_suite/__init__.py`, and `agent_eval_workspace/test_resume_suite.py`. "
-        "Implement `slugify(text)` and `dedupe_keep_order(items)` with unittests, then run the tests."
+        'Create a new folder `agent_eval_workspace/resume_suite`. Inside it create a small standard-library Python package with '
+        '`agent_eval_workspace/resume_suite/core.py`, `agent_eval_workspace/resume_suite/__init__.py`, and `agent_eval_workspace/test_resume_suite.py`. '
+        'Implement `slugify(text)` and `dedupe_keep_order(items)` with unittests, then run the tests.'
     )
     trace = ScenarioTrace()
     terminal = asyncio.Event()
@@ -307,14 +307,14 @@ async def run_server_restart_scenario() -> dict[str, Any]:
     async def on_event(event: dict[str, Any]) -> None:
         nonlocal prompt_sent
         trace.record(event)
-        action = str(event.get("action") or "")
-        extras = event.get("extras") or {}
-        state = str(extras.get("agent_state") or "").upper() if isinstance(extras, dict) else ""
-        if action and action not in {"streaming_chunk", "message", "recall", "system_message", "change_agent_state", "add_memory", "system"}:
+        action = str(event.get('action') or '')
+        extras = event.get('extras') or {}
+        state = str(extras.get('agent_state') or '').upper() if isinstance(extras, dict) else ''
+        if action and action not in {'streaming_chunk', 'message', 'recall', 'system_message', 'change_agent_state', 'add_memory', 'system'}:
             progress.set()
-        if not prompt_sent and state == "AWAITING_USER_INPUT":
+        if not prompt_sent and state == 'AWAITING_USER_INPUT':
             initialized.set()
-        elif state in {"AWAITING_USER_INPUT", "FINISHED", "STOPPED", "ERROR", "REJECTED"} or action == "finish":
+        elif state in {'AWAITING_USER_INPUT', 'FINISHED', 'STOPPED', 'ERROR', 'REJECTED'} or action == 'finish':
             terminal.set()
 
     restart_proc: subprocess.Popen[str] | None = None
@@ -329,12 +329,12 @@ async def run_server_restart_scenario() -> dict[str, Any]:
             await asyncio.wait_for(progress.wait(), timeout=120)
         except TimeoutError:
             return {
-                "conversation_id": conv_id,
-                "error": "no_tool_progress_before_restart_injection",
-                "event_count": len(trace.events),
-                "last_event_id": trace.last_event_id,
-                "terminal_state": trace.terminal_state,
-                "tool_actions": trace.tool_actions,
+                'conversation_id': conv_id,
+                'error': 'no_tool_progress_before_restart_injection',
+                'event_count': len(trace.events),
+                'last_event_id': trace.last_event_id,
+                'terminal_state': trace.terminal_state,
+                'tool_actions': trace.tool_actions,
             }
         await asyncio.sleep(2.0)
 
@@ -343,15 +343,15 @@ async def run_server_restart_scenario() -> dict[str, Any]:
         await asyncio.sleep(2.0)
         restart_proc = start_server_subprocess()
         health = wait_for_health(timeout=90)
-        settings_snapshot = request_json("GET", "/api/v1/settings")
+        settings_snapshot = request_json('GET', '/api/v1/settings')
 
         reconnect_client = AppClient(BASE_URL)
         try:
             async def on_reconnect(event: dict[str, Any]) -> None:
                 trace.record(event)
-                extras = event.get("extras") or {}
-                state = str(extras.get("agent_state") or "").upper() if isinstance(extras, dict) else ""
-                if state in {"AWAITING_USER_INPUT", "FINISHED", "STOPPED", "ERROR", "REJECTED"} or str(event.get("action") or "") == "finish":
+                extras = event.get('extras') or {}
+                state = str(extras.get('agent_state') or '').upper() if isinstance(extras, dict) else ''
+                if state in {'AWAITING_USER_INPUT', 'FINISHED', 'STOPPED', 'ERROR', 'REJECTED'} or str(event.get('action') or '') == 'finish':
                     terminal.set()
 
             await reconnect_client.join_conversation(conv_id, on_event=on_reconnect, latest_event_id=trace.last_event_id)
@@ -364,24 +364,24 @@ async def run_server_restart_scenario() -> dict[str, Any]:
 
         conv_state = None
         try:
-            conv_payload = request_json("GET", f"/api/v1/conversations/{conv_id}")
-            conv_state = conv_payload.get("agent_state")
+            conv_payload = request_json('GET', f'/api/v1/conversations/{conv_id}')
+            conv_state = conv_payload.get('agent_state')
         except Exception as exc:
-            conv_state = f"lookup_failed: {exc}"
+            conv_state = f'lookup_failed: {exc}'
 
-        test_ok, test_output = run_unittest("resume_suite")
+        test_ok, test_output = run_unittest('resume_suite')
         return {
-            "conversation_id": conv_id,
-            "killed_pids": killed,
-                "health_project_root": health.get("checks", {}).get("config", {}).get("project_root"),
-                "health_recovery": health.get("checks", {}).get("recovery"),
-            "settings_recovery": settings_snapshot.get("recovery_snapshot"),
-            "conversation_state_after_restart": conv_state,
-            "event_count": len(trace.events),
-            "last_event_id": trace.last_event_id,
-            "tool_actions": trace.tool_actions,
-            "tests_passed": test_ok,
-            "test_output_tail": test_output,
+            'conversation_id': conv_id,
+            'killed_pids': killed,
+                'health_project_root': health.get('checks', {}).get('config', {}).get('project_root'),
+                'health_recovery': health.get('checks', {}).get('recovery'),
+            'settings_recovery': settings_snapshot.get('recovery_snapshot'),
+            'conversation_state_after_restart': conv_state,
+            'event_count': len(trace.events),
+            'last_event_id': trace.last_event_id,
+            'tool_actions': trace.tool_actions,
+            'tests_passed': test_ok,
+            'test_output_tail': test_output,
         }
     finally:
         await client.close()
@@ -395,69 +395,69 @@ async def run_server_restart_scenario() -> dict[str, Any]:
 
 async def main() -> int:
     results: dict[str, Any] = {
-        "health_before": wait_for_health(timeout=30),
+        'health_before': wait_for_health(timeout=30),
     }
     save_results(results)
 
-    print_step("Scenario 1: complex fix challenge")
+    print_step('Scenario 1: complex fix challenge')
     try:
         prepare_complex_refactor()
         trace1, ok1 = await run_prompt(
-            "In `agent_eval_workspace/complex_refactor`, make the tests pass. Fix the root causes, keep the existing public functions, add concise module or function docstrings where they are missing, and run the tests.",
+            'In `agent_eval_workspace/complex_refactor`, make the tests pass. Fix the root causes, keep the existing public functions, add concise module or function docstrings where they are missing, and run the tests.',
         )
-        tests_ok1, test_output1 = run_unittest("complex_refactor")
-        stats_path = EVAL_WORKSPACE / "complex_refactor" / "reporting" / "stats.py"
-        results["complex_fix"] = {
-            "conversation_id": trace1.conversation_id,
-            "success": ok1,
-            "event_count": len(trace1.events),
-            "last_event_id": trace1.last_event_id,
-            "terminal_state": trace1.terminal_state,
-            "tool_actions": trace1.tool_actions,
-            "tests_passed": tests_ok1,
-            "test_output_tail": test_output1,
-            "stats_py_tail": stats_path.read_text(encoding="utf-8")[-1200:] if stats_path.exists() else None,
+        tests_ok1, test_output1 = run_unittest('complex_refactor')
+        stats_path = EVAL_WORKSPACE / 'complex_refactor' / 'reporting' / 'stats.py'
+        results['complex_fix'] = {
+            'conversation_id': trace1.conversation_id,
+            'success': ok1,
+            'event_count': len(trace1.events),
+            'last_event_id': trace1.last_event_id,
+            'terminal_state': trace1.terminal_state,
+            'tool_actions': trace1.tool_actions,
+            'tests_passed': tests_ok1,
+            'test_output_tail': test_output1,
+            'stats_py_tail': stats_path.read_text(encoding='utf-8')[-1200:] if stats_path.exists() else None,
         }
     except Exception as exc:
-        results["complex_fix"] = {"error": str(exc)}
+        results['complex_fix'] = {'error': str(exc)}
     save_results(results)
     await asyncio.sleep(5.0)
 
-    print_step("Scenario 2: websocket disconnect and reconnect")
+    print_step('Scenario 2: websocket disconnect and reconnect')
     try:
         reset_workspace()
         trace2, ok2 = await run_prompt(
-            "Create a folder `agent_eval_workspace/resilience_app`. Inside it create a standard-library Python package with `agent_eval_workspace/resilience_app/__init__.py`, `agent_eval_workspace/resilience_app/tasks.py`, `agent_eval_workspace/resilience_app/cli.py`, and `agent_eval_workspace/test_tasks.py`. Implement `parse_tasks(text)` to parse `[x] done` and `[ ] pending` lines, plus `summarize_tasks(tasks)` returning total/completed/pending counts. Add unittests and run them.",
+            'Create a folder `agent_eval_workspace/resilience_app`. Inside it create a standard-library Python package with `agent_eval_workspace/resilience_app/__init__.py`, `agent_eval_workspace/resilience_app/tasks.py`, `agent_eval_workspace/resilience_app/cli.py`, and `agent_eval_workspace/test_tasks.py`. Implement `parse_tasks(text)` to parse `[x] done` and `[ ] pending` lines, plus `summarize_tasks(tasks)` returning total/completed/pending counts. Add unittests and run them.',
             disconnect_after_tool=True,
             disconnect_pause=10.0,
         )
-        tests_ok2, test_output2 = run_unittest("resilience_app")
-        results["disconnect_reconnect"] = {
-            "conversation_id": trace2.conversation_id,
-            "success": ok2,
-            "event_count": len(trace2.events),
-            "last_event_id": trace2.last_event_id,
-            "terminal_state": trace2.terminal_state,
-            "tool_actions": trace2.tool_actions,
-            "disconnected_at_event_id": trace2.disconnected_at_event_id,
-            "tests_passed": tests_ok2,
-            "test_output_tail": test_output2,
+        tests_ok2, test_output2 = run_unittest('resilience_app')
+        results['disconnect_reconnect'] = {
+            'conversation_id': trace2.conversation_id,
+            'success': ok2,
+            'event_count': len(trace2.events),
+            'last_event_id': trace2.last_event_id,
+            'terminal_state': trace2.terminal_state,
+            'tool_actions': trace2.tool_actions,
+            'disconnected_at_event_id': trace2.disconnected_at_event_id,
+            'tests_passed': tests_ok2,
+            'test_output_tail': test_output2,
         }
     except Exception as exc:
-        results["disconnect_reconnect"] = {"error": str(exc)}
+        results['disconnect_reconnect'] = {'error': str(exc)}
     save_results(results)
     await asyncio.sleep(5.0)
 
-    print_step("Scenario 3: server restart during active work")
+    print_step('Scenario 3: server restart during active work')
     try:
-        results["server_restart"] = await run_server_restart_scenario()
+        results['server_restart'] = await run_server_restart_scenario()
     except Exception as exc:
-        results["server_restart"] = {"error": str(exc)}
+        results['server_restart'] = {'error': str(exc)}
 
     save_results(results)
     print(json.dumps(results, indent=2))
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     raise SystemExit(asyncio.run(main()))

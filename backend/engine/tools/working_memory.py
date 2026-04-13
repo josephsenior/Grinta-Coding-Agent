@@ -249,7 +249,7 @@ def _clear_section(section: str) -> AgentThinkAction:
                 any_cleared = True
         if any_cleared:
             _save_memory(memory)
-        return AgentThinkAction(thought="[WORKING_MEMORY] Cleared all sections.")
+        return AgentThinkAction(thought='[WORKING_MEMORY] Cleared all sections.')
     if section not in _VALID_SECTIONS:
         return AgentThinkAction(
             thought=f'[WORKING_MEMORY] Invalid section: {section}. Valid: {", ".join(_VALID_SECTIONS)}'

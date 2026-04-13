@@ -78,7 +78,7 @@ class TestRecoveryService:
 
         ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
         mock_context.set_agent_state.assert_awaited_once_with(
-            AgentState.AWAITING_USER_INPUT
+            AgentState.RATE_LIMITED
         )
 
     @pytest.mark.asyncio

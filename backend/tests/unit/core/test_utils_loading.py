@@ -138,7 +138,7 @@ class TestFinalization:
 
         compactor_cfg = cfg.get_agent_config(cfg.default_agent).compactor_config
         assert isinstance(compactor_cfg, AutoCompactorConfig)
-        assert compactor_cfg.llm_config.model == 'openai/gpt-4.1'
+        assert compactor_cfg.llm_config.model == 'openai/gpt-4.1'  # type: ignore
 
     def test_finalize_config_loads_bundled_mcp_servers(self, tmp_path):
         cfg = AppConfig()

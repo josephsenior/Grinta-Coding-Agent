@@ -1,4 +1,7 @@
-import json, sys, os
+import json
+import os
+import sys
+
 sys.path.insert(0, '.')
 os.environ['APP_SETTINGS_FILE'] = 'settings.json'
 
@@ -6,8 +9,8 @@ from backend.engine.planner import OrchestratorPlanner
 from backend.persistence.data_models.settings import Settings
 
 settings = Settings.model_validate(json.load(open('settings.json')))
-planner = OrchestratorPlanner(settings)
-tools = planner.get_tools()
+planner = OrchestratorPlanner(settings)  # type: ignore
+tools = planner.get_tools()  # type: ignore
 tools_json = json.dumps(tools, default=str)
 print(f'Tool count: {len(tools)}')
 print(f'Tool schema total chars: {len(tools_json)}')

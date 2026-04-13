@@ -329,7 +329,7 @@ def test_build_python_exec_command_includes_shell_fallbacks_for_bash():
 
     assert 'command -v python3' in command
     assert 'command -v python' in command
-    assert "command -v py" in command
+    assert 'command -v py' in command
     assert '[MISSING_TOOL] python/python3/py not found in PATH' in command
 
 

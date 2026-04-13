@@ -59,7 +59,7 @@ class ToolRegistry:
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
-            cls._instance = super(ToolRegistry, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
@@ -67,7 +67,7 @@ class ToolRegistry:
         """Initialize and detect all tools."""
         if getattr(self, '_initialized', False):
             return
-        
+
         self._tools: dict[str, ToolInfo] = {}
         self._is_container = self._detect_container_runtime()
         self._is_wsl = self._detect_wsl_runtime()

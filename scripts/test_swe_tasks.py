@@ -1,7 +1,8 @@
-"""
-Headless SWE task tests against the local App server.
+"""Headless SWE task tests against the local App server.
+
 Each task creates a concrete coding problem and verifies the agent solves it.
 """
+
 import asyncio
 import os
 import sys
@@ -15,6 +16,7 @@ from client import AppClient
 BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:3000")
 WAIT_SECONDS = int(os.environ.get("APP_WAIT_SECONDS", "300"))
 
+
 # Match the project_root configured in settings.json.
 # Override with APP_WORKSPACE env var if needed.
 def _get_workspace() -> str:
@@ -22,9 +24,12 @@ def _get_workspace() -> str:
     if env:
         return os.path.abspath(env)
     # Try to read from settings.json next to this file
-    settings_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
+    settings_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "settings.json"
+    )
     try:
         import json
+
         with open(settings_path, encoding="utf-8") as f:
             s = json.load(f)
         pr = (s.get("project_root") or "").strip()
@@ -34,6 +39,7 @@ def _get_workspace() -> str:
         pass
     # Fallback: App repo root (works when project_root is empty = cwd)
     return os.path.abspath(os.path.dirname(__file__))
+
 
 WORKSPACE = _get_workspace()
 
@@ -45,7 +51,7 @@ TASKS = [
         "setup_files": {
             "swe_task_bugfix.py": (
                 "def sum_of_squares(n):\n"
-                "    \"\"\"Return 1^2 + 2^2 + ... + n^2.\"\"\"\n"
+                '    """Return 1^2 + 2^2 + ... + n^2."""\n'
                 "    total = 0\n"
                 "    for i in range(1, n):  # BUG: off-by-one, should be range(1, n + 1)\n"
                 "        total += i * i\n"
@@ -61,8 +67,10 @@ TASKS = [
             "Fix the bug in the file and verify the function works correctly by running it."
         ),
         "verify": lambda files: (
-            ("range(1, n + 1)" in files.get("swe_task_bugfix.py", "")
-             or "range(1, n+1)" in files.get("swe_task_bugfix.py", ""))
+            (
+                "range(1, n + 1)" in files.get("swe_task_bugfix.py", "")
+                or "range(1, n+1)" in files.get("swe_task_bugfix.py", "")
+            )
         ),
     },
     {
@@ -70,12 +78,12 @@ TASKS = [
         "description": "Add a new function to an existing Python module",
         "setup_files": {
             "swe_task_utils.py": (
-                "\"\"\"Utility functions.\"\"\"\n\n"
+                '"""Utility functions."""\n\n'
                 "def add(a, b):\n"
-                "    \"\"\"Return a + b.\"\"\"\n"
+                '    """Return a + b."""\n'
                 "    return a + b\n\n"
                 "def subtract(a, b):\n"
-                "    \"\"\"Return a - b.\"\"\"\n"
+                '    """Return a - b."""\n'
                 "    return a - b\n"
             ),
         },
@@ -98,14 +106,14 @@ TASKS = [
         "setup_files": {
             "swe_task_calc.py": (
                 "def factorial(n):\n"
-                "    \"\"\"Return n! for non-negative integers.\"\"\"\n"
+                '    """Return n! for non-negative integers."""\n'
                 "    if n < 0:\n"
                 "        raise ValueError('n must be non-negative')\n"
                 "    if n == 0:\n"
                 "        return 1\n"
                 "    return n * factorial(n - 1)\n\n"
                 "def is_prime(n):\n"
-                "    \"\"\"Return True if n is a prime number.\"\"\"\n"
+                '    """Return True if n is a prime number."""\n'
                 "    if n < 2:\n"
                 "        return False\n"
                 "    for i in range(2, int(n**0.5) + 1):\n"
@@ -181,7 +189,7 @@ async def run_task(task: dict, client: AppClient) -> dict:
     # Write setup files into workspace
     for fname, content in task.get("setup_files", {}).items():
         fpath = os.path.join(WORKSPACE, fname)
-        with open(fpath, "w", encoding="utf-8") as f:
+        with open(fpath, "w", encoding="utf-8") as f:  # noqa: ASYNC230
             f.write(content)
         print(f"  Created setup file: {fname}")
 
@@ -223,7 +231,11 @@ async def run_task(task: dict, client: AppClient) -> dict:
         async def on_event(event: dict) -> None:
             event_count[0] += 1
             extras = event.get("extras") or {}
-            state = extras.get("agent_state", "").upper() if isinstance(extras, dict) else ""
+            state = (
+                extras.get("agent_state", "").upper()
+                if isinstance(extras, dict)
+                else ""
+            )
             if state:
                 last_state[0] = state
 
@@ -245,8 +257,11 @@ async def run_task(task: dict, client: AppClient) -> dict:
                 elif awaiting_count[0] >= 2:
                     # Agent sent a question after receiving the task - it gave up
                     terminal.set()
-            if state in {"FINISHED", "STOPPED", "ERROR", "REJECTED"} or \
-               action == "finish" or obs == "agent_finish":
+            if (
+                state in {"FINISHED", "STOPPED", "ERROR", "REJECTED"}
+                or action == "finish"
+                or obs == "agent_finish"
+            ):
                 terminal.set()
 
         print("  Joining event stream...")
@@ -267,7 +282,9 @@ async def run_task(task: dict, client: AppClient) -> dict:
             await asyncio.wait_for(terminal.wait(), timeout=WAIT_SECONDS)
             print(f"  Terminal state reached: {last_state[0]}")
         except TimeoutError:
-            print(f"  Timed out after {WAIT_SECONDS}s (state={last_state[0]}, events={event_count[0]})")
+            print(
+                f"  Timed out after {WAIT_SECONDS}s (state={last_state[0]}, events={event_count[0]})"
+            )
             result["exit_code"] = 2
             result["status"] = "TIMEOUT"
             result["last_state"] = last_state[0]
@@ -281,7 +298,7 @@ async def run_task(task: dict, client: AppClient) -> dict:
         for fname in task["output_files"]:
             fpath = os.path.join(WORKSPACE, fname)
             if os.path.exists(fpath):
-                with open(fpath, "r", encoding="utf-8") as f:
+                with open(fpath, "r", encoding="utf-8") as f:  # noqa: ASYNC230
                     file_contents[fname] = f.read()
                 print(f"\n  --- {fname} ---")
                 print(file_contents[fname][:800])
@@ -300,7 +317,9 @@ async def run_task(task: dict, client: AppClient) -> dict:
         else:
             result["status"] = "FAIL"
             result["exit_code"] = 1
-            print(f"  FAIL: verification failed. Files found: {list(file_contents.keys())}")
+            print(
+                f"  FAIL: verification failed. Files found: {list(file_contents.keys())}"
+            )
 
     except Exception as e:
         result["error"] = str(e)
@@ -334,8 +353,11 @@ async def main() -> int:
 
     # Check server health first
     import urllib.request
+
     try:
-        with urllib.request.urlopen(f"{BASE_URL}/api/health/live", timeout=5) as r:
+        with urllib.request.urlopen(
+            f"{BASE_URL}/api/health/live", timeout=5
+        ) as r:  # noqa: ASYNC210
             print(f"Server health: {r.status} OK\n")
     except Exception as e:
         print(f"Server not reachable: {e}")

@@ -226,26 +226,26 @@ class ToolResultValidator(ToolInvocationMiddleware):
             content = getattr(obs, 'content', '')
             if not isinstance(content, str):
                 return None
-            
+
             import re
             # Check PowerShell errors for Unix tools
             if 'CommandNotFoundException' in content or 'is not recognized as the name of a cmdlet' in content:
                 for tool in ['grep', 'ls', 'cat', 'find', 'sed', 'awk', 'chmod']:
-                    if re.search(rf"\b{tool}\b.*is not recognized", content, re.IGNORECASE) or f"ObjectNotFound: ({tool}:String)" in content:
+                    if re.search(rf'\b{tool}\b.*is not recognized', content, re.IGNORECASE) or f'ObjectNotFound: ({tool}:String)' in content:
                         return (
                             f"You attempted to use Unix tools ('{tool}') in PowerShell but they are missing or aliased incorrectly. "
                             f"DO NOT use Unix tools here. ALWAYS use `search_code`, `str_replace_editor` (view_file), or native PowerShell cmdlets."
                         )
-            
+
             # Check Bash errors for PowerShell tools
             if 'command not found' in content:
                 for tool in ['Get-ChildItem', 'Select-String', 'Get-Content', 'Get-Process']:
-                    if re.search(rf"\b{tool}: command not found", content, re.IGNORECASE):
+                    if re.search(rf'\b{tool}: command not found', content, re.IGNORECASE):
                         return (
                             f"You attempted to use a PowerShell cmdlet ('{tool}') in Bash. "
                             f"DO NOT use PowerShell cmdlets here. Use Unix tools or `search_code`."
                         )
-            
+
             return None
 
         self.add_rule('wrong_shell', check_wrong_shell, severity='warning')

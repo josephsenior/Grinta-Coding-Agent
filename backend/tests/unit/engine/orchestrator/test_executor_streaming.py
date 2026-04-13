@@ -423,7 +423,7 @@ def test_response_to_actions_passes_through_plain_message_after_guard_disabled(
     actions = executor._response_to_actions(response)
 
     assert len(actions) == 1
-    assert actions[0].content == "I've created grinta_feedback.md for you."
+    assert actions[0].content == "I've created grinta_feedback.md for you."  # type: ignore
 
 
 def test_response_to_actions_allows_conversational_plain_message(monkeypatch):
@@ -461,7 +461,7 @@ def test_response_to_actions_allows_conversational_plain_message(monkeypatch):
     actions = executor._response_to_actions(response)
 
     assert len(actions) == 1
-    assert actions[0].content == 'I have prepared a rating of the system and the tools for you.'
+    assert actions[0].content == 'I have prepared a rating of the system and the tools for you.'  # type: ignore
 
 
 def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):

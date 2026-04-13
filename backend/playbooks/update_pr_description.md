@@ -24,6 +24,7 @@ This branch belongs to PR: {{ PR_URL }}
 Use the GitHub REST API (via `curl` with `$GIT_PROVIDER_TOKEN`) or GitHub MCP tools to read the existing PR description, then update it to accurately reflect the changes.
 
 A good PR description covers:
+
 - **What** changed and why
 - **How** it was implemented (key decisions)
 - **Testing** — how to verify it works

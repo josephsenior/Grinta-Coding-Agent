@@ -640,7 +640,7 @@ class RuntimeExecutor:
                 f'Install with: winget install {normalized} '
                 '(or use choco/scoop, or check PATH)'
             )
-        if sys.platform == 'darwin':
+        if sys.platform == 'darwin':  # type: ignore
             return f'Install with: brew install {normalized} (or check PATH)'
         return f'Install with: apt-get install {normalized} (or check PATH)'
 
@@ -652,7 +652,7 @@ class RuntimeExecutor:
                 'Free disk space before retrying. Check usage in File Explorer '
                 'or in PowerShell with: Get-PSDrive -PSProvider FileSystem'
             )
-        if sys.platform == 'darwin':
+        if sys.platform == 'darwin':  # type: ignore
             return 'Free disk space before retrying. Check usage with: df -h'
         return 'Free disk space before retrying. Check usage with: df -h'
 
@@ -664,7 +664,7 @@ class RuntimeExecutor:
                 'Check file ACLs or read-only attributes, verify another process '
                 'is not locking the file, and only retry from an elevated shell if appropriate.'
             )
-        if sys.platform == 'darwin':
+        if sys.platform == 'darwin':  # type: ignore
             return (
                 'Check file ownership and permissions with: ls -l. '
                 'You may need chmod or to run as a different user.'

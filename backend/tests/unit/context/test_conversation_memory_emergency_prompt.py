@@ -19,7 +19,7 @@ def _make_memory() -> ContextMemory:
     )
     prompt_manager = MagicMock()
     prompt_manager.get_system_message.side_effect = RuntimeError('boom')
-    return ContextMemory(config, prompt_manager)
+    return ContextMemory(config, prompt_manager)  # type: ignore
 
 
 class TestEmergencySystemPrompt:

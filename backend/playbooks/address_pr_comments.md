@@ -20,6 +20,7 @@ This branch corresponds to PR: {{ PR_URL }}
 Next, use the GitHub REST API (via `curl` with `$GIT_PROVIDER_TOKEN`) or GitHub MCP tools to fetch all review comments and inline comments on this PR.
 
 For each comment or requested change:
+
 1. Understand what the reviewer is asking for
 2. Make the code change, documentation update, or test fix as requested
 3. If the request is unclear, implement the most reasonable interpretation

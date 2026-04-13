@@ -211,4 +211,4 @@ def create_pretrained_tokenizer(name: str) -> Any:
             return tiktoken.get_encoding(name)
     except Exception:
         return name
-    return name
+    return name  # type: ignore

@@ -8,9 +8,12 @@ back to pure Python traversal.
 from __future__ import annotations
 
 from backend.engine.tools.common import create_tool_definition
+from backend.engine.tools.ignore_filter import (
+    get_ignore_spec,
+    is_ignored_file,
+    prune_ignored_dirs,
+)
 from backend.ledger.action import AgentThinkAction
-
-from backend.engine.tools.ignore_filter import get_ignore_spec, prune_ignored_dirs, is_ignored_file
 
 _SEARCH_EXCLUDED_DIRS = (
     '.git',
@@ -43,7 +46,7 @@ SEARCH_CODE_TOOL_NAME = 'search_code'
 
 def create_search_code_tool() -> dict:
     """Create the search_code tool definition."""
-    return create_tool_definition(
+    return create_tool_definition(  # type: ignore
         name=SEARCH_CODE_TOOL_NAME,
         description=_SEARCH_CODE_DESCRIPTION,
         properties={
@@ -104,7 +107,7 @@ def build_search_code_action(
     context_lines = max(0, min(int(context_lines), 10))
     max_results = max(1, min(int(max_results), 500))
     is_case_sensitive = str(case_sensitive).lower() == 'true'
-    
+
     # Auto-fix common LLM mistake where they provide `.ext` instead of `*.ext`
     if file_pattern and not file_pattern.startswith(('*', '?', '!')) and file_pattern.startswith('.'):
         file_pattern = f'*{file_pattern}'
@@ -128,13 +131,13 @@ def build_search_code_action(
     rg_path = shutil.which('rg')
     if rg_path:
         return _search_with_ripgrep(
-            rg_path, pattern, path, file_pattern, context_lines, 
+            rg_path, pattern, path, file_pattern, context_lines,
             is_case_sensitive, max_results
         )
-    
+
     # 2. Fallback: Pure Python
     return _search_with_python(
-        pattern, path, file_pattern, context_lines, 
+        pattern, path, file_pattern, context_lines,
         is_case_sensitive, max_results
     )
 
@@ -149,7 +152,7 @@ def _search_with_ripgrep(
 ) -> AgentThinkAction:
     """Execute ripgrep directly via subprocess."""
     import subprocess
-    
+
     if not pattern:
         # File discovery mode
         args = [rg_path, '--files']
@@ -158,13 +161,13 @@ def _search_with_ripgrep(
         if file_pattern:
             args.extend(['--glob', file_pattern])
         args.append(path)
-        
+
         try:
             result = subprocess.run(args, capture_output=True, text=True, check=False)
             lines = result.stdout.splitlines()[:max_results]
             out = '\n'.join(lines)
             if not out:
-                out = "No matching files found."
+                out = 'No matching files found.'
             return AgentThinkAction(source_tool='search_code', thought=f'<search_results>\n{out}\n</search_results>')
         except Exception as e:
             return AgentThinkAction(source_tool='search_code', thought=f'<search_results>\nError running ripgrep: {e}\n</search_results>')
@@ -185,10 +188,10 @@ def _search_with_ripgrep(
         args.extend(['--glob', f'!**/{d}/**'])
     if file_pattern:
         args.extend(['--glob', file_pattern])
-        
+
     args.append(pattern)
     args.append(path)
-    
+
     try:
         result = subprocess.run(args, capture_output=True, text=True, check=False)
         out = result.stdout
@@ -196,7 +199,7 @@ def _search_with_ripgrep(
         lines = out.splitlines()[:limit]
         out_limited = '\n'.join(lines)
         if not out_limited:
-            out_limited = "No matches found."
+            out_limited = 'No matches found.'
         return AgentThinkAction(source_tool='search_code', thought=f'<search_results>\n{out_limited}\n</search_results>')
     except Exception as e:
          return AgentThinkAction(thought=f'<search_results>\\nError running ripgrep: {e}\
@@ -212,15 +215,15 @@ def _search_with_python(
     max_results: int,
 ) -> AgentThinkAction:
     """Execute search using pure Python standard library."""
+    import fnmatch
     import os
     import re
-    import fnmatch
-    
+
     if not os.path.exists(path):
-        return AgentThinkAction(source_tool='search_code', thought=f"<search_results>\nPath does not exist: {path}\n</search_results>")
-        
+        return AgentThinkAction(source_tool='search_code', thought=f'<search_results>\nPath does not exist: {path}\n</search_results>')
+
     results = []
-    
+
     # Compile regex if pattern provided
     regex = None
     if pattern:
@@ -228,7 +231,7 @@ def _search_with_python(
         try:
             regex = re.compile(pattern, flags)
         except re.error as e:
-            return AgentThinkAction(source_tool='search_code', thought=f"<search_results>\nInvalid regex pattern: {e}\n</search_results>")
+            return AgentThinkAction(source_tool='search_code', thought=f'<search_results>\nInvalid regex pattern: {e}\n</search_results>')
 
     # Setup spec using a directory root.
     # If `path` is a file, build ignores from its parent directory.
@@ -245,7 +248,7 @@ def _search_with_python(
         for root, dirs, files in os.walk(path):
             # Prune excluded dirs via pathspec
             prune_ignored_dirs(spec_root, root, dirs, spec)
-            
+
             for f in files:
                 if is_ignored_file(spec_root, root, f, spec):
                     continue
@@ -261,45 +264,45 @@ def _search_with_python(
         lines = target_files[:max_results]
         out = '\n'.join(lines)
         if not out:
-            out = "No matching files found."
+            out = 'No matching files found.'
         return AgentThinkAction(thought=f'<search_results>\\n{out}\
 </search_results>')
-        
+
     # Search mode
     match_count = 0
     for fpath in target_files:
         if match_count >= max_results:
             break
-            
+
         try:
-            with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
-                lines = f.readlines()
+            with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:  # type: ignore
+                lines = f.readlines()  # type: ignore
         except OSError:
             continue
-            
+
         file_matches = []
         for i, line in enumerate(lines):
-            if regex.search(line):
+            if regex.search(line):  # type: ignore
                 start = max(0, i - context_lines)
                 end = min(len(lines), i + context_lines + 1)
-                
+
                 # Format match block
                 block = []
                 for j in range(start, end):
-                    prefix = f"{j+1}:" if j == i else f"{j+1}-"
-                    block.append(f"{fpath}:{prefix}{lines[j].rstrip()}")
+                    prefix = f'{j+1}:' if j == i else f'{j+1}-'
+                    block.append(f'{fpath}:{prefix}{lines[j].rstrip()}')
                 file_matches.append('\n'.join(block))
-                
+
                 match_count += 1
                 if match_count >= max_results:
                     break
-                    
+
         if file_matches:
             results.extend(file_matches)
-            results.append("--")
-            
+            results.append('--')
+
     out = '\n'.join(results)
     if not out:
-        out = "No matches found."
+        out = 'No matches found.'
     return AgentThinkAction(thought=f'<search_results>\\n{out}\
 </search_results>')

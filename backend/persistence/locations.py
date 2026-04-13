@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
-from backend.core.constants import CONVERSATION_BASE_DIR
+from backend.core.constants import CONVERSATION_BASE_DIR  # noqa: E402
 
 if TYPE_CHECKING:
     from backend.core.config.app_config import AppConfig

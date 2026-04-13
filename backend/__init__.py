@@ -7,8 +7,8 @@ import warnings
 # can't be caught by module-based filters.
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 
-from importlib.metadata import PackageNotFoundError, version
-from pathlib import Path
+from importlib.metadata import PackageNotFoundError, version  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 __version__ = '0.55.0'
 __package_name__ = 'app-ai'

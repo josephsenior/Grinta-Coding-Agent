@@ -210,7 +210,7 @@ class UserSecrets(BaseModel):
         provider_tokens = self.provider_tokens
         if provider_tokens is None:
             object.__setattr__(self, 'provider_tokens', MappingProxyType({}))
-        elif not isinstance(provider_tokens, MappingProxyType):
+        elif not isinstance(provider_tokens, MappingProxyType):  # type: ignore
             object.__setattr__(
                 self,
                 'provider_tokens',
@@ -219,8 +219,8 @@ class UserSecrets(BaseModel):
 
         custom_secrets = self.custom_secrets
         if custom_secrets is None:
-            object.__setattr__(self, 'custom_secrets', MappingProxyType({}))
-        elif not isinstance(custom_secrets, MappingProxyType):
+            object.__setattr__(self, 'custom_secrets', MappingProxyType({}))  # type: ignore
+        elif not isinstance(custom_secrets, MappingProxyType):  # type: ignore
             object.__setattr__(
                 self,
                 'custom_secrets',

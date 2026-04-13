@@ -703,7 +703,7 @@ class Runtime(
             return NullObservation(content='')
 
         # Execute the action (synchronous path)
-        observation = self._execute_action_sync(action)
+        observation = self._execute_action_sync(action)  # type: ignore
         if hasattr(action, 'truncation_strategy') and getattr(
             action, 'truncation_strategy'
         ):

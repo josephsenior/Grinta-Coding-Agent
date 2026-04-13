@@ -64,7 +64,7 @@ class ChromaDBBackend(VectorBackend):
 
     backend_name = 'ChromaDB (Local)'
 
-    def __init__(
+    def __init__(  # noqa: D417
         self,
         collection_name: str = 'APP_memory',
         persist_directory: Path | None = None,

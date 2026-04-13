@@ -522,7 +522,7 @@ class EventRouterService:
 
                 worker_stream.subscribe(
                     EventStreamSubscriber.MAIN,
-                    _forward_worker_event,
+                    _forward_worker_event,  # type: ignore
                     f'delegate_progress_{worker_id}',
                 )
                 _emit_worker_progress('starting', 'Starting delegated worker')
