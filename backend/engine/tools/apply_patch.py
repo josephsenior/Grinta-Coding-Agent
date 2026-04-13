@@ -37,16 +37,17 @@ _DESCRIPTION = (
     '- Renaming a symbol across multiple files\n'
     '- Applying a pre-computed diff from `git diff` or `diff -u`\n'
     '- Making coordinated changes across several files simultaneously\n\n'
-    'CRITICAL: `patch` must be a complete git unified diff with full headers.\n'
+    'CRITICAL: `patch` must be a complete unified diff with standard headers.\n'
     'Required lines, in order:\n'
     '1. diff --git a/<file> b/<file>\n'
-    '2. index <old_hash>..<new_hash> <mode>\n'
-    '3. --- a/<file>\n'
-    '4. +++ b/<file>\n'
-    '5. @@ -n,m +n,m @@\n\n'
+    '2. --- a/<file> (or /dev/null for new files)\n'
+    '3. +++ b/<file> (or /dev/null for deleted files)\n'
+    '4. @@ -n,m +n,m @@\n\n'
+    'Optional but validated when present:\n'
+    '- index <old_hash>..<new_hash> [mode]\n\n'
     'Common errors:\n'
-    '- "corrupt patch at line X" usually means the index line is missing.\n'
-    '- "patch does not apply" usually means headers or hunk context are incomplete.\n\n'
+    '- "malformed index line" means an index header was provided but invalid.\n'
+    '- "patch does not apply" usually means hunk context does not match the file.\n\n'
     'Always generate patches via `git diff` when possible.\n\n'
     'After applying, the tool shows which files were modified. '
     "Use `str_replace_editor command='view_file'` to confirm the result."
@@ -63,7 +64,8 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
                 'type': 'string',
                 'description': (
                     'Complete git unified diff to apply (multi-file supported). '
-                    'Must include diff --git, index, ---/+++, and @@ hunk headers.'
+                    'Must include diff --git, ---/+++, and @@ hunk headers. '
+                    'Index line is optional, but if present it must be valid.'
                 ),
             },
             'check_only': {
@@ -84,7 +86,9 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
 # ---------------------------------------------------------------------------
 
 _DIFF_HEADER_RE = re.compile(r'^diff --git a/.+ b/.+$')
-_INDEX_RE = re.compile(r'^index [0-9a-fA-F]{7,64}\.\.[0-9a-fA-F]{7,64} [0-7]{6}$')
+_INDEX_RE = re.compile(
+    r'^index [0-9a-fA-F]{7,64}\.\.[0-9a-fA-F]{7,64}(?: [0-7]{6})?$'
+)
 _HUNK_HEADER_RE = re.compile(r'^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@')
 
 
@@ -109,24 +113,24 @@ def validate_apply_patch_contract(patch: str) -> str | None:
         if not _DIFF_HEADER_RE.match(block[0]):
             return f'Line {start + 1}: malformed diff header.'
 
-        index_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('index ')), None)
-        if index_rel is None:
-            return (
-                f'Line {start + 1}: missing `index <old_hash>..<new_hash> <mode>` line '
-                'after the diff header.'
-            )
-        if not _INDEX_RE.match(block[index_rel]):
+        index_rel = next(
+            (i for i, line in enumerate(block[1:], start=1) if line.startswith('index ')),
+            None,
+        )
+        if index_rel is not None and not _INDEX_RE.match(block[index_rel]):
             return (
                 f'Line {start + index_rel + 1}: malformed index line. '
-                'Expected `index <old_hash>..<new_hash> <mode>`.'
+                'Expected `index <old_hash>..<new_hash> [mode]`.'
             )
 
         minus_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('--- ')), None)
         plus_rel = next((i for i, line in enumerate(block[1:], start=1) if line.startswith('+++ ')), None)
         if minus_rel is None or plus_rel is None:
             return f'Line {start + 1}: missing `---`/`+++` file header lines.'
-        if minus_rel <= index_rel or plus_rel <= minus_rel:
-            return f'Line {start + 1}: header order must be diff --git, index, ---, +++, @@.'
+        if index_rel is not None and minus_rel <= index_rel:
+            return f'Line {start + 1}: header order must be diff --git, index (optional), ---, +++, @@.'
+        if plus_rel <= minus_rel:
+            return f'Line {start + 1}: header order must be diff --git, optional index, ---, +++, @@.'
 
         minus_line = block[minus_rel]
         plus_line = block[plus_rel]
@@ -158,9 +162,9 @@ def validate_apply_patch_contract(patch: str) -> str | None:
 def _guidance_message(validation_error: str) -> str:
     return (
         '[APPLY_PATCH_GUIDANCE] ' + validation_error + ' '
-        'This tool requires a full git unified diff in this exact order: '
-        'diff --git, index <old_hash>..<new_hash> <mode>, ---, +++, @@. '
-        'Do not auto-correct or strip headers; regenerate the patch via `git diff` and retry.'
+        'This tool requires a full unified diff in this order: '
+        'diff --git, optional valid index, ---, +++, @@. '
+        'Regenerate the patch via `git diff` and retry.'
     )
 
 
@@ -189,7 +193,12 @@ sys.exit(2)
     dry_run_arg = 'True' if check_only else 'False'
 
     py = f"""
-import base64, os, subprocess, sys, tempfile
+import base64, os, pathlib, subprocess, sys, tempfile
+
+try:
+    import whatthepatch  # type: ignore
+except Exception:
+    whatthepatch = None
 
 patch = base64.b64decode(b'{pb}').decode()
 
@@ -215,25 +224,166 @@ for raw_line in patch.splitlines():
     elif raw_line.startswith('-'):
         removed += 1
 
+
+def _run_git_apply(temp_name, dry_run):
+    git_args = ['git', 'apply', '--whitespace=fix']
+    if dry_run:
+        git_args.append('--check')
+    git_args.append(temp_name)
+    try:
+        return subprocess.run(git_args, capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+
+
+def _run_patch_apply(temp_name, dry_run):
+    patch_args = ['patch', '-p1']
+    if dry_run:
+        patch_args.insert(1, '--dry-run')
+    patch_args += ['--input', temp_name]
+    try:
+        return subprocess.run(patch_args, capture_output=True, text=True)
+    except FileNotFoundError:
+        return None
+
+
+def _apply_python_fallback(patch_text, dry_run):
+    if whatthepatch is None:
+        return 1, (
+            '[APPLY_PATCH_GUIDANCE] Neither `git` nor `patch` command is available, '
+            'and Python fallback dependency `whatthepatch` is missing.'
+        )
+
+    try:
+        diffs = list(whatthepatch.parse_patch(patch_text))
+    except Exception as exc:
+        return 1, 'Failed to parse unified diff in python fallback: ' + str(exc)
+
+    if not diffs:
+        return 1, 'No patch hunks were parsed by python fallback.'
+
+    touched = 0
+    for diff in diffs:
+        header = getattr(diff, 'header', None)
+        if header is None:
+            return 1, 'Patch header missing in python fallback parser.'
+
+        old_path = getattr(header, 'old_path', None)
+        new_path = getattr(header, 'new_path', None)
+
+        is_new = old_path == '/dev/null'
+        is_delete = new_path == '/dev/null'
+        target_path = old_path if is_delete else new_path
+        if not target_path:
+            return 1, 'Could not determine target path from patch header.'
+
+        path_obj = pathlib.Path(target_path)
+        if path_obj.is_absolute() or '..' in path_obj.parts:
+            return 1, 'Unsafe target path in patch header: ' + target_path
+
+        if (not is_new) and (not path_obj.exists()):
+            return 1, 'Target file not found for patch: ' + target_path
+
+        original_text = ''
+        if path_obj.exists():
+            original_text = path_obj.read_text(
+                encoding='utf-8',
+                errors='surrogateescape',
+            )
+        original_lines = original_text.splitlines(keepends=True)
+        line_ending = '\\r\\n' if '\\r\\n' in original_text else '\\n'
+
+        out_lines = []
+        cursor = 0
+        for change in diff.changes:
+            old_no = getattr(change, 'old', None)
+            new_no = getattr(change, 'new', None)
+            line_text = (getattr(change, 'line', '') or '')
+
+            if old_no is not None:
+                old_idx = max(0, int(old_no) - 1)
+                if old_idx > len(original_lines):
+                    return 1, 'Patch line reference out of range in ' + target_path
+
+                if old_idx < cursor:
+                    old_idx = cursor
+
+                out_lines.extend(original_lines[cursor:old_idx])
+
+                if old_idx < len(original_lines):
+                    source_line = original_lines[old_idx].rstrip('\\r\\n')
+                    if source_line != line_text.rstrip('\\r\\n'):
+                        return (
+                            1,
+                            'Patch context mismatch in '
+                            + target_path
+                            + ' at line '
+                            + str(old_no),
+                        )
+
+                cursor = min(len(original_lines), old_idx + 1)
+                if new_no is not None:
+                    out_lines.append(line_text + line_ending)
+            else:
+                if new_no is not None:
+                    out_lines.append(line_text + line_ending)
+
+        out_lines.extend(original_lines[cursor:])
+
+        if dry_run:
+            touched += 1
+            continue
+
+        if is_delete:
+            if path_obj.exists():
+                path_obj.unlink()
+            touched += 1
+            continue
+
+        path_obj.parent.mkdir(parents=True, exist_ok=True)
+        path_obj.write_text(''.join(out_lines), encoding='utf-8', errors='surrogateescape')
+        touched += 1
+
+    if dry_run:
+        return 0, 'Dry run OK via python fallback (' + str(touched) + ' files)'
+    return 0, 'Patch applied via python fallback (' + str(touched) + ' files)'
+
 with tempfile.NamedTemporaryFile(suffix='.patch', delete=False, mode='w') as f:
     f.write(patch)
     temp_name = f.name
 
 dry_run = {dry_run_arg}
 
-git_args = ['git', 'apply', '--whitespace=fix']
-if dry_run:
-    git_args.append('--check')
-git_args.append(temp_name)
+git_result = _run_git_apply(temp_name, dry_run)
+r = git_result
 
-r = subprocess.run(git_args, capture_output=True, text=True)
+git_not_repo = (
+    git_result is not None
+    and git_result.returncode != 0
+    and 'not a git repository' in (git_result.stderr or '').lower()
+)
 
-if r.returncode != 0 and 'not a git repository' in r.stderr.lower():
-    patch_args = ['patch', '-p1']
-    if dry_run:
-        patch_args.insert(1, '--dry-run')
-    patch_args += ['--input', temp_name]
-    r = subprocess.run(patch_args, capture_output=True, text=True)
+if git_result is None or git_not_repo:
+    patch_result = _run_patch_apply(temp_name, dry_run)
+    if patch_result is not None and patch_result.returncode == 0:
+        r = patch_result
+    else:
+        code, fallback_msg = _apply_python_fallback(patch, dry_run)
+        os.unlink(temp_name)
+        if code != 0:
+            if patch_result is not None:
+                prior = ((patch_result.stdout or '') + '\\n' + (patch_result.stderr or '')).strip()
+                if prior:
+                    print((prior + '\\n' + fallback_msg).strip())
+                    sys.exit(patch_result.returncode)
+            print(fallback_msg)
+            sys.exit(code)
+
+        out = fallback_msg
+        stats = f'[APPLY_PATCH_STATS] +{{added}} -{{removed}}'
+        out = (out + '\\n' + stats).strip() if out else stats
+        print(out)
+        sys.exit(0)
 
 combined = ((r.stdout or '') + '\\n' + (r.stderr or '')).strip()
 if r.returncode != 0 and 'corrupt patch' in combined.lower():

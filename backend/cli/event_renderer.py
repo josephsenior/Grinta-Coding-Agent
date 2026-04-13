@@ -2562,7 +2562,6 @@ class CLIEventRenderer:
         if not display_content:
             return
 
-
         # Render assistant content directly (no "Assistant" header).
         # Keep a small top spacer for readability.
         self._append_history(Text(""))

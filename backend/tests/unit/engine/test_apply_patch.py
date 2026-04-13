@@ -18,6 +18,15 @@ _VALID_PATCH = (
     "+new\n"
 )
 
+_VALID_PATCH_NO_INDEX = (
+    "diff --git a/x b/x\n"
+    "--- a/x\n"
+    "+++ b/x\n"
+    "@@ -1 +1 @@\n"
+    "-old\n"
+    "+new\n"
+)
+
 
 class TestBuildApplyPatchAction:
     def test_uses_shell_safe_python_transport(self) -> None:
@@ -60,12 +69,13 @@ class TestBuildApplyPatchAction:
         patch_desc = fn["parameters"]["properties"]["patch"]["description"]
 
         assert "diff --git" in desc
-        assert "index <old_hash>..<new_hash> <mode>" in desc
-        assert "corrupt patch at line X" in desc
+        assert "Optional but validated when present" in desc
+        assert "index <old_hash>..<new_hash> [mode]" in desc
+        assert "malformed index line" in desc
         assert "patch does not apply" in desc
         assert "Always generate patches via `git diff`" in desc
         assert "diff --git" in patch_desc
-        assert "index" in patch_desc
+        assert "Index line is optional" in patch_desc
 
     def test_script_contains_runtime_corrupt_patch_guidance(self) -> None:
         with patch(
@@ -77,6 +87,8 @@ class TestBuildApplyPatchAction:
         script = mock_transport.call_args.args[0]
         assert "[APPLY_PATCH_GUIDANCE]" in script
         assert "[APPLY_PATCH_STATS]" in script
+        assert "import whatthepatch" in script
+        assert "_apply_python_fallback" in script
 
     def test_script_fails_fast_for_invalid_patch_contract(self) -> None:
         with patch(
@@ -85,6 +97,7 @@ class TestBuildApplyPatchAction:
         ) as mock_transport:
             action = build_apply_patch_action(
                 "diff --git a/x b/x\n"
+                "index 0000..e69de29\n"
                 "--- a/x\n"
                 "+++ b/x\n"
                 "@@ -1 +1 @@\n"
@@ -95,7 +108,7 @@ class TestBuildApplyPatchAction:
         script = mock_transport.call_args.args[0]
         assert action.display_label == "Applying patch"
         assert "[APPLY_PATCH_GUIDANCE]" in script
-        assert "missing `index <old_hash>..<new_hash> <mode>`" in script
+        assert "malformed index line" in script
         assert "NamedTemporaryFile" not in script
         assert "sys.exit(2)" in script
 
@@ -112,18 +125,8 @@ class TestBuildApplyPatchAction:
 
 
 class TestValidateApplyPatchContract:
-    def test_rejects_missing_index_line(self) -> None:
-        error = validate_apply_patch_contract(
-            "diff --git a/x b/x\n"
-            "--- a/x\n"
-            "+++ b/x\n"
-            "@@ -1 +1 @@\n"
-            "-old\n"
-            "+new\n"
-        )
-
-        assert error is not None
-        assert "missing `index <old_hash>..<new_hash> <mode>`" in error
+    def test_accepts_missing_index_line(self) -> None:
+        assert validate_apply_patch_contract(_VALID_PATCH_NO_INDEX) is None
 
     def test_rejects_malformed_index_line(self) -> None:
         error = validate_apply_patch_contract(
@@ -138,6 +141,19 @@ class TestValidateApplyPatchContract:
 
         assert error is not None
         assert "malformed index line" in error
+
+    def test_accepts_index_without_mode(self) -> None:
+        error = validate_apply_patch_contract(
+            "diff --git a/new.txt b/new.txt\n"
+            "new file mode 100644\n"
+            "index 0000000..1111111\n"
+            "--- /dev/null\n"
+            "+++ b/new.txt\n"
+            "@@ -0,0 +1 @@\n"
+            "+hello\n"
+        )
+
+        assert error is None
 
     def test_accepts_canonical_patch(self) -> None:
         assert validate_apply_patch_contract(_VALID_PATCH) is None

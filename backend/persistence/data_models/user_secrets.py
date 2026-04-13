@@ -207,7 +207,7 @@ class UserSecrets(BaseModel):
 
     def model_post_init(self, __context: Any) -> None:  # type: ignore[override]
         """Normalize internal storage after validation."""
-        provider_tokens = getattr(self, 'provider_tokens')
+        provider_tokens = self.provider_tokens
         if provider_tokens is None:
             object.__setattr__(self, 'provider_tokens', MappingProxyType({}))
         elif not isinstance(provider_tokens, MappingProxyType):
@@ -217,7 +217,7 @@ class UserSecrets(BaseModel):
                 self._convert_provider_tokens(dict(provider_tokens)),
             )
 
-        custom_secrets = getattr(self, 'custom_secrets')
+        custom_secrets = self.custom_secrets
         if custom_secrets is None:
             object.__setattr__(self, 'custom_secrets', MappingProxyType({}))
         elif not isinstance(custom_secrets, MappingProxyType):
