@@ -592,6 +592,11 @@ def load_playbooks_from_dir(
     repo_agents: dict[str, RepoPlaybook] = {}
     knowledge_agents: dict[str, KnowledgePlaybook] = {}
     logger.debug('Loading agents from %s', playbook_dir)
+    logger.info(
+        'Playbook auto-trigger is %s (set %s=1 to enable)',
+        'ENABLED' if AUTO_TRIGGER_ENABLED else 'DISABLED',
+        AUTO_TRIGGER_ENV_VAR,
+    )
 
     # Collect files to process
     repo_root = playbook_dir.parent.parent
