@@ -18,54 +18,6 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
-
-logger = logging.getLogger(__name__)
-
-# Patterns for extracting / stripping <redacted_thinking> blocks from reasoning models.
-_THINK_EXTRACT_RE = re.compile(r'<redacted_thinking>(.*?)(?:</redacted_thinking>|$)', re.DOTALL | re.IGNORECASE)
-_THINK_STRIP_RE = re.compile(r'<redacted_thinking>.*?(?:</redacted_thinking>|$)', re.DOTALL | re.IGNORECASE)
-_INTERNAL_THINK_TAG_RE = re.compile(
-    r'^\[(?P<tag>[A-Z0-9_]+)\](?:\s*(?P<payload>.*))?$',
-    re.DOTALL,
-)
-_INTERNAL_THINK_LABELS = {
-    'CHECKPOINT': 'Saving checkpoint…',
-    'CHECKPOINT_RESULT': 'Checkpoint…',
-    'EXPLORE_TREE_STRUCTURE': 'Exploring code graph…',
-    'PREVIEW': 'Preparing preview…',
-    'READ_SYMBOL_DEFINITION': 'Reading symbol definitions…',
-    'ROLLBACK': 'Reverting…',
-    'SCRATCHPAD': 'Updating scratchpad…',
-    'VERIFY_FILE_LINES': 'Verifying file lines…',
-    'VIEW_AND_REPLACE': 'Preparing edit…',
-    'WORKING_MEMORY': 'Updating working memory…',
-}
-# Strip structured JSON payloads embedded in think-action thoughts.
-_THINK_RESULT_JSON_RE = re.compile(
-    r'\n?\[(?:CHECKPOINT_RESULT|REVERT_RESULT|ROLLBACK|TASK_TRACKER)\]'
-    r'\s*\{.*',
-    re.DOTALL,
-)
-_CMD_SUMMARY_NOISE_PATTERNS = (
-    'a complete log of this run can be found in',
-    '[below is the output of the previous command.]',
-    '[the command completed with exit code',
-    '[app: output truncated',
-)
-_CMD_SUMMARY_PRIORITY_PATTERNS = (
-    re.compile(
-        r'^\[(shell_mismatch|scaffold_setup_failed|missing_module|missing_tool|disk_full|permission_error|oom_killed|segfault|repeated_command_failure)\]',
-        re.IGNORECASE,
-    ),
-    re.compile(r'could not read package\.json', re.IGNORECASE),
-    re.compile(r'contains files that could conflict', re.IGNORECASE),
-    re.compile(r'operation cancelled', re.IGNORECASE),
-    re.compile(r'command not found|not recognized as', re.IGNORECASE),
-    re.compile(r'module(?:notfounderror| not found)|importerror', re.IGNORECASE),
-    re.compile(r'permission denied', re.IGNORECASE),
-    re.compile(r'enoent|eacces|eperm|fatal:|exception|traceback|error', re.IGNORECASE),
-)
-
 from rich import box
 from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.live import Live
@@ -79,6 +31,7 @@ from rich.text import Text
 from backend.cli.hud import HUDBar
 from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
+    ACTIVITY_PANEL_PADDING,
     CALLOUT_PANEL_PADDING,
     frame_live_body,
     frame_transcript_body,
@@ -165,6 +118,54 @@ from backend.ledger.observation import (
     TerminalObservation,
     UserRejectObservation,
 )
+
+logger = logging.getLogger(__name__)
+
+# Patterns for extracting / stripping <redacted_thinking> blocks from reasoning models.
+_THINK_EXTRACT_RE = re.compile(r'<redacted_thinking>(.*?)(?:</redacted_thinking>|$)', re.DOTALL | re.IGNORECASE)
+_THINK_STRIP_RE = re.compile(r'<redacted_thinking>.*?(?:</redacted_thinking>|$)', re.DOTALL | re.IGNORECASE)
+_INTERNAL_THINK_TAG_RE = re.compile(
+    r'^\[(?P<tag>[A-Z0-9_]+)\](?:\s*(?P<payload>.*))?$',
+    re.DOTALL,
+)
+_INTERNAL_THINK_LABELS = {
+    'CHECKPOINT': 'Saving checkpoint…',
+    'CHECKPOINT_RESULT': 'Checkpoint…',
+    'EXPLORE_TREE_STRUCTURE': 'Exploring code graph…',
+    'PREVIEW': 'Preparing preview…',
+    'READ_SYMBOL_DEFINITION': 'Reading symbol definitions…',
+    'ROLLBACK': 'Reverting…',
+    'SCRATCHPAD': 'Updating scratchpad…',
+    'VERIFY_FILE_LINES': 'Verifying file lines…',
+    'VIEW_AND_REPLACE': 'Preparing edit…',
+    'WORKING_MEMORY': 'Updating working memory…',
+}
+# Strip structured JSON payloads embedded in think-action thoughts.
+_THINK_RESULT_JSON_RE = re.compile(
+    r'\n?\[(?:CHECKPOINT_RESULT|REVERT_RESULT|ROLLBACK|TASK_TRACKER)\]'
+    r'\s*\{.*',
+    re.DOTALL,
+)
+_CMD_SUMMARY_NOISE_PATTERNS = (
+    'a complete log of this run can be found in',
+    '[below is the output of the previous command.]',
+    '[the command completed with exit code',
+    '[app: output truncated',
+)
+_CMD_SUMMARY_PRIORITY_PATTERNS = (
+    re.compile(
+        r'^\[(shell_mismatch|scaffold_setup_failed|missing_module|missing_tool|disk_full|permission_error|oom_killed|segfault|repeated_command_failure)\]',
+        re.IGNORECASE,
+    ),
+    re.compile(r'could not read package\.json', re.IGNORECASE),
+    re.compile(r'contains files that could conflict', re.IGNORECASE),
+    re.compile(r'operation cancelled', re.IGNORECASE),
+    re.compile(r'command not found|not recognized as', re.IGNORECASE),
+    re.compile(r'module(?:notfounderror| not found)|importerror', re.IGNORECASE),
+    re.compile(r'permission denied', re.IGNORECASE),
+    re.compile(r'enoent|eacces|eperm|fatal:|exception|traceback|error', re.IGNORECASE),
+)
+_APPLY_PATCH_TITLE = 'apply patch'
 
 
 def _sync_reasoning_after_tool_line(
@@ -276,6 +277,37 @@ def _summarize_cmd_failure(content: str) -> str:
                 return line[:160]
 
     return candidates[-1][:160]
+
+
+def _is_apply_patch_activity(title: str | None, label: str | None) -> bool:
+    """Return True when the internal shell card corresponds to apply_patch."""
+    title_text = (title or '').strip().lower()
+    label_text = (label or '').strip().lower()
+    return title_text == _APPLY_PATCH_TITLE or 'applying patch' in label_text or 'validating patch' in label_text
+
+
+def _compact_apply_patch_result(
+    *,
+    exit_code: int | None,
+    label: str,
+) -> tuple[str, str, list[Any] | None]:
+    """Compact result text for apply_patch to reduce transcript clutter."""
+    if exit_code == 0:
+        is_check_only = 'validating patch' in (label or '').lower()
+        if is_check_only:
+            return 'succeeded', 'ok', None
+        return (
+            'succeeded',
+            'ok',
+            [
+                format_activity_secondary('+....', kind='ok'),
+                format_activity_secondary('-....', kind='err'),
+            ],
+        )
+
+    if exit_code is None:
+        return 'failed', 'err', None
+    return f'failed · exit {exit_code}', 'err', None
 
 
 def _truncate_activity_detail(text: str, limit: int) -> str:
@@ -416,6 +448,7 @@ def _build_task_panel(task_list: list[dict[str, Any]]) -> Any:
         f'Tasks ({len(task_list)})',
         empty_state,
         accent_style='dim',
+        padding=ACTIVITY_PANEL_PADDING,
     )
 
 
@@ -447,6 +480,7 @@ def _build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
         f'Workers ({len(workers)})',
         empty_state,
         accent_style='dim',
+        padding=ACTIVITY_PANEL_PADDING,
     )
 
 
@@ -1872,9 +1906,20 @@ class CLIEventRenderer:
             # Always initialize; some branches omit previews.
             extra_lines = None
 
+            is_apply_patch_internal = is_internal and _is_apply_patch_activity(
+                title,
+                label,
+            )
+
+            if is_apply_patch_internal:
+                msg, result_kind, extra_lines = _compact_apply_patch_result(
+                    exit_code=exit_code,
+                    label=label,
+                )
+
             # CmdOutputObservation defaults to exit_code=-1 when unknown.
             # Treat any non-zero exit code as an error line (including -1 unknown).
-            if exit_code is not None and exit_code != 0:
+            elif exit_code is not None and exit_code != 0:
                 err_line = _summarize_cmd_failure(content)
                 msg = f'exit {exit_code}'
                 if err_line:
@@ -2684,6 +2729,7 @@ class CLIEventRenderer:
             'Draft reply',
             Group(*body),
             accent_style='dim',
+            padding=ACTIVITY_PANEL_PADDING,
         )
 
     @staticmethod

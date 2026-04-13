@@ -3,6 +3,7 @@
     "snyk.advanced.organization": "69f04fde-ea60-47e5-b739-1eec099c08c4",
     "snyk.advanced.autoSelectOrganization": true,
     "cSpell.words": [
-        "keepends"
+        "keepends",
+        "notfounderror"
     ]
 }

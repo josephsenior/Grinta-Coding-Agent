@@ -2261,6 +2261,87 @@ async def test_renderer_internal_cmd_run_uses_origin_tool_title() -> None:
     assert 'Shell' not in output
 
 
+@pytest.mark.asyncio
+async def test_renderer_apply_patch_output_is_collapsed_on_success() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    action = CmdRunAction(
+        command='python -c "print(\"internal\")"',
+        display_label='Applying patch',
+    )
+    action.source = EventSource.AGENT
+    action.tool_call_metadata = MagicMock(
+        function_name='apply_patch',
+        tool_call_id='call-apply-1',
+        total_calls_in_response=1,
+    )
+
+    await renderer.handle_event(action)
+    await renderer.handle_event(
+        CmdOutputObservation(
+            content=(
+                'diff --git a/foo.py b/foo.py\n'
+                'index 1111111..2222222 100644\n'
+                '--- a/foo.py\n'
+                '+++ b/foo.py\n'
+                '@@ -1,1 +1,1 @@\n'
+                '-old\n'
+                '+new\n'
+            ),
+            exit_code=0,
+            command='python -c "print(\"internal\")"',
+        )
+    )
+
+    output = _console_output(console)
+    assert 'Apply patch' in output
+    assert 'Applying patch' in output
+    assert 'succeeded' in output
+    assert '+....' in output
+    assert '-....' in output
+    assert 'diff --git' not in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_apply_patch_output_is_collapsed_on_failure() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    action = CmdRunAction(
+        command='python -c "print(\"internal\")"',
+        display_label='Applying patch',
+    )
+    action.source = EventSource.AGENT
+    action.tool_call_metadata = MagicMock(
+        function_name='apply_patch',
+        tool_call_id='call-apply-2',
+        total_calls_in_response=1,
+    )
+
+    await renderer.handle_event(action)
+    await renderer.handle_event(
+        CmdOutputObservation(
+            content='error: corrupt patch at line 7',
+            exit_code=1,
+            command='python -c "print(\"internal\")"',
+        )
+    )
+
+    output = _console_output(console)
+    assert 'Apply patch' in output
+    assert 'Applying patch' in output
+    assert 'failed' in output
+    assert '+....' not in output
+    assert '-....' not in output
+
+
 def test_reasoning_display_tool_icons() -> None:
     """ReasoningDisplay should show tool-specific icons."""
     rd = ReasoningDisplay()

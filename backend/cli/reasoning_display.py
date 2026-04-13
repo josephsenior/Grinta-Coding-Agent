@@ -11,10 +11,12 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
+from backend.cli.layout_tokens import ACTIVITY_PANEL_PADDING
 from backend.cli.transcript import format_callout_panel
 
-# Match format_activity_primary: same inset as tool card body text.
-_THOUGHT_LINE_PREFIX_CHARS = 2
+# Thought lines are rendered without an extra manual prefix so they align with
+# other activity panel bodies.
+_THOUGHT_LINE_PREFIX_CHARS = 0
 
 
 def _fit_thought_line(text: str, max_width: int | None) -> str:
@@ -152,20 +154,25 @@ class ReasoningDisplay:
 
         rows: list[Any] = []
 
-        header = Table.grid(expand=True)
-        # Two cells so the action label lines up with tool-card verb rows (pad 1 + 2).
-        header.add_column(width=2)
+        header_left = Table.grid(expand=True, padding=(0, 1))
+        header_left.add_column(no_wrap=True)
+        header_left.add_column(ratio=1)
+        header_left.add_row(
+            Spinner('dots', style='cyan'),
+            Text(action_label, style='bold cyan'),
+        )
+
+        header = Table.grid(expand=True, padding=(0, 0))
         header.add_column(ratio=1)
         header.add_column(justify='right')
         header.add_row(
-            Spinner('dots', style='cyan'),
-            Text(action_label, style='bold cyan'),
+            header_left,
             Text(meta_right, style='dim') if meta_right else Text(''),
         )
         rows.append(header)
 
         if trail := list(self._recent_actions):
-            self._extracted_from_renderable_38(trail, rows)
+            self._append_recent_actions_crumb(trail, rows)
         visible_thoughts = self._thought_lines
         clipped = False
         if max_lines is not None and max_lines >= 0 and len(visible_thoughts) > max_lines:
@@ -174,19 +181,12 @@ class ReasoningDisplay:
 
         for line in visible_thoughts:
             fitted = _fit_thought_line(line, max_width)
-            t = Text()
-            t.append('  ', style='')
-            t.append(fitted, style='italic dim')
-            rows.append(t)
+            rows.append(Text(fitted, style='italic dim'))
 
         if clipped:
-            notice = Text()
-            notice.append('  ', style='')
-            notice.append('auto-scroll: showing latest thoughts', style='dim italic')
-            rows.append(notice)
+            rows.append(Text('auto-scroll: showing latest thoughts', style='dim italic'))
 
         hint = Text()
-        hint.append('  ', style='')
         hint.append('Ctrl+C', style='bold dim')
         hint.append(' interrupts', style='dim italic')
         rows.append(hint)
@@ -195,16 +195,17 @@ class ReasoningDisplay:
             'Thinking',
             Group(*rows),
             accent_style='dim cyan',
-            # Match activity tool cards (format_activity_block): tighter inset than generic callouts.
-            padding=(0, 1),
+            padding=ACTIVITY_PANEL_PADDING,
         )
 
-    # TODO Rename this here and in `renderable`
-    def _extracted_from_renderable_38(self, trail, rows):
+    def _append_recent_actions_crumb(
+        self,
+        trail: list[str],
+        rows: list[Any],
+    ) -> None:
         # Last two completed steps — helps users see what already happened.
         tail = trail[-2:]
         crumb = Text()
-        crumb.append('  ', style='')
         crumb.append('then ', style='dim italic')
         crumb.append(' → '.join(tail), style='dim italic')
         rows.append(crumb)

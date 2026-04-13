@@ -36,8 +36,17 @@ _DESCRIPTION = (
     '- Renaming a symbol across multiple files\n'
     '- Applying a pre-computed diff from `git diff` or `diff -u`\n'
     '- Making coordinated changes across several files simultaneously\n\n'
-    'The `patch` parameter should be a valid unified diff string '
-    '(the output of `git diff` or `diff -u old new`).\n\n'
+    'CRITICAL: `patch` must be a complete git unified diff with full headers.\n'
+    'Required lines, in order:\n'
+    '1. diff --git a/<file> b/<file>\n'
+    '2. index <old_hash>..<new_hash> <mode>\n'
+    '3. --- a/<file>\n'
+    '4. +++ b/<file>\n'
+    '5. @@ -n,m +n,m @@\n\n'
+    'Common errors:\n'
+    '- "corrupt patch at line X" usually means the index line is missing.\n'
+    '- "patch does not apply" usually means headers or hunk context are incomplete.\n\n'
+    'Always generate patches via `git diff` when possible.\n\n'
     'After applying, the tool shows which files were modified. '
     "Use `str_replace_editor command='view_file'` to confirm the result."
 )
@@ -52,9 +61,8 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
             'patch': {
                 'type': 'string',
                 'description': (
-                    'The unified diff patch to apply. Must be valid unified diff format '
-                    '(as produced by `git diff` or `diff -u`). '
-                    'Multi-file patches are fully supported.'
+                    'Complete git unified diff to apply (multi-file supported). '
+                    'Must include diff --git, index, ---/+++, and @@ hunk headers.'
                 ),
             },
             'check_only': {
@@ -130,4 +138,5 @@ sys.exit(r.returncode)
     return CmdRunAction(
         command=build_python_exec_command(py),
         thought=f'[APPLY PATCH] {label}',
+        display_label='Validating patch' if check_only else 'Applying patch',
     )

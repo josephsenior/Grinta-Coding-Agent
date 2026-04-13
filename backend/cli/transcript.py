@@ -17,7 +17,7 @@ from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
 
-from backend.cli.layout_tokens import CALLOUT_PANEL_PADDING
+from backend.cli.layout_tokens import ACTIVITY_PANEL_PADDING, CALLOUT_PANEL_PADDING
 
 # Stripped from user-visible transcripts (still present on stored observations for the LLM).
 _APP_RESULT_VALIDATION_RE = re.compile(
@@ -132,7 +132,7 @@ def format_activity_block(
             title_align='left',
             border_style='dim',
             box=box.ROUNDED,
-            padding=(0, 1),
+            padding=ACTIVITY_PANEL_PADDING,
         )
     return content
 

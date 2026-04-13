@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from backend.engine.tools.apply_patch import build_apply_patch_action
+from backend.engine.tools.apply_patch import (
+    build_apply_patch_action,
+    create_apply_patch_tool,
+)
 
 
 class TestBuildApplyPatchAction:
@@ -24,6 +27,26 @@ class TestBuildApplyPatchAction:
         assert 'b64decode' in action.command
         assert 'print("hi")' not in action.command
         assert action.thought == '[APPLY PATCH] applying patch'
+        assert action.display_label == 'Applying patch'
+
+    def test_check_only_uses_validating_display_label(self) -> None:
+        action = build_apply_patch_action('diff --git a/x b/x', check_only=True)
+
+        assert action.display_label == 'Validating patch'
+
+    def test_tool_description_requires_full_git_unified_diff_headers(self) -> None:
+        tool = create_apply_patch_tool()
+        fn = tool['function']
+        desc = fn['description']
+        patch_desc = fn['parameters']['properties']['patch']['description']
+
+        assert 'diff --git' in desc
+        assert 'index <old_hash>..<new_hash> <mode>' in desc
+        assert 'corrupt patch at line X' in desc
+        assert 'patch does not apply' in desc
+        assert 'Always generate patches via `git diff`' in desc
+        assert 'diff --git' in patch_desc
+        assert 'index' in patch_desc
 
     def test_script_contains_corrupt_patch_guidance(self) -> None:
         with patch(
