@@ -449,7 +449,10 @@ class TreeSitterEditor:
                 preserve_indentation=True,
             )
 
-            # Validate if requested
+            # Normalize CRLF -> LF early so validation sees a consistent EOL style
+            new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
+
+            # Validate if requested against normalized content
             if validate:
                 validation_result = self._validate_syntax(new_code, file_path, language)
                 if not validation_result[0]:
@@ -459,11 +462,6 @@ class TreeSitterEditor:
                         syntax_valid=False,
                         original_code=original_code,
                     )
-
-            # Normalize \r\n → \n before writing in text mode to
-            # prevent doubling (original_code from binary read has \r\n,
-            # text-mode write would add another \r).
-            new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
 
             # Write back
             with open(file_path, 'w', encoding='utf-8') as f:
@@ -525,6 +523,9 @@ class TreeSitterEditor:
             end_byte = node.end_byte
             new_code = new_code[:start_byte] + new_name + new_code[end_byte:]
 
+        # Normalize CRLF -> LF early so validation sees a consistent EOL style
+        new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
+
         # Validate
         validation_result = self._validate_syntax(new_code, file_path, language)
         if not validation_result[0]:
@@ -534,11 +535,6 @@ class TreeSitterEditor:
                 syntax_valid=False,
                 original_code=original_code,
             )
-
-        # Normalize \r\n → \n before writing in text mode to
-        # prevent doubling (original_code from binary read has \r\n,
-        # text-mode write would add another \r).
-        new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
 
         # Write back
         with open(file_path, 'w', encoding='utf-8') as f:
