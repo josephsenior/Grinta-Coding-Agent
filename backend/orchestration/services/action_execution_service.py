@@ -207,8 +207,8 @@ class ActionExecutionService:
                 cb_service = getattr(controller, 'circuit_breaker_service', None)
                 if cb_service is not None:
                     error_lower = error_signature.lower()
-                    if 'apply_patch' in error_lower or '[apply_patch' in error_lower:
-                        cb_service.record_error(exc, tool_name='apply_patch')
+                    if 'str_replace_editor' in error_lower or '[str_replace_editor' in error_lower:
+                        cb_service.record_error(exc, tool_name='str_replace_editor')
 
                 effective_max_retries = max_identical_retries
                 if '[APPLY_PATCH_CLASS:malformed_patch]' in error_signature or '[APPLY_PATCH_CLASS:context_mismatch]' in error_signature:

@@ -23,8 +23,8 @@ _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
 # Tool fallback map — when a tool fails, suggest the next alternative so the
 # model can pivot in the same turn instead of stopping to explain.
 _TOOL_FALLBACK_MAP: dict[str, list[str]] = {
-    'ast_code_editor': ['str_replace_editor', 'apply_patch'],
-    'str_replace_editor': ['apply_patch'],
+    'ast_code_editor': ['str_replace_editor', ],
+    'str_replace_editor': [],
     'search_code': ['lsp_query'],
     'lsp_query': ['search_code'],
 }

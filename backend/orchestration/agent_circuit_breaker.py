@@ -181,25 +181,25 @@ class CircuitBreaker:
             )
 
         # 2.5 Deterministic same-tool failures
-        apply_patch_errors = self.get_tool_error_count('apply_patch')
-        if apply_patch_errors >= 2:
+        str_replace_editor_errors = self.get_tool_error_count('str_replace_editor')
+        if str_replace_editor_errors >= 2:
             recommendation = (
-                'Repeated deterministic apply_patch failures detected. '
+                'Repeated deterministic str_replace_editor failures detected. '
                 'Refresh file context with read_file before reattempting. '
                 'If this persists, switch to a different edit strategy.'
             )
-            if apply_patch_errors >= 3:
+            if str_replace_editor_errors >= 3:
                 recommendation = (
                     recommendation
-                    + ' apply_patch retries are now blocked until strategy changes.'
+                    + ' str_replace_editor retries are now blocked until strategy changes.'
                 )
             return CircuitBreakerResult(
                 tripped=True,
                 reason=(
-                    'Repeated apply_patch deterministic failures '
-                    f'({apply_patch_errors})'
+                    'Repeated str_replace_editor deterministic failures '
+                    f'({str_replace_editor_errors})'
                 ),
-                action='pause' if apply_patch_errors >= 3 else 'switch_context',
+                action='pause' if str_replace_editor_errors >= 3 else 'switch_context',
                 recommendation=recommendation,
                 system_message=recommendation,
             )

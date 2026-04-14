@@ -11,7 +11,6 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'execute_bash': ('', 'Shell'),
     'execute_powershell': ('', 'Shell'),
     'str_replace_editor': ('', 'Files'),
-    'apply_patch': ('', 'Apply patch'),
     'edit_file': ('', 'Edit file'),
     'ast_code_editor': ('', 'AST edit'),
     'agent_think': ('', 'Think'),
@@ -77,7 +76,6 @@ def friendly_verb_for_tool(
     if tn in {'execute_bash', 'execute_powershell'}:
         return 'Ran'
     mapping = {
-        'apply_patch': 'Patched',
         'edit_file': 'Edited',
         'ast_code_editor': 'Refactored',
         'agent_think': 'Thinking',
@@ -225,12 +223,6 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
         if sr_cmd:
             parts.append(sr_cmd)
         return ' · '.join(parts) if parts else 'file…'
-
-    if tn == 'apply_patch':
-        patch = args.get('patch') or args.get('diff') or ''
-        if isinstance(patch, str) and patch.strip():
-            return 'apply patch'
-        return 'apply patch'
 
     if tn in {'think', 'agent_think'}:
         t = args.get('thought') or args.get('content')

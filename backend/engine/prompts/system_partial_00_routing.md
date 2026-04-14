@@ -1,7 +1,7 @@
 <QUICK_REFERENCE>
 - **Find things:** Use `search_code` or `explore_tree_structure`.
 - **Read files:** ❌ Don't: `cat file.py` → ✅ Do: `str_replace_editor` (`view_file` / `view_range`)
-- **Edit files:** Use `str_replace_editor` (or `ast_code_editor` / `apply_patch`). NEVER use shell commands for file content.
+- **Edit files:** Use `str_replace_editor` (or `ast_code_editor`). NEVER use shell commands for file content.
 - **Safety:** Use `communicate_with_user` before high-risk actions.
 - **Execution:** Do not narrate file changes—call the tools.
 </QUICK_REFERENCE>

@@ -15,8 +15,8 @@ If path is uncertain: {path_discovery_hint}
 
 On tool failure, pivot in the same turn:
 
-- `ast_code_editor` → `str_replace_editor` → `apply_patch`
-- `str_replace_editor` → `apply_patch` (or fix match string)
+- `ast_code_editor` → `str_replace_editor` (exact) → `str_replace_editor` (normalize_ws)
+- `str_replace_editor` (exact) → `str_replace_editor` (normalize_ws or fuzzy_safe)
 
 {code_intelligence_fallback}
 

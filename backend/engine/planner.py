@@ -138,10 +138,7 @@ class OrchestratorPlanner:
         tools.append(create_recall_tool())
 
     def _add_edit_and_search_tools(self, tools: list) -> None:
-        """Add apply_patch, task_tracker, search_code, explore_code tools."""
-        from backend.engine.tools.apply_patch import (
-            create_apply_patch_tool,
-        )
+        """Add task_tracker, search_code, explore_code tools."""
         from backend.engine.tools.explore_code import (
             create_explore_tree_structure_tool,
             create_read_symbol_definition_tool,
@@ -152,9 +149,6 @@ class OrchestratorPlanner:
         from backend.engine.tools.task_tracker import (
             create_task_tracker_tool,
         )
-
-        if getattr(self._config, 'enable_apply_patch', True):
-            tools.append(create_apply_patch_tool())
         if getattr(self._config, 'enable_internal_task_tracker', True):
             tools.append(create_task_tracker_tool())
         tools.append(create_search_code_tool())

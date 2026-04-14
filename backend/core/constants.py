@@ -273,7 +273,6 @@ TASK_TRACKER_TOOL_NAME = 'task_tracker'
 NOTE_TOOL_NAME = 'note'
 RECALL_TOOL_NAME = 'recall'
 SEMANTIC_RECALL_TOOL_NAME = 'semantic_recall'
-APPLY_PATCH_TOOL_NAME = 'apply_patch'
 # ── Security Risk ───────────────────────────────────────────────────
 SECURITY_RISK_DESC = (
     "Optional. Your assessment of this action's safety risk (LOW/MEDIUM/HIGH). "

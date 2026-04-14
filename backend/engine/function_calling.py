@@ -19,7 +19,6 @@ from backend.engine.common import (
     common_response_to_actions,
 )
 from backend.engine.tools import (
-    create_apply_patch_tool,
     create_cmd_run_tool,
     create_finish_tool,
     create_llm_based_edit_tool,
@@ -32,7 +31,6 @@ from backend.engine.tools.analyze_project_structure import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
     build_analyze_project_structure_action,
 )
-from backend.engine.tools.apply_patch import build_apply_patch_action
 from backend.engine.tools.blackboard import (
     BLACKBOARD_TOOL_NAME,
     build_blackboard_action,
@@ -277,21 +275,6 @@ def _handle_memory_manager_tool(arguments: dict) -> AgentThinkAction:
 
     else:
         raise FunctionCallValidationError(f'Unknown memory_manager action: {action}')
-
-
-def _handle_apply_patch_tool(arguments: dict) -> CmdRunAction:
-    """Handle APPLY_PATCH_TOOL: apply a unified diff to the workspace."""
-    if 'patch' not in arguments:
-        raise FunctionCallValidationError(
-            'Missing required argument "patch" in tool call apply_patch'
-        )
-    check_only = arguments.get('check_only', 'false') == 'true'
-    # The tool now requires 'last_verified_line_content' instead of the old boolean.
-    return build_apply_patch_action(
-        patch=arguments['patch'],
-        check_only=check_only,
-        last_verified_line_content=arguments.get('last_verified_line_content', ''),
-    )
 
 
 def _handle_search_code_tool(arguments: dict) -> AgentThinkAction:
@@ -1235,7 +1218,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         MEMORY_MANAGER_TOOL_NAME: _handle_memory_manager_tool,
         NOTE_TOOL_NAME: lambda args: build_note_action(args['key'], args['value']),
         RECALL_TOOL_NAME: lambda args: build_recall_action(args['key']),
-        create_apply_patch_tool()['function']['name']: _handle_apply_patch_tool,
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         VERIFY_FILE_LINES_TOOL_NAME: _handle_verify_file_lines_tool,

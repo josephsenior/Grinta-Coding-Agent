@@ -1,7 +1,6 @@
 """Tool definitions used by the Orchestrator agent."""
 
 from .analyze_project_structure import create_analyze_project_structure_tool
-from .apply_patch import create_apply_patch_tool
 from .bash import create_cmd_run_tool
 from .checkpoint import create_checkpoint_tool
 from .condensation_request import create_summarize_context_tool
@@ -30,7 +29,6 @@ from .verify_file_lines import create_verify_file_lines_tool
 from .verify_ui import create_verify_ui_change_tool
 
 __all__ = [
-    'create_apply_patch_tool',
     'create_checkpoint_tool',
     'create_summarize_context_tool',
     'create_communicate_tool',
