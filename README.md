@@ -6,6 +6,10 @@
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Tests](https://github.com/josephsenior/Grinta-Agent/actions/workflows/py-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Agent/actions/workflows/py-tests.yml)
+[![Lint](https://github.com/josephsenior/Grinta-Agent/actions/workflows/lint.yml/badge.svg)](https://github.com/josephsenior/Grinta-Agent/actions/workflows/lint.yml)
+[![E2E](https://github.com/josephsenior/Grinta-Agent/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Agent/actions/workflows/e2e-tests.yml)
+[![Codecov](https://codecov.io/gh/josephsenior/Grinta-Agent/branch/main/graph/badge.svg)](https://codecov.io/gh/josephsenior/Grinta-Agent)
 
 > Autonomous coding that closes the loop: plan, execute, validate, finish.
 

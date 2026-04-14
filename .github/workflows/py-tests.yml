@@ -46,6 +46,14 @@ jobs:
           backend/tests/unit/core/test_runtime_config.py \
           backend/tests/unit/execution/test_command_timeout.py
 
+      - name: Run coverage and upload to Codecov
+        if: always()
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc || true
+          curl -s https://codecov.io/bash | bash -s -- -t $CODECOV_TOKEN || true
+
   gates-on-windows:
     name: Python Gates on Windows
     runs-on: windows-latest
@@ -74,6 +82,16 @@ jobs:
         run: uv run pytest -q backend/tests/unit/core/test_grinta_launch_entry.py backend/tests/unit/core/test_runtime_config.py backend/tests/unit/execution/test_command_timeout.py
         env:
           PYTHONPATH: ".;$env:PYTHONPATH"
+
+      - name: Run coverage and upload to Codecov
+        if: always()
+        shell: pwsh
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        run: |
+          uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc; if ($LASTEXITCODE -ne 0) { Write-Host "Tests failed, continuing" }
+          Invoke-WebRequest -Uri "https://codecov.io/bash" -OutFile codecov.ps1
+          powershell -ExecutionPolicy Bypass -File codecov.ps1 -t $env:CODECOV_TOKEN
 
   heavy-tests:
     name: Heavy / Integration Tests

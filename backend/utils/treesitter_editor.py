@@ -184,6 +184,15 @@ LANGUAGE_EXTENSIONS = {
     '.rst': 'rst',
     '.tex': 'latex',
     '.jl': 'julia',
+    # Additional languages commonly supported by Tree-sitter but not yet mapped
+    '.ps1': 'powershell',
+    '.psm1': 'powershell',
+    '.psd1': 'powershell',
+    '.ini': 'ini',
+    '.tf': 'hcl',
+    '.mk': 'make',
+    '.cmake': 'cmake',
+    '.dockerfile': 'dockerfile',
 }
 
 
@@ -211,10 +220,6 @@ class TreeSitterEditor:
     - Haskell, Elixir, Erlang, OCaml, Elm
 
     **Modern Systems:**
-                # Normalize CRLF -> LF early so validation sees a consistent EOL style
-                new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
-
-                # Validate if requested against normalized content
     - Swift, Objective-C, Dart
 
     **Data/Config:**
@@ -339,10 +344,6 @@ class TreeSitterEditor:
 
         except FileNotFoundError:
             logger.error('File not found: %s', file_path)
-                    # Normalize CRLF -> LF early so validation sees a consistent EOL style
-                    new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
-
-                    # Validate
             return None
 
     def find_symbol(
