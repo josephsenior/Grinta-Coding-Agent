@@ -33,8 +33,8 @@ from backend.ledger.action import CmdRunAction
 
 _DESCRIPTION = (
     "**CRITICAL: Exact Format Required**\n"
-    "You MUST verify the exact target file contents and line numbers using `read_file` or `grep_search` before using this tool.\n"
-    "This tool applies a unified diff (`git diff` / `diff -u` format) to the workspace atomically.\n\n"
+    "You MUST verify target file contents using `read_file` or `grep_search` IMMEDIATELY before using this tool.\n"
+    "This tool applies a unified diff (`git diff` / `diff -u` format) atomically.\n\n"
     "**CORRECT USAGE EXAMPLE:**\n"
     "```diff\n"
     "diff --git a/path/to/file.py b/path/to/file.py\n"
@@ -47,13 +47,15 @@ _DESCRIPTION = (
     "```\n\n"
     "**STRICT REQUIREMENTS:**\n"
     "- Must start with `diff --git a/<file> b/<file>`\n"
-    "- Followed by `--- a/<file>` (or `/dev/null` for new files)\n"
-    "- Followed by `+++ b/<file>` (or `/dev/null` for deleted files)\n"
-    "- Followed by hunk headers `@@ -n,m +n,m @@`\n"
-    "- Context lines (unchanged) must start with a single space.\n"
-    "- Added lines must start with `+`.\n"
-    "- Removed lines must start with `-`.\n"
-    "- You MUST explicitly set the `i_have_verified_file_contents_and_format` argument to `true`.\n"
+    "- Followed by `--- a/<file>` and `+++ b/<file>` lines.\n"
+    "- Followed by hunk headers `@@ -n,m +n,m @@`.\n"
+    "- **MANDATORY CONTEXT SPACES**: Unchanged lines MUST start with a single space.\n"
+    "- Change lines must start with `+` or `-`.\n\n"
+    "**COMMON FAILURES TO AVOID (CRITICAL):**\n"
+    "- **NO MARKDOWN**: Do not include '```diff' blocks INSIDE the patch string.\n"
+    "- **NO ELLIPSES**: Never use '...' to skip lines. Hunks must be contiguous.\n"
+    "- **NO MISSING SPACES**: Omission of the leading space on context lines will cause 'corrupt patch' errors.\n"
+    "- **EOF HANDLING**: If a file does not end in a newline, include `\\ No newline at end of file`.\n"
 )
 
 
@@ -66,17 +68,15 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
             "patch": {
                 "type": "string",
                 "description": (
-                    "Complete git unified diff to apply (multi-file supported). "
-                    "Must include diff --git, ---/+++, and @@ hunk headers. "
-                    "Index line is optional, but if present it must be valid."
+                    "Complete git unified diff. Must include diff --git, ---/+++, and @@ hunk headers. "
+                    "Ensure context lines start with a single space."
                 ),
             },
-            "i_have_verified_file_contents_and_format": {
-                "type": "boolean",
+            "last_verified_line_content": {
+                "type": "string",
                 "description": (
-                    "You MUST explicitly set this to `true` to acknowledge that you have "
-                    "recently verify the exact file contents using `read_file` or `grep_search` "
-                    "and reviewed the correct patch format requirements."
+                    "The exact content of the FIRST line of context in your patch, exactly as seen in your last `read_file` call. "
+                    "This forces you to verify the file content before patching."
                 ),
             },
             "check_only": {
@@ -88,7 +88,7 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
                 ),
             },
         },
-        required=["patch", "i_have_verified_file_contents_and_format"],
+        required=["patch", "last_verified_line_content"],
     )
 
 
@@ -115,6 +115,15 @@ def validate_apply_patch_contract(patch: str) -> str:
     has_hunk = any(line.startswith("@@ ") for line in lines)
 
     if not (has_git or (has_minus and has_plus)) or not has_hunk:
+        # Check if they are accidentally using a pseudo-diff or just code block
+        is_just_plus_minus = all(
+            line.startswith(("+", "-", " ")) or not line.strip() for line in lines
+        )
+        if is_just_plus_minus and (
+            any(line.startswith("+") for line in lines)
+            or any(line.startswith("-") for line in lines)
+        ):
+            return "Missing unified diff headers. You provided +/- lines but forgot 'diff --git', '---', '+++', and '@@' hunk headers."
         return "Missing required diff headers (diff --git, ---/+++, or @@)."
 
     # Heuristic to fix common LLM mistakes:
@@ -153,7 +162,7 @@ def _b64(s: str) -> str:
 def build_apply_patch_action(
     patch: str,
     check_only: bool = False,
-    i_have_verified_file_contents_and_format: bool = False,
+    last_verified_line_content: str = "",
 ) -> CmdRunAction:
     """Return a CmdRunAction that applies the unified diff to the workspace."""
     result = validate_apply_patch_contract(patch)
@@ -170,6 +179,21 @@ sys.exit(2)
             command=build_python_exec_command(py),
             thought=f"[APPLY PATCH] {label}",
             display_label="Validating patch" if check_only else "Applying patch",
+        )
+
+    if not last_verified_line_content:
+        py = """
+import sys
+
+print("[APPLY_PATCH_FAILURE] Missing mandatory context verification. "
+      "You must provide 'last_verified_line_content' to prove you read the file "
+      "immediately before patching.")
+sys.exit(2)
+"""
+        return CmdRunAction(
+            command=build_python_exec_command(py),
+            thought="[APPLY PATCH] missing verification",
+            display_label="Aborting patch",
         )
 
     # If validation passed, result contains the normalized patch
@@ -215,7 +239,7 @@ for raw_line in patch.splitlines():
 
 
 def _run_git_apply(temp_name, dry_run):
-    git_args = ['git', 'apply', '--whitespace=fix', '--recount', '--inaccurate-eof']
+    git_args = ['git', 'apply', '--whitespace=fix', '--recount', '--inaccurate-eof', '--verbose']
     if dry_run:
         git_args.append('--check')
     git_args.append(temp_name)
@@ -226,7 +250,7 @@ def _run_git_apply(temp_name, dry_run):
 
 
 def _run_patch_apply(temp_name, dry_run):
-    patch_args = ['patch', '-p1']
+    patch_args = ['patch', '-p1', '--batch']
     if dry_run:
         patch_args.insert(1, '--dry-run')
     patch_args += ['--input', temp_name]
@@ -304,10 +328,9 @@ def _apply_python_fallback(patch_text, dry_run):
                     if source_line != line_text.rstrip('\\r\\n'):
                         return (
                             1,
-                            'Patch context mismatch in '
-                            + target_path
-                            + ' at line '
-                            + str(old_no),
+                            f'[APPLY_PATCH_GUIDANCE] Patch context mismatch in {{target_path}} at line {{old_no}}. '
+                            f'Expected: "{{line_text.rstrip()}}", Found: "{{source_line.rstrip()}}". '
+                            f'Ensure you have the latest file content.'
                         )
 
                 cursor = min(len(original_lines), old_idx + 1)
@@ -374,14 +397,22 @@ if git_result is None or git_not_repo:
         print(out)
         sys.exit(0)
 
-combined = ((r.stdout or '') + '\\n' + (r.stderr or '')).strip()
-if r.returncode != 0 and 'corrupt patch' in combined.lower():
+combined = ((r.stdout or '') + '\n' + (r.stderr or '')).strip()
+if r.returncode != 0:
     guidance = (
-        '[APPLY_PATCH_GUIDANCE] The patch appears malformed or in the wrong format. '
-        'This tool expects a standard unified diff (git diff / diff -u), not a custom patch DSL. '
-        'Regenerate the patch in unified diff format and retry.'
+        '[APPLY_PATCH_GUIDANCE] The patch failed to apply. '
+        'Verify the file contents and line numbers match exactly. '
+        'If you used "git diff", ensure you updated your local view with "read_file" first. '
+        'The tool expects a standard unified diff (git diff / diff -u).'
     )
-    print((combined + '\\n\\n' + guidance).strip())
+    if 'corrupt patch' in combined.lower() or 'malformed' in combined.lower():
+        guidance = (
+            '[APPLY_PATCH_GUIDANCE] The patch appears malformed or in the wrong format. '
+            'This tool expects a standard unified diff (git diff / diff -u), not a custom patch DSL. '
+            'Regenerate the patch in unified diff format and retry.'
+        )
+    # Report the exact error and guidance
+print(f"Error applying patch (code {{r.returncode}}):\\n{{combined}}\\n\\n{{guidance}}")
     os.unlink(temp_name)
     sys.exit(r.returncode)
 

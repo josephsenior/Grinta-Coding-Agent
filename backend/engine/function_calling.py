@@ -288,7 +288,12 @@ def _handle_apply_patch_tool(arguments: dict) -> CmdRunAction:
             'Missing required argument "patch" in tool call apply_patch'
         )
     check_only = arguments.get('check_only', 'false') == 'true'
-    return build_apply_patch_action(patch=arguments['patch'], check_only=check_only)
+    # The tool now requires 'last_verified_line_content' instead of the old boolean.
+    return build_apply_patch_action(
+        patch=arguments['patch'],
+        check_only=check_only,
+        last_verified_line_content=arguments.get('last_verified_line_content', ''),
+    )
 
 
 def _handle_search_code_tool(arguments: dict) -> AgentThinkAction:

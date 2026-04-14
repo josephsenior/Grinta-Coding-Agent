@@ -62,13 +62,12 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act III — Architecture Under Pressure:** [03](03-the-architectural-gauntlet.md), [04](04-the-context-war.md), [05](05-the-giants-playbook.md), [06](06-the-system-design-playbook.md)
 - **Act IV — Proof, Cost, and Consequence:** [08](08-the-first-fixed-issue.md), [09](09-the-3am-decisions.md), [10](10-model-agnostic-reckoning.md), [11](11-the-console-wars.md), [12](12-open-source-was-the-better-business.md)
 - **Act V — Hidden Systems:** [13](13-the-hidden-playbooks.md), [14](14-the-verification-tax.md), [15](15-prompts-are-programs.md), [16](16-the-pragmatic-stack.md), [17](17-the-mind-of-the-agent.md)
-- **Act VI — Reliability Under Fire:** [18](18-surviving-the-crash.md), [19](19-circuit-breakers-and-hallucinations.md), [20](20-the-safety-sandbox-is-not-optional.md), [21](21-who-grades-the-agent.md), [22](22-the-middleware-contract.md), [23](23-the-parallelization-trap.md)
-- **Act VII — Incident Addenda and Prompt Discipline:** [23A](23-the-identity-and-execution-crisis.md), [24](24-the-perfect-prompt-illusion.md)
+- **Act VI — Reliability Under Fire:** [18](18-surviving-the-crash.md), [19](19-circuit-breakers-and-hallucinations.md), [20](20-the-safety-sandbox-is-not-optional.md), [21](21-who-grades-the-agent.md), [22](22-the-middleware-contract.md), [23](23-the-identity-and-execution-crisis.md)
+- **Act VII — Incident Addenda and Prompt Discipline:** [24](24-the-parallelization-trap.md), [25](25-the-perfect-prompt-illusion.md)
+- **Act VIII — Operational Reality & Production:** [26](26-the-observability-black-hole.md), [27](27-token-economics-and-the-finops-trap.md), [28](28-the-latency-veil-and-human-trust.md), [29](29-the-weight-divide-local-vs-hosted.md), [30](30-the-myth-of-the-committee.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
-
-Note on numbering: file names are preserved for repository stability, so both `23-the-parallelization-trap.md` and `23-the-identity-and-execution-crisis.md` exist. In the narrative arc, treat **The Parallelization Trap** as Chapter 23 and **The Identity and Execution Crisis** as Chapter 23A (postmortem addendum).
 
 | # | Chapter | What You'll Learn |
 | --- | --- | --- |
@@ -95,9 +94,14 @@ Note on numbering: file names are preserved for repository stability, so both `2
 | [20](20-the-safety-sandbox-is-not-optional.md) | **The Safety Sandbox Is Not Optional** | Why command-risk analysis and policy-driven validation are foundational in local-first agents, not optional polish. |
 | [21](21-who-grades-the-agent.md) | **Who Grades the Agent** | Why finish is a gated contract, how task validation blocks false completion, and why autonomous systems must not grade their own homework. |
 | [22](22-the-middleware-contract.md) | **The Middleware Contract** | Why middleware order is execution governance, how rollback became first-class in the pipeline, and why timing is architecture in autonomous systems. |
-| [23](23-the-parallelization-trap.md) | **The Parallelization Trap** | Why aggressive parallelization breaks autonomous agents, how global states decouple, and why safe-subset scheduling won out over unlimited throughput. |
-| [23A](23-the-identity-and-execution-crisis.md) | **The Identity and Execution Crisis** | A postmortem of four reliability failures: prompt over-caution loops, silent startup crashes, shell-identity mismatch on Windows, and brittle patch fallback execution. |
-| [24](24-the-perfect-prompt-illusion.md) | **The Perfect Prompt Illusion** | Why prompt quality is an architecture problem, how scannable structure improved behavior, and why LLM self-critique can be biased toward invented criticism. |
+| [23](23-the-identity-and-execution-crisis.md) | **The Identity and Execution Crisis** | A postmortem of four reliability failures: prompt over-caution loops, silent startup crashes, shell-identity mismatch on Windows, and brittle patch fallback execution. |
+| [24](24-the-parallelization-trap.md) | **The Parallelization Trap** | Why aggressive parallelization breaks autonomous agents, how global states decouple, and why safe-subset scheduling won out over unlimited throughput. |
+| [25](25-the-perfect-prompt-illusion.md) | **The Perfect Prompt Illusion** | Why prompt quality is an architecture problem, how scannable structure improved behavior, and why LLM self-critique can be biased toward invented criticism. |
+| [26](26-the-observability-black-hole.md) | **The Observability Black Hole** | Tracing tool calls, latent reasoning, and non-deterministic debugging when the agent hallucinates. |
+| [27](27-token-economics-and-the-finops-trap.md) | **Token Economics and the FinOps Trap** | Managing token costs, iteration caps, and routing between cheap and expensive models for operational viability. |
+| [28](28-the-latency-veil-and-human-trust.md) | **The Latency Veil and Human Trust** | Human-in-the-loop (HITL), streaming UX, and the balance of asking for permission vs. forgiveness. |
+| [29](29-the-weight-divide-local-vs-hosted.md) | **The Weight Divide: Local vs Hosted** | The operational realities of deploying heavy local weights vs. depending on frontier AI API latency. |
+| [30](30-the-myth-of-the-committee.md) | **The Myth of the Committee** | Why we killed the multi-agent swarm in favor of a single orchestrator with execution modes. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
 ---

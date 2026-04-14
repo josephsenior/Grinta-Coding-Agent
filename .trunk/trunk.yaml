@@ -10,6 +10,7 @@ plugins:
       uri: https://github.com/trunk-io/plugins
 lint:
   enabled:
+    - prettier@3.8.2
     - markdownlint@0.48.0
     - git-diff-check
     - pylint@4.0.5
