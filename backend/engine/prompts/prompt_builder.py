@@ -150,6 +150,7 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
         else ""
     )
 
+    autonomy = ""
     if level == "full":
         autonomy = (
             f"<AUTONOMY>\nFULL AUTONOMOUS MODE: Execute all planned steps end-to-end without "
@@ -157,7 +158,7 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
             f"same turn (e.g. ast_code_editor → str_replace_editor). Auto-retry "
             f"recoverable errors. Report back only after completing the full plan or after "
             f"exhausting all tool alternatives on a blocking sub-task. "
-            f'{cp_line}\n</AUTONOMY>"
+            f"{cp_line}\n</AUTONOMY>"
         )
 
     path_hint = _choose(

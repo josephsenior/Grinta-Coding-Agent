@@ -455,7 +455,7 @@ class OrchestratorExecutor:
                             raise LLMTimeout(
                                 f'Fallback completion timed out after {fallback_timeout} seconds',
                                 model=model_name,
-                            )
+                            ) from None
 
                         fallback_content_raw = getattr(fallback, 'content', None)
                         fallback_content = (
@@ -551,7 +551,7 @@ class OrchestratorExecutor:
                         raise LLMTimeout(
                             'LLM stream chunk timed out mid-generation after 20 seconds',
                             model=model_name,
-                        )
+                        ) from None
 
                     choices = chunk.get('choices', [])
                     if not choices:
@@ -683,8 +683,7 @@ class OrchestratorExecutor:
                 'Streaming checkpoint recovery requires manual confirmation before continuing.',
                 context={'recovery_reason': reason},
             )
-        else:
-            return
+        return
 
     def _get_checkpoint(self, event_stream: EventStream | None) -> StreamingCheckpoint:
         session_key = self._checkpoint_session_key(event_stream)
