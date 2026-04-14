@@ -211,9 +211,10 @@ class TreeSitterEditor:
     - Haskell, Elixir, Erlang, OCaml, Elm
 
     **Modern Systems:**
-    - Zig, Nim, V, D
+                # Normalize CRLF -> LF early so validation sees a consistent EOL style
+                new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
 
-    **Mobile:**
+                # Validate if requested against normalized content
     - Swift, Objective-C, Dart
 
     **Data/Config:**
@@ -338,9 +339,10 @@ class TreeSitterEditor:
 
         except FileNotFoundError:
             logger.error('File not found: %s', file_path)
-            return None
-        except Exception as e:
-            logger.error('Failed to parse %s: %s', file_path, e)
+                    # Normalize CRLF -> LF early so validation sees a consistent EOL style
+                    new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
+
+                    # Validate
             return None
 
     def find_symbol(
