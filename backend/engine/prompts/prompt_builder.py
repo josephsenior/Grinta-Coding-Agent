@@ -154,25 +154,10 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
         autonomy = (
             f"<AUTONOMY>\nFULL AUTONOMOUS MODE: Execute all planned steps end-to-end without "
             f"confirmation. On tool failure, pivot to alternative tools immediately within the "
-            f"same turn (e.g. ast_code_editor → str_replace_editor → apply_patch). Auto-retry "
+            f"same turn (e.g. ast_code_editor → str_replace_editor). Auto-retry "
             f"recoverable errors. Report back only after completing the full plan or after "
             f"exhausting all tool alternatives on a blocking sub-task. "
-            f'NEVER create temporary "demo" files or rewrite the file with different indentation '
-            f'just to make a patch apply. If you receive a simple command like "execute apply patch once", '
-            f"attempt it ONCE and stop. Ask only when critically "
-            f"ambiguous.{cp_line}\n</AUTONOMY>"
-        )
-    elif level == "supervised":
-        autonomy = (
-            f"<AUTONOMY>\nSUPERVISED MODE: Confirm before risky ops (delete, git push, system); "
-            f"keep user informed; wait when uncertain.{cp_line}\n</AUTONOMY>"
-        )
-    else:
-        autonomy = (
-            f"<AUTONOMY>\nBALANCED MODE: Routine ops autonomous; confirm high-risk / irreversible actions only.\n"
-            f'NEVER create temporary "demo" files or rewrite the file with different indentation '
-            f'just to make a patch apply. If you receive a simple command like "execute apply patch once", '
-            f"attempt it ONCE and stop.{cp_line}\n</AUTONOMY>"
+            f'{cp_line}\n</AUTONOMY>"
         )
 
     path_hint = _choose(

@@ -494,7 +494,7 @@ class FileEditor:
             candidate = str(match_mode).strip().lower()
             if candidate in {'exact', 'normalize_ws', 'fuzzy_safe'}:
                 return candidate
-        return 'normalize_ws' if normalize_ws else 'exact'
+        return 'normalize_ws' if normalize_ws is not False else 'exact'
 
     @staticmethod
     def _line_ending_for_content(content: str) -> str:

@@ -28,7 +28,6 @@ Use this order when several tools could fit:
 - **Shell** only for installs, builds, tests, git, process control, or when no repo tool applies
 - **Exact line/file creation or replacement** → `str_replace_editor`
 - **Symbol-aware refactors** → `ast_code_editor`
-- **Multi-file diff-style edits** → `apply_patch`
   </TOOL_ROUTING_LADDER>
 
 <CROSS_SESSION_LEARNING>
