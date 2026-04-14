@@ -2042,6 +2042,9 @@ class CLIEventRenderer:
                     msg = 'done'
                 result_kind = 'ok' if exit_code == 0 else 'neutral'
 
+            # Always hide stdout for CmdOutputObservation to reduce UX clutter
+            extra_lines = None
+
             inner = format_activity_shell_block(
                 verb,
                 label,

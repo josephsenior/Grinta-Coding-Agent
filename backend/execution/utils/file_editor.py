@@ -681,34 +681,6 @@ class FileEditor:
             else:
                 new_content = tolerant
 
-        # Validate syntax after replacement
-        if file_path:
-            # Skip syntax check for non-code files (e.g. .md, .txt)
-            if file_path.suffix.lower() in (".md", ".txt", ".json", ".yaml", ".yml"):
-                return new_content
-
-            from backend.orchestration.middleware.auto_check import (
-                _treesitter_syntax_check,
-            )
-
-            result = _treesitter_syntax_check(
-                str(file_path), new_content.encode("utf-8")
-            )
-            if result is not None:
-                is_valid, err_msg = result
-                if not is_valid:
-                    # Provide the EXACT syntax error from tree-sitter to the agent
-                    return ToolResult(
-                        output="",
-                        error=(
-                            f"CRITICAL: The edit failed because it introduces a Syntax Error:\n{err_msg}\n\n"
-                            "The tree-sitter parser rejected the resulting file. This usually means your `new_str` "
-                            "has a typo (missing quote, mismatched bracket, or bad indentation). "
-                            "Please fix the typo and retry the replacement."
-                        ),
-                        new_content=old_content,
-                    )
-
         return new_content
 
     def _resolve_edit_content(

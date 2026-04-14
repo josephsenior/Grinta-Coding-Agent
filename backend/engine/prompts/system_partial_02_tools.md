@@ -6,9 +6,9 @@ Editor `path` arguments are relative to the project root (see runtime working di
 **CRITICAL READ-BEFORE-EDIT RULE:**
 You MUST explicitly read a file's contents before you edit it. NEVER edit a file blindly or solely from memory. Always run `read_file` or `grep_search` to verify precise line numbers, code structure, and whitespace before applying changes.
 
-- **str_replace_editor**: Best for multi-file edits (via `batch_replace`), text replacements, and simple changes. Use `preview: true` if confidence is low (<0.7).
-  Greenfield: `str_replace_editor(command="create_file", path="...", file_text="...")`.
-- **ast_code_editor**: Prefer for function/class bodies (`edit_function`, `rename_symbol`), targeted ranges (`replace_range`, `insert_text`), or rollbacks (`undo_last_edit`).
+- **ast_code_editor**: Primary tool for robust, structure-aware file edits across 40+ languages. Edit by symbol, rename variables, or intelligently replace ranges without worrying about exact indentation.
+- **str_replace_editor**: Use for multi-file edits (via `batch_replace`) or when AST editing isn't applicable. Use `preview: true` if confidence is low (<0.7).
+  Greenfield: `ast_code_editor(command="create_file", path="...", file_text="...")`.
 
 </EDITOR_AND_FILE_OPERATIONS>
 
