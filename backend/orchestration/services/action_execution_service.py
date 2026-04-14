@@ -80,8 +80,11 @@ class ActionExecutionService:
     async def get_next_action(self) -> Action | None:
         """Get the next action from the agent, with automatic repair for validation errors."""
         max_repair_attempts = 3
+        max_identical_retries = 2
 
         error_logged = False
+        last_error_signature = ''
+        identical_error_count = 0
         for attempt in range(max_repair_attempts + 1):
             try:
                 confirmation = self._context.confirmation_service
@@ -174,6 +177,13 @@ class ActionExecutionService:
                 CommonFunctionCallValidationError,
                 CommonFunctionCallNotExistsError,
             ) as exc:
+                error_signature = f'{type(exc).__name__}:{str(exc).strip()}'
+                if error_signature == last_error_signature:
+                    identical_error_count += 1
+                else:
+                    last_error_signature = error_signature
+                    identical_error_count = 1
+
                 # Create detailed error observation
                 error_msg = str(exc)
                 if isinstance(
@@ -192,6 +202,25 @@ class ActionExecutionService:
                     # Add to event stream so it's recorded in history
                     self._context.event_stream.add_event(obs, EventSource.AGENT)
                     error_logged = True
+
+                controller = self._context.get_controller()
+                cb_service = getattr(controller, 'circuit_breaker_service', None)
+                if cb_service is not None:
+                    error_lower = error_signature.lower()
+                    if 'apply_patch' in error_lower or '[apply_patch' in error_lower:
+                        cb_service.record_error(exc, tool_name='apply_patch')
+
+                if identical_error_count > max_identical_retries:
+                    logger.error(
+                        'get_next_action blocked repeated identical recoverable error after %d attempts: %s',
+                        identical_error_count,
+                        error_signature,
+                    )
+                    from backend.core.schemas import AgentState as _AgentState
+
+                    if controller.get_agent_state() == _AgentState.RUNNING:
+                        await controller.set_agent_state_to(_AgentState.ERROR)
+                    return None
 
                 # If we have retries left, continue loop to let agent see error and try again
                 if attempt < max_repair_attempts:

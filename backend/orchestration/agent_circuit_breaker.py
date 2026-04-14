@@ -180,6 +180,29 @@ class CircuitBreaker:
                 ),
             )
 
+        # 2.5 Deterministic same-tool failures
+        apply_patch_errors = self.get_tool_error_count('apply_patch')
+        if apply_patch_errors >= 2:
+            recommendation = (
+                'Repeated deterministic apply_patch failures detected. '
+                'Refresh file context with read_file before reattempting. '
+                'If this persists, switch to a different edit strategy.'
+            )
+            if apply_patch_errors >= 3:
+                recommendation = (
+                    recommendation
+                    + ' apply_patch retries are now blocked until strategy changes.'
+                )
+            return CircuitBreakerResult(
+                tripped=True,
+                reason=(
+                    'Repeated apply_patch deterministic failures '
+                    f'({apply_patch_errors})'
+                ),
+                action='pause',
+                recommendation=recommendation,
+            )
+
         # 3. Stuck detections
         # The step_guard_service already emits targeted recovery messages.
         # The circuit breaker only decides when to finally stop the agent.

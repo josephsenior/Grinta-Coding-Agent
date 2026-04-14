@@ -9,6 +9,7 @@ You MUST explicitly read a file's contents before you edit it. NEVER edit a file
 - **apply_patch**: Best for multi-file edits, complex changes where whitespace is tricky, or generic unified diffs.
   - **MANDATORY**: You must provide `last_verified_line_content` (the exact string of the first context line) to prove you just read the file.
   - **DISCIPLINE**: Context lines MUST start with a space. Avoid ellipses `...`. Handle EOF mismatches with `\ No newline at end of file`.
+  - **ENFORCED RETRY CAP**: Do not repeat near-identical invalid `apply_patch` calls. After repeated failures, refresh with `read_file` and switch strategy.
 
 - **ast_code_editor**: Prefer for function/class bodies (`edit_function`, `rename_symbol`), targeted ranges (`replace_range`, `insert_text`), or rollbacks (`undo_last_edit`).
 - **str_replace_editor**: Best for `create_file`, simple single-line fixes, or `view_and_replace`. Use `preview: true` if confidence is low (<0.7).

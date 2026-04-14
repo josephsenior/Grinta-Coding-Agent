@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import re
 from unittest.mock import patch
 
 from backend.engine.tools.apply_patch import (
@@ -29,7 +31,10 @@ class TestBuildApplyPatchAction:
             "backend.engine.tools.apply_patch.build_python_exec_command",
             return_value='python3 -c "encoded"',
         ) as mock_transport:
-            action = build_apply_patch_action(_VALID_PATCH)
+            action = build_apply_patch_action(
+                _VALID_PATCH,
+                last_verified_line_content="old",
+            )
 
         assert action.command == 'python3 -c "encoded"'
         script = mock_transport.call_args.args[0]
@@ -44,7 +49,8 @@ class TestBuildApplyPatchAction:
             "+++ b/x\n"
             "@@ -1 +1 @@\n"
             "-old\n"
-            '+print("hi")\n'
+            '+print("hi")\n',
+            last_verified_line_content="old",
         )
 
         assert "b64decode" in action.command
@@ -53,7 +59,11 @@ class TestBuildApplyPatchAction:
         assert action.display_label == "Applying patch"
 
     def test_check_only_uses_validating_display_label(self) -> None:
-        action = build_apply_patch_action(_VALID_PATCH, check_only=True)
+        action = build_apply_patch_action(
+            _VALID_PATCH,
+            check_only=True,
+            last_verified_line_content="old",
+        )
 
         assert action.display_label == "Validating patch"
 
@@ -66,21 +76,19 @@ class TestBuildApplyPatchAction:
         assert "diff --git" in desc
         assert "CRITICAL: Exact Format Required" in desc
         assert "@@" in desc
-        assert (
-            "i_have_verified_file_contents_and_format" in fn["parameters"]["properties"]
-        )
-        assert (
-            "i_have_verified_file_contents_and_format" in fn["parameters"]["required"]
-        )
+        assert "last_verified_line_content" in fn["parameters"]["properties"]
+        assert "last_verified_line_content" in fn["parameters"]["required"]
         assert "diff --git" in patch_desc
-        assert "Index line is optional" in patch_desc
 
     def test_script_contains_runtime_corrupt_patch_guidance(self) -> None:
         with patch(
             "backend.engine.tools.apply_patch.build_python_exec_command",
             return_value='python3 -c "encoded"',
         ) as mock_transport:
-            build_apply_patch_action(_VALID_PATCH)
+            build_apply_patch_action(
+                _VALID_PATCH,
+                last_verified_line_content="old",
+            )
 
         script = mock_transport.call_args.args[0]
         assert "[APPLY_PATCH_GUIDANCE]" in script
@@ -105,7 +113,7 @@ class TestBuildApplyPatchAction:
         script = mock_transport.call_args.args[0]
         assert action.display_label == "Applying patch"
         assert "[APPLY_PATCH_GUIDANCE]" in script
-        assert "malformed `---` header" in script
+        assert "Malformed `---` header" in script
         assert "NamedTemporaryFile" not in script
         assert "sys.exit(2)" in script
 
@@ -114,16 +122,45 @@ class TestBuildApplyPatchAction:
             "backend.engine.tools.apply_patch.build_python_exec_command",
             return_value='python3 -c "encoded"',
         ) as mock_transport:
-            build_apply_patch_action(_VALID_PATCH)
+            build_apply_patch_action(
+                _VALID_PATCH,
+                last_verified_line_content="old",
+            )
 
         script = mock_transport.call_args.args[0]
         assert "+ '\\n' +" in script
-        assert "+ '\\n\\n' + guidance" in script
+        assert "\\n\\n{guidance}" in script
+
+    def test_auto_appends_terminal_newline_to_patch_payload(self) -> None:
+        patch_without_terminal_newline = (
+            "diff --git a/x b/x\n"
+            "--- a/x\n"
+            "+++ b/x\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new"
+        )
+        with patch(
+            "backend.engine.tools.apply_patch.build_python_exec_command",
+            return_value='python3 -c "encoded"',
+        ) as mock_transport:
+            build_apply_patch_action(
+                patch_without_terminal_newline,
+                last_verified_line_content="old",
+            )
+
+        script = mock_transport.call_args.args[0]
+        encoded_match = re.search(r"base64\.b64decode\(b'([^']+)'\)", script)
+        assert encoded_match is not None
+        decoded_patch = base64.b64decode(encoded_match.group(1)).decode()
+        assert decoded_patch.endswith("\n")
 
 
 class TestValidateApplyPatchContract:
     def test_accepts_missing_index_line(self) -> None:
-        assert validate_apply_patch_contract(_VALID_PATCH_NO_INDEX) is None
+        assert validate_apply_patch_contract(
+            _VALID_PATCH_NO_INDEX
+        ) == _VALID_PATCH_NO_INDEX.rstrip("\n")
 
     def test_accepts_malformed_index_line(self) -> None:
         error = validate_apply_patch_contract(
@@ -136,7 +173,7 @@ class TestValidateApplyPatchContract:
             "+new\n"
         )
 
-        assert error is None
+        assert error == _VALID_PATCH_NO_INDEX.rstrip("\n")
 
     def test_accepts_index_without_mode(self) -> None:
         error = validate_apply_patch_contract(
@@ -149,7 +186,35 @@ class TestValidateApplyPatchContract:
             "+hello\n"
         )
 
-        assert error is None
+        assert error.startswith("diff --git a/new.txt b/new.txt")
+        assert "@@ -0,0 +1 @@" in error
 
     def test_accepts_canonical_patch(self) -> None:
-        assert validate_apply_patch_contract(_VALID_PATCH) is None
+        normalized = validate_apply_patch_contract(_VALID_PATCH)
+        assert normalized.startswith("diff --git a/x b/x")
+        assert "index 1111111..2222222" not in normalized
+
+    def test_rejects_malformed_hunk_line_counts(self) -> None:
+        error = validate_apply_patch_contract(
+            "diff --git a/x b/x\n"
+            "--- a/x\n"
+            "+++ b/x\n"
+            "@@ -1,2 +1,1 @@\n"
+            " old\n"
+            "-old2\n"
+            "+new\n"
+        )
+
+        assert error.startswith("Malformed hunk line counts")
+
+    def test_rejects_malformed_minus_header(self) -> None:
+        error = validate_apply_patch_contract(
+            "diff --git a/x b/x\n"
+            "--- wrong\n"
+            "+++ b/x\n"
+            "@@ -1 +1 @@\n"
+            "-old\n"
+            "+new\n"
+        )
+
+        assert "Malformed `---` header" in error

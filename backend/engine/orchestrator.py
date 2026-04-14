@@ -10,7 +10,6 @@ Architecture notes (preserve these strengths):
 - The event stream is the sole communication channel between controller and agent.
 """
 
-
 from __future__ import annotations
 
 import asyncio
@@ -71,10 +70,10 @@ if TYPE_CHECKING:
 class Orchestrator(Agent):
     """Production orchestrator agent with modular planner–executor–memory architecture."""
 
-    VERSION = '2.2'
+    VERSION = "2.2"
     _MAX_QUEUED_ACTIONS_PER_RESPONSE = 2
     runtime_plugins: list[PluginRequirement] = [
-        AgentSkillsRequirement(name='agent_skills'),
+        AgentSkillsRequirement(name="agent_skills"),
     ]
 
     def __init__(
@@ -122,7 +121,7 @@ class Orchestrator(Agent):
 
         validate_internal_toolset(
             self.tools,
-            strict=bool(getattr(self.config, 'strict_tool_registry_check', True)),
+            strict=bool(getattr(self.config, "strict_tool_registry_check", True)),
         )
         self.executor: ExecutorProtocol = OrchestratorExecutor(
             llm=self.llm,
@@ -133,12 +132,14 @@ class Orchestrator(Agent):
 
         # Production health checks
         self.production_health_check_enabled = bool(
-            getattr(self.config, 'production_health_check', False)
-            and getattr(self.config, 'health_check_prompts', None)
+            getattr(self.config, "production_health_check", False)
+            and getattr(self.config, "health_check_prompts", None)
         )
         self._last_llm_latency: float = 0.0
+        self._recoverable_tool_error_signature: str = ""
+        self._recoverable_tool_error_count: int = 0
         self._reflection_interval: int = int(
-            getattr(self.config, 'reflection_interval', 8)
+            getattr(self.config, "reflection_interval", 8)
         )
         self._run_production_health_check()
 
@@ -146,20 +147,20 @@ class Orchestrator(Agent):
     # Initialization helpers
     # ------------------------------------------------------------------ #
     def _create_prompt_manager(self) -> PromptManager:
-        prompt_dir = os.path.join(os.path.dirname(__file__), 'prompts')
+        prompt_dir = os.path.join(os.path.dirname(__file__), "prompts")
         system_prompt = self.config.resolved_system_prompt_filename
         if not os.path.exists(os.path.join(prompt_dir, system_prompt)):
-            system_prompt = 'system_prompt'
+            system_prompt = "system_prompt"
 
-        resolved_model = ''
+        resolved_model = ""
         with contextlib.suppress(Exception):
-            resolved_model = (self.llm.config.model or '').strip()
+            resolved_model = (self.llm.config.model or "").strip()
         if not resolved_model and self.llm_registry:
             with contextlib.suppress(Exception):
                 llm_cfg = self.llm_registry.config.get_llm_config_from_agent_config(
                     self.config
                 )
-                if llm_cfg and getattr(llm_cfg, 'model', None):
+                if llm_cfg and getattr(llm_cfg, "model", None):
                     resolved_model = str(llm_cfg.model).strip()
         return OrchestratorPromptManager(
             prompt_dir=prompt_dir,
@@ -178,10 +179,10 @@ class Orchestrator(Agent):
             run_production_health_check(raise_on_failure=True)
         except ImportError:
             logger.warning(
-                'Health check module not found - skipping dependency validation'
+                "Health check module not found - skipping dependency validation"
             )
         except RuntimeError as exc:
-            logger.error('Production health check failed: %s', exc)
+            logger.error("Production health check failed: %s", exc)
             raise
 
     # ------------------------------------------------------------------ #
@@ -214,30 +215,33 @@ class Orchestrator(Agent):
         try:
             if exit_action := self._check_exit_command(state):
                 self._consecutive_context_errors = 0
+                self._recoverable_tool_error_signature = ""
+                self._recoverable_tool_error_count = 0
                 return exit_action
 
-            if (
-                not self.pending_actions
-                and self.deferred_actions
-            ):
+            if not self.pending_actions and self.deferred_actions:
                 self._promote_deferred_actions()
 
             if pending := self._consume_pending_action():
                 self._consecutive_context_errors = 0
+                self._recoverable_tool_error_signature = ""
+                self._recoverable_tool_error_count = 0
                 return pending
 
             condensed = self.memory_manager.condense_history(state)
             action = await self._execute_llm_step_async(state, condensed)
             # Successful step: reset the circuit breaker counter
             self._consecutive_context_errors = 0
+            self._recoverable_tool_error_signature = ""
+            self._recoverable_tool_error_count = 0
             return action
 
         except ContextLimitError:
             self._consecutive_context_errors = (
-                getattr(self, '_consecutive_context_errors', 0) + 1
+                getattr(self, "_consecutive_context_errors", 0) + 1
             )
             logger.warning(
-                'ContextLimitError encountered (%d/6). Attempting condensation + retry.',
+                "ContextLimitError encountered (%d/6). Attempting condensation + retry.",
                 self._consecutive_context_errors,
             )
 
@@ -247,7 +251,7 @@ class Orchestrator(Agent):
             # resolve after condensation.
             if self._consecutive_context_errors > 6:
                 raise AgentRuntimeError(
-                    'Circuit breaker: continuous ContextLimitErrors'
+                    "Circuit breaker: continuous ContextLimitErrors"
                 ) from None
 
             # Try auto-heal: condense once and retry
@@ -262,22 +266,27 @@ class Orchestrator(Agent):
                 raise
             except Exception:
                 logger.warning(
-                    'Auto-Healing retry failed after condensation. Falling back to think action.'
+                    "Auto-Healing retry failed after condensation. Falling back to think action."
                 )
                 return AgentThinkAction(
-                    thought='I have reached the context limit. I must condense my memory before proceeding.',
+                    thought="I have reached the context limit. I must condense my memory before proceeding.",
                 )
 
         except ToolExecutionError as e:
             self._consecutive_context_errors = 0
-            logger.warning('Auto-Healing: Tool Execution Error: %s', e)
+            logger.warning("Auto-Healing: Tool Execution Error: %s", e)
 
-            removed = self.clear_queued_actions(reason='Tool execution failed, aborting batched sequence')
+            removed = self.clear_queued_actions(
+                reason="Tool execution failed, aborting batched sequence"
+            )
             if removed > 0:
-                logger.info('Batched sequence aborted! Dispelled %d blind follow-up actions.', removed)
+                logger.info(
+                    "Batched sequence aborted! Dispelled %d blind follow-up actions.",
+                    removed,
+                )
 
             return AgentThinkAction(
-                thought=f'I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.',
+                thought=f"I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.",
             )
 
         except (
@@ -289,23 +298,40 @@ class Orchestrator(Agent):
             LLMMalformedActionError,
         ) as e:
             self._consecutive_context_errors = 0
-            logger.warning('Recoverable LLM tool-call error: %s', e)
+            logger.warning("Recoverable LLM tool-call error: %s", e)
+
+            error_signature = f"{type(e).__name__}:{str(e).strip()}"
+            if error_signature == self._recoverable_tool_error_signature:
+                self._recoverable_tool_error_count += 1
+            else:
+                self._recoverable_tool_error_signature = error_signature
+                self._recoverable_tool_error_count = 1
 
             removed = self.clear_queued_actions(
-                reason='Invalid LLM tool call, aborting batched sequence'
+                reason="Invalid LLM tool call, aborting batched sequence"
             )
             if removed > 0:
                 logger.info(
-                    'Batched sequence aborted! Dispelled %d blind follow-up actions.',
+                    "Batched sequence aborted! Dispelled %d blind follow-up actions.",
                     removed,
+                )
+
+            if self._recoverable_tool_error_count >= 3:
+                return AgentThinkAction(
+                    thought=(
+                        "[TOOL_CALL_RECOVERABLE_ERROR_ESCALATED] The same invalid tool call pattern "
+                        "repeated 3 times and was blocked. You must change strategy now: "
+                        "re-read relevant file context and emit a different corrected action "
+                        "(or switch tool), not a near-identical retry."
+                    )
                 )
 
             return AgentThinkAction(
                 thought=(
-                    '[TOOL_CALL_RECOVERABLE_ERROR] The previous tool call was invalid and was not executed. '
-                    f'Details: {str(e)}\n'
-                    'I will emit one corrected tool call with valid JSON arguments '
-                    '(double-quoted keys/strings, escaped newlines/quotes, required arguments present).'
+                    "[TOOL_CALL_RECOVERABLE_ERROR] The previous tool call was invalid and was not executed. "
+                    f"Details: {str(e)}\n"
+                    "I will emit one corrected tool call with valid JSON arguments "
+                    "(double-quoted keys/strings, escaped newlines/quotes, required arguments present)."
                 )
             )
 
@@ -315,8 +341,8 @@ class Orchestrator(Agent):
 
         except Exception as e:
             self._consecutive_context_errors = 0
-            logger.error('Critical Failure in Orchestrator.astep: %s', e, exc_info=True)
-            raise AgentRuntimeError(f'Critical agent failure: {str(e)}') from e
+            logger.error("Critical Failure in Orchestrator.astep: %s", e, exc_info=True)
+            raise AgentRuntimeError(f"Critical agent failure: {str(e)}") from e
 
     def _handle_pending_action_from_condensation(
         self, state: State, condensed: Any
@@ -326,10 +352,10 @@ class Orchestrator(Agent):
             return None
         if self._is_noop_condensation_action(condensed.pending_action):
             return condensed.pending_action
-        task_text = ''
+        task_text = ""
         with contextlib.suppress(Exception):
             initial_msg = self.memory_manager.get_initial_user_message(state.history)
-            task_text = (getattr(initial_msg, 'content', '') or '')[:200]
+            task_text = (getattr(initial_msg, "content", "") or "")[:200]
         self._queue_post_condensation_recovery(task_text=task_text)
         return condensed.pending_action
 
@@ -348,15 +374,15 @@ class Orchestrator(Agent):
 
             recent = state.history[-12:] if len(state.history) > 12 else state.history
             if any(isinstance(e, ErrorObservation) for e in recent):
-                self.prompt_manager.set_prompt_tier('debug')
+                self.prompt_manager.set_prompt_tier("debug")
                 return
             for e in recent:
                 if isinstance(e, (FileEditAction, FileWriteAction)):
-                    risk = getattr(e, 'security_risk', ActionSecurityRisk.UNKNOWN)
+                    risk = getattr(e, "security_risk", ActionSecurityRisk.UNKNOWN)
                     if risk in (ActionSecurityRisk.MEDIUM, ActionSecurityRisk.HIGH):
-                        self.prompt_manager.set_prompt_tier('debug')
+                        self.prompt_manager.set_prompt_tier("debug")
                         return
-            self.prompt_manager.set_prompt_tier('base')
+            self.prompt_manager.set_prompt_tier("base")
 
     def _execute_llm_step(self, state: State, condensed: Any) -> Action:
         """Core logic to prepare messages, call LLM, and return the first action."""
@@ -381,15 +407,15 @@ class Orchestrator(Agent):
         result = self.executor.execute(params, self.event_stream)
 
         try:
-            if hasattr(state, 'ack_planning_directive'):
-                state.ack_planning_directive(source='Orchestrator')
-            if hasattr(state, 'ack_memory_pressure'):
-                state.ack_memory_pressure(source='Orchestrator')
+            if hasattr(state, "ack_planning_directive"):
+                state.ack_planning_directive(source="Orchestrator")
+            if hasattr(state, "ack_memory_pressure"):
+                state.ack_memory_pressure(source="Orchestrator")
         finally:
-            extra_data = getattr(state, 'extra_data', None)
+            extra_data = getattr(state, "extra_data", None)
             if isinstance(extra_data, dict):
-                extra_data.pop('planning_directive', None)
-                extra_data.pop('memory_pressure', None)
+                extra_data.pop("planning_directive", None)
+                extra_data.pop("memory_pressure", None)
 
         self._last_llm_latency = result.execution_time
 
@@ -425,15 +451,15 @@ class Orchestrator(Agent):
         result = await self.executor.async_execute(params, self.event_stream)
 
         try:
-            if hasattr(state, 'ack_planning_directive'):
-                state.ack_planning_directive(source='Orchestrator')
-            if hasattr(state, 'ack_memory_pressure'):
-                state.ack_memory_pressure(source='Orchestrator')
+            if hasattr(state, "ack_planning_directive"):
+                state.ack_planning_directive(source="Orchestrator")
+            if hasattr(state, "ack_memory_pressure"):
+                state.ack_memory_pressure(source="Orchestrator")
         finally:
-            extra_data = getattr(state, 'extra_data', None)
+            extra_data = getattr(state, "extra_data", None)
             if isinstance(extra_data, dict):
-                extra_data.pop('planning_directive', None)
-                extra_data.pop('memory_pressure', None)
+                extra_data.pop("planning_directive", None)
+                extra_data.pop("memory_pressure", None)
 
         self._last_llm_latency = result.execution_time
 
@@ -446,7 +472,7 @@ class Orchestrator(Agent):
     # ------------------------------------------------------------------ #
     # Test/mocking helpers
     # ------------------------------------------------------------------ #
-    def set_llm(self, llm) -> None:    # pragma: no cover - used in tests
+    def set_llm(self, llm) -> None:  # pragma: no cover - used in tests
         """Replace the active LLM and propagate to planner/executor.
 
         Some unit tests inject a mock LLM after agent construction. The
@@ -455,10 +481,10 @@ class Orchestrator(Agent):
         in sync to avoid unintended real network calls.
         """
         self.llm = llm
-        if hasattr(self, 'planner') and hasattr(self.planner, '_llm'):
+        if hasattr(self, "planner") and hasattr(self.planner, "_llm"):
             with contextlib.suppress(Exception):
                 self.planner._llm = llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
-        if hasattr(self, 'executor') and hasattr(self.executor, '_llm'):
+        if hasattr(self, "executor") and hasattr(self.executor, "_llm"):
             with contextlib.suppress(Exception):
                 self.executor._llm = llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
 
@@ -473,8 +499,8 @@ class Orchestrator(Agent):
 
     def _sync_executor_llm(self) -> None:
         if (
-            hasattr(self, 'executor')
-            and getattr(self.executor, '_llm', None) is not self.llm
+            hasattr(self, "executor")
+            and getattr(self.executor, "_llm", None) is not self.llm
         ):
             with contextlib.suppress(Exception):
                 self.executor._llm = self.llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
@@ -492,12 +518,12 @@ class Orchestrator(Agent):
         """
         from backend.ledger.action import NullAction
 
-        message_text = ''
-        if result.response and getattr(result.response, 'choices', None):
+        message_text = ""
+        if result.response and getattr(result.response, "choices", None):
             first_choice = result.response.choices[0]
-            message = getattr(first_choice, 'message', None)
+            message = getattr(first_choice, "message", None)
             if message is not None:
-                raw = getattr(message, 'content', '') or ''
+                raw = getattr(message, "content", "") or ""
                 message_text = raw if isinstance(raw, str) else str(raw)
 
         if not message_text.strip():
@@ -518,20 +544,22 @@ class Orchestrator(Agent):
         while self.deferred_actions:
             self.pending_actions.append(self.deferred_actions.popleft())
 
-    def clear_queued_actions(self, reason: str = '') -> int:
+    def clear_queued_actions(self, reason: str = "") -> int:
         """Clear pending/deferred queues explicitly (used by stuck recovery)."""
         removed = len(self.pending_actions) + len(self.deferred_actions)
         self.pending_actions.clear()
         self.deferred_actions.clear()
         if removed > 0:
-            logger.warning('Cleared %d queued actions (%s)', removed, reason or 'no reason')
+            logger.warning(
+                "Cleared %d queued actions (%s)", removed, reason or "no reason"
+            )
         return removed
 
     def iter_queued_actions(self) -> list[Action]:
         """Return a snapshot of all queued actions, pending first then deferred."""
         return [*self.pending_actions, *self.deferred_actions]
 
-    def _queue_post_condensation_recovery(self, task_text: str = '') -> None:
+    def _queue_post_condensation_recovery(self, task_text: str = "") -> None:
         """Queue a brief think action after condensation to break the re-condensation loop.
 
         The agent_controller drain loop calls astep() immediately after dispatching
@@ -549,7 +577,7 @@ class Orchestrator(Agent):
         state.history already contains the original CondensationAction.
         """
         self.pending_actions.append(
-            AgentThinkAction(thought='Memory condensed. Resuming task.')
+            AgentThinkAction(thought="Memory condensed. Resuming task.")
         )
 
     # ------------------------------------------------------------------ #
@@ -557,7 +585,7 @@ class Orchestrator(Agent):
     # ------------------------------------------------------------------ #
     def _check_exit_command(self, state: State) -> Action | None:
         latest_user_message = state.get_last_user_message()
-        if latest_user_message and latest_user_message.content.strip() == '/exit':
+        if latest_user_message and latest_user_message.content.strip() == "/exit":
             return PlaybookFinishAction()
         return None
 
@@ -572,16 +600,16 @@ class Orchestrator(Agent):
     def _mcp_server_prompt_hints(self) -> list[dict[str, str]]:
         """Build ``[{"server": name, "hint": text}, ...]`` from MCP ``usage_hint`` fields."""
         try:
-            app_cfg = getattr(self.llm_registry, 'config', None)
-            mcp = getattr(app_cfg, 'mcp', None) if app_cfg is not None else None
-            servers = getattr(mcp, 'servers', None) or []
+            app_cfg = getattr(self.llm_registry, "config", None)
+            mcp = getattr(app_cfg, "mcp", None) if app_cfg is not None else None
+            servers = getattr(mcp, "servers", None) or []
             rows: list[dict[str, str]] = []
             for s in servers:
-                hint = (getattr(s, 'usage_hint', None) or '').strip()
+                hint = (getattr(s, "usage_hint", None) or "").strip()
                 if not hint:
                     continue
-                name = (getattr(s, 'name', None) or '').strip() or 'unknown'
-                rows.append({'server': name, 'hint': hint})
+                name = (getattr(s, "name", None) or "").strip() or "unknown"
+                rows.append({"server": name, "hint": hint})
             return rows
         except Exception:
             return []
@@ -598,21 +626,21 @@ class Orchestrator(Agent):
         validate_mcp_tool_name_collisions(
             self.tools,
             self.mcp_tools.keys(),
-            strict=bool(getattr(self.config, 'strict_mcp_tool_name_collision', False)),
+            strict=bool(getattr(self.config, "strict_mcp_tool_name_collision", False)),
         )
         # Sync connected tool names and descriptions so the system prompt reflects reality
-        pm = getattr(self, '_prompt_manager', None)
-        if pm and hasattr(pm, 'mcp_tool_names'):
+        pm = getattr(self, "_prompt_manager", None)
+        if pm and hasattr(pm, "mcp_tool_names"):
             pm.mcp_tool_names = list(self.mcp_tools.keys())
             descriptions: dict[str, str] = {}
             for tool_dict in mcp_tools:
-                fn = tool_dict.get('function') or {}
-                name = fn.get('name') or tool_dict.get('name', '')
-                desc = fn.get('description') or tool_dict.get('description', '')
+                fn = tool_dict.get("function") or {}
+                name = fn.get("name") or tool_dict.get("name", "")
+                desc = fn.get("description") or tool_dict.get("description", "")
                 if name and desc:
-                    first_line = desc.split('\n')[0][:120]
+                    first_line = desc.split("\n")[0][:120]
                     descriptions[name] = first_line
-            if hasattr(pm, 'mcp_tool_descriptions'):
+            if hasattr(pm, "mcp_tool_descriptions"):
                 pm.mcp_tool_descriptions = descriptions
-            if hasattr(pm, 'mcp_server_hints'):
+            if hasattr(pm, "mcp_server_hints"):
                 pm.mcp_server_hints = self._mcp_server_prompt_hints()

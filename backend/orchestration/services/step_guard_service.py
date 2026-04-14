@@ -233,7 +233,7 @@ class StepGuardService:
         _clear_agent_queued_actions(controller, reason='stuck_loop_recovery')
 
         created_files = self._collect_created_files(history)
-        msg, planning = self._build_stuck_recovery_message(created_files)
+        msg, planning = self._build_stuck_recovery_message(created_files, history)
 
         error_obs = ErrorObservation(content=msg, error_id='STUCK_LOOP_RECOVERY')
         attach_observation_cause(
@@ -259,8 +259,33 @@ class StepGuardService:
     def _build_stuck_recovery_message(
         self,
         created_files: set[str],
+        history: list,
     ) -> tuple[str, str]:
         """Build a generic stuck recovery message without task-text heuristics."""
+        recent_errors = [
+            (getattr(e, 'content', '') or '')
+            for e in history[-12:]
+            if isinstance(e, ErrorObservation)
+        ]
+        apply_patch_hits = sum(
+            1
+            for content in recent_errors
+            if 'apply_patch' in content.lower()
+            or 'corrupt patch' in content.lower()
+            or 'patch failed to apply' in content.lower()
+            or '[apply_patch_guidance]' in content.lower()
+        )
+        if apply_patch_hits >= 2:
+            return (
+                'STUCK LOOP DETECTED — repeated apply_patch failures were detected.\n'
+                'MANDATORY NEXT ACTIONS:\n'
+                '1. Read the target file again with read_file to refresh exact context lines.\n'
+                '2. Retry apply_patch once with corrected unified diff context.\n'
+                '3. If it fails again, switch to a different edit strategy instead of retrying apply_patch.\n'
+                'Do NOT emit another near-identical apply_patch call without new file evidence.',
+                'STUCK RECOVERY: read_file refresh, then one apply_patch retry max, then switch strategy.',
+            )
+
         created_str = ', '.join(sorted(created_files))
         if created_files:
             return (

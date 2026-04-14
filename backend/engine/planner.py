@@ -324,6 +324,17 @@ class OrchestratorPlanner:
 
         messages = self._inject_turn_status(messages, state)
         _maybe_log_prompt_metrics(messages)
+        if messages:
+            first = messages[0]
+            role = getattr(first, 'role', '')
+            if role == 'system':
+                for content in getattr(first, 'content', []):
+                    text = getattr(content, 'text', '')
+                    if '[DEGRADED_MODE_SYSTEM_PROMPT]' in text:
+                        logger.error(
+                            'Planner detected degraded emergency system prompt. Tool guidance fidelity may be reduced.'
+                        )
+                        break
 
         params: dict[str, Any] = {
             'messages': messages,

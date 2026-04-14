@@ -50,6 +50,9 @@ from backend.ledger.observation.reject import UserRejectObservation
 from backend.utils.prompt import PromptManager
 
 
+_MAX_SYSTEM_CONTEXT_SUMMARY_CHARS = 1200
+
+
 def _tool_ok_for_observation(obs: Observation) -> bool | None:
     """Structured tool outcome for serialized role=tool messages.
 
@@ -307,10 +310,10 @@ class ContextMemory:
     def _fallback_message_for_generic_event(self, event: Any) -> list[Message]:
         """Convert generic event doubles to user messages when possible."""
         fallback_content = None
-        if hasattr(event, 'content') and isinstance(getattr(event, 'content'), str):
-            fallback_content = getattr(event, 'content')
-        elif hasattr(event, 'message') and isinstance(getattr(event, 'message'), str):
-            fallback_content = getattr(event, 'message')
+        if hasattr(event, 'content') and isinstance(event.content, str):
+            fallback_content = event.content
+        elif hasattr(event, 'message') and isinstance(event.message, str):
+            fallback_content = event.message
         if fallback_content is not None:
             logger.debug(
                 '[ContextMemory] Handling generic event type %s via fallback.',
@@ -531,7 +534,11 @@ class ContextMemory:
                     logger.warning(
                         'APP_ALLOW_EMERGENCY_SYSTEM_PROMPT set — using minimal emergency system text'
                     )
-                    system_prompt = 'You are App agent.'
+                    system_prompt = (
+                        '[DEGRADED_MODE_SYSTEM_PROMPT] PromptManager unavailable. '
+                        'Critical tool and safety guidance may be missing. '
+                        'You are App agent.'
+                    )
                 else:
                     raise RuntimeError(
                         'System prompt could not be loaded. Fix PromptManager configuration or set '
@@ -543,16 +550,27 @@ class ContextMemory:
         return messages
 
     def _inject_context_summary_into_system(self, messages: list[Message]) -> None:
-        """Append context summary to leading system message if available."""
+        """Append a bounded context summary to the leading system message."""
         context_summary = self.get_context_summary()
         if not context_summary or not messages:
             return
         sys_msg = messages[0]
         if sys_msg.role != 'system':
             return
+        summary = context_summary
+        if len(summary) > _MAX_SYSTEM_CONTEXT_SUMMARY_CHARS:
+            logger.warning(
+                'Context summary truncated for system prompt integrity: %d -> %d chars',
+                len(summary),
+                _MAX_SYSTEM_CONTEXT_SUMMARY_CHARS,
+            )
+            summary = (
+                summary[:_MAX_SYSTEM_CONTEXT_SUMMARY_CHARS].rstrip()
+                + '\n[Context summary truncated for prompt integrity]'
+            )
         for content in sys_msg.content:
             if is_text_content(content):
-                content.text += f'\n\n{context_summary}'
+                content.text += f'\n\n{summary}'
                 break
 
     def _dedupe_system_messages(self, messages: list[Message]) -> list[Message]:

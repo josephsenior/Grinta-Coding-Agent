@@ -97,25 +97,49 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
 # ---------------------------------------------------------------------------
 
 _DIFF_HEADER_RE = re.compile(r"^diff --git a/.+ b/.+$")
-_HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@")
+_FILE_MINUS_RE = re.compile(r"^--- (a/.+|/dev/null)$")
+_FILE_PLUS_RE = re.compile(r"^\+\+\+ (b/.+|/dev/null)$")
+_HUNK_HEADER_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+
+
+def _classify_patch_error(validation_error: str) -> str:
+    message = validation_error.lower()
+    if 'context verification' in message or 'latest file content' in message:
+        return 'stale_view'
+    if 'target file not found' in message:
+        return 'tool_unavailable'
+    if 'context mismatch' in message:
+        return 'context_mismatch'
+    return 'malformed_patch'
+
+
+def _is_contract_error(validation_result: str) -> bool:
+    return validation_result.startswith(
+        ('Patch', 'Missing', 'Malformed', 'Unexpected')
+    )
+
+
+def _parse_hunk_header_counts(header_line: str) -> tuple[int, int] | None:
+    match = _HUNK_HEADER_RE.match(header_line)
+    if not match:
+        return None
+    old_count = int(match.group(2) or '1')
+    new_count = int(match.group(4) or '1')
+    return (old_count, new_count)
 
 
 def validate_apply_patch_contract(patch: str) -> str:
-    """Return a human-readable validation error when patch headers are malformed,
-    or the normalized patch text if it looks valid.
-    """
+    """Validate unified-diff structure and return normalized patch or error text."""
     lines = [line for line in patch.splitlines() if not line.startswith("index ")]
     if not lines:
         return "Patch is empty."
 
-    # Check for any of the standard unified diff markers
-    has_git = any(line.startswith("diff --git ") for line in lines)
-    has_minus = any(line.startswith("--- ") for line in lines)
-    has_plus = any(line.startswith("+++ ") for line in lines)
-    has_hunk = any(line.startswith("@@ ") for line in lines)
+    if any(line.strip().startswith('```') for line in lines):
+        return "Malformed patch: remove markdown fences and pass raw unified diff only."
 
-    if not (has_git or (has_minus and has_plus)) or not has_hunk:
-        # Check if they are accidentally using a pseudo-diff or just code block
+    has_git = any(line.startswith("diff --git ") for line in lines)
+    has_hunk = any(line.startswith("@@ ") for line in lines)
+    if not has_git or not has_hunk:
         is_just_plus_minus = all(
             line.startswith(("+", "-", " ")) or not line.strip() for line in lines
         )
@@ -126,28 +150,85 @@ def validate_apply_patch_contract(patch: str) -> str:
             return "Missing unified diff headers. You provided +/- lines but forgot 'diff --git', '---', '+++', and '@@' hunk headers."
         return "Missing required diff headers (diff --git, ---/+++, or @@)."
 
-    # Heuristic to fix common LLM mistakes:
-    # 1. Missing space for context lines
-    # 2. Missing headers if only one file is patched and it's obvious
-    processed_lines = []
+    diff_starts = [
+        idx for idx, line in enumerate(lines) if line.startswith('diff --git ')
+    ]
+    for block_idx, block_start in enumerate(diff_starts):
+        if not _DIFF_HEADER_RE.match(lines[block_start]):
+            return 'Malformed diff header: expected `diff --git a/<path> b/<path>`.'
 
-    # Simple case: if it starts with ---/+++ but no diff --git, it's still valid for git apply usually,
-    # but we search for the filenames to be safe.
+        block_end = (
+            diff_starts[block_idx + 1]
+            if block_idx + 1 < len(diff_starts)
+            else len(lines)
+        )
+        block = lines[block_start:block_end]
 
-    for line in lines:
-        if line.startswith(("diff ", "--- ", "+++ ", "@@ ", "+", "-", "index ", "\\ ")):
-            processed_lines.append(line)
-        elif line == "":
-            processed_lines.append(" ")
-        else:
-            # If it doesn't start with any marker, it's likely a context line missing its space
-            processed_lines.append(" " + line)
+        minus_line = next((line for line in block if line.startswith('--- ')), None)
+        plus_line = next((line for line in block if line.startswith('+++ ')), None)
+        if minus_line is None or plus_line is None:
+            return 'Malformed patch: each diff block must contain both --- and +++ headers.'
+        if not _FILE_MINUS_RE.match(minus_line):
+            return 'Malformed `---` header: expected `--- a/<path>` or `--- /dev/null`.'
+        if not _FILE_PLUS_RE.match(plus_line):
+            return 'Malformed `+++` header: expected `+++ b/<path>` or `+++ /dev/null`.'
 
-    return "\n".join(processed_lines)
+        hunk_indices = [
+            block_start + idx
+            for idx, line in enumerate(block)
+            if line.startswith('@@ ')
+        ]
+        if not hunk_indices:
+            return 'Malformed patch: each diff block must include at least one @@ hunk header.'
+
+        for hunk_pos, hunk_start in enumerate(hunk_indices):
+            parsed_counts = _parse_hunk_header_counts(lines[hunk_start])
+            if parsed_counts is None:
+                return 'Malformed hunk header: expected `@@ -n,m +n,m @@`.'
+
+            old_expected, new_expected = parsed_counts
+            hunk_end = (
+                hunk_indices[hunk_pos + 1]
+                if hunk_pos + 1 < len(hunk_indices)
+                else block_end
+            )
+
+            old_seen = 0
+            new_seen = 0
+            for line in lines[hunk_start + 1 : hunk_end]:
+                if not line:
+                    continue
+                if line.startswith('\\ No newline at end of file'):
+                    continue
+                if line.startswith(' '):
+                    old_seen += 1
+                    new_seen += 1
+                    continue
+                if line.startswith('-'):
+                    old_seen += 1
+                    continue
+                if line.startswith('+'):
+                    new_seen += 1
+                    continue
+                return (
+                    'Unexpected line in hunk body: all hunk lines must start with '
+                    "space, '+', '-', or '\\ No newline at end of file'."
+                )
+
+            if old_seen != old_expected or new_seen != new_expected:
+                return (
+                    'Malformed hunk line counts: header declares '
+                    f'old={old_expected}, new={new_expected} but body contains '
+                    f'old={old_seen}, new={new_seen}.'
+                )
+
+    return "\n".join(lines)
 
 
 def _guidance_message(validation_error: str) -> str:
+    error_class = _classify_patch_error(validation_error)
     return (
+        f"[APPLY_PATCH_CLASS:{error_class}] "
         "[APPLY_PATCH_GUIDANCE] " + validation_error + " "
         "This tool requires a full unified diff in this order: "
         "diff --git, optional valid index, ---, +++, @@. "
@@ -166,7 +247,7 @@ def build_apply_patch_action(
 ) -> CmdRunAction:
     """Return a CmdRunAction that applies the unified diff to the workspace."""
     result = validate_apply_patch_contract(patch)
-    if result.startswith("Missing") or result.startswith("Patch"):
+    if _is_contract_error(result):
         validation_error = result
         py = f"""
 import sys
@@ -201,6 +282,9 @@ sys.exit(2)
     patch = "\n".join(
         line for line in patch.splitlines() if not line.startswith("index ")
     )
+    # Auto-heal common LLM issue: missing terminal newline can break patch parsers.
+    if patch and not patch.endswith("\n"):
+        patch += "\n"
 
     pb = _b64(patch)
     dry_run_arg = "True" if check_only else "False"
