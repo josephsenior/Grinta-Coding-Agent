@@ -21,45 +21,44 @@ class TestImportFrom:
 
     def test_import_builtin_class(self):
         """Test importing a builtin class."""
-        result = import_from("builtins.dict")
+        result = import_from('builtins.dict')
         assert result is dict
 
     def test_import_stdlib_module(self):
         """Test importing from stdlib."""
-        result = import_from("os.path.join")
+        result = import_from('os.path.join')
         from os.path import join
 
         assert result is join
 
     def test_import_type(self):
         """Test importing a type."""
-        result = import_from("typing.List")
+        result = import_from('typing.List')
 
-        import typing
 
-        assert result is typing.List
+        assert result is list
 
     def test_import_function(self):
         """Test importing a function."""
-        result = import_from("os.path.exists")
+        result = import_from('os.path.exists')
         from os.path import exists
 
         assert result is exists
 
     def test_import_from_nested_module(self):
         """Test importing from deeply nested module."""
-        result = import_from("unittest.mock.MagicMock")
+        result = import_from('unittest.mock.MagicMock')
         assert result is MagicMock
 
     def test_import_nonexistent_module(self):
         """Test importing from nonexistent module raises."""
         with pytest.raises(ModuleNotFoundError):
-            import_from("nonexistent.module.Class")
+            import_from('nonexistent.module.Class')
 
     def test_import_nonexistent_attr(self):
         """Test importing nonexistent attribute raises."""
         with pytest.raises(AttributeError):
-            import_from("os.path.nonexistent_function")
+            import_from('os.path.nonexistent_function')
 
 
 class TestGetImpl:
@@ -72,7 +71,7 @@ class TestGetImpl:
 
     def test_same_class_returns_self(self):
         """Test get_impl with same class name returns the class."""
-        result = get_impl(list, "builtins.list")
+        result = get_impl(list, 'builtins.list')
         assert result is list
 
     def test_subclass_returns_impl(self):
@@ -87,7 +86,7 @@ class TestGetImpl:
         # Add to module so import_from can find it
         sys.modules[__name__].SubClass = SubClass
 
-        result = get_impl(BaseClass, f"{__name__}.SubClass")
+        result = get_impl(BaseClass, f'{__name__}.SubClass')
         assert result is SubClass
 
     def test_invalid_impl_raises(self):
@@ -101,8 +100,8 @@ class TestGetImpl:
 
         sys.modules[__name__].UnrelatedClass = UnrelatedClass
 
-        with pytest.raises(AssertionError, match="not a subclass"):
-            get_impl(BaseClass, f"{__name__}.UnrelatedClass")
+        with pytest.raises(AssertionError, match='not a subclass'):
+            get_impl(BaseClass, f'{__name__}.UnrelatedClass')
 
     def test_caching(self):
         """Test get_impl caches results."""
@@ -119,7 +118,7 @@ class TestGetImpl:
             pass
 
         sys.modules[__name__].MyDict = MyDict
-        result = get_impl(dict, f"{__name__}.MyDict")
+        result = get_impl(dict, f'{__name__}.MyDict')
         assert result is MyDict
 
 
@@ -178,8 +177,8 @@ class TestMatchesQualifiedNameInMro:
         class Base:
             pass
 
-        Base.__module__ = "test_module"
-        Base.__name__ = "BaseClass"
+        Base.__module__ = 'test_module'
+        Base.__name__ = 'BaseClass'
 
         class Sub(Base):
             pass
@@ -193,14 +192,14 @@ class TestMatchesQualifiedNameInMro:
         class BaseA:
             pass
 
-        BaseA.__module__ = "module_a"
-        BaseA.__name__ = "BaseA"
+        BaseA.__module__ = 'module_a'
+        BaseA.__name__ = 'BaseA'
 
         class BaseB:
             pass
 
-        BaseB.__module__ = "module_b"
-        BaseB.__name__ = "BaseB"
+        BaseB.__module__ = 'module_b'
+        BaseB.__name__ = 'BaseB'
 
         result = _matches_qualified_name_in_mro(BaseA, BaseB)
         assert result is False
@@ -225,22 +224,22 @@ class TestReimportBaseClass:
 
     def test_reimport_existing_class(self):
         """Test reimporting an existing class."""
-        result = _reimport_base_class("builtins", "dict")
+        result = _reimport_base_class('builtins', 'dict')
         assert result is dict
 
     def test_reimport_nonexistent_module(self):
         """Test reimporting from nonexistent module."""
-        result = _reimport_base_class("nonexistent", "Class")
+        result = _reimport_base_class('nonexistent', 'Class')
         assert result is None
 
     def test_reimport_nonexistent_class(self):
         """Test reimporting nonexistent class."""
-        result = _reimport_base_class("builtins", "NonexistentClass")
+        result = _reimport_base_class('builtins', 'NonexistentClass')
         assert result is None
 
     def test_reimport_non_type(self):
         """Test reimporting something that's not a type."""
-        result = _reimport_base_class("sys", "version")
+        result = _reimport_base_class('sys', 'version')
         # sys.version is a string, not a type
         assert result is None
 
@@ -254,8 +253,8 @@ class TestMatchesReimportedBase:
         class Base:
             pass
 
-        Base.__module__ = "builtins"
-        Base.__name__ = "dict"
+        Base.__module__ = 'builtins'
+        Base.__name__ = 'dict'
 
         class Sub(dict):
             pass
@@ -269,8 +268,8 @@ class TestMatchesReimportedBase:
         class Base:
             pass
 
-        Base.__module__ = "nonexistent"
-        Base.__name__ = "Class"
+        Base.__module__ = 'nonexistent'
+        Base.__name__ = 'Class'
 
         class Sub:
             pass
@@ -300,17 +299,17 @@ class TestRaiseInvalidImpl:
         class Base:
             pass
 
-        Base.__module__ = "test_module"
-        Base.__name__ = "BaseClass"
+        Base.__module__ = 'test_module'
+        Base.__name__ = 'BaseClass'
 
         class Impl:
             pass
 
-        Impl.__module__ = "impl_module"
-        Impl.__name__ = "ImplClass"
+        Impl.__module__ = 'impl_module'
+        Impl.__name__ = 'ImplClass'
 
         with pytest.raises(
-            AssertionError, match="Implementation class is not a subclass"
+            AssertionError, match='Implementation class is not a subclass'
         ):
             _raise_invalid_impl(Base, Impl)
 
@@ -320,17 +319,17 @@ class TestRaiseInvalidImpl:
         class Base:
             pass
 
-        Base.__module__ = "base_mod"
-        Base.__name__ = "Base"
+        Base.__module__ = 'base_mod'
+        Base.__name__ = 'Base'
 
         class Impl:
             pass
 
-        Impl.__module__ = "impl_mod"
-        Impl.__name__ = "Impl"
+        Impl.__module__ = 'impl_mod'
+        Impl.__name__ = 'Impl'
 
-        with pytest.raises(AssertionError, match="base=base_mod.Base"):
+        with pytest.raises(AssertionError, match='base=base_mod.Base'):
             _raise_invalid_impl(Base, Impl)
 
-        with pytest.raises(AssertionError, match="impl=impl_mod.Impl"):
+        with pytest.raises(AssertionError, match='impl=impl_mod.Impl'):
             _raise_invalid_impl(Base, Impl)

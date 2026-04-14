@@ -20,7 +20,7 @@ I watched my Swarm burn through $40 on a single ticket just complaining to itsel
 
 I realized the answer wasn't multiple agents. The answer was a single, highly capable orchestrator (`backend/orchestration/`) executing different **Modes**.
 
-Instead of switching *who* is doing the work, Grinta switches *how* the work is being done. The state machine (`backend/engine/`) transitions between stages: Planning, Execution, Tool Call, Validation, and Recovery.
+Instead of switching _who_ is doing the work, Grinta switches _how_ the work is being done. The state machine (`backend/engine/`) transitions between stages: Planning, Execution, Tool Call, Validation, and Recovery.
 
 The agent uses the same memory, the same identity, and the same context ledger. But when it enters the `validation` mode, the system constraints change. The rules of engagement change. The available tools change.
 

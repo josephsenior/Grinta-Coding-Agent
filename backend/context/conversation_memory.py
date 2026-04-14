@@ -50,7 +50,6 @@ from backend.ledger.observation.observation import Observation
 from backend.ledger.observation.reject import UserRejectObservation
 from backend.utils.prompt import PromptManager
 
-
 _MAX_SYSTEM_CONTEXT_SUMMARY_CHARS = 1200
 
 

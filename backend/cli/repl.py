@@ -44,8 +44,8 @@ def _prompt_toolkit_available() -> bool:
 # ---------------------------------------------------------------------------
 # History file
 # ---------------------------------------------------------------------------
-_HISTORY_DIR = Path.home() / ".grinta"
-_HISTORY_FILE = _HISTORY_DIR / "history.txt"
+_HISTORY_DIR = Path.home() / '.grinta'
+_HISTORY_FILE = _HISTORY_DIR / 'history.txt'
 
 
 @dataclass(frozen=True)
@@ -57,84 +57,84 @@ class SlashCommandSpec:
     usage: str
     aliases: tuple[str, ...] = ()
     #: Grouping key for `/help` (see `_HELP_SECTIONS_ORDER`).
-    help_section: str = "system"
+    help_section: str = 'system'
 
 
 _AUTONOMY_LEVEL_HINTS = {
-    "supervised": "Always ask before actions",
-    "balanced": "Ask only for high-risk actions",
-    "full": "Run without confirmation prompts",
+    'supervised': 'Always ask before actions',
+    'balanced': 'Ask only for high-risk actions',
+    'full': 'Run without confirmation prompts',
 }
 _SLASH_COMMANDS = (
     SlashCommandSpec(
-        "/help",
-        "Show commands and shortcuts",
-        "/help",
-        aliases=("/?",),
-        help_section="system",
+        '/help',
+        'Show commands and shortcuts',
+        '/help',
+        aliases=('/?',),
+        help_section='system',
     ),
     SlashCommandSpec(
-        "/settings",
-        "Open settings (model, API key, MCP)",
-        "/settings",
-        help_section="model",
+        '/settings',
+        'Open settings (model, API key, MCP)',
+        '/settings',
+        help_section='model',
     ),
     SlashCommandSpec(
-        "/sessions", "List past sessions", "/sessions", help_section="session"
+        '/sessions', 'List past sessions', '/sessions', help_section='session'
     ),
     SlashCommandSpec(
-        "/resume",
-        "Resume a past session by index or ID",
-        "/resume <N|id>",
-        help_section="session",
+        '/resume',
+        'Resume a past session by index or ID',
+        '/resume <N|id>',
+        help_section='session',
     ),
     SlashCommandSpec(
-        "/autonomy",
-        "View or set autonomy (supervised/balanced/full)",
-        "/autonomy [supervised|balanced|full]",
-        help_section="model",
+        '/autonomy',
+        'View or set autonomy (supervised/balanced/full)',
+        '/autonomy [supervised|balanced|full]',
+        help_section='model',
     ),
     SlashCommandSpec(
-        "/model",
-        "Show or switch the active model",
-        "/model [provider/model]",
-        help_section="model",
+        '/model',
+        'Show or switch the active model',
+        '/model [provider/model]',
+        help_section='model',
     ),
     SlashCommandSpec(
-        "/compact",
-        "Condense context to free token budget",
-        "/compact",
-        help_section="control",
+        '/compact',
+        'Condense context to free token budget',
+        '/compact',
+        help_section='control',
     ),
     SlashCommandSpec(
-        "/retry", "Re-send the last message", "/retry", help_section="control"
+        '/retry', 'Re-send the last message', '/retry', help_section='control'
     ),
     SlashCommandSpec(
-        "/status", "Show the current HUD snapshot", "/status", help_section="control"
+        '/status', 'Show the current HUD snapshot', '/status', help_section='control'
     ),
     SlashCommandSpec(
-        "/clear", "Clear the visible transcript", "/clear", help_section="control"
+        '/clear', 'Clear the visible transcript', '/clear', help_section='control'
     ),
     SlashCommandSpec(
-        "/exit", "Quit grinta", "/exit", aliases=("/quit",), help_section="system"
+        '/exit', 'Quit grinta', '/exit', aliases=('/quit',), help_section='system'
     ),
 )
 
 # Known models surfaced in `/model` tab-completion.
 # provider/model pairs — provider shown as display_meta in the completer.
 _KNOWN_MODELS: tuple[tuple[str, str], ...] = (
-    ("openai/gpt-4.1", "OpenAI"),
-    ("openai/gpt-4o", "OpenAI"),
-    ("openai/o4-mini", "OpenAI"),
-    ("anthropic/claude-opus-4-20250514", "Anthropic"),
-    ("anthropic/claude-sonnet-4-20250514", "Anthropic"),
-    ("anthropic/claude-haiku-4-20250514", "Anthropic"),
-    ("google/gemini-2.5-pro", "Google"),
-    ("google/gemini-2.5-flash", "Google"),
-    ("groq/meta-llama/llama-4-scout", "Groq"),
-    ("xai/grok-4.1-fast", "xAI"),
-    ("deepseek/deepseek-chat", "DeepSeek"),
-    ("openrouter/anthropic/claude-3.5-sonnet", "OpenRouter"),
+    ('openai/gpt-4.1', 'OpenAI'),
+    ('openai/gpt-4o', 'OpenAI'),
+    ('openai/o4-mini', 'OpenAI'),
+    ('anthropic/claude-opus-4-20250514', 'Anthropic'),
+    ('anthropic/claude-sonnet-4-20250514', 'Anthropic'),
+    ('anthropic/claude-haiku-4-20250514', 'Anthropic'),
+    ('google/gemini-2.5-pro', 'Google'),
+    ('google/gemini-2.5-flash', 'Google'),
+    ('groq/meta-llama/llama-4-scout', 'Groq'),
+    ('xai/grok-4.1-fast', 'xAI'),
+    ('deepseek/deepseek-chat', 'DeepSeek'),
+    ('openrouter/anthropic/claude-3.5-sonnet', 'OpenRouter'),
 )
 _COMMAND_ALIASES = {
     alias: spec.name for spec in _SLASH_COMMANDS for alias in spec.aliases
@@ -162,15 +162,15 @@ def _iter_command_completion_entries() -> list[tuple[str, str]]:
     entries: list[tuple[str, str]] = []
     for spec in _SLASH_COMMANDS:
         entries.append((spec.name, spec.description))
-        entries.extend((alias, f"Alias for {spec.name}") for alias in spec.aliases)
+        entries.extend((alias, f'Alias for {spec.name}') for alias in spec.aliases)
     return entries
 
 
 _HELP_SECTIONS_ORDER: tuple[tuple[str, str], ...] = (
-    ("session", "Session & history"),
-    ("model", "Model & configuration"),
-    ("control", "Context & control"),
-    ("system", "System"),
+    ('session', 'Session & history'),
+    ('model', 'Model & configuration'),
+    ('control', 'Context & control'),
+    ('system', 'System'),
 )
 
 
@@ -189,32 +189,32 @@ def _build_help_markdown() -> str:
         if not specs:
             continue
         if not first_section:
-            lines.append("")
+            lines.append('')
         first_section = False
-        lines.append(f"**{title}**")
-        lines.append("")
+        lines.append(f'**{title}**')
+        lines.append('')
         for spec in specs:
             alias_text = (
-                " _(aliases: "
-                + ", ".join(f"`{alias}`" for alias in spec.aliases)
-                + ")_"
+                ' _(aliases: '
+                + ', '.join(f'`{alias}`' for alias in spec.aliases)
+                + ')_'
                 if spec.aliases
-                else ""
+                else ''
             )
-            lines.append(f"- `{spec.usage}` — {spec.description}{alias_text}")
+            lines.append(f'- `{spec.usage}` — {spec.description}{alias_text}')
 
     lines.extend(
         [
-            "",
-            "**Input tips**",
-            "",
-            "- `Tab` autocomplete slash commands and common arguments",
-            "- `↑` / `↓` search prompt history",
-            "- `Alt+Enter` insert a newline",
-            "- `Ctrl+C` interrupt the current run",
+            '',
+            '**Input tips**',
+            '',
+            '- `Tab` autocomplete slash commands and common arguments',
+            '- `↑` / `↓` search prompt history',
+            '- `Alt+Enter` insert a newline',
+            '- `Ctrl+C` interrupt the current run',
         ]
     )
-    return "\n".join(lines)
+    return '\n'.join(lines)
 
 
 def _closest_command_names(command: str, *, limit: int = 2) -> list[str]:
@@ -239,10 +239,10 @@ def _build_command_completer(
         def get_completions(self, document, complete_event):  # type: ignore[override]
             del complete_event
             text_before_cursor = document.text_before_cursor.lstrip()
-            if not text_before_cursor.startswith("/"):
+            if not text_before_cursor.startswith('/'):
                 return
 
-            has_trailing_space = document.text_before_cursor.endswith(" ")
+            has_trailing_space = document.text_before_cursor.endswith(' ')
             parts = text_before_cursor.split()
             if not parts:
                 return
@@ -260,9 +260,9 @@ def _build_command_completer(
                 return
 
             canonical_command = _canonical_command_name(command_token)
-            argument_prefix = "" if has_trailing_space or len(parts) < 2 else parts[1]
+            argument_prefix = '' if has_trailing_space or len(parts) < 2 else parts[1]
 
-            if canonical_command == "/autonomy":
+            if canonical_command == '/autonomy':
                 lowered_prefix = argument_prefix.lower()
                 for level, description in _AUTONOMY_LEVEL_HINTS.items():
                     if level.startswith(lowered_prefix):
@@ -273,7 +273,7 @@ def _build_command_completer(
                         )
                 return
 
-            if canonical_command == "/model":
+            if canonical_command == '/model':
                 lowered_prefix = argument_prefix.lower()
                 for model_id, provider in _KNOWN_MODELS:
                     if lowered_prefix and not model_id.startswith(lowered_prefix):
@@ -285,7 +285,7 @@ def _build_command_completer(
                     )
                 return
 
-            if canonical_command == "/resume":
+            if canonical_command == '/resume':
                 lowered_prefix = argument_prefix.lower()
                 seen: set[str] = set()
                 for candidate, description in session_loader():
@@ -319,15 +319,15 @@ def _build_bindings() -> Any:
     @kb.add(Keys.Escape, Keys.Enter)
     def _newline(event):
         """Alt+Enter inserts a newline (multi-line input)."""
-        event.current_buffer.insert_text("\n")
+        event.current_buffer.insert_text('\n')
 
     return kb
 
 
 def _supports_prompt_session(input_stream: Any, output_stream: Any) -> bool:
     """Use prompt_toolkit only when both streams are attached to a TTY."""
-    input_is_tty = bool(getattr(input_stream, "isatty", lambda: False)())
-    output_is_tty = bool(getattr(output_stream, "isatty", lambda: False)())
+    input_is_tty = bool(getattr(input_stream, 'isatty', lambda: False)())
+    output_is_tty = bool(getattr(output_stream, 'isatty', lambda: False)())
     return input_is_tty and output_is_tty and _prompt_toolkit_available()
 
 
@@ -360,19 +360,19 @@ class Repl:
         self._last_user_message: str | None = None
         self._queued_input: list[str] = []
         #: Single-line bootstrap / idle status under the stats bar (prompt_toolkit only).
-        self._footer_system_status: str = ""
-        self._footer_system_kind: str = "system"
+        self._footer_system_status: str = ''
+        self._footer_system_kind: str = 'system'
         self._pt_session: Any | None = None
 
     def _invalidate_pt(self) -> None:
         sess = self._pt_session
         if sess is None:
             return
-        app = getattr(sess, "app", None)
+        app = getattr(sess, 'app', None)
         if app is not None:
             app.invalidate()
 
-    def _set_footer_system_line(self, text: str, *, kind: str = "system") -> None:
+    def _set_footer_system_line(self, text: str, *, kind: str = 'system') -> None:
         """One shared status line under the stats bar; replaces previous text."""
         self._footer_system_status = text
         self._footer_system_kind = kind
@@ -386,30 +386,30 @@ class Repl:
         status = self._footer_system_status.strip()
         if not status:
             return
-        warn = self._footer_system_kind.strip().lower() == "warning"
+        warn = self._footer_system_kind.strip().lower() == 'warning'
         body_cls = (
-            "class:prompt.footer.warn_body" if warn else "class:prompt.footer.body"
+            'class:prompt.footer.warn_body' if warn else 'class:prompt.footer.body'
         )
-        label = "system"
-        sep = ": "
+        label = 'system'
+        sep = ': '
         cols = shutil.get_terminal_size((110, 24)).columns
         reserve = 5 + len(label) + len(sep)
         max_w = max(16, cols - reserve)
         if len(status) > max_w:
-            status = status[: max_w - 1] + "…"
-        add("", "\n")
+            status = status[: max_w - 1] + '…'
+        add('', '\n')
         if warn:
-            add("class:prompt.footer.warn_bracket", "[")
-            add("class:prompt.footer.warn_core", "!")
-            add("class:prompt.footer.warn_bracket", "]  ")
-            add("class:prompt.footer.warn_kicker", label)
-            add("class:prompt.footer.warn_sep", sep)
+            add('class:prompt.footer.warn_bracket', '[')
+            add('class:prompt.footer.warn_core', '!')
+            add('class:prompt.footer.warn_bracket', ']  ')
+            add('class:prompt.footer.warn_kicker', label)
+            add('class:prompt.footer.warn_sep', sep)
         else:
-            add("class:prompt.footer.badge_bracket", "[")
-            add("class:prompt.footer.badge_core", "i")
-            add("class:prompt.footer.badge_bracket", "]  ")
-            add("class:prompt.footer.kicker", label)
-            add("class:prompt.footer.sep", sep)
+            add('class:prompt.footer.badge_bracket', '[')
+            add('class:prompt.footer.badge_core', 'i')
+            add('class:prompt.footer.badge_bracket', ']  ')
+            add('class:prompt.footer.kicker', label)
+            add('class:prompt.footer.sep', sep)
         add(body_cls, status)
 
     @property
@@ -455,7 +455,7 @@ class Repl:
     def _current_prompt_state(self) -> AgentState | None:
         renderer = self._renderer
         state = (
-            getattr(renderer, "current_state", None) if renderer is not None else None
+            getattr(renderer, 'current_state', None) if renderer is not None else None
         )
         if isinstance(state, AgentState):
             return state
@@ -471,10 +471,10 @@ class Repl:
     def _prompt_message(self) -> str:
         state = self._current_prompt_state()
         if state in {AgentState.ERROR, AgentState.REJECTED}:
-            label = "retry "
+            label = 'retry '
         else:
-            label = ""
-        return f"{label}❯ "
+            label = ''
+        return f'{label}❯ '
 
     def _prompt_placeholder(self) -> Any:
         from prompt_toolkit.formatted_text import HTML
@@ -486,133 +486,133 @@ class Repl:
     def _prompt_state_label(self) -> str:
         state = self._current_prompt_state()
         if state == AgentState.AWAITING_USER_CONFIRMATION:
-            return "Needs approval"
+            return 'Needs approval'
         if state in {AgentState.ERROR, AgentState.REJECTED}:
-            return "Needs attention"
+            return 'Needs attention'
         if state == AgentState.RUNNING:
-            return "Running"
+            return 'Running'
         if state == AgentState.FINISHED:
-            return "Done"
+            return 'Done'
         if state == AgentState.STOPPED:
-            return "Stopped"
-        return "Ready"
+            return 'Stopped'
+        return 'Ready'
 
     def _prompt_autonomy_label(self) -> str:
         controller = self._controller
         if controller is not None:
-            ac = getattr(controller, "autonomy_controller", None)
+            ac = getattr(controller, 'autonomy_controller', None)
             if ac is not None:
-                level = str(getattr(ac, "autonomy_level", "balanced")).strip().lower()
+                level = str(getattr(ac, 'autonomy_level', 'balanced')).strip().lower()
                 if level in _AUTONOMY_LEVEL_HINTS:
-                    return f"autonomy:{level}"
-        return "autonomy:balanced"
+                    return f'autonomy:{level}'
+        return 'autonomy:balanced'
 
     def _prompt_panel_data(self) -> dict[str, str]:
         hud = self._hud.state
         provider, model = HUDBar.describe_model(hud.model)
         tokens = (
-            HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else "0"
+            HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
         )
-        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else "?"
+        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else '?'
         if hud.context_tokens == 0 and hud.context_limit == 0:
-            token_display = "0 tokens"
+            token_display = '0 tokens'
         elif hud.context_limit == 0:
-            token_display = f"{tokens} tokens"
+            token_display = f'{tokens} tokens'
         else:
-            token_display = f"{tokens}/{lim}"
+            token_display = f'{tokens}/{lim}'
         mcp_txt = HUDBar._format_mcp_servers_label(hud.mcp_servers)
         skills_txt = HUDBar._format_skills_label(self._hud.bundled_skill_count)
         return {
-            "state_label": self._prompt_state_label(),
-            "autonomy_label": self._prompt_autonomy_label(),
-            "provider": provider,
-            "model": model,
-            "token_display": token_display,
-            "cost": f"${hud.cost_usd:.4f}",
-            "calls": f"{hud.llm_calls} calls",
-            "mcp": mcp_txt,
-            "skills": skills_txt,
-            "ledger": hud.ledger_status,
+            'state_label': self._prompt_state_label(),
+            'autonomy_label': self._prompt_autonomy_label(),
+            'provider': provider,
+            'model': model,
+            'token_display': token_display,
+            'cost': f'${hud.cost_usd:.4f}',
+            'calls': f'{hud.llm_calls} calls',
+            'mcp': mcp_txt,
+            'skills': skills_txt,
+            'ledger': hud.ledger_status,
         }
 
     def _prompt_state_style(self) -> str:
         state = self._current_prompt_state()
         if state == AgentState.AWAITING_USER_CONFIRMATION:
-            return "class:prompt.badge.review"
+            return 'class:prompt.badge.review'
         if state in {AgentState.ERROR, AgentState.REJECTED}:
-            return "class:prompt.badge.error"
+            return 'class:prompt.badge.error'
         if state == AgentState.RUNNING:
-            return "class:prompt.badge.running"
-        return "class:prompt.badge.ready"
+            return 'class:prompt.badge.running'
+        return 'class:prompt.badge.ready'
 
     def _prompt_autonomy_style(self) -> str:
         label = self._prompt_autonomy_label()
-        if "full" in label:
-            return "class:prompt.autonomy.full"
-        if "supervised" in label:
-            return "class:prompt.autonomy.supervised"
-        return "class:prompt.autonomy.balanced"
+        if 'full' in label:
+            return 'class:prompt.autonomy.full'
+        if 'supervised' in label:
+            return 'class:prompt.autonomy.supervised'
+        return 'class:prompt.autonomy.balanced'
 
     @staticmethod
     def _prompt_ledger_style(ledger_status: str) -> str:
-        if ledger_status in {"Healthy", "Ready", "Idle", "Starting"}:
-            return "class:prompt.health.good"
-        if ledger_status in {"Review", "Paused"}:
-            return "class:prompt.health.warn"
-        return "class:prompt.health.bad"
+        if ledger_status in {'Healthy', 'Ready', 'Idle', 'Starting'}:
+            return 'class:prompt.health.good'
+        if ledger_status in {'Review', 'Paused'}:
+            return 'class:prompt.health.warn'
+        return 'class:prompt.health.bad'
 
     def _prompt_toolbar_text(self) -> str:
         data = self._prompt_panel_data()
-        state_label = data["state_label"]
-        autonomy_label = data["autonomy_label"]
-        controls = f"{state_label}  │  {autonomy_label}  │  Tab for commands"
+        state_label = data['state_label']
+        autonomy_label = data['autonomy_label']
+        controls = f'{state_label}  │  {autonomy_label}  │  Tab for commands'
         telemetry = (
             f"provider: {data['provider']}  │  model: {data['model']}  │  {data['token_display']}  │  {data['cost']}  │  "
             f"{data['calls']}  │  {data['mcp']}  │  {data['skills']}  │  {data['ledger']}"
         )
-        return f" {controls}\n {telemetry} "
+        return f' {controls}\n {telemetry} '
 
     def _prompt_stats_row1_fragments(
         self, data: dict[str, str], compact: bool
     ) -> list[tuple[str, str]]:
         frags: list[tuple[str, str]] = []
-        frags.append(("class:prompt.brand", "GRINTA"))
-        frags.append(("class:prompt.dim", "  "))
+        frags.append(('class:prompt.brand', 'GRINTA'))
+        frags.append(('class:prompt.dim', '  '))
         frags.append((self._prompt_state_style(), f" {data['state_label'].upper()} "))
-        frags.append(("class:prompt.dim", "  "))
-        frags.append((self._prompt_autonomy_style(), data["autonomy_label"]))
+        frags.append(('class:prompt.dim', '  '))
+        frags.append((self._prompt_autonomy_style(), data['autonomy_label']))
         if not compact:
-            frags.append(("class:prompt.dim", "  "))
-            frags.append(("class:prompt.hint", "Tab for commands"))
+            frags.append(('class:prompt.dim', '  '))
+            frags.append(('class:prompt.hint', 'Tab for commands'))
         return frags
 
     def _prompt_stats_row2_fragments(
         self, data: dict[str, str], compact: bool, width: int = 120
     ) -> list[tuple[str, str]]:
         """Build row-2 fragments, wrapping to a second line when content exceeds width."""
-        sep = "  \u2022  "
+        sep = '  \u2022  '
 
         # Required prefix: provider + model + tokens + cost
         base: list[tuple[str, str]] = [
-            ("class:prompt.dim", "provider:"),
-            ("class:prompt.sep", " "),
-            ("class:prompt.model", data["provider"]),
-            ("class:prompt.sep", sep),
-            ("class:prompt.dim", "model:"),
-            ("class:prompt.sep", " "),
-            ("class:prompt.model", data["model"]),
-            ("class:prompt.sep", sep),
-            ("class:prompt.value", data["token_display"]),
-            ("class:prompt.sep", sep),
-            ("class:prompt.value", data["cost"]),
+            ('class:prompt.dim', 'provider:'),
+            ('class:prompt.sep', ' '),
+            ('class:prompt.model', data['provider']),
+            ('class:prompt.sep', sep),
+            ('class:prompt.dim', 'model:'),
+            ('class:prompt.sep', ' '),
+            ('class:prompt.model', data['model']),
+            ('class:prompt.sep', sep),
+            ('class:prompt.value', data['token_display']),
+            ('class:prompt.sep', sep),
+            ('class:prompt.value', data['cost']),
         ]
 
         # Optional fields in priority order.
         optionals: list[tuple[str, str]] = [
-            (self._prompt_ledger_style(data["ledger"]), data["ledger"]),
-            ("class:prompt.value", data["calls"]),
-            ("class:prompt.value", data["mcp"]),
-            ("class:prompt.value", data["skills"]),
+            (self._prompt_ledger_style(data['ledger']), data['ledger']),
+            ('class:prompt.value', data['calls']),
+            ('class:prompt.value', data['mcp']),
+            ('class:prompt.value', data['skills']),
         ]
 
         def _len(frags: list[tuple[str, str]]) -> int:
@@ -621,7 +621,7 @@ class Repl:
         # Build the full single-line version first.
         opt_frags: list[tuple[str, str]] = []
         for item_style, item_text in optionals:
-            opt_frags.extend([("class:prompt.sep", sep), (item_style, item_text)])
+            opt_frags.extend([('class:prompt.sep', sep), (item_style, item_text)])
 
         all_frags = list(base) + opt_frags
         if _len(all_frags) <= width:
@@ -629,12 +629,12 @@ class Repl:
 
         # Overflow → wrap: required fields on line 1, optionals on line 2.
         result = list(base)
-        result.append(("", "\n"))
-        indent = " " * 10  # width of "provider: " to align the wrapped row
-        result.append(("class:prompt.dim", indent))
+        result.append(('', '\n'))
+        indent = ' ' * 10  # width of "provider: " to align the wrapped row
+        result.append(('class:prompt.dim', indent))
         for idx, (item_style, item_text) in enumerate(optionals):
             if idx > 0:
-                result.append(("class:prompt.sep", sep))
+                result.append(('class:prompt.sep', sep))
             result.append((item_style, item_text))
 
         return result
@@ -646,14 +646,14 @@ class Repl:
         compact = width < 110
 
         # Keep HUD state/autonomy in sync so the Live-mode HUD matches.
-        self._hud.update_agent_state(data["state_label"])
-        level = data["autonomy_label"].replace("autonomy:", "")
+        self._hud.update_agent_state(data['state_label'])
+        level = data['autonomy_label'].replace('autonomy:', '')
         self._hud.update_autonomy(level)
 
         # Keep the compact line readable by folding provider/model into one token.
         model = (
-            data["model"]
-            if data["provider"] in {"(not set)", "(unknown)"}
+            data['model']
+            if data['provider'] in {'(not set)', '(unknown)'}
             else f"{data['provider']}/{data['model']}"
         )
 
@@ -667,14 +667,14 @@ class Repl:
                 f"{data['state_label']} · {data['autonomy_label']} · "
                 f"{model} · {data['token_display']} · {data['cost']}"
             )
-            add("class:prompt.dim", line)
+            add('class:prompt.dim', line)
             self._append_footer_system_fragments(fragments, add)
             return fragments
 
-        add("class:prompt.dim", "\u2500" * width)
-        add("", "\n")
+        add('class:prompt.dim', '\u2500' * width)
+        add('', '\n')
         fragments.extend(self._prompt_stats_row1_fragments(data, compact))
-        add("", "\n")
+        add('', '\n')
         # Pass actual terminal width so row 2 never overflows.
         fragments.extend(self._prompt_stats_row2_fragments(data, compact, width=width))
         self._append_footer_system_fragments(fragments, add)
@@ -682,7 +682,7 @@ class Repl:
 
     def _prompt_panel_message(self) -> Any:
         return [
-            ("class:prompt.arrow", self._prompt_message()),
+            ('class:prompt.arrow', self._prompt_message()),
         ]
 
     def _create_prompt_session(self) -> Any:
@@ -697,49 +697,49 @@ class Repl:
         prompt_style = Style.from_dict(
             {
                 # Default prompt text; no bg so the terminal background shows through.
-                "": "noreverse #e6eef7",
+                '': 'noreverse #e6eef7',
                 # PT defaults bottom-toolbar to reverse — disable without adding a fill color.
-                "bottom-toolbar": "noreverse",
-                "bottom-toolbar.text": "noreverse",
-                "prompt.border": "#4a7a9b",
-                "prompt.frame.border": "bold #34d399",
-                "prompt.brand": "bold #7dd3fc",
-                "prompt.dim": "#5c7287",
-                "prompt.model": "bold #dbe7f3",
-                "prompt.value": "#b4c4d5",
-                "prompt.sep": "#2f465b",
-                "prompt.arrow": "bold #7dd3fc",
-                "prompt.hint": "bold #f1bf63",
-                "prompt.badge.ready": "#86efac bold",
-                "prompt.badge.running": "#93c5fd bold",
-                "prompt.badge.review": "#fcd34d bold",
-                "prompt.badge.paused": "#fcd34d bold",
-                "prompt.badge.error": "#fca5a5 bold",
-                "prompt.autonomy.balanced": "#8bd8ff",
-                "prompt.autonomy.full": "#f1bf63 bold",
-                "prompt.autonomy.supervised": "#f0a3ff bold",
-                "prompt.health.good": "#8fdfb1 bold",
-                "prompt.health.warn": "#f1bf63 bold",
-                "prompt.health.bad": "#ff9ea8 bold",
-                "prompt.footer.badge_bracket": "#0e7490",
-                "prompt.footer.badge_core": "bold #22d3ee",
-                "prompt.footer.kicker": "bold #a5f3fc",
-                "prompt.footer.sep": "#64748b",
-                "prompt.footer.body": "#94a3b8",
-                "prompt.footer.warn_bracket": "#a16207",
-                "prompt.footer.warn_core": "bold #facc15",
-                "prompt.footer.warn_kicker": "bold #fde68a",
-                "prompt.footer.warn_sep": "#92400e",
-                "prompt.footer.warn_body": "#fcd34d",
-                "completion-menu": "bg:#0d1f30 #b8c7d8",
-                "completion-menu.completion": "bg:#0d1f30 #b8c7d8",
-                "completion-menu.completion.current": "bg:#1e4976 bold #ffffff",
-                "completion-menu.meta": "bg:#0a1929 #5c7fa0",
-                "completion-menu.meta.completion": "bg:#0a1929 #5c7fa0",
-                "completion-menu.meta.completion.current": "bg:#163350 #93c5fd",
-                "completion-menu.multi-column-meta": "bg:#0a1929 #5c7fa0",
-                "scrollbar.background": "bg:#0d1f30",
-                "scrollbar.button": "bg:#1e4976",
+                'bottom-toolbar': 'noreverse',
+                'bottom-toolbar.text': 'noreverse',
+                'prompt.border': '#4a7a9b',
+                'prompt.frame.border': 'bold #34d399',
+                'prompt.brand': 'bold #7dd3fc',
+                'prompt.dim': '#5c7287',
+                'prompt.model': 'bold #dbe7f3',
+                'prompt.value': '#b4c4d5',
+                'prompt.sep': '#2f465b',
+                'prompt.arrow': 'bold #7dd3fc',
+                'prompt.hint': 'bold #f1bf63',
+                'prompt.badge.ready': '#86efac bold',
+                'prompt.badge.running': '#93c5fd bold',
+                'prompt.badge.review': '#fcd34d bold',
+                'prompt.badge.paused': '#fcd34d bold',
+                'prompt.badge.error': '#fca5a5 bold',
+                'prompt.autonomy.balanced': '#8bd8ff',
+                'prompt.autonomy.full': '#f1bf63 bold',
+                'prompt.autonomy.supervised': '#f0a3ff bold',
+                'prompt.health.good': '#8fdfb1 bold',
+                'prompt.health.warn': '#f1bf63 bold',
+                'prompt.health.bad': '#ff9ea8 bold',
+                'prompt.footer.badge_bracket': '#0e7490',
+                'prompt.footer.badge_core': 'bold #22d3ee',
+                'prompt.footer.kicker': 'bold #a5f3fc',
+                'prompt.footer.sep': '#64748b',
+                'prompt.footer.body': '#94a3b8',
+                'prompt.footer.warn_bracket': '#a16207',
+                'prompt.footer.warn_core': 'bold #facc15',
+                'prompt.footer.warn_kicker': 'bold #fde68a',
+                'prompt.footer.warn_sep': '#92400e',
+                'prompt.footer.warn_body': '#fcd34d',
+                'completion-menu': 'bg:#0d1f30 #b8c7d8',
+                'completion-menu.completion': 'bg:#0d1f30 #b8c7d8',
+                'completion-menu.completion.current': 'bg:#1e4976 bold #ffffff',
+                'completion-menu.meta': 'bg:#0a1929 #5c7fa0',
+                'completion-menu.meta.completion': 'bg:#0a1929 #5c7fa0',
+                'completion-menu.meta.completion.current': 'bg:#163350 #93c5fd',
+                'completion-menu.multi-column-meta': 'bg:#0a1929 #5c7fa0',
+                'scrollbar.background': 'bg:#0d1f30',
+                'scrollbar.button': 'bg:#1e4976',
             }
         )
 
@@ -823,7 +823,7 @@ class Repl:
     async def _read_non_interactive_input(self) -> str:
         if self._queued_input:
             return self._queued_input.pop(0)
-        self._console.print(">>> ", end="")
+        self._console.print('>>> ', end='')
         return await asyncio.to_thread(sys.stdin.readline)
 
     # -- public entry point ------------------------------------------------
@@ -869,7 +869,7 @@ class Repl:
             )
             renderer = self._renderer
             if renderer is None:
-                raise RuntimeError("CLI renderer did not initialize.")
+                raise RuntimeError('CLI renderer did not initialize.')
 
             # -- staged init runs in background while user sees the prompt -----
             chat_ready_done = asyncio.Event()
@@ -879,25 +879,25 @@ class Repl:
             def _invalidate_prompt_session() -> None:
                 if session is None:
                     return
-                app = getattr(session, "app", None)
+                app = getattr(session, 'app', None)
                 if app is not None:
                     app.invalidate()
 
             def _handle_bootstrap_failure(exc: BaseException) -> None:
                 engine_init_exc[0] = exc
-                self._set_footer_system_line("")
+                self._set_footer_system_line('')
                 exc_name = type(exc).__name__
-                if "AuthenticationError" in exc_name or "api_key" in str(exc).lower():
+                if 'AuthenticationError' in exc_name or 'api_key' in str(exc).lower():
                     renderer.add_system_message(
-                        "No API key or model configured.\n"
-                        "Run grinta again and complete onboarding, "
-                        "or edit settings.json directly.\n"
-                        f"{exc}",
-                        title="error",
+                        'No API key or model configured.\n'
+                        'Run grinta again and complete onboarding, '
+                        'or edit settings.json directly.\n'
+                        f'{exc}',
+                        title='error',
                     )
                 else:
                     renderer.add_system_message(
-                        f"Initialization failed: {exc}", title="error"
+                        f'Initialization failed: {exc}', title='error'
                     )
                 self._running = False
                 _invalidate_prompt_session()
@@ -942,7 +942,7 @@ class Repl:
                         event_stream = runtime.event_stream
                         if event_stream is None:
                             raise RuntimeError(
-                                "Runtime did not produce an event stream."
+                                'Runtime did not produce an event stream.'
                             )
 
                         self._event_stream = event_stream
@@ -964,20 +964,20 @@ class Repl:
                         if agent.config.enable_mcp:
                             if session is not None:
                                 self._set_footer_system_line(
-                                    "Chat ready. MCP tools warming in background."
+                                    'Chat ready. MCP tools warming in background.'
                                 )
                             else:
                                 renderer.add_system_message(
-                                    "Chat ready. MCP tools warming in background.",
-                                    title="system",
+                                    'Chat ready. MCP tools warming in background.',
+                                    title='system',
                                 )
                         else:
                             self._hud.update_mcp_servers(0)
                             if session is not None:
-                                self._set_footer_system_line("Ready.")
+                                self._set_footer_system_line('Ready.')
                             else:
-                                renderer.add_system_message("Ready.", title="system")
-                        self._hud.update_ledger("Healthy")
+                                renderer.add_system_message('Ready.', title='system')
+                        self._hud.update_ledger('Healthy')
                         _invalidate_prompt_session()
                         chat_ready_done.set()
                     except Exception as exc:
@@ -991,26 +991,26 @@ class Repl:
                         await _setup_mcp_tools(agent, runtime, memory)
                     except Exception as exc:
                         logger.warning(
-                            "MCP warmup failed after chat became ready", exc_info=True
+                            'MCP warmup failed after chat became ready', exc_info=True
                         )
                         self._hud.update_mcp_servers(0)
-                        msg = f"MCP warmup failed: {exc}"
+                        msg = f'MCP warmup failed: {exc}'
                         if session is not None:
-                            self._set_footer_system_line(msg, kind="warning")
+                            self._set_footer_system_line(msg, kind='warning')
                         else:
-                            renderer.add_system_message(msg, title="warning")
+                            renderer.add_system_message(msg, title='warning')
                     else:
-                        mcp_status = getattr(agent, "mcp_capability_status", None) or {}
+                        mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
                         try:
-                            mcp_n = int(mcp_status.get("connected_client_count") or 0)
+                            mcp_n = int(mcp_status.get('connected_client_count') or 0)
                         except (TypeError, ValueError):
                             mcp_n = 0
                         self._hud.update_mcp_servers(mcp_n)
                         if session is not None:
-                            self._set_footer_system_line("MCP tools loaded.")
+                            self._set_footer_system_line('MCP tools loaded.')
                         else:
                             renderer.add_system_message(
-                                "MCP tools loaded.", title="system"
+                                'MCP tools loaded.', title='system'
                             )
                 finally:
                     chat_ready_done.set()
@@ -1027,30 +1027,30 @@ class Repl:
                 AgentState.RATE_LIMITED,
             ]
 
-            self._hud.update_ledger("Starting")
+            self._hud.update_ledger('Starting')
             if session is not None:
-                self._set_footer_system_line("Initializing engine...")
+                self._set_footer_system_line('Initializing engine...')
             else:
-                renderer.add_system_message("Initializing engine...", title="system")
+                renderer.add_system_message('Initializing engine...', title='system')
             bootstrap_task = asyncio.create_task(
-                _engine_bootstrap(), name="grinta-engine-bootstrap"
+                _engine_bootstrap(), name='grinta-engine-bootstrap'
             )
 
             while self._running:
                 try:
                     if session is None:
                         user_input = await self._read_non_interactive_input()
-                        if user_input == "":
+                        if user_input == '':
                             raise EOFError
                     else:
                         user_input = await session.prompt_async()
                 except KeyboardInterrupt:
                     continue
                 except EOFError:
-                    self._console.print("EOF Error received in prompt loop.")
+                    self._console.print('EOF Error received in prompt loop.')
                     break
                 except Exception as e:
-                    self._console.print(f"CRASH: {e}")
+                    self._console.print(f'CRASH: {e}')
                     import traceback
 
                     traceback.print_exc()
@@ -1063,11 +1063,11 @@ class Repl:
                 if not text:
                     continue
 
-                if text.startswith("/"):
+                if text.startswith('/'):
                     parts_sl = text.strip().split()
                     if parts_sl:
                         sc = _canonical_command_name(parts_sl[0].lower())
-                        if sc in ("/resume", "/compact", "/retry"):
+                        if sc in ('/resume', '/compact', '/retry'):
                             await engine_init_done.wait()
                             if engine_init_exc[0] is not None:
                                 continue
@@ -1118,24 +1118,24 @@ class Repl:
                     or event_stream is None
                 ):
                     self._renderer.add_system_message(
-                        "Initialization failed: engine components were not created.",
-                        title="error",
+                        'Initialization failed: engine components were not created.',
+                        title='error',
                     )
                     break
 
                 # -- user message: start Live for agent turn
                 # Print the user message statically since prompt_toolkit erases it
-                self._set_footer_system_line("")
+                self._set_footer_system_line('')
                 if self._next_action is not None:
                     initial_action = self._next_action
                     self._next_action = None
-                    msg_content = getattr(initial_action, "content", None)
+                    msg_content = getattr(initial_action, 'content', None)
                     if msg_content is not None:
                         await self._renderer.add_user_message(str(msg_content))
                     else:
                         if self._renderer is not None:
                             self._renderer.add_system_message(
-                                "Condensing context\u2026", title="grinta"
+                                'Condensing context\u2026', title='grinta'
                             )
                 else:
                     self._last_user_message = text
@@ -1163,7 +1163,7 @@ class Repl:
                     controller.step()
                 except Exception:
                     logger.debug(
-                        "controller.step() failed, agent loop will retry",
+                        'controller.step() failed, agent loop will retry',
                         exc_info=True,
                     )
 
@@ -1199,7 +1199,7 @@ class Repl:
                 runtime_orchestrator.release(self._acquire_result)
             event_stream = self._event_stream
             if event_stream is not None:
-                close = getattr(event_stream, "close", None)
+                close = getattr(event_stream, 'close', None)
                 if callable(close):
                     with contextlib.suppress(Exception):
                         close()
@@ -1228,7 +1228,7 @@ class Repl:
             try:
                 memory.status_callback = early_cb
             except Exception:
-                logger.debug("Could not set memory status callback", exc_info=True)
+                logger.debug('Could not set memory status callback', exc_info=True)
             self._controller = controller
 
         current_state = controller.get_agent_state()
@@ -1244,7 +1244,7 @@ class Repl:
         if agent_task is None or agent_task.done():
             agent_task = asyncio.create_task(
                 run_agent_until_done(controller, runtime, memory, end_states),
-                name="grinta-agent-loop",
+                name='grinta-agent-loop',
             )
 
         return controller, agent_task
@@ -1273,13 +1273,13 @@ class Repl:
         # Disabled by default to avoid aborting long-running sessions.
         # Set APP_AGENT_HARD_TIMEOUT_SECONDS / APP_AGENT_HARD_TIMEOUT_CMD_SECONDS
         # to a positive value to re-enable limits.
-        _hard_timeout_raw = os.getenv("APP_AGENT_HARD_TIMEOUT_SECONDS", "0")
+        _hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_SECONDS', '0')
         try:
             _HARD_TIMEOUT = max(0, int(_hard_timeout_raw))
         except (ValueError, TypeError):
             _HARD_TIMEOUT = 0
 
-        _cmd_hard_timeout_raw = os.getenv("APP_AGENT_HARD_TIMEOUT_CMD_SECONDS", "0")
+        _cmd_hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS', '0')
         try:
             _CMD_HARD_TIMEOUT = max(0, int(_cmd_hard_timeout_raw))
         except (ValueError, TypeError):
@@ -1334,7 +1334,7 @@ class Repl:
             # hanging forever (e.g. LLM API unresponsive). Allow a longer
             # budget while a foreground command action is still pending.
             active_timeout = _HARD_TIMEOUT
-            pending_action = getattr(controller, "_pending_action", None)
+            pending_action = getattr(controller, '_pending_action', None)
             if pending_action is not None:
                 with contextlib.suppress(Exception):
                     from backend.ledger.action import CmdRunAction
@@ -1346,11 +1346,11 @@ class Repl:
                         active_timeout = _CMD_HARD_TIMEOUT
 
             if active_timeout > 0 and time.monotonic() - _start > active_timeout:
-                logger.warning("Agent wait exceeded %ds hard timeout", active_timeout)
+                logger.warning('Agent wait exceeded %ds hard timeout', active_timeout)
                 if renderer is not None:
                     renderer.add_system_message(
-                        f"Agent timed out after {active_timeout} seconds. Returning to prompt.",
-                        title="⏱ Timeout",
+                        f'Agent timed out after {active_timeout} seconds. Returning to prompt.',
+                        title='⏱ Timeout',
                     )
                     renderer.drain_events()
                 # Cancel the stale task so it does not linger into the next turn.
@@ -1370,10 +1370,10 @@ class Repl:
         """Drain queued CLI events until the delivery queue stays quiet briefly."""
         for _ in range(max_passes):
             renderer.drain_events()
-            if getattr(renderer, "pending_event_count", 0) == 0:
+            if getattr(renderer, 'pending_event_count', 0) == 0:
                 await asyncio.sleep(settle_delay)
                 renderer.drain_events()
-                if getattr(renderer, "pending_event_count", 0) == 0:
+                if getattr(renderer, 'pending_event_count', 0) == 0:
                     return
             else:
                 await asyncio.sleep(settle_delay)
@@ -1406,7 +1406,7 @@ class Repl:
         self._reasoning.stop()
         if self._renderer is not None:
             self._renderer.add_system_message(
-                "Interrupted. Ready for input.", title="grinta"
+                'Interrupted. Ready for input.', title='grinta'
             )
 
     # -- session resume ----------------------------------------------------
@@ -1436,8 +1436,8 @@ class Repl:
         if llm_registry is None or agent is None or conversation_stats is None:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    "Resume failed: session bootstrap state is incomplete.",
-                    title="error",
+                    'Resume failed: session bootstrap state is incomplete.',
+                    title='error',
                 )
             return None
 
@@ -1447,7 +1447,7 @@ class Repl:
             if resolved_id is None:
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f"No session at index {target}.", title="warning"
+                        f'No session at index {target}.', title='warning'
                     )
                 return None
         else:
@@ -1455,7 +1455,7 @@ class Repl:
 
         if self._renderer is not None:
             self._renderer.add_system_message(
-                f"Resuming session: {resolved_id}", title="grinta"
+                f'Resuming session: {resolved_id}', title='grinta'
             )
 
         try:
@@ -1474,7 +1474,7 @@ class Repl:
         except Exception as exc:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    f"Resume failed: {exc}", title="error"
+                    f'Resume failed: {exc}', title='error'
                 )
             return None
 
@@ -1487,7 +1487,7 @@ class Repl:
         if event_stream is None:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    "Resume failed: no event stream.", title="error"
+                    'Resume failed: no event stream.', title='error'
                 )
             return None
 
@@ -1505,9 +1505,9 @@ class Repl:
             agent,
         )
         self._memory = memory
-        mcp_status = getattr(agent, "mcp_capability_status", None) or {}
+        mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
         try:
-            mcp_n = int(mcp_status.get("connected_client_count") or 0)
+            mcp_n = int(mcp_status.get('connected_client_count') or 0)
         except (TypeError, ValueError):
             mcp_n = 0
         self._hud.update_mcp_servers(mcp_n)
@@ -1531,17 +1531,17 @@ class Repl:
         try:
             memory.status_callback = early_cb
         except Exception:
-            logger.debug("Could not set memory status callback", exc_info=True)
+            logger.debug('Could not set memory status callback', exc_info=True)
 
         agent_task = asyncio.create_task(
             run_agent_until_done(controller, runtime, memory, end_states),
-            name="grinta-agent-loop",
+            name='grinta-agent-loop',
         )
 
         if self._renderer is not None:
             self._renderer.add_system_message(
-                f"Session {resolved_id} resumed. Send a message to continue.",
-                title="grinta",
+                f'Session {resolved_id} resumed. Send a message to continue.',
+                title='grinta',
             )
 
         return controller, agent_task
@@ -1554,8 +1554,8 @@ class Repl:
         try:
             pending = controller.get_pending_action()
         except Exception:
-            logger.debug("get_pending_action() failed, trying fallback", exc_info=True)
-            pending = getattr(controller, "_pending_action", None)
+            logger.debug('get_pending_action() failed, trying fallback', exc_info=True)
+            pending = getattr(controller, '_pending_action', None)
 
         if pending is not None:
             if self._renderer is not None:
@@ -1570,12 +1570,12 @@ class Repl:
             if self._renderer is not None:
                 with self._renderer.suspend_live():
                     approved = Confirm.ask(
-                        "[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]",
+                        '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
                         console=self._console,
                     )
             else:
                 approved = Confirm.ask(
-                    "[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]",
+                    '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
                     console=self._console,
                 )
 
@@ -1594,15 +1594,15 @@ class Repl:
             # Show current level
             level = self._get_current_autonomy()
             if self._renderer is not None:
-                level_lines = "\n".join(
-                    f"  {name:<10} — {_AUTONOMY_LEVEL_HINTS[name]}"
+                level_lines = '\n'.join(
+                    f'  {name:<10} — {_AUTONOMY_LEVEL_HINTS[name]}'
                     for name in valid_levels
                 )
                 self._renderer.add_system_message(
-                    f"Autonomy: {level}\n"
-                    f"{level_lines}\n"
+                    f'Autonomy: {level}\n'
+                    f'{level_lines}\n'
                     f'Change with: /autonomy <{"|".join(valid_levels)}>',
-                    title="autonomy",
+                    title='autonomy',
                 )
             return
 
@@ -1611,34 +1611,34 @@ class Repl:
             if self._renderer is not None:
                 self._renderer.add_system_message(
                     f"Invalid level '{new_level}'. Use: {', '.join(valid_levels)}",
-                    title="warning",
+                    title='warning',
                 )
             return
 
         controller = self._controller
         if controller is not None:
-            ac = getattr(controller, "autonomy_controller", None)
+            ac = getattr(controller, 'autonomy_controller', None)
             if ac is not None:
                 ac.autonomy_level = new_level
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f"Autonomy set to: {new_level}", title="autonomy"
+                        f'Autonomy set to: {new_level}', title='autonomy'
                     )
                 return
 
         if self._renderer is not None:
             self._renderer.add_system_message(
-                "No active controller. Send a message first to initialize, then set autonomy.",
-                title="warning",
+                'No active controller. Send a message first to initialize, then set autonomy.',
+                title='warning',
             )
 
     def _get_current_autonomy(self) -> str:
         controller = self._controller
         if controller is not None:
-            ac = getattr(controller, "autonomy_controller", None)
+            ac = getattr(controller, 'autonomy_controller', None)
             if ac is not None:
-                return str(getattr(ac, "autonomy_level", "balanced"))
-        return "balanced (default)"
+                return str(getattr(ac, 'autonomy_level', 'balanced'))
+        return 'balanced (default)'
 
     # -- slash commands ----------------------------------------------------
 
@@ -1647,12 +1647,12 @@ class Repl:
         raw_cmd = text.lower().split()[0]
         cmd = _canonical_command_name(raw_cmd)
 
-        if cmd in ("/exit", "/quit"):
+        if cmd in ('/exit', '/quit'):
             if self._renderer is not None:
-                self._renderer.add_system_message("Goodbye.", title="grinta")
+                self._renderer.add_system_message('Goodbye.', title='grinta')
             return False
 
-        if cmd == "/settings":
+        if cmd == '/settings':
             if self._renderer is not None:
                 with self._renderer.suspend_live():
                     open_settings(self._console)
@@ -1666,23 +1666,23 @@ class Repl:
             # the agentic conversation and should not appear in chat history.
             return True
 
-        if cmd == "/clear":
+        if cmd == '/clear':
             if self._renderer is not None:
                 self._renderer.clear_history()
                 self._renderer.add_system_message(
-                    "Screen cleared. Type a task or press Tab after `/` for commands.",
-                    title="grinta",
+                    'Screen cleared. Type a task or press Tab after `/` for commands.',
+                    title='grinta',
                 )
             return True
 
-        if cmd == "/status":
+        if cmd == '/status':
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    self._hud.plain_text(), title="status"
+                    self._hud.plain_text(), title='status'
                 )
             return True
 
-        if cmd == "/sessions":
+        if cmd == '/sessions':
             from backend.cli.session_manager import list_sessions
 
             if self._renderer is not None:
@@ -1692,31 +1692,31 @@ class Repl:
                 list_sessions(self._console, config=self._config)
             return True
 
-        if cmd == "/resume":
+        if cmd == '/resume':
             parts = text.strip().split()
             if len(parts) < 2:
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        "Usage: /resume <N> or /resume <session_id>. Press Tab to autocomplete recent sessions.",
-                        title="warning",
+                        'Usage: /resume <N> or /resume <session_id>. Press Tab to autocomplete recent sessions.',
+                        title='warning',
                     )
                 return True
             self._pending_resume = parts[1]
             return True
 
-        if cmd == "/autonomy":
+        if cmd == '/autonomy':
             self._handle_autonomy_command(text)
             return True
 
-        if cmd == "/help":
+        if cmd == '/help':
             if self._renderer is not None:
                 self._renderer.add_markdown_block(
-                    "Help",
+                    'Help',
                     _build_help_markdown(),
                 )
             return True
 
-        if cmd == "/model":
+        if cmd == '/model':
             from backend.cli.config_manager import update_model
 
             parts = text.strip().split(maxsplit=1)
@@ -1725,8 +1725,8 @@ class Repl:
                 provider, model = HUDBar.describe_model(current)
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f"Current provider: {provider}  model: {model}  (use `/model <provider/model>` to switch)",
-                        title="model",
+                        f'Current provider: {provider}  model: {model}  (use `/model <provider/model>` to switch)',
+                        title='model',
                     )
             else:
                 new_model = parts[1].strip()
@@ -1736,38 +1736,38 @@ class Repl:
                 provider, model = HUDBar.describe_model(get_current_model(self._config))
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f"Model switched to provider: {provider}  model: {model}. Changes apply to the next session.",
-                        title="model",
+                        f'Model switched to provider: {provider}  model: {model}. Changes apply to the next session.',
+                        title='model',
                     )
             return True
 
-        if cmd == "/compact":
+        if cmd == '/compact':
             from backend.ledger.action.agent import CondensationRequestAction
 
             self._next_action = CondensationRequestAction()
             return True
 
-        if cmd == "/retry":
+        if cmd == '/retry':
             if self._last_user_message:
                 self._next_action = MessageAction(content=self._last_user_message)
             else:
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        "No previous message to retry.",
-                        title="warning",
+                        'No previous message to retry.',
+                        title='warning',
                     )
             return True
 
         if self._renderer is not None:
             suggestion_text = _closest_command_names(raw_cmd)
-            suffix = ""
+            suffix = ''
             if suggestion_text:
-                rendered_suggestions = " or ".join(
-                    f"`{item}`" for item in suggestion_text
+                rendered_suggestions = ' or '.join(
+                    f'`{item}`' for item in suggestion_text
                 )
-                suffix = f" Try {rendered_suggestions}."
+                suffix = f' Try {rendered_suggestions}.'
             self._renderer.add_system_message(
-                f"Unknown command: {raw_cmd}.{suffix} Press Tab after `/` for autocomplete.",
-                title="warning",
+                f'Unknown command: {raw_cmd}.{suffix} Press Tab after `/` for autocomplete.',
+                title='warning',
             )
         return True

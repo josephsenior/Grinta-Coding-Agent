@@ -65,30 +65,30 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
         name=APPLY_PATCH_TOOL_NAME,
         description=_DESCRIPTION,
         properties={
-            "patch": {
-                "type": "string",
-                "description": (
-                    "Complete git unified diff. Must include diff --git, ---/+++, and @@ hunk headers. "
-                    "Ensure context lines start with a single space."
+            'patch': {
+                'type': 'string',
+                'description': (
+                    'Complete git unified diff. Must include diff --git, ---/+++, and @@ hunk headers. '
+                    'Ensure context lines start with a single space.'
                 ),
             },
-            "last_verified_line_content": {
-                "type": "string",
-                "description": (
-                    "The exact content of the FIRST line of context in your patch, exactly as seen in your last `read_file` call. "
-                    "This forces you to verify the file content before patching."
+            'last_verified_line_content': {
+                'type': 'string',
+                'description': (
+                    'The exact content of the FIRST line of context in your patch, exactly as seen in your last `read_file` call. '
+                    'This forces you to verify the file content before patching.'
                 ),
             },
-            "check_only": {
-                "type": "string",
-                "enum": ["true", "false"],
-                "description": (
+            'check_only': {
+                'type': 'string',
+                'enum': ['true', 'false'],
+                'description': (
                     "If 'true', validate the patch would apply cleanly without actually "
                     "modifying any files (dry-run). Defaults to 'false'."
                 ),
             },
         },
-        required=["patch", "last_verified_line_content"],
+        required=['patch', 'last_verified_line_content'],
     )
 
 
@@ -96,64 +96,64 @@ def create_apply_patch_tool() -> ChatCompletionToolParam:
 # Action builder
 # ---------------------------------------------------------------------------
 
-_DIFF_HEADER_RE = re.compile(r"^diff --git a/.+ b/.+$")
-_FILE_MINUS_RE = re.compile(r"^--- (a/.+|/dev/null)$")
-_FILE_PLUS_RE = re.compile(r"^\+\+\+ (b/.+|/dev/null)$")
-_HUNK_HEADER_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+_DIFF_HEADER_RE = re.compile(r'^diff --git a/.+ b/.+$')
+_FILE_MINUS_RE = re.compile(r'^--- (a/.+|/dev/null)$')
+_FILE_PLUS_RE = re.compile(r'^\+\+\+ (b/.+|/dev/null)$')
+_HUNK_HEADER_RE = re.compile(r'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@')
 
 
 def _classify_patch_error(validation_error: str) -> str:
     message = validation_error.lower()
-    if "context verification" in message or "latest file content" in message:
-        return "stale_view"
-    if "target file not found" in message:
-        return "tool_unavailable"
-    if "context mismatch" in message:
-        return "context_mismatch"
-    return "malformed_patch"
+    if 'context verification' in message or 'latest file content' in message:
+        return 'stale_view'
+    if 'target file not found' in message:
+        return 'tool_unavailable'
+    if 'context mismatch' in message:
+        return 'context_mismatch'
+    return 'malformed_patch'
 
 
 def _is_contract_error(validation_result: str) -> bool:
-    return validation_result.startswith(("Patch", "Missing", "Malformed", "Unexpected"))
+    return validation_result.startswith(('Patch', 'Missing', 'Malformed', 'Unexpected'))
 
 
 def _parse_hunk_header_counts(header_line: str) -> tuple[int, int] | None:
     match = _HUNK_HEADER_RE.match(header_line)
     if not match:
         return None
-    old_count = int(match.group(2) or "1")
-    new_count = int(match.group(4) or "1")
+    old_count = int(match.group(2) or '1')
+    new_count = int(match.group(4) or '1')
     return (old_count, new_count)
 
 
 def validate_apply_patch_contract(patch: str) -> str:
     """Validate unified-diff structure and return normalized patch or error text."""
-    lines = [line for line in patch.splitlines() if not line.startswith("index ")]
+    lines = [line for line in patch.splitlines() if not line.startswith('index ')]
     if not lines:
-        return "Patch is empty."
+        return 'Patch is empty.'
 
-    if any(line.strip().startswith("```") for line in lines):
-        return "Malformed patch: remove markdown fences and pass raw unified diff only."
+    if any(line.strip().startswith('```') for line in lines):
+        return 'Malformed patch: remove markdown fences and pass raw unified diff only.'
 
-    has_git = any(line.startswith("diff --git ") for line in lines)
-    has_hunk = any(line.startswith("@@ ") for line in lines)
+    has_git = any(line.startswith('diff --git ') for line in lines)
+    has_hunk = any(line.startswith('@@ ') for line in lines)
     if not has_git or not has_hunk:
         is_just_plus_minus = all(
-            line.startswith(("+", "-", " ")) or not line.strip() for line in lines
+            line.startswith(('+', '-', ' ')) or not line.strip() for line in lines
         )
         if is_just_plus_minus and (
-            any(line.startswith("+") for line in lines)
-            or any(line.startswith("-") for line in lines)
+            any(line.startswith('+') for line in lines)
+            or any(line.startswith('-') for line in lines)
         ):
             return "Missing unified diff headers. You provided +/- lines but forgot 'diff --git', '---', '+++', and '@@' hunk headers."
-        return "Missing required diff headers (diff --git, ---/+++, or @@)."
+        return 'Missing required diff headers (diff --git, ---/+++, or @@).'
 
     diff_starts = [
-        idx for idx, line in enumerate(lines) if line.startswith("diff --git ")
+        idx for idx, line in enumerate(lines) if line.startswith('diff --git ')
     ]
     for block_idx, block_start in enumerate(diff_starts):
         if not _DIFF_HEADER_RE.match(lines[block_start]):
-            return "Malformed diff header: expected `diff --git a/<path> b/<path>`."
+            return 'Malformed diff header: expected `diff --git a/<path> b/<path>`.'
 
         block_end = (
             diff_starts[block_idx + 1]
@@ -162,27 +162,27 @@ def validate_apply_patch_contract(patch: str) -> str:
         )
         block = lines[block_start:block_end]
 
-        minus_line = next((line for line in block if line.startswith("--- ")), None)
-        plus_line = next((line for line in block if line.startswith("+++ ")), None)
+        minus_line = next((line for line in block if line.startswith('--- ')), None)
+        plus_line = next((line for line in block if line.startswith('+++ ')), None)
         if minus_line is None or plus_line is None:
-            return "Malformed patch: each diff block must contain both --- and +++ headers."
+            return 'Malformed patch: each diff block must contain both --- and +++ headers.'
         if not _FILE_MINUS_RE.match(minus_line):
-            return "Malformed `---` header: expected `--- a/<path>` or `--- /dev/null`."
+            return 'Malformed `---` header: expected `--- a/<path>` or `--- /dev/null`.'
         if not _FILE_PLUS_RE.match(plus_line):
-            return "Malformed `+++` header: expected `+++ b/<path>` or `+++ /dev/null`."
+            return 'Malformed `+++` header: expected `+++ b/<path>` or `+++ /dev/null`.'
 
         hunk_indices = [
             block_start + idx
             for idx, line in enumerate(block)
-            if line.startswith("@@ ")
+            if line.startswith('@@ ')
         ]
         if not hunk_indices:
-            return "Malformed patch: each diff block must include at least one @@ hunk header."
+            return 'Malformed patch: each diff block must include at least one @@ hunk header.'
 
         for hunk_pos, hunk_start in enumerate(hunk_indices):
             parsed_counts = _parse_hunk_header_counts(lines[hunk_start])
             if parsed_counts is None:
-                return "Malformed hunk header: expected `@@ -n,m +n,m @@`."
+                return 'Malformed hunk header: expected `@@ -n,m +n,m @@`.'
 
             old_expected, new_expected = parsed_counts
             hunk_end = (
@@ -196,16 +196,16 @@ def validate_apply_patch_contract(patch: str) -> str:
             for line in lines[hunk_start + 1 : hunk_end]:
                 if not line:
                     continue
-                if line.startswith("\\ No newline at end of file"):
+                if line.startswith('\\ No newline at end of file'):
                     continue
-                if line.startswith(" "):
+                if line.startswith(' '):
                     old_seen += 1
                     new_seen += 1
                     continue
-                if line.startswith("-"):
+                if line.startswith('-'):
                     old_seen += 1
                     continue
-                if line.startswith("+"):
+                if line.startswith('+'):
                     new_seen += 1
                     continue
                 return (
@@ -215,22 +215,22 @@ def validate_apply_patch_contract(patch: str) -> str:
 
             if old_seen != old_expected or new_seen != new_expected:
                 return (
-                    "Malformed hunk line counts: header declares "
-                    f"old={old_expected}, new={new_expected} but body contains "
-                    f"old={old_seen}, new={new_seen}."
+                    'Malformed hunk line counts: header declares '
+                    f'old={old_expected}, new={new_expected} but body contains '
+                    f'old={old_seen}, new={new_seen}.'
                 )
 
-    return "\n".join(lines)
+    return '\n'.join(lines)
 
 
 def _guidance_message(validation_error: str) -> str:
     error_class = _classify_patch_error(validation_error)
     return (
-        f"[APPLY_PATCH_CLASS:{error_class}] "
-        "[APPLY_PATCH_GUIDANCE] " + validation_error + " "
-        "This tool requires a full unified diff in this order: "
-        "diff --git, optional valid index, ---, +++, @@. "
-        "Regenerate the patch via `git diff` and retry."
+        f'[APPLY_PATCH_CLASS:{error_class}] '
+        '[APPLY_PATCH_GUIDANCE] ' + validation_error + ' '
+        'This tool requires a full unified diff in this order: '
+        'diff --git, optional valid index, ---, +++, @@. '
+        'Regenerate the patch via `git diff` and retry.'
     )
 
 
@@ -241,7 +241,7 @@ def _b64(s: str) -> str:
 def build_apply_patch_action(
     patch: str,
     check_only: bool = False,
-    last_verified_line_content: str = "",
+    last_verified_line_content: str = '',
 ) -> CmdRunAction:
     """Return a CmdRunAction that applies the unified diff to the workspace."""
     result = validate_apply_patch_contract(patch)
@@ -253,11 +253,11 @@ import sys
 print({_guidance_message(validation_error)!r})
 sys.exit(2)
 """
-        label = "dry-run check" if check_only else "applying patch"
+        label = 'dry-run check' if check_only else 'applying patch'
         return CmdRunAction(
             command=build_python_exec_command(py),
-            thought=f"[APPLY PATCH] {label}",
-            display_label="Validating patch" if check_only else "Applying patch",
+            thought=f'[APPLY PATCH] {label}',
+            display_label='Validating patch' if check_only else 'Applying patch',
         )
 
     if not last_verified_line_content:
@@ -271,21 +271,21 @@ sys.exit(2)
 """
         return CmdRunAction(
             command=build_python_exec_command(py),
-            thought="[APPLY PATCH] missing verification",
-            display_label="Aborting patch",
+            thought='[APPLY PATCH] missing verification',
+            display_label='Aborting patch',
         )
 
     # If validation passed, result contains the normalized patch
     patch = result
-    patch = "\n".join(
-        line for line in patch.splitlines() if not line.startswith("index ")
+    patch = '\n'.join(
+        line for line in patch.splitlines() if not line.startswith('index ')
     )
     # Auto-heal common LLM issue: missing terminal newline can break patch parsers.
-    if patch and not patch.endswith("\n"):
-        patch += "\n"
+    if patch and not patch.endswith('\n'):
+        patch += '\n'
 
     pb = _b64(patch)
-    dry_run_arg = "True" if check_only else "False"
+    dry_run_arg = 'True' if check_only else 'False'
 
     py = f"""
 import base64, os, pathlib, subprocess, sys, tempfile
@@ -508,9 +508,9 @@ print(out)
 sys.exit(r.returncode)
 """
 
-    label = "dry-run check" if check_only else "applying patch"
+    label = 'dry-run check' if check_only else 'applying patch'
     return CmdRunAction(
         command=build_python_exec_command(py),
-        thought=f"[APPLY PATCH] {label}",
-        display_label="Validating patch" if check_only else "Applying patch",
+        thought=f'[APPLY PATCH] {label}',
+        display_label='Validating patch' if check_only else 'Applying patch',
     )

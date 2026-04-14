@@ -104,7 +104,7 @@ class TestFileEditorCoverageGaps:
     def test_insert_at_line_simple_new(self):
         """Covers line 505 (new_lines = [new_text])."""
         res = self.editor._insert_at_line('a\n', 'b', 2)
-        assert res == 'a\nb'
+        assert res == 'a\nb\n'
 
     def test_rollback_failure_logging_full(self):
         """Covers line 567-572 (rollback error handling)."""
@@ -132,7 +132,7 @@ class TestFileEditorCoverageGaps:
             normalize_ws=False,
         )
         assert result.error is not None
-        assert 'No match found even with whitespace normalization' in result.error
+        assert 'No exact match found' in result.error
 
     def test_unicode_decode_fallback(self):
         """Covers line 440-449 (UnicodeDecodeError fallback)."""

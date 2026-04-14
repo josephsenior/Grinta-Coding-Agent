@@ -6,6 +6,7 @@ validation, and atomic operations. Designed for production agent environments.
 
 from __future__ import annotations
 
+import difflib
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -120,6 +121,7 @@ class FileEditor:
         start_line: int | None = None,
         end_line: int | None = None,
         normalize_ws: bool | None = None,
+        match_mode: str | None = None,
         enable_linting: bool = False,
         dry_run: bool = False,
         **_: Any,
@@ -136,6 +138,8 @@ class FileEditor:
             insert_line: Optional line number to insert at (1-indexed)
             start_line: Optional start line number for range edit (1-indexed)
             end_line: Optional end line number for range edit (1-indexed)
+            normalize_ws: If True, allow whitespace-tolerant matching for replace operations.
+            match_mode: Optional replace matching mode: "exact", "normalize_ws", or "fuzzy_safe".
             enable_linting: Whether to enable linting (currently not implemented)
             dry_run: If True, compute preview result without writing changes
             **_: Additional keyword arguments (ignored)
@@ -170,6 +174,7 @@ class FileEditor:
                     start_line,
                     end_line,
                     normalize_ws,
+                    match_mode,
                     dry_run=dry_run,
                 )
             if command == 'undo_last_edit':
@@ -275,7 +280,7 @@ class FileEditor:
     def _view_directory(self, path: Path, max_depth: int = 2) -> ToolResult:
         """List directory contents."""
         import os
-        output = [f"Directory contents of {path}:"]
+        output = [f'Directory contents of {path}:']
         path_str = str(path)
         base_level = path_str.rstrip(os.sep).count(os.sep)
 
@@ -355,6 +360,7 @@ class FileEditor:
         start_line: int | None,
         end_line: int | None,
         normalize_ws: bool | None,
+        match_mode: str | None,
         *,
         dry_run: bool = False,
     ) -> ToolResult:
@@ -379,6 +385,7 @@ class FileEditor:
                 start_line,
                 end_line,
                 normalize_ws,
+                match_mode,
                 file_path=file_path,
             )
             if isinstance(new_content, ToolResult):
@@ -464,6 +471,12 @@ class FileEditor:
                 error='No match found even with whitespace normalization.',
                 new_content=file_content,
             )
+        if count > 1:
+            return ToolResult(
+                output='',
+                error=f'Whitespace-normalized old_str matches {count} locations. Must be unique.',
+                new_content=file_content,
+            )
 
         norm_start = norm_content.index(norm_old)
         norm_end = norm_start + len(norm_old)
@@ -471,6 +484,134 @@ class FileEditor:
         orig_start = self._map_normalized_offset_to_original(file_content, norm_start)
         orig_end = self._map_normalized_offset_to_original(file_content, norm_end)
         return file_content[:orig_start] + new_str + file_content[orig_end:]
+
+    @staticmethod
+    def _resolve_match_mode(
+        normalize_ws: bool | None,
+        match_mode: str | None,
+    ) -> str:
+        if match_mode is not None:
+            candidate = str(match_mode).strip().lower()
+            if candidate in {'exact', 'normalize_ws', 'fuzzy_safe'}:
+                return candidate
+        return 'normalize_ws' if normalize_ws else 'exact'
+
+    @staticmethod
+    def _line_ending_for_content(content: str) -> str:
+        if '\r\n' in content:
+            return '\r\n'
+        return '\n'
+
+    def _closest_match_candidates(
+        self,
+        file_content: str,
+        old_str: str,
+        *,
+        limit: int = 3,
+    ) -> list[tuple[float, int, str]]:
+        target = self._normalize_whitespace_for_match(old_str).strip()
+        if not target:
+            return []
+
+        candidates: list[tuple[float, int, str]] = []
+        for idx, line in enumerate(file_content.splitlines(), 1):
+            normalized = self._normalize_whitespace_for_match(line).strip()
+            if not normalized:
+                continue
+            ratio = difflib.SequenceMatcher(None, target, normalized).ratio()
+            if ratio < 0.4:
+                continue
+            snippet = line.strip()
+            if len(snippet) > 120:
+                snippet = f'{snippet[:117]}...'
+            candidates.append((ratio, idx, snippet))
+
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[:limit]
+
+    def _build_no_match_error(self, file_content: str, old_str: str, mode: str) -> str:
+        base = {
+            'exact': 'No exact match found for old_str.',
+            'normalize_ws': 'No match found even with whitespace normalization.',
+            'fuzzy_safe': 'No match found for fuzzy_safe mode.',
+        }.get(mode, 'No match found for old_str.')
+
+        closest = self._closest_match_candidates(file_content, old_str)
+        if not closest:
+            return base
+
+        lines = [base, 'Closest candidates:']
+        for ratio, line_no, snippet in closest:
+            lines.append(f'- line {line_no} (score {ratio:.2f}): {snippet}')
+        return '\n'.join(lines)
+
+    def _fuzzy_safe_replace(
+        self,
+        file_content: str,
+        old_str: str,
+        new_str: str,
+    ) -> str | ToolResult:
+        # Keep fuzzy matching intentionally narrow to avoid broad accidental edits.
+        if not old_str.strip():
+            return ToolResult(
+                output='',
+                error='fuzzy_safe mode requires a non-empty old_str.',
+                new_content=file_content,
+            )
+        if '\n' in old_str or '\r' in old_str:
+            return ToolResult(
+                output='',
+                error='fuzzy_safe mode supports only single-line old_str. Use normalize_ws for multi-line edits.',
+                new_content=file_content,
+            )
+        if len(old_str) > 120:
+            return ToolResult(
+                output='',
+                error='fuzzy_safe mode only supports old_str up to 120 characters.',
+                new_content=file_content,
+            )
+
+        target = self._normalize_whitespace_for_match(old_str).strip()
+        lines = file_content.splitlines(keepends=True)
+        scored: list[tuple[float, int, str]] = []
+        for idx, raw_line in enumerate(lines):
+            normalized_line = self._normalize_whitespace_for_match(raw_line).strip()
+            if not normalized_line:
+                continue
+            ratio = difflib.SequenceMatcher(None, target, normalized_line).ratio()
+            if ratio >= 0.9:
+                scored.append((ratio, idx, raw_line))
+
+        if not scored:
+            return ToolResult(
+                output='',
+                error=self._build_no_match_error(file_content, old_str, mode='fuzzy_safe'),
+                new_content=file_content,
+            )
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        best_ratio, best_idx, best_line = scored[0]
+
+        if len(scored) > 1 and abs(best_ratio - scored[1][0]) < 0.01:
+            return ToolResult(
+                output='',
+                error='fuzzy_safe found ambiguous matches with similar confidence. Narrow old_str and retry.',
+                new_content=file_content,
+            )
+
+        line_ending = ''
+        if best_line.endswith('\r\n'):
+            line_ending = '\r\n'
+        elif best_line.endswith('\n'):
+            line_ending = '\n'
+
+        replacement = new_str
+        if line_ending and not new_str.endswith(('\n', '\r')):
+            replacement = f'{new_str}{line_ending}'
+
+        updated = list(lines)
+        updated[best_idx] = replacement
+        return ''.join(updated)
 
     def _apply_str_replace(
         self,
@@ -480,36 +621,56 @@ class FileEditor:
         file_path: Path | None = None,
         *,
         normalize_ws: bool | None = None,
+        match_mode: str | None = None,
     ) -> str | ToolResult:
         """Apply old_str -> new_str replace with relaxed tolerant whitespace fallback, but validate tree-sitter syntax."""
+        resolved_mode = self._resolve_match_mode(normalize_ws, match_mode)
         exact_count = old_content.count(old_str)
-        
+
         if exact_count == 1:
             new_content = old_content.replace(old_str, new_str, 1)
         elif exact_count > 1:
             return ToolResult(
                 output='',
-                error=f"ERROR: old_str matches {exact_count} times. Must be unique.",
+                error=f'ERROR: old_str matches {exact_count} times. Must be unique.',
                 new_content=old_content,
             )
         else:
-            # Fall back to relaxed whitespace-tolerant match
-            tolerant = self._ws_tolerant_replace(old_content, old_str, new_str)
-            if isinstance(tolerant, ToolResult):
-                # No match found at all
-                return tolerant
-            new_content = tolerant
+            if resolved_mode == 'exact':
+                return ToolResult(
+                    output='',
+                    error=self._build_no_match_error(old_content, old_str, mode='exact'),
+                    new_content=old_content,
+                )
+
+            if resolved_mode == 'normalize_ws':
+                tolerant = self._ws_tolerant_replace(old_content, old_str, new_str)
+                if isinstance(tolerant, ToolResult):
+                    tolerant.error = self._build_no_match_error(
+                        old_content,
+                        old_str,
+                        mode='normalize_ws',
+                    )
+                    return tolerant
+                new_content = tolerant
+            else:
+                fuzzy_result = self._fuzzy_safe_replace(old_content, old_str, new_str)
+                if isinstance(fuzzy_result, ToolResult):
+                    return fuzzy_result
+                new_content = fuzzy_result
 
         # Validate syntax after replacement
         if file_path:
-            from backend.orchestration.middleware.auto_check import _treesitter_syntax_check
+            from backend.orchestration.middleware.auto_check import (
+                _treesitter_syntax_check,
+            )
             result = _treesitter_syntax_check(str(file_path), new_content.encode('utf-8'))
             if result is not None:
                 is_valid, err_msg = result
                 if not is_valid:
                     return ToolResult(
                         output='',
-                        error=f"ERROR: The edit introduces a Syntax Error:\n{err_msg}\nEdit rejected.",
+                        error=f'ERROR: The edit introduces a Syntax Error:\n{err_msg}\nEdit rejected.',
                         new_content=old_content,
                     )
 
@@ -533,6 +694,7 @@ class FileEditor:
         start_line: int | None,
         end_line: int | None,
         normalize_ws: bool | None,
+        match_mode: str | None,
         file_path: Path | None = None,
     ) -> str | ToolResult:
         """Determine new content based on provided parameters."""
@@ -556,6 +718,7 @@ class FileEditor:
                 new_str_val,
                 file_path=file_path,
                 normalize_ws=normalize_ws,
+                match_mode=match_mode,
             )
         if file_text_val:
             return file_text_val
@@ -693,6 +856,9 @@ class FileEditor:
         lines = content.splitlines(keepends=True)
         if not lines:
             lines = ['']
+
+        if content and new_text and not new_text.endswith(('\n', '\r')):
+            new_text = f'{new_text}{self._line_ending_for_content(content)}'
 
         # Normalize line number
         line_idx = max(0, min(line_num - 1, len(lines)))

@@ -16,12 +16,12 @@ from backend.core.errors import PlaybookValidationError
 from backend.core.logger import app_logger as logger
 from backend.playbooks.engine.types import InputMetadata, PlaybookMetadata, PlaybookType
 
-AUTO_TRIGGER_ENV_VAR = "GRINTA_ENABLE_PLAYBOOK_AUTO_TRIGGER"
-AUTO_TRIGGER_ENABLED = os.environ.get(AUTO_TRIGGER_ENV_VAR, "").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
+AUTO_TRIGGER_ENV_VAR = 'GRINTA_ENABLE_PLAYBOOK_AUTO_TRIGGER'
+AUTO_TRIGGER_ENABLED = os.environ.get(AUTO_TRIGGER_ENV_VAR, '').strip().lower() in {
+    '1',
+    'true',
+    'yes',
+    'on',
 }
 
 
@@ -36,14 +36,14 @@ def _finalize_loaded_playbook(metadata_dict, path):
         PlaybookMetadata: Finalized metadata object.
 
     """
-    if "version" in metadata_dict and (not isinstance(metadata_dict["version"], str)):
-        metadata_dict["version"] = str(metadata_dict["version"])
+    if 'version' in metadata_dict and (not isinstance(metadata_dict['version'], str)):
+        metadata_dict['version'] = str(metadata_dict['version'])
     try:
         return PlaybookMetadata(**metadata_dict)
     except ValidationError as exc:
-        valid_types = {"knowledge", "repo", "task"}
-        if ("type" in metadata_dict) and (metadata_dict.get("type") not in valid_types):
-            valid_display = ", ".join(f'"{t}"' for t in sorted(valid_types))
+        valid_types = {'knowledge', 'repo', 'task'}
+        if ('type' in metadata_dict) and (metadata_dict.get('type') not in valid_types):
+            valid_display = ', '.join(f'"{t}"' for t in sorted(valid_types))
             raise PlaybookValidationError(
                 f'Invalid "type" value: "{metadata_dict.get("type")}". Valid types are: {valid_display}'
             ) from exc
@@ -63,7 +63,7 @@ def _infer_playbook_type(metadata):
     inferred_type: PlaybookType
     if metadata.inputs:
         inferred_type = PlaybookType.TASK
-        trigger = f"/{metadata.name}"
+        trigger = f'/{metadata.name}'
         if not metadata.triggers:
             metadata.triggers = [trigger]
         elif trigger not in metadata.triggers:
@@ -84,9 +84,9 @@ class BasePlaybook(BaseModel):
     source: str
     type: PlaybookType
     PATH_TO_THIRD_PARTY_PLAYBOOK_NAME: ClassVar[dict[str, str]] = {
-        ".cursorrules": "cursorrules",
-        "agents.md": "agents",
-        "agent.md": "agents",
+        '.cursorrules': 'cursorrules',
+        'agents.md': 'agents',
+        'agent.md': 'agents',
     }
 
     @classmethod
@@ -119,8 +119,8 @@ class BasePlaybook(BaseModel):
 
         # Try relative path
         try:
-            rel_path = path.relative_to(playbook_dir).with_suffix("")
-            return str(rel_path).replace("\\", "/")
+            rel_path = path.relative_to(playbook_dir).with_suffix('')
+            return str(rel_path).replace('\\', '/')
         except Exception:
             pass
 
@@ -128,7 +128,7 @@ class BasePlaybook(BaseModel):
         try:
             rel_str = os.path.relpath(str(path), start=str(playbook_dir))
             rel_str = os.path.splitext(rel_str)[0]
-            return rel_str.replace("\\", "/")
+            return rel_str.replace('\\', '/')
         except Exception:
             return None
 
@@ -138,13 +138,13 @@ class BasePlaybook(BaseModel):
         if file_content is not None:
             return file_content
         try:
-            with open(path, encoding="utf-8", errors="replace") as f:
+            with open(path, encoding='utf-8', errors='replace') as f:
                 return f.read()
         except PermissionError:
             # Windows NamedTemporaryFile defaults to exclusive access which prevents a second
             # open(, encoding="utf-8") call while the handle is still alive. Tests keep the temporary file open,
             # so we fall back to the Win32 CreateFile API that allows shared reads.
-            if os.name == "nt":
+            if os.name == 'nt':
                 return cls._read_locked_file_windows(path)
             raise
 
@@ -176,7 +176,7 @@ class BasePlaybook(BaseModel):
         if handle == INVALID_HANDLE_VALUE:
             error = ctypes.GetLastError()
             raise PermissionError(
-                f"Unable to open locked file {path}: error {error}"
+                f'Unable to open locked file {path}: error {error}'
             )  # pragma: no cover
         try:
             import msvcrt
@@ -185,7 +185,7 @@ class BasePlaybook(BaseModel):
         except Exception:
             kernel32.CloseHandle(handle)
             raise
-        with os.fdopen(fd, "r", encoding="utf-8", errors="replace") as file_obj:
+        with os.fdopen(fd, 'r', encoding='utf-8', errors='replace') as file_obj:
             return file_obj.read()
 
     @classmethod
@@ -205,7 +205,7 @@ class BasePlaybook(BaseModel):
         }
 
         if inferred_type not in subclass_map:
-            msg = f"Could not determine playbook type for: {path}"
+            msg = f'Could not determine playbook type for: {path}'
             raise ValueError(msg)
 
         agent_name = derived_name if derived_name is not None else metadata.name
@@ -251,10 +251,10 @@ class BasePlaybook(BaseModel):
         loaded = frontmatter.load(file_io)
         content = loaded.content
         metadata_dict = loaded.metadata or {}
-        if "version" in metadata_dict and (
-            not isinstance(metadata_dict["version"], str)
+        if 'version' in metadata_dict and (
+            not isinstance(metadata_dict['version'], str)
         ):
-            metadata_dict["version"] = str(metadata_dict["version"])
+            metadata_dict['version'] = str(metadata_dict['version'])
         metadata = _finalize_loaded_playbook(metadata_dict, path)
         inferred_type = _infer_playbook_type(metadata)
 
@@ -277,7 +277,7 @@ class KnowledgePlaybook(BasePlaybook):
         """Validate that the knowledge agent has an appropriate type before initialization."""
         super().__init__(**data)
         if self.type not in [PlaybookType.KNOWLEDGE, PlaybookType.TASK]:
-            msg = "KnowledgePlaybook must have type KNOWLEDGE or TASK"
+            msg = 'KnowledgePlaybook must have type KNOWLEDGE or TASK'
             raise ValueError(msg)
 
     def match_trigger(self, message: str) -> str | None:
@@ -295,16 +295,16 @@ class KnowledgePlaybook(BasePlaybook):
         message_lower = message.lower()
 
         slash_triggers = [
-            trigger for trigger in self.triggers if trigger.startswith("/")
+            trigger for trigger in self.triggers if trigger.startswith('/')
         ]
         non_slash_triggers = [
-            trigger for trigger in self.triggers if not trigger.startswith("/")
+            trigger for trigger in self.triggers if not trigger.startswith('/')
         ]
 
         # Tier 1a: explicit slash command matching.
         # We parse slash commands first so '/foo' never mistakenly matches
         # '/foo-bar'.
-        detected_commands = set(re.findall(r"/[a-z0-9][a-z0-9_-]*", message_lower))
+        detected_commands = set(re.findall(r'/[a-z0-9][a-z0-9_-]*', message_lower))
         for trigger in slash_triggers:
             if trigger.lower() in detected_commands:
                 logger.debug(
@@ -340,7 +340,7 @@ class KnowledgePlaybook(BasePlaybook):
             )
             return None
 
-        if getattr(self.metadata, "strict_trigger_matching", False):
+        if getattr(self.metadata, 'strict_trigger_matching', False):
             logger.debug(
                 "Playbook '%s' strict trigger matching is enabled; skipping semantic fallback",
                 self.name,
@@ -350,7 +350,7 @@ class KnowledgePlaybook(BasePlaybook):
         # Tier 2: word-overlap similarity (lightweight semantic fallback)
         threshold = 0.55
         try:
-            message_words = set(re.findall(r"\w+", message_lower))
+            message_words = set(re.findall(r'\w+', message_lower))
         except re.error as exc:
             logger.warning(
                 "Playbook '%s' failed to tokenize message for semantic matching: %s",
@@ -366,7 +366,7 @@ class KnowledgePlaybook(BasePlaybook):
 
         for trigger in non_slash_triggers:
             try:
-                trigger_words = set(re.findall(r"\w+", trigger.lower()))
+                trigger_words = set(re.findall(r'\w+', trigger.lower()))
             except re.error as exc:
                 logger.warning(
                     "Playbook '%s' failed to tokenize trigger '%s': %s",
@@ -437,7 +437,7 @@ class RepoPlaybook(BasePlaybook):
         """Ensure repository playbooks are instantiated with repo knowledge type."""
         super().__init__(**data)
         if self.type != PlaybookType.REPO_KNOWLEDGE:
-            msg = f"RepoPlaybook initialized with incorrect type: {self.type}"
+            msg = f'RepoPlaybook initialized with incorrect type: {self.type}'
             raise ValueError(msg)
 
 
@@ -454,7 +454,7 @@ class TaskPlaybook(KnowledgePlaybook):
         """Validate task-specific type and append prompts for missing user input."""
         super().__init__(**data)
         if self.type != PlaybookType.TASK:
-            msg = f"TaskPlaybook initialized with incorrect type: {self.type}"
+            msg = f'TaskPlaybook initialized with incorrect type: {self.type}'
             raise ValueError(msg)
         self._append_missing_variables_prompt()
 
@@ -463,7 +463,7 @@ class TaskPlaybook(KnowledgePlaybook):
         if not self.requires_user_input() and (not self.metadata.inputs):
             return
         prompt = "\\n\\nIf the user didn't provide any of these variables, ask the user to provide them first before the agent can proceed with the task."
-        content = getattr(self, "content", "")
+        content = getattr(self, 'content', '')
         self.content = content + prompt
 
     def extract_variables(self, content: str) -> list[str]:
@@ -471,7 +471,7 @@ class TaskPlaybook(KnowledgePlaybook):
 
         Variables are in the format ${variable_name}.
         """
-        pattern = "\\$\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}"
+        pattern = '\\$\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}'
         return re.findall(pattern, content)
 
     def requires_user_input(self) -> bool:
@@ -479,9 +479,9 @@ class TaskPlaybook(KnowledgePlaybook):
 
         Returns True if the content contains variables in the format ${variable_name}.
         """
-        content = getattr(self, "content", "")
+        content = getattr(self, 'content', '')
         variables = self.extract_variables(content)
-        logger.debug("This playbook requires user input: %s", variables)
+        logger.debug('This playbook requires user input: %s', variables)
         return bool(variables)
 
     @property
@@ -503,11 +503,11 @@ def _collect_special_files(repo_root: Path) -> list[Path]:
     special_files = []
 
     # Add .cursorrules if it exists
-    if (repo_root / ".cursorrules").exists():
-        special_files.append(repo_root / ".cursorrules")
+    if (repo_root / '.cursorrules').exists():
+        special_files.append(repo_root / '.cursorrules')
 
     # Add agents markdown files if they exist
-    for agents_filename in ["AGENTS.md", "agents.md", "AGENT.md", "agent.md"]:
+    for agents_filename in ['AGENTS.md', 'agents.md', 'AGENT.md', 'agent.md']:
         agents_path = repo_root / agents_filename
         if agents_path.exists():
             special_files.append(agents_path)
@@ -529,7 +529,7 @@ def _collect_markdown_files(playbook_dir: Path) -> list[Path]:
     if not playbook_dir.exists():
         return []
 
-    return [f for f in playbook_dir.rglob("*.md") if f.name != "README.md"]
+    return [f for f in playbook_dir.rglob('*.md') if f.name != 'README.md']
 
 
 def _load_single_playbook(file: Path, playbook_dir: Path) -> BasePlaybook:
@@ -550,13 +550,13 @@ def _load_single_playbook(file: Path, playbook_dir: Path) -> BasePlaybook:
     try:
         return BasePlaybook.load(file, playbook_dir)
     except PlaybookValidationError as e:
-        error_msg = f"Error loading playbook from {file}: {e!s}"
+        error_msg = f'Error loading playbook from {file}: {e!s}'
         raise PlaybookValidationError(error_msg) from e
     except ValidationError as e:
-        error_msg = f"Error loading playbook from {file}: {e!s}"
+        error_msg = f'Error loading playbook from {file}: {e!s}'
         raise PlaybookValidationError(error_msg) from e
     except Exception as e:
-        error_msg = f"Error loading playbook from {file}: {e!s}"
+        error_msg = f'Error loading playbook from {file}: {e!s}'
         raise ValueError(error_msg) from e
 
 
@@ -571,10 +571,10 @@ def _categorize_agent(agent: BasePlaybook) -> tuple[str, BasePlaybook]:
 
     """
     if isinstance(agent, RepoPlaybook):
-        return ("repo", agent)
+        return ('repo', agent)
     if isinstance(agent, KnowledgePlaybook):
-        return ("knowledge", agent)
-    return ("unknown", agent)
+        return ('knowledge', agent)
+    return ('unknown', agent)
 
 
 def load_playbooks_from_dir(
@@ -594,10 +594,10 @@ def load_playbooks_from_dir(
 
     repo_agents: dict[str, RepoPlaybook] = {}
     knowledge_agents: dict[str, KnowledgePlaybook] = {}
-    logger.debug("Loading agents from %s", playbook_dir)
+    logger.debug('Loading agents from %s', playbook_dir)
     logger.info(
-        "Playbook auto-trigger is %s (set %s=1 to enable)",
-        "ENABLED" if AUTO_TRIGGER_ENABLED else "DISABLED",
+        'Playbook auto-trigger is %s (set %s=1 to enable)',
+        'ENABLED' if AUTO_TRIGGER_ENABLED else 'DISABLED',
         AUTO_TRIGGER_ENV_VAR,
     )
 
@@ -611,15 +611,15 @@ def load_playbooks_from_dir(
         agent = _load_single_playbook(file, playbook_dir)
         agent_type, categorized_agent = _categorize_agent(agent)
 
-        if agent_type == "repo" and isinstance(categorized_agent, RepoPlaybook):
+        if agent_type == 'repo' and isinstance(categorized_agent, RepoPlaybook):
             repo_agents[categorized_agent.name] = categorized_agent
-        elif agent_type == "knowledge" and isinstance(
+        elif agent_type == 'knowledge' and isinstance(
             categorized_agent, KnowledgePlaybook
         ):
             knowledge_agents[categorized_agent.name] = categorized_agent
 
     logger.debug(
-        "Loaded %s playbooks: %s",
+        'Loaded %s playbooks: %s',
         len(repo_agents) + len(knowledge_agents),
         [*repo_agents.keys(), *knowledge_agents.keys()],
     )

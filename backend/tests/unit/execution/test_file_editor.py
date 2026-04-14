@@ -196,6 +196,7 @@ class TestFileEditorEdit:
             path='code.py',
             old_str='if True:\n    value = 1\n',
             new_str='if True:\n    value = 2\n',
+            match_mode='normalize_ws',
         )
         assert result.error is None
         content = (Path(self.tmpdir) / 'code.py').read_text()
@@ -210,7 +211,8 @@ class TestFileEditorEdit:
             new_str='if True:\n    value = 2\n',
             normalize_ws=False,
         )
-        assert result.error is None
+        assert result.error is not None
+        assert 'No exact match found' in result.error
 
     def test_replace_requires_unique_match(self):
         self._write('dup.py', 'x = 1\ny = 2\nx = 1\n')
@@ -251,7 +253,9 @@ class TestFileEditorEdit:
                 '});\n'
             ),
         )
-        assert result.error == 'No match found even with whitespace normalization.'
+        assert result.error is not None
+        assert 'No exact match found' in result.error
+        assert 'Closest candidates' in result.error
 
     def test_replace_auto_fuzzy_unique_medium_similarity(self):
         self._write(
@@ -281,7 +285,8 @@ class TestFileEditorEdit:
                 '});\n'
             ),
         )
-        assert result.error == 'No match found even with whitespace normalization.'
+        assert result.error is not None
+        assert 'No exact match found' in result.error
 
     def test_replace_auto_fuzzy_short_snippet_single_anchor_line(self):
         self._write(
@@ -306,7 +311,33 @@ class TestFileEditorEdit:
                 '  expect(console.debug).toHaveBeenCalled();\n'
             ),
         )
-        assert result.error == 'No match found even with whitespace normalization.'
+        assert result.error is not None
+        assert 'No exact match found' in result.error
+
+    def test_replace_fuzzy_safe_single_line_success(self):
+        self._write('fuzzy.ts', 'first\nvalue = fooo\nlast\n')
+        result = self.editor(
+            command='edit',
+            path='fuzzy.ts',
+            old_str='value = foo',
+            new_str='value = bar',
+            match_mode='fuzzy_safe',
+        )
+        assert result.error is None
+        content = (Path(self.tmpdir) / 'fuzzy.ts').read_text()
+        assert 'value = bar' in content
+
+    def test_replace_fuzzy_safe_ambiguity_is_rejected(self):
+        self._write('ambiguous-fuzzy.ts', 'value = fooo\nvalue = fooo\n')
+        result = self.editor(
+            command='edit',
+            path='ambiguous-fuzzy.ts',
+            old_str='value = fo0o',
+            new_str='value = bar',
+            match_mode='fuzzy_safe',
+        )
+        assert result.error is not None
+        assert 'ambiguous' in result.error.lower()
 
     def test_replace_fuzzy_ambiguity_is_rejected(self):
         self._write(
@@ -334,7 +365,7 @@ class TestFileEditorEdit:
             new_str='/* replacement */\n',
         )
         assert result.error is not None
-        assert 'no match found' in result.error.lower()
+        assert 'closest candidates' in result.error.lower()
 
 
 # ---------------------------------------------------------------------------
