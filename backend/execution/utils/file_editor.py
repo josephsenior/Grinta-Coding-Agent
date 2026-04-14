@@ -806,7 +806,12 @@ class FileEditor:
 
             # Use appropriate message based on command and whether file existed
             if is_create:
-                output_msg = 'File created successfully'
+                preview_lines = content.splitlines()[:20]
+                preview_str = '\n'.join(f'{i+1}\t{line}' for i, line in enumerate(preview_lines))
+                if len(content.splitlines()) > 20:
+                    preview_str += '\n...\n(File truncated)'
+                le = '\\r\\n' if '\r\n' in content else '\\n'
+                output_msg = f'File created successfully. Line endings: {le}. File preview:\n{preview_str}'
             else:
                 output_msg = 'File written successfully'
 
@@ -842,7 +847,7 @@ class FileEditor:
         # Write file atomically (write to temp then rename)
         temp_path = file_path.with_suffix(file_path.suffix + '.tmp')
         try:
-            with open(temp_path, 'w', encoding='utf-8') as f:
+            with open(temp_path, 'w', encoding='utf-8', newline='\n') as f:
                 f.write(content)
             temp_path.replace(file_path)
         except Exception:

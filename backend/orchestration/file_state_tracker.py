@@ -71,6 +71,14 @@ class FileStateTracker:
         lines.append('</FILE_MANIFEST>')
         return '\n'.join(lines)
 
+    def has_been_read_recently(self, path: str) -> bool:
+        entry = self._files.get(path)
+        return entry is not None and entry.action in ('read', 'modified', 'created')
+
+    def has_been_modified_recently(self, path: str) -> bool:
+        entry = self._files.get(path)
+        return entry is not None and entry.action in ('modified', 'created')
+
     def to_dict(self) -> dict[str, Any]:
         return {
             path: {'action': e.action, 'timestamp': e.timestamp}
@@ -88,7 +96,7 @@ class FileStateTracker:
 
 
 class FileStateMiddleware(ToolInvocationMiddleware):
-    """Observe-stage middleware that records file operations to the tracker."""
+    """Middleware that blocks unknown file edits and records file operations."""
 
     def __init__(self) -> None:
         self._tracker = FileStateTracker()
@@ -96,6 +104,32 @@ class FileStateMiddleware(ToolInvocationMiddleware):
     @property
     def tracker(self) -> FileStateTracker:
         return self._tracker
+
+    async def execute(self, ctx: ToolInvocationContext) -> None:
+        action = ctx.action
+        action_cls = type(action).__name__
+
+        # Enforce read-before-edit for apply_patch and related file modifications
+        requires_read_check = False
+        target_path = ''
+
+        if action_cls == 'FileEditAction':
+            command = getattr(action, 'command', '')
+            if command == 'apply_patch':
+                requires_read_check = True
+                # Usually apply_patch targets the path arg
+                target_path = getattr(action, 'path', '')
+
+        if requires_read_check and target_path:
+            is_known = self._tracker.has_been_read_recently(
+                target_path
+            ) or self._tracker.has_been_modified_recently(target_path)
+            # If never seen recently, block the invocation
+            if not is_known:
+                ctx.block(
+                    f'[FILE_STATE_GUARD] Cannot edit {target_path}. You must run view_file/read_file on it '
+                    f'before applying a patch to ensure you have the exact correct context.'
+                )
 
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None

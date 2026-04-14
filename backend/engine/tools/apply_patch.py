@@ -217,7 +217,7 @@ def validate_apply_patch_contract(patch: str) -> str:
 
             if old_seen != old_expected or new_seen != new_expected:
                 # Auto-correct the hunk header
-                lines[hunk_start] = f"@@ -{old_start},{old_seen} +{new_start},{new_seen} @@"
+                lines[hunk_start] = f'@@ -{old_start},{old_seen} +{new_start},{new_seen} @@'
 
     return '\n'.join(lines)
 
@@ -295,6 +295,9 @@ except Exception:
     whatthepatch = None
 
 patch = base64.b64decode(b'{pb}').decode()
+# Force LF uniformly in the patch string so git apply acts predictably
+# and cross-platform issues are bypassed.
+patch = patch.replace('\\r\\n', '\\n')
 
 added = 0
 removed = 0
@@ -385,7 +388,7 @@ def _apply_python_fallback(patch_text, dry_run):
                 errors='surrogateescape',
             )
         original_lines = original_text.splitlines(keepends=True)
-        line_ending = '\\r\\n' if '\\r\\n' in original_text else '\\n'
+        line_ending = '\r\n' if '\r\n' in original_text else '\n'
 
         out_lines = []
         cursor = 0
@@ -405,15 +408,12 @@ def _apply_python_fallback(patch_text, dry_run):
                 out_lines.extend(original_lines[cursor:old_idx])
 
                 if old_idx < len(original_lines):
-                    source_line = original_lines[old_idx].rstrip('\\r\\n')
-                    if source_line != line_text.rstrip('\\r\\n'):
+                    source_line = original_lines[old_idx].rstrip('\r\n')
+                    if source_line != line_text.rstrip('\r\n'):
                         return (
                             1,
-                            f'[APPLY_PATCH_GUIDANCE] Patch context mismatch in {{target_path}} at line {{old_no}}. '
-                            f'Expected: "{{line_text.rstrip()}}", Found: "{{source_line.rstrip()}}". '
-                            f'Ensure you have the latest file content.'
-                        )
-
+                                f'[APPLY_PATCH_GUIDANCE] Patch context mismatch in {{target_path}} at line {{old_no}}. '
+                                f'Expected: "{{line_text.rstrip()}}", Found: "{{source_line.rstrip()}}". '
                 cursor = min(len(original_lines), old_idx + 1)
                 if new_no is not None:
                     out_lines.append(line_text + line_ending)
@@ -441,7 +441,7 @@ def _apply_python_fallback(patch_text, dry_run):
         return 0, 'Dry run OK via python fallback (' + str(touched) + ' files)'
     return 0, 'Patch applied via python fallback (' + str(touched) + ' files)'
 
-with tempfile.NamedTemporaryFile(suffix='.patch', delete=False, mode='w') as f:
+with tempfile.NamedTemporaryFile(suffix='.patch', delete=False, mode='w', newline='\\n', encoding='utf-8') as f:
     f.write(patch)
     temp_name = f.name
 
