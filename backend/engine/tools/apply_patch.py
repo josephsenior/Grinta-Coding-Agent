@@ -230,7 +230,7 @@ for raw_line in patch.splitlines():
         continue
     if raw_line.startswith('Binary files '):
         continue
-    if raw_line.startswith('\\ No newline at end of file'):
+    if raw_line.startswith('\\\\ No newline at end of file'):
         continue
     if raw_line.startswith('+'):
         added += 1
@@ -397,7 +397,7 @@ if git_result is None or git_not_repo:
         print(out)
         sys.exit(0)
 
-combined = ((r.stdout or '') + '\n' + (r.stderr or '')).strip()
+combined = ((r.stdout or '') + '\\n' + (r.stderr or '')).strip()
 if r.returncode != 0:
     guidance = (
         '[APPLY_PATCH_GUIDANCE] The patch failed to apply. '
@@ -412,7 +412,7 @@ if r.returncode != 0:
             'Regenerate the patch in unified diff format and retry.'
         )
     # Report the exact error and guidance
-print(f"Error applying patch (code {{r.returncode}}):\\n{{combined}}\\n\\n{{guidance}}")
+    print(f"Error applying patch (code {{r.returncode}}):\\n{{combined}}\\n\\n{{guidance}}")
     os.unlink(temp_name)
     sys.exit(r.returncode)
 
