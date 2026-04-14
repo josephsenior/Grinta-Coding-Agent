@@ -476,7 +476,7 @@ class FileEditor:
 
         # sliding window
         lines_orig = file_content.splitlines(keepends=True)
-        lines_norm = [self._normalize_whitespace_for_match(l) for l in lines_orig]
+        lines_norm = [self._normalize_whitespace_for_match(line_text) for line_text in lines_orig]
         norm_old_lines = norm_old.splitlines()
         if not norm_old_lines:
             return ToolResult(
@@ -697,13 +697,14 @@ class FileEditor:
             if result is not None:
                 is_valid, err_msg = result
                 if not is_valid:
-                    # Provide extra context for the AI to fix the typo
+                    # Provide the EXACT syntax error from tree-sitter to the agent
                     return ToolResult(
                         output="",
                         error=(
-                            f"ERROR: The edit introduces a Syntax Error:\n{err_msg}\n"
-                            "This usually happens because of a typo in your `new_str` (e.g. missing quote, "
-                            "extra bracket, or wrong indentation). Please review your `new_str` carefully."
+                            f"CRITICAL: The edit failed because it introduces a Syntax Error:\n{err_msg}\n\n"
+                            "The tree-sitter parser rejected the resulting file. This usually means your `new_str` "
+                            "has a typo (missing quote, mismatched bracket, or bad indentation). "
+                            "Please fix the typo and retry the replacement."
                         ),
                         new_content=old_content,
                     )
