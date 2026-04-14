@@ -412,8 +412,11 @@ def _apply_python_fallback(patch_text, dry_run):
                     if source_line != line_text.rstrip('\r\n'):
                         return (
                             1,
-                                f'[APPLY_PATCH_GUIDANCE] Patch context mismatch in {{target_path}} at line {{old_no}}. '
-                                f'Expected: "{{line_text.rstrip()}}", Found: "{{source_line.rstrip()}}". '
+                            f'[APPLY_PATCH_GUIDANCE] Patch context mismatch in {{target_path}} at line {{old_no}}. '
+                            f'Expected: "{{line_text.rstrip()}}", Found: "{{source_line.rstrip()}}". '
+                            f'Ensure you have the latest file content.'
+                        )
+
                 cursor = min(len(original_lines), old_idx + 1)
                 if new_no is not None:
                     out_lines.append(line_text + line_ending)
