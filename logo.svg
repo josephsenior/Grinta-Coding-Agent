@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <rect width="500" height="500" fill="#1A1C20"/>
+
+  <path d="
+    M 160 135
+    Q 205 100, 250 130
+    Q 295 100, 340 135
+    L 420 135
+    C 450 145, 410 190, 350 190
+    C 330 210, 320 240, 320 270
+    L 350 270
+    L 350 310
+    L 290 310
+    C 290 290, 210 290, 210 310
+    L 150 310
+    L 150 270
+    L 180 270
+    C 180 240, 170 210, 150 190
+    L 80 190
+    L 80 135
+    Z
+  " fill="#CC1836" stroke="#CC1836" stroke-width="4" stroke-linejoin="round"/>
+
+  <line x1="120" y1="135" x2="120" y2="190" stroke="#1A1C20" stroke-width="8" stroke-linecap="round"/>
+  
+  <line x1="148" y1="285" x2="185" y2="285" stroke="#1A1C20" stroke-width="8" stroke-linecap="round"/>
+  
+  <line x1="315" y1="285" x2="352" y2="285" stroke="#1A1C20" stroke-width="8" stroke-linecap="round"/>
+
+  <path d="M 190 170 C 185 130, 235 130, 235 170 C 220 180, 200 180, 190 170 Z" fill="#1A1C20"/>
+  <path d="M 265 170 C 265 130, 315 130, 310 170 C 300 180, 280 180, 265 170 Z" fill="#1A1C20"/>
+
+  <path d="M 197 167 C 194 140, 228 140, 228 167 C 218 174, 205 174, 197 167 Z" fill="#FFFFFF"/>
+  <path d="M 272 167 C 272 140, 306 140, 303 167 C 295 174, 282 174, 272 167 Z" fill="#FFFFFF"/>
+
+  <circle cx="218" cy="153" r="9" fill="#1A1C20"/>
+  <circle cx="221" cy="149" r="3.5" fill="#FFFFFF"/>
+
+  <circle cx="293" cy="153" r="9" fill="#1A1C20"/>
+  <circle cx="296" cy="149" r="3.5" fill="#FFFFFF"/>
+
+  <path d="M 238 182 Q 250 192 262 182" fill="none" stroke="#1A1C20" stroke-width="4" stroke-linecap="round"/>
+
+  <polyline points="215,220 235,240 215,260" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="245" y1="260" x2="275" y2="260" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round"/>
+
+  <g transform="scale(1.05, 1)">
+    <text x="238" y="400" font-family="'Arial Black', Impact, sans-serif" font-size="65" font-weight="900" fill="#CC1836" text-anchor="middle" letter-spacing="3">GRINTA</text>
+  </g>
+</svg>
