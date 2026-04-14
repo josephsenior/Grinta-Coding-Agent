@@ -165,6 +165,24 @@ class StepGuardService:
         # Circuit breaker only emits 'stop' for stuck detections now.
         # Step guard handles all recovery messaging separately.
         logger.error('Circuit breaker tripped: %s', result.reason)
+        state = getattr(controller, 'state', None)
+        # If action is switch_context, don't stop the agent, just force a new prompt directive
+        if getattr(result, 'action', '') == 'switch_context':
+            content = (
+                f'CIRCUIT BREAKER FORCED STRATEGY SWITCH: {result.reason}\n\n'
+                f'{result.recommendation}'
+            )
+            obs = ErrorObservation(content=content, error_id='CIRCUIT_BREAKER_FORCED_SWITCH')
+            attach_observation_cause(obs, _pending_action_for_observation_cause(controller), context='step_guard.forced_switch')
+            controller.event_stream.add_event(obs, EventSource.ENVIRONMENT)
+            if state and hasattr(state, 'set_planning_directive'):
+                state.set_planning_directive(
+                    'STRATEGY SWITCH REQUIRED: You must use a different tool or strategy now.',
+                    source='StepGuardService',
+                )
+            _clear_agent_queued_actions(controller, 'Forced strategy switch due to deterministic failures')
+            return True
+
         error_obs = ErrorObservation(
             content=(
                 f'CIRCUIT BREAKER TRIPPED: {result.reason}\n\n'

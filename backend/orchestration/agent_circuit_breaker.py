@@ -199,8 +199,9 @@ class CircuitBreaker:
                     'Repeated apply_patch deterministic failures '
                     f'({apply_patch_errors})'
                 ),
-                action='pause',
+                action='pause' if apply_patch_errors >= 3 else 'switch_context',
                 recommendation=recommendation,
+                system_message=recommendation,
             )
 
         # 3. Stuck detections

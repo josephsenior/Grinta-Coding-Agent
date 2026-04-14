@@ -210,7 +210,11 @@ class ActionExecutionService:
                     if 'apply_patch' in error_lower or '[apply_patch' in error_lower:
                         cb_service.record_error(exc, tool_name='apply_patch')
 
-                if identical_error_count > max_identical_retries:
+                effective_max_retries = max_identical_retries
+                if '[APPLY_PATCH_CLASS:malformed_patch]' in error_signature or '[APPLY_PATCH_CLASS:context_mismatch]' in error_signature:
+                    effective_max_retries = 1
+
+                if identical_error_count > effective_max_retries:
                     logger.error(
                         'get_next_action blocked repeated identical recoverable error after %d attempts: %s',
                         identical_error_count,

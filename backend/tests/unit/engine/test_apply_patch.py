@@ -194,8 +194,8 @@ class TestValidateApplyPatchContract:
         assert normalized.startswith('diff --git a/x b/x')
         assert 'index 1111111..2222222' not in normalized
 
-    def test_rejects_malformed_hunk_line_counts(self) -> None:
-        error = validate_apply_patch_contract(
+    def test_auto_corrects_malformed_hunk_line_counts(self) -> None:
+        normalized = validate_apply_patch_contract(
             'diff --git a/x b/x\n'
             '--- a/x\n'
             '+++ b/x\n'
@@ -204,8 +204,8 @@ class TestValidateApplyPatchContract:
             '-old2\n'
             '+new\n'
         )
-
-        assert error.startswith('Malformed hunk line counts')
+    
+        assert '@@ -1,2 +1,2 @@' in normalized
 
     def test_rejects_malformed_minus_header(self) -> None:
         error = validate_apply_patch_contract(

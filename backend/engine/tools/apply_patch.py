@@ -117,13 +117,15 @@ def _is_contract_error(validation_result: str) -> bool:
     return validation_result.startswith(('Patch', 'Missing', 'Malformed', 'Unexpected'))
 
 
-def _parse_hunk_header_counts(header_line: str) -> tuple[int, int] | None:
+def _parse_hunk_header_full(header_line: str) -> tuple[int, int, int, int] | None:
     match = _HUNK_HEADER_RE.match(header_line)
     if not match:
         return None
+    old_start = int(match.group(1))
     old_count = int(match.group(2) or '1')
+    new_start = int(match.group(3))
     new_count = int(match.group(4) or '1')
-    return (old_count, new_count)
+    return (old_start, old_count, new_start, new_count)
 
 
 def validate_apply_patch_contract(patch: str) -> str:
@@ -180,11 +182,11 @@ def validate_apply_patch_contract(patch: str) -> str:
             return 'Malformed patch: each diff block must include at least one @@ hunk header.'
 
         for hunk_pos, hunk_start in enumerate(hunk_indices):
-            parsed_counts = _parse_hunk_header_counts(lines[hunk_start])
+            parsed_counts = _parse_hunk_header_full(lines[hunk_start])
             if parsed_counts is None:
                 return 'Malformed hunk header: expected `@@ -n,m +n,m @@`.'
 
-            old_expected, new_expected = parsed_counts
+            old_start, old_expected, new_start, new_expected = parsed_counts
             hunk_end = (
                 hunk_indices[hunk_pos + 1]
                 if hunk_pos + 1 < len(hunk_indices)
@@ -214,11 +216,8 @@ def validate_apply_patch_contract(patch: str) -> str:
                 )
 
             if old_seen != old_expected or new_seen != new_expected:
-                return (
-                    'Malformed hunk line counts: header declares '
-                    f'old={old_expected}, new={new_expected} but body contains '
-                    f'old={old_seen}, new={new_seen}.'
-                )
+                # Auto-correct the hunk header
+                lines[hunk_start] = f"@@ -{old_start},{old_seen} +{new_start},{new_seen} @@"
 
     return '\n'.join(lines)
 
