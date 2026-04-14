@@ -430,19 +430,25 @@ class FileEditor:
     @staticmethod
     def _normalize_whitespace_for_match(text: str) -> str:
         """Normalize whitespace for tolerant matching while preserving line structure."""
-        from backend.engine.tools.whitespace_handler import WhitespaceHandler
-
-        return WhitespaceHandler.normalize_for_match(text)
-
-    @staticmethod
-    def _map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
-        """Map normalized-text offset back to original-text offset."""
-        from backend.engine.tools.whitespace_handler import WhitespaceHandler
-
-        return WhitespaceHandler.map_normalized_offset_to_original(
-            original,
-            norm_offset,
-        )
+        import re
+        # Strategy:
+        # 1. Convert tabs to 4 spaces
+        # 2. Convert all non-newline whitespace sequences to a single space
+        # 3. Strip leading/trailing whitespace on every line
+        # 4. Collapse multiple blank lines into one
+        lines = text.splitlines()
+        normalized_lines = []
+        for line in lines:
+            line = line.replace('\t', '    ')
+            # 2. Convert all non-newline whitespace sequences to a single space
+            line = re.sub(r'[ \t]+', ' ', line).strip()
+            # 3. Strip leading/trailing whitespace on every line
+            # 4. Collapse multiple blank lines into one
+            normalized_lines.append(line)
+        
+        # Join with \n and strip overall to ignore leading/trailing empty lines in match
+        result = '\n'.join(normalized_lines)
+        return re.sub(r'\n+', '\n', result).strip()
 
     def _ws_tolerant_replace(
         self,
@@ -468,12 +474,39 @@ class FileEditor:
                 new_content=file_content,
             )
 
-        norm_start = norm_content.index(norm_old)
-        norm_end = norm_start + len(norm_old)
+        # sliding window
+        lines_orig = file_content.splitlines(keepends=True)
+        lines_norm = [self._normalize_whitespace_for_match(l) for l in lines_orig]
+        norm_old_lines = norm_old.splitlines()
+        if not norm_old_lines:
+             return ToolResult(output='', error='old_str contains only whitespace.', new_content=file_content)
 
-        orig_start = self._map_normalized_offset_to_original(file_content, norm_start)
-        orig_end = self._map_normalized_offset_to_original(file_content, norm_end)
-        return file_content[:orig_start] + new_str + file_content[orig_end:]
+        first_line_matches = [i for i, nl in enumerate(lines_norm) if nl == norm_old_lines[0]]
+        
+        valid_match = None
+        for s in first_line_matches:
+            found = True
+            curr = s
+            for target in norm_old_lines:
+                while curr < len(lines_norm) and not lines_norm[curr] and target:
+                    curr += 1
+                if curr >= len(lines_norm) or lines_norm[curr] != target:
+                    found = False
+                    break
+                curr += 1
+            if found:
+                if valid_match: return ToolResult(output='', error='Ambiguous match.', new_content=file_content)
+                valid_match = (s, curr)
+
+        if valid_match:
+            s, e = valid_match
+            return ''.join(lines_orig[:s]) + new_str + ''.join(lines_orig[e:])
+
+        return ToolResult(output='', error='Whitespace-based matching failed internally.', new_content=file_content)
+
+    @staticmethod
+    def _map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
+        return -1
 
     @staticmethod
     def _line_ending_for_content(content: str) -> str:
@@ -491,6 +524,10 @@ class FileEditor:
         target = self._normalize_whitespace_for_match(old_str).strip()
         if not target:
             return []
+
+        # If old_str is multi-line, we look for matches of the first line to give context
+        if '\n' in old_str or '\r' in old_str:
+            target = self._normalize_whitespace_for_match(old_str.splitlines()[0]).strip()
 
         candidates: list[tuple[float, int, str]] = []
         for idx, line in enumerate(file_content.splitlines(), 1):
@@ -613,11 +650,15 @@ class FileEditor:
         else:
             tolerant = self._ws_tolerant_replace(old_content, old_str, new_str)
             if isinstance(tolerant, ToolResult):
-                fuzzy_result = self._fuzzy_safe_replace(old_content, old_str, new_str)
-                if isinstance(fuzzy_result, ToolResult):
-                    fuzzy_result.error = tolerant.error + '\n\n' + fuzzy_result.error
-                    return fuzzy_result
-                new_content = fuzzy_result
+                if '\n' not in old_str and '\r' not in old_str:
+                    fuzzy_result = self._fuzzy_safe_replace(old_content, old_str, new_str)
+                    if not isinstance(fuzzy_result, ToolResult):
+                        new_content = fuzzy_result
+                    else:
+                        tolerant.error = tolerant.error + '\n\n' + fuzzy_result.error
+                        return tolerant
+                else:
+                    return tolerant
             else:
                 new_content = tolerant
 
