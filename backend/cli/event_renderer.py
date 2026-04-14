@@ -1509,10 +1509,18 @@ class CLIEventRenderer:
                 elif source_tool == 'revert_to_checkpoint':
                     verb, title = 'Reverted', 'Checkpoint'
                     detail = human_msg or 'workspace reverted'
+                elif source_tool == 'search_code':
+                    verb, title = 'Search Code', 'Tool'
+                    lines = [ln for ln in (human_msg or '').splitlines() if ln.strip() and not ln.startswith('Error running ripgrep:')]
+                    if not lines or any('No matches found.' in ln for ln in lines[:5]) or any('No matching files found' in ln for ln in lines[:5]):
+                        detail = 'No matches found.'
+                    else:
+                        match_count = sum(1 for line in lines if re.match(r'^.*:\d+:', line)) or len(lines)
+                        detail = f'Found {match_count} match lines.'
                 else:
                     verb = source_tool.replace('_', ' ').title()
                     title = 'Tool'
-                    detail = human_msg or source_tool
+                    detail = str(human_msg)[:150] or source_tool
                 self._emit_activity_turn_header()
                 kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
                 self._print_or_buffer(
@@ -2556,7 +2564,29 @@ class CLIEventRenderer:
             for line in friendly.split('\n'):
                 self._append_history(Text(line, style='cyan'))
         else:
-            self._append_history(Padding(Markdown(display_content), (0, 0, 1, 0)))
+            # Condense embedded search tool output or ripgrep-style match lines
+            s = display_content.strip()
+
+            # If tool JSON didn't match, check for explicit <search_results> tags
+            if '<search_results>' in s:
+                m = re.search(r'<search_results>\s*(?P<payload>.*?)\s*</search_results>', s, re.S)
+                payload = m.group('payload') if m else s
+                lines = [ln for ln in payload.splitlines() if ln.strip() and not ln.startswith('Error running ripgrep:')]
+                if not lines or any('No matches found.' in ln for ln in lines[:5]) or any('No matching files found' in ln for ln in lines[:5]):
+                    summary = 'No matches found.'
+                else:
+                    match_count = sum(1 for line in lines if re.match(r'^.*:\\d+:', line)) or len(lines)
+                    summary = f'Found {match_count} match{"es" if match_count != 1 else ""}.'
+                self._append_history(Text(summary, style='cyan'))
+            else:
+                # Also detect plain ripgrep-like output without XML tags and condense it
+                plain_lines = [ln for ln in s.splitlines() if ln.strip()]
+                if plain_lines and any(re.match(r'^.*:\\d+:', ln) for ln in plain_lines[:5]):
+                    match_count = sum(1 for line in plain_lines if re.match(r'^.*:\\d+:', line)) or len(plain_lines)
+                    summary = f'Found {match_count} match{"es" if match_count != 1 else ""}.'
+                    self._append_history(Text(summary, style='cyan'))
+                else:
+                    self._append_history(Padding(Markdown(display_content), (0, 0, 1, 0)))
         for attachment in attachments or []:
             self._append_history(attachment)
         self._append_history(Text(''))
