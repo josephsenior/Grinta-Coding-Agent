@@ -50,17 +50,17 @@ from backend.orchestration.agent import Agent
 from backend.orchestration.state.state import State
 from backend.utils.prompt import OrchestratorPromptManager, PromptManager
 
-from . import message_serializer
-from .contracts import (
+from backend.engine import message_serializer
+from backend.engine.contracts import (
     ExecutorProtocol,
     MemoryManagerProtocol,
     PlannerProtocol,
     SafetyManagerProtocol,
 )
-from .executor import OrchestratorExecutor
-from .memory_manager import ContextMemoryManager
-from .planner import OrchestratorPlanner
-from .safety import OrchestratorSafetyManager
+from backend.engine.executor import OrchestratorExecutor
+from backend.engine.memory_manager import ContextMemoryManager
+from backend.engine.planner import OrchestratorPlanner
+from backend.engine.safety import OrchestratorSafetyManager
 
 if TYPE_CHECKING:
     from backend.ledger.action import Action
@@ -492,7 +492,7 @@ class Orchestrator(Agent):
         if not self.pending_actions:
             return None
         # Try to batch consecutive read-only file reads into one action
-        from .file_reads import try_batch_file_reads
+        from backend.engine.file_reads import try_batch_file_reads
 
         batched = try_batch_file_reads(self.pending_actions)
         return batched if batched else self.pending_actions.popleft()

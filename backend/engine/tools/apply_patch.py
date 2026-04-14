@@ -104,27 +104,25 @@ _HUNK_HEADER_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 
 def _classify_patch_error(validation_error: str) -> str:
     message = validation_error.lower()
-    if 'context verification' in message or 'latest file content' in message:
-        return 'stale_view'
-    if 'target file not found' in message:
-        return 'tool_unavailable'
-    if 'context mismatch' in message:
-        return 'context_mismatch'
-    return 'malformed_patch'
+    if "context verification" in message or "latest file content" in message:
+        return "stale_view"
+    if "target file not found" in message:
+        return "tool_unavailable"
+    if "context mismatch" in message:
+        return "context_mismatch"
+    return "malformed_patch"
 
 
 def _is_contract_error(validation_result: str) -> bool:
-    return validation_result.startswith(
-        ('Patch', 'Missing', 'Malformed', 'Unexpected')
-    )
+    return validation_result.startswith(("Patch", "Missing", "Malformed", "Unexpected"))
 
 
 def _parse_hunk_header_counts(header_line: str) -> tuple[int, int] | None:
     match = _HUNK_HEADER_RE.match(header_line)
     if not match:
         return None
-    old_count = int(match.group(2) or '1')
-    new_count = int(match.group(4) or '1')
+    old_count = int(match.group(2) or "1")
+    new_count = int(match.group(4) or "1")
     return (old_count, new_count)
 
 
@@ -134,7 +132,7 @@ def validate_apply_patch_contract(patch: str) -> str:
     if not lines:
         return "Patch is empty."
 
-    if any(line.strip().startswith('```') for line in lines):
+    if any(line.strip().startswith("```") for line in lines):
         return "Malformed patch: remove markdown fences and pass raw unified diff only."
 
     has_git = any(line.startswith("diff --git ") for line in lines)
@@ -151,11 +149,11 @@ def validate_apply_patch_contract(patch: str) -> str:
         return "Missing required diff headers (diff --git, ---/+++, or @@)."
 
     diff_starts = [
-        idx for idx, line in enumerate(lines) if line.startswith('diff --git ')
+        idx for idx, line in enumerate(lines) if line.startswith("diff --git ")
     ]
     for block_idx, block_start in enumerate(diff_starts):
         if not _DIFF_HEADER_RE.match(lines[block_start]):
-            return 'Malformed diff header: expected `diff --git a/<path> b/<path>`.'
+            return "Malformed diff header: expected `diff --git a/<path> b/<path>`."
 
         block_end = (
             diff_starts[block_idx + 1]
@@ -164,27 +162,27 @@ def validate_apply_patch_contract(patch: str) -> str:
         )
         block = lines[block_start:block_end]
 
-        minus_line = next((line for line in block if line.startswith('--- ')), None)
-        plus_line = next((line for line in block if line.startswith('+++ ')), None)
+        minus_line = next((line for line in block if line.startswith("--- ")), None)
+        plus_line = next((line for line in block if line.startswith("+++ ")), None)
         if minus_line is None or plus_line is None:
-            return 'Malformed patch: each diff block must contain both --- and +++ headers.'
+            return "Malformed patch: each diff block must contain both --- and +++ headers."
         if not _FILE_MINUS_RE.match(minus_line):
-            return 'Malformed `---` header: expected `--- a/<path>` or `--- /dev/null`.'
+            return "Malformed `---` header: expected `--- a/<path>` or `--- /dev/null`."
         if not _FILE_PLUS_RE.match(plus_line):
-            return 'Malformed `+++` header: expected `+++ b/<path>` or `+++ /dev/null`.'
+            return "Malformed `+++` header: expected `+++ b/<path>` or `+++ /dev/null`."
 
         hunk_indices = [
             block_start + idx
             for idx, line in enumerate(block)
-            if line.startswith('@@ ')
+            if line.startswith("@@ ")
         ]
         if not hunk_indices:
-            return 'Malformed patch: each diff block must include at least one @@ hunk header.'
+            return "Malformed patch: each diff block must include at least one @@ hunk header."
 
         for hunk_pos, hunk_start in enumerate(hunk_indices):
             parsed_counts = _parse_hunk_header_counts(lines[hunk_start])
             if parsed_counts is None:
-                return 'Malformed hunk header: expected `@@ -n,m +n,m @@`.'
+                return "Malformed hunk header: expected `@@ -n,m +n,m @@`."
 
             old_expected, new_expected = parsed_counts
             hunk_end = (
@@ -198,28 +196,28 @@ def validate_apply_patch_contract(patch: str) -> str:
             for line in lines[hunk_start + 1 : hunk_end]:
                 if not line:
                     continue
-                if line.startswith('\\ No newline at end of file'):
+                if line.startswith("\\ No newline at end of file"):
                     continue
-                if line.startswith(' '):
+                if line.startswith(" "):
                     old_seen += 1
                     new_seen += 1
                     continue
-                if line.startswith('-'):
+                if line.startswith("-"):
                     old_seen += 1
                     continue
-                if line.startswith('+'):
+                if line.startswith("+"):
                     new_seen += 1
                     continue
                 return (
-                    'Unexpected line in hunk body: all hunk lines must start with '
+                    "Unexpected line in hunk body: all hunk lines must start with "
                     "space, '+', '-', or '\\ No newline at end of file'."
                 )
 
             if old_seen != old_expected or new_seen != new_expected:
                 return (
-                    'Malformed hunk line counts: header declares '
-                    f'old={old_expected}, new={new_expected} but body contains '
-                    f'old={old_seen}, new={new_seen}.'
+                    "Malformed hunk line counts: header declares "
+                    f"old={old_expected}, new={new_expected} but body contains "
+                    f"old={old_seen}, new={new_seen}."
                 )
 
     return "\n".join(lines)

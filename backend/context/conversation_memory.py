@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -194,9 +195,12 @@ class ContextMemory:
         store = self.vector_store
         if store is None:
             return
-        starter = getattr(store, 'start_background_warmup', None)
-        if callable(starter):
-            starter()
+        starter_fn = cast(
+            Callable[[], None] | None,
+            getattr(store, 'start_background_warmup', None),
+        )
+        if starter_fn is not None:
+            starter_fn()
 
     @staticmethod
     def _is_valid_image_url(url: str | None) -> bool:
@@ -475,7 +479,8 @@ class ContextMemory:
         if event_id is not None:
             return f'event_{event_id}'
         digest = hashlib.sha1(
-            f'{type(event).__name__}:{content[:400]}'.encode('utf-8', 'ignore')
+            f'{type(event).__name__}:{content[:400]}'.encode('utf-8', 'ignore'),
+            usedforsecurity=False,
         ).hexdigest()[:16]
         return f'synthetic_{type(event).__name__}_{digest}'
 
