@@ -13,11 +13,10 @@ Read command errors and classify quickly: permissions, path, syntax, dependency,
 
 If path is uncertain: {path_discovery_hint}
 
-On tool failure, pivot in the same turn:
+On tool failure:
 
-- `ast_code_editor` → `str_replace_editor` (normalize_ws) → `str_replace_editor` (fuzzy_safe)
-- `str_replace_editor` (normalize_ws) → `str_replace_editor` (fuzzy_safe)
-
+- `ast_code_editor` → `str_replace_editor`
+-`str_replace_editor` → `ast_code_editor`
 {code_intelligence_fallback}
 
 Never rerun the same failing command unchanged. After 3 failed approaches on the same sub-task, summarize attempts and ask the user.

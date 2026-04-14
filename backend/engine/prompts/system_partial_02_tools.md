@@ -10,11 +10,10 @@ You MUST explicitly read a file's contents before you edit it. NEVER edit a file
   Greenfield: `str_replace_editor(command="create_file", path="...", file_text="...")`.
 - **ast_code_editor**: Prefer for function/class bodies (`edit_function`, `rename_symbol`), targeted ranges (`replace_range`, `insert_text`), or rollbacks (`undo_last_edit`).
 
-  No `edit_file` — use str_replace or ast.
-  </EDITOR_AND_FILE_OPERATIONS>
+</EDITOR_AND_FILE_OPERATIONS>
 
 <CODE_QUALITY>
-Minimal comments;Low complexity high quality modular code; minimal diff unless asked; explore before large edits; imports at top unless circular logic requires otherwise.
+Minimal comments; High quality modular code; Minimal diff unless asked; explore before large edits; imports at top unless circular logic requires otherwise.
 </CODE_QUALITY>
 
 <ENVIRONMENT_SETUP>

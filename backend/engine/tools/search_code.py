@@ -121,13 +121,20 @@ def build_search_code_action(
     # Auto-fix where pattern is exactly a wildcard and file_pattern is empty
     import re
 
+    # If NO pattern is provided, but file_pattern is, ensure it has wildcards if it looks like a substring
+    # If the user provides "test" or "tests", convert to "*test*"
+    if not pattern and file_pattern and not any(c in file_pattern for c in "*?[]"):
+        file_pattern = f"*{file_pattern}*"
+
     if (
         pattern
         and not file_pattern
         and re.match(r"^[\w\*\.\-\?]+$", pattern)
-        and pattern.startswith(("*", "?"))
+        and (pattern.startswith(("*", "?", ".")) or any(x in pattern for x in ["test", "tests", "util", "src"]))
     ):
         file_pattern = pattern
+        if not any(c in file_pattern for c in "*?[]"):
+            file_pattern = f"*{file_pattern}*"
         pattern = ""
 
     # Validate regex pattern early to prevent silent failures and hallucination loops

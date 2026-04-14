@@ -2039,45 +2039,16 @@ class CLIEventRenderer:
                 if not raw_lines:
                     msg = 'done' if exit_code == 0 else None
                 else:
-                    msg = raw_lines[0][:220] if len(raw_lines[0]) > 2 else 'done'
-                    if len(raw_lines) > 1:
-                        from backend.cli.transcript import _ACTIVITY_SECONDARY_INDENT
-
-                        extra_lines = []
-                        max_preview = 12
-                        for ln in raw_lines[1:max_preview]:
-                            t = Text(_ACTIVITY_SECONDARY_INDENT, style='')
-                            t.append(f'  {ln[:200]}', style='dim')
-                            extra_lines.append(t)
-                        if len(raw_lines) > max_preview:
-                            t = Text(_ACTIVITY_SECONDARY_INDENT, style='')
-                            t.append(
-                                f'  ... and {len(raw_lines) - max_preview} more entries',
-                                style='dim italic',
-                            )
-                            extra_lines.append(t)
-
+                    msg = 'done'
                 result_kind = 'ok' if exit_code == 0 else 'neutral'
 
-            self._emit_activity_turn_header()  # not a duplicate
-            if is_internal:
-                # Internal tool — compact activity row, no raw terminal block
-                inner = format_activity_block(
-                    verb,
-                    label,
-                    secondary=msg,
-                    secondary_kind=result_kind,
-                    extra_lines=extra_lines,
-                    title=title or 'Shell',
-                )
-            else:
-                inner = format_activity_shell_block(
-                    verb,
-                    label,
-                    result_message=msg,
-                    result_kind=result_kind,
-                    extra_lines=extra_lines,
-                )
+            inner = format_activity_shell_block(
+                verb,
+                label,
+                result_message=msg,
+                result_kind=result_kind,
+                extra_lines=extra_lines,
+            )
             self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
             return
 
