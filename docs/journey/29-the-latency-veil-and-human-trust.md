@@ -28,4 +28,4 @@ Other agents prioritize 100% autonomy and ask for forgiveness. I learned that fo
 
 ---
 
-← [Token Economics and the FinOps Trap](27-token-economics-and-the-finops-trap.md) | [The Book of Grinta](README.md) | [The Weight Divide: Local vs Hosted](29-the-weight-divide-local-vs-hosted.md) →
+← [Token Economics and the FinOps Trap](28-token-economics-and-the-finops-trap.md) | [The Book of Grinta](README.md) | [The Weight Divide: Local vs Hosted](30-the-weight-divide-local-vs-hosted.md) →

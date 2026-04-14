@@ -71,4 +71,4 @@ Ultimately, Grinta's architecture proves you do not need a compiled language to 
 
 ---
 
-← [Prompts Are Programs](15-prompts-are-programs.md) | [The Book of Grinta](README.md) | [The Mind of the Agent](17-the-mind-of-the-agent.md) →
+← [Prompts Are Programs](15-prompts-are-programs.md) | [The Book of Grinta](README.md) | [The Mind of the Agent](18-the-mind-of-the-agent.md) →

@@ -32,4 +32,4 @@ Grinta is that single developer.
 
 ---
 
-← [The Weight Divide: Local vs Hosted](29-the-weight-divide-local-vs-hosted.md) | [The Book of Grinta](README.md) | [The Road Ahead](07-the-road-ahead.md) →
+← [The Weight Divide: Local vs Hosted](30-the-weight-divide-local-vs-hosted.md) | [The Book of Grinta](README.md) | [The Road Ahead](07-the-road-ahead.md) →

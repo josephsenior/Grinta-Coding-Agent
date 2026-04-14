@@ -171,4 +171,4 @@ That is where command-risk analysis, policy gates, and honest safety boundaries 
 
 ---
 
-← [Surviving the Crash](18-surviving-the-crash.md) | [The Book of Grinta](README.md) | [The Safety Sandbox Is Not Optional](20-the-safety-sandbox-is-not-optional.md) →
+← [Surviving the Crash](19-surviving-the-crash.md) | [The Book of Grinta](README.md) | [The Safety Sandbox Is Not Optional](21-the-safety-sandbox-is-not-optional.md) →

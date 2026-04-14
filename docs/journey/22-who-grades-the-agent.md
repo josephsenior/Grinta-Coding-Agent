@@ -124,4 +124,4 @@ The next chapter goes one layer deeper into execution governance: middleware ord
 
 ---
 
-← [The Safety Sandbox Is Not Optional](20-the-safety-sandbox-is-not-optional.md) | [The Book of Grinta](README.md) | [The Middleware Contract](22-the-middleware-contract.md) →
+← [The Safety Sandbox Is Not Optional](21-the-safety-sandbox-is-not-optional.md) | [The Book of Grinta](README.md) | [The Middleware Contract](23-the-middleware-contract.md) →

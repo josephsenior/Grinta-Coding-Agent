@@ -131,4 +131,4 @@ The next chapter tackles one of the most tempting mistakes in autonomous agent d
 
 ---
 
-← [Who Grades the Agent](21-who-grades-the-agent.md) | [The Book of Grinta](README.md) | [The Parallelization Trap](23-the-parallelization-trap.md) →
+← [Who Grades the Agent](22-who-grades-the-agent.md) | [The Book of Grinta](README.md) | [The Parallelization Trap](23-the-parallelization-trap.md) →

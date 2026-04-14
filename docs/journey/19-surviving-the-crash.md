@@ -134,4 +134,4 @@ Crash survival is not a feature on top of the agent. It is the floor under every
 
 ---
 
-← [The Mind of the Agent](17-the-mind-of-the-agent.md) | [The Book of Grinta](README.md) | [Circuit Breakers and Hallucinations](19-circuit-breakers-and-hallucinations.md) →
+← [The Mind of the Agent](18-the-mind-of-the-agent.md) | [The Book of Grinta](README.md) | [Circuit Breakers and Hallucinations](20-circuit-breakers-and-hallucinations.md) →

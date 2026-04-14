@@ -155,7 +155,7 @@ I moved Grinta to event-oriented persistence because snapshots alone could not a
 
 That shift made the system more operationally serious. It also made the system more expensive to build. Ordering, recovery, and replay correctness all become first-class engineering problems the moment you commit to a durable ledger.
 
-The detailed mechanics now live in [18-surviving-the-crash.md](18-surviving-the-crash.md). This chapter keeps the architectural point: decomposition gave those reliability concerns explicit homes instead of hiding them in one giant controller.
+The detailed mechanics now live in [19-surviving-the-crash.md](19-surviving-the-crash.md). This chapter keeps the architectural point: decomposition gave those reliability concerns explicit homes instead of hiding them in one giant controller.
 
 ---
 
@@ -174,7 +174,7 @@ The system had to do all of this without collapsing into spaghetti:
 
 This is why the service decomposition mattered so much. Once those responsibilities moved into dedicated services, incidents became diagnosable and behavior became testable.
 
-The deeper stuck and circuit-breaker story now lives in [19-circuit-breakers-and-hallucinations.md](19-circuit-breakers-and-hallucinations.md), because that subsystem eventually became large enough to deserve its own chapter.
+The deeper stuck and circuit-breaker story now lives in [20-circuit-breakers-and-hallucinations.md](20-circuit-breakers-and-hallucinations.md), because that subsystem eventually became large enough to deserve its own chapter.
 
 ---
 

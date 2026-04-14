@@ -110,4 +110,4 @@ Building a reliable AI agent isn't about adding every feature you can think of. 
 
 ---
 
-← [The Pragmatic Stack](16-the-pragmatic-stack.md) | [The Book of Grinta](README.md) | [Surviving the Crash](18-surviving-the-crash.md) →
+← [The Pragmatic Stack](17-the-pragmatic-stack.md) | [The Book of Grinta](README.md) | [Surviving the Crash](19-surviving-the-crash.md) →

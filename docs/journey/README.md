@@ -61,10 +61,10 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act II — The Things I Had to Kill:** [02](02-the-killed-darlings.md)
 - **Act III — Architecture Under Pressure:** [03](03-the-architectural-gauntlet.md), [04](04-the-context-war.md), [05](05-the-giants-playbook.md), [06](06-the-system-design-playbook.md)
 - **Act IV — Proof, Cost, and Consequence:** [08](08-the-first-fixed-issue.md), [09](09-the-3am-decisions.md), [10](10-model-agnostic-reckoning.md), [11](11-the-console-wars.md), [12](12-open-source-was-the-better-business.md)
-- **Act V — Hidden Systems:** [13](13-the-hidden-playbooks.md), [14](14-the-verification-tax.md), [15](15-prompts-are-programs.md), [16](16-the-pragmatic-stack.md), [17](17-the-mind-of-the-agent.md)
-- **Act VI — Reliability Under Fire:** [18](18-surviving-the-crash.md), [19](19-circuit-breakers-and-hallucinations.md), [20](20-the-safety-sandbox-is-not-optional.md), [21](21-who-grades-the-agent.md), [22](22-the-middleware-contract.md), [23](23-the-identity-and-execution-crisis.md)
-- **Act VII — Incident Addenda and Prompt Discipline:** [24](24-the-parallelization-trap.md), [25](25-the-perfect-prompt-illusion.md)
-- **Act VIII — Operational Reality & Production:** [26](26-the-observability-black-hole.md), [27](27-token-economics-and-the-finops-trap.md), [28](28-the-latency-veil-and-human-trust.md), [29](29-the-weight-divide-local-vs-hosted.md), [30](30-the-myth-of-the-committee.md)
+- **Act V — Hidden Systems:** [13](13-the-hidden-playbooks.md), [14](14-the-verification-tax.md), [15](15-prompts-are-programs.md), [16](17-the-pragmatic-stack.md), [17](18-the-mind-of-the-agent.md)
+- **Act VI — Reliability Under Fire:** [18](19-surviving-the-crash.md), [19](20-circuit-breakers-and-hallucinations.md), [20](21-the-safety-sandbox-is-not-optional.md), [21](22-who-grades-the-agent.md), [22](23-the-middleware-contract.md), [23](24-the-identity-and-execution-crisis.md)
+- **Act VII — Incident Addenda and Prompt Discipline:** [24](25-the-parallelization-trap.md), [25](26-the-perfect-prompt-illusion.md)
+- **Act VIII — Operational Reality & Production:** [26](27-the-observability-black-hole.md), [27](28-token-economics-and-the-finops-trap.md), [28](29-the-latency-veil-and-human-trust.md), [29](30-the-weight-divide-local-vs-hosted.md), [30](31-the-myth-of-the-committee.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
@@ -87,21 +87,21 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [13](13-the-hidden-playbooks.md) | **The Hidden Playbooks** | Why the right knowledge should arrive at the right moment, how playbooks evolved out of earlier micro-agent ideas, and why runtime expertise beats prompt bloat. |
 | [14](14-the-verification-tax.md) | **The Verification Tax** | Why autonomous agents cannot be allowed to grade their own homework, how validators, replay, and auditability make false finishes harder, and why testing the infrastructure matters more than congratulating the model. |
 | [15](15-prompts-are-programs.md) | **Prompts Are Programs** | Why prompt engineering became a software-design problem, how Python replaced Jinja, and why the system prompt had to become debuggable, modular, and platform-aware. |
-| [16](16-the-pragmatic-stack.md) | **The Pragmatic Stack** | Why Grinta chose practical defaults over trend-chasing: `uv`, JSON-first config, and Python with strict architectural discipline. |
-| [17](17-the-mind-of-the-agent.md) | **The Mind of the Agent** | The cognitive architecture behind tool use and memory: what was removed, what stayed optional, and what made autonomous behavior more reliable. |
-| [18](18-surviving-the-crash.md) | **Surviving the Crash** | How event streams, WAL markers, backpressure policy, and replay semantics make long agent sessions recoverable after real failures. |
-| [19](19-circuit-breakers-and-hallucinations.md) | **Circuit Breakers and Hallucinations** | Why stuck detection became multi-heuristic, how adaptive breaker thresholds work, and how Grinta limits runaway loops before they burn budget. |
-| [20](20-the-safety-sandbox-is-not-optional.md) | **The Safety Sandbox Is Not Optional** | Why command-risk analysis and policy-driven validation are foundational in local-first agents, not optional polish. |
-| [21](21-who-grades-the-agent.md) | **Who Grades the Agent** | Why finish is a gated contract, how task validation blocks false completion, and why autonomous systems must not grade their own homework. |
-| [22](22-the-middleware-contract.md) | **The Middleware Contract** | Why middleware order is execution governance, how rollback became first-class in the pipeline, and why timing is architecture in autonomous systems. |
-| [23](23-the-identity-and-execution-crisis.md) | **The Identity and Execution Crisis** | A postmortem of four reliability failures: prompt over-caution loops, silent startup crashes, shell-identity mismatch on Windows, and brittle patch fallback execution. |
-| [24](24-the-parallelization-trap.md) | **The Parallelization Trap** | Why aggressive parallelization breaks autonomous agents, how global states decouple, and why safe-subset scheduling won out over unlimited throughput. |
-| [25](25-the-perfect-prompt-illusion.md) | **The Perfect Prompt Illusion** | Why prompt quality is an architecture problem, how scannable structure improved behavior, and why LLM self-critique can be biased toward invented criticism. |
-| [26](26-the-observability-black-hole.md) | **The Observability Black Hole** | Tracing tool calls, latent reasoning, and non-deterministic debugging when the agent hallucinates. |
-| [27](27-token-economics-and-the-finops-trap.md) | **Token Economics and the FinOps Trap** | Managing token costs, iteration caps, and routing between cheap and expensive models for operational viability. |
-| [28](28-the-latency-veil-and-human-trust.md) | **The Latency Veil and Human Trust** | Human-in-the-loop (HITL), streaming UX, and the balance of asking for permission vs. forgiveness. |
-| [29](29-the-weight-divide-local-vs-hosted.md) | **The Weight Divide: Local vs Hosted** | The operational realities of deploying heavy local weights vs. depending on frontier AI API latency. |
-| [30](30-the-myth-of-the-committee.md) | **The Myth of the Committee** | Why we killed the multi-agent swarm in favor of a single orchestrator with execution modes. |
+| [16](17-the-pragmatic-stack.md) | **The Pragmatic Stack** | Why Grinta chose practical defaults over trend-chasing: `uv`, JSON-first config, and Python with strict architectural discipline. |
+| [17](18-the-mind-of-the-agent.md) | **The Mind of the Agent** | The cognitive architecture behind tool use and memory: what was removed, what stayed optional, and what made autonomous behavior more reliable. |
+| [18](19-surviving-the-crash.md) | **Surviving the Crash** | How event streams, WAL markers, backpressure policy, and replay semantics make long agent sessions recoverable after real failures. |
+| [19](20-circuit-breakers-and-hallucinations.md) | **Circuit Breakers and Hallucinations** | Why stuck detection became multi-heuristic, how adaptive breaker thresholds work, and how Grinta limits runaway loops before they burn budget. |
+| [20](21-the-safety-sandbox-is-not-optional.md) | **The Safety Sandbox Is Not Optional** | Why command-risk analysis and policy-driven validation are foundational in local-first agents, not optional polish. |
+| [21](22-who-grades-the-agent.md) | **Who Grades the Agent** | Why finish is a gated contract, how task validation blocks false completion, and why autonomous systems must not grade their own homework. |
+| [22](23-the-middleware-contract.md) | **The Middleware Contract** | Why middleware order is execution governance, how rollback became first-class in the pipeline, and why timing is architecture in autonomous systems. |
+| [23](24-the-identity-and-execution-crisis.md) | **The Identity and Execution Crisis** | A postmortem of four reliability failures: prompt over-caution loops, silent startup crashes, shell-identity mismatch on Windows, and brittle patch fallback execution. |
+| [24](25-the-parallelization-trap.md) | **The Parallelization Trap** | Why aggressive parallelization breaks autonomous agents, how global states decouple, and why safe-subset scheduling won out over unlimited throughput. |
+| [25](26-the-perfect-prompt-illusion.md) | **The Perfect Prompt Illusion** | Why prompt quality is an architecture problem, how scannable structure improved behavior, and why LLM self-critique can be biased toward invented criticism. |
+| [26](27-the-observability-black-hole.md) | **The Observability Black Hole** | Tracing tool calls, latent reasoning, and non-deterministic debugging when the agent hallucinates. |
+| [27](28-token-economics-and-the-finops-trap.md) | **Token Economics and the FinOps Trap** | Managing token costs, iteration caps, and routing between cheap and expensive models for operational viability. |
+| [28](29-the-latency-veil-and-human-trust.md) | **The Latency Veil and Human Trust** | Human-in-the-loop (HITL), streaming UX, and the balance of asking for permission vs. forgiveness. |
+| [29](30-the-weight-divide-local-vs-hosted.md) | **The Weight Divide: Local vs Hosted** | The operational realities of deploying heavy local weights vs. depending on frontier AI API latency. |
+| [30](31-the-myth-of-the-committee.md) | **The Myth of the Committee** | Why we killed the multi-agent swarm in favor of a single orchestrator with execution modes. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
 ---

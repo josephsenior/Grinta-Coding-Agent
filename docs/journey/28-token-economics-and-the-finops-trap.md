@@ -24,4 +24,4 @@ The FinOps trap forces you to become a better architect.
 
 ---
 
-← [The Observability Black Hole](26-the-observability-black-hole.md) | [The Book of Grinta](README.md) | [The Latency Veil and Human Trust](28-the-latency-veil-and-human-trust.md) →
+← [The Observability Black Hole](27-the-observability-black-hole.md) | [The Book of Grinta](README.md) | [The Latency Veil and Human Trust](29-the-latency-veil-and-human-trust.md) →

@@ -123,4 +123,4 @@ The next chapter goes deeper into completion integrity: who decides a task is ac
 
 ---
 
-← [Circuit Breakers and Hallucinations](19-circuit-breakers-and-hallucinations.md) | [The Book of Grinta](README.md) | [Who Grades the Agent](21-who-grades-the-agent.md) →
+← [Circuit Breakers and Hallucinations](20-circuit-breakers-and-hallucinations.md) | [The Book of Grinta](README.md) | [Who Grades the Agent](22-who-grades-the-agent.md) →

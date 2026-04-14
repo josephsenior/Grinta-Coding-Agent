@@ -321,4 +321,4 @@ That is exactly what the next chapter answers.
 
 ---
 
-← [The Verification Tax](14-the-verification-tax.md) | [The Book of Grinta](README.md) | [The Pragmatic Stack](16-the-pragmatic-stack.md) →
+← [The Verification Tax](14-the-verification-tax.md) | [The Book of Grinta](README.md) | [The Pragmatic Stack](17-the-pragmatic-stack.md) →

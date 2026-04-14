@@ -26,4 +26,4 @@ Observability in agentic systems isn't about logging errors; it's about logging 
 
 ---
 
-← [The Perfect Prompt Illusion](25-the-perfect-prompt-illusion.md) | [The Book of Grinta](README.md) | [Token Economics and the FinOps Trap](27-token-economics-and-the-finops-trap.md) →
+← [The Perfect Prompt Illusion](26-the-perfect-prompt-illusion.md) | [The Book of Grinta](README.md) | [Token Economics and the FinOps Trap](28-token-economics-and-the-finops-trap.md) →

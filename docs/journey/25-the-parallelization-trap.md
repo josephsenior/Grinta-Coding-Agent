@@ -76,4 +76,4 @@ The next chapter returns to the epilogue perspective: what remains unfinished, w
 
 ---
 
-← [The Middleware Contract](22-the-middleware-contract.md) | [The Book of Grinta](README.md) | [The Identity and Execution Crisis](23-the-identity-and-execution-crisis.md) →
+← [The Middleware Contract](23-the-middleware-contract.md) | [The Book of Grinta](README.md) | [The Identity and Execution Crisis](24-the-identity-and-execution-crisis.md) →

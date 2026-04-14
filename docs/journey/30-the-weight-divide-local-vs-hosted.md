@@ -26,4 +26,4 @@ You build against the frontier APIs because they work, but you architect the sys
 
 ---
 
-← [The Latency Veil and Human Trust](28-the-latency-veil-and-human-trust.md) | [The Book of Grinta](README.md) | [The Myth of the Committee](30-the-myth-of-the-committee.md) →
+← [The Latency Veil and Human Trust](29-the-latency-veil-and-human-trust.md) | [The Book of Grinta](README.md) | [The Myth of the Committee](31-the-myth-of-the-committee.md) →
