@@ -418,20 +418,12 @@ def _map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
     return WhitespaceHandler.map_normalized_offset_to_original(original, norm_offset)
 
 
-def _extract_view_replace_params(kwargs: dict) -> tuple[str, str, Any, bool, str | None]:
-    """Extract old_str, new_str, view_range, normalize_ws, and match_mode from kwargs."""
+def _extract_view_replace_params(kwargs: dict) -> tuple[str, str, Any]:
+    """Extract old_str, new_str, and view_range from kwargs."""
     old_str = kwargs.get('old_str', '')
     new_str = kwargs.get('new_str', '')
     view_range = kwargs.get('view_range')
-    normalize_ws = kwargs.get('normalize_ws', False)
-    if isinstance(normalize_ws, str):
-        normalize_ws = normalize_ws.lower() == 'true'
-    match_mode = kwargs.get('match_mode')
-    if isinstance(match_mode, str):
-        match_mode = match_mode.strip().lower()
-    if match_mode not in {'exact', 'normalize_ws', 'fuzzy_safe'}:
-        match_mode = None
-    return old_str, new_str, view_range, normalize_ws, match_mode
+    return old_str, new_str, view_range
 
 
 def _get_search_content_by_range(content: str, view_range: Any) -> str:
@@ -473,7 +465,7 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
     """
     import os
 
-    old_str, new_str, view_range, normalize_ws, match_mode = _extract_view_replace_params(kwargs)
+    old_str, new_str, view_range = _extract_view_replace_params(kwargs)
 
     if not os.path.isfile(path):
         return [AgentThinkAction(thought=f'[VIEW_AND_REPLACE] File not found: {path}')]
@@ -497,25 +489,16 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
 
     search_content = _get_search_content_by_range(content, view_range)
 
-    resolved_mode = match_mode or ('normalize_ws' if normalize_ws else 'exact')
-
-    if resolved_mode != 'fuzzy_safe' and old_str not in search_content:
-        if resolved_mode == 'normalize_ws':
-            _, err = _ws_tolerant_replace(search_content, old_str, new_str)
-            if err:
-                return [
-                    AgentThinkAction(
-                        thought=f'[VIEW_AND_REPLACE] {err} Use view_file command to check the actual content.'
-                    )
-                ]
-        else:
-            return [_old_str_not_found_action(path, view_range)]
+    if old_str not in search_content:
+        _, err = _ws_tolerant_replace(search_content, old_str, new_str)
+        if err:
+            return [
+                AgentThinkAction(
+                    thought=f'[VIEW_AND_REPLACE] {err} Use view_file command to check the actual content.'
+                )
+            ]
 
     edit_kwargs: dict = {'old_str': old_str, 'new_str': new_str}
-    if normalize_ws:
-        edit_kwargs['normalize_ws'] = True
-    if match_mode:
-        edit_kwargs['match_mode'] = match_mode
 
     return [
         FileReadAction(

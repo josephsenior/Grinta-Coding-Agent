@@ -202,18 +202,6 @@ class TestFileEditorEdit:
         content = (Path(self.tmpdir) / 'code.py').read_text()
         assert 'value = 2' in content
 
-    def test_replace_normalize_ws_false_keeps_strict_behavior(self):
-        self._write('code.py', 'if True:\n\tvalue = 1\n')
-        result = self.editor(
-            command='edit',
-            path='code.py',
-            old_str='if True:\n    value = 1\n',
-            new_str='if True:\n    value = 2\n',
-            normalize_ws=False,
-        )
-        assert result.error is not None
-        assert 'No exact match found' in result.error
-
     def test_replace_requires_unique_match(self):
         self._write('dup.py', 'x = 1\ny = 2\nx = 1\n')
         result = self.editor(
@@ -224,95 +212,6 @@ class TestFileEditorEdit:
         )
         assert result.error is not None
         assert 'Must be unique' in result.error
-
-    def test_replace_auto_fuzzy_unique_high_similarity(self):
-        self._write(
-            'logger.test.ts',
-            (
-                'describe("Logger", () => {\n'
-                '  it("should log debug messages in production", () => {\n'
-                '    logger.debug("Debug message");\n'
-                '    expect(console.debug).toHaveBeenCalled();\n'
-                '  });\n'
-                '});\n'
-            ),
-        )
-        result = self.editor(
-            command='edit',
-            path='logger.test.ts',
-            old_str=(
-                'it("should not log debug messages in production", () => {\n'
-                '  logger.debug("Debug message");\n'
-                '  expect(console.debug).toHaveBeenCalled();\n'
-                '});\n'
-            ),
-            new_str=(
-                'it("should not log debug messages in production", () => {\n'
-                '  logger.debug("Debug message");\n'
-                '  expect(console.debug).not.toHaveBeenCalled();\n'
-                '});\n'
-            ),
-        )
-        assert result.error is not None
-        assert 'No exact match found' in result.error
-        assert 'Closest candidates' in result.error
-
-    def test_replace_auto_fuzzy_unique_medium_similarity(self):
-        self._write(
-            'logger-medium.test.ts',
-            (
-                'describe("Logger", () => {\n'
-                '            it("should log debug messages in production", () => {\n'
-                '              logger.debug("Debug message");\n'
-                '              expect(console.debug).toHaveBeenCalled();\n'
-                '            });\n'
-                '});\n'
-            ),
-        )
-        result = self.editor(
-            command='edit',
-            path='logger-medium.test.ts',
-            old_str=(
-                'it("should not log debug messages in production", () => {\n'
-                '  logger.debug("Debug message");\n'
-                '  expect(console.debug).toHaveBeenCalled();\n'
-                '});\n'
-            ),
-            new_str=(
-                'it("should not log debug messages in production", () => {\n'
-                '  logger.debug("Debug message");\n'
-                '  expect(console.debug).not.toHaveBeenCalled();\n'
-                '});\n'
-            ),
-        )
-        assert result.error is not None
-        assert 'No exact match found' in result.error
-
-    def test_replace_auto_fuzzy_short_snippet_single_anchor_line(self):
-        self._write(
-            'logger-short.test.ts',
-            (
-                '            it("should log debug messages in production", () => {\n'
-                '                  logger.debug("Debug message");\n'
-                '                  expect(console.debug).toHaveBeenCalled();\n'
-            ),
-        )
-        result = self.editor(
-            command='edit',
-            path='logger-short.test.ts',
-            old_str=(
-                'it("should not log debug messages in production", () => {\n'
-                '  logger.debug("Debug message");\n'
-                '  expect(console.debug).not.toHaveBeenCalled();\n'
-            ),
-            new_str=(
-                'it("should not log debug messages in production", () => {\n'
-                '  logger.debug("Debug message");\n'
-                '  expect(console.debug).toHaveBeenCalled();\n'
-            ),
-        )
-        assert result.error is not None
-        assert 'No exact match found' in result.error
 
     def test_replace_fuzzy_safe_single_line_success(self):
         self._write('fuzzy.ts', 'first\nvalue = fooo\nlast\n')
@@ -338,47 +237,6 @@ class TestFileEditorEdit:
         )
         assert result.error is not None
         assert 'ambiguous' in result.error.lower()
-
-    def test_replace_fuzzy_ambiguity_is_rejected(self):
-        self._write(
-            'ambiguous.ts',
-            (
-                'it("should log debug messages in production", () => {\n'
-                '  logger.debug("Debug message");\n'
-                '  expect(console.debug).toHaveBeenCalled();\n'
-                '});\n\n'
-                'it("should log debug messages in production", () => {\n'
-                '  logger.debug("Debug message");\n'
-                '  expect(console.debug).toHaveBeenCalled();\n'
-                '});\n'
-            ),
-        )
-        result = self.editor(
-            command='edit',
-            path='ambiguous.ts',
-            old_str=(
-                'it("should not log debug messages in production", () => {\n'
-                '  logger.debug("Debug message");\n'
-                '  expect(console.debug).toHaveBeenCalled();\n'
-                '});\n'
-            ),
-            new_str='/* replacement */\n',
-        )
-        assert result.error is not None
-        assert 'closest candidates' in result.error.lower()
-
-
-# ---------------------------------------------------------------------------
-# FileEditor — unknown command
-# ---------------------------------------------------------------------------
-
-
-class TestFileEditorUnknown:
-    """Tests for unknown commands."""
-
-    def setup_method(self):
-        self.tmpdir = tempfile.mkdtemp()
-        self.editor = FileEditor(workspace_root=self.tmpdir)
 
     def test_unknown_command(self):
         result = self.editor(command='delete', path='x.txt')

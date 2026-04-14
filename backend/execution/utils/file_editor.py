@@ -120,8 +120,6 @@ class FileEditor:
         insert_line: int | None = None,
         start_line: int | None = None,
         end_line: int | None = None,
-        normalize_ws: bool | None = None,
-        match_mode: str | None = None,
         enable_linting: bool = False,
         dry_run: bool = False,
         **_: Any,
@@ -138,8 +136,6 @@ class FileEditor:
             insert_line: Optional line number to insert at (1-indexed)
             start_line: Optional start line number for range edit (1-indexed)
             end_line: Optional end line number for range edit (1-indexed)
-            normalize_ws: If True, allow whitespace-tolerant matching for replace operations.
-            match_mode: Optional replace matching mode: "exact", "normalize_ws", or "fuzzy_safe".
             enable_linting: Whether to enable linting (currently not implemented)
             dry_run: If True, compute preview result without writing changes
             **_: Additional keyword arguments (ignored)
@@ -173,8 +169,6 @@ class FileEditor:
                     insert_line,
                     start_line,
                     end_line,
-                    normalize_ws,
-                    match_mode,
                     dry_run=dry_run,
                 )
             if command == 'undo_last_edit':
@@ -359,8 +353,6 @@ class FileEditor:
         insert_line: int | None,
         start_line: int | None,
         end_line: int | None,
-        normalize_ws: bool | None,
-        match_mode: str | None,
         *,
         dry_run: bool = False,
     ) -> ToolResult:
@@ -384,8 +376,6 @@ class FileEditor:
                 insert_line,
                 start_line,
                 end_line,
-                normalize_ws,
-                match_mode,
                 file_path=file_path,
             )
             if isinstance(new_content, ToolResult):
@@ -484,17 +474,6 @@ class FileEditor:
         orig_start = self._map_normalized_offset_to_original(file_content, norm_start)
         orig_end = self._map_normalized_offset_to_original(file_content, norm_end)
         return file_content[:orig_start] + new_str + file_content[orig_end:]
-
-    @staticmethod
-    def _resolve_match_mode(
-        normalize_ws: bool | None,
-        match_mode: str | None,
-    ) -> str:
-        if match_mode is not None:
-            candidate = str(match_mode).strip().lower()
-            if candidate in {'exact', 'normalize_ws', 'fuzzy_safe'}:
-                return candidate
-        return 'normalize_ws' if normalize_ws is not False else 'exact'
 
     @staticmethod
     def _line_ending_for_content(content: str) -> str:
@@ -619,12 +598,8 @@ class FileEditor:
         old_str: str,
         new_str: str,
         file_path: Path | None = None,
-        *,
-        normalize_ws: bool | None = None,
-        match_mode: str | None = None,
     ) -> str | ToolResult:
         """Apply old_str -> new_str replace with relaxed tolerant whitespace fallback, but validate tree-sitter syntax."""
-        resolved_mode = self._resolve_match_mode(normalize_ws, match_mode)
         exact_count = old_content.count(old_str)
 
         if exact_count == 1:
@@ -636,28 +611,15 @@ class FileEditor:
                 new_content=old_content,
             )
         else:
-            if resolved_mode == 'exact':
-                return ToolResult(
-                    output='',
-                    error=self._build_no_match_error(old_content, old_str, mode='exact'),
-                    new_content=old_content,
-                )
-
-            if resolved_mode == 'normalize_ws':
-                tolerant = self._ws_tolerant_replace(old_content, old_str, new_str)
-                if isinstance(tolerant, ToolResult):
-                    tolerant.error = self._build_no_match_error(
-                        old_content,
-                        old_str,
-                        mode='normalize_ws',
-                    )
-                    return tolerant
-                new_content = tolerant
-            else:
+            tolerant = self._ws_tolerant_replace(old_content, old_str, new_str)
+            if isinstance(tolerant, ToolResult):
                 fuzzy_result = self._fuzzy_safe_replace(old_content, old_str, new_str)
                 if isinstance(fuzzy_result, ToolResult):
+                    fuzzy_result.error = tolerant.error + '\n\n' + fuzzy_result.error
                     return fuzzy_result
                 new_content = fuzzy_result
+            else:
+                new_content = tolerant
 
         # Validate syntax after replacement
         if file_path:
@@ -693,8 +655,6 @@ class FileEditor:
         insert_line: int | None,
         start_line: int | None,
         end_line: int | None,
-        normalize_ws: bool | None,
-        match_mode: str | None,
         file_path: Path | None = None,
     ) -> str | ToolResult:
         """Determine new content based on provided parameters."""
@@ -717,8 +677,6 @@ class FileEditor:
                 old_str_val,
                 new_str_val,
                 file_path=file_path,
-                normalize_ws=normalize_ws,
-                match_mode=match_mode,
             )
         if file_text_val:
             return file_text_val

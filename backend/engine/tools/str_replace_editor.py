@@ -19,13 +19,11 @@ _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editin
 * `batch_replace`: atomic multi-file edits. Provide `edits` array of {path, old_str, new_str}. All succeed or all roll back.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
-`match_mode` controls matching strategy: `normalize_ws` (default), `exact`, or `fuzzy_safe`. `normalize_ws` automatically handles indentation and spacing differences.
-`normalize_ws: true` is legacy shorthand for `match_mode: "normalize_ws"`.
 """
 _SHORT_STR_REPLACE_EDITOR_DESCRIPTION = (
     'File viewing, creation, and editing tool. Commands: view_file, create_file, replace_text, '
     'insert_text, undo_last_edit, view_and_replace, batch_replace. Use project-relative paths. '
-    'old_str must match uniquely. Optional match_mode: normalize_ws (default)|exact|fuzzy_safe.\n'
+    'old_str must match uniquely.\n'
 )
 
 
@@ -86,15 +84,6 @@ def create_str_replace_editor_tool(
                 'description': 'Optional for `view_file`/`view_and_replace`. Line range [start, end] (1-indexed). Use [start, -1] for rest of file.',
                 'items': {'type': 'integer'},
                 'type': 'array',
-            },
-            'normalize_ws': {
-                'description': 'If true, ignore whitespace differences when matching `old_str`.',
-                'type': 'boolean',
-            },
-            'match_mode': {
-                'description': 'Optional replace matching strategy: `normalize_ws` (default handled by engine), `exact`, or `fuzzy_safe`.',
-                'type': 'string',
-                'enum': ['exact', 'normalize_ws', 'fuzzy_safe'],
             },
             'edits': {
                 'description': 'Required for `batch_replace`. Array of {path, old_str, new_str} edits applied atomically.',
