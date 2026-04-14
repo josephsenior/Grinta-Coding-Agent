@@ -388,7 +388,7 @@ def _apply_python_fallback(patch_text, dry_run):
                 errors='surrogateescape',
             )
         original_lines = original_text.splitlines(keepends=True)
-        line_ending = '\r\n' if '\r\n' in original_text else '\n'
+        line_ending = '\\r\\n' if '\\r\\n' in original_text else '\\n'
 
         out_lines = []
         cursor = 0
@@ -408,8 +408,8 @@ def _apply_python_fallback(patch_text, dry_run):
                 out_lines.extend(original_lines[cursor:old_idx])
 
                 if old_idx < len(original_lines):
-                    source_line = original_lines[old_idx].rstrip('\r\n')
-                    if source_line != line_text.rstrip('\r\n'):
+                    source_line = original_lines[old_idx].rstrip('\\r\\n')
+                    if source_line != line_text.rstrip('\\r\\n'):
                         return (
                             1,
                             f'[APPLY_PATCH_GUIDANCE] Patch context mismatch in {{target_path}} at line {{old_no}}. '
