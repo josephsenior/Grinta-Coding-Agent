@@ -239,6 +239,36 @@ class TestHandleStrReplaceEditorTool:
                 }
             )
 
+    def test_view_and_replace_with_old_str_returns_edit_action(self, tmp_path):
+        target = tmp_path / 'sample.txt'
+        target.write_text('hello world\n', encoding='utf-8')
+        action = _handle_str_replace_editor_tool(
+            {
+                'command': 'view_and_replace',
+                'path': str(target),
+                'old_str': 'world',
+                'new_str': 'team',
+            }
+        )
+        assert isinstance(action, FileEditAction)
+        assert action.command == 'replace_text'
+
+    def test_replace_preview_is_read_only_think_action(self, tmp_path):
+        target = tmp_path / 'sample.txt'
+        target.write_text('alpha\nbeta\n', encoding='utf-8')
+        action = _handle_str_replace_editor_tool(
+            {
+                'command': 'replace_text',
+                'path': str(target),
+                'old_str': 'beta',
+                'new_str': 'gamma',
+                'preview': True,
+            }
+        )
+        assert isinstance(action, AgentThinkAction)
+        assert 'dry-run' in action.thought
+        assert target.read_text(encoding='utf-8') == 'alpha\nbeta\n'
+
 
 # ---------------------------------------------------------------------------
 # _handle_think_tool
@@ -875,3 +905,19 @@ class TestHandleBatchReplaceCommand:
 
         with pytest.raises(FunctionCallValidationError):
             _handle_batch_replace_command({'edits': []})
+
+    def test_invalid_batch_path_raises(self):
+        from backend.engine.function_calling import _handle_batch_replace_command
+
+        with pytest.raises(FunctionCallValidationError, match='invalid path'):
+            _handle_batch_replace_command(
+                {
+                    'edits': [
+                        {
+                            'path': '../escape.txt',
+                            'old_str': 'a',
+                            'new_str': 'b',
+                        }
+                    ]
+                }
+            )

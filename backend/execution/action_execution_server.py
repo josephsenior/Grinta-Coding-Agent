@@ -1134,8 +1134,23 @@ class RuntimeExecutor:
             old_str=action.old_str,
             new_str=action.new_str,
             insert_line=action.insert_line,
+            start_line=getattr(action, 'start_line', None),
+            end_line=getattr(action, 'end_line', None),
             normalize_ws=action.normalize_ws,
             enable_linting=enable_lint,
+            edit_mode=getattr(action, 'edit_mode', None),
+            format_kind=getattr(action, 'format_kind', None),
+            format_op=getattr(action, 'format_op', None),
+            format_path=getattr(action, 'format_path', None),
+            format_value=getattr(action, 'format_value', None),
+            anchor_type=getattr(action, 'anchor_type', None),
+            anchor_value=getattr(action, 'anchor_value', None),
+            anchor_occurrence=getattr(action, 'anchor_occurrence', None),
+            section_action=getattr(action, 'section_action', None),
+            section_content=getattr(action, 'section_content', None),
+            patch_text=getattr(action, 'patch_text', None),
+            expected_hash=getattr(action, 'expected_hash', None),
+            expected_file_hash=getattr(action, 'expected_file_hash', None),
         )
         if result_str.startswith('ERROR:'):
             return ErrorObservation(result_str)

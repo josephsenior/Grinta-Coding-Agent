@@ -44,3 +44,16 @@ Today, we made the call to delete `apply_patch` entirely. We tore out the `apply
 We learned a valuable lesson: **Don't force an LLM to emulate a 1970s UNIX CLI tool.** Design the tools around the strengths of the LLM. String matching is native to language models; positional diffing is not.
 
 The era of Unified Diffs in our engine is over. The era of AST and semantic search/replace has begun.
+
+## 2026 Update: Non-Code Reliability Layer
+
+After deploying `str_replace_editor`, we found a second-order reliability gap: non-code files are often ambiguous for raw substring replacement.
+
+We now treat raw replace as a compatibility fallback and prefer explicit edit modes for non-code work:
+
+- `format` (JSON/YAML/TOML parser mutate + serialize)
+- `section` (anchor-bounded edits)
+- `range` (line interval edits with optional hash guard)
+- `patch` (strict-context hunk apply)
+
+This preserves the original lesson (avoid line-math-first tooling for LLMs) while adding deterministic constraints where plain text can drift.

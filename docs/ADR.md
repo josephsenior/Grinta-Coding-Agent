@@ -365,3 +365,26 @@ semantics cleanly without implying that only world-state mutations matter.
 - ✅ Package and protocol changes can be evaluated against one stable reference
 - ⚠️ During transition, docs may reference both canonical names and current code names
 - ⚠️ A later implementation sweep must migrate symbols, packages, and persisted schemas carefully
+
+---
+
+## ADR-017: Non-Code Document Edit Protocol
+
+**Status:** Accepted  
+**Date:** 2026-04  
+**Context:** Tree-sitter provides strong structure-aware edits for source code, but non-code artifacts (markdown, config, docs) are fragile when edited only through raw `old_str`/`new_str` matching.
+
+**Decision:** Standardize a document-edit protocol for non-code files with explicit edit modes:
+- `format` for parser-based mutations of structured formats (JSON/YAML/TOML)
+- `section` for anchor-bounded edits
+- `range` for deterministic line-range edits with optional hash guards
+- `patch` for strict-context unified-diff hunk application
+- `replace` retained only as backward-compatible fallback
+
+**Consequences:**
+- ✅ Deterministic edits with stronger constraints than raw substring replacement
+- ✅ Better behavior under text drift and repeated phrases
+- ✅ Clear failure modes for ambiguous anchors/hunks
+- ✅ Backward compatibility preserved for existing `replace_text` usage
+- ⚠️ More implementation complexity in file-editor runtime
+- ⚠️ Additional parser dependency risk for YAML/TOML paths

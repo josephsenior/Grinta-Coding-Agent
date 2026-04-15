@@ -7,11 +7,14 @@ validation, and atomic operations. Designed for production agent environments.
 from __future__ import annotations
 
 import difflib
+import hashlib
+import json
+import re
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from backend.core.type_safety.path_validation import (
     PathValidationError,
@@ -28,6 +31,30 @@ class ToolResult:
     error: str | None = None
     old_content: str | None = None
     new_content: str | None = None
+
+
+@dataclass(frozen=True)
+class _FileReadMeta:
+    """Encoding and newline style for round-tripping disk I/O."""
+
+    encoding: str
+    newline: Literal['crlf', 'lf']
+    had_bom: bool
+
+
+_QUOTE_TRANSLATE = str.maketrans(
+    {
+        '\u201c': '"',
+        '\u201d': '"',
+        '\u2018': "'",
+        '\u2019': "'",
+    }
+)
+
+
+def normalize_quotes(s: str) -> str:
+    """Map typographic quotes to straight quotes (Claude Code normalizeQuotes)."""
+    return s.translate(_QUOTE_TRANSLATE)
 
 
 class ToolError(Exception):
@@ -63,8 +90,19 @@ class FileEditor:
         self._undo_history: dict[str, deque[str | None]] = defaultdict(
             lambda: deque(maxlen=self._UNDO_MAX_PER_FILE)
         )
+        # Last read encoding/newline per path (for CRLF/BOM round-trip on write)
+        self._file_io_meta: dict[str, _FileReadMeta] = {}
         # Path validator for security
         self._path_validator = None  # Lazy initialization
+
+    def _io_meta_key(self, file_path: Path) -> str:
+        return self._undo_key(file_path)
+
+    def _remember_io_meta(self, file_path: Path, meta: _FileReadMeta) -> None:
+        self._file_io_meta[self._io_meta_key(file_path)] = meta
+
+    def _take_io_meta(self, file_path: Path) -> _FileReadMeta | None:
+        return self._file_io_meta.pop(self._io_meta_key(file_path), None)
 
     def _undo_key(self, file_path: Path) -> str:
         try:
@@ -122,6 +160,19 @@ class FileEditor:
         end_line: int | None = None,
         enable_linting: bool = False,
         dry_run: bool = False,
+        edit_mode: str | None = None,
+        format_kind: str | None = None,
+        format_op: str | None = None,
+        format_path: str | None = None,
+        format_value: Any = None,
+        anchor_type: str | None = None,
+        anchor_value: str | None = None,
+        anchor_occurrence: int | None = None,
+        section_action: str | None = None,
+        section_content: str | None = None,
+        patch_text: str | None = None,
+        expected_hash: str | None = None,
+        expected_file_hash: str | None = None,
         **_: Any,
     ) -> ToolResult:
         """Execute a file editor command.
@@ -169,6 +220,19 @@ class FileEditor:
                     insert_line,
                     start_line,
                     end_line,
+                    edit_mode=edit_mode,
+                    format_kind=format_kind,
+                    format_op=format_op,
+                    format_path=format_path,
+                    format_value=format_value,
+                    anchor_type=anchor_type,
+                    anchor_value=anchor_value,
+                    anchor_occurrence=anchor_occurrence,
+                    section_action=section_action,
+                    section_content=section_content,
+                    patch_text=patch_text,
+                    expected_hash=expected_hash,
+                    expected_file_hash=expected_file_hash,
                     dry_run=dry_run,
                 )
             if command == 'undo_last_edit':
@@ -353,6 +417,19 @@ class FileEditor:
         start_line: int | None,
         end_line: int | None,
         *,
+        edit_mode: str | None = None,
+        format_kind: str | None = None,
+        format_op: str | None = None,
+        format_path: str | None = None,
+        format_value: Any = None,
+        anchor_type: str | None = None,
+        anchor_value: str | None = None,
+        anchor_occurrence: int | None = None,
+        section_action: str | None = None,
+        section_content: str | None = None,
+        patch_text: str | None = None,
+        expected_hash: str | None = None,
+        expected_file_hash: str | None = None,
         dry_run: bool = False,
     ) -> ToolResult:
         """Handle edit command - modify file content."""
@@ -360,6 +437,19 @@ class FileEditor:
             # Read existing content
             old_content = self._read_file(file_path) if file_path.exists() else None
             old_content_str = old_content or ''
+
+            if expected_file_hash and file_path.exists():
+                digest = self._sha256_text(old_content_str)
+                if digest != expected_file_hash:
+                    return ToolResult(
+                        output='',
+                        error=(
+                            'File hash guard failed: expected_file_hash does not match '
+                            'current file contents (re-read the file and refresh the hash).'
+                        ),
+                        old_content=old_content,
+                        new_content=old_content,
+                    )
 
             # Extract params
             file_text_val, old_str_val, new_str_val = self._extract_edit_params(
@@ -375,6 +465,18 @@ class FileEditor:
                 insert_line,
                 start_line,
                 end_line,
+                edit_mode=edit_mode,
+                format_kind=format_kind,
+                format_op=format_op,
+                format_path=format_path,
+                format_value=format_value,
+                anchor_type=anchor_type,
+                anchor_value=anchor_value,
+                anchor_occurrence=anchor_occurrence,
+                section_action=section_action,
+                section_content=section_content,
+                patch_text=patch_text,
+                expected_hash=expected_hash,
                 file_path=file_path,
             )
             if isinstance(new_content, ToolResult):
@@ -673,6 +775,76 @@ class FileEditor:
         updated[best_idx] = replacement
         return ''.join(updated)
 
+    @staticmethod
+    def _flex_quote_pattern(needle: str) -> str:
+        """Build a regex that treats straight and typographic quotes as equivalent."""
+        parts: list[str] = []
+        for ch in needle:
+            if ch == '"':
+                parts.append('(?:["\u201c\u201d])')
+            elif ch == "'":
+                parts.append("(?:['\u2018\u2019])")
+            else:
+                parts.append(re.escape(ch))
+        return ''.join(parts)
+
+    def _find_actual_substring_regex(self, haystack: str, needle: str) -> str | None:
+        """Fallback: regex when normalizeQuotes + index slice cannot match."""
+        try:
+            rx = re.compile(self._flex_quote_pattern(needle), re.DOTALL)
+        except re.error:
+            return None
+        matches = list(rx.finditer(haystack))
+        if len(matches) == 1:
+            return matches[0].group(0)
+        return None
+
+    def _find_actual_substring_for_replace(self, haystack: str, needle: str) -> str | None:
+        """Resolve model straight quotes to on-disk substring (Claude: normalizeQuotes + index slice).
+
+        First exact match, then search in quote-normalized space; slice original by same indices
+        (1:1 quote mapping preserves string length). Fall back to regex if needed.
+        """
+        if needle in haystack:
+            return needle
+
+        norm_needle = normalize_quotes(needle)
+        norm_hay = normalize_quotes(haystack)
+        if norm_needle and norm_needle in norm_hay:
+            n = norm_hay.count(norm_needle)
+            if n != 1:
+                return None
+            idx = norm_hay.index(norm_needle)
+            if idx + len(needle) > len(haystack):
+                return self._find_actual_substring_regex(haystack, needle)
+            actual = haystack[idx : idx + len(needle)]
+            if normalize_quotes(actual) != norm_needle:
+                return self._find_actual_substring_regex(haystack, needle)
+            return actual
+
+        return self._find_actual_substring_regex(haystack, needle)
+
+    @staticmethod
+    def _preserve_quote_style_in_new_string(actual_old: str, new_str: str) -> str:
+        """Align straight quotes in new_str with quote characters used in actual_old."""
+        doubles = [c for c in actual_old if c in '"\u201c\u201d']
+        singles = [c for c in actual_old if c in "'\u2018\u2019"]
+        di = 0
+        si = 0
+        out: list[str] = []
+        for ch in new_str:
+            if ch == '"':
+                repl = doubles[di % len(doubles)] if doubles else '"'
+                di += 1
+                out.append(repl)
+            elif ch == "'":
+                repl = singles[si % len(singles)] if singles else "'"
+                si += 1
+                out.append(repl)
+            else:
+                out.append(ch)
+        return ''.join(out)
+
     def _apply_str_replace(
         self,
         old_content: str,
@@ -692,6 +864,18 @@ class FileEditor:
                 new_content=old_content,
             )
         else:
+            actual = self._find_actual_substring_for_replace(old_content, old_str)
+            if actual is not None:
+                if old_content.count(actual) != 1:
+                    return ToolResult(
+                        output='',
+                        error='ERROR: quote-normalized old_str is not unique.',
+                        new_content=old_content,
+                    )
+                adjusted_new = self._preserve_quote_style_in_new_string(actual, new_str)
+                new_content = old_content.replace(actual, adjusted_new, 1)
+                return new_content
+
             tolerant = self._ws_tolerant_replace(old_content, old_str, new_str)
             if isinstance(tolerant, ToolResult):
                 if '\n' not in old_str and '\r' not in old_str:
@@ -727,9 +911,71 @@ class FileEditor:
         insert_line: int | None,
         start_line: int | None,
         end_line: int | None,
+        *,
+        edit_mode: str | None = None,
+        format_kind: str | None = None,
+        format_op: str | None = None,
+        format_path: str | None = None,
+        format_value: Any = None,
+        anchor_type: str | None = None,
+        anchor_value: str | None = None,
+        anchor_occurrence: int | None = None,
+        section_action: str | None = None,
+        section_content: str | None = None,
+        patch_text: str | None = None,
+        expected_hash: str | None = None,
         file_path: Path | None = None,
     ) -> str | ToolResult:
         """Determine new content based on provided parameters."""
+        resolved_mode = (edit_mode or '').strip().lower() or None
+        if resolved_mode == 'format':
+            return self._apply_format_edit(
+                old_content_str,
+                file_path=file_path,
+                format_kind=format_kind,
+                format_op=format_op,
+                format_path=format_path,
+                format_value=format_value,
+            )
+        if resolved_mode == 'section':
+            return self._apply_section_edit(
+                old_content_str,
+                anchor_type=anchor_type,
+                anchor_value=anchor_value,
+                anchor_occurrence=anchor_occurrence,
+                section_action=section_action,
+                section_content=section_content,
+            )
+        if resolved_mode == 'range':
+            if start_line is None or end_line is None:
+                return ToolResult(
+                    output='',
+                    error='edit_mode=range requires start_line and end_line.',
+                    new_content=old_content_str,
+                )
+            return self._replace_range_guarded(
+                old_content_str,
+                self._resolve_edit_content(file_text_val, new_str_val),
+                start_line,
+                end_line,
+                expected_hash=expected_hash,
+            )
+        if resolved_mode == 'patch':
+            return self._apply_unified_patch(old_content_str, patch_text)
+        if resolved_mode == 'replace':
+            if old_str_val and new_str_val:
+                return self._apply_str_replace(
+                    old_content_str,
+                    old_str_val,
+                    new_str_val,
+                    file_path=file_path,
+                )
+            return ToolResult(
+                output='',
+                error='edit_mode=replace requires old_str and new_str.',
+                new_content=old_content_str,
+            )
+
         if start_line is not None and end_line is not None:
             return self._replace_range(
                 old_content_str,
@@ -760,10 +1006,277 @@ class FileEditor:
             new_content=old_content_str,
         )
 
+    @staticmethod
+    def _slice_text_by_line_range(content: str, start_line: int, end_line: int) -> str:
+        lines = content.splitlines(keepends=True)
+        if not lines or start_line < 1:
+            return ''
+        start_idx = start_line - 1
+        end_idx = min(len(lines), end_line)
+        if start_idx >= len(lines):
+            return ''
+        return ''.join(lines[start_idx:end_idx])
+
+    @staticmethod
+    def _sha256_text(text: str) -> str:
+        return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+    def _replace_range_guarded(
+        self,
+        content: str,
+        new_text: str,
+        start_line: int,
+        end_line: int,
+        *,
+        expected_hash: str | None = None,
+    ) -> str | ToolResult:
+        if expected_hash:
+            current_slice = self._slice_text_by_line_range(content, start_line, end_line)
+            if self._sha256_text(current_slice) != expected_hash:
+                return ToolResult(
+                    output='',
+                    error='Range guard failed: expected_hash does not match target slice.',
+                    new_content=content,
+                )
+        return self._replace_range(content, new_text, start_line, end_line)
+
+    def _apply_format_edit(
+        self,
+        content: str,
+        *,
+        file_path: Path | None,
+        format_kind: str | None,
+        format_op: str | None,
+        format_path: str | None,
+        format_value: Any,
+    ) -> str | ToolResult:
+        kind = (format_kind or (file_path.suffix.lstrip('.') if file_path else '')).lower()
+        kind_map = {'yml': 'yaml'}
+        kind = kind_map.get(kind, kind)
+        op = (format_op or 'set').lower()
+        if kind not in {'json', 'yaml', 'toml'}:
+            return ToolResult(
+                output='',
+                error=f'Unsupported format kind for parser-based edit: {kind!r}',
+                new_content=content,
+            )
+        if not format_path:
+            return ToolResult(
+                output='',
+                error='edit_mode=format requires format_path.',
+                new_content=content,
+            )
+        try:
+            data = self._parse_structured_content(content, kind)
+            updated = self._mutate_structured_data(data, op, format_path, format_value)
+            return self._serialize_structured_content(updated, kind)
+        except Exception as exc:
+            return ToolResult(
+                output='',
+                error=f'Format edit failed: {exc}',
+                new_content=content,
+            )
+
+    def _parse_structured_content(self, content: str, kind: str) -> Any:
+        if kind == 'json':
+            return json.loads(content or '{}')
+        if kind == 'yaml':
+            import yaml
+
+            return yaml.safe_load(content) or {}
+        # toml
+        try:
+            import tomllib
+
+            return tomllib.loads(content or '')
+        except Exception:
+            import toml
+
+            return toml.loads(content or '')
+
+    def _serialize_structured_content(self, data: Any, kind: str) -> str:
+        if kind == 'json':
+            return f'{json.dumps(data, indent=2, ensure_ascii=True)}\n'
+        if kind == 'yaml':
+            import yaml
+
+            return yaml.safe_dump(data, sort_keys=False)
+        # toml
+        try:
+            import toml
+
+            return toml.dumps(data)
+        except Exception as exc:
+            raise ValueError(f'TOML serialization unavailable: {exc}') from exc
+
+    @staticmethod
+    def _structured_path_tokens(path_expr: str) -> list[str]:
+        cleaned = path_expr.strip()
+        if cleaned.startswith('$.'):
+            cleaned = cleaned[2:]
+        elif cleaned.startswith('$'):
+            cleaned = cleaned[1:]
+        return [p for p in cleaned.split('.') if p]
+
+    def _mutate_structured_data(
+        self, data: Any, op: str, path_expr: str, value: Any
+    ) -> Any:
+        if not isinstance(data, dict):
+            raise ValueError('Structured root must be an object/map')
+        tokens = self._structured_path_tokens(path_expr)
+        if not tokens:
+            raise ValueError('format_path must point to a key')
+        node = data
+        for token in tokens[:-1]:
+            if token not in node or not isinstance(node[token], dict):
+                if op == 'set':
+                    node[token] = {}
+                else:
+                    raise ValueError(f'Path segment {token!r} not found')
+            node = node[token]
+        leaf = tokens[-1]
+        if op == 'set':
+            node[leaf] = value
+        elif op == 'delete':
+            node.pop(leaf, None)
+        elif op == 'append':
+            target = node.get(leaf)
+            if target is None:
+                node[leaf] = [value]
+            elif isinstance(target, list):
+                target.append(value)
+            else:
+                raise ValueError('append target is not a list')
+        else:
+            raise ValueError(f'Unsupported format_op: {op!r}')
+        return data
+
+    def _apply_section_edit(
+        self,
+        content: str,
+        *,
+        anchor_type: str | None,
+        anchor_value: str | None,
+        anchor_occurrence: int | None,
+        section_action: str | None,
+        section_content: str | None,
+    ) -> str | ToolResult:
+        if not anchor_value:
+            return ToolResult(
+                output='',
+                error='edit_mode=section requires anchor_value.',
+                new_content=content,
+            )
+        kind = (anchor_type or 'markdown_heading').lower()
+        occ = anchor_occurrence or 1
+        action = (section_action or 'replace').lower()
+        lines = content.splitlines(keepends=True)
+        if kind == 'markdown_heading':
+            heading_re = re.compile(r'^(#{1,6})\s+(.*)$')
+            matches = []
+            for idx, line in enumerate(lines):
+                m = heading_re.match(line.strip('\r\n'))
+                if m and m.group(2).strip() == anchor_value.strip():
+                    matches.append((idx, len(m.group(1))))
+            if len(matches) < occ or occ < 1:
+                return ToolResult(output='', error='Section anchor not found.', new_content=content)
+            start_idx, level = matches[occ - 1]
+            end_idx = len(lines)
+            for j in range(start_idx + 1, len(lines)):
+                m = heading_re.match(lines[j].strip('\r\n'))
+                if m and len(m.group(1)) <= level:
+                    end_idx = j
+                    break
+        else:
+            pattern = anchor_value if kind == 'regex' else re.escape(anchor_value)
+            matches = list(re.finditer(pattern, content, re.MULTILINE))
+            if len(matches) < occ or occ < 1:
+                return ToolResult(output='', error='Section anchor not found.', new_content=content)
+            target = matches[occ - 1]
+            start_idx = content[: target.start()].count('\n')
+            end_idx = len(lines)
+
+        replacement = section_content or ''
+        repl_lines = replacement.splitlines(keepends=True)
+        if action == 'replace':
+            result_lines = lines[:start_idx] + repl_lines + lines[end_idx:]
+        elif action == 'insert_before':
+            result_lines = lines[:start_idx] + repl_lines + lines[start_idx:]
+        elif action == 'insert_after':
+            result_lines = lines[:end_idx] + repl_lines + lines[end_idx:]
+        elif action == 'delete':
+            result_lines = lines[:start_idx] + lines[end_idx:]
+        else:
+            return ToolResult(
+                output='',
+                error=f'Unsupported section_action: {action!r}',
+                new_content=content,
+            )
+        return ''.join(result_lines)
+
+    def _apply_unified_patch(self, content: str, patch_text: str | None) -> str | ToolResult:
+        if not patch_text:
+            return ToolResult(
+                output='',
+                error='edit_mode=patch requires patch_text.',
+                new_content=content,
+            )
+        hunks: list[tuple[str, str]] = []
+        old_lines: list[str] = []
+        new_lines: list[str] = []
+        in_hunk = False
+        for raw_line in patch_text.splitlines():
+            if raw_line.startswith('@@'):
+                if in_hunk:
+                    hunks.append((''.join(old_lines), ''.join(new_lines)))
+                old_lines, new_lines = [], []
+                in_hunk = True
+                continue
+            if not in_hunk:
+                continue
+            if raw_line.startswith(' '):
+                text = raw_line[1:] + '\n'
+                old_lines.append(text)
+                new_lines.append(text)
+            elif raw_line.startswith('-'):
+                old_lines.append(raw_line[1:] + '\n')
+            elif raw_line.startswith('+'):
+                new_lines.append(raw_line[1:] + '\n')
+        if in_hunk:
+            hunks.append((''.join(old_lines), ''.join(new_lines)))
+
+        updated = content
+        for old_chunk, new_chunk in hunks:
+            if not old_chunk:
+                updated = f'{updated}{new_chunk}'
+                continue
+            count = updated.count(old_chunk)
+            if count != 1:
+                return ToolResult(
+                    output='',
+                    error='Patch hunk context did not match uniquely.',
+                    new_content=content,
+                )
+            updated = updated.replace(old_chunk, new_chunk, 1)
+        return updated
+
     def _write_edit_result(
         self, file_path: Path, old_content: str | None, new_content: str
     ) -> ToolResult:
         """Write the result of an edit operation to disk."""
+        if old_content is not None and file_path.exists():
+            disk_now = self._read_file(file_path)
+            if disk_now != old_content:
+                return ToolResult(
+                    output='',
+                    error=(
+                        'FILE_UNEXPECTEDLY_MODIFIED: file changed on disk since it was read. '
+                        'Re-read the file and retry the edit.'
+                    ),
+                    old_content=old_content,
+                    new_content=new_content,
+                )
+
         # Validate syntax where possible before applying the edit to avoid
         # introducing syntax errors into the repository.
         is_valid, msg = self._maybe_validate_syntax_for_file(file_path, new_content)
@@ -848,6 +1361,19 @@ class FileEditor:
                     new_content=content,
                 )
 
+            if file_existed and old_content is not None:
+                disk_now = self._read_file(file_path)
+                if disk_now != old_content:
+                    return ToolResult(
+                        output='',
+                        error=(
+                            'FILE_UNEXPECTEDLY_MODIFIED: file changed on disk since it was read. '
+                            'Re-read the file and retry the write.'
+                        ),
+                        old_content=old_content,
+                        new_content=content,
+                    )
+
             # Backup original if in transaction
             if self._transaction_stack:
                 self._backup_file(file_path, old_content)
@@ -883,29 +1409,74 @@ class FileEditor:
                 new_content=None,
             )
 
+    def _read_file_with_meta(self, file_path: Path) -> tuple[str, _FileReadMeta]:
+        """Read text and capture encoding + newline style for symmetric writes."""
+        raw = file_path.read_bytes()
+        if not raw:
+            return '', _FileReadMeta(encoding='utf-8', newline='lf', had_bom=False)
+
+        had_bom = False
+        if raw.startswith(b'\xff\xfe'):
+            text = raw[2:].decode('utf-16-le')
+            encoding = 'utf-16-le'
+            had_bom = True
+        elif raw.startswith(b'\xfe\xff'):
+            text = raw[2:].decode('utf-16-be')
+            encoding = 'utf-16-be'
+            had_bom = True
+        elif raw.startswith(b'\xef\xbb\xbf'):
+            text = raw[3:].decode('utf-8')
+            encoding = 'utf-8-sig'
+            had_bom = True
+        else:
+            try:
+                text = raw.decode('utf-8')
+                encoding = 'utf-8'
+            except UnicodeDecodeError:
+                text = raw.decode('latin-1')
+                encoding = 'latin-1'
+
+        crlf = text.count('\r\n')
+        lone_lf = text.count('\n') - crlf
+        newline: Literal['crlf', 'lf'] = (
+            'crlf' if crlf > 0 and crlf >= lone_lf else 'lf'
+        )
+        return text, _FileReadMeta(encoding=encoding, newline=newline, had_bom=had_bom)
+
     def _read_file(self, file_path: Path) -> str:
-        """Read file content with proper encoding handling."""
-        try:
-            with open(file_path, encoding='utf-8') as f:
-                return f.read()
-        except UnicodeDecodeError:
-            # Fallback to latin-1 for binary-like files
-            with open(file_path, encoding='latin-1', errors='replace') as f:
-                return f.read()
+        """Read file content with encoding + BOM handling; remember I/O metadata."""
+        text, meta = self._read_file_with_meta(file_path)
+        self._remember_io_meta(file_path, meta)
+        return text
 
     def _write_file(self, file_path: Path, content: str) -> None:
-        """Write file content, creating directories if needed."""
-        # Ensure directory exists
+        """Write file atomically, preserving prior encoding/newline style when known."""
         file_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Write file atomically (write to temp then rename)
         temp_path = file_path.with_suffix(file_path.suffix + '.tmp')
+        meta = self._take_io_meta(file_path)
+        if meta is None:
+            meta = _FileReadMeta(encoding='utf-8', newline='lf', had_bom=False)
+
+        if meta.newline == 'crlf':
+            content = content.replace('\r\n', '\n').replace('\n', '\r\n')
+
         try:
-            with open(temp_path, 'w', encoding='utf-8', newline='\n') as f:
-                f.write(content)
+            if meta.encoding == 'utf-16-le':
+                data = b'\xff\xfe' + content.encode('utf-16-le')
+            elif meta.encoding == 'utf-16-be':
+                data = b'\xfe\xff' + content.encode('utf-16-be')
+            elif meta.encoding == 'utf-8-sig' or (
+                meta.had_bom and meta.encoding == 'utf-8'
+            ):
+                data = b'\xef\xbb\xbf' + content.encode('utf-8')
+            elif meta.encoding == 'latin-1':
+                data = content.encode('latin-1')
+            else:
+                data = content.encode('utf-8')
+
+            temp_path.write_bytes(data)
             temp_path.replace(file_path)
         except Exception:
-            # Clean up temp file on error
             if temp_path.exists():
                 temp_path.unlink()
             raise

@@ -6,6 +6,7 @@ This is similar to the functionality of `OrchestratorResponseParser`.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
@@ -15,6 +16,7 @@ from backend.core.errors import (
     FunctionCallValidationError,
 )
 from backend.core.logger import app_logger as logger
+from backend.core.type_safety.path_validation import PathValidationError, SafePath
 from backend.engine.common import (
     common_response_to_actions,
 )
@@ -515,9 +517,7 @@ def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
     ]
 
 
-def _preview_str_replace_edit(
-    path: str, command: str, kwargs: dict
-) -> AgentThinkAction | CmdRunAction:
+def _preview_str_replace_edit(path: str, command: str, kwargs: dict) -> AgentThinkAction:
     """Generate a unified diff preview of what a replace_text or insert_text would produce."""
     import difflib
     import os
@@ -567,28 +567,11 @@ def _preview_str_replace_edit(
     if not diff_text:
         return AgentThinkAction(thought=f'[PREVIEW] No changes detected for {path}')
 
-    # Write the new text actually to the file to make changes "kept by default",
-    # and write old text to a .orig file to do a VS Code native split diff.
-    orig_path = f'{path}.orig'
-    try:
-        with open(orig_path, 'w', encoding='utf-8') as f:
-            f.writelines(original_lines)
-        with open(path, 'w', encoding='utf-8') as f:
-            f.writelines(new_lines)
-    except OSError as exc:
-        return AgentThinkAction(thought=f'[PREVIEW] Cannot write to {path}: {exc}')
-
-    script = (
-        "import os, subprocess;"
-        f"subprocess.run(['code', '--wait', '--diff', {orig_path!r}, {path!r}]);"
-        f"os.remove({orig_path!r})"
-    )
-    cmd = build_python_exec_command(script)
-
-    return CmdRunAction(
-        command=cmd,
-        thought=f'[PREVIEW -> NATIVE DIFF] Edit applied to {path}. Opening native VS Code diff. Changes kept by default. You can undo and save in the editor if you reject them.',
-        blocking=True,
+    return AgentThinkAction(
+        thought=(
+            f'[PREVIEW] Proposed changes for {path} (dry-run, no file writes):\n'
+            f'```diff\n{diff_text}\n```'
+        )
     )
 
 
@@ -650,7 +633,10 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
 
     if command == 'view_and_replace':
         actions = _handle_view_and_replace(path, other_kwargs)
-        return actions[0]
+        if len(actions) == 1:
+            return actions[0]
+        # Execute the replacement action; returning the first action would drop edits.
+        return actions[1]
 
     if command == 'view_file':
         return FileReadAction(
@@ -689,44 +675,122 @@ def _handle_batch_replace_command(arguments: dict) -> CmdRunAction:
         raise FunctionCallValidationError(
             'batch_replace requires "edits" array of {path, old_str, new_str}'
         )
+    normalized_edits: list[dict[str, str]] = []
+    workspace_root = Path.cwd()
+    for idx, edit in enumerate(edits):
+        if not isinstance(edit, dict):
+            raise FunctionCallValidationError(
+                f'batch_replace edit at index {idx} must be an object'
+            )
+        path_val = edit.get('path')
+        old_val = edit.get('old_str')
+        new_val = edit.get('new_str')
+        if not isinstance(path_val, str) or not isinstance(old_val, str) or not isinstance(
+            new_val, str
+        ):
+            raise FunctionCallValidationError(
+                f'batch_replace edit at index {idx} must include string path/old_str/new_str'
+            )
+        try:
+            safe_path = SafePath.validate(
+                path_val,
+                workspace_root=str(workspace_root),
+                must_be_relative=True,
+            )
+        except PathValidationError as exc:
+            raise FunctionCallValidationError(
+                f'batch_replace invalid path at index {idx}: {exc.message}'
+            ) from exc
+        normalized_edits.append(
+            {
+                'path': str(safe_path.path),
+                'old_str': old_val,
+                'new_str': new_val,
+            }
+        )
     preview = arguments.get('preview', False)
-    edits_json = _json.dumps(edits)
+    edits_json = _json.dumps(normalized_edits)
     preview_flag = 'True' if preview else 'False'
 
     # --- readable Python source that will be base64-transported -----------
     script = f"""\
-import json, sys
+import json, re, sys
+from collections import defaultdict
+
+def _strip_trailing_newlines(s):
+    return re.sub(r'\\n+$', '', s)
+
 edits = json.loads({edits_json!r})
 preview = {preview_flag}
-backups = []
 errors = []
+
+by_path = defaultdict(list)
 for i, edit in enumerate(edits):
-    path, old, new = edit['path'], edit['old_str'], edit['new_str']
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        count = content.count(old)
-        if count == 0:
-            errors.append(f'Edit {{i}}: old_str not found in {{path}}')
+    by_path[edit['path']].append((i, edit))
+
+for path, seq in by_path.items():
+    for a in range(len(seq)):
+        for b in range(a + 1, len(seq)):
+            oa, ob = seq[a][1], seq[b][1]
+            old_b = _strip_trailing_newlines(ob['old_str'])
+            new_a = oa['new_str']
+            if old_b and old_b in new_a:
+                ia, ib = seq[a][0], seq[b][0]
+                errors.append(
+                    f'Edit ordering guard: edit {{ib}} old_str is contained in edit {{ia}} new_str (path {{path}})'
+                )
+                break
+        if errors:
             break
-        if count > 1:
-            errors.append(f'Edit {{i}}: old_str matches {{count}} locations in {{path}} — must be unique')
-            break
-        backups.append((path, content))
-        if not preview:
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(content.replace(old, new, 1))
-        print(f'  [OK] {{path}}')
-    except Exception as e:
-        errors.append(f'Edit {{i}}: {{e}}')
+    if errors:
         break
-if errors:
-    for bpath, bcontent in backups:
+
+buffers = {{}}
+if not errors:
+    for i, edit in enumerate(edits):
+        path, old, new = edit['path'], edit['old_str'], edit['new_str']
         try:
-            with open(bpath, 'w', encoding='utf-8') as f:
-                f.write(bcontent)
-        except OSError as e:
-            sys.stderr.write(f'[batch_replace] Rollback failed for {{bpath!r}}: {{e}}\\n')
+            if path not in buffers:
+                with open(path, 'r', encoding='utf-8') as f:
+                    buffers[path] = f.read()
+            content = buffers[path]
+            count = content.count(old)
+            if count == 0:
+                errors.append(f'Edit {{i}}: old_str not found in {{path}}')
+                break
+            if count > 1:
+                errors.append(
+                    f'Edit {{i}}: old_str matches {{count}} locations in {{path}} — must be unique'
+                )
+                break
+            buffers[path] = content.replace(old, new, 1)
+        except Exception as e:
+            errors.append(f'Edit {{i}}: {{e}}')
+            break
+
+if not errors and not preview:
+    originals = {{}}
+    for path in buffers:
+        with open(path, 'r', encoding='utf-8') as f:
+            originals[path] = f.read()
+    for path, final in buffers.items():
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(final)
+            print(f'  [OK] {{path}}')
+        except Exception as e:
+            errors.append(f'Write failed for {{path}}: {{e}}')
+            for opath, ocontent in originals.items():
+                try:
+                    with open(opath, 'w', encoding='utf-8') as f:
+                        f.write(ocontent)
+                except OSError as err:
+                    sys.stderr.write(
+                        f'[batch_replace] Rollback failed for {{opath!r}}: {{err}}\\n'
+                    )
+            break
+
+if errors:
     print('BATCH EDIT FAILED — all changes rolled back.')
     print('Error:', errors[0])
     sys.exit(1)
@@ -742,7 +806,7 @@ else:
         command=build_python_exec_command(
             f"import base64;exec(base64.b64decode(b'{script_b64}').decode())"
         ),
-        thought=f'[BATCH REPLACE] {label} {len(edits)} edit(s) atomically',
+        thought=f'[BATCH REPLACE] {label} {len(normalized_edits)} edit(s) atomically',
     )
 
 
@@ -1065,11 +1129,28 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
             'old_str',
             'new_str',
             'insert_line',
+            'start_line',
+            'end_line',
             'view_range',
             'normalize_ws',
             'match_mode',
             'preview',
             'confidence',
+            'edit_mode',
+            'format_kind',
+            'format_op',
+            'format_path',
+            'format_value',
+            'anchor_type',
+            'anchor_value',
+            'anchor_occurrence',
+            'section_action',
+            'section_content',
+            'patch_text',
+            'expected_hash',
+            'expected_file_hash',
+            'start_line',
+            'end_line',
             'security_risk',
         ):
             if key in normalized_args:

@@ -4,10 +4,15 @@ Maintains a manifest of files read, modified, and created during a session.
 The manifest path for on-disk persistence (when used) is under
 ``~/.grinta/workspaces/<id>/agent/file_manifest.json``; the in-memory summary
 is injected into context via the planner.
+
+Read snapshots (mtime + content hash) support Claude-style staleness detection:
+if disk changes after a read, edits can be blocked until the model re-reads.
 """
 
 from __future__ import annotations
 
+import hashlib
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,11 +43,35 @@ class FileEntry:
     timestamp: float = field(default_factory=time.time)
 
 
+@dataclass(frozen=True)
+class ReadSnapshot:
+    """Disk state observed after a read (Claude-style readFileState + mtime)."""
+
+    mtime: float
+    content_sha256: str
+
+
+def _normalize_path_key(path_str: str) -> str | None:
+    """Stable dict key for a resolved filesystem path."""
+    try:
+        p = Path(path_str).expanduser()
+        if not p.is_absolute():
+            p = Path.cwd() / p
+        resolved = p.resolve()
+        s = os.path.normpath(str(resolved))
+        if os.name == 'nt':
+            s = os.path.normcase(s)
+        return s
+    except OSError:
+        return None
+
+
 class FileStateTracker:
     """Tracks files touched during the agent session."""
 
     def __init__(self) -> None:
         self._files: dict[str, FileEntry] = {}
+        self._read_snapshots: dict[str, ReadSnapshot] = {}
 
     def record(self, path: str, action: str) -> None:
         if not path:
@@ -58,6 +87,64 @@ class FileStateTracker:
         if len(self._files) > _MAX_TRACKED_FILES:
             oldest_key = min(self._files, key=lambda k: self._files[k].timestamp)
             del self._files[oldest_key]
+            self._read_snapshots.pop(oldest_key, None)
+
+    def record_read_snapshot_from_disk(self, path_str: str) -> None:
+        """Store mtime + sha256 of file bytes after a read (for staleness checks)."""
+        key = _normalize_path_key(path_str)
+        if not key:
+            return
+        try:
+            p = Path(key)
+            if not p.is_file():
+                return
+            st = p.stat()
+            digest = hashlib.sha256(p.read_bytes()).hexdigest()
+            self._read_snapshots[key] = ReadSnapshot(
+                mtime=st.st_mtime,
+                content_sha256=digest,
+            )
+        except OSError:
+            logger.debug('record_read_snapshot_from_disk failed for %s', path_str)
+
+    def invalidate_read_snapshot(self, path_str: str) -> None:
+        key = _normalize_path_key(path_str)
+        if key:
+            self._read_snapshots.pop(key, None)
+
+    def check_read_stale(self, path_str: str) -> str | None:
+        """Return error message if disk changed since snapshot; else None.
+
+        If mtime is newer but bytes hash matches (e.g. Windows noise), allow.
+        """
+        if os.environ.get('GRINTA_SKIP_READ_STALE_CHECK', '').lower() in (
+            '1',
+            'true',
+            'yes',
+        ):
+            return None
+        key = _normalize_path_key(path_str)
+        if not key:
+            return None
+        snap = self._read_snapshots.get(key)
+        if snap is None:
+            return None
+        try:
+            p = Path(key)
+            if not p.is_file():
+                return None
+            st = p.stat()
+            if st.st_mtime <= snap.mtime:
+                return None
+            digest = hashlib.sha256(p.read_bytes()).hexdigest()
+            if digest == snap.content_sha256:
+                return None
+        except OSError:
+            return None
+        return (
+            f'[FILE_STATE_GUARD] File changed on disk since it was read '
+            f'(path {path_str!r}). Read it again before editing.'
+        )
 
     def get_summary(self) -> str:
         """Return a compact summary of tracked files for injection into context."""
@@ -112,13 +199,29 @@ class FileStateMiddleware(ToolInvocationMiddleware):
         # Enforce read-before-edit for apply_patch and related file modifications
         requires_read_check = False
         target_path = ''
+        mutating_edit = False
 
         if action_cls == 'FileEditAction':
-            command = getattr(action, 'command', '')
+            command = getattr(action, 'command', '') or 'write'
             if command == 'apply_patch':
                 requires_read_check = True
-                # Usually apply_patch targets the path arg
                 target_path = getattr(action, 'path', '')
+            elif os.environ.get('GRINTA_ENFORCE_READ_BEFORE_EDIT', '').lower() in (
+                '1',
+                'true',
+                'yes',
+            ) and command in ('replace_text', 'insert_text'):
+                requires_read_check = True
+                target_path = getattr(action, 'path', '')
+            if command in {
+                'replace_text',
+                'insert_text',
+                'edit',
+                'view_and_replace',
+                'write',
+            }:
+                mutating_edit = True
+                target_path = target_path or getattr(action, 'path', '')
 
         if requires_read_check and target_path:
             is_known = self._tracker.has_been_read_recently(
@@ -131,6 +234,16 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                     f'before applying a patch to ensure you have the exact correct context.'
                 )
 
+        if (
+            not ctx.blocked
+            and mutating_edit
+            and target_path
+            and action_cls == 'FileEditAction'
+        ):
+            stale_msg = self._tracker.check_read_stale(target_path)
+            if stale_msg:
+                ctx.block(stale_msg)
+
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None
     ) -> None:
@@ -140,18 +253,22 @@ class FileStateMiddleware(ToolInvocationMiddleware):
         try:
             if action_cls == 'FileEditAction':
                 path = getattr(action, 'path', '')
-                command = getattr(action, 'command', '')
+                command = getattr(action, 'command', '') or 'write'
                 if command == 'create_file':
                     self._tracker.record(path, 'created')
                 elif command == 'view_file':
                     self._tracker.record(path, 'read')
+                    self._tracker.record_read_snapshot_from_disk(path)
                 else:
                     self._tracker.record(path, 'modified')
+                    self._tracker.invalidate_read_snapshot(path)
             elif action_cls == 'FileReadAction':
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'read')
+                self._tracker.record_read_snapshot_from_disk(path)
             elif action_cls == 'FileWriteAction':
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'created')
+                self._tracker.invalidate_read_snapshot(path)
         except Exception:
             logger.debug('FileStateMiddleware: failed to record action', exc_info=True)

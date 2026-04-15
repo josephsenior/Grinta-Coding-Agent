@@ -20,7 +20,7 @@ The UI (`backend/cli/reasoning_display.py`, `layout_tokens.py`) makes the invisi
 
 Trust is also about blast radius. I've watched an agent confidently type `rm -rf` in what it thought was a scratch directory. It wasn't.
 
-This is why `backend/cli/confirmation.py` became a core part of the system. High-risk commands run through a middleware validation check before execution. Tools like `apply_patch` or dangerous `run_command` segments pause the execution loop entirely, presenting a prompt to the user: "The agent wants to delete this file. Allow? [Y/N]".
+This is why `backend/cli/confirmation.py` became a core part of the system. High-risk commands run through a middleware validation check before execution. Dangerous shell segments or high-impact editor operations (`str_replace_editor` / `ast_code_editor`) can pause the execution loop entirely, presenting a prompt to the user: "The agent wants to delete this file. Allow? [Y/N]".
 
 This bridges the latency veil perfectly. The human knows what the machine intends to do before disaster happens.
 

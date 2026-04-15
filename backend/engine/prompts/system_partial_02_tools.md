@@ -6,9 +6,20 @@ Editor `path` arguments are relative to the project root (see runtime working di
 **CRITICAL READ-BEFORE-EDIT RULE:**
 You MUST explicitly read a file's contents before you edit it. NEVER edit a file blindly or solely from memory. Always run `read_file` or `grep_search` to verify precise line numbers, code structure, and whitespace before applying changes.
 
-- **ast_code_editor**: Primary tool for robust, structure-aware file edits across 40+ languages. Edit by symbol, rename variables, or intelligently replace ranges without worrying about exact indentation.
-- **str_replace_editor**: Use for multi-file edits (via `batch_replace`) or when AST editing isn't applicable. Use `preview: true` if confidence is low (<0.7).
-  Greenfield: `ast_code_editor(command="create_file", path="...", file_text="...")`.
+**Edit vs write vs patch (reliability):**
+- **Surgical edits** = small `old_str` → `new_str` replacements (or `edit_mode` primitives below). This is the primary, safe path.
+- **Full file** = `create_file` / write tools when you are replacing or creating an entire file body — do not paste a whole file into a tiny replace.
+- **Unified diff / `patch` mode** = strict context apply or human-readable diff review — not the default way to mutate code; use it when you need exact hunk context or after previewing a diff.
+
+- **ast_code_editor**: Primary tool for structure-aware code edits (symbols, rename, range replacement, indentation normalization) across 40+ languages.
+- **str_replace_editor**: Primary tool for non-code/document edits and multi-file edits.
+  Prefer explicit `edit_mode` for reliability:
+  - `format` for JSON/YAML/TOML mutations
+  - `section` for anchor-bounded edits
+  - `range` for line-bounded edits (optional `expected_hash` guard on the target slice; optional `expected_file_hash` for the whole file as last read)
+  - `patch` for strict-context unified diff hunk apply (display-oriented or strict apply — not the default edit path)
+  Use `preview: true` for dry-run diffs when confidence is low.
+  Greenfield file creation: `ast_code_editor(command="create_file", path="...", file_text="...")`.
 
 </EDITOR_AND_FILE_OPERATIONS>
 

@@ -43,6 +43,20 @@ def execute_file_editor(
     normalize_ws: bool | None = None,
     enable_linting: bool = False,
     dry_run: bool = False,
+    *,
+    edit_mode: str | None = None,
+    format_kind: str | None = None,
+    format_op: str | None = None,
+    format_path: str | None = None,
+    format_value: Any = None,
+    anchor_type: str | None = None,
+    anchor_value: str | None = None,
+    anchor_occurrence: int | None = None,
+    section_action: str | None = None,
+    section_content: str | None = None,
+    patch_text: str | None = None,
+    expected_hash: str | None = None,
+    expected_file_hash: str | None = None,
 ) -> tuple[str, tuple[str | None, str | None]]:
     """Execute file editor command and handle exceptions."""
     insert_line, error_msg = _parse_insert_line(insert_line)
@@ -63,6 +77,19 @@ def execute_file_editor(
         normalize_ws,
         enable_linting,
         dry_run,
+        edit_mode=edit_mode,
+        format_kind=format_kind,
+        format_op=format_op,
+        format_path=format_path,
+        format_value=format_value,
+        anchor_type=anchor_type,
+        anchor_value=anchor_value,
+        anchor_occurrence=anchor_occurrence,
+        section_action=section_action,
+        section_content=section_content,
+        patch_text=patch_text,
+        expected_hash=expected_hash,
+        expected_file_hash=expected_file_hash,
     )
 
     if result.error:
@@ -101,6 +128,20 @@ def _invoke_editor(
     normalize_ws: bool | None,
     enable_linting: bool,
     dry_run: bool,
+    *,
+    edit_mode: str | None = None,
+    format_kind: str | None = None,
+    format_op: str | None = None,
+    format_path: str | None = None,
+    format_value: Any = None,
+    anchor_type: str | None = None,
+    anchor_value: str | None = None,
+    anchor_occurrence: int | None = None,
+    section_action: str | None = None,
+    section_content: str | None = None,
+    patch_text: str | None = None,
+    expected_hash: str | None = None,
+    expected_file_hash: str | None = None,
 ) -> Any:
     """Safely invoke the editor with MISSING sentinels."""
     from backend.core.type_safety.sentinels import MISSING
@@ -120,6 +161,19 @@ def _invoke_editor(
             normalize_ws=normalize_ws,
             enable_linting=enable_linting,
             dry_run=dry_run,
+            edit_mode=edit_mode,
+            format_kind=format_kind,
+            format_op=format_op,
+            format_path=format_path,
+            format_value=format_value,
+            anchor_type=anchor_type,
+            anchor_value=anchor_value,
+            anchor_occurrence=anchor_occurrence,
+            section_action=section_action,
+            section_content=section_content,
+            patch_text=patch_text,
+            expected_hash=expected_hash,
+            expected_file_hash=expected_file_hash,
         )
     except ToolError as e:
         return ToolResult(output='', error=str(e))

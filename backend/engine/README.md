@@ -79,6 +79,16 @@ FileEditAction(
 )
 ```
 
+### Non-Code Editing Protocol
+
+For non-code files, prefer document-oriented editing over raw substring replacement:
+
+- `edit_mode="format"` for structured files (`json`, `yaml`, `toml`) using parser mutate/serialize.
+- `edit_mode="section"` for anchor-bounded document sections (for example markdown headings).
+- `edit_mode="range"` for deterministic line-range edits, optionally guarded by `expected_hash`.
+- `edit_mode="patch"` for unified-diff hunk application with strict context matching.
+- `edit_mode="replace"` as compatibility fallback for legacy `old_str`/`new_str` edits.
+
 ### Command Execution
 
 **CmdRunAction** - Run shell commands:
