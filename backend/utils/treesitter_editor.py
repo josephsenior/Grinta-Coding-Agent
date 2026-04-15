@@ -795,9 +795,57 @@ class TreeSitterEditor:
             # Parse the new code
             tree = parser.parse(code.encode('utf-8'))
 
-            # Check for errors (Tree-sitter marks error nodes)
-            if self._has_syntax_errors(tree.root_node):
-                return False, 'Code contains syntax errors'
+            # Collect ERROR / missing nodes to create a precise message
+            error_nodes: list[NodeType] = []
+
+            def _collect_errors(node: NodeType) -> None:
+                if getattr(node, 'type', None) == 'ERROR' or getattr(node, 'is_missing', False):
+                    error_nodes.append(node)
+                for child in getattr(node, 'children', []) or []:
+                    _collect_errors(child)
+
+            _collect_errors(tree.root_node)
+
+            if error_nodes:
+                # Build a helpful message showing up to 3 errors with context
+                max_show = 3
+                lines = code.splitlines()
+                parts: list[str] = []
+                for node in error_nodes[:max_show]:
+                    # Extract node positions and text where available (use safe attribute access)
+                    start_point = getattr(node, 'start_point', (0, 0))
+                    start_row, start_col = start_point[0], start_point[1]
+                    start_byte = getattr(node, 'start_byte', None)
+                    end_byte = getattr(node, 'end_byte', None)
+
+                    node_text = ''
+                    if start_byte is not None and end_byte is not None:
+                        b = code.encode('utf-8')
+                        if 0 <= start_byte < end_byte <= len(b):
+                            node_text = b[start_byte:end_byte].decode('utf-8', errors='replace')
+
+                    # Get the source line for context
+                    src_line = ''
+                    if isinstance(start_row, int) and 0 <= start_row < len(lines):
+                        src_line = lines[start_row]
+
+                    # Ensure start_col is a valid non-negative int
+                    if not isinstance(start_col, int) or start_col < 0:
+                        start_col = 0
+
+                    caret = ' ' * start_col + '^'
+                    parts.append(
+                        f"Syntax error at {file_path}:{start_row+1}:{start_col+1}: node='{getattr(node, 'type', '?')}'"
+                    )
+                    if node_text:
+                        parts.append(f'  Node text: {node_text!r}')
+                    if src_line:
+                        parts.append(f'  {src_line}')
+                        parts.append(f'  {caret}')
+                if len(error_nodes) > max_show:
+                    parts.append(f'  (and {len(error_nodes)-max_show} more syntax error nodes)')
+
+                return False, '\n'.join(parts)
 
             return True, 'Syntax valid'
 

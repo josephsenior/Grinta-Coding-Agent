@@ -529,6 +529,31 @@ class FileEditor:
             return '\r\n'
         return '\n'
 
+    def _maybe_validate_syntax_for_file(self, file_path: Path, content: str) -> tuple[bool, str]:
+        """Attempt syntax validation using Tree-sitter for the file's language.
+
+        Returns (is_valid, message). If Tree-sitter or a parser is not available,
+        returns (True, reason) to indicate validation was skipped.
+        """
+        try:
+            # Lazy import to avoid hard dependency when tree-sitter isn't installed
+            from backend.utils.treesitter_editor import TreeSitterEditor
+
+        except Exception as exc:  # pragma: no cover - environment dependent
+            return True, f'Tree-sitter unavailable: {exc}'
+
+        try:
+            editor = TreeSitterEditor()
+        except Exception as exc:  # pragma: no cover - runtime import issues
+            return True, f'Tree-sitter initialization failed: {exc}'
+
+        language = editor.detect_language(str(file_path))
+        if not language:
+            return True, 'No parser mapping for file extension; skipping validation'
+
+        is_valid, msg = editor._validate_syntax(content, str(file_path), language)
+        return is_valid, msg
+
     def _closest_match_candidates(
         self,
         file_content: str,
@@ -739,6 +764,17 @@ class FileEditor:
         self, file_path: Path, old_content: str | None, new_content: str
     ) -> ToolResult:
         """Write the result of an edit operation to disk."""
+        # Validate syntax where possible before applying the edit to avoid
+        # introducing syntax errors into the repository.
+        is_valid, msg = self._maybe_validate_syntax_for_file(file_path, new_content)
+        if not is_valid:
+            return ToolResult(
+                output='',
+                error=f'Syntax validation failed: {msg}',
+                old_content=old_content,
+                new_content=new_content,
+            )
+
         # Backup original if in transaction
         if self._transaction_stack:
             self._backup_file(file_path, old_content)
@@ -797,6 +833,17 @@ class FileEditor:
             if file_existed and old_content == content:
                 return ToolResult(
                     output='No changes applied (content unchanged).',
+                    old_content=old_content,
+                    new_content=content,
+                )
+
+            # Validate syntax where possible before writing to avoid introducing
+            # syntax errors into the repository.
+            is_valid, msg = self._maybe_validate_syntax_for_file(file_path, content)
+            if not is_valid:
+                return ToolResult(
+                    output='',
+                    error=f'Syntax validation failed: {msg}',
                     old_content=old_content,
                     new_content=content,
                 )
