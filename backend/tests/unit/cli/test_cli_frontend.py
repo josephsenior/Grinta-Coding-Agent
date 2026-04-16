@@ -630,6 +630,34 @@ async def test_renderer_error_observation_shows_recovery_steps() -> None:
 
 
 @pytest.mark.asyncio
+async def test_renderer_syntax_validation_error_panel_is_compact() -> None:
+    """Syntax validation failures should not dump tree-sitter noise into the CLI panel."""
+    from backend.ledger.observation import ErrorObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    noisy = (
+        'ERROR:\nSyntax validation failed: Syntax error at '
+        'C:\\proj\\demo.test.ts:8:3: node=ERROR\n'
+        "  Node text: 'it'\n"
+        "    it('x', () => {\n"
+        '    ^\n'
+    )
+    error_obs = ErrorObservation(content=noisy)
+    await renderer.handle_event(error_obs)
+
+    output = _console_output(console)
+    assert 'syntax check' in output.lower()
+    assert 'What you can try' in output
+    assert 'node=' not in output
+    assert 'Node text' not in output
+
+
+@pytest.mark.asyncio
 async def test_system_error_message_shows_restart_guidance_for_init_failures() -> None:
     """Startup failures should suggest how to recover outside the REPL."""
     console = _make_console()

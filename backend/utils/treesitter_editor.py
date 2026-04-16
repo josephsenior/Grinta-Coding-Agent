@@ -196,6 +196,140 @@ LANGUAGE_EXTENSIONS = {
 }
 
 
+def _format_python_ast_syntax_error(code: str, file_path: str) -> str | None:
+    """If ``code`` is invalid Python, return a rich message; otherwise ``None``."""
+    import ast
+
+    try:
+        ast.parse(code, filename=file_path)
+    except SyntaxError as e:
+        return _render_python_syntax_error(e, code, file_path)
+    return None
+
+
+def _render_python_syntax_error(e: SyntaxError, code: str, file_path: str) -> str:
+    lineno = e.lineno or 1
+    offset = e.offset or 0
+    msg = (e.msg or 'invalid syntax').strip()
+    lines = code.splitlines()
+    parts: list[str] = [
+        f'Python syntax error at {file_path}:{lineno}:{offset}',
+        f'Parser message: {msg}',
+    ]
+    if e.lineno and 1 <= e.lineno <= len(lines):
+        line = lines[e.lineno - 1]
+        parts.append(f'  {line}')
+        if e.offset is not None and e.offset >= 1:
+            col = e.offset - 1
+            parts.append(f'  {" " * col}^')
+    parts.append(_what_to_try_line_python(msg))
+    return '\n'.join(parts)
+
+
+def _what_to_try_line_python(msg: str) -> str:
+    lower = msg.lower()
+    if 'unexpected eof' in lower or 'end of file' in lower:
+        return (
+            'What to try: add the missing closing delimiter (`)`, `]`, `}`, or finish the string/block).'
+        )
+    if 'indent' in lower:
+        return 'What to try: fix indentation so blocks align with `def`, `class`, `if`, etc.'
+    if 'invalid syntax' in lower and '(' in msg:
+        return 'What to try: check unmatched parentheses, brackets, or a missing `:` before a block.'
+    return (
+        'What to try: follow the parser message above (often a missing `,`, `:`, `)`, or quote).'
+    )
+
+
+def _find_first_missing_node(node: Any) -> Any | None:
+    """Return the first MISSING node in a subtree (depth-first)."""
+    if getattr(node, 'is_missing', False):
+        return node
+    for child in getattr(node, 'children', []) or []:
+        found = _find_first_missing_node(child)
+        if found is not None:
+            return found
+    return None
+
+
+def _what_to_try_for_expected_token(expected: str | None, language: str) -> str:
+    """One-line hint for agents when a MISSING node's type names an expected token."""
+    if not expected:
+        return (
+            'What to try: compare this spot with a valid example of the surrounding construct '
+            f'({language}).'
+        )
+    exp = expected.strip()
+    if len(exp) > 32:
+        return (
+            'What to try: the grammar expected a specific token here; narrow the edit and re-parse.'
+        )
+    if exp in {')', ']', '}', '>'}:
+        return f'What to try: insert `{exp}` to close an unmatched opening bracket.'
+    if exp in {';', ','}:
+        return f'What to try: insert `{exp}` if a delimiter is required between parts here.'
+    if exp == ':':
+        return 'What to try: add `:` if a block or type annotation requires it.'
+    if exp in {'"', "'", '`'}:
+        return 'What to try: close or fix the string / template literal.'
+    return f'What to try: the grammar expected `{exp}` at this position; add or move tokens accordingly.'
+
+
+def _format_treesitter_error_block(
+    node: Any,
+    file_path: str,
+    code: str,
+    lines: list[str],
+    language: str,
+) -> list[str]:
+    """Build human- and agent-friendly lines for one ERROR or MISSING node."""
+    start_point = getattr(node, 'start_point', (0, 0))
+    start_row, start_col = start_point[0], start_point[1]
+    start_byte = getattr(node, 'start_byte', None)
+    end_byte = getattr(node, 'end_byte', None)
+
+    node_text = ''
+    if start_byte is not None and end_byte is not None:
+        b = code.encode('utf-8')
+        if 0 <= start_byte < end_byte <= len(b):
+            node_text = b[start_byte:end_byte].decode('utf-8', errors='replace')
+
+    if not isinstance(start_col, int) or start_col < 0:
+        start_col = 0
+
+    missing = node if getattr(node, 'is_missing', False) else _find_first_missing_node(node)
+    expected = None
+    if missing is not None:
+        expected = getattr(missing, 'type', None) or None
+
+    parts: list[str] = [
+        f'Syntax error at {file_path}:{start_row + 1}:{start_col + 1}',
+    ]
+    if expected:
+        parts.append(f'Expected: `{expected}` (grammar token)')
+    else:
+        parts.append('Expected: (not inferred — parser landed on an ERROR node)')
+
+    if node_text:
+        preview = node_text.replace('\n', '\\n')
+        if len(preview) > 120:
+            preview = preview[:117] + '...'
+        parts.append(f'Found: {preview!r}')
+    elif getattr(node, 'type', None) == 'ERROR' and not getattr(node, 'is_missing', False):
+        parts.append(
+            'Found: unexpected token(s) at this position (see source line below).'
+        )
+
+    src_line = ''
+    if isinstance(start_row, int) and 0 <= start_row < len(lines):
+        src_line = lines[start_row]
+        parts.append(f'  {src_line}')
+        parts.append(f'  {" " * start_col}^')
+
+    parts.append(_what_to_try_for_expected_token(expected, language))
+    return parts
+
+
 class TreeSitterEditor:
     """Universal editor powered by Tree-sitter.
 
@@ -788,18 +922,25 @@ class TreeSitterEditor:
 
         """
         try:
+            # Python: prefer the interpreter's SyntaxError (expected token hints).
+            if language == 'python':
+                py_msg = _format_python_ast_syntax_error(code, file_path)
+                if py_msg is not None:
+                    return False, py_msg
+                return True, 'Syntax valid'
+
             parser = self.get_parser(language)
             if not parser:
                 return True, 'Parser not available, skipping validation'
 
-            # Parse the new code
             tree = parser.parse(code.encode('utf-8'))
 
-            # Collect ERROR / missing nodes to create a precise message
             error_nodes: list[NodeType] = []
 
             def _collect_errors(node: NodeType) -> None:
-                if getattr(node, 'type', None) == 'ERROR' or getattr(node, 'is_missing', False):
+                if getattr(node, 'type', None) == 'ERROR' or getattr(
+                    node, 'is_missing', False
+                ):
                     error_nodes.append(node)
                 for child in getattr(node, 'children', []) or []:
                     _collect_errors(child)
@@ -807,43 +948,22 @@ class TreeSitterEditor:
             _collect_errors(tree.root_node)
 
             if error_nodes:
-                # Build a helpful message showing up to 3 errors with context
                 max_show = 3
                 lines = code.splitlines()
                 parts: list[str] = []
                 for node in error_nodes[:max_show]:
-                    # Extract node positions and text where available (use safe attribute access)
-                    start_point = getattr(node, 'start_point', (0, 0))
-                    start_row, start_col = start_point[0], start_point[1]
-                    start_byte = getattr(node, 'start_byte', None)
-                    end_byte = getattr(node, 'end_byte', None)
-
-                    node_text = ''
-                    if start_byte is not None and end_byte is not None:
-                        b = code.encode('utf-8')
-                        if 0 <= start_byte < end_byte <= len(b):
-                            node_text = b[start_byte:end_byte].decode('utf-8', errors='replace')
-
-                    # Get the source line for context
-                    src_line = ''
-                    if isinstance(start_row, int) and 0 <= start_row < len(lines):
-                        src_line = lines[start_row]
-
-                    # Ensure start_col is a valid non-negative int
-                    if not isinstance(start_col, int) or start_col < 0:
-                        start_col = 0
-
-                    caret = ' ' * start_col + '^'
-                    parts.append(
-                        f"Syntax error at {file_path}:{start_row+1}:{start_col+1}: node='{getattr(node, 'type', '?')}'"
+                    parts.extend(
+                        _format_treesitter_error_block(
+                            node, file_path, code, lines, language
+                        )
                     )
-                    if node_text:
-                        parts.append(f'  Node text: {node_text!r}')
-                    if src_line:
-                        parts.append(f'  {src_line}')
-                        parts.append(f'  {caret}')
+                    parts.append('')  # blank between error sites
+                if parts and parts[-1] == '':
+                    parts.pop()
                 if len(error_nodes) > max_show:
-                    parts.append(f'  (and {len(error_nodes)-max_show} more syntax error nodes)')
+                    parts.append(
+                        f'(and {len(error_nodes) - max_show} more syntax error location(s))'
+                    )
 
                 return False, '\n'.join(parts)
 

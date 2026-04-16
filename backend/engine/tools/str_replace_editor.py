@@ -11,7 +11,7 @@ from backend.inference.tool_names import STR_REPLACE_EDITOR_TOOL_NAME
 
 _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `view_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
-* `create_file`: create new file (fails if exists). Requires `file_text` — full-file body for new files.
+* `create_file`: create new file (fails if exists). Requires `file_text` — full-file body for new files. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call.
 * `insert_text`: insert `new_str` after `insert_line`.
 * `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
 * `view_and_replace`: view + replace in one call. `view_range` scopes both display and match. Kept for compatibility.
@@ -22,7 +22,7 @@ _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editin
   - `range`: line-range replacement with optional `expected_hash` (slice) or `expected_file_hash` (whole file as read).
   - `patch`: unified diff hunk apply with strict context — for strict apply or review, not the default editing style.
 
-Default mental model: **surgical replace** for code edits; **full `file_text`** only for create/overwrite; **patch** when you need diff-shaped context.
+Default mental model: **surgical replace** for code edits; **minimal valid `file_text` on create**, then iterate; **full `file_text`** only when truly replacing a whole file; **patch** when you need diff-shaped context.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
 """

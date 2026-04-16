@@ -482,8 +482,10 @@ class TestValidateSyntax:
     def test_invalid_python(self, editor):
         code = 'def foo(\n    return 1\n'  # syntax error
         is_valid, msg = editor._validate_syntax(code, 'f.py', 'python')
-        # may report invalid or skip validation
-        assert isinstance(is_valid, bool)
+        assert is_valid is False
+        assert 'Python syntax error' in msg
+        assert 'Parser message:' in msg
+        assert 'What to try:' in msg
 
     def test_no_parser_for_unknown_language(self, editor):
         code = 'some code'
@@ -585,12 +587,14 @@ class TestCoverageGaps:
         import pytest
 
         with pytest.MonkeyPatch.context() as mp:
-            # Mock get_parser to raise an exception
+            # Mock get_parser to raise an exception (non-Python path calls get_parser).
             def raise_exc(lang):
                 raise Exception('test exception')
 
             mp.setattr(editor, 'get_parser', raise_exc)
-            is_valid, msg = editor._validate_syntax('code', 'f.py', 'python')
+            is_valid, msg = editor._validate_syntax(
+                'const x =', 'f.js', 'javascript'
+            )
             # Should skip validation and return True on exception
             assert is_valid is True
             assert 'Validation skipped' in msg

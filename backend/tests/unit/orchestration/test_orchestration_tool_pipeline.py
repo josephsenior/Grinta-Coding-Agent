@@ -194,6 +194,56 @@ class TestCircuitBreakerMiddlewarePipeline:
         service.record_error.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_observe_str_replace_syntax_uses_syntax_bucket(self):
+        from backend.ledger.observation import ErrorObservation
+
+        from backend.orchestration.agent_circuit_breaker import (
+            STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME,
+            STR_REPLACE_EDITOR_TOOL_NAME,
+        )
+
+        controller = MagicMock()
+        service = MagicMock()
+        controller.circuit_breaker_service = service
+        mw = CircuitBreakerMiddleware(controller)
+        action = MagicMock()
+        action.tool_call_metadata = MagicMock(function_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        ctx = ToolInvocationContext(
+            controller=controller, action=action, state=MagicMock()
+        )
+        obs = ErrorObservation(content='ERROR:\nSyntax validation failed: bad')
+        await mw.observe(ctx, obs)
+        service.record_error.assert_called_once()
+        assert (
+            service.record_error.call_args.kwargs['tool_name']
+            == STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+        )
+
+    @pytest.mark.asyncio
+    async def test_observe_str_replace_non_syntax_uses_hard_bucket(self):
+        from backend.ledger.observation import ErrorObservation
+
+        from backend.orchestration.agent_circuit_breaker import (
+            STR_REPLACE_EDITOR_TOOL_NAME,
+        )
+
+        controller = MagicMock()
+        service = MagicMock()
+        controller.circuit_breaker_service = service
+        mw = CircuitBreakerMiddleware(controller)
+        action = MagicMock()
+        action.tool_call_metadata = MagicMock(function_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        ctx = ToolInvocationContext(
+            controller=controller, action=action, state=MagicMock()
+        )
+        obs = ErrorObservation(content='old_str not found')
+        await mw.observe(ctx, obs)
+        assert (
+            service.record_error.call_args.kwargs['tool_name']
+            == STR_REPLACE_EDITOR_TOOL_NAME
+        )
+
+    @pytest.mark.asyncio
     async def test_observe_none_observation_is_noop(self):
         controller = MagicMock()
         service = MagicMock()

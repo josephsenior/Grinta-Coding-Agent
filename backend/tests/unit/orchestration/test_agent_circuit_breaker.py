@@ -15,9 +15,12 @@ from unittest.mock import MagicMock
 
 from backend.ledger.action import ActionSecurityRisk
 from backend.orchestration.agent_circuit_breaker import (
+    STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME,
+    STR_REPLACE_EDITOR_TOOL_NAME,
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerResult,
+    classify_str_replace_editor_error_bucket,
 )
 
 
@@ -520,3 +523,94 @@ class TestUpdateMetrics:
         # Should not raise
         breaker._update_metrics(state)
         assert breaker.consecutive_errors == 0
+
+
+class TestStrReplaceEditorTaxonomy:
+    """str_replace_editor vs syntax bucket thresholds and classification."""
+
+    def test_classify_syntax_vs_hard(self):
+        assert (
+            classify_str_replace_editor_error_bucket('Syntax validation failed: oops')
+            == STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+        )
+        assert (
+            classify_str_replace_editor_error_bucket('old_str not found')
+            == STR_REPLACE_EDITOR_TOOL_NAME
+        )
+
+    def test_syntax_errors_skip_consecutive_counter(self):
+        """Syntax-bucket errors should not advance global consecutive_errors."""
+        config = CircuitBreakerConfig(max_consecutive_errors=3)
+        breaker = CircuitBreaker(config)
+        for _ in range(10):
+            breaker.record_error(
+                RuntimeError('Syntax validation failed: x'),
+                tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME,
+            )
+        assert breaker.consecutive_errors == 0
+
+    def test_syntax_trips_switch_context_at_five(self):
+        config = CircuitBreakerConfig(
+            max_consecutive_errors=100,
+            max_high_risk_actions=100,
+            max_stuck_detections=100,
+        )
+        breaker = CircuitBreaker(config)
+        for _ in range(4):
+            breaker.record_error(
+                RuntimeError('x'), tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+            )
+        assert breaker.check(MagicMock()).tripped is False
+        breaker.record_error(
+            RuntimeError('x'), tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+        )
+        result = breaker.check(MagicMock())
+        assert result.tripped is True
+        assert result.action == 'switch_context'
+
+    def test_syntax_trips_pause_at_eight(self):
+        config = CircuitBreakerConfig(
+            max_consecutive_errors=200,
+            max_high_risk_actions=200,
+            max_stuck_detections=200,
+        )
+        breaker = CircuitBreaker(config)
+        for _ in range(7):
+            breaker.record_error(
+                RuntimeError('x'), tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+            )
+        assert breaker.check(MagicMock()).action == 'switch_context'
+        breaker.record_error(
+            RuntimeError('x'), tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+        )
+        result = breaker.check(MagicMock())
+        assert result.tripped is True
+        assert result.action == 'pause'
+
+    def test_hard_bucket_trips_unchanged(self):
+        config = CircuitBreakerConfig(
+            max_consecutive_errors=100,
+            max_high_risk_actions=100,
+            max_stuck_detections=100,
+        )
+        breaker = CircuitBreaker(config)
+        breaker.record_error(RuntimeError('no match'), tool_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        assert breaker.check(MagicMock()).tripped is False
+        breaker.record_error(RuntimeError('no match'), tool_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        result = breaker.check(MagicMock())
+        assert result.tripped is True
+        assert result.action == 'switch_context'
+
+    def test_record_success_clears_both_str_replace_buckets(self):
+        config = CircuitBreakerConfig()
+        breaker = CircuitBreaker(config)
+        breaker.record_error(RuntimeError('a'), tool_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        breaker.record_error(
+            RuntimeError('Syntax validation failed:'),
+            tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME,
+        )
+        assert breaker.get_tool_error_count(STR_REPLACE_EDITOR_TOOL_NAME) == 1
+        assert breaker.get_tool_error_count(STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME) == 1
+        breaker.record_success(tool_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        assert breaker.get_tool_error_count(STR_REPLACE_EDITOR_TOOL_NAME) == 0
+        assert breaker.get_tool_error_count(STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME) == 0

@@ -30,6 +30,9 @@ from backend.inference.exceptions import (
 from backend.ledger import EventSource
 from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.observation import ErrorObservation
+from backend.orchestration.agent_circuit_breaker import (
+    classify_str_replace_editor_error_bucket,
+)
 
 if TYPE_CHECKING:
     from backend.ledger.action import Action
@@ -208,7 +211,8 @@ class ActionExecutionService:
                 if cb_service is not None:
                     error_lower = error_signature.lower()
                     if 'str_replace_editor' in error_lower or '[str_replace_editor' in error_lower:
-                        cb_service.record_error(exc, tool_name='str_replace_editor')
+                        bucket = classify_str_replace_editor_error_bucket(str(exc))
+                        cb_service.record_error(exc, tool_name=bucket)
 
                 effective_max_retries = max_identical_retries
                 if '[APPLY_PATCH_CLASS:malformed_patch]' in error_signature or '[APPLY_PATCH_CLASS:context_mismatch]' in error_signature:

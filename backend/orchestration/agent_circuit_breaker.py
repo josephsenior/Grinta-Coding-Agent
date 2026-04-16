@@ -27,6 +27,23 @@ from backend.core.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
 from backend.ledger.observation import ErrorObservation
 
+# Per-tool keys for str_replace_editor failures. Syntax validation rejects are
+# tracked separately with higher trip thresholds than match/path/guard errors.
+STR_REPLACE_EDITOR_TOOL_NAME = 'str_replace_editor'
+STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME = 'str_replace_editor_syntax'
+
+
+def classify_str_replace_editor_error_bucket(content: str) -> str:
+    """Map str_replace_editor error text to a circuit-breaker per-tool bucket.
+
+    Syntax validation failures are common while iterating on generated code;
+    they use ``STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME`` and higher ``check()``
+    thresholds than deterministic match failures.
+    """
+    if 'syntax validation failed' in (content or '').lower():
+        return STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+    return STR_REPLACE_EDITOR_TOOL_NAME
+
 
 @dataclass
 class CircuitBreakerConfig:
@@ -180,15 +197,40 @@ class CircuitBreaker:
                 ),
             )
 
-        # 2.5 Deterministic same-tool failures
-        str_replace_editor_errors = self.get_tool_error_count('str_replace_editor')
-        if str_replace_editor_errors >= 2:
+        # 2.5 Deterministic same-tool failures (str_replace_editor taxonomy)
+        str_replace_hard = self.get_tool_error_count(STR_REPLACE_EDITOR_TOOL_NAME)
+        str_replace_syntax = self.get_tool_error_count(STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME)
+
+        # Syntax rejects: higher budget than match-not-found / path / guard failures.
+        if str_replace_syntax >= 5:
+            recommendation = (
+                'Repeated syntax validation failures on edited files. '
+                'Prefer minimal parsing-safe stubs and smaller surgical edits; '
+                'refresh file context with read_file before reattempting.'
+            )
+            if str_replace_syntax >= 8:
+                recommendation = (
+                    recommendation
+                    + ' Syntax-validation retries are now blocked until strategy changes.'
+                )
+            return CircuitBreakerResult(
+                tripped=True,
+                reason=(
+                    'Repeated str_replace_editor syntax validation failures '
+                    f'({str_replace_syntax})'
+                ),
+                action='pause' if str_replace_syntax >= 8 else 'switch_context',
+                recommendation=recommendation,
+                system_message=recommendation,
+            )
+
+        if str_replace_hard >= 2:
             recommendation = (
                 'Repeated deterministic str_replace_editor failures detected. '
                 'Refresh file context with read_file before reattempting. '
                 'If this persists, switch to a different edit strategy.'
             )
-            if str_replace_editor_errors >= 3:
+            if str_replace_hard >= 3:
                 recommendation = (
                     recommendation
                     + ' str_replace_editor retries are now blocked until strategy changes.'
@@ -197,9 +239,9 @@ class CircuitBreaker:
                 tripped=True,
                 reason=(
                     'Repeated str_replace_editor deterministic failures '
-                    f'({str_replace_editor_errors})'
+                    f'({str_replace_hard})'
                 ),
-                action='pause' if str_replace_editor_errors >= 3 else 'switch_context',
+                action='pause' if str_replace_hard >= 3 else 'switch_context',
                 recommendation=recommendation,
                 system_message=recommendation,
             )
@@ -249,7 +291,10 @@ class CircuitBreaker:
             tool_name: Optional tool name for per-tool tracking
 
         """
-        self.consecutive_errors += 1
+        # Syntax validation failures are higher-variance; do not consume the
+        # global consecutive-error budget (else they trip before the syntax bucket).
+        if tool_name != STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME:
+            self.consecutive_errors += 1
         self.recent_errors.append(str(error))
         self.recent_actions_success.append(False)
         if tool_name:
@@ -259,7 +304,13 @@ class CircuitBreaker:
         """Record a successful action."""
         self.consecutive_errors = 0  # Reset consecutive error counter
         self.recent_actions_success.append(True)
-        if tool_name:
+        if tool_name in (
+            STR_REPLACE_EDITOR_TOOL_NAME,
+            STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME,
+        ):
+            self._per_tool_errors.pop(STR_REPLACE_EDITOR_TOOL_NAME, None)
+            self._per_tool_errors.pop(STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME, None)
+        elif tool_name:
             self._per_tool_errors.pop(tool_name, None)
 
     def get_tool_error_count(self, tool_name: str) -> int:

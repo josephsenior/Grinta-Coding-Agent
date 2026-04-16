@@ -8,6 +8,7 @@ You MUST explicitly read a file's contents before you edit it. NEVER edit a file
 
 **Edit vs write vs patch (reliability):**
 - **Surgical edits** = small `old_str` → `new_str` replacements (or `edit_mode` primitives below). This is the primary, safe path.
+- **Greenfield / new files** = start with a **minimal, parsing-valid stub** (imports, one function/class shell, closing delimiters) that passes the language parser, then grow with small follow-up edits. Do **not** paste an entire large file in one `create_file` / one-shot write — it fails syntax validation and burns context.
 - **Full file** = `create_file` / write tools when you are replacing or creating an entire file body — do not paste a whole file into a tiny replace.
 - **Unified diff / `patch` mode** = strict context apply or human-readable diff review — not the default way to mutate code; use it when you need exact hunk context or after previewing a diff.
 

@@ -590,6 +590,8 @@ class ErrorGuidance:
 
     summary: str
     steps: tuple[str, ...]
+    # When True, "What you can try" lists only steps (summary is shown as the panel headline).
+    omit_summary_in_recovery: bool = False
 
 
 @dataclass
@@ -624,8 +626,17 @@ def _split_error_text(error_text: str) -> tuple[str, str]:
     if not stripped:
         return 'Unknown error', ''
     lines = stripped.splitlines()
-    summary = lines[0].strip() or 'Unknown error'
-    detail = '\n'.join(line.rstrip() for line in lines[1:]).strip()
+    # Drop leading "ERROR:" scaffolding so the summary is a real message, not a banner line.
+    idx = 0
+    while idx < len(lines):
+        head = lines[idx].strip()
+        if head and head.upper() not in ('ERROR:', 'ERROR'):
+            break
+        idx += 1
+    if idx >= len(lines):
+        return 'Unknown error', ''
+    summary = lines[idx].strip() or 'Unknown error'
+    detail = '\n'.join(line.rstrip() for line in lines[idx + 1 :]).strip()
     if len(detail) > 2000:
         detail = detail[:2000] + '\n... (truncated)'
     return summary, detail
@@ -634,6 +645,16 @@ def _split_error_text(error_text: str) -> tuple[str, str]:
 def _error_guidance(error_text: str) -> ErrorGuidance | None:
     """Return actionable recovery steps for common CLI error patterns."""
     lower = error_text.lower()
+    if 'syntax validation failed' in lower:
+        return ErrorGuidance(
+            summary='Edit was not saved: the file fails a syntax check (invalid structure).',
+            steps=(
+                'Fix the broken brackets, quotes, or keywords in that file (the agent still sees the full tool error in context).',
+                'Prefer small patches or a minimal valid stub, then iterate.',
+                'Re-read the file before applying the next edit.',
+            ),
+            omit_summary_in_recovery=True,
+        )
     if 'no api key or model configured' in lower or (
         'initialization failed' in lower
         and _contains_any(
@@ -811,9 +832,10 @@ def _build_recovery_text(guidance: ErrorGuidance) -> Text:
     """Render a guidance block for the error panel."""
     recovery = Text()
     recovery.append('What you can try\n', style='yellow bold')
-    recovery.append(guidance.summary, style='yellow')
-    if guidance.steps:
-        recovery.append('\n', style='yellow')
+    if guidance.summary and not guidance.omit_summary_in_recovery:
+        recovery.append(guidance.summary, style='yellow')
+        if guidance.steps:
+            recovery.append('\n', style='yellow')
     for index, step in enumerate(guidance.steps, start=1):
         recovery.append(f'{index}. {step}', style='yellow')
         if index < len(guidance.steps):
@@ -829,9 +851,13 @@ def _build_error_panel(
 ) -> Panel:
     """Render a structured error panel with recovery guidance when available."""
     summary, detail = _split_error_text(error_text)
-    body_parts: list[Any] = [Text(summary, style=f'{accent_style} bold')]
-
     guidance = _error_guidance(error_text)
+    headline = (
+        guidance.summary
+        if guidance is not None and 'syntax validation failed' in error_text.lower()
+        else summary
+    )
+    body_parts: list[Any] = [Text(headline, style=f'{accent_style} bold')]
     # When we have actionable guidance (recognized error type), the raw provider
     # detail is noisy and redundant — suppress it so the panel stays clean.
     if guidance is None and detail:
