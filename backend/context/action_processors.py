@@ -27,6 +27,7 @@ from backend.ledger.action.agent import (
     ProposalAction,
     UncertaintyAction,
 )
+from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.mcp import MCPAction
 
 _META_COGNITION_ACTION_TYPES = (
@@ -88,6 +89,7 @@ def _is_tool_based_action(action: Action) -> bool:
         src_value = src or ''
     tool_action_classes = (
         AgentThinkAction,
+        BrowserToolAction,
         FileEditAction,
         FileReadAction,
         MCPAction,

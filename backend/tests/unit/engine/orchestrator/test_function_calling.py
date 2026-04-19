@@ -239,29 +239,40 @@ class TestHandleStrReplaceEditorTool:
                 }
             )
 
-    def test_view_and_replace_with_old_str_returns_edit_action(self, tmp_path):
+    def test_view_and_replace_command_rejected(self, tmp_path):
         target = tmp_path / 'sample.txt'
         target.write_text('hello world\n', encoding='utf-8')
-        action = _handle_str_replace_editor_tool(
-            {
-                'command': 'view_and_replace',
-                'path': str(target),
-                'old_str': 'world',
-                'new_str': 'team',
-            }
-        )
-        assert isinstance(action, FileEditAction)
-        assert action.command == 'replace_text'
+        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
+            _handle_str_replace_editor_tool(
+                {
+                    'command': 'view_and_replace',
+                    'path': str(target),
+                    'old_str': 'world',
+                    'new_str': 'team',
+                }
+            )
 
-    def test_replace_preview_is_read_only_think_action(self, tmp_path):
+    def test_batch_replace_command_rejected(self, tmp_path):
+        target = tmp_path / 'a.py'
+        target.write_text('x\n', encoding='utf-8')
+        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
+            _handle_str_replace_editor_tool(
+                {
+                    'command': 'batch_replace',
+                    'path': str(target),
+                    'edits': [{'path': 'a.py', 'old_str': 'x', 'new_str': 'y'}],
+                }
+            )
+
+    def test_insert_text_preview_is_read_only_think_action(self, tmp_path):
         target = tmp_path / 'sample.txt'
         target.write_text('alpha\nbeta\n', encoding='utf-8')
         action = _handle_str_replace_editor_tool(
             {
-                'command': 'replace_text',
+                'command': 'insert_text',
                 'path': str(target),
-                'old_str': 'beta',
                 'new_str': 'gamma',
+                'insert_line': 0,
                 'preview': True,
             }
         )
@@ -502,44 +513,39 @@ class TestValidateStructureEditorArgs:
         assert isinstance(result, FileReadAction)
         assert result.path == 'x.py'
 
-    def test_canonical_replace_text_passthrough_returns_file_edit_action(self):
+    def test_ast_replace_text_command_rejected(self):
         from backend.engine.function_calling import _handle_ast_code_editor_tool
 
-        result = _handle_ast_code_editor_tool(
-            {
-                'command': 'replace_text',
-                'path': 'x.py',
-                'old_str': 'old',
-                'new_str': 'new',
-            }
-        )
-        assert isinstance(result, FileEditAction)
-        assert result.path == 'x.py'
-        assert result.command == 'replace_text'
+        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
+            _handle_ast_code_editor_tool(
+                {
+                    'command': 'replace_text',
+                    'path': 'x.py',
+                    'old_str': 'old',
+                    'new_str': 'new',
+                }
+            )
 
-    def test_unknown_command_returns_message_action(self):
-        """Unknown command returns a MessageAction with an error."""
+    def test_unknown_command_raises_validation_error(self):
         from backend.engine.function_calling import _handle_ast_code_editor_tool
 
-        result = _handle_ast_code_editor_tool(
-            {'command': 'totally_unknown_cmd', 'path': 'x.py'}
-        )
-        assert isinstance(result, MessageAction)
-        assert 'error' in result.content.lower() or 'unknown' in result.content.lower()
+        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
+            _handle_ast_code_editor_tool(
+                {'command': 'totally_unknown_cmd', 'path': 'x.py'}
+            )
 
     def test_str_replace_alias_is_rejected(self):
         from backend.engine.function_calling import _handle_ast_code_editor_tool
 
-        result = _handle_ast_code_editor_tool(
-            {
-                'command': 'str_replace',
-                'path': 'x.py',
-                'old_str': 'old',
-                'new_str': 'new',
-            }
-        )
-        assert isinstance(result, MessageAction)
-        assert 'unknown' in result.content.lower()
+        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
+            _handle_ast_code_editor_tool(
+                {
+                    'command': 'str_replace',
+                    'path': 'x.py',
+                    'old_str': 'old',
+                    'new_str': 'new',
+                }
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -847,77 +853,3 @@ class TestHealthCheck:
         ):
             result = run_production_health_check(raise_on_failure=False)
         assert result['overall_status'] == 'CRITICAL_FAILURE'
-
-
-# ---------------------------------------------------------------------------
-# _handle_batch_replace_command — base64 encoding tests
-# ---------------------------------------------------------------------------
-
-
-class TestHandleBatchReplaceCommand:
-    """Verify batch_replace uses base64-encoded payloads, not raw inline JSON."""
-
-    def test_command_uses_base64_encoding(self):
-        from backend.engine.function_calling import _handle_batch_replace_command
-
-        action = _handle_batch_replace_command({
-            'edits': [{'path': 'a.py', 'old_str': 'foo', 'new_str': 'bar'}]
-        })
-        assert isinstance(action, CmdRunAction)
-        assert 'b64decode' in action.command
-        # No raw repr() embedding
-        assert 'repr(' not in action.command
-
-    def test_command_is_single_line(self):
-        from backend.engine.function_calling import _handle_batch_replace_command
-
-        action = _handle_batch_replace_command({
-            'edits': [
-                {'path': 'a.py', 'old_str': 'hello', 'new_str': 'world'},
-                {'path': 'b.py', 'old_str': 'x', 'new_str': 'y'},
-            ]
-        })
-        # The shell command itself must be a single line (no embedded newlines)
-        assert '\n' not in action.command
-
-    def test_command_contains_no_unescaped_json(self):
-        """Edits with special chars should not appear raw in the command."""
-        from backend.engine.function_calling import _handle_batch_replace_command
-
-        action = _handle_batch_replace_command({
-            'edits': [{'path': 'c.py', 'old_str': 'print("hi")', 'new_str': 'print("bye")'}]
-        })
-        # The raw JSON content should NOT appear in the command string
-        assert 'print("hi")' not in action.command
-        assert 'b64decode' in action.command
-
-    def test_preview_mode_sets_flag(self):
-        from backend.engine.function_calling import _handle_batch_replace_command
-
-        action = _handle_batch_replace_command({
-            'edits': [{'path': 'a.py', 'old_str': 'x', 'new_str': 'y'}],
-            'preview': True,
-        })
-        assert 'dry-run' in action.thought.lower()
-
-    def test_empty_edits_raises(self):
-        from backend.engine.function_calling import _handle_batch_replace_command
-
-        with pytest.raises(FunctionCallValidationError):
-            _handle_batch_replace_command({'edits': []})
-
-    def test_invalid_batch_path_raises(self):
-        from backend.engine.function_calling import _handle_batch_replace_command
-
-        with pytest.raises(FunctionCallValidationError, match='invalid path'):
-            _handle_batch_replace_command(
-                {
-                    'edits': [
-                        {
-                            'path': '../escape.txt',
-                            'old_str': 'a',
-                            'new_str': 'b',
-                        }
-                    ]
-                }
-            )

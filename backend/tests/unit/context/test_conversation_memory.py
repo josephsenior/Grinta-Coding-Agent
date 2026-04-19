@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, cast
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -21,12 +22,13 @@ from backend.context.message_formatting import (
 from backend.core.message import Message, TextContent
 from backend.integrations.mcp.mcp_utils import call_tool_mcp
 from backend.ledger.action import MessageAction
+from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.event import EventSource
 from backend.ledger.observation import AgentThinkObservation, ErrorObservation
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.mcp import MCPObservation
-from backend.ledger.tool import ToolCallMetadata
+from backend.ledger.tool import ToolCallMetadata, build_tool_call_metadata
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -215,6 +217,95 @@ class TestToolResultPropagation:
 
         assert not out
         assert json.loads(tool_messages['call_5'].content[0].text) == obs.tool_result  # type: ignore
+
+
+class TestToolPairingMessageShape:
+    @staticmethod
+    def _tool_meta(tool_call_id: str) -> ToolCallMetadata:
+        response_obj = SimpleNamespace(
+            id=f'resp_{tool_call_id}',
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        role='assistant',
+                        content='',
+                        tool_calls=[
+                            SimpleNamespace(
+                                id=tool_call_id,
+                                type='function',
+                                function=SimpleNamespace(
+                                    name='browser',
+                                    arguments='{"command":"navigate"}',
+                                ),
+                            )
+                        ],
+                    )
+                )
+            ],
+        )
+        return build_tool_call_metadata(
+            function_name='browser',
+            tool_call_id=tool_call_id,
+            response_obj=response_obj,
+            total_calls_in_response=1,
+        )
+
+    def test_process_events_keeps_assistant_tool_call_when_observation_has_metadata(
+        self,
+    ):
+        mem = _make_memory()
+        initial_user = MessageAction(content='check example.com')
+        initial_user.source = EventSource.USER
+
+        action = BrowserToolAction(command='navigate', params={'url': 'https://example.com'})
+        action.source = EventSource.AGENT
+        action.tool_call_metadata = self._tool_meta('tc_ok')
+
+        obs = CmdOutputObservation(
+            content='Navigated to https://example.com',
+            command='browser navigate',
+            metadata={'exit_code': 0},
+        )
+        obs.tool_call_metadata = action.tool_call_metadata
+
+        messages = mem.process_events(
+            condensed_history=[action, obs],
+            initial_user_action=initial_user,
+            max_message_chars=None,
+            vision_is_active=False,
+        )
+
+        assert any(m.role == 'assistant' and m.tool_calls for m in messages)
+        assert any(m.role == 'tool' for m in messages)
+
+    def test_process_events_drops_unpaired_assistant_tool_call_without_observation_metadata(
+        self,
+    ):
+        mem = _make_memory()
+        initial_user = MessageAction(content='check example.com')
+        initial_user.source = EventSource.USER
+
+        action = BrowserToolAction(command='navigate', params={'url': 'https://example.com'})
+        action.source = EventSource.AGENT
+        action.tool_call_metadata = self._tool_meta('tc_missing')
+
+        obs = CmdOutputObservation(
+            content='Navigated to https://example.com',
+            command='browser navigate',
+            metadata={'exit_code': 0},
+        )
+        # Intentional: no obs.tool_call_metadata, this becomes role=user.
+
+        messages = mem.process_events(
+            condensed_history=[action, obs],
+            initial_user_action=initial_user,
+            max_message_chars=None,
+            vision_is_active=False,
+        )
+
+        assert not any(m.role == 'assistant' and m.tool_calls for m in messages)
+        assert not any(m.role == 'tool' for m in messages)
+        assert sum(1 for m in messages if m.role == 'user') >= 2
 
 
 class TestStaticHelpers:

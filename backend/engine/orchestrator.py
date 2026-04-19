@@ -44,6 +44,7 @@ from backend.engine.contracts import (
     PlannerProtocol,
     SafetyManagerProtocol,
 )
+from backend.engine import prompt_role_debug as _prompt_role_debug
 from backend.engine.executor import OrchestratorExecutor
 from backend.engine.memory_manager import ContextMemoryManager
 from backend.engine.planner import OrchestratorPlanner
@@ -394,10 +395,22 @@ class Orchestrator(Agent):
         )
         self._set_prompt_tier_from_recent_history(state)
 
+        astep_id = (
+            _prompt_role_debug.mark_astep_begin()
+            if _prompt_role_debug.any_prompt_or_reasoning_debug()
+            else 0
+        )
         messages = self.memory_manager.build_messages(
             condensed_history=condensed.events,
             initial_user_message=initial_user_message,
             llm_config=self.llm.config,
+        )
+        _prompt_role_debug.log_prompt_roles_after_build_messages(
+            messages,
+            astep_id=astep_id,
+            condensed_event_count=len(condensed.events),
+            pending_condensation=condensed.pending_action is not None,
+            history_event_count=len(state.history),
         )
         serialized_messages = message_serializer.serialize_messages(messages)
         params = self.planner.build_llm_params(serialized_messages, state, self.tools)
@@ -435,11 +448,24 @@ class Orchestrator(Agent):
         )
         self._set_prompt_tier_from_recent_history(state)
 
+        astep_id = (
+            _prompt_role_debug.mark_astep_begin()
+            if _prompt_role_debug.any_prompt_or_reasoning_debug()
+            else 0
+        )
+
         def _prepare_params() -> dict[str, Any]:
             messages = self.memory_manager.build_messages(
                 condensed_history=condensed.events,
                 initial_user_message=initial_user_message,
                 llm_config=self.llm.config,
+            )
+            _prompt_role_debug.log_prompt_roles_after_build_messages(
+                messages,
+                astep_id=astep_id,
+                condensed_event_count=len(condensed.events),
+                pending_condensation=condensed.pending_action is not None,
+                history_event_count=len(state.history),
             )
             serialized_messages = message_serializer.serialize_messages(messages)
             return self.planner.build_llm_params(serialized_messages, state, self.tools)

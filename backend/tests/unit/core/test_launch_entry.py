@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-import grinta_launch.entry as launcher
+import launch.entry as launcher
 
 
 def test_main_prepends_entry_root_before_run_path(monkeypatch, tmp_path: Path) -> None:

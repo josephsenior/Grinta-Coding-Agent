@@ -22,6 +22,8 @@ You MUST explicitly read a file's contents before you edit it. NEVER edit a file
   Use `preview: true` for dry-run diffs when confidence is low.
   Greenfield file creation: `ast_code_editor(command="create_file", path="...", file_text="...")`.
 
+**Tool-call JSON (why “escaping” failures happen):** Native function-calling sends tool arguments as JSON. If a parameter string is not valid JSON (bad backslashes, unescaped quotes, broken newlines in a giant shell one-liner), the **entire call fails at parse time**—no tool runs, which burns turns and looks like repeated mysterious failures. For multiline HTML/CSS/JSON/config bodies, **prefer `str_replace_editor` / `ast_code_editor` `create_file`** with a properly escaped `file_text` string, or **split work**: a minimal `create_file` then `insert_text` / small `edit_mode` steps. Use **terminal here-strings** only when necessary; huge pasted scripts inside `command` are the most fragile path because one bad escape aborts the whole call.
+
 </EDITOR_AND_FILE_OPERATIONS>
 
 <CODE_QUALITY>

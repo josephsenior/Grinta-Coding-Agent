@@ -34,7 +34,7 @@ dependencies = [
   "libtmux>=0.37,<0.40",
   "mcp>=1.10,<2",
   "openai>=1.40,<3",
-  "pillow>=11.3,<12",
+  "pillow>=11.3,<13",
   "psutil>=7,<8",
   "python-dotenv>=1.1.1,<2",
   "python-frontmatter>=1.1,<2",
@@ -78,6 +78,7 @@ urls = { Repository = "https://github.com/josephsenior/Grinta-Agent", Issues = "
 packages = [
   "backend",
   "client",
+  "launch",
   "grinta_launch",
 ]
 
@@ -108,6 +109,10 @@ test = [
 ]
 
 runtime = []
+
+browser = [
+  "browser-use>=0.12,<0.15",
+]
 
 [tool.hatch.version]
 path = "backend/__init__.py"
@@ -196,5 +201,7 @@ fail_under = 95
 skips = ["B101", "B110", "B404", "B603", "B607"]
 exclude_dirs = ["backend/tests"]
 
+# Use a project-local environment only: run `uv sync` in this repo, then `uv run …`.
+# Avoid `pip install` into the global Python alongside unrelated agent stacks; that causes resolver conflicts.
 [tool.uv]
 constraint-dependencies = ["transformers<4.47.0"]

@@ -88,7 +88,8 @@ class FileEditActionSchema(ActionSchemaV1):
         default=None, description='File content for create command'
     )
     old_str: str | None = Field(
-        default=None, description='String to replace (replace_text command)'
+        default=None,
+        description='String to replace (file-editor substring replace opcode)',
     )
     new_str: str | None = Field(default=None, description='Replacement string')
     insert_line: int | None = Field(
@@ -262,6 +263,17 @@ class BrowseInteractiveActionSchema(ActionSchemaV1):
     browser_actions: str = Field(
         default='',
         description='Browser actions to execute (clicks, typing, navigation)',
+    )
+
+
+class BrowserToolActionSchema(ActionSchemaV1):
+    """Schema for native browser-use tool actions (in-process, no nested Agent)."""
+
+    action_type: Literal['browser_tool'] = Field(ActionType.BROWSER_TOOL.value, frozen=True)
+    runnable: bool = Field(True, frozen=True)
+    command: str = Field(..., min_length=1, description='browser subcommand')
+    params: dict[str, Any] = Field(
+        default_factory=dict, description='Command-specific parameters'
     )
 
 
@@ -498,6 +510,7 @@ ActionSchemaUnion = (
     | MessageActionSchema
     | SystemMessageActionSchema
     | BrowseInteractiveActionSchema
+    | BrowserToolActionSchema
     | PlaybookFinishActionSchema
     | AgentRejectActionSchema
     | ChangeAgentStateActionSchema

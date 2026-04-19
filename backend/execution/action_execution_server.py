@@ -64,6 +64,7 @@ from backend.ledger.action import (
     FileReadAction,
     FileWriteAction,
 )
+from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.signal import SignalProgressAction
@@ -156,8 +157,10 @@ class RuntimeExecutor:
 
             set_active_tool_registry(self.session_manager.tool_registry)
 
-        # Browser attribute kept for compatibility; initialized to None
+        # Legacy attribute; native browser uses GrintaNativeBrowser (optional browser-use).
         self.browser: Any | None = None
+        self.enable_browser = enable_browser
+        self._native_browser: Any | None = None
 
         # Keep a separate cancellation service for non-session tasks if needed,
         # or just rely on session manager for shell tasks.
@@ -1404,6 +1407,22 @@ class RuntimeExecutor:
         # The actual decrementation happens in SessionOrchestrator. We just return ack here.
         return SignalProgressObservation(acknowledged=True)
 
+    async def browser_tool(self, action: BrowserToolAction) -> Observation:
+        """Run native browser-use commands (in-process; optional dependency)."""
+        if not self.enable_browser:
+            return ErrorObservation(
+                content=(
+                    'ERROR: Browser runtime is disabled for this session '
+                    '(enable_browser=false on the runtime).'
+                )
+            )
+        from backend.execution.browser import GrintaNativeBrowser
+
+        if self._native_browser is None:
+            self._native_browser = GrintaNativeBrowser(self.downloads_directory)
+        ctl: GrintaNativeBrowser = self._native_browser
+        return await ctl.execute(action.command, action.params)
+
     def close(self) -> None:
         """Clean up resources owned by the in-process executor."""
         if self._mcp_clients:
@@ -1447,6 +1466,15 @@ class RuntimeExecutor:
             except Exception:
                 pass
             self.browser = None
+        if self._native_browser is not None:
+            try:
+                from backend.utils.async_utils import call_async_from_sync
+                from backend.core.constants import GENERAL_TIMEOUT
+
+                call_async_from_sync(self._native_browser.shutdown, GENERAL_TIMEOUT)
+            except Exception:
+                pass
+            self._native_browser = None
 
 
 # Initialize global variables for client and proxies

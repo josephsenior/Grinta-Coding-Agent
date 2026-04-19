@@ -33,6 +33,85 @@ def _create_console(*args: Any, **kwargs: Any) -> Any:
 Console = _create_console
 
 
+def _parse_project_dir_from_argv() -> Path | None:
+    """Return ``-p`` / ``--project`` directory from ``sys.argv`` if present."""
+    argv = sys.argv[1:]
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ('-p', '--project') and i + 1 < len(argv):
+            try:
+                return Path(argv[i + 1]).expanduser().resolve()
+            except OSError:
+                return None
+        if a.startswith('--project='):
+            try:
+                return Path(a.split('=', 1)[1]).expanduser().resolve()
+            except OSError:
+                return None
+        i += 1
+    return None
+
+
+def _grinta_install_tree_for_dotenv() -> Path:
+    """``backend/cli/main.py`` → parents ``cli``, ``backend``, Grinta repo root."""
+    return Path(__file__).resolve().parent.parent.parent
+
+
+def _load_dotenv_early(*, explicit_project: str | None = None) -> None:
+    """Load ``.env`` into ``os.environ`` before backend imports.
+
+    1. **Grinta install** ``<repo>/.env`` — canonical defaults (``LOG_TO_FILE``, keys).
+       You do not need a ``.env`` in every workspace for logging defaults.
+    2. Optional **``-p`` / explicit project** ``.env`` with ``override=True`` so a
+       client repo can override API keys without duplicating logging flags.
+
+    The process **cwd** is intentionally not loaded: launch location stays unrelated
+    to where configuration lives.
+
+    Uses ``override=False`` for the Grinta file so real OS environment variables win.
+    """
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    try:
+        load_dotenv(_grinta_install_tree_for_dotenv() / '.env', override=False)
+    except OSError:
+        pass
+    for base in (
+        _parse_project_dir_from_argv(),
+        Path(explicit_project).expanduser().resolve() if explicit_project else None,
+    ):
+        if base is None:
+            continue
+        try:
+            load_dotenv(base / '.env', override=True)
+        except OSError:
+            pass
+
+
+def _log_to_file_effective() -> bool:
+    """Mirror ``LOG_TO_FILE`` default in ``backend.core.constants`` without importing backend."""
+    raw = os.getenv('LOG_TO_FILE')
+    if raw is not None and raw.strip() != '':
+        return raw.strip().lower() in ('true', '1', 'yes')
+    return os.getenv('LOG_LEVEL', 'INFO').upper() == 'DEBUG'
+
+
+def _app_logger_level_after_silence() -> int:
+    """Level for ``app`` / ``app.access`` when silencing console noise.
+
+    When ``LOG_TO_FILE`` is enabled, keep the configured log level so
+    ``TimedRotatingFileHandler`` still receives INFO/DEBUG records.
+    """
+    if not _log_to_file_effective():
+        return logging.ERROR
+    name = os.getenv('LOG_LEVEL', 'INFO').upper()
+    mapping = logging.getLevelNamesMapping()
+    return mapping.get(name, logging.INFO)
+
+
 # ── Silence logging immediately at import time ──────────────────────
 # This MUST run before any backend modules are imported so their
 # module-level handlers never write to stdout/stderr.
@@ -47,6 +126,7 @@ def _silence_all_loggers() -> None:
     root.addHandler(logging.NullHandler())
     root.setLevel(logging.WARNING)
 
+    app_level = _app_logger_level_after_silence()
     for name in ('app', 'app.access'):
         lg = logging.getLogger(name)
         for h in lg.handlers[:]:
@@ -55,7 +135,7 @@ def _silence_all_loggers() -> None:
             ):
                 lg.removeHandler(h)
         lg.addHandler(logging.NullHandler())
-        lg.setLevel(logging.ERROR)
+        lg.setLevel(app_level)
         lg.propagate = False
 
     for name in (
@@ -65,6 +145,7 @@ def _silence_all_loggers() -> None:
         logging.getLogger(name).setLevel(logging.CRITICAL)
 
 
+_load_dotenv_early()
 _silence_all_loggers()
 
 
@@ -224,6 +305,11 @@ async def _async_main(
     model: str | None = None,
     project: str | None = None,
 ) -> None:
+    resolved_project = (
+        str(Path(project).resolve()) if project else str(Path.cwd().resolve())
+    )
+    os.environ['PROJECT_ROOT'] = resolved_project
+
     from backend.cli.config_manager import (
         auto_detect_api_keys,
         ensure_default_model,
@@ -232,8 +318,11 @@ async def _async_main(
     )
     from backend.cli.repl import Repl
     from backend.core.config import load_app_config
+    from backend.core.constants import LOG_TO_FILE
+    from backend.core.logger import configure_file_logging, get_log_dir
     from backend.persistence.locations import get_project_local_data_root
 
+    configure_file_logging()
     # Backend imports above trigger module-level logger setup — re-silence.
     _silence_all_loggers()
 
@@ -243,13 +332,14 @@ async def _async_main(
         term_cols = 120
     console = Console(width=term_cols - 2)
     show_grinta_splash(console)
+    if LOG_TO_FILE:
+        console.print(f'  [dim]Session logs: {get_log_dir()}/app.log[/dim]')
+    else:
+        console.print(
+            '  [dim]File logging off — enable in Grinta repo ``.env`` '
+            '(``LOG_TO_FILE=true`` or ``LOG_LEVEL=DEBUG``)[/dim]'
+        )
     initial_input = _read_piped_stdin()
-
-    resolved_project = (
-        str(Path(project).resolve()) if project else str(Path.cwd().resolve())
-    )
-    # Tools reload config in-process; pin the shell workspace so it matches this session.
-    os.environ['PROJECT_ROOT'] = resolved_project
 
     # -- load config -------------------------------------------------------
     config = load_app_config()
@@ -305,6 +395,9 @@ def main(
     cleanup_storage: bool = False,
 ) -> None:
     """Synchronous entry point for the ``grinta`` console_script."""
+    # Grinta repo ``.env`` first (and optional explicit project), before backend
+    # import so ``LOG_TO_FILE`` / ``LOG_LEVEL`` match ``backend.core.constants``.
+    _load_dotenv_early(explicit_project=project)
     # Silence all logging immediately — before any backend imports fire their
     # module-level handlers (backend/core/logger.py installs a JSON→stdout
     # handler when imported, which would spew INFO noise into the terminal).

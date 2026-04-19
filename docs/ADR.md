@@ -385,6 +385,6 @@ semantics cleanly without implying that only world-state mutations matter.
 - ✅ Deterministic edits with stronger constraints than raw substring replacement
 - ✅ Better behavior under text drift and repeated phrases
 - ✅ Clear failure modes for ambiguous anchors/hunks
-- ✅ Backward compatibility preserved for existing `replace_text` usage
+- ✅ `replace_text`, `view_and_replace`, and `batch_replace` removed from tool surface; prefer `ast_code_editor`, `edit_mode`, and sequential edits + checkpoints for multi-file work
 - ⚠️ More implementation complexity in file-editor runtime
 - ⚠️ Additional parser dependency risk for YAML/TOML paths

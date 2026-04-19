@@ -53,22 +53,6 @@ debug_*.py
 
 diag_*.txt
 
-# Mistaken / legacy Grinta workspace-root session trees (use .grinta/storage/sessions/)
-sessions/
-
-# Runtime user data
-backend/prompts/
-backend/snippets/
-backend/sessions/
-backend/workspace/
-workspace/users/
-workspace/sessions/
-
-# Local App storage (generated user conversation/event state)
-storage/users/
-storage/sessions/
-storage/app.db
-
 # Test coverage reports
 coverage/
 .coverage
@@ -87,6 +71,9 @@ mypy_*.txt
 pylint_*.txt
 *_results.txt
 *_check.txt
+
+# Grinta runtime logs (always under install tree ``logs/``, not workspace cwd)
+logs/
 
 # Debug/error logs
 *.out

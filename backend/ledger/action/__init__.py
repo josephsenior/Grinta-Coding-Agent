@@ -20,6 +20,7 @@ from backend.ledger.action.agent import (
     TaskTrackingAction,
     UncertaintyAction,
 )
+from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.browse import BrowseInteractiveAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.commands import CmdRunAction
@@ -55,6 +56,7 @@ __all__ = [
     'CmdRunAction',
     'CondensationAction',
     'CondensationRequestAction',
+    'BrowserToolAction',
     'BrowseInteractiveAction',
     'DelegateTaskAction',
     'EscalateToHumanAction',

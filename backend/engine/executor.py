@@ -276,7 +276,9 @@ class OrchestratorExecutor:
                     if not text_piece:
                         return
 
-                    content_accumulate += text_piece
+                    content_accumulate = _merge_stream_fragment(
+                        content_accumulate, text_piece
+                    )
                     display_acc = redact_streamed_tool_call_markers(
                         content_accumulate
                     )
@@ -297,7 +299,9 @@ class OrchestratorExecutor:
                     if not text_piece:
                         return
 
-                    thinking_accumulate += text_piece
+                    thinking_accumulate = _merge_stream_fragment(
+                        thinking_accumulate, text_piece
+                    )
                     if event_stream:
                         ev = StreamingChunkAction(
                             chunk='',

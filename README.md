@@ -71,11 +71,13 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for implementation details.
 
 ### Linux / macOS / manual
 
-1. Install dependencies:
+1. Install dependencies **in this repo’s environment only** (creates/updates `.venv/`; do not rely on a global `pip install` mixed with unrelated tools):
 
 ```bash
-uv sync
+uv sync --group browser
 ```
+
+Optional dev/test tools: `uv sync --group dev --group test --group browser`.
 
 1. Create local settings:
 
@@ -88,6 +90,8 @@ cp settings.template.json settings.json
 ```bash
 uv run python -m backend.cli.entry
 ```
+
+If you previously installed `grinta-ai` with `pip` into a **global** interpreter, remove it (`pip uninstall grinta-ai`) and use `uv run` from this repository so dependencies stay isolated.
 
 ### Optional raw HTTP backend (API/OpenAPI tooling)
 

@@ -6,7 +6,6 @@ This is similar to the functionality of `OrchestratorResponseParser`.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
@@ -16,7 +15,6 @@ from backend.core.errors import (
     FunctionCallValidationError,
 )
 from backend.core.logger import app_logger as logger
-from backend.core.type_safety.path_validation import PathValidationError, SafePath
 from backend.engine.common import (
     common_response_to_actions,
 )
@@ -28,6 +26,11 @@ from backend.engine.tools import (
     create_structure_editor_tool,
     create_summarize_context_tool,
     create_think_tool,
+)
+from backend.engine.tools.browser_native import (
+    BROWSER_TOOL_NAME,
+    build_browser_tool_action,
+    create_browser_tool,
 )
 from backend.engine.tools.analyze_project_structure import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
@@ -59,7 +62,6 @@ from backend.engine.tools.memory_manager import (
 )
 from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.note import build_note_action, build_recall_action
-from backend.engine.tools.prompt import build_python_exec_command
 from backend.engine.tools.revert_to_checkpoint import (
     REVERT_TO_CHECKPOINT_TOOL_NAME,
     build_revert_to_checkpoint_action,
@@ -86,16 +88,12 @@ from backend.engine.tools.verify_file_lines import (
     VERIFY_FILE_LINES_TOOL_NAME,
     build_verify_file_lines_action,
 )
-from backend.engine.tools.verify_ui import (
-    VERIFY_UI_CHANGE_TOOL_NAME,
-    build_verify_ui_change_action,
-)
-from backend.engine.tools.whitespace_handler import WhitespaceHandler
 from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
 from backend.ledger.action import (
     Action,
     ActionSecurityRisk,
     AgentThinkAction,
+    BrowserToolAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -174,6 +172,13 @@ def _require_tool_argument(
             f'Missing required argument "{key}" in tool call {tool_name}'
         )
     return arguments[key]
+
+
+def _handle_browser_tool(arguments: dict) -> BrowserToolAction:
+    """Handle native browser-use tool calls."""
+    action = build_browser_tool_action(arguments)
+    set_security_risk(action, arguments)
+    return action
 
 
 def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
@@ -381,144 +386,8 @@ def _filter_valid_editor_kwargs(other_kwargs: dict) -> dict:
     return valid_kwargs_for_editor
 
 
-def _normalize_whitespace(text: str) -> str:
-    """Normalize whitespace for fuzzy matching: strip trailing spaces and unify indent chars."""
-    return WhitespaceHandler.normalize_for_match(text)
-
-
-def _ws_tolerant_replace(
-    file_content: str, old_str: str, new_str: str
-) -> tuple[str | None, str | None]:
-    """Try whitespace-normalized matching to find and replace old_str in file_content.
-
-    Returns (new_content, None) on success, or (None, error_message) on failure.
-    """
-    norm_content = _normalize_whitespace(file_content)
-    norm_old = _normalize_whitespace(old_str)
-
-    count = norm_content.count(norm_old)
-    if count == 0:
-        return None, 'No match found even with whitespace normalization.'
-    if count > 1:
-        return (
-            None,
-            f'Whitespace-normalized old_str matches {count} locations — must be unique.',
-        )
-
-    norm_start = norm_content.index(norm_old)
-    norm_end = norm_start + len(norm_old)
-
-    orig_start = _map_normalized_offset_to_original(file_content, norm_start)
-    orig_end = _map_normalized_offset_to_original(file_content, norm_end)
-
-    new_content = file_content[:orig_start] + new_str + file_content[orig_end:]
-    return new_content, None
-
-
-def _map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
-    """Map a character offset in normalized text back to the original text."""
-    return WhitespaceHandler.map_normalized_offset_to_original(original, norm_offset)
-
-
-def _extract_view_replace_params(kwargs: dict) -> tuple[str, str, Any]:
-    """Extract old_str, new_str, and view_range from kwargs."""
-    old_str = kwargs.get('old_str', '')
-    new_str = kwargs.get('new_str', '')
-    view_range = kwargs.get('view_range')
-    return old_str, new_str, view_range
-
-
-def _get_search_content_by_range(content: str, view_range: Any) -> str:
-    """Slice content to the given line range. Returns full content if range invalid."""
-    if not view_range or len(view_range) < 2:
-        return content
-    lines = content.splitlines(keepends=True)
-    start_val = view_range[0] if view_range[0] is not None else 1
-    end_val = view_range[1]
-    try:
-        start_idx = max(0, int(start_val) - 1)
-        end_idx = len(lines) if end_val in (-1, None) else min(len(lines), int(end_val))
-    except (TypeError, ValueError):
-        start_idx, end_idx = 0, len(lines)
-    return ''.join(lines[start_idx:end_idx])
-
-
-def _old_str_not_found_action(path: str, view_range: Any) -> AgentThinkAction:
-    """Build AgentThinkAction for 'old_str not found' error."""
-    range_suffix = ''
-    if (
-        view_range
-        and len(view_range) >= 2
-        and view_range[0] is not None
-        and view_range[1] is not None
-    ):
-        range_suffix = f' (within lines {view_range[0]}-{view_range[1]})'
-    return AgentThinkAction(
-        thought=f'[VIEW_AND_REPLACE] old_str not found in {path}{range_suffix}. '
-        'Use view_file command to check the actual content.'
-    )
-
-
-def _handle_view_and_replace(path: str, kwargs: dict) -> list[Action]:
-    """Handle the compound view_and_replace command.
-
-    Returns a list of actions: first a FileReadAction (view_file), then a FileEditAction (replace_text).
-    If old_str/new_str are provided, performs the replacement; otherwise just views.
-    """
-    import os
-
-    old_str, new_str, view_range = _extract_view_replace_params(kwargs)
-
-    if not os.path.isfile(path):
-        return [AgentThinkAction(thought=f'[VIEW_AND_REPLACE] File not found: {path}')]
-
-    if not old_str:
-        return [
-            FileReadAction(
-                path=path,
-                impl_source=FileReadSource.FILE_EDITOR,
-                view_range=view_range,
-            )
-        ]
-
-    try:
-        with open(path, encoding='utf-8', errors='replace') as f:
-            content = f.read()
-    except OSError as exc:
-        return [
-            AgentThinkAction(thought=f'[VIEW_AND_REPLACE] Cannot read {path}: {exc}')
-        ]
-
-    search_content = _get_search_content_by_range(content, view_range)
-
-    if old_str not in search_content:
-        _, err = _ws_tolerant_replace(search_content, old_str, new_str)
-        if err:
-            return [
-                AgentThinkAction(
-                    thought=f'[VIEW_AND_REPLACE] {err} Use view_file command to check the actual content.'
-                )
-            ]
-
-    edit_kwargs: dict = {'old_str': old_str, 'new_str': new_str}
-
-    return [
-        FileReadAction(
-            path=path,
-            impl_source=FileReadSource.FILE_EDITOR,
-            view_range=view_range,
-        ),
-        FileEditAction(
-            path=path,
-            command='replace_text',
-            impl_source=FileEditSource.FILE_EDITOR,
-            **edit_kwargs,
-        ),
-    ]
-
-
 def _preview_str_replace_edit(path: str, command: str, kwargs: dict) -> AgentThinkAction:
-    """Generate a unified diff preview of what a replace_text or insert_text would produce."""
+    """Generate a unified diff preview of what an insert_text edit would produce."""
     import difflib
     import os
 
@@ -533,24 +402,7 @@ def _preview_str_replace_edit(path: str, command: str, kwargs: dict) -> AgentThi
 
     new_lines = list(original_lines)
 
-    if command == 'replace_text':
-        old_str = kwargs.get('old_str', '')
-        new_str = kwargs.get('new_str', '')
-        if not old_str:
-            return AgentThinkAction(
-                thought='[PREVIEW] old_str is required for replace_text preview'
-            )
-        original_text = ''.join(original_lines)
-        count = original_text.count(old_str)
-        if count == 0:
-            return AgentThinkAction(thought=f'[PREVIEW] old_str not found in {path}')
-        if count > 1:
-            return AgentThinkAction(
-                thought=f'[PREVIEW] old_str matches {count} locations — must be unique'
-            )
-        new_text = original_text.replace(old_str, new_str, 1)
-        new_lines = new_text.splitlines(keepends=True)
-    elif command == 'insert_text':
+    if command == 'insert_text':
         insert_line = int(kwargs.get('insert_line', 0))
         new_str = kwargs.get('new_str', '')
         insert_text = new_str if new_str.endswith('\n') else new_str + '\n'
@@ -599,10 +451,6 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     """Handle str_replace_editor tool call."""
     command = arguments.get('command', '')
 
-    # batch_replace is handled separately — it doesn't need path validation
-    if command == 'batch_replace':
-        return _handle_batch_replace_command(arguments)
-
     path, command = _validate_str_replace_editor_args(arguments)
     command, normalized_args = _normalize_file_editor_command_and_args(
         command, arguments
@@ -610,10 +458,8 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     valid_commands = {
         'view_file',
         'create_file',
-        'replace_text',
         'insert_text',
         'undo_last_edit',
-        'view_and_replace',
     }
     if command not in valid_commands:
         raise FunctionCallValidationError(
@@ -628,15 +474,8 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     _apply_confidence_preview_override(other_kwargs, path)
 
     raw_preview = other_kwargs.pop('preview', False)
-    if _is_preview_enabled(raw_preview) and command in ('replace_text', 'insert_text'):
+    if _is_preview_enabled(raw_preview) and command == 'insert_text':
         return _preview_str_replace_edit(path, command, other_kwargs)
-
-    if command == 'view_and_replace':
-        actions = _handle_view_and_replace(path, other_kwargs)
-        if len(actions) == 1:
-            return actions[0]
-        # Execute the replacement action; returning the first action would drop edits.
-        return actions[1]
 
     if command == 'view_file':
         return FileReadAction(
@@ -647,8 +486,6 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
 
     view_range = other_kwargs.pop('view_range', None)
     valid_kwargs = _filter_valid_editor_kwargs(other_kwargs)
-    if command == 'replace_text' and view_range is not None:
-        valid_kwargs['view_range'] = view_range
 
     action = FileEditAction(
         path=path,
@@ -658,156 +495,6 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     )
     set_security_risk(action, arguments)
     return action
-
-
-def _handle_batch_replace_command(arguments: dict) -> CmdRunAction:
-    """Handle batch_replace command — atomic multi-file edits with rollback.
-
-    The entire Python script is base64-encoded so the shell command contains no
-    nested quotes, newlines, or special characters.  This makes it safe for
-    PowerShell ``-Command``, bash ``-c``, and cmd ``/c`` alike.
-    """
-    import base64
-    import json as _json
-
-    edits = arguments.get('edits')
-    if not edits or not isinstance(edits, list):
-        raise FunctionCallValidationError(
-            'batch_replace requires "edits" array of {path, old_str, new_str}'
-        )
-    normalized_edits: list[dict[str, str]] = []
-    workspace_root = Path.cwd()
-    for idx, edit in enumerate(edits):
-        if not isinstance(edit, dict):
-            raise FunctionCallValidationError(
-                f'batch_replace edit at index {idx} must be an object'
-            )
-        path_val = edit.get('path')
-        old_val = edit.get('old_str')
-        new_val = edit.get('new_str')
-        if not isinstance(path_val, str) or not isinstance(old_val, str) or not isinstance(
-            new_val, str
-        ):
-            raise FunctionCallValidationError(
-                f'batch_replace edit at index {idx} must include string path/old_str/new_str'
-            )
-        try:
-            safe_path = SafePath.validate(
-                path_val,
-                workspace_root=str(workspace_root),
-                must_be_relative=True,
-            )
-        except PathValidationError as exc:
-            raise FunctionCallValidationError(
-                f'batch_replace invalid path at index {idx}: {exc.message}'
-            ) from exc
-        normalized_edits.append(
-            {
-                'path': str(safe_path.path),
-                'old_str': old_val,
-                'new_str': new_val,
-            }
-        )
-    preview = arguments.get('preview', False)
-    edits_json = _json.dumps(normalized_edits)
-    preview_flag = 'True' if preview else 'False'
-
-    # --- readable Python source that will be base64-transported -----------
-    script = f"""\
-import json, re, sys
-from collections import defaultdict
-
-def _strip_trailing_newlines(s):
-    return re.sub(r'\\n+$', '', s)
-
-edits = json.loads({edits_json!r})
-preview = {preview_flag}
-errors = []
-
-by_path = defaultdict(list)
-for i, edit in enumerate(edits):
-    by_path[edit['path']].append((i, edit))
-
-for path, seq in by_path.items():
-    for a in range(len(seq)):
-        for b in range(a + 1, len(seq)):
-            oa, ob = seq[a][1], seq[b][1]
-            old_b = _strip_trailing_newlines(ob['old_str'])
-            new_a = oa['new_str']
-            if old_b and old_b in new_a:
-                ia, ib = seq[a][0], seq[b][0]
-                errors.append(
-                    f'Edit ordering guard: edit {{ib}} old_str is contained in edit {{ia}} new_str (path {{path}})'
-                )
-                break
-        if errors:
-            break
-    if errors:
-        break
-
-buffers = {{}}
-if not errors:
-    for i, edit in enumerate(edits):
-        path, old, new = edit['path'], edit['old_str'], edit['new_str']
-        try:
-            if path not in buffers:
-                with open(path, 'r', encoding='utf-8') as f:
-                    buffers[path] = f.read()
-            content = buffers[path]
-            count = content.count(old)
-            if count == 0:
-                errors.append(f'Edit {{i}}: old_str not found in {{path}}')
-                break
-            if count > 1:
-                errors.append(
-                    f'Edit {{i}}: old_str matches {{count}} locations in {{path}} — must be unique'
-                )
-                break
-            buffers[path] = content.replace(old, new, 1)
-        except Exception as e:
-            errors.append(f'Edit {{i}}: {{e}}')
-            break
-
-if not errors and not preview:
-    originals = {{}}
-    for path in buffers:
-        with open(path, 'r', encoding='utf-8') as f:
-            originals[path] = f.read()
-    for path, final in buffers.items():
-        try:
-            with open(path, 'w', encoding='utf-8') as f:
-                f.write(final)
-            print(f'  [OK] {{path}}')
-        except Exception as e:
-            errors.append(f'Write failed for {{path}}: {{e}}')
-            for opath, ocontent in originals.items():
-                try:
-                    with open(opath, 'w', encoding='utf-8') as f:
-                        f.write(ocontent)
-                except OSError as err:
-                    sys.stderr.write(
-                        f'[batch_replace] Rollback failed for {{opath!r}}: {{err}}\\n'
-                    )
-            break
-
-if errors:
-    print('BATCH EDIT FAILED — all changes rolled back.')
-    print('Error:', errors[0])
-    sys.exit(1)
-else:
-    if preview:
-        print('DRY RUN: all', len(edits), 'edits would apply cleanly.')
-    else:
-        print('BATCH EDIT OK:', len(edits), 'files updated atomically.')
-"""
-    script_b64 = base64.b64encode(script.encode()).decode()
-    label = 'dry-run' if preview else 'applying'
-    return CmdRunAction(
-        command=build_python_exec_command(
-            f"import base64;exec(base64.b64decode(b'{script_b64}').decode())"
-        ),
-        thought=f'[BATCH REPLACE] {label} {len(normalized_edits)} edit(s) atomically',
-    )
 
 
 def _handle_think_tool(arguments: dict) -> AgentThinkAction:
@@ -1114,9 +801,7 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
     file_editor_commands = {
         'create_file',
         'view_file',
-        'replace_text',
         'insert_text',
-        'view_and_replace',
         'undo_last_edit',
     }
     if command in file_editor_commands:
@@ -1201,6 +886,8 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
                 f"Valid commands: {all_cmds}"
             )
 
+    except FunctionCallValidationError:
+        raise
     except Exception as e:
         return MessageAction(content=f'❌ Structure Editor error: {str(e)}')
 
@@ -1297,7 +984,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
         REVERT_TO_CHECKPOINT_TOOL_NAME: build_revert_to_checkpoint_action,
         SESSION_DIFF_TOOL_NAME: _handle_session_diff_tool,
-        VERIFY_UI_CHANGE_TOOL_NAME: build_verify_ui_change_action,
+        BROWSER_TOOL_NAME: _handle_browser_tool,
     }
 
 

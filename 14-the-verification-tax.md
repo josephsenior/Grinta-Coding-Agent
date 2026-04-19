@@ -1,324 +1,292 @@
-# 15. Prompts Are Programs
+# 14. The Verification Tax
 
-There is a popular way of talking about prompt engineering that makes it sound like copywriting for machines.
+Autonomy without verification is seductive: the agent says, "Done," and everyone quietly agrees that it means something.
 
-Choose the right words.
-Add a few examples.
-Massage the phrasing.
-Find the secret incantation.
+That version is cheap; it is also fake.
 
-I understand the appeal of talking about it that way.
-It flatters the mystique.
+If [08. The First Fixed Issue](08-the-first-fixed-issue.md) was the chapter where the system proved it could finish real work once, this chapter is about the machinery that stops the word *finished* from turning into theater.
 
-It is also one of the least useful mental models you can carry into a serious agent system.
+It also lives downstream of two other pressures: the memory discipline in [04. The Context War](04-the-context-war.md) and the prompt discipline in [15. Prompts Are Programs](15-prompts-are-programs.md). A system that remembers badly or instructs badly will validate badly too.
 
-Because once the prompt stops being a single clever paragraph and starts becoming the control surface for a real tool, it is no longer just wording.
+Because the hard truth is simple: an autonomous coding agent is not mainly judged by how confidently it can describe a solution. It is judged by whether the surrounding system can verify that the solution actually happened.
 
-It is software.
+That surrounding system costs money: it costs code, it costs latency, and it costs design complexity.
 
-That was one of the most important architecture lessons in Grinta.
+That cost is the verification tax.
 
-The day I really accepted that was the day the prompt system started getting better.
+And if you do not pay it, you are not building autonomy; you are building a storytelling machine.
 
 ---
 
-## The Jinja Disaster
+## The Lie of "Done"
 
-Earlier versions of the project used Jinja2 for system-prompt rendering.
+The more time I spent around coding agents, the more one failure mode started to disgust me.
 
-On paper, this sounded reasonable.
+The agent would:
 
-Templating engines exist to render structured text with conditionals.
-Prompts are structured text with conditionals.
-Case closed.
+- describe the fix in confident language
+- mention the files it supposedly changed
+- summarize the tests it supposedly ran
+- present a polished closing message
 
-In practice, it turned into a mess.
+And underneath that surface, one of several things would be true:
 
-The prompt logic spread across template branches, configuration checks, and slightly different "optimized" variants that all claimed to be the right one. I had hundreds of lines of prompt logic rendered through a DSL that made perfect sense for HTML and terrible sense for a live system prompt whose shape depended on runtime conditions.
+- the tests never actually ran
+- the file edits did not apply
+- the edits existed but did not satisfy the task
+- the output looked active but the task had stalled three loops ago
 
-That kind of architecture has a special way of wasting your time.
+This is not a rare failure.
+It is one of the default failure modes of the whole field.
 
-You cannot reason about it locally.
-You cannot debug it comfortably.
-You cannot step through it like real code.
-You end up rendering giant strings and eyeballing the result like a person checking tea leaves.
+Models are good at producing the linguistic shape of completion.
+That does not mean completion happened.
 
-That is when I realized the problem was not that the prompt was hard.
-It was that I had chosen the wrong *medium* for the logic.
+Once I really accepted that, a lot of design decisions became easier.
 
----
+I stopped asking, "How do I make the model conclude better?"
+I started asking, "How do I make false finishes structurally harder?"
 
-## The Moment the Prompt Became Code
-
-Once I stopped treating the prompt as sacred text and started treating it as a program that produces text, a lot of confusion vanished.
-
-That shift sounds minor.
-It is not.
-
-The key mental change was this:
-
-the thing I needed to design was not only the final string.
-It was the **rendering path** that produced the string.
-
-That meant I suddenly cared about all the questions software engineers already know how to ask:
-
-- where is the logic allowed to branch
-- which parts are static and which are dynamic
-- how do I debug a bad output
-- how do I make one section change without destabilizing the rest
-- how do I keep platform-specific behavior explicit instead of smearing it everywhere
-
-Once you ask those questions, prompt architecture stops feeling mystical.
-It starts feeling like normal engineering again.
-
-That was a relief.
+That shift is where the validator stack came from.
 
 ---
 
-## Why Python Won
+## Why Validation Could Not Be One Thing
 
-The current prompt builder in Grinta is deliberately boring.
+One naive way to solve this would be to create a single yes-or-no validator.
 
-That is praise.
+But real engineering tasks do not fail in one way.
 
-Static prompt sections live in markdown files.
-Dynamic prompt sections are rendered by plain Python functions.
-The builder takes context and returns a string.
+Sometimes the missing thing is tests.
+Sometimes it is a meaningful code change.
+Sometimes it is an expected output file.
+Sometimes it is a subtler mismatch between what the user asked for and what the system actually did.
 
-That is it.
+That is why the validation layer in Grinta had to become plural.
 
-No DSL gymnastics.
-No prompt templating religion.
-No second language hidden inside the first.
+Not because plurality is elegant, but because tasks are messy.
 
-Python won for the least glamorous and most important reasons:
+The `TaskValidator` abstraction forced me to think correctly about the problem. A validator is not a magical oracle. It is one lens over the evidence available in the task history and current state. Each validator asks a narrower question. Together, they make it harder for the system to promote rhetoric into reality.
 
-- normal control flow
-- normal debugging
-- normal code review
-- normal testing instincts
-- normal IDE support
+That was the right abstraction because it mirrors how serious engineers already think. When I review work, I do not ask one gigantic abstract question. I ask several concrete ones:
 
-If a branch in the prompt is wrong, I can inspect the function that produced it.
-If a platform conditional is wrong, I can see the exact `_choose(...)` logic.
-If a section becomes too large or too confusing, I can split it like any other code.
+- did the code actually change
+- did the tests pass
+- were the promised artifacts created
+- does the result satisfy the request
 
-That is a better engineering environment than hoping a template engine keeps feeling manageable after the fifth layer of conditionals.
+The validator system formalized that instinct.
 
 ---
 
-## The Five-Part Prompt Spine
+## The First Layer: Did Anything Real Change?
 
-One of the cleanest consequences of the pure-Python rewrite was that the system prompt developed an actual spine.
+The `DiffValidator` exists because a shocking amount of agent work can look busy without becoming substantive.
 
-The prompt is not one blob. It is several deliberately different sections that each solve a different problem.
+Whitespace churn.
+Comment edits.
+Renames that sound meaningful but change nothing.
+Tool noise that creates the *appearance* of progress.
 
-That architecture had to stay lean enough to survive the pressure described in [04. The Context War](04-the-context-war.md), and modular enough to coexist with the runtime knowledge packets described in [13. The Hidden Playbooks](13-the-hidden-playbooks.md) without collapsing back into one giant god-prompt.
+So the diff layer asks a brutal question:
 
-Grinta's prompt builder loads and assembles five main partials:
+**Was there a meaningful code change, or did the session only produce surface movement?**
 
-- routing
-- autonomy
-- tools
-- tail
-- critical
+That is why the validator filters out metadata, blank lines, and comment-only changes. It is not enough that a diff exists. The diff has to look like work that could plausibly satisfy the task.
 
-That decomposition matters because the sections do not do the same work.
+This sounds basic until you watch an autonomous loop spin. Then you realize how much false momentum a system can generate without anyone explicitly lying.
 
-### Routing
+The model is not always deceiving you.
+Sometimes it is merely mistaking activity for progress.
 
-The routing section teaches the model how to choose between tools.
-
-This is more important than people think. A lot of bad agent behavior is not caused by lack of intelligence. It is caused by bad tool selection. Models will happily use the shell as a blunt instrument unless the environment teaches them a better hierarchy.
-
-That is why routing exists as its own first-class section. It encodes hard-earned taste: when to use layout-discovery tools, when to prefer structured file readers, when shell usage is appropriate, and when it is just noisy laziness.
-
-### Autonomy
-
-Autonomy is not one slider buried in config.
-It is a behavioral contract.
-
-The autonomy partial makes that contract visible. Full, balanced, and supervised modes each produce a different block of instructions. That matters because the model should not be asked to infer the user's risk appetite from vibes.
-
-If the system is going to be more or less independent, say it clearly.
-
-### Tools
-
-The tools section is where the architecture stops pretending that all tools are morally equal.
-
-It teaches fallback order, discourages bad habits, and reinforces the central discipline of the product: structured tools first, shell last for source-code operations.
-
-This is one of the places where prompt engineering and product philosophy become the same thing. The prompt is not merely describing tools. It is teaching the model the values embedded in the tool layer.
-
-### Tail
-
-The tail is where late-stage behavioral guidance lives: MCP exposure, permissions framing, server hints, and the final reminders that should survive near the end of the system message.
-
-I liked making this its own section because the end of a prompt has a different rhetorical role from the beginning. Some instructions need to greet the model early. Some need to remain visible late.
-
-That is not mystical either. It is layout.
-
-### Critical
-
-The critical section isolates the hardest constraints.
-
-It exists because some rules should not be buried in the middle of softer guidance. Rules like "do not claim a file was created if you never invoked the file-editing tool" or "do not fabricate results when a tool failed" deserve their own hard edge.
-
-That separation makes the prompt easier to reason about and makes the rule hierarchy more legible.
+The validator does not care about the story.
+It cares about the trace.
 
 ---
 
-## Markdown for Content, Structure for Boundaries
+## The Second Layer: Did the Tests Actually Pass?
 
-The final prompt format also taught me something obvious that I had somehow managed to forget.
+The `TestPassingValidator` is one of the clearest examples of why verification belongs in infrastructure, not just in prose instructions.
 
-Models are not alien readers.
-They are statistical machines trained on oceans of technical text.
+You can tell a model, "Please run the tests before finishing," a thousand times.
+That does not mean the tests ran.
 
-That means format matters.
+So the validator inspects recent history, looks for commands that actually count as test execution, and checks the observed outcomes.
 
-Markdown works well because it is close to the native visual grammar of software communication: headers, bullets, short sections, explicit emphasis. Models have seen an absurd amount of it.
+That is a much healthier relationship to evidence.
 
-But markdown alone is not enough when you need sharper structural boundaries.
+It does not ask the model whether it was careful.
+It checks whether the system observed test-like behavior and whether the resulting exit codes support the claim.
 
-That is where explicit blocks such as `<AUTONOMY>` and `<MCP_TOOLS>` earn their place. They give the prompt hard segmentation without forcing everything into JSON-shaped rigidity. They are not there because XML is elegant. They are there because the model parses structural boundaries well when those boundaries are obvious and consistent.
+There is something emotionally clarifying about that. The model can be brilliant, mediocre, tired, overconfident, or unlucky. The validator does not need to psychoanalyze it. It only needs to ask: *what happened?*
 
-That combination ended up being the sweet spot:
-
-- markdown for readable content
-- structural tags for delimiters
-- Python for assembly
-
-It sounds almost embarrassingly practical.
-That is why it works.
+This is also why I increasingly view agent reliability as a systems problem more than a prompt problem. Prompts tell the model what kind of behavior is wanted. Verification tells the runtime whether that behavior actually occurred.
 
 ---
 
-## The MCP Menu Problem
+## The Third Layer: Were the Promised Artifacts Produced?
 
-The prompt builder also forced me to confront a problem that shows up any time an agent gains external extensibility.
+Some tasks are not mainly about tests.
+They are about outputs.
 
-How do you expose a large set of external capabilities without turning the prompt into garbage?
+Create this file.
+Write that config.
+Produce this report.
+Save that script.
 
-The answer in Grinta was to treat MCP tools as a **menu**, not as a swarm of native function signatures scattered all over the system prompt.
+That is where the file-existence layer matters.
 
-The builder collects the available tool names, adds descriptions when useful, layers in server-level hints when those exist, and presents the result as one coherent block. The execution path stays simple: one gateway call pattern, many available tools.
+The `FileExistsValidator` is intentionally pragmatic. It can use explicit expected files if the task defines them clearly. It can also fall back to hints parsed from the task description when the instruction is more natural-language than structured.
 
-That separation is incredibly important.
+I like this validator because it reflects a broader principle that shaped Grinta:
 
-The prompt should explain *what exists* and *when to use it*.
-The runtime should own *how it is executed*.
+**systems should reward explicit structure when it exists, but degrade gracefully when users speak like humans.**
 
-When those responsibilities blur together, the model ends up carrying too much interface detail in its active context. When they are separated cleanly, the system scales without making the core prompt unreadable.
+That is the same compromise that shows up in [13. The Hidden Playbooks](13-the-hidden-playbooks.md): reward structure when it exists, but do not require ritual purity before the system can help.
 
----
-
-## Platform Awareness Without Prompt Rot
-
-One of the easiest ways to ruin a system prompt is to let platform conditionals seep into every paragraph.
-
-Windows here.
-Unix there.
-Maybe bash.
-Maybe PowerShell.
-Maybe Git Bash on Windows.
-Maybe a fallback.
-
-If you do that carelessly, the prompt starts to decay into caveat soup.
-
-This is another place where pure Python helped. Platform awareness could be expressed through small rendering choices instead of duplicated prompt variants. The builder can choose different strings, different examples, or different process-management guidance without forking the entire prompt into parallel universes.
-
-That sounds like a minor implementation detail.
-It is actually a huge maintainability win.
-
-It means cross-platform support lives in the rendering layer instead of turning the prompt corpus into a branching labyrinth.
+That is one of the hardest balances in agent design. If you demand perfect structure from the user, you get brittle usability. If you accept only vague language, you get mushy validation. The right answer is usually layered: use strong structure when available, and use best-effort inference when it is not.
 
 ---
 
-## Debug Tier and the Architecture of Escalation
+## The Fourth Layer: The Model as a Weak Judge of Its Own Work
 
-One of the subtler improvements in the prompt system was the shift from one static prompt to a tiered model.
+There is also an LLM-based evaluator in the stack.
 
-Normal operation and stressed operation are not the same thing.
+That sentence needs to be handled carefully.
 
-If the agent has been running cleanly, the base prompt should stay lean.
-If the session is error-heavy, high-risk, or historically scarred, the system should be able to inject more guidance.
+I do believe a model can be useful as one signal in a validation system. It can summarize recent actions. It can compare task requirements to the observed trajectory. It can point out missing items or unresolved criteria that a purely mechanical check might miss.
 
-That is the logic behind the debug tier.
+But I do not trust it as the sole judge.
 
-It lets the system add lessons learned, stronger guidance, and additional context exactly when the situation justifies the extra prompt weight. This is a much better compromise than always shipping the heaviest possible prompt. Constant maximalism is not sophistication. It is laziness.
+That is why this layer is not the system.
+It is one input to the system.
 
-When [08. The First Fixed Issue](08-the-first-fixed-issue.md) talks about lessons learned being stored and reinjected after a successful run, this tier is the mechanism underneath that behavior. And when [14. The Verification Tax](14-the-verification-tax.md) argues that higher-risk moments deserve stricter infrastructure around truth, this is the prompt-side version of the same instinct: escalate guidance when the run gets riskier instead of pretending one lightweight prompt is equally suited to everything.
+That distinction matters philosophically as much as technically. The field often drifts into a lazy pattern where the model generates, evaluates, and approves its own output. That can be useful for narrowing search space. It is dangerous when treated as proof.
 
-Escalation is sophistication.
-
-Good systems know when to bring more structure to the front.
+In Grinta, the LLM evaluator is strongest when it acts like a skeptical reviewer, not like a final authority.
 
 ---
 
-## Why This Was More Than a Refactor
+## Composite Validation and the Architecture of Doubt
 
-It would be easy to describe this chapter as a refactor story.
+The `CompositeValidator` may be the most important part of the whole design, because it encodes something I think agent builders need more of:
 
-That would undersell it.
+doubt.
 
-The shift from Jinja to Python changed more than syntax. It changed how I thought about the model's operating environment. The prompt stopped being a magical speech delivered to the model and became a rendered interface specification generated by normal code.
+Not performative doubt.
+Structured doubt.
 
-That is a much healthier way to think.
+The composite layer allows thresholds, confidence scoring, and different rules about what counts as enough evidence. That means the system can behave differently depending on the task shape and the risk tolerance:
 
-It lowers the emotional temperature around prompt work.
-It makes debugging less embarrassing.
-It makes changes easier to justify.
-It makes the system easier to share with other engineers without sounding like a mystic.
+- require all validators to pass in stricter contexts
+- accept a subset when the task is looser
+- fail open or fail closed depending on whether absence of evidence should block completion
 
-This matters because a lot of AI work still suffers from an unhealthy split: "real engineering" on one side, "prompt magic" on the other.
+This is not just configuration flexibility.
+It is an admission that validation is not binary certainty descending from heaven.
 
-I do not believe that split is useful.
+Validation is evidence aggregation under uncertainty.
 
-Prompt architecture is part of the software architecture.
-The moment the prompt governs tool routing, autonomy, platform behavior, permissions, and external capability discovery, it is already inside the engineering core whether you admit it or not.
-
----
-
-## What Survived the Rewrite
-
-Not everything in the old prompt world was wrong.
-
-What survived mattered:
-
-- the need for clear sections
-- the need for hard constraints
-- the importance of tool-routing guidance
-- the idea that prompt shape affects model behavior more than people admit
-
-What died was the illusion that these needs should be managed through increasingly fancy templating.
-
-That illusion cost me time.
-It also taught me something valuable: in AI systems, the glamorous solution is often the one that leaves the worst debugging experience behind.
-
-The boring solution usually wins in the long run.
+That is a much more realistic way to think about autonomous work. Some tasks deserve strictness. Some deserve probabilistic confidence. Some deserve a human in the loop. The architecture should be able to express that instead of collapsing everything into one fake boolean.
 
 ---
 
-## Why This Chapter Matters
+## Replay, Audit, and the Difference Between Intuition and Evidence
 
-This chapter matters because prompt work is still too often explained either like marketing or like sorcery.
+The validator stack is only one part of the verification story.
 
-I wanted to show the middle ground.
+The bigger story is that the agent leaves behind an inspectable trail.
 
-Prompt design can be rigorous.
-Prompt design can be modular.
-Prompt design can be debuggable.
-Prompt design can be boring in exactly the right way.
+That is why durable event history, audit logs, and replay-oriented design matter so much. You cannot improve an agent systematically if the only record of a run is a pretty final summary. You need:
 
-That is not a downgrade.
-That is what happens when a field starts maturing.
+- the actions
+- the observations
+- the execution outcomes
+- the validation outcomes
+- the point where the system decided the work was complete
 
-The best prompt system in a serious agent is not the one with the cleverest phrasing.
-It is the one whose rendering path you can still understand when something breaks at 2 AM.
+Without that, every reliability conversation becomes folklore.
 
-That is when you know the prompt finally became part of the product instead of a pile of ritual text taped to the side of it.
+With it, you can ask harder questions:
+
+- where did the agent actually spend its effort
+- when did it start drifting
+- which validator blocked a false finish
+- whether a change in prompt or model improved behavior or merely changed style
+
+This is one of the places where agent engineering starts to feel less like prompt craft and more like proper systems work. Once you care about replay and auditability, you are no longer just chasing impressive outputs. You are building evidence.
 
 ---
 
-[← The Hidden Playbooks](13-the-hidden-playbooks.md) | [The Book of Grinta](README.md) | [Prompts Are Programs →](15-prompts-are-programs.md)
+## Testing an Agent Means Testing the Surrounding Machinery
+
+This is probably the deepest lesson in the chapter.
+
+When people say they are testing a coding agent, they often mean they are evaluating the model's answers.
+
+That is only part of the problem.
+
+What you are really testing is a stack:
+
+- command classification
+- tool execution
+- edit application
+- output observation
+- validator behavior
+- finish gating
+- replay fidelity
+
+This is why the unit tests around the validation layer matter so much to me. They are not glamorous. They are not the kind of thing people show in flashy demos. But they are exactly the kind of tests that prevent a system from becoming untrustworthy in slow, embarrassing ways.
+
+It is also why I increasingly respect open systems that expose trajectories, replay, logs, and explicit tool contracts. Even when I diverge from their design, I trust their seriousness more. They are leaving behind material that can be inspected, argued with, and improved.
+
+That is the opposite of demo culture.
+
+---
+
+## Why This Tax Is Worth Paying
+
+Verification makes the system heavier.
+
+It adds latency.
+It adds code.
+It adds edge cases.
+It forces the architecture to confront uncertainty honestly.
+
+That is exactly why people are tempted to skip it.
+
+But the alternative is worse.
+
+Without verification, the system gets lighter by becoming less truthful. It moves faster because it is allowed to believe itself.
+
+I do not think that trade is worth making.
+
+The verification tax is worth paying because the entire promise of an autonomous coding agent depends on the word *autonomous* meaning more than "produces a convincing paragraph with code-shaped optimism."
+
+If the system cannot distinguish a real finish from a persuasive hallucination, it is not autonomous in any meaningful engineering sense.
+
+It is decorative.
+
+---
+
+## What This Chapter Really Means
+
+This chapter is not really about validators alone.
+
+It is about posture.
+
+Do you build a system that trusts the model by default and only occasionally checks it?
+Or do you build a system that assumes language is not proof and therefore surrounds the model with mechanisms that test its claims against reality?
+
+Grinta chose the second path.
+
+That choice made the system harder to build.
+It also made the first real autonomous finish mean something when it finally happened.
+
+That is the deeper point.
+
+The best moment in a project like this is not when the model *sounds* impressive. It is when the infrastructure makes success undeniable.
+
+---
+
+← [The Hidden Playbooks](13-the-hidden-playbooks.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [Prompts Are Programs](15-prompts-are-programs.md) →

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import textwrap
 import time
 from collections import deque
 from typing import Any
@@ -12,10 +13,13 @@ from rich.table import Table
 from rich.text import Text
 
 from backend.cli.transcript import format_callout_panel
+from backend.engine import prompt_role_debug as _prompt_role_debug
 
 # Thought lines are rendered without an extra manual prefix so they align with
 # other activity panel bodies.
 _THOUGHT_LINE_PREFIX_CHARS = 0
+# Safety cap on stored logical lines (streaming can be very chatty).
+_MAX_STORED_THOUGHT_LINES = 50_000
 
 
 def _fit_thought_line(text: str, max_width: int | None) -> str:
@@ -27,6 +31,22 @@ def _fit_thought_line(text: str, max_width: int | None) -> str:
     if len(line) <= budget:
         return line
     return line[:budget] if budget <= 4 else f'{line[:budget - 1]}…'
+
+
+def _thought_lines_for_display(line: str, max_width: int | None) -> list[str]:
+    """One logical thought line → one or more panel rows (wrap when width is known)."""
+    stripped = (line or '').strip()
+    if not stripped:
+        return []
+    if max_width is not None and max_width > 16:
+        return textwrap.wrap(
+            stripped,
+            width=max_width,
+            break_long_words=True,
+            break_on_hyphens=False,
+        )
+    fitted = _fit_thought_line(stripped, max_width)
+    return [fitted] if fitted else []
 
 
 class ReasoningDisplay:
@@ -47,17 +67,21 @@ class ReasoningDisplay:
         self._current_action: str = ''
         # Completed step labels (excludes the current action) for a short breadcrumb.
         self._recent_actions: deque[str] = deque(maxlen=4)
-        self._max_lines: int = 10  # show up to 10 thought lines for real-time stream
+        self._max_lines: int = _MAX_STORED_THOUGHT_LINES
         self._start_time: float | None = None
         self._cost_at_start: float = 0.0
         self._current_cost: float = 0.0
+        self._last_debug_stream_log: float = 0.0
 
     # -- lifecycle ---------------------------------------------------------
 
     def start(self) -> None:
+        was_active = self._active
         self._active = True
         if self._start_time is None:
             self._start_time = time.monotonic()
+        if not was_active:
+            _prompt_role_debug.log_reasoning_transition('reasoning.start', '')
 
     def stop(self) -> None:
         self._active = False
@@ -65,6 +89,7 @@ class ReasoningDisplay:
         self._current_action = ''
         self._recent_actions.clear()
         self._start_time = None
+        _prompt_role_debug.log_reasoning_transition('reasoning.stop', '')
 
     @property
     def active(self) -> bool:
@@ -80,16 +105,23 @@ class ReasoningDisplay:
 
     def update_thought(self, text: str) -> None:
         self.start()
+        _prompt_role_debug.log_reasoning_transition('reasoning.update_thought', text)
         for line in text.splitlines():
             if stripped := line.strip():
                 self._thought_lines.append(stripped)
-        # Keep only the last N lines for a compact view.
         if len(self._thought_lines) > self._max_lines:
             self._thought_lines = self._thought_lines[-self._max_lines :]
 
     def set_streaming_thought(self, text: str) -> None:
         """Replace thought lines with new content (for cumulative streaming updates)."""
         self.start()
+        if _prompt_role_debug.env_reasoning_astep_debug():
+            now = time.monotonic()
+            if now - self._last_debug_stream_log >= 1.0:
+                self._last_debug_stream_log = now
+                _prompt_role_debug.log_reasoning_transition(
+                    'reasoning.set_streaming_thought', text
+                )
         self._thought_lines.clear()
         for line in text.splitlines():
             if stripped := line.strip():
@@ -101,9 +133,13 @@ class ReasoningDisplay:
         self.start()
         new = (label or '').strip()
         if new != self._current_action:
+            _prompt_role_debug.log_reasoning_transition('reasoning.update_action', new)
             if self._current_action:
                 self._recent_actions.append(self._current_action)
             self._current_action = new
+            # Per-step wall clock: the header timer should reflect the *current* sub-step
+            # (e.g. browser CDP), not time since the first spinner in this agent turn.
+            self._start_time = time.monotonic()
 
     def snapshot_thoughts(self) -> list[str]:
         """Return a copy of current thought lines without clearing them."""
@@ -124,10 +160,7 @@ class ReasoningDisplay:
     ) -> RenderResult:
         if not self.active:
             return
-        panel_max_lines = None
-        if options.max_height:
-            panel_max_lines = max(3, min(10, options.max_height - 6))
-        yield self.renderable(max_width=options.max_width, max_lines=panel_max_lines)
+        yield self.renderable(max_width=options.max_width, max_lines=None)
 
     def renderable(
         self,
@@ -179,8 +212,8 @@ class ReasoningDisplay:
             clipped = True
 
         for line in visible_thoughts:
-            fitted = _fit_thought_line(line, max_width)
-            rows.append(Text(fitted, style='italic dim'))
+            for row in _thought_lines_for_display(line, max_width):
+                rows.append(Text(row, style='italic dim'))
 
         if clipped:
             rows.append(Text('auto-scroll: showing latest thoughts', style='dim italic'))

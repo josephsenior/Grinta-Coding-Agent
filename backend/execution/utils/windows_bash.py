@@ -180,10 +180,16 @@ class WindowsPowershellSession(BaseShellSession):
 
         process = None
         try:
+            # Child Python tools (uv/uvx/pip) often print UTF-8 symbols; without this,
+            # Windows defaults (cp1252) raise UnicodeEncodeError inside the child.
+            child_env = os.environ.copy()
+            child_env.setdefault('PYTHONIOENCODING', 'utf-8')
+            child_env.setdefault('PYTHONUTF8', '1')
             # Use Popen instead of run to capture PID for cancellation service
             process = subprocess.Popen(
                 ps_command,
                 cwd=work_dir,
+                env=child_env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 stdin=subprocess.PIPE if input_text is not None else None,

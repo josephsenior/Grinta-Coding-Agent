@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import logging
 import os
+import re
 import sys
 import traceback
 from datetime import datetime
@@ -40,6 +42,8 @@ from backend.core.log_formatters import (
 )
 
 __all__ = [
+    'configure_file_logging',
+    'get_log_dir',
     '_TRACE_LOCAL',
     'ColoredFormatter',
     'ColorType',
@@ -276,8 +280,12 @@ if current_log_level == logging.DEBUG:
 # Always suppress stdout logging — Rich Live owns the terminal.
 app_logger.addHandler(logging.NullHandler())
 access_logger.addHandler(logging.NullHandler())
-app_logger.setLevel(logging.ERROR)
-access_logger.setLevel(logging.ERROR)
+# Without a file handler, clamp to ERROR so nothing leaks to the console via other handlers.
+# When LOG_TO_FILE is true, keep current_log_level so TimedRotatingFileHandler actually receives
+# INFO/DEBUG (logger level is applied before handler level; ERROR here made app.log nearly empty).
+if not LOG_TO_FILE:
+    app_logger.setLevel(logging.ERROR)
+    access_logger.setLevel(logging.ERROR)
 app_logger.addFilter(SensitiveDataFilter(app_logger.name))
 app_logger.addFilter(TraceContextFilter())
 # Optionally correlate logs with active OpenTelemetry spans
@@ -310,13 +318,50 @@ if LOG_SHIPPING_ENABLED:
         app_logger.warning('Failed to initialize log shipping: %s', e)
 
 app_logger.debug('Logging initialized')
-LOG_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'logs'
-)
-if LOG_TO_FILE:
-    app_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
-    access_logger.addHandler(get_file_handler(LOG_DIR, current_log_level))
-    app_logger.debug('Logging to file in: %s', LOG_DIR)
+
+
+def _grinta_install_tree_root() -> str:
+    """Directory that contains ``backend/`` (editable install or wheel).
+
+    Session files live under ``logs/workspaces/<segment>/`` here (never only in
+    the user's repo tree). ``segment`` is derived from ``PROJECT_ROOT`` so each
+    workspace is isolated while you keep one Grinta checkout for debugging.
+    """
+    return os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+
+
+def _workspace_logs_segment() -> str:
+    root = os.environ.get('PROJECT_ROOT', '').strip()
+    if not root:
+        return 'no_project'
+    key = os.path.normcase(os.path.normpath(root))
+    digest = hashlib.sha256(key.encode('utf-8')).hexdigest()[:12]
+    base = os.path.basename(root.rstrip('/\\')) or 'workspace'
+    safe = re.sub(r'[^A-Za-z0-9._-]+', '_', base)[:48].strip('_') or 'workspace'
+    return f'{safe}__{digest}'
+
+
+def get_log_dir() -> str:
+    """Return the log directory for this process (``app.log``, ``llm/``, …)."""
+    override = globals().get('LOG_DIR')
+    if isinstance(override, (str, os.PathLike)):
+        return os.fspath(override)
+    return os.path.join(
+        _grinta_install_tree_root(),
+        'logs',
+        'workspaces',
+        _workspace_logs_segment(),
+    )
+
+
+def __getattr__(name: str) -> Any:
+    if name == 'LOG_DIR':
+        return get_log_dir()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 LOQUACIOUS_LOGGERS = [
     'engineio',
     'engineio.server',
@@ -353,7 +398,7 @@ class LlmFileHandler(logging.FileHandler):
             self.session = datetime.now().strftime('%y-%m-%d_%H-%M')
         else:
             self.session = 'default'
-        self.log_directory = os.path.join(LOG_DIR, 'llm', self.session)
+        self.log_directory = os.path.join(get_log_dir(), 'llm', self.session)
         os.makedirs(self.log_directory, exist_ok=True)
         if not DEBUG:
             for file in os.listdir(self.log_directory):
@@ -394,10 +439,34 @@ def _get_llm_file_handler(name: str, log_level: int) -> LlmFileHandler:
 def _setup_llm_logger(name: str, log_level: int) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.propagate = False
-    logger.setLevel(logging.DEBUG) # Force debug
-    if LOG_TO_FILE:
-        logger.addHandler(_get_llm_file_handler(name, logging.DEBUG))
+    logger.setLevel(logging.DEBUG)  # Force debug
     return logger
+
+
+_file_logging_configured = False
+
+
+def configure_file_logging() -> None:
+    """Attach file handlers after ``PROJECT_ROOT`` is known (CLI / workers).
+
+    Idempotent. Uses :func:`get_log_dir` so each workspace maps to its own
+    directory under ``<Grinta>/logs/workspaces/``.
+    """
+    global _file_logging_configured
+    if _file_logging_configured or not LOG_TO_FILE:
+        return
+    log_dir = get_log_dir()
+    os.makedirs(log_dir, exist_ok=True)
+    app_logger.addHandler(get_file_handler(log_dir, current_log_level))
+    access_logger.addHandler(get_file_handler(log_dir, current_log_level))
+    for name in ('prompt', 'response'):
+        lg = logging.getLogger(name)
+        for h in list(lg.handlers):
+            if isinstance(h, LlmFileHandler):
+                lg.removeHandler(h)
+        lg.addHandler(_get_llm_file_handler(name, logging.DEBUG))
+    app_logger.debug('Logging to file in: %s', log_dir)
+    _file_logging_configured = True
 
 
 llm_prompt_logger = _setup_llm_logger('prompt', current_log_level)

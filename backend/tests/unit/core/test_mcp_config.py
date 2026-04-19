@@ -221,12 +221,12 @@ class TestMCPServerConfigStdio:
         assert a != 'not a config'
 
     def test_from_dict_stdio(self):
-        data = {'command': 'npx', 'args': ['-y', '@browser-use/mcp']}
-        cfg = MCPServerConfig.from_dict('browser-use', data)
-        assert cfg.name == 'browser-use'
+        data = {'command': 'npx', 'args': ['-y', '@example/mcp']}
+        cfg = MCPServerConfig.from_dict('example-stdio', data)
+        assert cfg.name == 'example-stdio'
         assert cfg.type == 'stdio'
         assert cfg.command == 'npx'
-        assert cfg.args == ['-y', '@browser-use/mcp']
+        assert cfg.args == ['-y', '@example/mcp']
 
     def test_from_dict_sse(self):
         data = {'url': 'http://localhost:3000/sse'}
@@ -310,7 +310,7 @@ class TestMCPServerConfigStdio:
             'enabled': True,
             'servers': [
                 {'name': 'generic-stdio', 'type': 'stdio', 'command': 'node'},
-                {'name': 'browser-use', 'type': 'stdio', 'command': 'npx'},
+                {'name': 'another-stdio', 'type': 'stdio', 'command': 'npx'},
                 {'name': 'my-sse', 'type': 'sse', 'url': 'http://localhost/sse'},
             ],
         }
@@ -320,7 +320,7 @@ class TestMCPServerConfigStdio:
 
         # All servers should be loaded (no Windows filtering)
         assert 'generic-stdio' in names
-        assert 'browser-use' in names
+        assert 'another-stdio' in names
         assert 'my-sse' in names
 
 

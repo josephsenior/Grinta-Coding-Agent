@@ -65,6 +65,14 @@ MCP_PENDING_ACTION_TIMEOUT_FLOOR = 180.0
 # Foreground shell commands (env setup, installs, builds) often run far longer than
 # the default pending-action timeout while still progressing normally.
 CMD_PENDING_ACTION_TIMEOUT_FLOOR = 600.0
+# Native browser: per-stage fail-fast budgets (see GrintaNativeBrowser).
+BROWSER_SESSION_START_TIMEOUT_SEC = 90.0
+BROWSER_CDP_NAVIGATE_TIMEOUT_SEC = 20.0
+BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC = 45.0
+BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC = 40.0
+BROWSER_SCREENSHOT_TIMEOUT_SEC = 45.0
+# Worst single browser_tool call: cold session start + navigate (or snapshot). Not a "hang window".
+BROWSER_TOOL_SYNC_TIMEOUT_SECONDS = 165.0
 
 # ── Threshold Constants ─────────────────────────────────────────────
 MAX_LINES_TO_EDIT = 300
@@ -140,6 +148,8 @@ CURRENT_AGENT_CONFIG_SCHEMA_VERSION = '2025-11-14'
 DEFAULT_AGENT_MEMORY_ENABLED = True
 DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED = True
 DEFAULT_AGENT_BROWSING_ENABLED = True
+# In-process browser-use tools (optional dependency group `browser`)
+DEFAULT_AGENT_NATIVE_BROWSER_ENABLED = True
 DEFAULT_AGENT_VECTOR_MEMORY_ENABLED = True
 DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED = True
 DEFAULT_AGENT_AUTO_LINT_ENABLED = True
@@ -149,7 +159,8 @@ DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
 DEFAULT_AGENT_CMD_ENABLED = True
 DEFAULT_AGENT_THINK_ENABLED = True
 DEFAULT_AGENT_FINISH_ENABLED = True
-DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = True
+# Optional LLM-initiated compaction; automatic condensation still runs when needed.
+DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = False
 DEFAULT_AGENT_HISTORY_TRUNCATION_ENABLED = True
 DEFAULT_AGENT_PLAN_MODE_ENABLED = True
 DEFAULT_AGENT_MCP_ENABLED = True
@@ -165,7 +176,8 @@ DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER = 50.0
 DEFAULT_AGENT_MAX_AUTONOMOUS_ITERATIONS = 0
 DEFAULT_AGENT_STUCK_DETECTION_ENABLED = True
 DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS = 0
-DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED = True
+DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED = False
+DEFAULT_AGENT_SIGNAL_PROGRESS_ENABLED = False
 DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED = True
 DEFAULT_AGENT_SYSTEM_PROMPT_FILENAME = 'system_prompt'
 DEFAULT_AGENT_CLI_MODE = True
@@ -418,13 +430,38 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     'DEBUG': ('false', 'Enable general debug mode'),
     'DEBUG_LLM': ('false', 'Log raw LLM request/response payloads'),
     'DEBUG_LLM_PROMPT': ('false', 'Log full prompt text sent to LLMs'),
+    'APP_DEBUG_PROMPT_ROLES': (
+        'false',
+        'Log per-astep message-role histogram and compaction flags after build_messages',
+    ),
+    'APP_DEBUG_REASONING_ASTEP': (
+        'false',
+        'Log reasoning panel transitions with the current astep id for prompt-vs-UI correlation',
+    ),
+    'APP_CLI_SHOW_REASONING_TEXT': (
+        'true',
+        'Render reasoning/thinking text in CLI panels; set false/0 to suppress provider reasoning leakage',
+    ),
     'LOG_JSON': ('true', 'Emit structured JSON logs (recommended for prod)'),
     'LOG_JSON_LEVEL_KEY': ('level', 'JSON key name for the log-level field'),
     'OTEL_LOG_CORRELATION': ('<OTEL_ENABLED>', 'Attach OTEL trace/span IDs to logs'),
     'OTEL_ENABLED': ('false', 'Master switch for OpenTelemetry integration'),
-    'LOG_TO_FILE': ('<true when DEBUG>', 'Write logs to a file in addition to stdout'),
+    'LOG_TO_FILE': (
+        '<true when LOG_LEVEL is DEBUG else false>',
+        'Append structured logs under repo logs/app.log; set LOG_TO_FILE=true (or use DEBUG) — required for full logs because the CLI keeps the app logger at ERROR when this is off',
+    ),
     'LOG_ALL_EVENTS': ('True', 'Log every event processed by the event stream'),
     'DEBUG_RUNTIME': ('false', 'Extra runtime container debug output'),
+    'APP_DEBUG_PROMPT_ROLES': (
+        'false',
+        'Per astep: log message role histogram after build_messages (condensed event count, '
+        'pending condensation, assistant tool-call presence); use with LOG_LEVEL=INFO or DEBUG',
+    ),
+    'APP_DEBUG_REASONING_ASTEP': (
+        'false',
+        'CLI: log ReasoningDisplay lifecycle/thought/action updates with shared astep_id '
+        '(see APP_DEBUG_PROMPT_ROLES) to correlate UI with LLM steps',
+    ),
     # API versioning
     'APP_PERMISSIVE_API': (
         '',

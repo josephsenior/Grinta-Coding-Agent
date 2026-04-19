@@ -3,7 +3,7 @@
 After condensation or many edits, the LLM's understanding of a file's current
 state can drift.  This tool lets the agent cheaply verify specific assertions
 about file contents without reading the entire file, preventing stale-model
-edit failures (the #1 cause of failed replace_text operations).
+edit failures (the #1 cause of failed string-replace operations).
 
 Usage examples:
   verify_file_lines(path="src/main.py", assertions=[

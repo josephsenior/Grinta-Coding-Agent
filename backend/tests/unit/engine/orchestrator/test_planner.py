@@ -22,6 +22,7 @@ def _make_config(**kwargs):
     cfg.enable_finish = True
     cfg.enable_condensation_request = False
     cfg.enable_browsing = False
+    cfg.enable_native_browser = False
     cfg.enable_editor = True
     cfg.enable_first_turn_orientation_prompt = False
     cfg.merge_control_system_into_primary = False
@@ -264,6 +265,14 @@ class TestAddBrowsingTool:
         tools: list[Any] = []
         p._add_browsing_tool(tools)
         assert len(tools) == 0
+
+    def test_native_browser_adds_browser_tool(self):
+        cfg = _make_config(enable_browsing=True, enable_native_browser=True)
+        p = _make_planner(config=cfg)
+        tools: list[Any] = []
+        p._add_browsing_tool(tools)
+        names = [t.get('function', {}).get('name') for t in tools]
+        assert 'browser' in names
 
 
 # ---------------------------------------------------------------------------

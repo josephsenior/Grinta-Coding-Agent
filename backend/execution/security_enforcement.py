@@ -13,6 +13,7 @@ from pathlib import Path, PurePath
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
+from backend.execution.editor_only_shell_policy import evaluate_editor_only_shell_block
 from backend.security.command_analyzer import CommandAnalyzer
 
 if TYPE_CHECKING:
@@ -349,10 +350,16 @@ class SecurityEnforcementMixin:
 
     def _evaluate_security_policy(self, action: Action) -> SecurityPolicyDecision:
         from backend.core.enums import ActionSecurityRisk
-        from backend.ledger.action import ActionConfirmationStatus
+        from backend.ledger.action import ActionConfirmationStatus, CmdRunAction
 
         sec_cfg = self.config.security  # type: ignore[attr-defined]
         decision = SecurityPolicyDecision()
+
+        if isinstance(action, CmdRunAction):
+            editor_block = self._enforce_editor_only_shell_writes(action)
+            if editor_block is not None:
+                decision.block_message = editor_block
+                return decision
 
         hardening_result = self._enforce_hardened_local_policy(action)
         if hardening_result is not None:
@@ -413,6 +420,24 @@ class SecurityEnforcementMixin:
                 exc_info=True,
             )
             return None
+
+    def _enforce_editor_only_shell_writes(self, action: Action) -> str | None:
+        """Enforce editor tools for workspace file writes (CmdRunAction only)."""
+        from backend.ledger.action import CmdRunAction
+
+        if not isinstance(action, CmdRunAction):
+            return None
+        if getattr(action, 'is_static', False) or getattr(action, 'hidden', False):
+            return None
+        if getattr(action, 'is_input', False):
+            return None
+        sec_cfg = self.config.security  # type: ignore[attr-defined]
+        return evaluate_editor_only_shell_block(
+            command=action.command or '',
+            security_config=sec_cfg,
+            workspace_root=self._workspace_root_path(),
+            cwd=getattr(action, 'cwd', None),
+        )
 
     def _enforce_hardened_local_policy(self, action: Action) -> Observation | None:
         """Apply deterministic local policy gates before heuristic risk handling."""

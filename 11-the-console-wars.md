@@ -1,324 +1,115 @@
-# 15. Prompts Are Programs
+# 11. The Console Wars
 
-There is a popular way of talking about prompt engineering that makes it sound like copywriting for machines.
+Cross-platform portability looks elegant until you build a terminal layer that has to survive real developer machines.
 
-Choose the right words.
-Add a few examples.
-Massage the phrasing.
-Find the secret incantation.
+Usually, you pretend this layer does not exist. You write your Python code on a Mac or a Linux machine, you use `subprocess.run()`, you pass in some bash commands, and you assume the world works the same way everywhere.
 
-I understand the appeal of talking about it that way.
-It flatters the mystique.
+If you are building a web application, you are probably fine. If you are building a local autonomous coding agent that needs to execute terminal commands on the user’s machine to run tests, start servers, and analyze output, you are in for a nightmare.
 
-It is also one of the least useful mental models you can carry into a serious agent system.
-
-Because once the prompt stops being a single clever paragraph and starts becoming the control surface for a real tool, it is no longer just wording.
-
-It is software.
-
-That was one of the most important architecture lessons in Grinta.
-
-The day I really accepted that was the day the prompt system started getting better.
+This chapter is about the reality of the terminal layer in Grinta: Windows vs. Linux vs. Mac is not just a line-ending problem. It is a semantic difference in how the operating system talks to processes.
 
 ---
 
-## The Jinja Disaster
+## The Illusion of POSIX
 
-Earlier versions of the project used Jinja2 for system-prompt rendering.
+When I first built the terminal execution layer, I used `libtmux`.
 
-On paper, this sounded reasonable.
+It was beautiful. I could spin up a detached tmux session, send keystrokes, capture the output pane, handle background processes, send SIGINT (Ctrl-C), and kill hung processes gracefully. The agent could run a long-lived server in the background and continue thinking in the foreground.
 
-Templating engines exist to render structured text with conditionals.
-Prompts are structured text with conditionals.
-Case closed.
+And then I tried to run it on Windows.
 
-In practice, it turned into a mess.
+Tmux does not work natively on Windows PowerShell or Command Prompt. WSL (Windows Subsystem for Linux) exists, but you cannot assume the user's project is in the WSL filesystem or that the agent is running there. Git Bash is an option, but it lacks the PTY (pseudo-terminal) support required for interactive tmux sessions.
 
-The prompt logic spread across template branches, configuration checks, and slightly different "optimized" variants that all claimed to be the right one. I had hundreds of lines of prompt logic rendered through a DSL that made perfect sense for HTML and terrible sense for a live system prompt whose shape depended on runtime conditions.
+Suddenly, my elegant tmux-backed execution layer was fundamentally incompatible with half the world's developers.
 
-That kind of architecture has a special way of wasting your time.
+This was a major fork in the road. The easy choice was to abandon Windows support. "Grinta requires macOS or Linux." Dozens of open-source projects make exactly that choice.
 
-You cannot reason about it locally.
-You cannot debug it comfortably.
-You cannot step through it like real code.
-You end up rendering giant strings and eyeballing the result like a person checking tea leaves.
+But the hard truth is: if a local coding agent cannot fix a bug in a standard Windows workspace, it is failing at its primary job. I had to build a cross-platform execution layer that abstracted away the shell itself.
 
-That is when I realized the problem was not that the prompt was hard.
-It was that I had chosen the wrong *medium* for the logic.
+## The Semantic Execution Layer
 
----
+Grinta does not run "bash" or "PowerShell." It runs a semantic request to execute a command.
 
-## The Moment the Prompt Became Code
+The `UnifiedShellSession` layer dynamically detects the environment at startup. It checks `os.name`. It probes for `bash`, `pwsh`, `powershell`, and `tmux`. It checks if it is running inside a Docker container or WSL.
 
-Once I stopped treating the prompt as sacred text and started treating it as a program that produces text, a lot of confusion vanished.
+Based on that immutable capabilities footprint, it routes execution to one of three implementations:
 
-That shift sounds minor.
-It is not.
+1. **The tmux-backed BashSession:** The gold standard. If on Linux/Mac with tmux installed, Grinta gets interactive PTYs, process group signaling, and background jobs.
+2. **The SimpleBashSession:** The fallback for Git Bash on Windows or systems without tmux. Subprocess execution with basic `nohup` for background tasks, but no interactive input sending.
+3. **The WindowsPowershellSession:** Pure Windows environments without Git Bash. Subprocess execution with PowerShell-specific encoding parameters and `Start-Process` for background dispatch.
 
-The key mental change was this:
+Each implementation serves a different capability tier, but from the agent's perspective they all look the same: send a command, get output, optionally send input to a running process.
 
-the thing I needed to design was not only the final string.
-It was the **rendering path** that produced the string.
+### Why Persistent Sessions Matter
 
-That meant I suddenly cared about all the questions software engineers already know how to ask:
+The `bash` tool does not just launch isolated subprocesses. It maintains persistent shell sessions.
 
-- where is the logic allowed to branch
-- which parts are static and which are dynamic
-- how do I debug a bad output
-- how do I make one section change without destabilizing the rest
-- how do I keep platform-specific behavior explicit instead of smearing it everywhere
+Each session has an ID. The agent can open a session, run a command, read the output later, run another command in the same session with the same working directory and environment variables, send interactive input like confirming a prompt or pressing Ctrl-C, and eventually close the session. The session survives across multiple agent iterations, which means the agent can start a development server, continue editing code in subsequent steps, and come back to read the server output later.
 
-Once you ask those questions, prompt architecture stops feeling mystical.
-It starts feeling like normal engineering again.
+This is architecturally important because interactive engineering work cannot be modeled as single fire-and-forget shell commands. A real developer keeps terminals open. They switch between them. They read output that appeared while they were editing a file. The persistent session model gives the agent the same workflow.
 
-That was a relief.
+The terminal manager tracks sessions by ID and enforces limits. If too many sessions are open, the agent needs to close old ones. If a session's process exits, the manager detects it. If the agent needs to read output from a session it started five iterations ago, the output is still there.
 
----
+### The Truncation Problem
 
-## Why Python Won
+Shell output is one of the most dangerous sources of context bloat. A single `cat` on a large file or a verbose test suite can produce fifty thousand tokens of output that the agent does not need and that crushes the context window.
 
-The current prompt builder in Grinta is deliberately boring.
+The bash tool implements a configurable truncation strategy. Output beyond a size limit gets truncated with a clear notice: the output tells the agent exactly how many characters were hidden and suggests using `grep` or `head`/`tail` to filter. The truncation is not silent — that would be worse than no truncation, because the agent would reason from incomplete data without knowing it was incomplete.
 
-That is praise.
+There is also a `grep_pattern` parameter that lets the agent pre-filter output server-side before it even reaches the context. If the agent knows it only needs lines containing "ERROR" from a build log, it can specify that pattern and receive only matching lines. That is far more efficient than receiving the full output, reading it, and then deciding what matters.
 
-Static prompt sections live in markdown files.
-Dynamic prompt sections are rendered by plain Python functions.
-The builder takes context and returns a string.
+### Platform-Aware Descriptions
 
-That is it.
+One subtle but effective technique is that the tool descriptions themselves change based on the detected platform.
 
-No DSL gymnastics.
-No prompt templating religion.
-No second language hidden inside the first.
+On Linux/Mac, the bash tool's description mentions `bash` syntax, Unix commands, and POSIX conventions. On Windows, the same tool describes `PowerShell` syntax, Windows-native commands, and Windows path conventions. The agent never sees the wrong platform's guidance.
 
-Python won for the least glamorous and most important reasons:
+This matters because LLMs learn from training data that is overwhelmingly Unix-oriented. Without platform-specific guidance in the tool description itself, the model defaults to bash syntax on Windows and produces commands that fail immediately. The platform-aware description is a form of prompt engineering applied to the tool layer rather than the system prompt — steering the model toward correct behavior before it even starts generating.
 
-- normal control flow
-- normal debugging
-- normal code review
-- normal testing instincts
-- normal IDE support
+## The Micro-Frictions
 
-If a branch in the prompt is wrong, I can inspect the function that produced it.
-If a platform conditional is wrong, I can see the exact `_choose(...)` logic.
-If a section becomes too large or too confusing, I can split it like any other code.
+Building these three implementations revealed exactly how different these systems are. The terminal layer works hard to shield the LLM from these differences.
 
-That is a better engineering environment than hoping a template engine keeps feeling manageable after the fifth layer of conditionals.
+When an LLM writes to a file using shell commands on Windows, it often uses standard bash syntax like `echo "hello" > file.txt`. In PowerShell, this produces UTF-16 encoded text with a BOM (Byte Order Mark) by default, which breaks Python scripts and compilers expecting UTF-8. Grinta has to handle these encoding nuances so the LLM doesn't break the user's files.
+
+When the LLM tries to write a path on Windows, it uses `C:\Users\Name\Project`. The `\` escapes special characters in some contexts, but not others. The `$` signifies variables. Grinta's terminal layer has to backtick-escape PowerShell-specific special characters such as the backtick, the double quote, and the dollar sign just so the command reaches the shell safely.
+
+When the system deletes a file on Windows, `os.replace` can throw locking errors if a virus scanner or background process is even *looking* at the file. The local filesystem wrapper in Grinta has to implement a retry loop for deletes explicitly to survive Windows locking nonsense.
+
+There are even intelligent intercepts at the execution server level. If the LLM generates a command using shell-specific syntax and the `UnifiedShellSession` knows it is running in PowerShell, Grinta detects `_POWERSHELL_BUILTIN_COMMANDS` like `Get-Content` or `Write-Output` and will dynamically rewrite things, like expanding `python3` to `python` when operating under a Windows virtual environment.
+
+## Guiding the Agent Safely
+
+The final piece of the cross-platform puzzle was helping the LLM navigate the environment when it made mistakes.
+
+If the agent tries to install a missing dependency on Mac, the error guidance gently suggests `brew install <tool>`. On Ubuntu, it suggests `apt-get`. On Windows, it suggests `winget`. Disk space checks dynamically route to `df -h` on Unix or `Get-PSDrive FileSystem` on Windows.
+
+I built this because I watched early versions of the agent confidently run `sudo apt install xyz` on a Windows machine, stare at the error, and try to run it three more times.
+
+Cross-platform execution is not glamorous. The code is ugly. It is full of edge cases, environment variables, encodings, and string replacements. But this semantic execution layer is what allows Grinta to be handed to an arbitrary machine and actually compile the code.
 
 ---
 
-## The Five-Part Prompt Spine
+## The Security Layer Underneath
 
-One of the cleanest consequences of the pure-Python rewrite was that the system prompt developed an actual spine.
+Everything described above runs through the security analyzer before it touches the shell.
 
-The prompt is not one blob. It is several deliberately different sections that each solve a different problem.
+The command analyzer evaluates every shell command the agent generates and assigns a risk assessment with four severity tiers: CRITICAL, HIGH, MEDIUM, and LOW. Each tier maps to specific threat patterns.
 
-That architecture had to stay lean enough to survive the pressure described in [04. The Context War](04-the-context-war.md), and modular enough to coexist with the runtime knowledge packets described in [13. The Hidden Playbooks](13-the-hidden-playbooks.md) without collapsing back into one giant god-prompt.
+CRITICAL commands are things that can destroy the system: `rm -rf /`, `mkfs`, `dd if=/dev/zero`, `:(){ :|:& };:` (a fork bomb), `chmod -R 777 /`, `> /dev/sda`. These are blocked or require explicit user confirmation regardless of autonomy level, because no legitimate coding task needs to format a disk.
 
-Grinta's prompt builder loads and assembles five main partials:
+HIGH-risk commands access sensitive resources: `curl | bash` (piping from the internet to the shell), SSH key operations, credential file access, Docker socket access, environment variable export of sensitive values, and network listeners on privileged ports. These get flagged and, depending on the autonomy configuration, may require user confirmation.
 
-- routing
-- autonomy
-- tools
-- tail
-- critical
+MEDIUM-risk commands are legitimate operations with side effects worth noting: package installations, git operations that modify history, service restarts, file permission changes. These are logged and allowed under normal autonomy but flagged for awareness.
 
-That decomposition matters because the sections do not do the same work.
+LOW-risk commands — reading files, running tests, navigating directories — pass through silently.
 
-### Routing
+The analyzer also detects chain escalation. A single command like `echo "harmless"` is LOW risk. But `echo "harmless" && rm -rf /` is CRITICAL because the `&&` chain contains a destructive operation. The analyzer splits commands on shell operators (`&&`, `||`, `;`, `|`) and evaluates each segment independently, reporting the highest risk found. Without chain analysis, an attacker could trivially bypass security by prepending an innocuous command.
 
-The routing section teaches the model how to choose between tools.
+On Python file writes, the security layer performs a separate check: AST-level validation. It parses the Python code the agent is about to write, walks the abstract syntax tree, and looks for dangerous patterns — `exec()`, `eval()`, `__import__('os').system()`, subprocess calls with `shell=True`, and other injection vectors. If the code is syntactically invalid Python, it flags that too, because invalid code that the agent writes is either a bug (which should be caught before it reaches the filesystem) or an injection attempt.
 
-This is more important than people think. A lot of bad agent behavior is not caused by lack of intelligence. It is caused by bad tool selection. Models will happily use the shell as a blunt instrument unless the environment teaches them a better hierarchy.
-
-That is why routing exists as its own first-class section. It encodes hard-earned taste: when to use layout-discovery tools, when to prefer structured file readers, when shell usage is appropriate, and when it is just noisy laziness.
-
-### Autonomy
-
-Autonomy is not one slider buried in config.
-It is a behavioral contract.
-
-The autonomy partial makes that contract visible. Full, balanced, and supervised modes each produce a different block of instructions. That matters because the model should not be asked to infer the user's risk appetite from vibes.
-
-If the system is going to be more or less independent, say it clearly.
-
-### Tools
-
-The tools section is where the architecture stops pretending that all tools are morally equal.
-
-It teaches fallback order, discourages bad habits, and reinforces the central discipline of the product: structured tools first, shell last for source-code operations.
-
-This is one of the places where prompt engineering and product philosophy become the same thing. The prompt is not merely describing tools. It is teaching the model the values embedded in the tool layer.
-
-### Tail
-
-The tail is where late-stage behavioral guidance lives: MCP exposure, permissions framing, server hints, and the final reminders that should survive near the end of the system message.
-
-I liked making this its own section because the end of a prompt has a different rhetorical role from the beginning. Some instructions need to greet the model early. Some need to remain visible late.
-
-That is not mystical either. It is layout.
-
-### Critical
-
-The critical section isolates the hardest constraints.
-
-It exists because some rules should not be buried in the middle of softer guidance. Rules like "do not claim a file was created if you never invoked the file-editing tool" or "do not fabricate results when a tool failed" deserve their own hard edge.
-
-That separation makes the prompt easier to reason about and makes the rule hierarchy more legible.
+That is the difference between a prototype and a real tool.
 
 ---
 
-## Markdown for Content, Structure for Boundaries
-
-The final prompt format also taught me something obvious that I had somehow managed to forget.
-
-Models are not alien readers.
-They are statistical machines trained on oceans of technical text.
-
-That means format matters.
-
-Markdown works well because it is close to the native visual grammar of software communication: headers, bullets, short sections, explicit emphasis. Models have seen an absurd amount of it.
-
-But markdown alone is not enough when you need sharper structural boundaries.
-
-That is where explicit blocks such as `<AUTONOMY>` and `<MCP_TOOLS>` earn their place. They give the prompt hard segmentation without forcing everything into JSON-shaped rigidity. They are not there because XML is elegant. They are there because the model parses structural boundaries well when those boundaries are obvious and consistent.
-
-That combination ended up being the sweet spot:
-
-- markdown for readable content
-- structural tags for delimiters
-- Python for assembly
-
-It sounds almost embarrassingly practical.
-That is why it works.
-
----
-
-## The MCP Menu Problem
-
-The prompt builder also forced me to confront a problem that shows up any time an agent gains external extensibility.
-
-How do you expose a large set of external capabilities without turning the prompt into garbage?
-
-The answer in Grinta was to treat MCP tools as a **menu**, not as a swarm of native function signatures scattered all over the system prompt.
-
-The builder collects the available tool names, adds descriptions when useful, layers in server-level hints when those exist, and presents the result as one coherent block. The execution path stays simple: one gateway call pattern, many available tools.
-
-That separation is incredibly important.
-
-The prompt should explain *what exists* and *when to use it*.
-The runtime should own *how it is executed*.
-
-When those responsibilities blur together, the model ends up carrying too much interface detail in its active context. When they are separated cleanly, the system scales without making the core prompt unreadable.
-
----
-
-## Platform Awareness Without Prompt Rot
-
-One of the easiest ways to ruin a system prompt is to let platform conditionals seep into every paragraph.
-
-Windows here.
-Unix there.
-Maybe bash.
-Maybe PowerShell.
-Maybe Git Bash on Windows.
-Maybe a fallback.
-
-If you do that carelessly, the prompt starts to decay into caveat soup.
-
-This is another place where pure Python helped. Platform awareness could be expressed through small rendering choices instead of duplicated prompt variants. The builder can choose different strings, different examples, or different process-management guidance without forking the entire prompt into parallel universes.
-
-That sounds like a minor implementation detail.
-It is actually a huge maintainability win.
-
-It means cross-platform support lives in the rendering layer instead of turning the prompt corpus into a branching labyrinth.
-
----
-
-## Debug Tier and the Architecture of Escalation
-
-One of the subtler improvements in the prompt system was the shift from one static prompt to a tiered model.
-
-Normal operation and stressed operation are not the same thing.
-
-If the agent has been running cleanly, the base prompt should stay lean.
-If the session is error-heavy, high-risk, or historically scarred, the system should be able to inject more guidance.
-
-That is the logic behind the debug tier.
-
-It lets the system add lessons learned, stronger guidance, and additional context exactly when the situation justifies the extra prompt weight. This is a much better compromise than always shipping the heaviest possible prompt. Constant maximalism is not sophistication. It is laziness.
-
-When [08. The First Fixed Issue](08-the-first-fixed-issue.md) talks about lessons learned being stored and reinjected after a successful run, this tier is the mechanism underneath that behavior. And when [14. The Verification Tax](14-the-verification-tax.md) argues that higher-risk moments deserve stricter infrastructure around truth, this is the prompt-side version of the same instinct: escalate guidance when the run gets riskier instead of pretending one lightweight prompt is equally suited to everything.
-
-Escalation is sophistication.
-
-Good systems know when to bring more structure to the front.
-
----
-
-## Why This Was More Than a Refactor
-
-It would be easy to describe this chapter as a refactor story.
-
-That would undersell it.
-
-The shift from Jinja to Python changed more than syntax. It changed how I thought about the model's operating environment. The prompt stopped being a magical speech delivered to the model and became a rendered interface specification generated by normal code.
-
-That is a much healthier way to think.
-
-It lowers the emotional temperature around prompt work.
-It makes debugging less embarrassing.
-It makes changes easier to justify.
-It makes the system easier to share with other engineers without sounding like a mystic.
-
-This matters because a lot of AI work still suffers from an unhealthy split: "real engineering" on one side, "prompt magic" on the other.
-
-I do not believe that split is useful.
-
-Prompt architecture is part of the software architecture.
-The moment the prompt governs tool routing, autonomy, platform behavior, permissions, and external capability discovery, it is already inside the engineering core whether you admit it or not.
-
----
-
-## What Survived the Rewrite
-
-Not everything in the old prompt world was wrong.
-
-What survived mattered:
-
-- the need for clear sections
-- the need for hard constraints
-- the importance of tool-routing guidance
-- the idea that prompt shape affects model behavior more than people admit
-
-What died was the illusion that these needs should be managed through increasingly fancy templating.
-
-That illusion cost me time.
-It also taught me something valuable: in AI systems, the glamorous solution is often the one that leaves the worst debugging experience behind.
-
-The boring solution usually wins in the long run.
-
----
-
-## Why This Chapter Matters
-
-This chapter matters because prompt work is still too often explained either like marketing or like sorcery.
-
-I wanted to show the middle ground.
-
-Prompt design can be rigorous.
-Prompt design can be modular.
-Prompt design can be debuggable.
-Prompt design can be boring in exactly the right way.
-
-That is not a downgrade.
-That is what happens when a field starts maturing.
-
-The best prompt system in a serious agent is not the one with the cleverest phrasing.
-It is the one whose rendering path you can still understand when something breaks at 2 AM.
-
-That is when you know the prompt finally became part of the product instead of a pile of ritual text taped to the side of it.
-
----
-
-[← The Model-Agnostic Reckoning](10-model-agnostic-reckoning.md) | [The Book of Grinta](README.md) | [Open Source Was the Better Business →](12-open-source-was-the-better-business.md)
+← [The Model-Agnostic Reckoning](10-model-agnostic-reckoning.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [Open Source Was the Better Business](12-open-source-was-the-better-business.md) →

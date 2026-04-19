@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -12,6 +11,7 @@ from backend.core.errors import (
     FunctionCallValidationError as CoreFunctionCallValidationError,
 )
 from backend.core.logger import app_logger as logger
+from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_types import make_function_chunk, make_tool_param
 from backend.ledger.action import Action
 
@@ -101,12 +101,12 @@ def parse_tool_call_arguments(tool_call: Any) -> dict[str, Any]:
                 f'Got {type(raw_arguments).__name__}.'
             )
             raise TypeError(msg)
-        return json.loads(raw_arguments)
-    except (json.JSONDecodeError, AttributeError, TypeError) as e:
-        msg = (
-            f'Failed to parse tool call arguments: {e}. '
-            f'Raw arguments: {raw_arguments}'
-        )
+        return parse_tool_arguments_object(raw_arguments)
+    except (AttributeError, TypeError, ValueError) as e:
+        preview = raw_arguments
+        if isinstance(preview, str) and len(preview) > 240:
+            preview = f'{preview[:237]}...'
+        msg = f'Failed to parse tool call arguments: {e}. Raw arguments: {preview}'
         raise FunctionCallValidationError(msg) from e
 
 

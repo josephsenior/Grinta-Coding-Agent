@@ -4,6 +4,8 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
+from backend.core.constants import BROWSER_TOOL_SYNC_TIMEOUT_SECONDS
+from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.commands import CmdRunAction
 from backend.orchestration.services.pending_action_service import PendingActionService
 
@@ -349,6 +351,25 @@ class TestPendingActionService(unittest.TestCase):
 
         # Past long command floor (600s), timeout should trigger.
         mock_time.return_value = 705.0
+        self.assertIsNone(service.get())
+        self.mock_controller.event_stream.add_event.assert_called_once()
+
+    @patch('time.time')
+    def test_browser_tool_action_uses_long_timeout_floor(self, mock_time):
+        """Native browser tool should outlive default pending timeout (Chromium launch)."""
+        service = PendingActionService(self.mock_context, timeout=120.0)
+        action = BrowserToolAction(
+            command='navigate', params={'url': 'https://example.com'}
+        )
+
+        mock_time.return_value = 100.0
+        service.set(action)
+
+        # Still within browser_tool floor (165s default), past default pending (120s).
+        mock_time.return_value = 100.0 + float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS) - 10.0
+        self.assertEqual(service.get(), action)
+
+        mock_time.return_value = 100.0 + float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS) + 5.0
         self.assertIsNone(service.get())
         self.mock_controller.event_stream.add_event.assert_called_once()
 

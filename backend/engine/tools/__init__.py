@@ -2,6 +2,7 @@
 
 from .analyze_project_structure import create_analyze_project_structure_tool
 from .bash import create_cmd_run_tool
+from .browser_native import create_browser_tool
 from .checkpoint import create_checkpoint_tool
 from .condensation_request import create_summarize_context_tool
 from .delegate_task import create_delegate_task_tool
@@ -26,7 +27,6 @@ from .task_tracker import create_task_tracker_tool
 from .terminal_manager import create_terminal_manager_tool
 from .think import create_think_tool
 from .verify_file_lines import create_verify_file_lines_tool
-from .verify_ui import create_verify_ui_change_tool
 
 __all__ = [
     'create_checkpoint_tool',
@@ -44,12 +44,12 @@ __all__ = [
     'create_signal_progress_tool',
     'create_think_tool',
     'create_cmd_run_tool',
+    'create_browser_tool',
     'create_str_replace_editor_tool',
     'create_structure_editor_tool',
     'create_task_tracker_tool',
     'create_verify_file_lines_tool',
     'create_delegate_task_tool',
     'create_revert_to_checkpoint_tool',
-    'create_verify_ui_change_tool',
     'create_terminal_manager_tool',
 ]

@@ -1,1 +1,1 @@
-"""Portable Grinta launcher package."""
+"""Alias package so `python -m grinta_launch.entry` resolves correctly."""

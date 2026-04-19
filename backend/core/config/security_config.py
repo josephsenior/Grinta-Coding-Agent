@@ -108,6 +108,15 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "allowed inside the workspace, e.g. ['curl', 'invoke-webrequest']."
         ),
     )
+    require_editor_for_shell_file_writes: bool = Field(
+        default=True,
+        description=(
+            'When True, shell commands cannot create or overwrite project files via '
+            'redirection, tee/dd, or PowerShell file-writing cmdlets; agents must use '
+            'str_replace_editor / ast_code_editor. Set False only if you rely on shell '
+            'scripts to generate files.'
+        ),
+    )
     model_config = ConfigDict(extra='ignore')
 
     @classmethod

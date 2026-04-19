@@ -1,11 +1,6 @@
 {
   "mcpServers": {
     "default": {},
-    "browser-use": {
-      "command": "npx",
-      "args": ["-y", "browser-use-mcp"],
-      "usage_hint": "Full browser automation for live sites, forms, screenshots, and JS-heavy pages—prefer over raw HTTP when the DOM or user interactions matter."
-    },
     "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"],

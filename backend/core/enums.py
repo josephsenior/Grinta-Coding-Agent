@@ -68,6 +68,8 @@ class ActionType(str, Enum):
     TERMINAL_READ = 'terminal_read'
     BROWSE = 'browse'
     BROWSE_INTERACTIVE = 'browse_interactive'
+    # Native in-process browser (browser-use library; name avoids clashing with RuntimeExecutor.browser)
+    BROWSER_TOOL = 'browser_tool'
     MCP = 'call_tool_mcp'
     THINK = 'think'
     FINISH = 'finish'

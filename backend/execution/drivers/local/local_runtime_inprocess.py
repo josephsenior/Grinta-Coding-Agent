@@ -6,9 +6,12 @@ and HTTP communication for desktop applications that only need local runtime.
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
 import os
 import sys
 import tempfile
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -35,6 +38,7 @@ from backend.ledger.action import (
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.observation import Observation
 from backend.security.analyzer import SecurityAnalyzer
+from backend.core.constants import BROWSER_TOOL_SYNC_TIMEOUT_SECONDS
 from backend.utils.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
@@ -52,6 +56,52 @@ def get_user_info() -> tuple[int, str | None]:
     if uid_getter and callable(uid_getter):
         return (uid_getter(), username)  # pylint: disable=not-callable
     return (0, username)
+
+
+class _PersistentAsyncLoopRunner:
+    """Run coroutines on a dedicated long-lived event loop thread.
+
+    Browser sessions maintain internal loop-affine objects (CDP session, tasks).
+    Reusing them across short-lived loops can hang. This runner keeps one loop
+    alive for all browser tool calls in the LocalRuntime lifecycle.
+    """
+
+    def __init__(self, name: str = 'local-runtime-browser-loop') -> None:
+        self._name = name
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(
+            target=self._run_forever,
+            name=self._name,
+            daemon=True,
+        )
+        self._thread.start()
+
+    def _run_forever(self) -> None:
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_forever()
+
+    def submit(
+        self, corofn: Callable[..., Any], timeout: float, *args: Any, **kwargs: Any
+    ) -> Any:
+        coro = corofn(*args, **kwargs)
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        try:
+            return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError as exc:
+            future.cancel()
+            raise TimeoutError(
+                f'call_async_from_sync timed out after {timeout}s for '
+                f'{getattr(corofn, "__name__", corofn)}'
+            ) from exc
+
+    def close(self, timeout: float = 2.0) -> None:
+        """Stop and close the dedicated loop thread."""
+        if self._loop.is_closed():
+            return
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self._thread.join(timeout=timeout)
+        if not self._thread.is_alive():
+            self._loop.close()
 
 
 class LocalRuntimeInProcess(ActionExecutionClient):
@@ -106,6 +156,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         # protocol so this driver does not depend on the concrete class at
         # runtime — any executor satisfying the protocol works.
         self._executor: RuntimeExecutorProtocol | None = None
+        self._browser_loop_runner: _PersistentAsyncLoopRunner | None = None
 
         # Apply startup env vars
         if self.config.runtime_config.runtime_startup_env_vars:
@@ -275,6 +326,33 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(self._executor.lsp_query, 15.0, action)
 
+    def browser_tool(self, action: Any) -> Observation:
+        """Native browser-use tool via RuntimeExecutor."""
+        from backend.ledger.action.browser_tool import BrowserToolAction
+
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        if not isinstance(action, BrowserToolAction):
+            raise TypeError('expected BrowserToolAction')
+        try:
+            if self._browser_loop_runner is None:
+                self._browser_loop_runner = _PersistentAsyncLoopRunner()
+            return self._browser_loop_runner.submit(
+                self._executor.browser_tool,
+                BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
+                action,
+            )
+        except TimeoutError as exc:
+            sub = getattr(action, 'command', '') or ''
+            raise TimeoutError(
+                f'call_async_from_sync timed out after {BROWSER_TOOL_SYNC_TIMEOUT_SECONDS}s '
+                f'for browser_tool (subcommand={sub!r}). '
+                'Typical causes: Chromium first-time download inside browser.start(), '
+                'a slow CDP navigate, or async teardown blocked — use GRINTA_BROWSER_TRACE=1, '
+                'CALL_ASYNC_LOOP_SHUTDOWN_WAIT_SEC, CALL_ASYNC_LOOP_FINALIZE_WAIT_SEC; '
+                'run `uvx browser-use install` once in a normal shell if cold start is slow.'
+            ) from exc
+
     def list_files(self, path: str | None = None, recursive: bool = False) -> list[str]:
         """List files in the specified path."""
         if self._executor is None:
@@ -399,6 +477,12 @@ class LocalRuntimeInProcess(ActionExecutionClient):
 
     def close(self) -> None:
         """Clean up runtime resources."""
+        if self._browser_loop_runner is not None:
+            try:
+                self._browser_loop_runner.close()
+            except Exception:
+                logger.debug('LocalRuntimeInProcess browser loop close failed', exc_info=True)
+            self._browser_loop_runner = None
         if self._executor:
             # RuntimeExecutor cleanup (this is synchronous)
             if hasattr(self._executor, 'close'):

@@ -40,6 +40,8 @@ Tool result line syntax is shared via :mod:`backend.inference.tool_result_format
 
 import copy
 import json
+
+from backend.core.tool_arguments_json import parse_tool_arguments_object
 import re
 from collections.abc import Iterable
 from threading import Lock
@@ -111,7 +113,7 @@ TOOL_EXAMPLES = {
     },
     'str_replace_editor': {
         'create_file': "\nASSISTANT:\nThere is no `app.py` file in the current directory. Let me create a Python file `app.py`:\n<function=str_replace_editor>\n<parameter=command>create_file</parameter>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=file_text>\nfrom flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    numbers = list(range(1, 11))\n    return str(numbers)\n\nif __name__ == '__main__':\n    app.run(port=5000)\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [str_replace_editor]:\nFile created successfully at: /workspace/app.py\n",
-        'edit_file': "\nASSISTANT:\nNow let me display the numbers in a table format:\n<function=str_replace_editor>\n<parameter=command>replace_text</parameter>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=old_str>return str(numbers)</parameter>\n<parameter=new_str>return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [str_replace_editor]:\nThe file /workspace/app.py has been edited. Here's the result of running `cat -n` on a snippet of /workspace/app.py:\n     3\n     4  @app.route('/')\n     5  def index():\n     6      numbers = list(range(1, 11))\n     7      return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'\n     8\n     9  if __name__ == '__main__':\n    10      app.run(port=5000)\n\n",
+        'edit_file': "\nASSISTANT:\nNow let me display the numbers in a table format using a line-range edit:\n<function=ast_code_editor>\n<parameter=command>replace_range</parameter>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=start_line>7</parameter>\n<parameter=end_line>7</parameter>\n<parameter=new_code>    return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [ast_code_editor]:\nThe file /workspace/app.py has been edited. Here's the result of running `cat -n` on a snippet of /workspace/app.py:\n     3\n     4  @app.route('/')\n     5  def index():\n     6      numbers = list(range(1, 11))\n     7      return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'\n     8\n     9  if __name__ == '__main__':\n    10      app.run(port=5000)\n\n",
     },
     'browser': {
         'view_page': "\nASSISTANT:\nLet me check how the page looks in the browser:\n<function=browser>\n<parameter=code>\ngoto('http://127.0.0.1:5000')\nnoop(1000)  # Wait for page to load\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [browser]:\n[Browser shows the numbers in a table format]\n",
@@ -379,9 +381,17 @@ def _parse_tool_call_arguments(tool_call: dict) -> dict:
 
     """
     try:
-        return json.loads(tool_call['function']['arguments'])
-    except json.JSONDecodeError as e:
-        msg = f'Failed to parse arguments as JSON. Arguments: {tool_call["function"]["arguments"]}'
+        raw = tool_call['function']['arguments']
+        if isinstance(raw, dict):
+            return raw
+        if not isinstance(raw, str):
+            msg = f'tool call arguments must be str or dict, got {type(raw).__name__}'
+            raise TypeError(msg)
+        return parse_tool_arguments_object(raw)
+    except (KeyError, TypeError, ValueError) as e:
+        raw = tool_call.get('function', {}).get('arguments', '')
+        preview = raw if isinstance(raw, str) and len(raw) <= 240 else f'{str(raw)[:237]}...'
+        msg = f'Failed to parse arguments as JSON: {e}. Arguments: {preview}'
         raise FunctionCallConversionError(
             msg,
         ) from e

@@ -32,6 +32,7 @@ from backend.ledger.action.files import (
     FileReadAction,
     FileWriteAction,
 )
+from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.message import (
     MessageAction,
@@ -64,6 +65,7 @@ actions = (
     DelegateTaskAction,
     BlackboardAction,
     LspQueryAction,
+    BrowserToolAction,
 )
 ACTION_TYPE_TO_CLASS = {action_class.action: action_class for action_class in actions}
 

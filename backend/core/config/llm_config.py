@@ -31,8 +31,8 @@ from backend.core.constants import (
     DEFAULT_LLM_TEMPERATURE,
     DEFAULT_LLM_TOP_P,
 )
-from backend.core.logger import LOG_DIR
 from backend.core.logger import app_logger as logger
+from backend.core.logger import get_log_dir
 
 
 @contextmanager
@@ -176,7 +176,7 @@ class LLMConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=False, description='Whether to log LLM completions to the state'
     )
     log_completions_folder: str = Field(
-        default=os.path.join(LOG_DIR, 'completions'),
+        default_factory=lambda: os.path.join(get_log_dir(), 'completions'),
         min_length=1,
         description='The folder to log LLM completions to',
     )

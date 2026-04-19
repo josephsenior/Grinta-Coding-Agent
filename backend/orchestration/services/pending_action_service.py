@@ -9,6 +9,7 @@ import time
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.constants import (
+    BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     CMD_PENDING_ACTION_TIMEOUT_FLOOR,
     MCP_PENDING_ACTION_TIMEOUT_FLOOR,
 )
@@ -68,6 +69,9 @@ class PendingActionService:
             return max(candidates)
         if type(action).__name__ == 'MCPAction':
             return max(float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR)
+        if type(action).__name__ == 'BrowserToolAction':
+            # Align with LocalRuntime browser_tool sync bridge (cold start + one operation budget).
+            return max(float(base), float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS))
         return float(base)
 
     @staticmethod

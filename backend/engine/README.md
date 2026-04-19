@@ -101,9 +101,12 @@ CmdRunAction(
 
 ### Browser Automation
 
-**MCP Browser** - Modular browsing via Model Context Protocol. The
-orchestrator can access web browsing capabilities if an MCP server
-(like `browser-use`) is connected and `enable_browsing` is set to true.
+**Native browser tool (`browser`)** — In-process automation via the optional
+[`browser-use`](https://github.com/browser-use/browser-use) Python package (no nested `Agent`; Grinta stays the only LLM policy).
+
+1. Install deps: `uv sync --group browser` (adds `browser-use` to the environment).
+2. Install Chromium for automation **before** relying on the tool: `uvx browser-use install` (typical on a fresh machine). Pre-installing avoids slow or failing first launches under Grinta’s session start timeout.
+3. Enable in agent config: `enable_browsing = true` and `enable_native_browser = true`.
 
 ### Communication
 

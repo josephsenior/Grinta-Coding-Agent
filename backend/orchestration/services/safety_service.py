@@ -9,6 +9,7 @@ from backend.ledger.action import (
     ActionConfirmationStatus,
     ActionSecurityRisk,
     BrowseInteractiveAction,
+    BrowserToolAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -26,6 +27,7 @@ class SafetyService:
     _CONFIRMATION_TYPES = (
         CmdRunAction,
         BrowseInteractiveAction,
+        BrowserToolAction,
         FileEditAction,
         FileReadAction,
     )

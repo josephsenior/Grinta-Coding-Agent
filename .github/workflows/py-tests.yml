@@ -42,7 +42,7 @@ jobs:
         run: uv run python -m compileall backend
       - name: Run minimal pytest slice
         run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -q \
-          backend/tests/unit/core/test_grinta_launch_entry.py \
+          backend/tests/unit/core/test_launch_entry.py \
           backend/tests/unit/core/test_runtime_config.py \
           backend/tests/unit/execution/test_command_timeout.py
 
@@ -79,7 +79,7 @@ jobs:
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
       - name: Run minimal pytest slice
-        run: uv run pytest -q backend/tests/unit/core/test_grinta_launch_entry.py backend/tests/unit/core/test_runtime_config.py backend/tests/unit/execution/test_command_timeout.py
+        run: uv run pytest -q backend/tests/unit/core/test_launch_entry.py backend/tests/unit/core/test_runtime_config.py backend/tests/unit/execution/test_command_timeout.py
         env:
           PYTHONPATH: ".;$env:PYTHONPATH"
 

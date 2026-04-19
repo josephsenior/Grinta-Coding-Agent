@@ -55,7 +55,7 @@ COMMANDS:
     Required: path, new_str, insert_line
     insert_line=0 inserts at the beginning of the file
 
-9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `replace_text`, `insert_text`, etc.). Symbol-level commands (`edit_symbol_body`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
+9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `insert_text`, etc.). Symbol-level commands (`edit_symbol_body`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
 
 NOTE:
 - Prefer this tool for structure-aware code edits.
@@ -78,7 +78,7 @@ BEST PRACTICES:
 _SHORT_STRUCTURE_EDITOR_DESCRIPTION = """Structure-aware editor for 40+ languages (Python, JS, TS, Go, Rust, Java, C++, etc.)
 
 Commands: edit_symbol_body, rename_symbol, find_symbol, replace_range, normalize_indent,
-          create_file, view_file, replace_text, insert_text, undo_last_edit
+          create_file, view_file, insert_text, undo_last_edit
 - Edits by symbol name (function/class), not line numbers
 - Auto-indents code to match file style
 - Validates syntax before saving
@@ -119,7 +119,6 @@ def create_structure_editor_tool(
                     'normalize_indent',
                     'create_file',
                     'view_file',
-                    'replace_text',
                     'insert_text',
                     'undo_last_edit',
                 ],
@@ -178,6 +177,11 @@ def create_structure_editor_tool(
             'new_str': {
                 'description': 'Text to insert (for insert_text command)',
                 'type': 'string',
+            },
+            'view_range': {
+                'description': 'Optional line range [start, end] (1-indexed) for view_file',
+                'items': {'type': 'integer'},
+                'type': 'array',
             },
             'insert_line': {
                 'description': 'Line number to insert after (0 for beginning of file, for insert_text command)',

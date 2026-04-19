@@ -1,324 +1,239 @@
-# 15. Prompts Are Programs
+# 03. The Architectural Gauntlet
 
-There is a popular way of talking about prompt engineering that makes it sound like copywriting for machines.
+If the previous chapters explain why Grinta changed direction, this one explains why it did not collapse under its own complexity.
 
-Choose the right words.
-Add a few examples.
-Massage the phrasing.
-Find the secret incantation.
+Because building an agent is one problem.
+Building an agent codebase that can survive months of growth without rotting is a different problem entirely.
 
-I understand the appeal of talking about it that way.
-It flatters the mystique.
+This is where I became obsessed with architecture.
 
-It is also one of the least useful mental models you can carry into a serious agent system.
+Not architecture as a buzzword.
+Architecture as survival.
 
-Because once the prompt stops being a single clever paragraph and starts becoming the control surface for a real tool, it is no longer just wording.
+Grinta today is not a single giant loop with random helper files. It is a decomposed system with a serious orchestration layer, event-sourced state, recovery machinery, service boundaries, validation, and discipline around code quality. That shape did not appear automatically. It came from repeatedly feeling the pain of monoliths, debugging deadlocks, and deciding that if the project kept growing, the code had to remain understandable.
 
-It is software.
-
-That was one of the most important architecture lessons in Grinta.
-
-The day I really accepted that was the day the prompt system started getting better.
+This chapter is probably the closest thing in this journey to a personality profile. I do not know how to watch a codebase rot without wanting to tear it open and redraw the boundaries. Some people tolerate architectural debt longer than I can. I feel it physically when I open a file and my brain resists reading something I wrote myself.
 
 ---
 
-## The Jinja Disaster
+## The Monolith Broke First
 
-Earlier versions of the project used Jinja2 for system-prompt rendering.
+A lot of solo projects start clean and become messy slowly.
 
-On paper, this sounded reasonable.
+That process is easy to underestimate because the project still works while the architecture is getting worse. You keep adding logic, the file gets longer, the conditionals get deeper, the responsibilities blur, and nothing fully explodes — until it does.
 
-Templating engines exist to render structured text with conditionals.
-Prompts are structured text with conditionals.
-Case closed.
+That happened here.
 
-In practice, it turned into a mess.
+The orchestrator and other major components started out more centralized. As the agent gained:
 
-The prompt logic spread across template branches, configuration checks, and slightly different "optimized" variants that all claimed to be the right one. I had hundreds of lines of prompt logic rendered through a DSL that made perfect sense for HTML and terrible sense for a live system prompt whose shape depended on runtime conditions.
+- more tools
+- more error cases
+- more state transitions
+- more safety checks
+- more persistence requirements
+- more retry logic
+- more event-driven behavior
+- more context management
 
-That kind of architecture has a special way of wasting your time.
+it became obvious that a monolithic design would not scale.
 
-You cannot reason about it locally.
-You cannot debug it comfortably.
-You cannot step through it like real code.
-You end up rendering giant strings and eyeballing the result like a person checking tea leaves.
+This was not just about style. It was about maintainability, testability, and cognitive load.
 
-That is when I realized the problem was not that the prompt was hard.
-It was that I had chosen the wrong *medium* for the logic.
+If one file is trying to handle action generation, execution control, pending action tracking, observation processing, retries, stuck detection, safety gates, validation, and state transitions all at once, then every bug becomes harder to isolate and every feature becomes harder to add without fear.
 
----
+So I decomposed it.
 
-## The Moment the Prompt Became Code
+Not just the orchestrator. Everything.
 
-Once I stopped treating the prompt as sacred text and started treating it as a program that produces text, a lot of confusion vanished.
+I remember opening some of those swollen files and feeling dread before I had even started tracing the logic. That was the signal. If I did not want to read my own code, then the architecture was already charging interest.
 
-That shift sounds minor.
-It is not.
-
-The key mental change was this:
-
-the thing I needed to design was not only the final string.
-It was the **rendering path** that produced the string.
-
-That meant I suddenly cared about all the questions software engineers already know how to ask:
-
-- where is the logic allowed to branch
-- which parts are static and which are dynamic
-- how do I debug a bad output
-- how do I make one section change without destabilizing the rest
-- how do I keep platform-specific behavior explicit instead of smearing it everywhere
-
-Once you ask those questions, prompt architecture stops feeling mystical.
-It starts feeling like normal engineering again.
-
-That was a relief.
+That principle became a repo-wide priority.
 
 ---
 
-## Why Python Won
+## Clean Code Was Not Cosmetic
 
-The current prompt builder in Grinta is deliberately boring.
+I care a lot about code quality, and I was stubborn about defending that standard even as the system grew.
 
-That is praise.
+Across the repo, I treated low cyclomatic and cognitive complexity as an operational requirement, not an aesthetic preference.
 
-Static prompt sections live in markdown files.
-Dynamic prompt sections are rendered by plain Python functions.
-The builder takes context and returns a string.
+That outcome was not accidental. It came from deliberate decomposition, repeated refactors, and a refusal to let "it works" become the definition of acceptable code.
 
-That is it.
+The codebase's low average complexity is not proof that the problem itself is simple. It is proof that I kept paying the refactor cost early instead of shoving it into the future.
 
-No DSL gymnastics.
-No prompt templating religion.
-No second language hidden inside the first.
+That matters for two brutally practical reasons.
 
-Python won for the least glamorous and most important reasons:
+### 1. It protects the project from itself
 
-- normal control flow
-- normal debugging
-- normal code review
-- normal testing instincts
-- normal IDE support
+Agent systems naturally accumulate complexity. They interact with models, files, processes, networks, state machines, retry logic, safety policies, and user-facing controls. Without aggressive simplification, the repo becomes unreadable very fast.
 
-If a branch in the prompt is wrong, I can inspect the function that produced it.
-If a platform conditional is wrong, I can see the exact `_choose(...)` logic.
-If a section becomes too large or too confusing, I can split it like any other code.
+### 2. It makes reliability work possible
 
-That is a better engineering environment than hoping a template engine keeps feeling manageable after the fifth layer of conditionals.
+You cannot debug a stateful autonomous system effectively if every subsystem is tangled into every other subsystem.
 
----
+Good architecture is not decoration. It is the precondition for diagnosable failure.
 
-## The Five-Part Prompt Spine
+### The Art of Code Quality and Codebase Structure
 
-One of the cleanest consequences of the pure-Python rewrite was that the system prompt developed an actual spine.
+Code quality is not a style preference. In an agent system, it is operational leverage.
 
-The prompt is not one blob. It is several deliberately different sections that each solve a different problem.
+When files are small enough to reason about, boundaries are explicit, and responsibilities are local, debugging stays linear. When modules become ambiguous and mixed, debugging becomes archaeological work. You are no longer solving the current bug. You are decoding accidental history.
 
-That architecture had to stay lean enough to survive the pressure described in [04. The Context War](04-the-context-war.md), and modular enough to coexist with the runtime knowledge packets described in [13. The Hidden Playbooks](13-the-hidden-playbooks.md) without collapsing back into one giant god-prompt.
+That is why I treat codebase structure as part of reliability engineering. A clean structure reduces error blast radius, shortens incident resolution time, and makes both humans and agents less likely to introduce regressions while patching the system.
 
-Grinta's prompt builder loads and assembles five main partials:
+### Cyclomatic vs Cognitive Complexity
 
-- routing
-- autonomy
-- tools
-- tail
-- critical
+Cyclomatic complexity and cognitive complexity are related, but they measure different pain.
 
-That decomposition matters because the sections do not do the same work.
+- Cyclomatic complexity measures branching surface area: how many execution paths a function can take.
+- Cognitive complexity measures comprehension load: how hard the control flow is for a human to follow.
 
-### Routing
+A function can have acceptable cyclomatic complexity and still be mentally hostile if it is deeply nested, context-switches across multiple concerns, or relies on subtle state transitions. That is why teams that only track cyclomatic complexity often miss the real maintenance risk.
 
-The routing section teaches the model how to choose between tools.
+Cognitive complexity is underestimated because it is less visible in dashboards and harder to compress into a single pass/fail gate. But in practice it is often the first thing that breaks velocity. It slows code review, increases misreads during incidents, and makes "small changes" far more dangerous than they look.
 
-This is more important than people think. A lot of bad agent behavior is not caused by lack of intelligence. It is caused by bad tool selection. Models will happily use the shell as a blunt instrument unless the environment teaches them a better hierarchy.
-
-That is why routing exists as its own first-class section. It encodes hard-earned taste: when to use layout-discovery tools, when to prefer structured file readers, when shell usage is appropriate, and when it is just noisy laziness.
-
-### Autonomy
-
-Autonomy is not one slider buried in config.
-It is a behavioral contract.
-
-The autonomy partial makes that contract visible. Full, balanced, and supervised modes each produce a different block of instructions. That matters because the model should not be asked to infer the user's risk appetite from vibes.
-
-If the system is going to be more or less independent, say it clearly.
-
-### Tools
-
-The tools section is where the architecture stops pretending that all tools are morally equal.
-
-It teaches fallback order, discourages bad habits, and reinforces the central discipline of the product: structured tools first, shell last for source-code operations.
-
-This is one of the places where prompt engineering and product philosophy become the same thing. The prompt is not merely describing tools. It is teaching the model the values embedded in the tool layer.
-
-### Tail
-
-The tail is where late-stage behavioral guidance lives: MCP exposure, permissions framing, server hints, and the final reminders that should survive near the end of the system message.
-
-I liked making this its own section because the end of a prompt has a different rhetorical role from the beginning. Some instructions need to greet the model early. Some need to remain visible late.
-
-That is not mystical either. It is layout.
-
-### Critical
-
-The critical section isolates the hardest constraints.
-
-It exists because some rules should not be buried in the middle of softer guidance. Rules like "do not claim a file was created if you never invoked the file-editing tool" or "do not fabricate results when a tool failed" deserve their own hard edge.
-
-That separation makes the prompt easier to reason about and makes the rule hierarchy more legible.
+Keeping both low is not academic purity. It is how I keep Grinta modifiable under pressure.
 
 ---
 
-## Markdown for Content, Structure for Boundaries
+## The 21-Service Orchestrator
 
-The final prompt format also taught me something obvious that I had somehow managed to forget.
+One of the clearest examples of this philosophy is the orchestrator decomposition.
 
-Models are not alien readers.
-They are statistical machines trained on oceans of technical text.
+Earlier versions of the codebase already had the right instinct: the controller was decomposed into 24 separate service files — nearly 8,000 lines of controller code, each file handling one narrow concern. That was the instinct I inherited, but Grinta reshaped it.
 
-That means format matters.
+Three services from that era died with the features they supported. The delegation service died when I killed the multi-agent team. The budget guard was simplified once Stripe-backed per-user billing went away. The telemetry service was folded into lighter-weight hooks. In their place, Grinta added services that matched its new identity — exception handling, step decision logic, and task validation — all born from pain points that only became visible after the agent became a single-process local CLI.
 
-Markdown works well because it is close to the native visual grammar of software communication: headers, bullets, short sections, explicit emphasis. Models have seen an absurd amount of it.
+The orchestration layer was split into 21 focused services, each with a narrow job. Instead of one giant controller pretending to do everything, the system delegates responsibilities across services for action execution, state transitions, iteration control, lifecycle management, observation processing, pending action tracking, recovery, retries, safety, stuck detection, task validation, and more.
 
-But markdown alone is not enough when you need sharper structural boundaries.
+That list matters not because of the specific names, but because of what it reveals about how seriously the problem was decomposed.
 
-That is where explicit blocks such as `<AUTONOMY>` and `<MCP_TOOLS>` earn their place. They give the prompt hard segmentation without forcing everything into JSON-shaped rigidity. They are not there because XML is elegant. They are there because the model parses structural boundaries well when those boundaries are obvious and consistent.
+Even that list hides the shape of the work. The top-level orchestrator is still over a thousand lines because coordination is genuinely hard. But the dangerous logic now lives where it can be named and tested. Event routing earned its own boundary because routing, delegation, and parallel worker orchestration were complex enough to drown the main loop. The pending action service exists because a single pending slot broke once overlapping async delivery became real — so now it tracks multiple outstanding actions. And there is a context facade whose sole purpose is to stop auxiliary services from reaching directly into the controller internals.
 
-That combination ended up being the sweet spot:
+Each service exists because the agent loop is not a single thing. It is a bundle of concerns that need different rules, different tests, and different failure handling.
 
-- markdown for readable content
-- structural tags for delimiters
-- Python for assembly
+### What Each Service Actually Manages
 
-It sounds almost embarrassingly practical.
-That is why it works.
+The decomposition is not random. Each service maps to a specific failure mode I observed while building the system.
 
----
+The **Step Decision Service** determines whether an incoming event should trigger an agent step at all. User messages always step. Agent messages step unless the system is waiting for user input. Condensation actions always step because the system needs to continue after memory compaction. But state-change observations, recall observations, and error observations never step — they are informational, not action-triggering. That decision tree was not obvious. I built it after watching the agent enter infinite loops where an observation would trigger a step, which would generate another observation, which would trigger another step. Separating "should I step?" from "how do I step?" killed that loop.
 
-## The MCP Menu Problem
+The **Step Guard Service** sits in front of every step and asks whether the agent is in a safe state to continue. It implements a warning-then-trip pattern: the first time a guard condition triggers (circuit breaker, stuck detection), it emits a warning with a planning directive that tells the model to change its strategy. If the same condition triggers again on the same action-reason pair, it trips harder. Only after a configurable number of warnings does the guard actually hard-stop the loop. This graduated response prevents a single transient error from killing an otherwise productive session.
 
-The prompt builder also forced me to confront a problem that shows up any time an agent gains external extensibility.
+The **Recovery Service** classifies exceptions into three buckets. Hard-stop exceptions — authentication failures, content policy violations, irrecoverable context window errors — transition the agent to `AWAITING_USER_INPUT` immediately because no amount of retrying will help. Rate-limit exceptions go to the retry queue with a doubled backoff multiplier. Everything else gets converted into an error observation that the agent can see and recover from, while the agent continues running. That classification was one of the most valuable pieces of work in the entire project, because the difference between "retry" and "die" determines whether the agent can survive real-world API instability.
 
-How do you expose a large set of external capabilities without turning the prompt into garbage?
+The **Retry Service** owns the retry queue with exponential backoff bounded by a configurable maximum delay. It computes initial delay accounting for both rate-limit hints from the provider and consecutive error counts from the circuit breaker. This means the retry delay automatically increases when the system is under sustained pressure, not just when a single call fails.
 
-The answer in Grinta was to treat MCP tools as a **menu**, not as a swarm of native function signatures scattered all over the system prompt.
+The **Observation Service** matches incoming observations to the correct pending action by cause — preferring the stream ID linkage, falling back to the most recent pending action if the linkage is missing. It drops stale duplicate observations for background-only event types like recall, and it handles user confirmations and rejections as state transitions. That matching logic sounds trivial until you realize that async event delivery means observations can arrive out of order, and without correct matching, the agent processes observation B as the result of action A.
 
-The builder collects the available tool names, adds descriptions when useful, layers in server-level hints when those exist, and presents the result as one coherent block. The execution path stays simple: one gateway call pattern, many available tools.
+The **Safety Service** evaluates the security risk of every action before it executes. It delegates to the `SecurityAnalyzer` for rich pattern matching, falls back to `UNKNOWN` risk if the analyzer is unavailable, and then applies the autonomy controller's confirmation gates. In fully autonomous mode, the agent proceeds. In supervised mode, the agent pauses for user approval. The safety service does not decide whether an action is dangerous — the analyzer does that. The safety service decides what to *do about it*.
 
-That separation is incredibly important.
+The **State Transition Service** enforces the state machine explicitly. It maintains a map of valid transitions — which states can follow which other states — and rejects invalid transitions with warnings. This sounds mechanical, but without it, the agent can end up in impossible states where it is simultaneously "running" and "finished" because two concurrent events both triggered state changes. The explicit state graph makes impossible states structurally impossible.
 
-The prompt should explain *what exists* and *when to use it*.
-The runtime should own *how it is executed*.
+The **Task Validation Service** gets the final vote before a finish action can actually end the session. It walks the task tracker, recursively finds every step that is not marked as done, and if active steps remain, blocks the finish. This is the integrity constraint that prevents the most dangerous failure mode: an agent that confidently reports success while work is still incomplete.
 
-When those responsibilities blur together, the model ends up carrying too much interface detail in its active context. When they are separated cleanly, the system scales without making the core prompt unreadable.
+### The Hot Path as a Sentence
 
----
+Once those distinctions are explicit, the code gets sharper.
 
-## Platform Awareness Without Prompt Rot
+The hot path reads almost like a sentence: check prerequisites, check guards, get action, execute action, process observation, transition state, validate completion. Each clause has its own service, its own tests, its own failure mode.
 
-One of the easiest ways to ruin a system prompt is to let platform conditionals seep into every paragraph.
-
-Windows here.
-Unix there.
-Maybe bash.
-Maybe PowerShell.
-Maybe Git Bash on Windows.
-Maybe a fallback.
-
-If you do that carelessly, the prompt starts to decay into caveat soup.
-
-This is another place where pure Python helped. Platform awareness could be expressed through small rendering choices instead of duplicated prompt variants. The builder can choose different strings, different examples, or different process-management guidance without forking the entire prompt into parallel universes.
-
-That sounds like a minor implementation detail.
-It is actually a huge maintainability win.
-
-It means cross-platform support lives in the rendering layer instead of turning the prompt corpus into a branching labyrinth.
+And once the code gets sharper, the system becomes easier to trust.
 
 ---
 
-## Debug Tier and the Architecture of Escalation
+## Why Event Sourcing Entered the Picture
 
-One of the subtler improvements in the prompt system was the shift from one static prompt to a tiered model.
+This was one of the hardest architectural decisions in the whole project.
 
-Normal operation and stressed operation are not the same thing.
+I moved Grinta to event-oriented persistence because snapshots alone could not answer the questions that matter during failure:
 
-If the agent has been running cleanly, the base prompt should stay lean.
-If the session is error-heavy, high-risk, or historically scarred, the system should be able to inject more guidance.
+- what happened before the crash
+- which action produced which observation
+- whether replay can reproduce the same behavior
+- whether state transitions are still trustworthy
 
-That is the logic behind the debug tier.
+That shift made the system more operationally serious. It also made the system more expensive to build. Ordering, recovery, and replay correctness all become first-class engineering problems the moment you commit to a durable ledger.
 
-It lets the system add lessons learned, stronger guidance, and additional context exactly when the situation justifies the extra prompt weight. This is a much better compromise than always shipping the heaviest possible prompt. Constant maximalism is not sophistication. It is laziness.
-
-When [08. The First Fixed Issue](08-the-first-fixed-issue.md) talks about lessons learned being stored and reinjected after a successful run, this tier is the mechanism underneath that behavior. And when [14. The Verification Tax](14-the-verification-tax.md) argues that higher-risk moments deserve stricter infrastructure around truth, this is the prompt-side version of the same instinct: escalate guidance when the run gets riskier instead of pretending one lightweight prompt is equally suited to everything.
-
-Escalation is sophistication.
-
-Good systems know when to bring more structure to the front.
+The detailed mechanics now live in [19-surviving-the-crash.md](19-surviving-the-crash.md). This chapter keeps the architectural point: decomposition gave those reliability concerns explicit homes instead of hiding them in one giant controller.
 
 ---
 
-## Why This Was More Than a Refactor
+## Recovery and Guardrails Were the Same Problem
 
-It would be easy to describe this chapter as a refactor story.
+At first I treated "recovery" and "safety" as separate ideas.
+In practice they were the same architectural concern: failure containment.
 
-That would undersell it.
+The system had to do all of this without collapsing into spaghetti:
 
-The shift from Jinja to Python changed more than syntax. It changed how I thought about the model's operating environment. The prompt stopped being a magical speech delivered to the model and became a rendered interface specification generated by normal code.
+- classify exceptions by recoverability
+- retry only when retrying is rational
+- block false finishes when plan state is incomplete
+- detect loop behavior before it burns a session
+- enforce policy before risky actions hit the environment
 
-That is a much healthier way to think.
+This is why the service decomposition mattered so much. Once those responsibilities moved into dedicated services, incidents became diagnosable and behavior became testable.
 
-It lowers the emotional temperature around prompt work.
-It makes debugging less embarrassing.
-It makes changes easier to justify.
-It makes the system easier to share with other engineers without sounding like a mystic.
-
-This matters because a lot of AI work still suffers from an unhealthy split: "real engineering" on one side, "prompt magic" on the other.
-
-I do not believe that split is useful.
-
-Prompt architecture is part of the software architecture.
-The moment the prompt governs tool routing, autonomy, platform behavior, permissions, and external capability discovery, it is already inside the engineering core whether you admit it or not.
+The deeper stuck and circuit-breaker story now lives in [20-circuit-breakers-and-hallucinations.md](20-circuit-breakers-and-hallucinations.md), because that subsystem eventually became large enough to deserve its own chapter.
 
 ---
 
-## What Survived the Rewrite
+## Architecture as Failure Containment
 
-Not everything in the old prompt world was wrong.
+One of the strongest lessons of this project is that reliability is not mainly a prompting trick.
 
-What survived mattered:
+Reliability is architecture refusing to let a probabilistic model act without supervision from deterministic systems.
 
-- the need for clear sections
-- the need for hard constraints
-- the importance of tool-routing guidance
-- the idea that prompt shape affects model behavior more than people admit
+In Grinta, that shows up as explicit state transitions, pending action tracking, validation before finish, middleware gates around execution, and a persistence trail that can be audited after the fact. The goal is simple: make bad behavior visible early, reduce blast radius, and keep sessions recoverable.
 
-What died was the illusion that these needs should be managed through increasingly fancy templating.
+That is what turned this from a clever prototype into a system I could trust under pressure.
 
-That illusion cost me time.
-It also taught me something valuable: in AI systems, the glamorous solution is often the one that leaves the worst debugging experience behind.
+---
 
-The boring solution usually wins in the long run.
+## What I Learned from Decomposition
+
+The deeper I went, the clearer one principle became:
+
+**Big systems do not stay understandable by accident.**
+
+If you want a project to grow while staying maintainable, you have to keep paying the simplification cost.
+
+That means:
+
+- breaking large files apart even when it is annoying
+- naming boundaries clearly
+- moving logic into focused services
+- preserving testability as a first-class requirement
+- refusing to accept complexity just because the domain is complex
+
+This is one of the biggest differences between hacking something together and engineering something to last.
 
 ---
 
 ## Why This Chapter Matters
 
-This chapter matters because prompt work is still too often explained either like marketing or like sorcery.
+If someone looks at Grinta and assumes it is just a wrapper around an API plus a few tools, this is the chapter that should break that illusion.
 
-I wanted to show the middle ground.
+The architectural gauntlet is where the project stopped being a clever experiment and became a serious system.
 
-Prompt design can be rigorous.
-Prompt design can be modular.
-Prompt design can be debuggable.
-Prompt design can be boring in exactly the right way.
+Not because it became larger.
+Because it became more disciplined.
 
-That is not a downgrade.
-That is what happens when a field starts maturing.
-
-The best prompt system in a serious agent is not the one with the cleverest phrasing.
-It is the one whose rendering path you can still understand when something breaks at 2 AM.
-
-That is when you know the prompt finally became part of the product instead of a pile of ritual text taped to the side of it.
+And that discipline is what made the later systems possible: context management, model-agnostic inference, security hardening, recovery, and the ability to keep evolving the repo without drowning in its own complexity.
 
 ---
 
-[← The Killed Darlings](02-the-killed-darlings.md) | [The Book of Grinta](README.md) | [The Context War →](04-the-context-war.md)
+## What Comes Next
+
+Once the architecture could survive complexity, the next battle was keeping long-running sessions coherent.
+
+That battle was not about persistence.
+It was about memory.
+It was about attention.
+It was about the harsh reality that context windows are not just size limits — they are cognitive limits.
+
+That is the next chapter.
+
+---
+
+← [The Killed Darlings](02-the-killed-darlings.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Context War](04-the-context-war.md) →

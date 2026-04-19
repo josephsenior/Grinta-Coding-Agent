@@ -1,324 +1,132 @@
-# 15. Prompts Are Programs
+# 10. The Model-Agnostic Reckoning
 
-There is a popular way of talking about prompt engineering that makes it sound like copywriting for machines.
+There is a certain arrogance in building an AI agent around one language model.
 
-Choose the right words.
-Add a few examples.
-Massage the phrasing.
-Find the secret incantation.
+It assumes the current king of the benchmarks will stay king forever. Worse, it treats one model's quirks as if they were universal intelligence.
 
-I understand the appeal of talking about it that way.
-It flatters the mystique.
+When you hardcode your agent to OpenAI's function-calling schema, temperature settings, and JSON output expectations, you are not building a general agent. You are building an OpenAI client with extra steps.
 
-It is also one of the least useful mental models you can carry into a serious agent system.
+If a better open-source model drops tomorrow, your agent breaks. If your user needs local models for privacy, your agent is useless.
 
-Because once the prompt stops being a single clever paragraph and starts becoming the control surface for a real tool, it is no longer just wording.
+Grinta is model-agnostic. Not as a marketing bullet point, but as a structural philosophy that forced me to rewrite the entire inference layer from scratch.
 
-It is software.
-
-That was one of the most important architecture lessons in Grinta.
-
-The day I really accepted that was the day the prompt system started getting better.
+This chapter is about why that matters, and what model compatibility actually looks like in the trenches.
 
 ---
 
-## The Jinja Disaster
+## The Illusion of the Generic API
 
-Earlier versions of the project used Jinja2 for system-prompt rendering.
+In the beginning, I thought model-agnosticism meant using a library like LiteLLM to route calls. "Just swap the base URL and the model string."
 
-On paper, this sounded reasonable.
+That is naive for autonomous systems. It works for a chatbot. It catastrophically fails for an autonomous coding agent.
 
-Templating engines exist to render structured text with conditionals.
-Prompts are structured text with conditionals.
-Case closed.
+An autonomous coding agent relies completely on structured outputs, function calling, parameter extraction, and context window management. These are exactly the areas where LLM providers violently disagree on implementation.
 
-In practice, it turned into a mess.
+OpenAI natively supports tools with JSON schema.
+Anthropic supports XML-like `<tool_use>` blocks overlaid on an API schema.
+Gemini has `function_declarations`.
+Local models often have *no* native tool calling, meaning you have to prompt them into producing text that looks like a function call and parse it with regular expressions.
 
-The prompt logic spread across template branches, configuration checks, and slightly different "optimized" variants that all claimed to be the right one. I had hundreds of lines of prompt logic rendered through a DSL that made perfect sense for HTML and terrible sense for a live system prompt whose shape depended on runtime conditions.
+If you don't build an abstraction layer above these implementations, your agent logic becomes infected with provider-specific `if/else` statements. The prompt manager needs to know which model is running to decide how to format the system instructions. The parser needs to know. The orchestrator needs to know.
 
-That kind of architecture has a special way of wasting your time.
+Soon, your entire codebase is just a giant switch statement based on `model_name`.
 
-You cannot reason about it locally.
-You cannot debug it comfortably.
-You cannot step through it like real code.
-You end up rendering giant strings and eyeballing the result like a person checking tea leaves.
+## The Three-Client Architecture
 
-That is when I realized the problem was not that the prompt was hard.
-It was that I had chosen the wrong *medium* for the logic.
+I realized that to be truly model-agnostic, I had to stop trusting third-party libraries to normalize everything. The abstraction had to be mine, and it had to sit right at the boundary between Grinta and the network.
 
----
+The inference layer implements a true three-client architecture, plus an essential fallback:
 
-## The Moment the Prompt Became Code
+1. **Native OpenAI Client:** Direct SDK integration for OpenAI models.
+2. **Native Anthropic Client:** Direct SDK integration for Claude models.
+3. **Native Gemini Client:** Direct SDK integration for Google GenAI models.
+4. **OpenAI-Compatible Fallback:** The crucial fallback for everything else (Grok, DeepSeek, Mistral, Ollama, LM Studio, vLLM).
 
-Once I stopped treating the prompt as sacred text and started treating it as a program that produces text, a lot of confusion vanished.
+The provider resolver sits in front of this. It knows about eighteen provider prefixes: `anthropic`, `deepinfra`, `deepseek`, `fireworks`, `google`, `groq`, `lightning`, `lm_studio`, `mistral`, `nvidia`, `ollama`, `openai`, `openrouter`, `perplexity`, `replicate`, `together`, `vllm`, and `xai`. If you ask for `anthropic/claude-3-5-sonnet`, it routes to the Anthropic client. If you ask for `ollama/llama3`, it automatically discovers the local Ollama endpoint on port `:11434` and routes to the OpenAI-compatible proxy client.
 
-That shift sounds minor.
-It is not.
+Provider resolution is intentionally strict for configured models. Grinta trusts an explicit provider prefix or an exact catalog entry, and does not infer providers from model-name patterns. That distinction matters because loose inference — "oh, this model name contains 'claude' so it must be Anthropic" — breaks when providers start hosting each other's models or when proxy/aggregator services like OpenRouter and Lightning AI sit between you and the actual provider. Those aggregators need the `openai/` prefix for routing, and the resolver handles that explicitly.
 
-The key mental change was this:
+### The Shared Connection Pool
 
-the thing I needed to design was not only the final string.
-It was the **rendering path** that produced the string.
+One engineering detail that most people would never notice but that matters enormously at scale: the three clients share an httpx connection pool.
 
-That meant I suddenly cared about all the questions software engineers already know how to ask:
+LLM SDKs use httpx internally. By default, each SDK client creates its own transport, wasting TCP connections when multiple sessions hit the same provider. Grinta's inference layer shares `httpx.Client` and `httpx.AsyncClient` instances keyed by `(provider, base_url)`. The pool limits are tuned: 20 max connections, 10 max keepalive connections, 120-second keepalive expiry. This means keep-alive connections are reused across sessions, reducing TLS handshake overhead and connection setup time.
 
-- where is the logic allowed to branch
-- which parts are static and which are dynamic
-- how do I debug a bad output
-- how do I make one section change without destabilizing the rest
-- how do I keep platform-specific behavior explicit instead of smearing it everywhere
+When you are running a long autonomous session with hundreds of LLM calls, the difference between establishing a fresh TCP connection on every call and reusing a warm connection pool is measurable in both latency and reliability.
 
-Once you ask those questions, prompt architecture stops feeling mystical.
-It starts feeling like normal engineering again.
+## Standardizing the Tools
 
-That was a relief.
+The hardest part of this was normalizing the tool execution.
 
----
+An agent does not just "ask" to use a tool. It emits a specialized message format. The provider SDK returns that specialized format.
 
-## Why Python Won
+Grinta normalizes *everything* back to the OpenAI schema internally.
 
-The current prompt builder in Grinta is deliberately boring.
+When the Anthropic client receives a `<tool_use>` block, Grinta's mapper immediately intercepts it, formats the arguments as JSON, and wraps it in a synthetic OpenAI-style `tool_calls` array. When the agent uses a non-native local model without function calling support, Grinta uses an XML-to-JSON fallback converter that parses generic text shaped like `<function=read_file><parameter=path>main.py</parameter></function>` and silently turns it into the exact same OpenAI-style function call object.
 
-That is praise.
+The fallback converter is a piece of engineering I am quietly proud of. The pseudo-XML contract allows flexible spacing around tags, uses non-greedy matching up to the first literal `</parameter>` to avoid ambiguity, and ships with stop words like `</function>` for streaming boundaries. Tool results on the user side use strict structured payload blocks — `<app_tool_result_json>{"tool_name":"...","content":...}</app_tool_result_json>` — that guarantee deterministic round-trip parsing. No ambiguous free-text parsing. No heuristic guessing.
 
-Static prompt sections live in markdown files.
-Dynamic prompt sections are rendered by plain Python functions.
-The builder takes context and returns a string.
+The converter tracks its own telemetry: strict parse success, strict parse failure, and malformed payload rejection counters. Because when the fallback path silently fails, you need to know about it before the user does.
 
-That is it.
+The orchestrator never knows what model it is talking to. It only ever sees standard function calls.
 
-No DSL gymnastics.
-No prompt templating religion.
-No second language hidden inside the first.
+## The Catalog Over Hardcoding
 
-Python won for the least glamorous and most important reasons:
+Then comes the issue of model parameters.
 
-- normal control flow
-- normal debugging
-- normal code review
-- normal testing instincts
-- normal IDE support
+Some models support `temperature`. O1 and O3 "thinking" models do not.
+Some models support `top_p`.
+Some models have a specific parameter for reasoning effort or thinking budgets.
+Some models support prompt cache hints. Some do not.
+Some models accept stop words. Some break if you send them.
+Some models support structured response schemas. Some ignore them.
 
-If a branch in the prompt is wrong, I can inspect the function that produced it.
-If a platform conditional is wrong, I can see the exact `_choose(...)` logic.
-If a section becomes too large or too confusing, I can split it like any other code.
+If you write your inference layer with hard-coded rules like `if model.startswith('o1'): del payload['temperature']`, you are fighting a losing battle against the release cycle of the AI industry.
 
-That is a better engineering environment than hoping a template engine keeps feeling manageable after the fifth layer of conditionals.
+Grinta solved this with a data-driven catalog and a capability system. The `ModelFeatures` dataclass carries frozen capability flags: `supports_function_calling`, `supports_reasoning_effort`, `supports_prompt_cache`, `supports_stop_words`, and `supports_response_schema`. Each capability is resolved by matching the model name against pattern lists — glob patterns that match against the normalized model basename or, for provider-qualified patterns containing a `/`, against the full model string including the provider prefix.
 
----
+Model name normalization is its own small discipline. The resolver trims whitespace, lowercases, strips provider prefixes to extract the canonical basename, and drops trailing `-gguf` suffixes because local model files carry format identifiers that have nothing to do with capability. Two model strings that describe the same model but look different textually get normalized to the same canonical name.
 
-## The Five-Part Prompt Spine
+This means adding support for a new model is often a data change — adding a pattern to a list — instead of writing conditional code. When a new model family launches with unusual behavior, I update the catalog. I do not rewrite the inference logic.
 
-One of the cleanest consequences of the pure-Python rewrite was that the system prompt developed an actual spine.
+## The LLM Exception Mapper
 
-The prompt is not one blob. It is several deliberately different sections that each solve a different problem.
+When Claude throws an over-limit error, it looks different than when Gemini does the same thing. When OpenAI returns a 408, it means timeout. When it returns a 503, it means service unavailable. Anthropic returns a `BadRequestError` with a message about maximum context length. Google throws a completely different SDK exception.
 
-That architecture had to stay lean enough to survive the pressure described in [04. The Context War](04-the-context-war.md), and modular enough to coexist with the runtime knowledge packets described in [13. The Hidden Playbooks](13-the-hidden-playbooks.md) without collapsing back into one giant god-prompt.
+Grinta's LLM exception mapper normalizes all of these into a standard hierarchy: `ContextWindowExceededError`, `RateLimitError`, `AuthenticationError`, `ContentPolicyViolationError`, `ServiceUnavailableError`, `NotFoundError`, `InternalServerError`. The mapper processes API status errors by HTTP code, checks bad-request errors for context-window-specific language, and wraps everything else in a provider-labeled `ModelProviderError`.
 
-Grinta's prompt builder loads and assembles five main partials:
+This is critical because the recovery service — the orchestrator component that decides whether to retry, back off, or hard-stop — must not care which provider threw the error. It cares only about the *category* of the error. An authentication failure from Anthropic and an authentication failure from OpenAI must both produce the same behavior: immediate stop, surface to the user, do not retry.
 
-- routing
-- autonomy
-- tools
-- tail
-- critical
-
-That decomposition matters because the sections do not do the same work.
-
-### Routing
-
-The routing section teaches the model how to choose between tools.
-
-This is more important than people think. A lot of bad agent behavior is not caused by lack of intelligence. It is caused by bad tool selection. Models will happily use the shell as a blunt instrument unless the environment teaches them a better hierarchy.
-
-That is why routing exists as its own first-class section. It encodes hard-earned taste: when to use layout-discovery tools, when to prefer structured file readers, when shell usage is appropriate, and when it is just noisy laziness.
-
-### Autonomy
-
-Autonomy is not one slider buried in config.
-It is a behavioral contract.
-
-The autonomy partial makes that contract visible. Full, balanced, and supervised modes each produce a different block of instructions. That matters because the model should not be asked to infer the user's risk appetite from vibes.
-
-If the system is going to be more or less independent, say it clearly.
-
-### Tools
-
-The tools section is where the architecture stops pretending that all tools are morally equal.
-
-It teaches fallback order, discourages bad habits, and reinforces the central discipline of the product: structured tools first, shell last for source-code operations.
-
-This is one of the places where prompt engineering and product philosophy become the same thing. The prompt is not merely describing tools. It is teaching the model the values embedded in the tool layer.
-
-### Tail
-
-The tail is where late-stage behavioral guidance lives: MCP exposure, permissions framing, server hints, and the final reminders that should survive near the end of the system message.
-
-I liked making this its own section because the end of a prompt has a different rhetorical role from the beginning. Some instructions need to greet the model early. Some need to remain visible late.
-
-That is not mystical either. It is layout.
-
-### Critical
-
-The critical section isolates the hardest constraints.
-
-It exists because some rules should not be buried in the middle of softer guidance. Rules like "do not claim a file was created if you never invoked the file-editing tool" or "do not fabricate results when a tool failed" deserve their own hard edge.
-
-That separation makes the prompt easier to reason about and makes the rule hierarchy more legible.
+Without this normalization layer, error handling in an agent becomes a nest of provider-specific `try/except` blocks that multiply every time a new provider is added. With it, error handling is written once against a clean hierarchy, and new providers just need a mapper.
 
 ---
 
-## Markdown for Content, Structure for Boundaries
+## The LLM Response Contract
 
-The final prompt format also taught me something obvious that I had somehow managed to forget.
+One more detail that matters: the response object itself.
 
-Models are not alien readers.
-They are statistical machines trained on oceans of technical text.
+Every LLM call in Grinta returns an `LLMResponse` — a custom object that provides both attribute access and dictionary access to the same data. That dual interface exists because some parts of the codebase naturally read `response.content` while others naturally read `response['choices']`, and enforcing a single style across thousands of call sites would produce more boilerplate than clarity.
 
-That means format matters.
+The response carries the raw content, the parsed tool calls, stop reason, token usage (prompt tokens, completion tokens, total), and provider metadata. The token usage tracking feeds directly into the cost quota middleware: every response updates a running total, and the middleware blocks new calls when the budget cap is reached.
 
-Markdown works well because it is close to the native visual grammar of software communication: headers, bullets, short sections, explicit emphasis. Models have seen an absurd amount of it.
-
-But markdown alone is not enough when you need sharper structural boundaries.
-
-That is where explicit blocks such as `<AUTONOMY>` and `<MCP_TOOLS>` earn their place. They give the prompt hard segmentation without forcing everything into JSON-shaped rigidity. They are not there because XML is elegant. They are there because the model parses structural boundaries well when those boundaries are obvious and consistent.
-
-That combination ended up being the sweet spot:
-
-- markdown for readable content
-- structural tags for delimiters
-- Python for assembly
-
-It sounds almost embarrassingly practical.
-That is why it works.
+The stop reason normalization matters more than you might expect. OpenAI returns `stop` for completed responses and `tool_calls` when the model wants to use a tool. Anthropic returns `end_turn` and `tool_use`. Gemini has its own vocabulary. The response mapper normalizes all of these to a standard set so the orchestrator can make decisions like "should I continue stepping?" without knowing which provider is active.
 
 ---
 
-## The MCP Menu Problem
+## The Lesson of the Reckoning
 
-The prompt builder also forced me to confront a problem that shows up any time an agent gains external extensibility.
+Why go to all this trouble?
 
-How do you expose a large set of external capabilities without turning the prompt into garbage?
+Because events do not lie. Models do. Models change. Startups pivot. Pricing goes up. Open-source models get better.
 
-The answer in Grinta was to treat MCP tools as a **menu**, not as a swarm of native function signatures scattered all over the system prompt.
+If your agent is tied to one model's API syntax, your architecture is renting space in someone else's walled garden. When they move the walls, you die.
 
-The builder collects the available tool names, adds descriptions when useful, layers in server-level hints when those exist, and presents the result as one coherent block. The execution path stays simple: one gateway call pattern, many available tools.
+The decision to build the inference layer this way was expensive. It took weeks to design, test, debug across providers, and ensure error handling was normalized natively. It means maintaining three client implementations plus a fallback, keeping the capability catalog current as models launch, and updating the exception mapper when providers change their error formats.
 
-That separation is incredibly important.
+But the alternative — depending on a framework's abstraction or a single provider's SDK — creates a dependency that compounds over time. Every month that passes, every new model launch, and every pricing shift validates that investment. Grinta can switch from Claude to GPT to Gemini to a local Ollama model with a single config change. No code change. No adapter. No migration.
 
-The prompt should explain *what exists* and *when to use it*.
-The runtime should own *how it is executed*.
-
-When those responsibilities blur together, the model ends up carrying too much interface detail in its active context. When they are separated cleanly, the system scales without making the core prompt unreadable.
+Grinta is model-agnostic because it is the only way to build an agent that can survive next year.
 
 ---
 
-## Platform Awareness Without Prompt Rot
-
-One of the easiest ways to ruin a system prompt is to let platform conditionals seep into every paragraph.
-
-Windows here.
-Unix there.
-Maybe bash.
-Maybe PowerShell.
-Maybe Git Bash on Windows.
-Maybe a fallback.
-
-If you do that carelessly, the prompt starts to decay into caveat soup.
-
-This is another place where pure Python helped. Platform awareness could be expressed through small rendering choices instead of duplicated prompt variants. The builder can choose different strings, different examples, or different process-management guidance without forking the entire prompt into parallel universes.
-
-That sounds like a minor implementation detail.
-It is actually a huge maintainability win.
-
-It means cross-platform support lives in the rendering layer instead of turning the prompt corpus into a branching labyrinth.
-
----
-
-## Debug Tier and the Architecture of Escalation
-
-One of the subtler improvements in the prompt system was the shift from one static prompt to a tiered model.
-
-Normal operation and stressed operation are not the same thing.
-
-If the agent has been running cleanly, the base prompt should stay lean.
-If the session is error-heavy, high-risk, or historically scarred, the system should be able to inject more guidance.
-
-That is the logic behind the debug tier.
-
-It lets the system add lessons learned, stronger guidance, and additional context exactly when the situation justifies the extra prompt weight. This is a much better compromise than always shipping the heaviest possible prompt. Constant maximalism is not sophistication. It is laziness.
-
-When [08. The First Fixed Issue](08-the-first-fixed-issue.md) talks about lessons learned being stored and reinjected after a successful run, this tier is the mechanism underneath that behavior. And when [14. The Verification Tax](14-the-verification-tax.md) argues that higher-risk moments deserve stricter infrastructure around truth, this is the prompt-side version of the same instinct: escalate guidance when the run gets riskier instead of pretending one lightweight prompt is equally suited to everything.
-
-Escalation is sophistication.
-
-Good systems know when to bring more structure to the front.
-
----
-
-## Why This Was More Than a Refactor
-
-It would be easy to describe this chapter as a refactor story.
-
-That would undersell it.
-
-The shift from Jinja to Python changed more than syntax. It changed how I thought about the model's operating environment. The prompt stopped being a magical speech delivered to the model and became a rendered interface specification generated by normal code.
-
-That is a much healthier way to think.
-
-It lowers the emotional temperature around prompt work.
-It makes debugging less embarrassing.
-It makes changes easier to justify.
-It makes the system easier to share with other engineers without sounding like a mystic.
-
-This matters because a lot of AI work still suffers from an unhealthy split: "real engineering" on one side, "prompt magic" on the other.
-
-I do not believe that split is useful.
-
-Prompt architecture is part of the software architecture.
-The moment the prompt governs tool routing, autonomy, platform behavior, permissions, and external capability discovery, it is already inside the engineering core whether you admit it or not.
-
----
-
-## What Survived the Rewrite
-
-Not everything in the old prompt world was wrong.
-
-What survived mattered:
-
-- the need for clear sections
-- the need for hard constraints
-- the importance of tool-routing guidance
-- the idea that prompt shape affects model behavior more than people admit
-
-What died was the illusion that these needs should be managed through increasingly fancy templating.
-
-That illusion cost me time.
-It also taught me something valuable: in AI systems, the glamorous solution is often the one that leaves the worst debugging experience behind.
-
-The boring solution usually wins in the long run.
-
----
-
-## Why This Chapter Matters
-
-This chapter matters because prompt work is still too often explained either like marketing or like sorcery.
-
-I wanted to show the middle ground.
-
-Prompt design can be rigorous.
-Prompt design can be modular.
-Prompt design can be debuggable.
-Prompt design can be boring in exactly the right way.
-
-That is not a downgrade.
-That is what happens when a field starts maturing.
-
-The best prompt system in a serious agent is not the one with the cleverest phrasing.
-It is the one whose rendering path you can still understand when something breaks at 2 AM.
-
-That is when you know the prompt finally became part of the product instead of a pile of ritual text taped to the side of it.
-
----
-
-[← The 3 AM Decisions](09-the-3am-decisions.md) | [The Book of Grinta](README.md) | [The Console Wars →](11-the-console-wars.md)
+← [The 3 AM Decisions](09-the-3am-decisions.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Console Wars](11-the-console-wars.md) →

@@ -168,6 +168,16 @@ class TestCallAsyncFromSync:
         with pytest.raises(RuntimeError, match='async error'):
             call_async_from_sync(failing_async)
 
+    def test_returns_despite_lingering_background_task(self):
+        """Stray asyncio tasks are cancelled with a bounded wait so the worker thread exits."""
+
+        async def leaves_lingering():
+            asyncio.get_running_loop().create_task(asyncio.sleep(3600))
+            return 'done'
+
+        result = call_async_from_sync(leaves_lingering, timeout=10.0)
+        assert result == 'done'
+
 
 class TestGetMaxWorkers:
     def test_reads_app_thread_pool_env(self):

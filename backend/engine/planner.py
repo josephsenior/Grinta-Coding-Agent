@@ -149,7 +149,7 @@ class OrchestratorPlanner:
         from backend.engine.tools.task_tracker import (
             create_task_tracker_tool,
         )
-        if getattr(self._config, 'enable_internal_task_tracker', True):
+        if getattr(self._config, 'enable_internal_task_tracker', False):
             tools.append(create_task_tracker_tool())
         tools.append(create_search_code_tool())
         tools.append(create_explore_tree_structure_tool())
@@ -253,17 +253,10 @@ class OrchestratorPlanner:
     def _add_browsing_tool(self, tools: list) -> None:
         if not getattr(self._config, 'enable_browsing', False):
             return
-        # Only expose verify_ui_change when the browser-use MCP server is actually configured.
-        try:
-            mcp = getattr(self._config, 'mcp', None)
-            servers = list(getattr(mcp, 'servers', None) or [])
-            server_names = {getattr(s, 'name', '') for s in servers}
-        except TypeError:
-            server_names = set()
-        if 'browser-use' in server_names:
-            from backend.engine.tools.verify_ui import create_verify_ui_change_tool
+        if getattr(self._config, 'enable_native_browser', False):
+            from backend.engine.tools.browser_native import create_browser_tool
 
-            tools.append(create_verify_ui_change_tool())
+            tools.append(create_browser_tool())
 
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):

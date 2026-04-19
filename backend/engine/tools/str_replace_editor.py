@@ -11,24 +11,22 @@ from backend.inference.tool_names import STR_REPLACE_EDITOR_TOOL_NAME
 
 _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `view_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
-* `create_file`: create new file (fails if exists). Requires `file_text` — full-file body for new files. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call.
+* `create_file`: create new file (fails if exists). Requires `file_text` — full-file body for new files. The value must be **valid JSON string content** (escaped quotes and newlines). Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call.
 * `insert_text`: insert `new_str` after `insert_line`.
 * `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
-* `view_and_replace`: view + replace in one call. `view_range` scopes both display and match. Kept for compatibility.
-* `batch_replace`: atomic multi-file edits. Provide `edits` array of {path, old_str, new_str}. All succeed or all roll back. Edits are validated in order (later `old_str` must not be trapped inside an earlier `new_str` on the same path).
 * `edit_mode`: safer non-code editing primitives — prefer these over giant free-form replaces for documents:
   - `format`: parser-based mutation for json/yaml/toml/markdown/html/xml.
   - `section`: anchor-bounded section edit.
   - `range`: line-range replacement with optional `expected_hash` (slice) or `expected_file_hash` (whole file as read).
   - `patch`: unified diff hunk apply with strict context — for strict apply or review, not the default editing style.
 
-Default mental model: **surgical replace** for code edits; **minimal valid `file_text` on create**, then iterate; **full `file_text`** only when truly replacing a whole file; **patch** when you need diff-shaped context.
+Default mental model: **`edit_mode`** / **`ast_code_editor`** for structured code edits; **minimal valid `file_text` on create**, then **`insert_text`** or line/range tools. Multi-file work: sequential **`ast_code_editor`** calls or checkpoints — there is no atomic batch string API.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
 """
 _SHORT_STR_REPLACE_EDITOR_DESCRIPTION = (
     'File viewing, creation, and editing tool. Commands: view_file, create_file, '
-    'insert_text, undo_last_edit, view_and_replace, batch_replace. Supports edit_mode=format|section|range|patch. '
+    'insert_text, undo_last_edit. Supports edit_mode=format|section|range|patch. '
     'Use project-relative paths.\n'
 )
 
@@ -55,14 +53,12 @@ def create_str_replace_editor_tool(
         description=description,
         properties={
             'command': get_command_param(
-                'The commands to run: `view_file`, `create_file`, `insert_text`, `undo_last_edit`, `view_and_replace`, `batch_replace`.',
+                'The commands to run: `view_file`, `create_file`, `insert_text`, `undo_last_edit`.',
                 [
                     'view_file',
                     'create_file',
                     'insert_text',
                     'undo_last_edit',
-                    'view_and_replace',
-                    'batch_replace',
                 ],
             ),
             'path': get_path_param(
@@ -73,12 +69,8 @@ def create_str_replace_editor_tool(
                 'description': 'Required for `create_file`. Content of the file to create.',
                 'type': 'string',
             },
-            'old_str': {
-                'description': 'Exact string to replace (used by compatibility flows like `view_and_replace` and `batch_replace`).',
-                'type': 'string',
-            },
             'new_str': {
-                'description': 'Replacement string (compatibility flows) or text to insert for `insert_text`.',
+                'description': 'Text to insert for `insert_text` (required there).',
                 'type': 'string',
             },
             'insert_line': {
@@ -86,31 +78,9 @@ def create_str_replace_editor_tool(
                 'type': 'integer',
             },
             'view_range': {
-                'description': 'Optional for `view_file`/`view_and_replace`. Line range [start, end] (1-indexed). Use [start, -1] for rest of file.',
+                'description': 'Optional for `view_file`. Line range [start, end] (1-indexed). Use [start, -1] for rest of file.',
                 'items': {'type': 'integer'},
                 'type': 'array',
-            },
-            'edits': {
-                'description': 'Required for `batch_replace`. Array of {path, old_str, new_str} edits applied atomically.',
-                'type': 'array',
-                'items': {
-                    'type': 'object',
-                    'properties': {
-                        'path': {
-                            'type': 'string',
-                            'description': 'Absolute file path.',
-                        },
-                        'old_str': {
-                            'type': 'string',
-                            'description': 'Exact text to replace.',
-                        },
-                        'new_str': {
-                            'type': 'string',
-                            'description': 'Replacement text.',
-                        },
-                    },
-                    'required': ['path', 'old_str', 'new_str'],
-                },
             },
             'security_risk': get_security_risk_param(),
             'preview': {

@@ -1,4 +1,4 @@
-please# ============================================
+# ============================================
 # GRINTA - Quick Start Script
 # ============================================
 # Run this script in PowerShell to start Grinta
@@ -34,8 +34,8 @@ if (-not (Test-Path 'settings.json')) {
     Copy-Item 'settings.template.json' 'settings.json'
 }
 
-Write-Host 'Step 1: Syncing dependencies with uv...' -ForegroundColor Yellow
-& uv sync
+Write-Host 'Step 1: Syncing dependencies with uv (project .venv + browser group)...' -ForegroundColor Yellow
+& uv sync --group browser
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host '[ERROR] Failed to sync dependencies' -ForegroundColor Red

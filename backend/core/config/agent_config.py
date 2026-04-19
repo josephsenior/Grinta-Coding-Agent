@@ -25,6 +25,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_AUTO_RETRY_ON_ERROR,
     DEFAULT_AGENT_AUTONOMY_LEVEL,
     DEFAULT_AGENT_BROWSING_ENABLED,
+    DEFAULT_AGENT_NATIVE_BROWSER_ENABLED,
     DEFAULT_AGENT_CLI_MODE,
     DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
@@ -55,6 +56,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_REFLECTION_ENABLED,
     DEFAULT_AGENT_REFLECTION_MAX_ATTEMPTS,
     DEFAULT_AGENT_REFLECTION_MIDDLEWARE_ENABLED,
+    DEFAULT_AGENT_SIGNAL_PROGRESS_ENABLED,
     DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED,
     DEFAULT_AGENT_STUCK_DETECTION_ENABLED,
     DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS,
@@ -113,6 +115,10 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED
     )
     enable_browsing: bool = Field(default=DEFAULT_AGENT_BROWSING_ENABLED)
+    enable_native_browser: bool = Field(
+        default=DEFAULT_AGENT_NATIVE_BROWSER_ENABLED,
+        description='Expose native browser-use tools (requires optional `browser` dependency group)',
+    )
     enable_vector_memory: bool = Field(
         default=DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
         description='Enable persistent vector memory store',
@@ -138,10 +144,26 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
 
     # Core tool toggles
-    enable_think: bool = Field(default=DEFAULT_AGENT_THINK_ENABLED)
-    enable_finish: bool = Field(default=DEFAULT_AGENT_FINISH_ENABLED)
+    enable_think: bool = Field(
+        default=DEFAULT_AGENT_THINK_ENABLED,
+        description=(
+            'Expose the think tool for explicit reasoning steps (optional; models may reason in prose).'
+        ),
+    )
+    enable_finish: bool = Field(
+        default=DEFAULT_AGENT_FINISH_ENABLED,
+        description=(
+            'Expose the finish tool. Keep enabled: the orchestrator uses it as the normal task-completion '
+            'signal (state transitions, validation). Disabling removes a core lifecycle hook unless you '
+            'replace it elsewhere.'
+        ),
+    )
     enable_condensation_request: bool = Field(
-        default=DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED
+        default=DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
+        description=(
+            'Expose summarize_context so the model can request conversation condensation. Independent of '
+            'automatic compaction; default off to reduce redundant tool surface.'
+        ),
     )
 
     # Agent Tools configuration
@@ -149,7 +171,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_editor: bool = Field(default=True)
     enable_working_memory: bool = Field(default=True)
     enable_lsp_query: bool = Field(default=True)
-    enable_signal_progress: bool = Field(default=True)
+    enable_signal_progress: bool = Field(default=DEFAULT_AGENT_SIGNAL_PROGRESS_ENABLED)
     enable_swarming: bool = Field(default=False)
     enable_blackboard: bool = Field(default=False)
     enable_verify_file_lines: bool = Field(default=True)

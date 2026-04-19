@@ -17,15 +17,13 @@ def _make_config(**kwargs):
     cfg.enable_editor = True
     cfg.enable_run_tests = True
     cfg.enable_apply_patch = True
-    cfg.enable_task_tracker = True
+    cfg.enable_internal_task_tracker = True
     cfg.enable_checkpoints = True
     cfg.enable_session_diff = True
     cfg.enable_working_memory = True
     cfg.enable_verify_file_lines = True
     cfg.enable_browsing = True
-    browser_server = MagicMock()
-    browser_server.name = 'browser-use'
-    cfg.mcp.servers = [browser_server]
+    cfg.mcp.servers = []
 
     for k, v in kwargs.items():
         setattr(cfg, k, v)

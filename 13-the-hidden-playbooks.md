@@ -1,324 +1,323 @@
-# 15. Prompts Are Programs
+# 13. The Hidden Playbooks
 
-There is a popular way of talking about prompt engineering that makes it sound like copywriting for machines.
+Bad architecture often feels responsible while you build it.
 
-Choose the right words.
-Add a few examples.
-Massage the phrasing.
-Find the secret incantation.
+It tells you that the safest thing to do is to put *everything* in the base prompt.
+Every rule.
+Every convention.
+Every scar from a previous failure.
+Every repository habit.
+Every special case.
 
-I understand the appeal of talking about it that way.
-It flatters the mystique.
+That feels disciplined.
+It is often just fear wearing a systems-engineering costume.
 
-It is also one of the least useful mental models you can carry into a serious agent system.
+If [04. The Context War](04-the-context-war.md) was about not drowning a model in too much memory, this chapter is about the opposite failure: starving it of the *right* knowledge at the exact moment it needs it.
 
-Because once the prompt stops being a single clever paragraph and starts becoming the control surface for a real tool, it is no longer just wording.
+That is what the playbook system solved.
 
-It is software.
+Not by becoming magical, but by becoming timely.
 
-That was one of the most important architecture lessons in Grinta.
-
-The day I really accepted that was the day the prompt system started getting better.
-
----
-
-## The Jinja Disaster
-
-Earlier versions of the project used Jinja2 for system-prompt rendering.
-
-On paper, this sounded reasonable.
-
-Templating engines exist to render structured text with conditionals.
-Prompts are structured text with conditionals.
-Case closed.
-
-In practice, it turned into a mess.
-
-The prompt logic spread across template branches, configuration checks, and slightly different "optimized" variants that all claimed to be the right one. I had hundreds of lines of prompt logic rendered through a DSL that made perfect sense for HTML and terrible sense for a live system prompt whose shape depended on runtime conditions.
-
-That kind of architecture has a special way of wasting your time.
-
-You cannot reason about it locally.
-You cannot debug it comfortably.
-You cannot step through it like real code.
-You end up rendering giant strings and eyeballing the result like a person checking tea leaves.
-
-That is when I realized the problem was not that the prompt was hard.
-It was that I had chosen the wrong *medium* for the logic.
+It sits between [04. The Context War](04-the-context-war.md) and [15. Prompts Are Programs](15-prompts-are-programs.md): one chapter is about protecting the model from too much memory, the other about keeping the core instruction layer sane.
 
 ---
 
-## The Moment the Prompt Became Code
+## The Real Problem
 
-Once I stopped treating the prompt as sacred text and started treating it as a program that produces text, a lot of confusion vanished.
+The problem was never simply, "How do I make the prompt smarter?"
 
-That shift sounds minor.
-It is not.
+The real problem was:
 
-The key mental change was this:
+- how do I keep the base prompt lean enough to stay readable
+- how do I preserve repository-specific rules without paying their token cost on every turn
+- how do I surface specialized knowledge only when the task actually crosses into that territory
+- how do I avoid building another grand theory of self-improving intelligence when what I really need is a reliable way to inject scar tissue
 
-the thing I needed to design was not only the final string.
-It was the **rendering path** that produced the string.
+This distinction matters.
 
-That meant I suddenly cared about all the questions software engineers already know how to ask:
+A lot of agent systems collapse these problems together. They treat permanent instructions, runtime memory, task templates, and specialist knowledge as one giant undifferentiated blob. That usually leads to two bad outcomes at once:
 
-- where is the logic allowed to branch
-- which parts are static and which are dynamic
-- how do I debug a bad output
-- how do I make one section change without destabilizing the rest
-- how do I keep platform-specific behavior explicit instead of smearing it everywhere
+- the core prompt becomes bloated
+- the system still fails to surface the most relevant knowledge at the right time
 
-Once you ask those questions, prompt architecture stops feeling mystical.
-It starts feeling like normal engineering again.
-
-That was a relief.
+The playbook architecture came from refusing that compromise.
 
 ---
 
-## Why Python Won
+## The Ancestor: Micro-Agents
 
-The current prompt builder in Grinta is deliberately boring.
+This part of Grinta did not appear out of nowhere.
 
-That is praise.
+The earlier codebase had a smaller, rougher ancestor of the same idea: micro-agents.
 
-Static prompt sections live in markdown files.
-Dynamic prompt sections are rendered by plain Python functions.
-The builder takes context and returns a string.
+That architecture had three forms:
 
-That is it.
+- **knowledge micro-agents** for trigger-based expertise injection
+- **repo micro-agents** for repository-scoped guidance and compatibility with files like `.cursorrules` and `agents.md`
+- **task micro-agents** for slash-command style templates with structured inputs
 
-No DSL gymnastics.
-No prompt templating religion.
-No second language hidden inside the first.
+The form factor was simple and powerful: markdown files with frontmatter metadata.
 
-Python won for the least glamorous and most important reasons:
+That mattered to me for two reasons.
 
-- normal control flow
-- normal debugging
-- normal code review
-- normal testing instincts
-- normal IDE support
+First, markdown is easy for humans to write, review, and version.
+Second, it keeps the knowledge artifact legible. A good system should not require contributors to learn a private DSL just to teach the agent one useful habit.
 
-If a branch in the prompt is wrong, I can inspect the function that produced it.
-If a platform conditional is wrong, I can see the exact `_choose(...)` logic.
-If a section becomes too large or too confusing, I can split it like any other code.
+I learned that pattern partly by studying OpenHands. What impressed me there was not only the existence of micro-agents. It was the architectural humility of the idea. Small declarative units. Triggered when needed. Not a giant god-prompt pretending to know everything at all times.
 
-That is a better engineering environment than hoping a template engine keeps feeling manageable after the fifth layer of conditionals.
+Grinta kept that humility and rebuilt the system with tighter boundaries.
 
 ---
 
-## The Five-Part Prompt Spine
+## What a Playbook Actually Is
 
-One of the cleanest consequences of the pure-Python rewrite was that the system prompt developed an actual spine.
+A playbook is not a persona.
+It is not a brand name for a prompt snippet.
+It is not a little roleplay packet.
 
-The prompt is not one blob. It is several deliberately different sections that each solve a different problem.
+A playbook is a runtime expertise unit.
 
-That architecture had to stay lean enough to survive the pressure described in [04. The Context War](04-the-context-war.md), and modular enough to coexist with the runtime knowledge packets described in [13. The Hidden Playbooks](13-the-hidden-playbooks.md) without collapsing back into one giant god-prompt.
+It has content, metadata, and a very specific reason to exist.
 
-Grinta's prompt builder loads and assembles five main partials:
+Grinta's current system recognizes three playbook types:
 
-- routing
-- autonomy
-- tools
-- tail
-- critical
+- **knowledge playbooks**
+- **repository playbooks**
+- **task playbooks**
 
-That decomposition matters because the sections do not do the same work.
+That split is more important than it looks.
 
-### Routing
+### Knowledge playbooks
 
-The routing section teaches the model how to choose between tools.
+Knowledge playbooks are for specialized competence that should appear only when the conversation indicates it is relevant.
 
-This is more important than people think. A lot of bad agent behavior is not caused by lack of intelligence. It is caused by bad tool selection. Models will happily use the shell as a blunt instrument unless the environment teaches them a better hierarchy.
+This is the right home for things like:
 
-That is why routing exists as its own first-class section. It encodes hard-earned taste: when to use layout-discovery tools, when to prefer structured file readers, when shell usage is appropriate, and when it is just noisy laziness.
+- domain-specific engineering guidance
+- workflow knowledge that is useful only for certain classes of tasks
+- hard-earned implementation lessons that would be distracting if shown on every run
 
-### Autonomy
+The philosophical point is simple: expertise should be available on demand, not permanently stapled to the model's forehead.
 
-Autonomy is not one slider buried in config.
-It is a behavioral contract.
+### Repository playbooks
 
-The autonomy partial makes that contract visible. Full, balanced, and supervised modes each produce a different block of instructions. That matters because the model should not be asked to infer the user's risk appetite from vibes.
+Repository playbooks solve a different problem.
 
-If the system is going to be more or less independent, say it clearly.
+Every repository has its own small culture:
 
-### Tools
+- naming habits
+- build commands
+- testing expectations
+- forbidden shortcuts
+- structural preferences
 
-The tools section is where the architecture stops pretending that all tools are morally equal.
+Trying to encode all of that globally is a mistake.
 
-It teaches fallback order, discourages bad habits, and reinforces the central discipline of the product: structured tools first, shell last for source-code operations.
+Repository playbooks let a project say, "This is how *I* do things here," without pretending that every repository in the world shares the same conventions. That is also why compatibility with files like `.cursorrules` and `agents.md` mattered. Good tooling should meet real developer ecosystems where they already are instead of demanding ritual conversion into one blessed format.
 
-This is one of the places where prompt engineering and product philosophy become the same thing. The prompt is not merely describing tools. It is teaching the model the values embedded in the tool layer.
+### Task playbooks
 
-### Tail
+Task playbooks are the most explicitly operational of the three.
 
-The tail is where late-stage behavioral guidance lives: MCP exposure, permissions framing, server hints, and the final reminders that should survive near the end of the system message.
+They are triggered like commands, take structured inputs, and exist for repeated workflows that benefit from a reliable template.
 
-I liked making this its own section because the end of a prompt has a different rhetorical role from the beginning. Some instructions need to greet the model early. Some need to remain visible late.
+That makes them different from freeform memory.
+Freeform memory says, "Here is something worth remembering."
+Task playbooks say, "Here is a reusable way to frame a class of work."
 
-That is not mystical either. It is layout.
-
-### Critical
-
-The critical section isolates the hardest constraints.
-
-It exists because some rules should not be buried in the middle of softer guidance. Rules like "do not claim a file was created if you never invoked the file-editing tool" or "do not fabricate results when a tool failed" deserve their own hard edge.
-
-That separation makes the prompt easier to reason about and makes the rule hierarchy more legible.
-
----
-
-## Markdown for Content, Structure for Boundaries
-
-The final prompt format also taught me something obvious that I had somehow managed to forget.
-
-Models are not alien readers.
-They are statistical machines trained on oceans of technical text.
-
-That means format matters.
-
-Markdown works well because it is close to the native visual grammar of software communication: headers, bullets, short sections, explicit emphasis. Models have seen an absurd amount of it.
-
-But markdown alone is not enough when you need sharper structural boundaries.
-
-That is where explicit blocks such as `<AUTONOMY>` and `<MCP_TOOLS>` earn their place. They give the prompt hard segmentation without forcing everything into JSON-shaped rigidity. They are not there because XML is elegant. They are there because the model parses structural boundaries well when those boundaries are obvious and consistent.
-
-That combination ended up being the sweet spot:
-
-- markdown for readable content
-- structural tags for delimiters
-- Python for assembly
-
-It sounds almost embarrassingly practical.
-That is why it works.
+That is closer to the way good engineers actually operate. I do not just remember facts. I also reuse procedures.
 
 ---
 
-## The MCP Menu Problem
+## Why Timing Matters More Than Volume
 
-The prompt builder also forced me to confront a problem that shows up any time an agent gains external extensibility.
+The most important thing about the playbook system is not the taxonomy.
+It is the timing model.
 
-How do you expose a large set of external capabilities without turning the prompt into garbage?
+I did not want one giant prompt that carried every possible instruction forever.
 
-The answer in Grinta was to treat MCP tools as a **menu**, not as a swarm of native function signatures scattered all over the system prompt.
+That approach looks safe at first because nothing is missing.
+But nothing is prioritized either.
 
-The builder collects the available tool names, adds descriptions when useful, layers in server-level hints when those exist, and presents the result as one coherent block. The execution path stays simple: one gateway call pattern, many available tools.
+Once a prompt gets large enough, knowledge stops being guidance and starts being background radiation. The model sees it, but the signal-to-noise ratio keeps collapsing. By the time the relevant instruction matters, it has been diluted by everything else that was included "just in case."
 
-That separation is incredibly important.
+Playbooks invert that.
 
-The prompt should explain *what exists* and *when to use it*.
-The runtime should own *how it is executed*.
+They say:
 
-When those responsibilities blur together, the model ends up carrying too much interface detail in its active context. When they are separated cleanly, the system scales without making the core prompt unreadable.
+- keep the base system prompt focused
+- keep reusable expertise modular
+- inject it when the task or conversation actually earns it
 
----
-
-## Platform Awareness Without Prompt Rot
-
-One of the easiest ways to ruin a system prompt is to let platform conditionals seep into every paragraph.
-
-Windows here.
-Unix there.
-Maybe bash.
-Maybe PowerShell.
-Maybe Git Bash on Windows.
-Maybe a fallback.
-
-If you do that carelessly, the prompt starts to decay into caveat soup.
-
-This is another place where pure Python helped. Platform awareness could be expressed through small rendering choices instead of duplicated prompt variants. The builder can choose different strings, different examples, or different process-management guidance without forking the entire prompt into parallel universes.
-
-That sounds like a minor implementation detail.
-It is actually a huge maintainability win.
-
-It means cross-platform support lives in the rendering layer instead of turning the prompt corpus into a branching labyrinth.
+That is not just cheaper in tokens.
+It is cleaner in cognition.
 
 ---
 
-## Debug Tier and the Architecture of Escalation
+## Triggering Without Becoming Noisy
 
-One of the subtler improvements in the prompt system was the shift from one static prompt to a tiered model.
+The moment you build trigger-based knowledge injection, you inherit a new class of failure.
 
-Normal operation and stressed operation are not the same thing.
+False positives.
 
-If the agent has been running cleanly, the base prompt should stay lean.
-If the session is error-heavy, high-risk, or historically scarred, the system should be able to inject more guidance.
+And false positives are poisonous.
 
-That is the logic behind the debug tier.
+If a system keeps pulling in irrelevant expertise, two things happen quickly:
 
-It lets the system add lessons learned, stronger guidance, and additional context exactly when the situation justifies the extra prompt weight. This is a much better compromise than always shipping the heaviest possible prompt. Constant maximalism is not sophistication. It is laziness.
+- the context gets polluted
+- the user stops trusting that the system knows why it surfaced anything
 
-When [08. The First Fixed Issue](08-the-first-fixed-issue.md) talks about lessons learned being stored and reinjected after a successful run, this tier is the mechanism underneath that behavior. And when [14. The Verification Tax](14-the-verification-tax.md) argues that higher-risk moments deserve stricter infrastructure around truth, this is the prompt-side version of the same instinct: escalate guidance when the run gets riskier instead of pretending one lightweight prompt is equally suited to everything.
+That is why the trigger matcher in Grinta uses two tiers instead of one.
 
-Escalation is sophistication.
+The first tier is fast substring matching.
+If the message clearly contains a trigger phrase, that is the cheap and obvious win.
 
-Good systems know when to bring more structure to the front.
+If that fails, there is a second tier: lightweight semantic overlap.
+It measures word overlap with a Jaccard-like similarity check and only fires past a threshold. Short triggers get penalized because short triggers are where most accidental matches come from.
 
----
+That little design decision captures a larger philosophy I kept relearning across this whole project:
 
-## Why This Was More Than a Refactor
+**simple features become serious features the moment you respect their failure modes.**
 
-It would be easy to describe this chapter as a refactor story.
-
-That would undersell it.
-
-The shift from Jinja to Python changed more than syntax. It changed how I thought about the model's operating environment. The prompt stopped being a magical speech delivered to the model and became a rendered interface specification generated by normal code.
-
-That is a much healthier way to think.
-
-It lowers the emotional temperature around prompt work.
-It makes debugging less embarrassing.
-It makes changes easier to justify.
-It makes the system easier to share with other engineers without sounding like a mystic.
-
-This matters because a lot of AI work still suffers from an unhealthy split: "real engineering" on one side, "prompt magic" on the other.
-
-I do not believe that split is useful.
-
-Prompt architecture is part of the software architecture.
-The moment the prompt governs tool routing, autonomy, platform behavior, permissions, and external capability discovery, it is already inside the engineering core whether you admit it or not.
+The playbook system is a good example. On paper it sounds like "keyword matching plus markdown files." In reality it becomes an exercise in relevance, restraint, and trust calibration.
 
 ---
 
-## What Survived the Rewrite
+## Why This Beat a Bigger Prompt
 
-Not everything in the old prompt world was wrong.
+The easiest argument for playbooks is token efficiency.
 
-What survived mattered:
+That is true.
+It is also the least interesting argument.
 
-- the need for clear sections
-- the need for hard constraints
-- the importance of tool-routing guidance
-- the idea that prompt shape affects model behavior more than people admit
+The stronger argument is architectural clarity.
 
-What died was the illusion that these needs should be managed through increasingly fancy templating.
+Once knowledge is broken into playbooks, several things improve immediately:
 
-That illusion cost me time.
-It also taught me something valuable: in AI systems, the glamorous solution is often the one that leaves the worst debugging experience behind.
+- the core prompt becomes easier to reason about
+- repository-specific rules stop pretending to be universal law
+- specialized guidance becomes inspectable as a discrete artifact
+- contributors can improve one domain without reopening the entire prompt stack
 
-The boring solution usually wins in the long run.
+That last point matters more than people think.
+
+Monolithic prompts make collaboration ugly. If all intelligence lives in one massive system prompt, every improvement becomes a risky surgery. A modular playbook system creates smaller seams. People can refine one packet of knowledge without destabilizing everything else.
+
+That is the same instinct that drove the service decomposition in [03. The Architectural Gauntlet](03-the-architectural-gauntlet.md) and the prompt builder changes in [06. The System Design Playbook](06-the-system-design-playbook.md): stop pretending one giant object is easier just because it is singular.
+
+---
+
+## Repository Knowledge Without Pretending Every Repo Is the Same
+
+This is where the playbook system became emotionally satisfying to me.
+
+I have a strong dislike for tools that claim to be universal while quietly assuming one kind of project, one kind of workflow, and one kind of developer.
+
+Repository playbooks push against that arrogance.
+
+They let the system say:
+
+- this repo uses these commands
+- this repo hates these shortcuts
+- this repo wants these conventions respected
+- this repo has already learned these lessons the hard way
+
+That is a more honest form of intelligence.
+
+It does not pretend the model has absorbed every local convention from pure reasoning. It gives the model a disciplined way to inherit local scar tissue.
+
+And because those instructions live as versioned artifacts, they are reviewable. The team can decide whether a rule belongs there. The rule does not just dissolve into invisible prompt sediment.
+
+---
+
+## Task Playbooks and the Difference Between Memory and Procedure
+
+There is another reason I wanted task playbooks.
+
+Memory alone is not enough for repeatable engineering behavior.
+
+You also need procedure.
+
+There are many tasks where the user is not asking for deep open-ended reasoning. They are asking for a structured workflow with a few variable inputs. In those moments, a task playbook is more valuable than another paragraph of general instructions.
+
+This is where the slash-command model becomes useful.
+
+It gives the system a way to recognize, "This is a repeated pattern of work. The best thing to do is not improvise the framing from scratch every time. The best thing to do is start from a reusable shape and then fill in the specifics."
+
+That is not a retreat from autonomy.
+It is autonomy with better leverage.
+
+But a good procedure is still not proof. [14. The Verification Tax](14-the-verification-tax.md) is about what has to happen after the procedure runs, and [08. The First Fixed Issue](08-the-first-fixed-issue.md) is the first time that whole loop visibly closed in Grinta.
+
+---
+
+## The Knowledge Layer Behind the Curtain
+
+The playbooks are not the entire knowledge story.
+
+There is also a knowledge base layer behind them: chunking, collections, vector-backed retrieval, metadata around documents and chunks, and the bridge that turns stored knowledge into something the runtime can actually use.
+
+That matters because not all relevant knowledge should live as a hand-authored playbook.
+
+Some knowledge is better treated as:
+
+- retrieved background
+- semantically matched reference material
+- structured chunks attached to collections and documents
+
+But I still think the playbooks are the real architectural heart of the system.
+
+The knowledge base is storage.
+The playbooks are judgment about *when* to surface what matters.
+
+Storage without timing is just a warehouse.
+
+---
+
+## What Survived From the Bigger Dream
+
+Earlier in this project, I kept flirting with grander ideas.
+
+Self-improving prompts.
+Self-curating context systems.
+Richer layers of automated optimization.
+
+Some of that work was ambitious.
+Some of it was intelligent.
+Much of it was too much.
+
+The playbook system survived because it is modest in the right way.
+
+It does not claim to be a self-evolving intelligence architecture.
+It just gives the system a disciplined way to surface the right expertise at the right time.
+
+That is a recurring pattern in Grinta's best decisions.
+
+The things that survived were usually not the most grandiose ideas.
+They were the ideas that stayed close to a real failure mode and solved it cleanly.
 
 ---
 
 ## Why This Chapter Matters
 
-This chapter matters because prompt work is still too often explained either like marketing or like sorcery.
+This chapter matters because playbooks are easy to underestimate.
 
-I wanted to show the middle ground.
+From far away, they sound like a convenience feature.
 
-Prompt design can be rigorous.
-Prompt design can be modular.
-Prompt design can be debuggable.
-Prompt design can be boring in exactly the right way.
+From close up, they are one of the clearest examples of the architectural taste that eventually defined Grinta:
 
-That is not a downgrade.
-That is what happens when a field starts maturing.
+- modular instead of monolithic
+- timely instead of always-on
+- explicit instead of magical
+- repository-aware instead of pretending every project is interchangeable
 
-The best prompt system in a serious agent is not the one with the cleverest phrasing.
-It is the one whose rendering path you can still understand when something breaks at 2 AM.
+That is why I trust this system more than I trust the older dreams it replaced.
 
-That is when you know the prompt finally became part of the product instead of a pile of ritual text taped to the side of it.
+The old dreams wanted the system to become smarter in the abstract.
+The playbooks made it more useful at the exact moment usefulness was required.
+
+That is a better kind of intelligence.
 
 ---
 
-[← Open Source Was the Better Business](12-open-source-was-the-better-business.md) | [The Book of Grinta](README.md) | [The Verification Tax →](14-the-verification-tax.md)
+← [Open Source Was the Better Business](12-open-source-was-the-better-business.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Verification Tax](14-the-verification-tax.md) →

@@ -158,8 +158,11 @@ class TestFinalization:
 
             finalize_config(cfg)
 
-        # browser is always disabled; bundled MCPs are always extended
-        assert cfg.enable_browser is False
+        # Native browser follows active agent flags; bundled MCPs are always extended
+        assert cfg.enable_browser is bool(
+            cfg.get_agent_config(cfg.default_agent).enable_browsing
+            and cfg.get_agent_config(cfg.default_agent).enable_native_browser
+        )
 
 
 # ── Named Group Loaders ───────────────────────────────────────────────

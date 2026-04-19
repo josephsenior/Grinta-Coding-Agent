@@ -72,6 +72,37 @@ def _get_max_workers() -> int:
 _MAX_WORKERS = _get_max_workers()
 EXECUTOR: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=_MAX_WORKERS)
 
+# Hard cap for cancelling stray tasks after the main coroutine completes (e.g. browser-use CDP tasks).
+_LOOP_SHUTDOWN_WAIT_SEC = float(os.getenv('CALL_ASYNC_LOOP_SHUTDOWN_WAIT_SEC', '2.0'))
+# Cap for shutdown_asyncgens / shutdown_default_executor — the latter can otherwise block for minutes
+# on Windows when browser-use leaves work on the loop's default executor threads.
+_LOOP_FINALIZE_WAIT_SEC = float(os.getenv('CALL_ASYNC_LOOP_FINALIZE_WAIT_SEC', '3.0'))
+
+
+def _cancel_pending_tasks_bounded(
+    loop: asyncio.AbstractEventLoop, *, timeout_sec: float
+) -> None:
+    """Cancel tasks still scheduled on *loop*; wait at most *timeout_sec* for cancellation.
+
+    ``asyncio.run`` can block in loop teardown if third-party code leaves tasks that do not
+    finish promptly when cancelled. This keeps ``call_async_from_sync`` worker threads bounded.
+    """
+    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+    if not pending:
+        return
+    for t in pending:
+        t.cancel()
+    gather_coro = asyncio.gather(*pending, return_exceptions=True)
+    try:
+        loop.run_until_complete(asyncio.wait_for(gather_coro, timeout=timeout_sec))
+    except TimeoutError:
+        undone = sum(1 for t in pending if not t.done())
+        _logger.warning(
+            'call_async_from_sync: %d task(s) still pending after %.1fs shutdown wait',
+            undone,
+            timeout_sec,
+        )
+
 
 async def call_sync_from_async(
     fn: Callable[..., Any], *args: Any, **kwargs: Any
@@ -108,13 +139,39 @@ def call_async_from_sync(
         return await coro
 
     def run():
-        """Run coroutine in fresh event loop within worker thread."""
-        loop_for_thread = asyncio.new_event_loop()
+        """Run coroutine in a fresh event loop within the worker thread.
+
+        After the main coroutine returns, cancel any remaining tasks with a bounded wait so
+        libraries that spawn background asyncio work (e.g. browser CDP handlers) cannot keep
+        the thread parked indefinitely during ``asyncio.run`` teardown.
+        """
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            asyncio.set_event_loop(loop_for_thread)
-            return asyncio.run(arun())
+            result = loop.run_until_complete(arun())
+            _cancel_pending_tasks_bounded(loop, timeout_sec=_LOOP_SHUTDOWN_WAIT_SEC)
+            return result
         finally:
-            loop_for_thread.close()
+            # Unbounded shutdown_asyncgens / shutdown_default_executor can hang (esp. default
+            # executor joining browser/CDP threadpool work). Always bound wall time.
+            fin = _LOOP_FINALIZE_WAIT_SEC
+            try:
+                loop.run_until_complete(
+                    asyncio.wait_for(loop.shutdown_asyncgens(), timeout=fin)
+                )
+            except (TimeoutError, Exception):
+                pass
+            try:
+                loop.run_until_complete(
+                    asyncio.wait_for(loop.shutdown_default_executor(), timeout=fin)
+                )
+            except (TimeoutError, Exception):
+                pass
+            asyncio.set_event_loop(None)
+            try:
+                loop.close()
+            except Exception:
+                pass
 
     if getattr(EXECUTOR, '_shutdown', False):
         return run()

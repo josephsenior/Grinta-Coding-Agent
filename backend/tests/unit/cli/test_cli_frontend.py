@@ -1298,6 +1298,19 @@ async def test_repl_run_accepts_first_message_before_mcp_warmup_finishes() -> No
 # ── New tests: Reasoning elapsed time ────────────────────────────────────
 
 
+def test_start_live_passes_vertical_overflow_visible() -> None:
+    """Rich Live defaults to ellipsis when content is taller than the terminal; use visible overflow for the Thinking panel."""
+    console = _make_console()
+    with patch('backend.cli.event_renderer.Live') as live_cls:
+        live_cls.return_value = MagicMock()
+        r = CLIEventRenderer(
+            console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_event_loop()
+        )
+        r.start_live()
+    assert live_cls.call_args is not None
+    assert live_cls.call_args.kwargs.get('vertical_overflow') == 'visible'
+
+
 def test_reasoning_display_elapsed_time() -> None:
     """ReasoningDisplay should show elapsed time when active."""
     rd = ReasoningDisplay()
@@ -2417,8 +2430,8 @@ def test_reasoning_display_tool_icons() -> None:
     panel = rd.renderable()
     assert panel is not None
     assert panel.padding == (0, 0)
-    # Verify default max lines and recent-step deque capacity
-    assert rd._max_lines == 10
+    # Verify stored-line cap and recent-step deque capacity
+    assert rd._max_lines == 50_000
     assert rd._recent_actions.maxlen == 4
 
 
@@ -2446,6 +2459,20 @@ def test_reasoning_display_auto_scroll_shows_latest_lines() -> None:
     assert 'auto-scroll: showing latest thoughts' in output
     assert 'thought 15' in output
     assert 'thought 06' not in output
+
+
+def test_reasoning_display_wraps_long_lines_by_default() -> None:
+    """Long one-line reasoning wraps to panel width instead of truncating."""
+    rd = ReasoningDisplay()
+    rd.start()
+    long_line = 'rgba(12,34,56,0.7) ' * 25
+    rd.update_thought(long_line)
+    console = _make_console(width=72)
+    console.print(rd.renderable(max_width=72))
+    output = _console_output(console)
+    assert output.count('rgba(12,34,56,0.7)') >= 25
+    # Wrapped text uses several panel lines; single-line truncation would be one dim row.
+    assert output.count('rgba') >= 25
 
 
 def test_hud_compact_format_for_narrow_terminal() -> None:

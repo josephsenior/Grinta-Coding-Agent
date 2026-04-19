@@ -25,6 +25,15 @@ def attach_observation_cause(
     * ``action_or_id is None`` clears ``cause`` (observations not tied to a tool).
     * Invalid or unassigned ids (:data:`Event.INVALID_ID`) log a warning and clear.
     """
+    if (
+        action_or_id is not None
+        and not isinstance(action_or_id, int)
+        and getattr(observation, 'tool_call_metadata', None) is None
+    ):
+        tcm = getattr(action_or_id, 'tool_call_metadata', None)
+        if tcm is not None:
+            observation.tool_call_metadata = tcm
+
     if action_or_id is None:
         observation.cause = None
         return

@@ -178,7 +178,7 @@ class FileEditor:
         """Execute a file editor command.
 
         Args:
-            command: Command to execute ("view_file", "replace_text", "insert_text", "create_file", "undo_last_edit", "view_and_replace", "edit", "write").
+            command: Command to execute ("view_file", "replace_text" [internal substring replace], "insert_text", "create_file", "undo_last_edit", "edit", "write").
             path: File path (relative to workspace_root or absolute)
             file_text: Optional file content for write/edit operations (use MISSING if not provided)
             view_range: Optional [start_line, end_line] for view command (1-indexed)
@@ -210,7 +210,6 @@ class FileEditor:
                 'edit',
                 'replace_text',
                 'insert_text',
-                'view_and_replace',
             ):
                 return self._handle_edit(
                     file_path,
@@ -558,7 +557,7 @@ class FileEditor:
         old_str: str,
         new_str: str,
     ) -> str | ToolResult:
-        """Try whitespace-normalized matching for replace_text."""
+        """Try whitespace-normalized matching for substring replace (internal opcode)."""
         norm_content = self._normalize_whitespace_for_match(file_content)
         norm_old = self._normalize_whitespace_for_match(old_str)
 

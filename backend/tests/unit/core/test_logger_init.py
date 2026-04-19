@@ -35,6 +35,8 @@ def test_logger_init_json_and_file(tmp_path):
                 importlib.reload(constants_mod)
                 importlib.reload(logger_mod)
 
+                logger_mod.configure_file_logging()
+
                 # Check if handlers were added
                 assert any(
                     isinstance(h, logging.FileHandler)

@@ -217,7 +217,6 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                 'replace_text',
                 'insert_text',
                 'edit',
-                'view_and_replace',
                 'write',
             }:
                 mutating_edit = True

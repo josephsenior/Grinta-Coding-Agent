@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 import textwrap
 import time
@@ -50,6 +51,7 @@ from backend.cli.tool_call_display import (
     tool_headline,
     try_format_message_as_tool_json,
 )
+from backend.engine import prompt_role_debug as _prompt_role_debug
 from backend.cli.transcript import (
     format_activity_block,
     format_activity_delta_secondary,
@@ -73,6 +75,7 @@ from backend.ledger.action import (
     Action,
     AgentThinkAction,
     BrowseInteractiveAction,
+    BrowserToolAction,
     ClarificationRequestAction,
     CmdRunAction,
     CondensationAction,
@@ -122,6 +125,21 @@ from backend.ledger.observation import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _show_reasoning_text() -> bool:
+    """Whether to render model reasoning text in CLI.
+
+    Default is on for backward compatibility. Set APP_CLI_SHOW_REASONING_TEXT=0
+    to disable user-visible reasoning text and prevent provider reasoning leakage.
+    """
+    raw = os.environ.get('APP_CLI_SHOW_REASONING_TEXT', '').strip().lower()
+    return raw not in (
+        '0',
+        'false',
+        'no',
+        'off',
+    )
 
 # Patterns for extracting / stripping <redacted_thinking> blocks from reasoning models.
 _THINK_EXTRACT_RE = re.compile(
@@ -182,12 +200,21 @@ def _sync_reasoning_after_tool_line(
     thought: str,
 ) -> None:
     """Live panel: spinner + optional dim thinking text (``action.thought`` is LLM tags only; often empty)."""
+    label = (tool_label or '').strip()
     t = (thought or '').strip()
-    if not t:
+    # Always refresh the action line when we have a label.  Previously we no-op'd when
+    # ``thought`` was empty, which left the streaming placeholder (e.g. ``Browser…``)
+    # up even after the concrete tool action (with URL / path) was known.
+    if not label and not t:
         return
+    _prompt_role_debug.log_reasoning_transition('tool_line', label or t)
     reasoning.start()
-    reasoning.update_action(tool_label)
-    reasoning.update_thought(t)
+    if label:
+        _prompt_role_debug.log_reasoning_transition('update_action', label)
+        reasoning.update_action(label)
+    if t and _show_reasoning_text():
+        _prompt_role_debug.log_reasoning_transition('update_thought', t)
+        reasoning.update_thought(t)
 
 
 def _normalize_reasoning_text(text: str) -> tuple[str | None, str | None]:
@@ -700,6 +727,22 @@ def _error_guidance(error_text: str) -> ErrorGuidance | None:
                 'Increase pending_action_timeout in settings.json if your environment is consistently slow.',
             ),
         )
+    if _contains_any(
+        lower,
+        (
+            'call_async_from_sync',
+            'browser_tool',
+        ),
+    ) and _contains_any(lower, ('timeout', 'timed out')):
+        return ErrorGuidance(
+            summary='The local runtime sync bridge timed out waiting for an async tool to finish.',
+            steps=(
+                'This is usually the in-process executor thread (e.g. native browser / browser-use), not the LLM provider.',
+                'Close stray Chromium or Chrome processes, restart the CLI, and retry.',
+                'Set GRINTA_BROWSER_TRACE=1 to print browser stage lines to stderr; optional env vars: CALL_ASYNC_LOOP_SHUTDOWN_WAIT_SEC (task cancel wait, default 2s), CALL_ASYNC_LOOP_FINALIZE_WAIT_SEC (asyncgen/executor shutdown cap, default 3s).',
+                'If the action may still be running in the background, check processes before retrying.',
+            ),
+        )
     if _contains_any(lower, ('timeout', 'timed out')):
         return ErrorGuidance(
             summary='The provider did not answer before the CLI gave up waiting.',
@@ -1011,6 +1054,9 @@ class CLIEventRenderer:
             console=self._console,
             auto_refresh=False,
             transient=True,  # erases on stop — we print final output ourselves
+            # Default Rich Live uses vertical ellipsis when content exceeds terminal
+            # height — that truncates the Thinking panel mid-text. Show full height.
+            vertical_overflow='visible',
         )
         live.start()
         self._live = live
@@ -1477,7 +1523,7 @@ class CLIEventRenderer:
         if isinstance(action, MessageAction):
             self._flush_pending_tool_cards()
             cot = (getattr(action, 'thought', None) or '').strip()
-            if cot:
+            if cot and _show_reasoning_text():
                 self._ensure_reasoning()
                 self._reasoning.update_thought(cot)
             self._stop_reasoning()
@@ -1722,6 +1768,20 @@ class CLIEventRenderer:
             _sync_reasoning_after_tool_line(
                 self._reasoning, f'{verb} {detail}', thought
             )
+            self.refresh()
+            return
+
+        # -- Native browser (browser-use) --------------------------------------
+        if isinstance(action, BrowserToolAction):
+            self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
+            cmd = getattr(action, 'command', '') or 'browser'
+            params = getattr(action, 'params', None) or {}
+            url = params.get('url') if isinstance(params, dict) else None
+            detail = str(url)[:80] if url else str(cmd)
+            self._print_activity(str(cmd), detail, None, title='Browser')
+            thought = getattr(action, 'thought', '') or ''
+            _sync_reasoning_after_tool_line(self._reasoning, detail, thought)
             self.refresh()
             return
 
@@ -1972,7 +2032,7 @@ class CLIEventRenderer:
 
         # First-class thinking field: if the provider streamed reasoning tokens
         # via the dedicated thinking channel, display them immediately.
-        if action.thinking_accumulated:
+        if action.thinking_accumulated and _show_reasoning_text():
             self._ensure_reasoning()
             self._reasoning.set_streaming_thought(action.thinking_accumulated)
 
@@ -1981,7 +2041,7 @@ class CLIEventRenderer:
         think_match = _THINK_EXTRACT_RE.search(raw)
         if think_match:
             thinking_text = think_match.group(1)
-            if thinking_text.strip():
+            if thinking_text.strip() and _show_reasoning_text():
                 self._ensure_reasoning()
                 self._reasoning.set_streaming_thought(thinking_text)
             # Strip thinking from the streaming preview.
@@ -1999,7 +2059,9 @@ class CLIEventRenderer:
         self._streaming_final = action.is_final
         if action.is_final:
             self._hud.state.llm_calls += 1
-        self.refresh(force=action.is_final)
+        # Always force redraw on streaming updates; throttling here made token
+        # output feel delayed vs. the model (refresh() only coalesces to ~20fps).
+        self.refresh(force=True)
 
     # -- observation handlers ----------------------------------------------
 
@@ -2743,7 +2805,7 @@ class CLIEventRenderer:
         self._ensure_reasoning()
         if action_label:
             self._reasoning.update_action(action_label)
-        if thought:
+        if thought and _show_reasoning_text():
             self._reasoning.update_thought(thought)
 
     def _set_task_panel(self, task_list: list[dict[str, Any]]) -> None:
