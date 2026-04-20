@@ -7,6 +7,7 @@ source and document files.
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -99,6 +100,18 @@ def _likely_toolchain_command(command: str) -> bool:
     return bool(_TOOLCHAIN_ANYWHERE.search(command))
 
 
+def _env_allow_shell_writes() -> bool:
+    """``GRINTA_ALLOW_SHELL_WRITES`` global override.
+
+    Setting this to ``1/true/yes/on`` force-allows shell writes regardless
+    of the security config — matching OpenCode and Claude Code, which
+    expose a full shell tool without blanket file-write bans. Useful for
+    one-off scripted scaffolding sessions.
+    """
+    raw = os.environ.get('GRINTA_ALLOW_SHELL_WRITES', '').strip().lower()
+    return raw in {'1', 'true', 'yes', 'on'}
+
+
 def evaluate_editor_only_shell_block(
     *,
     command: str,
@@ -108,10 +121,20 @@ def evaluate_editor_only_shell_block(
 ) -> str | None:
     """Return an error message if this shell command must not run, else None.
 
-    workspace_root and cwd are reserved for future path-precision checks.
+    Precedence:
+
+    1. ``GRINTA_ALLOW_SHELL_WRITES=1`` env var → always allow.
+    2. ``security_config.require_editor_for_shell_file_writes=False`` → allow.
+    3. Otherwise run the pattern checks and block Set-Content/Out-File/
+       redirection/tee/dd when they target non-log files.
+
+    workspace_root and cwd are reserved for future path-precision checks
+    (e.g. only block writes outside the workspace).
     """
     _ = Path(workspace_root)
     _ = cwd
+    if _env_allow_shell_writes():
+        return None
     if not getattr(security_config, 'require_editor_for_shell_file_writes', True):
         return None
 
@@ -143,5 +166,7 @@ _BLOCK_MSG = (
     '`str_replace_editor` (create_file, insert_text, edit_mode) or '
     '`ast_code_editor` (create_file, replace_range, …). '
     'Do not use Set-Content, Out-File, tee, or `>` / `>>` to write source or '
-    'document files. Redirection to `.log` / `.tmp` or a temp path is still allowed.'
+    'document files. Redirection to `.log` / `.tmp` or a temp path is still allowed. '
+    'If you really need shell writes (e.g. scaffolding scripts), set the '
+    'environment variable GRINTA_ALLOW_SHELL_WRITES=1.'
 )

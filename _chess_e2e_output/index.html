@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chess</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Chess</h1>
+    <div id="status">White's turn</div>
+    <button id="reset">Reset</button>
+  </header>
+  <main>
+    <div id="board" class="board"></div>
+    <aside class="captures">
+      <section><h3>Captured White</h3><div id="cap-w" class="cap-row"></div></section>
+      <section><h3>Captured Black</h3><div id="cap-b" class="cap-row"></div></section>
+    </aside>
+  </main>
+  <script src="chess.js"></script>
+</body>
+</html>

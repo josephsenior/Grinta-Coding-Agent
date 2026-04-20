@@ -549,14 +549,18 @@ class TestStrReplaceEditorTaxonomy:
             )
         assert breaker.consecutive_errors == 0
 
-    def test_syntax_trips_switch_context_at_five(self):
+    def test_syntax_trips_switch_context_at_ten(self):
+        # Raised from 5 → 10 when we downgraded the pre-write syntax veto to
+        # a post-write warning (see FileEditor._maybe_validate_syntax_for_file).
+        # Only opt-in strict mode can populate this bucket now, so we give
+        # the agent substantially more budget before intervening.
         config = CircuitBreakerConfig(
             max_consecutive_errors=100,
             max_high_risk_actions=100,
             max_stuck_detections=100,
         )
         breaker = CircuitBreaker(config)
-        for _ in range(4):
+        for _ in range(9):
             breaker.record_error(
                 RuntimeError('x'), tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
             )
@@ -568,14 +572,14 @@ class TestStrReplaceEditorTaxonomy:
         assert result.tripped is True
         assert result.action == 'switch_context'
 
-    def test_syntax_trips_pause_at_eight(self):
+    def test_syntax_trips_pause_at_fifteen(self):
         config = CircuitBreakerConfig(
             max_consecutive_errors=200,
             max_high_risk_actions=200,
             max_stuck_detections=200,
         )
         breaker = CircuitBreaker(config)
-        for _ in range(7):
+        for _ in range(14):
             breaker.record_error(
                 RuntimeError('x'), tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
             )

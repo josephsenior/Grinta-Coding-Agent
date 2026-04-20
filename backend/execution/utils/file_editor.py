@@ -9,6 +9,7 @@ from __future__ import annotations
 import difflib
 import hashlib
 import json
+import os
 import re
 from collections import defaultdict, deque
 from contextlib import contextmanager
@@ -630,11 +631,39 @@ class FileEditor:
             return '\r\n'
         return '\n'
 
-    def _maybe_validate_syntax_for_file(self, file_path: Path, content: str) -> tuple[bool, str]:
+    # Languages where a Tree-sitter ERROR node is almost always a real
+    # syntax error (not a parser limitation). These were historically
+    # blocked pre-write; we now always downgrade to a warning and let the
+    # model see the diagnostic in the next turn (matching OpenCode +
+    # Claude Code behavior). Opt back in to the old veto by setting
+    # ``GRINTA_STRICT_WRITE_VALIDATION=1``.
+    _STRICT_VALIDATION_LANGUAGES: frozenset[str] = frozenset(
+        {'html', 'css', 'scss', 'json', 'yaml', 'xml', 'svg', 'toml'}
+    )
+
+    @staticmethod
+    def _strict_write_validation_enabled() -> bool:
+        """Return True iff the legacy pre-write veto should block on ERROR."""
+        raw = os.environ.get('GRINTA_STRICT_WRITE_VALIDATION', '').strip().lower()
+        return raw in {'1', 'true', 'yes', 'on'}
+
+    def _maybe_validate_syntax_for_file(
+        self, file_path: Path, content: str
+    ) -> tuple[bool, str]:
         """Attempt syntax validation using Tree-sitter for the file's language.
 
-        Returns (is_valid, message). If Tree-sitter or a parser is not available,
-        returns (True, reason) to indicate validation was skipped.
+        Returns ``(is_valid, message)``. ``is_valid=False`` blocks the write.
+
+        By default **we never block** — even for ``_STRICT_VALIDATION_LANGUAGES``
+        we return ``True`` with a ``WARNING:`` prefix so the write proceeds
+        and the model sees the diagnostic in the tool observation. This
+        matches OpenCode's ``write.ts`` (which writes first, then appends LSP
+        errors to the output) and Claude Code's ``FileWriteTool`` (which
+        notifies LSP asynchronously after the write). Blocking traps weaker
+        models in an unrecoverable loop of rewriting the same malformed file.
+
+        Setting ``GRINTA_STRICT_WRITE_VALIDATION=1`` restores the old
+        pre-write veto for HTML/CSS/JSON/... if you really want it.
         """
         try:
             # Lazy import to avoid hard dependency when tree-sitter isn't installed
@@ -653,7 +682,94 @@ class FileEditor:
             return True, 'No parser mapping for file extension; skipping validation'
 
         is_valid, msg = editor._validate_syntax(content, str(file_path), language)
-        return is_valid, msg
+        if is_valid:
+            return True, msg
+
+        # Append a diagnostic hint if the failure looks like double-escape
+        # residue — the single most common cause of bogus syntax errors
+        # when writing from LLM output.
+        enriched_msg = self._enrich_syntax_error_with_escape_hint(
+            msg, content, file_path
+        )
+
+        # Attach a content excerpt around the reported error lines so the
+        # model can fix the file from the observation alone, without
+        # re-reading. Mirrors the rich diagnostics that LSP-backed agents
+        # (OpenCode, Claude Code) surface to callers.
+        enriched_msg = self._attach_content_context(enriched_msg, content)
+
+        if (
+            language in self._STRICT_VALIDATION_LANGUAGES
+            and self._strict_write_validation_enabled()
+        ):
+            return False, enriched_msg
+
+        # Default path: surface the diagnostic as a warning, let the write
+        # proceed. The model will fix the file on the next turn using the
+        # warning text as context.
+        return True, f'WARNING: {enriched_msg}'
+
+    @staticmethod
+    def _attach_content_context(msg: str, content: str, *, radius: int = 2) -> str:
+        """Append up to ``radius`` lines of content around any line number in ``msg``.
+
+        Tree-sitter errors look like ``Line 17: unexpected token`` — we parse
+        those line numbers out, then render a short excerpt. Does nothing if
+        no line numbers are present or content is trivially short.
+        """
+        if not msg or not content:
+            return msg
+        lines = content.splitlines()
+        if len(lines) < 3:
+            return msg
+        try:
+            import re as _re
+
+            nums = {
+                int(m.group(1))
+                for m in _re.finditer(r'(?i)\bline\s+(\d{1,6})\b', msg)
+            }
+        except Exception:
+            return msg
+        if not nums:
+            return msg
+
+        excerpts: list[str] = []
+        for n in sorted(nums)[:5]:
+            start = max(1, n - radius)
+            end = min(len(lines), n + radius)
+            width = len(str(end))
+            block = [f'  [line {n} — excerpt]']
+            for i in range(start, end + 1):
+                marker = '>>' if i == n else '  '
+                block.append(f'  {marker} {i:>{width}} | {lines[i - 1]}')
+            excerpts.append('\n'.join(block))
+        if not excerpts:
+            return msg
+        return msg + '\n\nContent context:\n' + '\n\n'.join(excerpts)
+
+    @staticmethod
+    def _enrich_syntax_error_with_escape_hint(
+        msg: str, content: str, file_path: Path
+    ) -> str:
+        """Append a hint to the syntax-error message when escape residue is detected."""
+        try:
+            from backend.core.content_escape_repair import (
+                has_literal_escape_residue,
+            )
+
+            if has_literal_escape_residue(content, file_path):
+                return (
+                    msg
+                    + '\n\n[HINT] The content contains literal backslash-escape '
+                    'sequences (e.g. \\n, \\") that appear to be double-escaped. '
+                    'In your next tool call, use a single backslash for newlines '
+                    '(a real newline character, not the characters "\\" + "n") '
+                    'and unescaped double quotes inside strings.'
+                )
+        except Exception:
+            pass
+        return msg
 
     def _closest_match_candidates(
         self,
@@ -1296,8 +1412,11 @@ class FileEditor:
         # Write new content
         self._write_file(file_path, new_content)
 
+        output = 'File updated successfully'
+        if msg and msg.startswith('WARNING:'):
+            output = f'{output}\n{msg}'
         return ToolResult(
-            output='File updated successfully',
+            output=output,
             old_content=old_content,
             new_content=new_content,
         )
@@ -1359,6 +1478,7 @@ class FileEditor:
                     old_content=old_content,
                     new_content=content,
                 )
+            soft_warning = msg if msg and msg.startswith('WARNING:') else ''
 
             if file_existed and old_content is not None:
                 disk_now = self._read_file(file_path)
@@ -1393,6 +1513,9 @@ class FileEditor:
                 output_msg = f'File created successfully. Line endings: {le}. File preview:\n{preview_str}'
             else:
                 output_msg = 'File written successfully'
+
+            if soft_warning:
+                output_msg = f'{output_msg}\n{soft_warning}'
 
             return ToolResult(
                 output=output_msg,
@@ -1455,6 +1578,34 @@ class FileEditor:
         meta = self._take_io_meta(file_path)
         if meta is None:
             meta = _FileReadMeta(encoding='utf-8', newline='lf', had_bom=False)
+
+        # Last-chance safety net: if any tool path that bypassed the
+        # tool-handler-level repair (e.g. a non-standard entry point, or
+        # content assembled in-process) still has literal escape residue,
+        # scrub it here before the bytes hit disk. No-op on unaffected
+        # content / file types.
+        try:
+            from backend.core.content_escape_repair import repair_literal_escapes
+            from backend.core.logger import app_logger as _disk_logger
+
+            report = repair_literal_escapes(content, file_path)
+            if report.changed:
+                _disk_logger.warning(
+                    '[escape_repair:disk] %s: scrubbed %d literal escape sequences '
+                    'at write time (upstream repair missed this path)',
+                    file_path,
+                    report.replacements,
+                )
+                content = report.content
+        except Exception:
+            try:
+                from backend.core.logger import app_logger as _disk_logger
+
+                _disk_logger.debug(
+                    'escape_repair disk safety-net failed', exc_info=True
+                )
+            except Exception:
+                pass
 
         if meta.newline == 'crlf':
             content = content.replace('\r\n', '\n').replace('\n', '\r\n')

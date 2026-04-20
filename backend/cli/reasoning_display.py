@@ -1,10 +1,22 @@
-"""Live reasoning panel — shows agent thinking step-by-step."""
+"""Live reasoning panel — shows agent thinking step-by-step.
+
+Designed to be the *primary* signal the user follows while the agent works.
+Kept intentionally minimal:
+
+* one header row: spinner + active action + elapsed/cost on the right,
+* the latest streamed thoughts below (auto-wrapped, never ellipsised),
+* a subtle trailing cursor to signal that tokens are still arriving.
+
+No duplicate Ctrl+C hint (the fake-prompt bar directly below the panel
+already shows "Agent working… ctrl+c to interrupt"), and no inline
+breadcrumb — the committed activity stream above the panel already
+tells the user what happened earlier in the turn.
+"""
 
 from __future__ import annotations
 
 import textwrap
 import time
-from collections import deque
 from typing import Any
 
 from rich.console import Console, ConsoleOptions, Group, RenderResult
@@ -22,31 +34,39 @@ _THOUGHT_LINE_PREFIX_CHARS = 0
 _MAX_STORED_THOUGHT_LINES = 50_000
 
 
-def _fit_thought_line(text: str, max_width: int | None) -> str:
-    """Avoid ultra-wide lines in narrow terminals."""
-    line = (text or '').strip()
-    if not line or max_width is None or max_width <= _THOUGHT_LINE_PREFIX_CHARS + 12:
-        return line
-    budget = max_width - _THOUGHT_LINE_PREFIX_CHARS
-    if len(line) <= budget:
-        return line
-    return line[:budget] if budget <= 4 else f'{line[:budget - 1]}…'
+# Panel chrome overhead: ``╭─ Thinking ─╮`` borders + left/right padding added
+# by ``format_callout_panel``. Subtract from ``max_width`` before handing the
+# width to ``textwrap.wrap`` so wrapped rows fit inside the panel instead of
+# being clipped by Rich when the rendered row exceeds the interior width.
+_PANEL_CHROME_WIDTH = 6
+
+# Character used at the end of the latest thought while streaming is active.
+# Rich spinner in the header already conveys "thinking" — this cursor conveys
+# "tokens are still flowing for this specific thought".
+_STREAM_CURSOR = '▌'
 
 
 def _thought_lines_for_display(line: str, max_width: int | None) -> list[str]:
-    """One logical thought line → one or more panel rows (wrap when width is known)."""
+    """One logical thought line → one or more panel rows (wrap when width is known).
+
+    Never truncates with an ellipsis — we prefer to wrap across multiple
+    rows so the user can read the full thought. When the terminal is too
+    narrow to meaningfully wrap, we fall back to returning the line as-is
+    (Rich will then soft-wrap the row itself).
+    """
     stripped = (line or '').strip()
     if not stripped:
         return []
-    if max_width is not None and max_width > 16:
-        return textwrap.wrap(
-            stripped,
-            width=max_width,
-            break_long_words=True,
-            break_on_hyphens=False,
-        )
-    fitted = _fit_thought_line(stripped, max_width)
-    return [fitted] if fitted else []
+    if max_width is None or max_width <= _PANEL_CHROME_WIDTH + 12:
+        return [stripped]
+    wrap_width = max(12, max_width - _PANEL_CHROME_WIDTH - _THOUGHT_LINE_PREFIX_CHARS)
+    wrapped = textwrap.wrap(
+        stripped,
+        width=wrap_width,
+        break_long_words=True,
+        break_on_hyphens=False,
+    )
+    return wrapped or [stripped]
 
 
 class ReasoningDisplay:
@@ -65,13 +85,14 @@ class ReasoningDisplay:
         self._active = False
         self._thought_lines: list[str] = []
         self._current_action: str = ''
-        # Completed step labels (excludes the current action) for a short breadcrumb.
-        self._recent_actions: deque[str] = deque(maxlen=4)
         self._max_lines: int = _MAX_STORED_THOUGHT_LINES
         self._start_time: float | None = None
         self._cost_at_start: float = 0.0
         self._current_cost: float = 0.0
         self._last_debug_stream_log: float = 0.0
+        # True when ``set_streaming_thought`` has written content since the
+        # last non-streaming update — drives the trailing stream cursor.
+        self._streaming: bool = False
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -87,8 +108,8 @@ class ReasoningDisplay:
         self._active = False
         self._thought_lines.clear()
         self._current_action = ''
-        self._recent_actions.clear()
         self._start_time = None
+        self._streaming = False
         _prompt_role_debug.log_reasoning_transition('reasoning.stop', '')
 
     @property
@@ -111,6 +132,8 @@ class ReasoningDisplay:
                 self._thought_lines.append(stripped)
         if len(self._thought_lines) > self._max_lines:
             self._thought_lines = self._thought_lines[-self._max_lines :]
+        # A non-streaming thought snapshot turns the cursor off again.
+        self._streaming = False
 
     def set_streaming_thought(self, text: str) -> None:
         """Replace thought lines with new content (for cumulative streaming updates)."""
@@ -128,18 +151,20 @@ class ReasoningDisplay:
                 self._thought_lines.append(stripped)
         if len(self._thought_lines) > self._max_lines:
             self._thought_lines = self._thought_lines[-self._max_lines :]
+        self._streaming = bool(self._thought_lines)
 
     def update_action(self, label: str) -> None:
         self.start()
         new = (label or '').strip()
         if new != self._current_action:
             _prompt_role_debug.log_reasoning_transition('reasoning.update_action', new)
-            if self._current_action:
-                self._recent_actions.append(self._current_action)
             self._current_action = new
             # Per-step wall clock: the header timer should reflect the *current* sub-step
             # (e.g. browser CDP), not time since the first spinner in this agent turn.
             self._start_time = time.monotonic()
+            # Action changes end any prior streaming run — the model is
+            # committing to a next step, not still generating text.
+            self._streaming = False
 
     def snapshot_thoughts(self) -> list[str]:
         """Return a copy of current thought lines without clearing them."""
@@ -180,64 +205,55 @@ class ReasoningDisplay:
 
         meta_right = ' · '.join(elapsed_bits) if elapsed_bits else ''
 
-        action_label = self._current_action or 'Thinking…'
-        if max_width and len(action_label) > max(24, max_width - 24):
-            action_label = f'{action_label[:max(8, max_width - 28)]}…'
+        action_label = self._current_action or 'Thinking'
+        # Reserve room for the right-side meta + separators when trimming.
+        reserved = len(meta_right) + 6 if meta_right else 4
+        if max_width and len(action_label) > max(24, max_width - reserved):
+            action_label = f'{action_label[: max(8, max_width - reserved - 1)]}…'
 
         rows: list[Any] = []
 
-        header_left = Table.grid(expand=True, padding=(0, 1))
-        header_left.add_column(no_wrap=True)
-        header_left.add_column(ratio=1)
-        header_left.add_row(
-            Spinner('dots', style='cyan'),
-            Text(action_label, style='bold cyan'),
-        )
-
         header = Table.grid(expand=True, padding=(0, 0))
+        header.add_column(width=2, no_wrap=True)
         header.add_column(ratio=1)
-        header.add_column(justify='right')
+        header.add_column(justify='right', no_wrap=True)
         header.add_row(
-            header_left,
-            Text(meta_right, style='dim') if meta_right else Text(''),
+            Spinner('dots', style='#7dd3fc'),
+            Text(action_label, style='bold #dbe7f3'),
+            Text(meta_right, style='#5d7286') if meta_right else Text(''),
         )
         rows.append(header)
 
-        if trail := list(self._recent_actions):
-            self._append_recent_actions_crumb(trail, rows)
-        visible_thoughts = self._thought_lines
+        # Wrap every thought line *before* applying the line budget so the
+        # budget counts physical rows (what the terminal renders), not
+        # logical thought lines. This prevents a long unwrapped line from
+        # being mid-truncated by Rich when the panel height is clamped.
+        wrapped_rows: list[str] = []
+        for line in self._thought_lines:
+            wrapped_rows.extend(_thought_lines_for_display(line, max_width))
+
         clipped = False
-        if max_lines is not None and max_lines >= 0 and len(visible_thoughts) > max_lines:
-            visible_thoughts = visible_thoughts[-max_lines:]
+        if max_lines is not None and max_lines >= 0 and len(wrapped_rows) > max_lines:
+            wrapped_rows = wrapped_rows[-max_lines:]
             clipped = True
 
-        for line in visible_thoughts:
-            for row in _thought_lines_for_display(line, max_width):
-                rows.append(Text(row, style='italic dim'))
+        # Streaming cursor on the very last row so the user can see the
+        # model is actively generating tokens (vs the spinner which just
+        # says "the turn is busy").
+        if wrapped_rows and self._streaming:
+            wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
+
+        for row in wrapped_rows:
+            rows.append(Text(row, style='#a3b5c9'))
 
         if clipped:
-            rows.append(Text('auto-scroll: showing latest thoughts', style='dim italic'))
-
-        hint = Text()
-        hint.append('Ctrl+C', style='bold dim')
-        hint.append(' interrupts', style='dim italic')
-        rows.append(hint)
+            rows.append(
+                Text('… showing latest thoughts', style='#5d7286 italic')
+            )
 
         return format_callout_panel(
             'Thinking',
             Group(*rows),
-            accent_style='dim cyan',
+            accent_style='#4a6b82',
             padding=(0, 0),
         )
-
-    def _append_recent_actions_crumb(
-        self,
-        trail: list[str],
-        rows: list[Any],
-    ) -> None:
-        # Last two completed steps — helps users see what already happened.
-        tail = trail[-2:]
-        crumb = Text()
-        crumb.append('then ', style='dim italic')
-        crumb.append(' → '.join(tail), style='dim italic')
-        rows.append(crumb)

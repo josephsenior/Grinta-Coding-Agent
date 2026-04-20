@@ -134,6 +134,49 @@ class TestFileEditorWrite:
         # File should not actually be created
         assert not (Path(self.tmpdir) / 'dry.txt').exists()
 
+    def test_malformed_css_write_succeeds_with_warning(self, monkeypatch):
+        # Default policy: post-write warning, never a pre-write veto. This is
+        # the change that unsticks weaker models from the "retry the same
+        # malformed file forever" loop. CSS with a stray semicolon between
+        # the selector and opening brace is rejected by tree-sitter-css.
+        monkeypatch.delenv('GRINTA_STRICT_WRITE_VALIDATION', raising=False)
+        bad_css = '.btn {\n  display: flex;\\n    gap: 4px;\n}\n'
+        result = self.editor(
+            command='create_file', path='broken.css', file_text=bad_css
+        )
+        assert result.error is None
+        assert (Path(self.tmpdir) / 'broken.css').exists()
+        # The diagnostic is still surfaced so the agent can self-correct.
+        assert 'WARNING' in result.output
+
+    def test_malformed_css_write_vetoed_when_strict_env_set(self, monkeypatch):
+        monkeypatch.setenv('GRINTA_STRICT_WRITE_VALIDATION', '1')
+        bad_css = '.btn {\n  display: flex;\\n    gap: 4px;\n}\n'
+        result = self.editor(
+            command='create_file', path='broken.css', file_text=bad_css
+        )
+        assert result.error is not None
+        assert 'Syntax validation failed' in result.error
+        assert not (Path(self.tmpdir) / 'broken.css').exists()
+
+    def test_syntax_warning_includes_content_excerpt(self, monkeypatch):
+        # Rich feedback: the WARNING text should carry a pointer-style excerpt
+        # of the offending line so the model can patch without re-reading.
+        monkeypatch.delenv('GRINTA_STRICT_WRITE_VALIDATION', raising=False)
+        lines = [f'.class-{i} {{ color: red; }}' for i in range(1, 40)]
+        lines[20] = '.bad { display: flex;\\n  gap: 4px; }'
+        bad_css = '\n'.join(lines) + '\n'
+        result = self.editor(
+            command='create_file', path='excerpt.css', file_text=bad_css
+        )
+        assert result.error is None
+        # If tree-sitter reports a line number (it almost always does for
+        # this class of error), the excerpt block is appended. We assert
+        # on the marker since exact line numbers depend on the parser.
+        if 'Content context' in result.output:
+            assert '>>' in result.output  # excerpt pointer
+            assert '| ' in result.output  # line-number separator
+
 
 # ---------------------------------------------------------------------------
 # FileEditor — edit

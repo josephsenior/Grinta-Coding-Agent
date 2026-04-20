@@ -107,6 +107,11 @@ class HUDBar:
         bar = self._format_compact() if use_compact else self._format()
         yield bar
 
+    # Shared tight bullet separator. Matches the live branded row so the
+    # committed footer and the in-progress footer feel like the same bar.
+    _SEP_TEXT = ' · '
+    _SEP_STYLE = '#3a5368'
+
     def _full_bar_length(self) -> int:
         """Approximate character length of the full-format HUD bar."""
         provider, model = self.describe_model(self.state.model)
@@ -120,15 +125,19 @@ class HUDBar:
             token_display += ' est'
         mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
         skills_label = self._format_skills_label(self._bundled_skill_count)
+        model_display = (
+            model
+            if provider in {'(not set)', '(unknown)'}
+            else f'{provider}/{model}'
+        )
         parts = [
-            f' provider: {provider}',
-            f'  •  model: {model}',
-            f'  •  {token_display}',
-            f'  •  ${self.state.cost_usd:.4f}',
-            f'  •  {self.state.llm_calls} calls',
-            f'  •  {mcp_label}',
-            f'  •  {skills_label}',
-            f'  •  {self.state.ledger_status}',
+            f' {model_display}',
+            f'{self._SEP_TEXT}{token_display}',
+            f'{self._SEP_TEXT}${self.state.cost_usd:.4f}',
+            f'{self._SEP_TEXT}{self.state.llm_calls} calls',
+            f'{self._SEP_TEXT}{mcp_label}',
+            f'{self._SEP_TEXT}{skills_label}',
+            f'{self._SEP_TEXT}{self.state.ledger_status}',
         ]
         return sum(len(p) for p in parts) + 1  # +1 for leading space
 
@@ -151,14 +160,16 @@ class HUDBar:
             token_display += ' est'
         mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
         skills_label = self._format_skills_label(self._bundled_skill_count)
-        SEP = ('  •  ', '#2f465b')
+        # Combined "provider/model" — the explicit "provider:" and "model:"
+        # labels were visual weight without information gain.
+        if provider in {'(not set)', '(unknown)'}:
+            model_display = model
+        else:
+            model_display = f'{provider}/{model}'
+        SEP = (self._SEP_TEXT, self._SEP_STYLE)
         parts = [
             (' ', ''),
-            ('provider: ', '#4a6b82'),
-            (provider, 'bold #dbe7f3'),
-            SEP,
-            ('model: ', '#4a6b82'),
-            (model, 'bold #dbe7f3'),
+            (model_display, 'bold #dbe7f3'),
             SEP,
             (token_display, '#b4c4d5'),
             SEP,

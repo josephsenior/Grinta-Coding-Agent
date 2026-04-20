@@ -182,6 +182,42 @@ class FileStateTracker:
                 )
 
 
+_READ_BEFORE_EDIT_COMMANDS: frozenset[str] = frozenset(
+    {
+        'apply_patch',
+        'replace_text',
+        'insert_text',
+        'edit',
+        'str_replace',
+    }
+)
+
+_MUTATING_EDIT_COMMANDS: frozenset[str] = frozenset(
+    {
+        'replace_text',
+        'insert_text',
+        'edit',
+        'write',
+        'str_replace',
+        'apply_patch',
+    }
+)
+
+
+def _read_before_edit_enforced() -> bool:
+    """Read-before-edit is on by default; opt out with GRINTA_SKIP_READ_BEFORE_EDIT=1.
+
+    Claude Code enforces this unconditionally and it is their single most
+    effective guard against "string not found" / context drift errors. We
+    allow opt-out for legacy replay scenarios and power users.
+    """
+    return os.environ.get('GRINTA_SKIP_READ_BEFORE_EDIT', '').lower() not in (
+        '1',
+        'true',
+        'yes',
+    )
+
+
 class FileStateMiddleware(ToolInvocationMiddleware):
     """Middleware that blocks unknown file edits and records file operations."""
 
@@ -203,22 +239,10 @@ class FileStateMiddleware(ToolInvocationMiddleware):
 
         if action_cls == 'FileEditAction':
             command = getattr(action, 'command', '') or 'write'
-            if command == 'apply_patch':
+            if command in _READ_BEFORE_EDIT_COMMANDS and _read_before_edit_enforced():
                 requires_read_check = True
                 target_path = getattr(action, 'path', '')
-            elif os.environ.get('GRINTA_ENFORCE_READ_BEFORE_EDIT', '').lower() in (
-                '1',
-                'true',
-                'yes',
-            ) and command in ('replace_text', 'insert_text'):
-                requires_read_check = True
-                target_path = getattr(action, 'path', '')
-            if command in {
-                'replace_text',
-                'insert_text',
-                'edit',
-                'write',
-            }:
+            if command in _MUTATING_EDIT_COMMANDS:
                 mutating_edit = True
                 target_path = target_path or getattr(action, 'path', '')
 
@@ -226,11 +250,22 @@ class FileStateMiddleware(ToolInvocationMiddleware):
             is_known = self._tracker.has_been_read_recently(
                 target_path
             ) or self._tracker.has_been_modified_recently(target_path)
-            # If never seen recently, block the invocation
+            # Skip the read-before-edit guard when the file does not yet
+            # exist — this is a common pattern for "create-then-edit" flows
+            # where the first edit supplies the initial body. ``create_file``
+            # is already excluded by command allowlist above.
             if not is_known:
+                try:
+                    exists = Path(target_path).expanduser().is_file()
+                except OSError:
+                    exists = True
+                if not exists:
+                    return
                 ctx.block(
-                    f'[FILE_STATE_GUARD] Cannot edit {target_path}. You must run view_file/read_file on it '
-                    f'before applying a patch to ensure you have the exact correct context.'
+                    '[FILE_STATE_GUARD] File has not been read yet in this '
+                    f'session: {target_path}. Read it first (use view_file or '
+                    'grep to locate the exact text) before editing, otherwise '
+                    'your old_str / anchor context will likely not match.'
                 )
 
         if (

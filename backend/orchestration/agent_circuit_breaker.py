@@ -201,14 +201,21 @@ class CircuitBreaker:
         str_replace_hard = self.get_tool_error_count(STR_REPLACE_EDITOR_TOOL_NAME)
         str_replace_syntax = self.get_tool_error_count(STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME)
 
-        # Syntax rejects: higher budget than match-not-found / path / guard failures.
-        if str_replace_syntax >= 5:
+        # Syntax rejects: much higher budget than match-not-found / path /
+        # guard failures. Since the default write path now downgrades the
+        # strict veto to a *post-write warning* (see
+        # ``FileEditor._maybe_validate_syntax_for_file``), the only way this
+        # bucket fills up is if a caller explicitly set
+        # ``GRINTA_STRICT_WRITE_VALIDATION=1``. We therefore pick thresholds
+        # that are generous enough to let the agent iterate on a genuinely
+        # hard file rather than trigger a pause on minor churn.
+        if str_replace_syntax >= 10:
             recommendation = (
                 'Repeated syntax validation failures on edited files. '
                 'Prefer minimal parsing-safe stubs and smaller surgical edits; '
                 'refresh file context with read_file before reattempting.'
             )
-            if str_replace_syntax >= 8:
+            if str_replace_syntax >= 15:
                 recommendation = (
                     recommendation
                     + ' Syntax-validation retries are now blocked until strategy changes.'
@@ -219,7 +226,7 @@ class CircuitBreaker:
                     'Repeated str_replace_editor syntax validation failures '
                     f'({str_replace_syntax})'
                 ),
-                action='pause' if str_replace_syntax >= 8 else 'switch_context',
+                action='pause' if str_replace_syntax >= 15 else 'switch_context',
                 recommendation=recommendation,
                 system_message=recommendation,
             )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
@@ -176,6 +177,43 @@ def _coerce_message_content_text(content: Any) -> str:
     return strip_thinking_tags(_raw_message_content_text(content))
 
 
+def _canonicalize_tool_call_arguments(tool_call: Any, arguments: dict[str, Any]) -> None:
+    """Overwrite ``tool_call.function.arguments`` with canonical JSON.
+
+    The raw wire-format string the LLM emitted can contain malformed escape
+    sequences (e.g. ``\\y`` or an unterminated ``\\``) that are tolerated by
+    our local ``json_repair`` pass but are rejected by upstream APIs when the
+    same conversation is replayed (``BadRequestError: Invalid \\escape``). By
+    replacing the raw string with ``json.dumps`` of the already-parsed dict we
+    guarantee every future turn sends valid JSON, and we also normalize
+    ``NaN``/``Infinity`` out (``allow_nan=False``).
+    """
+    try:
+        canonical = json.dumps(arguments, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        logger.debug(
+            'Skipping tool-call argument canonicalization (%s): %s',
+            type(exc).__name__,
+            exc,
+        )
+        return
+
+    fn = getattr(tool_call, 'function', None)
+    if fn is None:
+        return
+    try:
+        setattr(fn, 'arguments', canonical)
+    except (AttributeError, TypeError):
+        # Some SDK objects are frozen dataclasses / BaseModel with no setattr
+        # hook. In that case the caller relies on build_tool_call_metadata
+        # copying the already-parsed dict, so the canonical form is preserved
+        # downstream through ToolCallMetadata.from_sdk.
+        logger.debug(
+            'Tool call function is immutable; canonical arguments will be '
+            'applied via ToolCallMetadata instead.'
+        )
+
+
 def process_tool_calls(
     assistant_msg: Any,
     response: ModelResponse,
@@ -190,6 +228,10 @@ def process_tool_calls(
     for i, tool_call in enumerate(assistant_msg.tool_calls):
         logger.debug('Processing tool call: %s', tool_call)
         arguments = parse_tool_call_arguments(tool_call)
+        # Replace the raw LLM-emitted JSON string with a canonical, round-trip
+        # safe re-serialization so malformed escapes never poison replayed
+        # conversation history (see BadRequestError: Invalid \escape).
+        _canonicalize_tool_call_arguments(tool_call, arguments)
         action = create_action_fn(tool_call, arguments)
 
         # Attach thinking tokens to first tool call only when the model emitted them.

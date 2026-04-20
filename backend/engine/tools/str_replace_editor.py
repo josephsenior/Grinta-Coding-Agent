@@ -11,7 +11,7 @@ from backend.inference.tool_names import STR_REPLACE_EDITOR_TOOL_NAME
 
 _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `view_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
-* `create_file`: create new file (fails if exists). Requires `file_text` — full-file body for new files. The value must be **valid JSON string content** (escaped quotes and newlines). Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call.
+* `create_file`: create new file (fails if exists). Requires `file_text` — full-file body for new files. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call.
 * `insert_text`: insert `new_str` after `insert_line`.
 * `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
 * `edit_mode`: safer non-code editing primitives — prefer these over giant free-form replaces for documents:
@@ -23,6 +23,17 @@ _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editin
 Default mental model: **`edit_mode`** / **`ast_code_editor`** for structured code edits; **minimal valid `file_text` on create**, then **`insert_text`** or line/range tools. Multi-file work: sequential **`ast_code_editor`** calls or checkpoints — there is no atomic batch string API.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
+
+## STRING ARGUMENT ESCAPING RULES (critical)
+
+`file_text`, `new_str`, `section_content`, and `patch_text` are **JSON strings**. Follow JSON escape rules — NOT Python/C repr rules:
+- Newline in the content → the single escape sequence `\\n` on the wire (one backslash + n). This decodes to an actual newline character when written to disk.
+- Double quote inside the content → `\\"` on the wire (one backslash + quote).
+- Tab → `\\t`. Carriage return → `\\r`. Literal backslash → `\\\\`.
+- **Never double-escape.** Writing `\\\\n` on the wire produces the two-character sequence `\\n` in the file, which is almost always wrong for HTML/CSS/JS/TS/Python.
+- Unescaped raw newlines inside a JSON string literal are invalid JSON and will be rejected.
+
+If the tool reports `Syntax validation failed` with a hint about literal escape residue, retry using the rules above.
 """
 _SHORT_STR_REPLACE_EDITOR_DESCRIPTION = (
     'File viewing, creation, and editing tool. Commands: view_file, create_file, '
@@ -66,11 +77,18 @@ def create_str_replace_editor_tool(
                 '`src/main.py`) or an absolute path under that root.'
             ),
             'file_text': {
-                'description': 'Required for `create_file`. Content of the file to create.',
+                'description': (
+                    'Required for `create_file`. Full body of the file to create, as a JSON string. '
+                    'Escape newlines as \\n (single backslash) and embedded double quotes as \\". '
+                    'Do NOT double-escape (\\\\n produces the literal characters "\\n" in the file).'
+                ),
                 'type': 'string',
             },
             'new_str': {
-                'description': 'Text to insert for `insert_text` (required there).',
+                'description': (
+                    'Text to insert for `insert_text` (required there). JSON string — '
+                    'escape newlines as \\n, embedded quotes as \\".'
+                ),
                 'type': 'string',
             },
             'insert_line': {
@@ -134,11 +152,17 @@ def create_str_replace_editor_tool(
                 'enum': ['replace', 'insert_before', 'insert_after', 'delete'],
             },
             'section_content': {
-                'description': 'Replacement/insert content for edit_mode=section.',
+                'description': (
+                    'Replacement/insert content for edit_mode=section. JSON string — '
+                    'escape newlines as \\n, embedded quotes as \\".'
+                ),
                 'type': 'string',
             },
             'patch_text': {
-                'description': 'Unified diff patch body for edit_mode=patch.',
+                'description': (
+                    'Unified diff patch body for edit_mode=patch. JSON string — escape '
+                    'newlines as \\n so the diff structure survives JSON decoding.'
+                ),
                 'type': 'string',
             },
             'expected_hash': {

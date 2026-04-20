@@ -330,6 +330,144 @@ def test_async_execute_handles_cumulative_tool_call_name_and_args(monkeypatch):
     assert tc['function']['arguments'] == '{"command": "tree", "path": ".", "depth": 2}'
 
 
+def _stream_chunks_to_tool_args(chunks: list[str]) -> str:
+    """Drive `chunks` through the live streaming path and return assembled args."""
+    import backend.engine.function_calling as fc
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.ledger.action import MessageAction
+
+    sys.modules.setdefault('app.engine.function_calling', fc)
+    from backend.engine import executor as executor_module
+
+    captured: dict[str, Any] = {}
+
+    def _record(response, **kwargs):
+        captured['response'] = response
+        return [MessageAction(content='tc_detected', wait_for_response=True)]
+
+    executor_module.orchestrator_function_calling.response_to_actions = _record  # type: ignore[assignment]
+
+    async def fake_astream(**kwargs):
+        for piece in chunks:
+            yield {
+                'id': 'chatcmpl-x',
+                'model': 'test-model',
+                'choices': [
+                    {
+                        'delta': {
+                            'tool_calls': [
+                                {
+                                    'index': 0,
+                                    'id': 'call_x',
+                                    'function': {
+                                        'name': 'str_replace_editor',
+                                        'arguments': piece,
+                                    },
+                                }
+                            ]
+                        }
+                    }
+                ],
+            }
+        yield {
+            'id': 'chatcmpl-x',
+            'model': 'test-model',
+            'choices': [{'delta': {}, 'finish_reason': 'tool_calls'}],
+        }
+
+    llm = MagicMock()
+    llm.astream = fake_astream
+
+    executor = OrchestratorExecutor(
+        llm=llm,
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=MagicMock(),
+        mcp_tools_provider=lambda: {},
+    )
+
+    asyncio.run(executor.async_execute({'messages': []}, MagicMock()))
+    resp = captured.get('response')
+    assert resp is not None
+    assert resp.tool_calls is not None
+    return resp.tool_calls[0]['function']['arguments']
+
+
+def test_append_only_delta_preserves_content_even_when_chunk_is_substring_of_prefix():
+    """Regression: ``_merge_stream_fragment`` used to silently drop a delta if
+    it appeared anywhere in the accumulated prefix.
+
+    Observed in logs (Kimi K2.5, CSS body): after streaming ~500 chars of
+    CSS, a later delta of ``";\\n    justify"`` was erased because the
+    substring ``";\\n    "`` already appeared earlier. The file on disk
+    then read ``margin-top: 25px-content: center;`` instead of the correct
+    ``margin-top: 25px;\\n    justify-content: center;``.
+    """
+    # Simulate: prefix of arguments ends with "};\n    " pattern, then a
+    # short whitespace+punctuation delta that *happens* to reappear inside
+    # the prefix. Plain concatenation must preserve it verbatim.
+    prefix = (
+        '{"command": "create_file", "path": "styles.css", "file_text": '
+        '"h1 {\\n    color: #fff;\\n    margin-bottom: 20px;\\n}\\n\\n'
+        '.controls {\\n    margin-top: 25px'
+    )
+    mid = ';\\n    justify'
+    tail = '-content: center;\\n}"}'
+    result = _stream_chunks_to_tool_args([prefix, mid, tail])
+    assert result == prefix + mid + tail, (
+        'append-only delta was mutated by merge heuristics; got:\n' + result
+    )
+    assert 'justify-content' in result
+    # The specific corruption pattern we saw in the bug report must not appear.
+    assert '25px-content' not in result
+
+
+def test_append_only_delta_preserves_plain_closing_brace_chunk():
+    """Regression: a single-char ``"}"`` delta after the object opener was
+    dropped because it was a suffix of existing content like ``{"command": "x"}``.
+
+    We must never drop a delta just because it is a suffix of the accumulator.
+    """
+    # existing ends with "}"; next delta starts with "}," extending the object.
+    # With the old overlap heuristic this could merge to ``{"a":"b","c":"d"`` —
+    # dropping characters at the boundary. The new logic must give the full JSON.
+    parts = ['{"a":"b"', '}', '  ']
+    result = _stream_chunks_to_tool_args(parts)
+    assert result == '{"a":"b"}  '
+
+
+def test_suffix_prefix_overlap_is_not_silently_trimmed():
+    """Regression for the ``for (let col++) {`` corruption.
+
+    When existing ends with ``"col"`` and the next delta starts with ``"col"``
+    (e.g. identifier ``column`` split across chunks, or two uses of ``col`` back-to-back),
+    the old overlap heuristic ate one copy, producing ``col`` instead of ``colcol``.
+    """
+    parts = ['for (let col', 'col++)']
+    result = _stream_chunks_to_tool_args(parts)
+    assert result == 'for (let colcol++)'
+
+
+def test_cumulative_snapshot_still_detected_when_provider_resends_full_args():
+    """The second chunk restates everything from the first, with extra fields.
+
+    Behaviour for snapshot providers is preserved: the second chunk should
+    replace rather than concatenate.
+    """
+    parts = [
+        '{"command": "tree", "path": "."}',
+        '{"command": "tree", "path": ".", "depth": 2}',
+    ]
+    result = _stream_chunks_to_tool_args(parts)
+    assert result == '{"command": "tree", "path": ".", "depth": 2}'
+
+
+def test_exact_duplicate_chunk_is_collapsed():
+    """Provider retried the same chunk — we must collapse, not double."""
+    parts = ['{"a":1', '{"a":1', ',"b":2}']
+    result = _stream_chunks_to_tool_args(parts)
+    assert result == '{"a":1,"b":2}'
+
+
 def test_get_checkpoint_clears_stale_wal_when_persisted_control_event_proves_progress(
     monkeypatch, tmp_path
 ):

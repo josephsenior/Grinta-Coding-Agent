@@ -79,7 +79,6 @@ packages = [
   "backend",
   "client",
   "launch",
-  "grinta_launch",
 ]
 
 [tool.hatch.build.targets.wheel.force-include]

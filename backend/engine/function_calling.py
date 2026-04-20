@@ -455,6 +455,20 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     command, normalized_args = _normalize_file_editor_command_and_args(
         command, arguments
     )
+
+    # Repair double-escape residue (``\n`` / ``\"``) that slips through when
+    # models mis-encode tool-call JSON. Only applies to structured file types
+    # where literal escape pairs are syntactically impossible; a no-op for
+    # anything else. The repair is logged so the model sees the correction.
+    from backend.core.content_escape_repair import repair_arguments_in_place
+
+    repair_changes = repair_arguments_in_place(normalized_args, path)
+    if repair_changes:
+        logger.warning(
+            '[escape_repair] %s: corrected literal escapes in %s',
+            path,
+            ', '.join(f'{name}(x{count})' for name, count in repair_changes),
+        )
     valid_commands = {
         'view_file',
         'create_file',
@@ -797,6 +811,20 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
     # Validate arguments
     command, path = _validate_ast_code_editor_args(arguments, tool_name)
     command, normalized_args = _normalize_ast_code_editor_alias(command, arguments)
+
+    # Repair double-escaped content (``\n`` / ``\"``) before it reaches the
+    # StructureEditor. Structure-aware commands (replace_range, etc.) build
+    # FileEditActions directly and would otherwise bypass the repair applied
+    # in ``_handle_str_replace_editor_tool``.
+    from backend.core.content_escape_repair import repair_arguments_in_place
+
+    repair_changes = repair_arguments_in_place(normalized_args, path)
+    if repair_changes:
+        logger.warning(
+            '[escape_repair] %s (ast_code_editor): corrected literal escapes in %s',
+            path,
+            ', '.join(f'{name}(x{count})' for name, count in repair_changes),
+        )
 
     file_editor_commands = {
         'create_file',

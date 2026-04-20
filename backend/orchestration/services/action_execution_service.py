@@ -42,6 +42,30 @@ if TYPE_CHECKING:
     from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
+# Substrings that appear in ``BadRequestError`` messages when the API
+# rejects our request body because the tool-call ``arguments`` string isn't
+# valid JSON. We treat these as recoverable so the agent isn't killed by a
+# single malformed LLM emission; the ``_convert_tool_calls`` safety net in
+# ``backend/context/action_processors.py`` repairs on the next build.
+_MALFORMED_JSON_MARKERS: tuple[str, ...] = (
+    'invalid \\escape',
+    'invalid escape',
+    'expecting property name',
+    'expecting value',
+    'unterminated string',
+    'control character',
+    'json parse error',
+    'invalid json',
+)
+
+
+def _looks_like_bad_json_request(exc: Exception, error_str_lower: str) -> bool:
+    """Return ``True`` when ``exc`` is a BadRequestError caused by malformed JSON."""
+    if not isinstance(exc, BadRequestError):
+        return False
+    return any(marker in error_str_lower for marker in _MALFORMED_JSON_MARKERS)
+
+
 def _resolve_operation_pipeline(context):
     context_dict = getattr(context, '__dict__', {})
     pipeline = context_dict.get('operation_pipeline')
@@ -288,6 +312,8 @@ class ActionExecutionService:
 
     async def _handle_context_window_error(self, exc: Exception) -> Action | None:
         error_str = str(exc).lower()
+        if _looks_like_bad_json_request(exc, error_str):
+            return self._handle_malformed_request_error(exc)
         if not is_context_window_error(error_str, exc):
             raise exc
         if not self._context.agent.config.enable_history_truncation:
@@ -295,4 +321,36 @@ class ActionExecutionService:
         self._context.event_stream.add_event(
             CondensationRequestAction(), EventSource.AGENT
         )
+        return None
+
+    def _handle_malformed_request_error(self, exc: Exception) -> Action | None:
+        """Recover from ``BadRequestError: Invalid \\escape``-style failures.
+
+        The API rejected our request body because the ``tool_calls`` we
+        replayed contain malformed JSON in ``function.arguments``. Fix #1
+        should prevent new occurrences, but legacy ledger events may still
+        carry the bug. We emit an error observation so the model sees the
+        failure next turn, then return ``None`` to let the outer loop
+        re-attempt (the ``_convert_tool_calls`` safety net will repair the
+        arguments on the next build).
+        """
+        logger.warning(
+            'BadRequestError with JSON-parse wording detected; treating as '
+            'recoverable: %s',
+            exc,
+        )
+        from backend.ledger.action import AgentThinkAction
+
+        think = AgentThinkAction(
+            thought=(
+                '[API_REJECTED_MALFORMED_ARGS] Your previous tool call '
+                'contained invalid JSON escape sequences and was rejected '
+                'by the API. Emit the same call again with strict JSON: use '
+                'a single backslash for newlines inside strings (not "\\\\n"), '
+                'escape embedded double quotes as \\", and avoid raw control '
+                'characters in string values.'
+            )
+        )
+        think.source = EventSource.AGENT
+        self._context.event_stream.add_event(think, EventSource.AGENT)
         return None

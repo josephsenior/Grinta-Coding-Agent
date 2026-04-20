@@ -95,3 +95,42 @@ def test_allows_powershell_to_temp() -> None:
         )
         is None
     )
+
+
+@pytest.mark.parametrize('truthy', ['1', 'true', 'yes', 'on'])
+def test_env_override_allows_shell_writes(
+    monkeypatch: pytest.MonkeyPatch, truthy: str
+) -> None:
+    # GRINTA_ALLOW_SHELL_WRITES lets callers opt back in to the permissive
+    # behavior that OpenCode / Claude Code ship by default.
+    monkeypatch.setenv('GRINTA_ALLOW_SHELL_WRITES', truthy)
+    assert (
+        evaluate_editor_only_shell_block(
+            command='Set-Content -Path index.html -Value "<html>"',
+            security_config=_cfg(),
+            workspace_root='/workspace',
+        )
+        is None
+    )
+
+
+def test_env_override_off_preserves_block(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Explicit "off" must not accidentally flip-disable the block.
+    monkeypatch.setenv('GRINTA_ALLOW_SHELL_WRITES', '0')
+    msg = evaluate_editor_only_shell_block(
+        command='Set-Content -Path index.html -Value "<html>"',
+        security_config=_cfg(),
+        workspace_root='/workspace',
+    )
+    assert msg is not None
+
+
+def test_block_message_mentions_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv('GRINTA_ALLOW_SHELL_WRITES', raising=False)
+    msg = evaluate_editor_only_shell_block(
+        command='Set-Content -Path index.html -Value z',
+        security_config=_cfg(),
+        workspace_root='/workspace',
+    )
+    assert msg is not None
+    assert 'GRINTA_ALLOW_SHELL_WRITES' in msg

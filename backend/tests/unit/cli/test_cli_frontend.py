@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from rich.console import Console
+from rich.text import Text
 
 from backend.cli.confirmation import _risk_label
 from backend.cli.diff_renderer import DiffPanel
@@ -227,16 +228,25 @@ def test_hud_shows_mcp_server_count_when_set() -> None:
     )
 
 
-def test_hud_shows_provider_and_model_separately() -> None:
+def test_hud_shows_provider_and_model_combined() -> None:
+    """HUD shows 'provider/model' combined to reduce visual clutter.
+
+    Previously the bar rendered ``provider: google  •  model: X``; the extra
+    labels were redundant visual weight since the provider is already
+    implied by the prefix of the model slug.
+    """
     hud = HUDBar()
     hud.update_model('openai/google/gemini-3-flash-preview')
 
     full = hud._format().plain
     compact = hud._format_compact().plain
 
-    assert 'provider: google' in full
-    assert 'model: gemini-3-flash-preview' in full
-    assert 'openai/google' not in full
+    assert 'google/gemini-3-flash-preview' in full
+    # The redundant separate labels must be gone.
+    assert 'provider:' not in full
+    assert 'model:' not in full
+    # The raw "openai/google/..." with the provider prefix still should not leak.
+    assert 'openai/google/gemini-3-flash-preview' not in full
     assert 'google/gemini-3-flash-preview' in compact
 
 
@@ -2430,9 +2440,7 @@ def test_reasoning_display_tool_icons() -> None:
     panel = rd.renderable()
     assert panel is not None
     assert panel.padding == (0, 0)
-    # Verify stored-line cap and recent-step deque capacity
     assert rd._max_lines == 50_000
-    assert rd._recent_actions.maxlen == 4
 
 
 def test_reasoning_display_budget_burn() -> None:
@@ -2456,9 +2464,66 @@ def test_reasoning_display_auto_scroll_shows_latest_lines() -> None:
     console.print(rd.renderable(max_width=90, max_lines=4))
     output = _console_output(console)
 
-    assert 'auto-scroll: showing latest thoughts' in output
+    assert 'showing latest thoughts' in output
     assert 'thought 15' in output
     assert 'thought 06' not in output
+
+
+def test_reasoning_display_has_no_redundant_ctrl_c_hint() -> None:
+    """The reasoning panel must not repeat the Ctrl+C hint.
+
+    The fake-prompt bar directly below the panel already surfaces
+    "Agent working · ctrl+c to interrupt", so echoing it inside the
+    Thinking panel was pure visual clutter.
+    """
+    rd = ReasoningDisplay()
+    rd.start()
+    rd.update_thought('analyzing request')
+    console = _make_console(width=90)
+    console.print(rd.renderable(max_width=90))
+    output = _console_output(console)
+    lowered = output.lower()
+    assert 'ctrl+c' not in lowered
+    assert 'interrupts' not in lowered
+
+
+def test_reasoning_display_streaming_shows_trailing_cursor() -> None:
+    """While streaming, the latest thought row ends with a subtle cursor."""
+    rd = ReasoningDisplay()
+    rd.set_streaming_thought('partial reasoning in flight')
+    console = _make_console(width=90)
+    console.print(rd.renderable(max_width=90))
+    output = _console_output(console)
+    assert '▌' in output
+    assert 'partial reasoning in flight' in output
+
+
+def test_reasoning_display_no_cursor_when_action_changes() -> None:
+    """Starting a new action ends the streaming run; no cursor should remain."""
+    rd = ReasoningDisplay()
+    rd.set_streaming_thought('thinking about fix')
+    rd.update_action('Writing index.html')
+    console = _make_console(width=90)
+    console.print(rd.renderable(max_width=90))
+    output = _console_output(console)
+    assert '▌' not in output
+
+
+def test_reasoning_display_no_breadcrumb_trail() -> None:
+    """Recent-step breadcrumb was removed to reduce clutter.
+
+    Activity history already lives above the live panel; duplicating a
+    "then X → Y" crumb inside Thinking made long turns feel noisy.
+    """
+    rd = ReasoningDisplay()
+    rd.update_action('Reading src/a.py')
+    rd.update_action('Reading src/b.py')
+    rd.update_action('Writing src/c.py')
+    console = _make_console(width=90)
+    console.print(rd.renderable(max_width=90))
+    output = _console_output(console)
+    assert 'then ' not in output
+    assert '→' not in output
 
 
 def test_reasoning_display_wraps_long_lines_by_default() -> None:
@@ -2473,6 +2538,126 @@ def test_reasoning_display_wraps_long_lines_by_default() -> None:
     assert output.count('rgba(12,34,56,0.7)') >= 25
     # Wrapped text uses several panel lines; single-line truncation would be one dim row.
     assert output.count('rgba') >= 25
+
+
+@pytest.mark.asyncio
+async def test_reasoning_gets_generous_budget_when_alone() -> None:
+    """When only the reasoning panel is active, it should get >= 12 lines.
+
+    Regression guard: the previous layout reserved 10 rows for bottom
+    chrome and then clamped reasoning to ``max(6, …)``, which in practice
+    made long thoughts appear truncated to ~2 visible rows on mid-height
+    terminals. The new layout reserves only ~6 rows and floors the
+    reasoning budget at 12 lines so thoughts stream cleanly.
+    """
+    console = _make_console(width=100)
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    renderer._reasoning.start()
+    renderer._reasoning.update_thought('x ' * 80)
+    for i in range(40):
+        renderer._reasoning.update_thought(f'line {i:02d}')
+
+    captured: dict[str, int | None] = {'max_lines': None}
+
+    def _capture(*, max_width, max_lines):  # type: ignore[no-redef]
+        captured['max_lines'] = max_lines
+        return Text('stub')
+
+    renderer._reasoning.renderable = _capture  # type: ignore[assignment]
+    from rich.console import ConsoleOptions
+
+    options = ConsoleOptions(
+        size=console.size,
+        legacy_windows=False,
+        min_width=10,
+        max_width=100,
+        is_terminal=False,
+        encoding='utf-8',
+        max_height=40,
+    )
+
+    list(renderer.__rich_console__(console, options))
+    assert captured['max_lines'] is not None
+    assert captured['max_lines'] >= 12, (
+        f'reasoning budget was {captured["max_lines"]} lines; '
+        'regression against line-budget fix'
+    )
+
+
+@pytest.mark.asyncio
+async def test_reasoning_keeps_meaningful_budget_when_sharing_with_stream() -> None:
+    """Reasoning + streaming preview should each keep a usable vertical budget."""
+    console = _make_console(width=100)
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    renderer._reasoning.start()
+    renderer._reasoning.update_thought('thinking hard about the problem')
+    renderer._streaming_accumulated = 'draft reply paragraph ' * 30
+
+    captured: dict[str, int | None] = {
+        'reasoning': None,
+        'stream': None,
+    }
+
+    def _capture_reasoning(*, max_width, max_lines):  # type: ignore[no-redef]
+        captured['reasoning'] = max_lines
+        return Text('reasoning-stub')
+
+    def _capture_stream(*, max_width, max_lines):  # type: ignore[no-redef]
+        captured['stream'] = max_lines
+        return Text('stream-stub')
+
+    renderer._reasoning.renderable = _capture_reasoning  # type: ignore[assignment]
+    renderer._render_streaming_preview = _capture_stream  # type: ignore[assignment]
+    from rich.console import ConsoleOptions
+
+    options = ConsoleOptions(
+        size=console.size,
+        legacy_windows=False,
+        min_width=10,
+        max_width=100,
+        is_terminal=False,
+        encoding='utf-8',
+        max_height=40,
+    )
+    list(renderer.__rich_console__(console, options))
+
+    assert (captured['reasoning'] or 0) >= 10
+    assert (captured['stream'] or 0) >= 6
+    # Reasoning gets at least as much room as the streaming preview —
+    # it's the primary signal the user follows.
+    assert (captured['reasoning'] or 0) >= (captured['stream'] or 0)
+
+
+@pytest.mark.asyncio
+async def test_fake_prompt_uses_tight_separator_and_combined_model_slug() -> None:
+    """Visual-clutter guard for the branded row.
+
+    * Uses ' · ' instead of '  •  ' so the row feels less crowded.
+    * Renders ``provider/model`` combined instead of two labelled fields.
+    """
+    console = _make_console(width=120)
+    hud = HUDBar()
+    hud.update_model('openai/google/gemini-3-flash-preview')
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    prompt = renderer._render_fake_prompt(120)
+    console.print(prompt)
+    output = _console_output(console)
+
+    assert 'provider:' not in output
+    assert 'model:' not in output
+    assert 'google/gemini-3-flash-preview' in output
+    # Tight bullet separator; the old "  •  " (with two spaces on each side)
+    # must not leak back in.
+    assert '  •  ' not in output
+    assert 'Agent working · ctrl+c to interrupt' in output
 
 
 def test_hud_compact_format_for_narrow_terminal() -> None:

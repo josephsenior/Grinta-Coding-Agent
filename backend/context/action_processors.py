@@ -240,6 +240,46 @@ def _content_from_assistant_message(
     return content_items
 
 
+def _canonicalize_tool_call_arguments_dict(call_dict: dict[str, Any]) -> None:
+    """Ensure ``function.arguments`` is a canonical JSON string (safety net).
+
+    This runs every time an assistant tool-call message is rebuilt for the
+    API. Even if upstream canonicalization missed a case (e.g. legacy events
+    persisted before that fix landed), we re-parse via ``json_repair`` and
+    re-serialize here so the API never sees ``Invalid \\escape``.
+    """
+    function_payload = call_dict.get('function')
+    if not isinstance(function_payload, dict):
+        return
+    raw_arguments = function_payload.get('arguments')
+    if not isinstance(raw_arguments, str) or not raw_arguments.strip():
+        return
+    try:
+        from backend.core.tool_arguments_json import parse_tool_arguments_object
+
+        parsed = parse_tool_arguments_object(raw_arguments)
+    except Exception:
+        # Can't repair — leave the raw string. The outer
+        # BadRequestError handler will detect the failure and surface a
+        # recoverable error to the model instead of looping forever.
+        logger.debug(
+            'Could not canonicalize legacy tool-call arguments (len=%d); '
+            'leaving raw.',
+            len(raw_arguments),
+        )
+        return
+    import json as _json
+
+    try:
+        function_payload['arguments'] = _json.dumps(
+            parsed, ensure_ascii=False, allow_nan=False
+        )
+    except (TypeError, ValueError):
+        logger.debug(
+            'Could not serialize canonical tool-call arguments; leaving raw.'
+        )
+
+
 def _convert_tool_calls(raw_tool_calls: Any) -> list[ToolCall] | None:
     """Convert SDK-specific tool call payloads into dicts accepted by Message."""
     if not raw_tool_calls:
@@ -261,6 +301,7 @@ def _convert_tool_calls(raw_tool_calls: Any) -> list[ToolCall] | None:
             }
 
         _ensure_tool_call_function(call_dict, call, idx)
+        _canonicalize_tool_call_arguments_dict(call_dict)
         if not call_dict.get('id'):
             call_dict['id'] = call_dict.get('tool_call_id') or f'tool_call_{idx}'
         call_dict.setdefault('type', getattr(call, 'type', 'function'))
@@ -324,11 +365,11 @@ def _merge_tool_metadata_thought(action: PlaybookFinishAction) -> None:
         return
     response = _to_model_response_lite(tool_metadata.model_response)
     if response is None or not response.choices:
-        setattr(action, 'tool_call_metadata', None)
+        action.tool_call_metadata = None
         return
     choice = response.choices[0]
     if not hasattr(choice, 'message'):
-        setattr(action, 'tool_call_metadata', None)
+        action.tool_call_metadata = None
         return
     assistant_msg = cast(Any, choice).message
     content = getattr(assistant_msg, 'content', '') or ''
@@ -339,7 +380,7 @@ def _merge_tool_metadata_thought(action: PlaybookFinishAction) -> None:
             setattr(action, target_attr, current + '\n' + content)
     else:
         setattr(action, target_attr, content)
-    setattr(action, 'tool_call_metadata', None)
+    action.tool_call_metadata = None
 
 
 def _handle_message_action(

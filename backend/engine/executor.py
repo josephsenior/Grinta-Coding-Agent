@@ -234,41 +234,57 @@ class OrchestratorExecutor:
                 thinking_accumulate = ''
 
                 def _merge_stream_fragment(existing: str, incoming: str) -> str:
-                    """Merge streamed tool-call fragments from mixed provider semantics.
+                    """Merge streamed fragments with safe append-only defaults.
 
-                    Some providers emit true deltas (append-only), while others emit
-                    cumulative snapshots for the current field. This helper handles
-                    both safely and avoids duplicating already-seen content.
+                    OpenAI-compatible providers emit *append-only* deltas on the
+                    content / tool-call fields. A small number of non-standard
+                    providers emit *cumulative snapshots* instead (each chunk
+                    restates the whole field). This helper accepts both, but its
+                    default — when in any doubt — is to concatenate.
+
+                    The earlier implementation tried to be clever by dropping
+                    incoming fragments that happened to be a substring of the
+                    already-accumulated text, or by trimming a suffix/prefix
+                    overlap. Both heuristics are unsafe against long append-only
+                    deltas because short fragments like ``"}"``, ``"\n    "``,
+                    or ``";\n    justify"`` are almost guaranteed to appear
+                    somewhere in a multi-kilobyte CSS / JS body, and would be
+                    silently erased — corrupting the file the model was writing.
+
+                    The rules here are deliberately narrow so that the default
+                    path is plain concatenation:
+
+                    * An empty side is a no-op.
+                    * An ``incoming`` that *exactly* equals ``existing`` is a
+                      provider retry for the same chunk; drop it.
+                    * An ``incoming`` that starts with the full ``existing``
+                      string and is strictly longer is a cumulative snapshot;
+                      replace with ``incoming``.
+                    * If ``existing`` ends in a structural closer (``}`` / ``]``)
+                      and ``incoming`` starts with ``existing`` up to that
+                      closer and is strictly longer, it is a cumulative
+                      snapshot that has reopened the object to add more
+                      fields; replace with ``incoming``.
+                    * Otherwise, treat as a genuine append-only delta and
+                      concatenate verbatim. Never silently drop or trim.
                     """
                     if not incoming:
                         return existing
                     if not existing:
                         return incoming
-
-                    # Cumulative resend: incoming already contains existing prefix.
-                    if incoming.startswith(existing):
-                        return incoming
-
-                    # Common cumulative JSON pattern: prior chunk is a complete
-                    # smaller object/list, and the new chunk extends it before
-                    # the closing brace/bracket.
-                    if existing.endswith('}') and incoming.startswith(existing[:-1]):
-                        return incoming
-                    if existing.endswith(']') and incoming.startswith(existing[:-1]):
-                        return incoming
-
-                    # Already incorporated.
-                    if existing.startswith(incoming) or existing.endswith(incoming):
+                    if incoming == existing:
                         return existing
-                    if incoming in existing:
-                        return existing
-
-                    # Merge by maximal suffix/prefix overlap.
-                    max_overlap = min(len(existing), len(incoming))
-                    for overlap in range(max_overlap, 0, -1):
-                        if existing.endswith(incoming[:overlap]):
-                            return existing + incoming[overlap:]
-
+                    if len(incoming) > len(existing) and incoming.startswith(
+                        existing
+                    ):
+                        return incoming
+                    if (
+                        len(existing) >= 2
+                        and existing[-1:] in ('}', ']')
+                        and len(incoming) > len(existing)
+                        and incoming.startswith(existing[:-1])
+                    ):
+                        return incoming
                     return existing + incoming
 
                 async def _emit_text_piece(text_piece: str) -> None:
@@ -831,8 +847,7 @@ class OrchestratorExecutor:
     def _emit_thought_chunks(
         self, response: ModelResponse, event_stream: EventStream, chunk_size: int = 80
     ) -> None:
-        import json
-
+        from backend.core.tool_arguments_json import parse_tool_arguments_object
         from backend.engine.common import extract_assistant_message
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
@@ -845,31 +860,39 @@ class OrchestratorExecutor:
 
         for idx, tool_call in enumerate(tool_calls):
             try:
-                if getattr(tool_call, 'function', None) and isinstance(
-                    tool_call.function.arguments, str
-                ):
-                    args = json.loads(tool_call.function.arguments)
-                    if '__thought' in args:
-                        thought_text = args['__thought']
-                        accumulated = ''
-                        for i in range(0, len(thought_text), chunk_size):
-                            chunk = thought_text[i : i + chunk_size]
-                            accumulated += chunk
-                            ev = StreamingChunkAction(
-                                chunk=chunk,
-                                accumulated=accumulated,
-                                is_final=False,
-                            )
-                            ev.source = EventSource.AGENT
-                            event_stream.add_event(ev, EventSource.AGENT)
-
-                        final_ev = StreamingChunkAction(
-                            chunk='',
+                fn = getattr(tool_call, 'function', None)
+                if fn is None:
+                    continue
+                raw_args = getattr(fn, 'arguments', None)
+                if isinstance(raw_args, dict):
+                    args = raw_args
+                elif isinstance(raw_args, str) and raw_args.strip():
+                    # Route through parse_tool_arguments_object so malformed
+                    # escapes don't silently swallow every thought.
+                    args = parse_tool_arguments_object(raw_args)
+                else:
+                    continue
+                if '__thought' in args:
+                    thought_text = args['__thought']
+                    accumulated = ''
+                    for i in range(0, len(thought_text), chunk_size):
+                        chunk = thought_text[i : i + chunk_size]
+                        accumulated += chunk
+                        ev = StreamingChunkAction(
+                            chunk=chunk,
                             accumulated=accumulated,
-                            is_final=True,
+                            is_final=False,
                         )
-                        final_ev.source = EventSource.AGENT
-                        event_stream.add_event(final_ev, EventSource.AGENT)
+                        ev.source = EventSource.AGENT
+                        event_stream.add_event(ev, EventSource.AGENT)
+
+                    final_ev = StreamingChunkAction(
+                        chunk='',
+                        accumulated=accumulated,
+                        is_final=True,
+                    )
+                    final_ev.source = EventSource.AGENT
+                    event_stream.add_event(final_ev, EventSource.AGENT)
             except Exception as exc:
                 logger.debug(
                     'Could not parse thought for streaming from tool call %d: %s',

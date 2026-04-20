@@ -1054,9 +1054,13 @@ class CLIEventRenderer:
             console=self._console,
             auto_refresh=False,
             transient=True,  # erases on stop — we print final output ourselves
-            # Default Rich Live uses vertical ellipsis when content exceeds terminal
-            # height — that truncates the Thinking panel mid-text. Show full height.
-            vertical_overflow='visible',
+            # ``visible`` causes Rich to re-print overflow content on every
+            # refresh when the Live body is taller than the terminal, which
+            # makes streaming panels (Draft reply, Thinking) render dozens of
+            # duplicate copies per turn. ``crop`` redraws in place; panels
+            # that could exceed height (streaming preview, reasoning thoughts)
+            # are responsible for clamping themselves to ``options.max_height``.
+            vertical_overflow='crop',
         )
         live.start()
         self._live = live
@@ -1318,12 +1322,35 @@ class CLIEventRenderer:
             live_sections.append(self._task_panel)
         if self._delegate_panel is not None:
             live_sections.append(self._delegate_panel)
+        # Split the available vertical budget between the streaming preview
+        # and the reasoning panel so neither one grows unbounded and pushes
+        # its sibling off-screen (which, with ``vertical_overflow='crop'``,
+        # would hide the streamed content entirely).
+        #
+        # The reserve below accounts for the fake-prompt block at the bottom
+        # of the Live display: input row (1) + separator (1) + branded row
+        # (1) + stats row (1-2) + padding (~1) = ~6 rows. Previously we
+        # reserved 10 rows, which — combined with a very defensive
+        # ``max(4, …)`` floor — left as few as 4 physical rows for reasoning
+        # content and made long thoughts appear truncated to ~2 lines.
+        stream_max_lines: int | None = None
+        reasoning_max_lines: int | None = None
+        if options.max_height:
+            available = max(12, options.max_height - 6)
+            if self._streaming_accumulated and self._reasoning.active:
+                # Give reasoning at least as much room as the streaming preview
+                # — it's what the user follows between tool calls.
+                reasoning_share = max(10, available * 3 // 5)
+                stream_max_lines = max(6, min(16, available - reasoning_share - 1))
+                reasoning_max_lines = max(
+                    10, min(reasoning_share, available - stream_max_lines - 1)
+                )
+            elif self._streaming_accumulated:
+                stream_max_lines = max(10, min(28, available))
+            elif self._reasoning.active:
+                reasoning_max_lines = max(12, min(32, available))
+
         if self._streaming_accumulated:
-            stream_max_lines = None
-            if options.max_height:
-                # Keep the streaming preview in a viewport so Live doesn't fall
-                # back to bottom ellipsis clipping when drafts get long.
-                stream_max_lines = max(8, min(24, options.max_height - 10))
             live_sections.append(
                 self._render_streaming_preview(
                     max_width=options.max_width,
@@ -1332,7 +1359,10 @@ class CLIEventRenderer:
             )
         reasoning_section: Any | None = None
         if self._reasoning.active:
-            reasoning_section = self._reasoning.renderable(max_width=options.max_width)
+            reasoning_section = self._reasoning.renderable(
+                max_width=options.max_width,
+                max_lines=reasoning_max_lines,
+            )
             live_sections.append(reasoning_section)
 
         for index, section in enumerate(live_sections):
@@ -1378,15 +1408,20 @@ class CLIEventRenderer:
         input_row.add_column()
         input_row.add_row(
             Spinner('dots', style='bold #7dd3fc'),
-            Text('Agent working… ctrl+c to interrupt', style='italic #5d7286'),
+            Text('Agent working · ctrl+c to interrupt', style='italic #5d7286'),
         )
         items.append(input_row)
 
         # -- separator (mirrors _prompt_bottom_toolbar) ---------------------
-        items.append(Text('─' * width, style='#5c7287'))
+        items.append(Text('─' * width, style='#3a5368'))
 
         state_label = hud.agent_state_label or 'Running'
         autonomy = hud.autonomy_level or 'balanced'
+
+        # Tight bullet separator — the old "  •  " (5 chars) made the row
+        # feel crowded; " · " keeps the visual rhythm while reclaiming
+        # ~2 chars per delimiter for denser information without clutter.
+        SEP = (' · ', '#3a5368')
 
         if width < 72:
             # Compact single-line mode for very narrow terminals.
@@ -1402,13 +1437,13 @@ class CLIEventRenderer:
             )
             line = Text()
             line.append(state_label, style='dim')
-            line.append(' · ', style='#2f465b')
+            line.append(SEP[0], style=SEP[1])
             line.append(f'autonomy:{autonomy}', style='dim')
-            line.append(' · ', style='#2f465b')
+            line.append(SEP[0], style=SEP[1])
             line.append(model_short, style='dim')
-            line.append(' · ', style='#2f465b')
+            line.append(SEP[0], style=SEP[1])
             line.append(ctx, style='dim')
-            line.append(' · ', style='#2f465b')
+            line.append(SEP[0], style=SEP[1])
             line.append(f'${hud.cost_usd:.4f}', style='dim')
             items.append(line)
             return Group(*items)
@@ -1439,9 +1474,7 @@ class CLIEventRenderer:
         row1.append(f'autonomy:{autonomy}', style=auto_style)
         items.append(row1)
 
-        # -- row 2: model · tokens · cost · calls · MCP · skills · ledger --
-        SEP = ('  \u2022  ', '#2f465b')
-
+        # -- row 2: model · tokens · cost · ledger (+ optionals) -----------
         ctx = (
             HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
         )
@@ -1462,26 +1495,29 @@ class CLIEventRenderer:
         elif hud.ledger_status not in {'Healthy', 'Ready', 'Idle', 'Starting'}:
             ledger_style = '#ff9ea8 bold'
 
-        # Build row 2 parts and wrap to a second line if they overflow.
-        parts: list[tuple[str, str]] = [
-            ('provider:', '#5c7287'),
-            (' ', ''),
-            (provider, 'bold #dbe7f3'),
-            SEP,
-            ('model:', '#5c7287'),
-            (' ', ''),
-            (model, 'bold #dbe7f3'),
+        # "provider/model" combined — the explicit "provider:" and "model:"
+        # labels were redundant visual weight. Provider is already implied
+        # by the prefix of the model slug.
+        if provider in {'(not set)', '(unknown)'}:
+            model_display = model
+        else:
+            model_display = f'{provider}/{model}'
+
+        primary_parts: list[tuple[str, str]] = [
+            (model_display, 'bold #dbe7f3'),
             SEP,
             (token_display, '#b4c4d5'),
             SEP,
             (f'${hud.cost_usd:.4f}', '#b4c4d5'),
+            SEP,
+            (hud.ledger_status, ledger_style),
         ]
         optional_parts: list[tuple[str, str]] = [
-            (hud.ledger_status, ledger_style),
             (f'{hud.llm_calls} calls', '#b4c4d5'),
             (mcp_label, '#b4c4d5'),
             (skills_label, '#b4c4d5'),
         ]
+        parts: list[tuple[str, str]] = list(primary_parts)
         for content, style in optional_parts:
             parts.append(SEP)
             parts.append((content, style))
@@ -1493,16 +1529,12 @@ class CLIEventRenderer:
                 row2.append(content, style=style)
             items.append(row2)
         else:
-            # Split into two lines: required on line 1, optionals on line 2.
+            # Split: essentials on line 1, optionals on line 2.
             row2a = Text()
-            base_len = 11  # provider: + provider + sep + model: + model + sep + tokens + sep + cost
-            for content, style in parts[:base_len]:
+            for content, style in primary_parts:
                 row2a.append(content, style=style)
             items.append(row2a)
             row2b = Text()
-            row2b.append(
-                '          ', style=''
-            )  # indent to align under the provider label
             first = True
             for content, style in optional_parts:
                 if not first:
@@ -2874,8 +2906,10 @@ class CLIEventRenderer:
         if max_lines <= 0 or not content:
             return content
 
-        # Account for panel padding / gutters so wrapping approximates terminal width.
-        wrap_width = max(20, (max_width or 120) - 8)
+        # Account for panel padding / gutters so wrapping approximates terminal
+        # width. 10 = 2 border chars + 4 padding chars (left+right) + 4-char
+        # safety margin to leave room for Rich's trailing space on ANSI rows.
+        wrap_width = max(20, (max_width or 120) - 10)
         wrapped: list[str] = []
         for raw in content.splitlines() or ['']:
             if not raw:
