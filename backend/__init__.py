@@ -6,6 +6,12 @@ import warnings
 # The asttokens/astroid warning fires from frozen importlib frames and
 # can't be caught by module-based filters.
 warnings.filterwarnings('ignore', category=DeprecationWarning)
+# google-genai (Gemini SDK) subclasses aiohttp.ClientSession — noisy on import.
+warnings.filterwarnings(
+    'ignore',
+    message=r'Inheritance class AiohttpClientSession from ClientSession is discouraged',
+    category=DeprecationWarning,
+)
 
 from importlib.metadata import PackageNotFoundError, version  # noqa: E402
 from pathlib import Path  # noqa: E402

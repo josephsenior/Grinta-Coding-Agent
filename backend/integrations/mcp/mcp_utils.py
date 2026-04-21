@@ -57,6 +57,51 @@ def _get_mcp_connect_timeout_sec() -> float:
         return 60.0
 
 
+_ENV_VAR_PATTERN = re.compile(r'^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$')
+
+
+def _resolve_server_env(raw_env: dict[str, str] | None) -> dict[str, str] | None:
+    """Resolve MCP server env values against ``os.environ``.
+
+    Rules (applied per key/value):
+      * ``""`` (empty)        -> look up ``os.environ[key]``. If missing, drop
+        the key so the parent process env (already inherited by the stdio
+        transport) is used and we don't pass a literal empty string, which
+        some MCP servers (e.g. ``@modelcontextprotocol/server-github``) treat
+        as an auth failure.
+      * ``"${VAR}"``          -> look up ``os.environ["VAR"]``. If missing,
+        drop the key (same rationale).
+      * anything else         -> passed through verbatim.
+
+    This lets a user put ``GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx`` in their
+    ``.env`` while keeping the MCP config free of secrets.
+    """
+    if not raw_env:
+        return raw_env
+
+    resolved: dict[str, str] = {}
+    for key, value in raw_env.items():
+        if not isinstance(value, str):
+            resolved[key] = value
+            continue
+
+        if value == '':
+            from_env = os.environ.get(key)
+            if from_env:
+                resolved[key] = from_env
+            continue
+
+        match = _ENV_VAR_PATTERN.match(value.strip())
+        if match:
+            from_env = os.environ.get(match.group(1))
+            if from_env:
+                resolved[key] = from_env
+            continue
+
+        resolved[key] = value
+    return resolved
+
+
 
 def convert_mcps_to_tools(mcps: list[MCPClient] | None) -> list[dict]:
     """Converts a list of MCPClient instances to ChatCompletionToolParam format.
@@ -184,6 +229,13 @@ async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
     logger.info('Initializing MCP agent for %s with stdio connection...', server.name)
     client = MCPClient()
     timeout_sec = _get_mcp_connect_timeout_sec()
+
+    # Swap empty / ${VAR} env entries with real values from os.environ so
+    # secrets defined in the user's .env (e.g. GITHUB_PERSONAL_ACCESS_TOKEN)
+    # actually reach the MCP child process.
+    resolved_env = _resolve_server_env(server.env)
+    if resolved_env is not server.env:
+        server = server.model_copy(update={'env': resolved_env})
 
     try:
         await asyncio.wait_for(client.connect_stdio(server), timeout=timeout_sec)
@@ -578,8 +630,6 @@ def _make_mcp_observation(action: MCPAction, payload: dict) -> MCPObservation:
 async def _execute_wrapper_tool(
     action: MCPAction,
     mcps: list[MCPClient],
-    *,
-    configured_servers: list | None = None,
 ) -> MCPObservation:
     """Execute a wrapper tool and return observation."""
     try:
@@ -590,20 +640,8 @@ async def _execute_wrapper_tool(
             inner_action = SimpleNamespace(name=tool_name, arguments=args)
             return await _call_mcp_raw(mcps, inner_action)
 
-        if action.name == 'mcp_capabilities_status':
-            from backend.integrations.mcp.wrappers import (
-                mcp_capabilities_status,
-            )
-
-            result_dict = await mcp_capabilities_status(
-                mcps,
-                action.arguments,
-                _call_underlying,
-                configured_servers=configured_servers,
-            )
-        else:
-            wrapper_fn = WRAPPER_TOOL_REGISTRY[action.name]
-            result_dict = await wrapper_fn(mcps, action.arguments, _call_underlying)
+        wrapper_fn = WRAPPER_TOOL_REGISTRY[action.name]
+        result_dict = await wrapper_fn(mcps, action.arguments, _call_underlying)
         return _make_mcp_observation(
             action, _normalize_mcp_success_payload(result_dict)
         )
@@ -731,8 +769,7 @@ async def _execute_direct_tool(
                     f"MCP tool '{action.name}' returned an error: {e}\n"
                     'You can try:\n'
                     '  1. Re-call the tool with corrected arguments\n'
-                    f'  2. Use {_terminal_tool()} as a fallback to accomplish the same task\n'
-                    '  3. Use mcp_capabilities_status to check current MCP server health'
+                    f'  2. Use {_terminal_tool()} as a fallback to accomplish the same task'
                 ),
                 code='MCP_TOOL_ERROR',
                 retryable=False,
@@ -747,7 +784,7 @@ async def _execute_direct_tool(
                 message=(
                     f"MCP tool '{action.name}' timed out (server did not respond in time).\n"
                     'The tool may be waiting on a slow network call or the MCP server may be stuck.\n'
-                    'Try: mcp_capabilities_status, a narrower query, or non-MCP tools.\n'
+                    'Try: a narrower query, or fall back to a non-MCP tool.\n'
                     'Tune limits: APP_MCP_CALL_TOTAL_BUDGET_SEC, APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC.'
                 ),
                 code='MCP_TOOL_TIMEOUT',
@@ -769,8 +806,7 @@ async def _execute_direct_tool(
                     'The MCP server may be disconnected or experiencing issues.\n'
                     'Fallback options:\n'
                     f'  1. Use {_terminal_tool()} to accomplish the same task\n'
-                    '  2. Use mcp_capabilities_status to inspect current MCP availability\n'
-                    '  3. Continue with non-MCP tools'
+                    '  2. Continue with non-MCP tools'
                 ),
                 code='MCP_SERVER_UNAVAILABLE',
                 retryable=True,
@@ -782,14 +818,14 @@ async def call_tool_mcp(
     mcps: list[MCPClient],
     action: MCPAction,
     *,
-    configured_servers: list | None = None,
+    configured_servers: list | None = None,  # noqa: ARG001 - kept for API compat
 ) -> Observation:
     """Call a tool on an MCP server and return the observation.
 
     Args:
         mcps: The list of MCP clients to execute the action on
         action: The MCP action to execute
-        configured_servers: Servers App attempted to connect (for diagnostics tools)
+        configured_servers: Unused; kept for backwards-compatible call sites.
 
     Returns:
         The observation from the MCP server
@@ -799,9 +835,9 @@ async def call_tool_mcp(
 
     # Handle wrapper tools
     if action.name in WRAPPER_TOOL_REGISTRY:
-        return await _execute_wrapper_tool(
-            action, mcps, configured_servers=configured_servers
-        )
+        return await _execute_wrapper_tool(action, mcps)
+
+    from backend.engine.tools.prompt import get_terminal_tool_name as _terminal_tool
 
     if not mcps:
         return _make_mcp_observation(
@@ -809,17 +845,16 @@ async def call_tool_mcp(
             _build_mcp_error_payload(
                 action_name=action.name,
                 message=(
-                    'No MCP clients are currently connected. '
-                    'Use mcp_capabilities_status to inspect availability and continue '
-                    'with non-MCP tools.'
+                    'No MCP clients are currently connected for this session. '
+                    f'Use {_terminal_tool()} or another non-MCP tool instead; '
+                    'only the tools listed in your active tool schema are available.'
                 ),
                 code='MCP_NO_CLIENTS',
-                retryable=True,
+                retryable=False,
             ),
         )
 
     # Handle direct tools with graceful fallback on client lookup failure
-    from backend.engine.tools.prompt import get_terminal_tool_name as _terminal_tool
     try:
         matching_client = _find_matching_mcp(mcps, action.name)
     except ValueError:
@@ -828,14 +863,14 @@ async def call_tool_mcp(
             _build_mcp_error_payload(
                 action_name=action.name,
                 message=(
-                    f"MCP tool '{action.name}' is not available on any connected MCP "
-                    'server.\n'
-                    'This may mean the server that provides this tool is disconnected.\n'
-                    'Use mcp_capabilities_status to check which tools are currently '
-                    f'available, or use {_terminal_tool()} as a fallback.'
+                    f"MCP tool '{action.name}' is not available in this session.\n"
+                    'Only the tool names listed in your active tool schema are valid — '
+                    'pass them verbatim to `call_mcp_tool(tool_name=...)` with no '
+                    '`server:` / `server/` / `server__` prefix.\n'
+                    f'If none fit, use {_terminal_tool()} or another non-MCP tool.'
                 ),
                 code='MCP_TOOL_UNAVAILABLE',
-                retryable=True,
+                retryable=False,
             ),
         )
     return await _execute_direct_tool(action, matching_client)

@@ -130,7 +130,7 @@ def format_activity_block(
             content,
             title=panel_title,
             title_align='left',
-            border_style='dim',
+            border_style='#3a5368',
             box=box.ROUNDED,
             padding=ACTIVITY_PANEL_PADDING,
         )
@@ -139,15 +139,36 @@ def format_activity_block(
 
 def format_activity_turn_header() -> Rule:
     """Section divider before the first tool/shell row each agent turn."""
-    return Rule(title='Agent activity', style='dim cyan', align='left')
+    return Rule(title='Tools & commands', style='dim cyan', align='left')
+
+
+_REASONING_SENTENCE_ENDERS = ('.', '!', '?', ':', ';', '"', "'", ')', ']', '…')
 
 
 def format_reasoning_snapshot(lines: list[str]) -> Group:
-    """Transcript block for reasoning that finished (after the live panel closes)."""
+    """Transcript block for reasoning that finished (after the live panel closes).
+
+    Models frequently emit a few tokens of preamble ("Let me check the file…",
+    "I'll build it as a single HTML page…") and then switch to a tool call
+    mid-thought. The CLI flushes whatever reasoning has accumulated when the
+    action fires, which can leave the last committed line dangling without
+    terminal punctuation — reading like a truncation bug.
+
+    To make the UX read as intentional rather than broken, we append a single
+    ``…`` to the final line when it doesn't already end in a
+    sentence-terminator. The ellipsis is visually consistent with the
+    streaming-cursor indicator and signals "the model continued into an
+    action" rather than "text was lost".
+    """
     cleaned = [ln.strip() for ln in lines if (ln or '').strip()]
     if not cleaned:
         return Group()
-    return Group(*[Text(line, style='dim italic') for line in cleaned])
+    last = cleaned[-1]
+    if last and not last.endswith(_REASONING_SENTENCE_ENDERS):
+        cleaned[-1] = f'{last}…'
+    # Stronger separation from assistant Markdown (default foreground): dimmer
+    # blue-gray + italic so internal reasoning never reads as the main reply.
+    return Group(*[Text(line, style='italic #64748b dim') for line in cleaned])
 
 
 def format_activity_shell_block(
@@ -159,8 +180,17 @@ def format_activity_shell_block(
     result_message: str | None = None,
     result_kind: str = 'ok',
     extra_lines: list[Any] | None = None,
+    title: str | None = None,
 ) -> Any:
-    """Rounded Terminal card — same visual style as other tool cards."""
+    """Rounded Terminal card — same visual style as other tool cards.
+
+    The default ``title`` is ``Terminal`` so plain shell commands render as
+    before. Internal tools (apply_patch, analyze_project_structure, …) carry
+    a friendlier title derived from their ``tool_call_metadata.function_name``
+    via :func:`backend.cli.tool_call_display.tool_headline`; the renderer
+    forwards that title here so the user sees e.g. ``Apply patch`` instead
+    of a generic ``Terminal`` header for tool-authored commands.
+    """
     return format_activity_block(
         verb,
         detail,
@@ -169,7 +199,7 @@ def format_activity_shell_block(
         result_message=result_message,
         result_kind=result_kind,
         extra_lines=extra_lines,
-        title='Terminal',
+        title=title or 'Terminal',
     )
 
 

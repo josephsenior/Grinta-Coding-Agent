@@ -17,6 +17,11 @@ import warnings
 
 # Suppress ALL DeprecationWarnings before any package is imported.
 warnings.filterwarnings('ignore', category=DeprecationWarning)
+warnings.filterwarnings(
+    'ignore',
+    message=r'Inheritance class AiohttpClientSession from ClientSession is discouraged',
+    category=DeprecationWarning,
+)
 
 
 _EPILOG = """examples:

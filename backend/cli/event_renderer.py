@@ -35,6 +35,7 @@ from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
     ACTIVITY_PANEL_PADDING,
     CALLOUT_PANEL_PADDING,
+    TRANSCRIPT_LEFT_INSET,
     TRANSCRIPT_RIGHT_INSET,
     frame_live_body,
     frame_transcript_body,
@@ -192,6 +193,28 @@ _CMD_SUMMARY_PRIORITY_PATTERNS = (
 )
 _APPLY_PATCH_TITLE = 'apply patch'
 _APPLY_PATCH_STATS_RE = re.compile(r'\[APPLY_PATCH_STATS\]\s*\+(\d+)\s*-(\d+)')
+
+# Exact command strings produced by `backend/execution/browser/grinta_browser.py`
+# when it dispatches a `CmdOutputObservation` for a browser tool action.
+# We use a whitelist (rather than `startswith('browser ')`) so that a user's
+# shell command that happens to start with the word "browser" (e.g.
+# ``browser-cli --help``) isn't silently dropped from the transcript.
+_BROWSER_TOOL_COMMANDS = frozenset(
+    {
+        'browser start',
+        'browser close',
+        'browser navigate',
+        'browser snapshot',
+        'browser screenshot',
+        'browser click',
+        'browser type',
+    }
+)
+
+# Prefix emitted by ``file_editor._view_directory`` when the editor is pointed
+# at a directory rather than a regular file. Used by the File-read observation
+# handler to switch the result label from "N lines" to "N entries".
+_DIRECTORY_VIEW_PREFIX = 'Directory contents of '
 
 
 def _sync_reasoning_after_tool_line(
@@ -545,12 +568,14 @@ def _build_task_panel(task_list: list[dict[str, Any]]) -> Any:
         table.add_row(badge, body)
 
     empty_state: Any = (
-        table if task_list else Text('No tracked tasks yet.', style='dim')
+        table
+        if task_list
+        else Text('No tasks in the tracker yet — the agent may add some as it works.', style='dim')
     )
     return format_callout_panel(
         f'Tasks ({len(task_list)})',
         empty_state,
-        accent_style='dim',
+        accent_style='#4a6b82',
         padding=ACTIVITY_PANEL_PADDING,
     )
 
@@ -581,12 +606,17 @@ def _build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
         table.add_row(badge, body)
 
     empty_state: Any = (
-        table if workers else Text('No delegated workers yet.', style='dim')
+        table
+        if workers
+        else Text(
+            'No parallel workers — subtasks appear here when the agent delegates.',
+            style='dim',
+        )
     )
     return format_callout_panel(
         f'Workers ({len(workers)})',
         empty_state,
-        accent_style='dim',
+        accent_style='#4a6b82',
         padding=ACTIVITY_PANEL_PADDING,
     )
 
@@ -606,6 +636,60 @@ _IDLE_STATES = {
     AgentState.PAUSED,
     AgentState.REJECTED,
 }
+
+# Provider / network / quota issues: calm “notice” styling (cyan) instead of red.
+_RECOVERABLE_NOTICE_FRAGMENTS = (
+    'timeout',
+    'timed out',
+    'did not answer before',
+    'retrying without streaming',
+    'stream timed out',
+    'fallback completion timed out',
+    'rate limit',
+    'too many requests',
+    '429',
+    'quota',
+    'billing',
+    'insufficient_quota',
+    'connection',
+    'unreachable',
+    'connect error',
+    'dns',
+    'ssl',
+    'certificate',
+    'econnrefused',
+    'econnreset',
+    'context length',
+    'context window',
+    'token limit',
+    'max tokens',
+    'too large to process',
+)
+
+# Auth, policy, and hard failures — keep scarlet “error” treatment.
+_CRITICAL_ERROR_FRAGMENTS = (
+    'syntax validation failed',
+    '401',
+    'unauthorized',
+    'invalid api key',
+    'authenticationerror',
+    'api key rejected',
+    'no api key or model configured',
+    'permission denied',
+    'access is denied',
+    '403',
+    'filenotfounderror',
+)
+
+
+def _use_recoverable_notice_style(error_text: str) -> bool:
+    """True for timeouts and provider hiccups; False for auth/syntax/crash-like errors."""
+    lower = error_text.lower()
+    if _contains_any(lower, _CRITICAL_ERROR_FRAGMENTS):
+        return False
+    if _contains_any(lower, _RECOVERABLE_NOTICE_FRAGMENTS):
+        return True
+    return False
 
 # Subscriber ID for the CLI renderer.
 _SUBSCRIBER = EventStreamSubscriber.CLI
@@ -631,6 +715,26 @@ class PendingActivityCard:
     secondary: str | None = None
     kind: str = 'generic'
     payload: dict[str, Any] | None = None
+
+
+def _reasoning_lines_skip_already_committed(
+    prev: list[str] | None, new: list[str]
+) -> list[str]:
+    """Drop leading lines already printed in the previous reasoning snapshot.
+
+    Models (especially Gemini with long CoT) often restate the same preamble on
+    every segment; Grinta flushes thoughts at tool boundaries, so without this
+    the transcript repeats goals and plan bullets while work is advancing.
+    """
+    if not new:
+        return []
+    if not prev:
+        return new
+    n = min(len(prev), len(new))
+    i = 0
+    while i < n and prev[i] == new[i]:
+        i += 1
+    return new[i:]
 
 
 def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
@@ -667,6 +771,42 @@ def _split_error_text(error_text: str) -> tuple[str, str]:
     if len(detail) > 2000:
         detail = detail[:2000] + '\n... (truncated)'
     return summary, detail
+
+
+def _error_panel_text_wrap_width(console_width: int | None) -> int | None:
+    """Character width for wrapped body lines inside a transcript error/notice panel."""
+    if console_width is None:
+        return None
+    # Transcript inset + rounded border + CALLOUT_PANEL_PADDING (1, 2) horizontal.
+    area = max(20, console_width - TRANSCRIPT_LEFT_INSET - TRANSCRIPT_RIGHT_INSET)
+    inner = area - 2 - 4
+    return max(16, inner)
+
+
+def _wrap_panel_text_block(text: str, *, wrap_width: int | None) -> str:
+    """Hard-wrap lines so long API / exception strings stay inside the panel."""
+    if wrap_width is None or not text:
+        return text
+    lines_out: list[str] = []
+    for raw in text.splitlines():
+        if not raw:
+            lines_out.append('')
+            continue
+        chunk = textwrap.wrap(
+            raw,
+            width=wrap_width,
+            replace_whitespace=False,
+            drop_whitespace=False,
+        )
+        lines_out.extend(chunk or [''])
+    return '\n'.join(lines_out)
+
+
+def _error_panel_outer_width(console_width: int | None) -> int | None:
+    """Width of the Panel box aligned with the framed transcript column."""
+    if console_width is None:
+        return None
+    return max(20, console_width - TRANSCRIPT_LEFT_INSET - TRANSCRIPT_RIGHT_INSET)
 
 
 def _error_guidance(error_text: str) -> ErrorGuidance | None:
@@ -743,12 +883,54 @@ def _error_guidance(error_text: str) -> ErrorGuidance | None:
                 'If the action may still be running in the background, check processes before retrying.',
             ),
         )
+    if _contains_any(
+        lower,
+        (
+            'browser screenshot timed out',
+            'browser screenshot failed',
+            'browser snapshot timed out',
+            'snapshot timed out',
+            'screenshot timed out',
+            'tried compositor and window capture',
+            'navigation to ',
+        ),
+    ) and _contains_any(
+        lower,
+        ('timed out', 'timeout', 'compositor', 'window capture'),
+    ):
+        return ErrorGuidance(
+            summary='The browser tool did not finish in time.',
+            steps=(
+                'A JavaScript alert/confirm/prompt dialog on the page may be '
+                'blocking rendering; we now auto-dismiss these before '
+                'screenshots, but it can still happen on other commands. '
+                'Try ``browser snapshot`` to probe DOM state without rendering.',
+                'Re-run ``browser navigate`` to the same URL to reset the tab, '
+                'or close stray Chrome/Chromium windows and retry.',
+                'Set GRINTA_BROWSER_TRACE=1 before launching to see stage '
+                'timings on stderr.',
+            ),
+        )
+    if 'fallback completion timed out' in lower:
+        return ErrorGuidance(
+            summary='The non-streaming retry also hit the wait limit.',
+            steps=(
+                'Check your network and the provider status page, then try again.',
+                'Pick another model in /settings if this endpoint is often slow.',
+                'Optional: raise APP_LLM_FALLBACK_TIMEOUT_SECONDS for a longer '
+                'non-streaming cap (many setups use 60s by default).',
+            ),
+        )
     if _contains_any(lower, ('timeout', 'timed out')):
         return ErrorGuidance(
-            summary='The provider did not answer before the CLI gave up waiting.',
+            summary="The model didn't finish within Grinta's wait window.",
             steps=(
-                'Check your network connection and the provider status page.',
-                'Retry with a shorter request or switch to a faster model in /settings.',
+                'Confirm your network and the provider status page, then retry.',
+                'Shorter prompts or a faster model in /settings usually help.',
+                'If chunks pause too long mid-stream, raise APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS '
+                '(default 90s) or APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS.',
+                'If streaming often stalls, Grinta may retry non-streaming automatically—'
+                'watch for the cyan “Still working” note in the transcript.',
             ),
         )
     if _contains_any(
@@ -871,19 +1053,85 @@ def _error_guidance(error_text: str) -> ErrorGuidance | None:
     return None
 
 
-def _build_recovery_text(guidance: ErrorGuidance) -> Text:
-    """Render a guidance block for the error panel."""
+def _build_recovery_text(
+    guidance: ErrorGuidance,
+    *,
+    for_notice: bool = False,
+    wrap_width: int | None = None,
+) -> Text:
+    """Render a guidance block for the error / notice panel."""
     recovery = Text()
-    recovery.append('What you can try\n', style='yellow bold')
-    if guidance.summary and not guidance.omit_summary_in_recovery:
-        recovery.append(guidance.summary, style='yellow')
+    if for_notice:
+        recovery.append('Next steps\n', style='bold dim cyan')
+        sum_style = 'cyan'
+        step_style = 'dim cyan'
+    else:
+        recovery.append('What you can try\n', style='yellow bold')
+        sum_style = 'yellow'
+        step_style = 'yellow'
+    # Cyan notice panels already use ``guidance.summary`` as the headline body.
+    if (
+        guidance.summary
+        and not guidance.omit_summary_in_recovery
+        and not for_notice
+    ):
+        sum_block = _wrap_panel_text_block(
+            guidance.summary,
+            wrap_width=wrap_width,
+        )
+        recovery.append(sum_block, style=sum_style)
         if guidance.steps:
-            recovery.append('\n', style='yellow')
+            recovery.append('\n', style=sum_style)
     for index, step in enumerate(guidance.steps, start=1):
-        recovery.append(f'{index}. {step}', style='yellow')
+        line = f'{index}. {step}'
+        line = _wrap_panel_text_block(line, wrap_width=wrap_width)
+        recovery.append(line, style=step_style)
         if index < len(guidance.steps):
-            recovery.append('\n', style='yellow')
+            recovery.append('\n', style=step_style)
     return recovery
+
+
+def _notice_panel_title(error_text: str) -> str:
+    """Short cyan banner title for recoverable (notice-style) issues."""
+    lower = error_text.lower()
+    if 'fallback completion timed out' in lower:
+        return 'Still no reply'
+    if _contains_any(
+        lower,
+        ('rate limit', 'too many requests', '429', 'quota', 'billing'),
+    ):
+        return 'Rate or quota limit'
+    if _contains_any(
+        lower,
+        ('connection', 'unreachable', 'connect error', 'dns', 'ssl', 'certificate'),
+    ):
+        return 'Connection issue'
+    if _contains_any(lower, ('timeout', 'timed out', 'did not answer')):
+        return 'Request timed out'
+    return 'Heads-up'
+
+
+def _build_llm_stream_fallback_panel() -> Panel:
+    """Compact callout when streaming stalls and the engine retries without streaming."""
+    body = Group(
+        Text(
+            'The first streamed tokens took longer than expected, so Grinta is '
+            'retrying the same completion in one shot (non-streaming).',
+            style='cyan',
+        ),
+        Text(
+            'You do not need to do anything—this is common on busy endpoints.',
+            style='dim #64748b',
+        ),
+    )
+    return Panel(
+        body,
+        title=Text('ℹ  Still working', style='bold cyan'),
+        title_align='left',
+        border_style='#5dade2',
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
 
 
 def _build_error_panel(
@@ -891,31 +1139,62 @@ def _build_error_panel(
     *,
     title: str = 'Error',
     accent_style: str = 'red',
+    force_notice: bool | None = None,
+    content_width: int | None = None,
 ) -> Panel:
-    """Render a structured error panel with recovery guidance when available."""
+    """Render a structured panel with recovery guidance when available.
+
+    Recoverable provider/network issues use a compact cyan “notice” treatment;
+    auth, validation, and similar failures keep the red error styling.
+    """
+    wrap_w = _error_panel_text_wrap_width(content_width)
     summary, detail = _split_error_text(error_text)
     guidance = _error_guidance(error_text)
-    headline = (
-        guidance.summary
-        if guidance is not None and 'syntax validation failed' in error_text.lower()
-        else summary
+    use_notice = (
+        force_notice if force_notice is not None else _use_recoverable_notice_style(error_text)
     )
-    body_parts: list[Any] = [Text(headline, style=f'{accent_style} bold')]
-    # When we have actionable guidance (recognized error type), the raw provider
-    # detail is noisy and redundant — suppress it so the panel stays clean.
+    accent = 'cyan' if use_notice else accent_style
+    border = '#5dade2' if use_notice else accent_style
+    headline_style = 'bold cyan' if use_notice else f'{accent_style} bold'
+    detail_style = 'dim cyan' if use_notice else f'{accent_style} dim'
+
+    if guidance is not None and 'syntax validation failed' in error_text.lower():
+        headline = guidance.summary
+    elif use_notice and guidance is not None:
+        # Friendlier line than raw provider exception scaffolding.
+        headline = guidance.summary
+    else:
+        headline = summary
+    headline = _wrap_panel_text_block(headline, wrap_width=wrap_w)
+    body_parts: list[Any] = [Text(headline, style=headline_style)]
     if guidance is None and detail:
-        body_parts.append(Text(detail, style=f'{accent_style} dim'))
+        body_parts.append(
+            Text(_wrap_panel_text_block(detail, wrap_width=wrap_w), style=detail_style)
+        )
 
     if guidance is not None:
-        body_parts.append(_build_recovery_text(guidance))
+        body_parts.append(Text(''))  # air gap before steps
+        body_parts.append(
+            _build_recovery_text(guidance, for_notice=use_notice, wrap_width=wrap_w)
+        )
 
-    panel_title = Text(title.strip() or 'Error', style=f'{accent_style} bold')
-    return Panel(
-        Group(*body_parts),
-        title=panel_title,
-        border_style=accent_style,
-        padding=CALLOUT_PANEL_PADDING,
-    )
+    if use_notice:
+        panel_label = _notice_panel_title(error_text)
+        panel_title = Text(f'ℹ  {panel_label}', style=f'bold {accent}')
+    else:
+        panel_title = Text(title.strip() or 'Error', style=f'{accent_style} bold')
+    notice_pad = (0, 1) if use_notice else CALLOUT_PANEL_PADDING
+    panel_kw: dict[str, Any] = {
+        'title': panel_title,
+        'title_align': 'left',
+        'border_style': border,
+        'box': box.ROUNDED,
+        'padding': notice_pad,
+    }
+    outer = _error_panel_outer_width(content_width)
+    if outer is not None:
+        panel_kw['width'] = outer
+    return Panel(Group(*body_parts), **panel_kw)
 
 
 def _system_message_tag(title: str) -> tuple[str, str]:
@@ -1018,6 +1297,8 @@ class CLIEventRenderer:
         self._activity_turn_header_emitted: bool = False
         #: Monotonic timestamp of the last Live refresh (for throttling).
         self._last_refresh_time: float = 0.0
+        #: Last reasoning lines committed to transcript (for prefix de-dup per turn).
+        self._last_committed_reasoning_lines: list[str] | None = None
 
     @property
     def current_state(self) -> AgentState | None:
@@ -1072,6 +1353,10 @@ class CLIEventRenderer:
         self._flush_thinking_block()
         live = self._live
         if live is None:
+            try:
+                self._console.show_cursor(True)
+            except Exception:
+                pass
             return
         self._live = None
         if (
@@ -1091,6 +1376,12 @@ class CLIEventRenderer:
             live.stop()
         except Exception:
             logger.debug('Live.stop() failed', exc_info=True)
+        # Rich usually restores the cursor, but prompt_toolkit may still think the
+        # screen layout is pre-Live; force-visible cursor before the next prompt.
+        try:
+            self._console.show_cursor(True)
+        except Exception:
+            pass
 
     # Minimum seconds between non-forced Live refreshes (~20 fps).
     _REFRESH_MIN_INTERVAL: float = 0.05
@@ -1144,6 +1435,7 @@ class CLIEventRenderer:
         self._pending_shell_is_internal = False
         self._pending_activity_card = None
         self._activity_turn_header_emitted = False
+        self._last_committed_reasoning_lines = None
         self._current_state = AgentState.RUNNING
         self._hud.update_ledger('Healthy')
         self._hud.update_agent_state('Running')
@@ -1179,6 +1471,7 @@ class CLIEventRenderer:
         self._delegate_panel = None
         self._delegate_panel_signature = None
         self._last_printed_delegate_panel_signature = None
+        self._last_committed_reasoning_lines = None
         self._clear_streaming_preview()
         self._reasoning.stop()
         self.refresh()
@@ -1219,14 +1512,32 @@ class CLIEventRenderer:
     def add_system_message(self, text: str, *, title: str = 'Info') -> None:
         lower_title = title.strip().lower()
         if lower_title == 'error':
-            self._print_or_buffer(_build_error_panel(text, title='Error'))
-            self._hud.update_ledger('Error')
+            use_notice = _use_recoverable_notice_style(text)
+            self._print_or_buffer(
+                _build_error_panel(
+                    text,
+                    title='Error',
+                    force_notice=use_notice,
+                    content_width=self._console.width,
+                )
+            )
+            if use_notice:
+                self._hud.update_ledger('Idle')
+                self._hud.update_agent_state('Ready')
+            else:
+                self._hud.update_ledger('Error')
             return
         if 'timeout' in lower_title:
             self._print_or_buffer(
-                _build_error_panel(text, title=title, accent_style='yellow')
+                _build_error_panel(
+                    text,
+                    title=title,
+                    force_notice=True,
+                    content_width=self._console.width,
+                )
             )
-            self._hud.update_ledger('Error')
+            self._hud.update_ledger('Idle')
+            self._hud.update_agent_state('Ready')
             return
         if lower_title == 'warning':
             tag, color = _system_message_tag(title)
@@ -1337,18 +1648,29 @@ class CLIEventRenderer:
         reasoning_max_lines: int | None = None
         if options.max_height:
             available = max(12, options.max_height - 6)
+            thought_rows = self._reasoning.live_panel_shows_thought_rows()
             if self._streaming_accumulated and self._reasoning.active:
-                # Give reasoning at least as much room as the streaming preview
-                # — it's what the user follows between tool calls.
-                reasoning_share = max(10, available * 3 // 5)
-                stream_max_lines = max(6, min(16, available - reasoning_share - 1))
-                reasoning_max_lines = max(
-                    10, min(reasoning_share, available - stream_max_lines - 1)
-                )
+                if thought_rows:
+                    reasoning_share = max(10, available * 3 // 5)
+                    stream_max_lines = max(6, min(16, available - reasoning_share - 1))
+                    reasoning_max_lines = max(
+                        10, min(reasoning_share, available - stream_max_lines - 1)
+                    )
+                else:
+                    # Header-only Thinking panel: give the draft-reply preview
+                    # the bulk of the Live viewport.
+                    reasoning_max_lines = 6
+                    stream_max_lines = max(
+                        10, min(28, available - 5)
+                    )
             elif self._streaming_accumulated:
                 stream_max_lines = max(10, min(28, available))
             elif self._reasoning.active:
-                reasoning_max_lines = max(12, min(32, available))
+                reasoning_max_lines = (
+                    max(12, min(32, available))
+                    if thought_rows
+                    else 6
+                )
 
         if self._streaming_accumulated:
             live_sections.append(
@@ -1406,9 +1728,18 @@ class CLIEventRenderer:
         input_row = Table.grid()
         input_row.add_column(width=3)
         input_row.add_column()
+        state_l = (hud.agent_state_label or 'Running').strip()
+        if state_l.lower() == 'running':
+            subline = 'Agent working · ctrl+c to interrupt'
+            spin_style = 'bold #7dd3fc'
+            text_style = 'italic #5d7286'
+        else:
+            subline = f'{state_l} · ctrl+c if you need to interrupt'
+            spin_style = 'dim #5d7286'
+            text_style = 'italic #64748b'
         input_row.add_row(
-            Spinner('dots', style='bold #7dd3fc'),
-            Text('Agent working · ctrl+c to interrupt', style='italic #5d7286'),
+            Spinner('dots', style=spin_style),
+            Text(subline, style=text_style),
         )
         items.append(input_row)
 
@@ -1436,6 +1767,13 @@ class CLIEventRenderer:
                 else '0'
             )
             line = Text()
+            ws_compact = (hud.workspace_path or '').strip()
+            if ws_compact:
+                line.append(
+                    HUDBar.ellipsize_path(ws_compact, 22),
+                    style='dim #94a3b8',
+                )
+                line.append(SEP[0], style=SEP[1])
             line.append(state_label, style='dim')
             line.append(SEP[0], style=SEP[1])
             line.append(f'autonomy:{autonomy}', style='dim')
@@ -1473,6 +1811,16 @@ class CLIEventRenderer:
             auto_style = '#f0a3ff bold'
         row1.append(f'autonomy:{autonomy}', style=auto_style)
         items.append(row1)
+
+        ws_full = (hud.workspace_path or '').strip()
+        if ws_full:
+            row_ws = Text()
+            row_ws.append('workspace ', style='dim #64748b')
+            row_ws.append(
+                HUDBar.ellipsize_path(ws_full, max(28, width - 14)),
+                style='#94a3b8',
+            )
+            items.append(row_ws)
 
         # -- row 2: model · tokens · cost · ledger (+ optionals) -----------
         ctx = (
@@ -2118,6 +2466,19 @@ class CLIEventRenderer:
                 self._pending_shell_action = None
                 self._pending_shell_command = None
                 return
+            # Browser tool completions reuse CmdOutputObservation (command
+            # strings like ``browser navigate``/``browser screenshot``). The
+            # corresponding ``Browser`` card was already printed when the
+            # action was dispatched; rendering another ``Terminal / Ran /
+            # $ (command) / ✓ done`` block creates spurious ghost rows in
+            # the transcript. Treat those as already-displayed.
+            _obs_cmd = (getattr(obs, 'command', '') or '').strip().lower()
+            if _obs_cmd in _BROWSER_TOOL_COMMANDS:
+                self._pending_shell_action = None
+                self._pending_shell_command = None
+                self._pending_shell_title = None
+                self._pending_shell_is_internal = False
+                return
             exit_code = getattr(obs, 'exit_code', None)
             if exit_code is None:
                 meta = getattr(obs, 'metadata', None)
@@ -2158,6 +2519,9 @@ class CLIEventRenderer:
                 if err_line:
                     msg += f' · {err_line}'
                 result_kind = 'err'
+                # Hide raw stdout on failures: the summary line already carries
+                # the important bit and the full body is reachable via logs.
+                extra_lines = None
             else:
                 raw_lines = (
                     [ln.strip() for ln in content.split('\n') if ln.strip()]
@@ -2169,9 +2533,10 @@ class CLIEventRenderer:
                 else:
                     msg = 'done'
                 result_kind = 'ok' if exit_code == 0 else 'neutral'
-
-            # Always hide stdout for CmdOutputObservation to reduce UX clutter
-            extra_lines = None
+                # Plain shell successes: suppress the verbose stdout to reduce
+                # transcript clutter; curated summaries (apply_patch +/− delta)
+                # set their own ``extra_lines`` above and are preserved.
+                extra_lines = None
 
             inner = format_activity_shell_block(
                 verb,
@@ -2179,6 +2544,12 @@ class CLIEventRenderer:
                 result_message=msg,
                 result_kind=result_kind,
                 extra_lines=extra_lines,
+                # ``title`` was captured from the tool-call metadata when
+                # CmdRunAction was buffered; use it so internal tool
+                # invocations (apply_patch, analyze_project_structure, …)
+                # render under their friendly headline instead of the
+                # generic ``Terminal`` card.
+                title=title if is_internal else None,
             )
             self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))
             return
@@ -2225,11 +2596,22 @@ class CLIEventRenderer:
         if isinstance(obs, ErrorObservation):
             self._stop_reasoning()
             self._flush_pending_tool_cards()
+            self._clear_streaming_preview()
             error_content = getattr(obs, 'content', str(obs))
+            use_notice = _use_recoverable_notice_style(error_content)
             self._append_history(
-                _build_error_panel(error_content),
+                _build_error_panel(
+                    error_content,
+                    force_notice=use_notice,
+                    content_width=self._console.width,
+                ),
             )
-            self._hud.update_ledger('Error')
+            # Do not force HUD to Ready/Idle here for recoverable notices — the
+            # agent may still be RUNNING (e.g. before RecoveryService transitions
+            # state), which made the status bar lie and hid why the prompt was
+            # blocked.  Ledger/agent HUD is driven by AgentStateChangedObservation.
+            if not use_notice:
+                self._hud.update_ledger('Error')
             return
 
         if isinstance(obs, UserRejectObservation):
@@ -2284,11 +2666,15 @@ class CLIEventRenderer:
                     return
             content = getattr(obs, 'content', '')
             if content:
-                self._append_history(
-                    format_activity_result_secondary(
-                        f'status · {content}', kind='neutral'
+                lower_c = content.lower()
+                if 'stream timed out' in lower_c or 'retrying without streaming' in lower_c:
+                    self._append_history(_build_llm_stream_fallback_panel())
+                else:
+                    self._append_history(
+                        format_activity_result_secondary(
+                            f'status · {content}', kind='neutral'
+                        )
                     )
-                )
             return
 
         # -- File read result -------------------------------------------------
@@ -2297,7 +2683,21 @@ class CLIEventRenderer:
             content = getattr(obs, 'content', '') or ''
             n_lines = len(content.splitlines()) if content else 0
             pending = self._take_pending_activity_card('file_read')  # type: ignore
-            result_message = f'{n_lines:,} lines' if n_lines else 'empty file'
+            # ``str_replace_editor view`` on a directory returns a header line
+            # (``Directory contents of <path>:``) followed by one entry per
+            # line. Labelling that output as "N lines" is misleading — the
+            # number the user cares about is *entries*. We subtract 1 for the
+            # header so the count matches what they see in the listing.
+            if content.startswith(_DIRECTORY_VIEW_PREFIX):
+                n_entries = max(0, n_lines - 1)
+                if n_entries == 1:
+                    result_message = '1 entry'
+                elif n_entries:
+                    result_message = f'{n_entries:,} entries'
+                else:
+                    result_message = 'empty directory'
+            else:
+                result_message = f'{n_lines:,} lines' if n_lines else 'empty file'
             if pending is not None:
                 self._render_pending_activity_card(
                     pending,  # type: ignore
@@ -2882,7 +3282,14 @@ class CLIEventRenderer:
         thoughts = self._reasoning.snapshot_thoughts()
         if not thoughts:
             return
-        self._print_or_buffer(format_reasoning_snapshot(thoughts))
+        fresh = _reasoning_lines_skip_already_committed(
+            self._last_committed_reasoning_lines,
+            thoughts,
+        )
+        self._last_committed_reasoning_lines = list(thoughts)
+        if not fresh:
+            return
+        self._print_or_buffer(format_reasoning_snapshot(fresh))
 
     def _stop_reasoning(self) -> None:
         """Flush any accumulated thoughts to static output, then stop the spinner.
@@ -2948,13 +3355,18 @@ class CLIEventRenderer:
 
         body: list[Any] = [Markdown(clipped)]
         if clipped != full:
-            body.append(Text('auto-scroll: showing latest content', style='dim italic'))
+            body.append(
+                Text(
+                    'Tail preview — full reply will appear in chat when streaming finishes',
+                    style='dim italic',
+                )
+            )
         if not self._streaming_final:
-            body.append(Text('streaming…', style='dim'))
+            body.append(Text('Still streaming…', style='dim'))
         return format_callout_panel(
             'Draft reply',
             Group(*body),
-            accent_style='dim',
+            accent_style='#5d8aa8',
             padding=ACTIVITY_PANEL_PADDING,
         )
 

@@ -37,7 +37,7 @@ def ctrl(mock_context):
 
 class TestRecoveryService:
     @pytest.mark.asyncio
-    async def test_emits_error_and_stays_running_on_timeout(
+    async def test_emits_error_and_returns_to_user_on_timeout(
         self, mock_context, ctrl
     ):
         svc = RecoveryService(mock_context)
@@ -49,9 +49,12 @@ class TestRecoveryService:
         assert isinstance(err_obs, ErrorObservation)
         assert err_obs.error_id == 'LLM_TIMEOUT'
         assert 'Timeout' in err_obs.content
-        # Timeout is agent-survivable: no retry queue, no state transition
         ctrl.retry_service.schedule_retry_after_failure.assert_not_awaited()
-        mock_context.set_agent_state.assert_not_awaited()
+        # Timeout returns to user input so the CLI is not blocked in
+        # _wait_for_agent_idle while the HUD incorrectly showed "Ready".
+        mock_context.set_agent_state.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
 
     @pytest.mark.asyncio
     async def test_clears_pending_and_discards_context(self, mock_context, ctrl):

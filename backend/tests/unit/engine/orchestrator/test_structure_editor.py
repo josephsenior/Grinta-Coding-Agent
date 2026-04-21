@@ -234,11 +234,23 @@ class TestInsertCode:
 
 class TestUndoLastEdit:
     def test_undo_after_edit(self, editor, py_file):
+        """``undo_last_edit`` restores the pre-edit contents byte-for-byte.
+
+        Subtle constraint: the default :class:`EditorConfig` has both
+        ``backup_enabled=True`` *and* ``validate_syntax=True``. Undo history
+        is recorded inside ``_write_and_clean_file``, which is only reached
+        *after* syntax validation succeeds. If we replace a single line
+        (e.g. ``def greet(name):``) with a comment we leave the function
+        body as an orphaned ``return`` — invalid Python — and the edit
+        short-circuits before any history is recorded. To test undo we
+        must therefore replace the *whole* file with syntactically valid
+        content so the edit actually lands.
+        """
         original = open(py_file, encoding='utf-8').read()
-        # Make an edit that records undo history
-        editor.replace_code_range(py_file, 1, 1, '# replaced\n')
+        line_count = len(original.splitlines()) or 1
+        editor.replace_code_range(py_file, 1, line_count, '# replaced\n')
         result = editor.undo_last_edit(py_file)
-        assert result.success is True
+        assert result.success is True, result.message
         restored = open(py_file, encoding='utf-8').read()
         assert restored == original
 

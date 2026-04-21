@@ -59,12 +59,22 @@ class TestFileEditorCoverageGaps:
         assert 'No content provided' in result.error
 
     def test_apply_edit_logic_append_only(self):
-        """Covers line 343 (old_content_str + new_str_val)."""
-        # old_str is MISSING, new_str is provided
+        """Covers line 343 (old_content_str + new_str_val).
+
+        Line-ending normalization note: Python's text-mode ``open`` on
+        Windows reads the file back as ``line1\\r\\n`` even if we wrote a
+        Unix ``line1\\n``. The editor faithfully preserves whatever
+        terminator it read, so the concatenated ``new_content`` may carry
+        CRLF on the existing line and LF on the appended one. The invariant
+        the test actually cares about is "old content is preserved and
+        ``new_str`` appended after it" — we compare after normalizing
+        line endings so the assertion is cross-platform.
+        """
         self._write('test.txt', 'line1\n')
         result = self.editor(command='edit', path='test.txt', new_str='line2\n')
         assert result.new_content is not None
-        assert 'line1\nline2\n' in result.new_content
+        normalized = result.new_content.replace('\r\n', '\n').replace('\r', '\n')
+        assert 'line1\nline2\n' in normalized
 
     def test_transaction_success(self):
         """Covers lines 546-547 (Transaction success pop)."""
@@ -120,7 +130,15 @@ class TestFileEditorCoverageGaps:
             # No crash!
 
     def test_fuzzy_match_error_high_ratio(self):
-        """Covers exact matching error without difflib suggestion check."""
+        """Covers exact-matching error with close-but-not-identical ``old_str``.
+
+        When the edit can't be located verbatim the editor now emits a
+        more informative diagnostic that mentions whitespace normalization
+        (it tries that as a fallback before giving up). The previous
+        assertion locked to the older wording (``No exact match found``);
+        we just check the new, stable substring and that at least one
+        candidate suggestion was surfaced so the user can course-correct.
+        """
         content = "def foo():\n    print('hello')\n    return True\n"
         self._write('fuzzy.py', content)
         old_str = "def foo():\n    print('helo')\n    return True\n"
@@ -132,7 +150,8 @@ class TestFileEditorCoverageGaps:
             normalize_ws=False,
         )
         assert result.error is not None
-        assert 'No exact match found' in result.error
+        assert 'No match found' in result.error, result.error
+        assert 'Closest candidates' in result.error, result.error
 
     def test_unicode_decode_fallback(self):
         """Covers line 440-449 (UnicodeDecodeError fallback)."""

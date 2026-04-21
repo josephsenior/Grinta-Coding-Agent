@@ -132,6 +132,19 @@ class RecoveryService:
             await self._context.set_agent_state(AgentState.RATE_LIMITED)
             return
 
+        # Provider wall-clock timeouts (streaming stall, first-chunk wait, step
+        # wait_for, etc.): return to user input instead of auto-calling
+        # controller.step() again.  Auto-retry blocked the CLI in
+        # _wait_for_agent_idle while recoverable error panels set the HUD to
+        # "Ready", so the user could not type.  The model already receives the
+        # ErrorObservation; the user can send a follow-up or /retry.
+        if isinstance(exc, Timeout):
+            logger.warning(
+                'Timeout: returning to AWAITING_USER_INPUT so the CLI prompt is usable again'
+            )
+            await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
+            return
+
         # Agent-survivable error: brief pause so we don't hammer the provider,
         # then continue. The model sees the ErrorObservation and can try a
         # different approach.

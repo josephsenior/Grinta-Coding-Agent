@@ -24,7 +24,9 @@ def create_signal_progress_tool() -> dict[str, Any]:
             'description': (
                 'Signal forward progress on a long-running task to prevent stuck-loop detection. '
                 'Call every 10-15 steps during sustained multi-file operations. '
-                'Do NOT call if actually stuck — use escalate() instead.'
+                'Only needed when your recent turns did NOT produce file edits, writes, LSP '
+                'queries, task_tracker updates, or delegated subtasks (those already auto-signal). '
+                "Do NOT call if actually stuck — use `communicate_with_user(intent='escalate')` instead."
             ),
             'parameters': {
                 'type': 'object',

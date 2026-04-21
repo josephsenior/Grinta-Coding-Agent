@@ -552,16 +552,28 @@ class OrchestratorExecutor:
                         if _fc_usage and isinstance(_fc_usage, dict):
                             streamed_usage = _fc_usage
 
+                stream_chunk_timeout = 90.0
+                try:
+                    _sc_raw = os.getenv(
+                        'APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS', '90'
+                    ).strip()
+                    _sc_parsed = float(_sc_raw)
+                    stream_chunk_timeout = _sc_parsed if _sc_parsed > 0 else 90.0
+                except (TypeError, ValueError):
+                    stream_chunk_timeout = 90.0
+
                 while True:
                     try:
                         chunk = await asyncio.wait_for(
-                            anext(stream_aiter), timeout=20.0
+                            anext(stream_aiter),
+                            timeout=stream_chunk_timeout,
                         )
                     except StopAsyncIteration:
                         break
                     except asyncio.TimeoutError:
                         logger.warning(
-                            'LLM stream chunk timed out mid-generation after 20 seconds. Streaming stalled.'
+                            'LLM stream chunk timed out mid-generation after %.1fs. Streaming stalled.',
+                            stream_chunk_timeout,
                         )
                         from backend.inference.exceptions import Timeout as LLMTimeout
 
@@ -569,7 +581,7 @@ class OrchestratorExecutor:
                             getattr(self._llm, 'config', None), 'model', None
                         )
                         raise LLMTimeout(
-                            'LLM stream chunk timed out mid-generation after 20 seconds',
+                            f'LLM stream chunk timed out mid-generation after {stream_chunk_timeout} seconds',
                             model=model_name,
                         ) from None
 

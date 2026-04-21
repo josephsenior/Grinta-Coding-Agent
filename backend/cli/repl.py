@@ -372,6 +372,34 @@ class Repl:
         if app is not None:
             app.invalidate()
 
+    def _sync_terminal_after_agent_turn(self, session: Any | None) -> None:
+        """Restore sane stdout/stderr after Rich Live so the next prompt can paint.
+
+        While the agent runs, ``prompt_toolkit`` is idle (``app._is_running`` is
+        false), so ``Application.invalidate()`` is a no-op. Rich may leave the
+        cursor hidden or streams unsynced — without this, the multiline prompt
+        sometimes never appears until the user resizes the terminal.
+        """
+        if session is None:
+            try:
+                self._console.show_cursor(True)
+            except Exception:
+                pass
+            return
+        try:
+            self._console.show_cursor(True)
+        except Exception:
+            pass
+        out = getattr(session, 'output', None)
+        if out is not None:
+            try:
+                # Leave the cursor on a fresh row after Rich scrollback so the
+                # next full-screen prompt layout computes correctly.
+                out.write('\n')
+                out.flush()
+            except Exception:
+                pass
+
     def _set_footer_system_line(self, text: str, *, kind: str = 'system') -> None:
         """One shared status line under the stats bar; replaces previous text."""
         self._footer_system_status = text
@@ -525,6 +553,7 @@ class Repl:
         return {
             'state_label': self._prompt_state_label(),
             'autonomy_label': self._prompt_autonomy_label(),
+            'workspace': (hud.workspace_path or '').strip(),
             'provider': provider,
             'model': model,
             'token_display': token_display,
@@ -592,8 +621,22 @@ class Repl:
         """Build row-2 fragments, wrapping to a second line when content exceeds width."""
         sep = '  \u2022  '
 
-        # Required prefix: provider + model + tokens + cost
-        base: list[tuple[str, str]] = [
+        ws_raw = (data.get('workspace') or '').strip()
+        # Required prefix: optional workspace, then provider + model + tokens + cost
+        base: list[tuple[str, str]] = []
+        if ws_raw:
+            ws_max = max(18, min(72, width - 50))
+            ws_show = HUDBar.ellipsize_path(ws_raw, ws_max)
+            base.extend(
+                [
+                    ('class:prompt.dim', 'workspace:'),
+                    ('class:prompt.sep', ' '),
+                    ('class:prompt.model', ws_show),
+                    ('class:prompt.sep', sep),
+                ]
+            )
+        base.extend(
+            [
             ('class:prompt.dim', 'provider:'),
             ('class:prompt.sep', ' '),
             ('class:prompt.model', data['provider']),
@@ -606,6 +649,7 @@ class Repl:
             ('class:prompt.sep', sep),
             ('class:prompt.value', data['cost']),
         ]
+        )
 
         # Optional fields in priority order.
         optionals: list[tuple[str, str]] = [
@@ -663,8 +707,12 @@ class Repl:
             fragments.append((style, text))
 
         if width < 72:
+            ws = (data.get('workspace') or '').strip()
+            ws_prefix = (
+                f"{HUDBar.ellipsize_path(ws, 28)} · " if ws else ''
+            )
             line = (
-                f"{data['state_label']} · {data['autonomy_label']} · "
+                f"{ws_prefix}{data['state_label']} · {data['autonomy_label']} · "
                 f"{model} · {data['token_display']} · {data['cost']}"
             )
             add('class:prompt.dim', line)
@@ -849,6 +897,7 @@ class Repl:
             bootstrap_task: asyncio.Task[None] | None = None  # type: ignore
             config = self._config
             self._hud.update_model(get_current_model(config))
+            self._hud.update_workspace(getattr(config, 'project_root', None))
 
             # -- prompt session (fast, no I/O) --------------------------------
             session: Any | None = None
@@ -921,6 +970,9 @@ class Repl:
                         self._llm_registry = llm_registry
                         self._conversation_stats = conversation_stats
                         self._config = config_
+                        self._hud.update_workspace(
+                            getattr(config_, 'project_root', None)
+                        )
                     except Exception as exc:
                         _handle_bootstrap_failure(exc)
                         return
@@ -1170,10 +1222,20 @@ class Repl:
                 try:
                     await self._wait_for_agent_idle(controller, agent_task)
                 except (KeyboardInterrupt, asyncio.CancelledError):
+                    # Tear down Live *before* printing the interrupt line so Rich and
+                    # prompt_toolkit don't fight over the cursor; ``finally`` still
+                    # runs idempotent ``stop_live`` for safety.
+                    if self._renderer is not None:
+                        self._renderer.stop_live()
                     await self._cancel_agent(agent_task)
                 finally:
-                    self._renderer.stop_live()
+                    if self._renderer is not None:
+                        self._renderer.stop_live()
+                    # Restore cursor / scroll first so prompt_toolkit recomputes layout
+                    # against the final terminal state; then invalidate the app.
+                    self._sync_terminal_after_agent_turn(session)
                     _invalidate_prompt_session()
+                    self._invalidate_pt()
         finally:
             self._pt_session = None
             if bootstrap_task is not None and not bootstrap_task.done():

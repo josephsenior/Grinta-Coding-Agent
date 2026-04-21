@@ -20,8 +20,14 @@ import warnings
 from pathlib import Path
 from typing import Any
 
-# Suppress third-party DeprecationWarnings (belt-and-suspenders with entry.py).
-warnings.filterwarnings('ignore', message='importing.*from.*astroid', category=DeprecationWarning)
+# Suppress third-party DeprecationWarnings (same default as entry.py / backend pkg).
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+# google-genai subclasses aiohttp.ClientSession (emits noise on import in some envs).
+warnings.filterwarnings(
+    'ignore',
+    message=r'Inheritance class AiohttpClientSession from ClientSession is discouraged',
+    category=DeprecationWarning,
+)
 
 
 def _create_console(*args: Any, **kwargs: Any) -> Any:
@@ -61,8 +67,8 @@ def _grinta_install_tree_for_dotenv() -> Path:
 def _load_dotenv_early(*, explicit_project: str | None = None) -> None:
     """Load ``.env`` into ``os.environ`` before backend imports.
 
-    1. **Grinta install** ``<repo>/.env`` — canonical defaults (``LOG_TO_FILE``, keys).
-       You do not need a ``.env`` in every workspace for logging defaults.
+    1. **Grinta install** ``<repo>/.env`` — optional keys and overrides (e.g. ``LOG_TO_FILE=false``).
+       Logging defaults (``LOG_TO_FILE``, ``DEBUG_LLM``) are on in ``backend.core.constants``.
     2. Optional **``-p`` / explicit project** ``.env`` with ``override=True`` so a
        client repo can override API keys without duplicating logging flags.
 
@@ -96,7 +102,7 @@ def _log_to_file_effective() -> bool:
     raw = os.getenv('LOG_TO_FILE')
     if raw is not None and raw.strip() != '':
         return raw.strip().lower() in ('true', '1', 'yes')
-    return os.getenv('LOG_LEVEL', 'INFO').upper() == 'DEBUG'
+    return True
 
 
 def _app_logger_level_after_silence() -> int:
@@ -195,7 +201,7 @@ def show_grinta_splash(console: Any | None = None) -> None:
         ]
 
     _TAGLINE = 'AI agent. Pure grit.'
-    _HINT    = 'Type /help to explore commands'
+    _HINT = 'Type /help for commands · Ctrl+C interrupts the agent · /quit or exit to leave'
 
     def _body(visible: int, *, tagline: bool = False) -> Group:
         figlet = Text()
@@ -318,8 +324,7 @@ async def _async_main(
     )
     from backend.cli.repl import Repl
     from backend.core.config import load_app_config
-    from backend.core.constants import LOG_TO_FILE
-    from backend.core.logger import configure_file_logging, get_log_dir
+    from backend.core.logger import configure_file_logging
     from backend.persistence.locations import get_project_local_data_root
 
     configure_file_logging()
@@ -332,13 +337,6 @@ async def _async_main(
         term_cols = 120
     console = Console(width=term_cols - 2)
     show_grinta_splash(console)
-    if LOG_TO_FILE:
-        console.print(f'  [dim]Session logs: {get_log_dir()}/app.log[/dim]')
-    else:
-        console.print(
-            '  [dim]File logging off — enable in Grinta repo ``.env`` '
-            '(``LOG_TO_FILE=true`` or ``LOG_LEVEL=DEBUG``)[/dim]'
-        )
     initial_input = _read_piped_stdin()
 
     # -- load config -------------------------------------------------------

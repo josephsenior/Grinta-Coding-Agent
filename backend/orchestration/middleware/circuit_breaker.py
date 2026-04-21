@@ -22,6 +22,10 @@ _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
     'FileWriteObservation',
     'AgentDelegateObservation',
     'LspQueryObservation',
+    # Updating the structured task plan counts as real progress; without
+    # this, long multi-step tasks spent in task_tracker(update) would trip
+    # stuck detection and force the model to call signal_progress defensively.
+    'TaskTrackingObservation',
 )
 
 # Tool fallback map — when a tool fails, suggest the next alternative so the

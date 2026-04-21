@@ -33,7 +33,7 @@ def test_log_to_file_effective_defaults_when_unset() -> None:
 
     with patch.dict(os.environ, {'LOG_LEVEL': 'INFO'}, clear=False):
         os.environ.pop('LOG_TO_FILE', None)
-        assert cli_main._log_to_file_effective() is False
+        assert cli_main._log_to_file_effective() is True
 
     with patch.dict(os.environ, {'LOG_LEVEL': 'DEBUG'}, clear=False):
         os.environ.pop('LOG_TO_FILE', None)
@@ -60,6 +60,15 @@ def test_app_logger_level_after_silence_error_when_no_file() -> None:
         clear=False,
     ):
         assert cli_main._app_logger_level_after_silence() == logging.ERROR
+
+
+def test_app_logger_level_after_silence_respects_log_level_when_file_default() -> None:
+    """Unset LOG_TO_FILE defaults to file logging on; console app level follows LOG_LEVEL."""
+    from backend.cli import main as cli_main
+
+    with patch.dict(os.environ, {'LOG_LEVEL': 'INFO'}, clear=False):
+        os.environ.pop('LOG_TO_FILE', None)
+        assert cli_main._app_logger_level_after_silence() == logging.INFO
 
 
 def test_parse_project_dir_from_argv_short_form(

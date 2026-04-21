@@ -42,3 +42,23 @@ def test_analyze_project_structure_symbols(tmp_path) -> None:
     assert 'class MyClass:' in action.thought
     assert 'def my_func():' in action.thought
     assert 'MY_VAR =' in action.thought
+
+
+def test_analyze_project_structure_file_outline_python(tmp_path) -> None:
+    test_file = tmp_path / 'big.py'
+    test_file.write_text(
+        'class Foo:\n'
+        '    def bar(self, x: int) -> str:\n'
+        '        return str(x)\n\n'
+        'def top() -> None:\n'
+        '    pass\n',
+        encoding='utf-8',
+    )
+    action = build_analyze_project_structure_action({
+        'command': 'file_outline',
+        'path': str(test_file),
+    })
+    assert 'FILE OUTLINE' in action.thought
+    assert 'class Foo' in action.thought
+    assert 'def bar' in action.thought
+    assert 'def top' in action.thought

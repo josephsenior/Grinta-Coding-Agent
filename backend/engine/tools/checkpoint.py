@@ -4,6 +4,12 @@ Persists to ``.app/checkpoints.json``.  The agent can ``save`` a
 checkpoint after completing a logical phase, and ``restore`` to see
 what was done.  This complements the task_tracker by providing a
 durable progress snapshot that survives condensation.
+
+**Roadmap (product):** hybrid checkpoints — implicit pre-risk snapshots before
+large edits/commands plus **manual** ``checkpoint`` for named milestones;
+``revert_to_checkpoint`` remains the coarse undo. Once auto-checkpoint coverage
+is trusted, consider deprecating per-editor ``undo_last_edit`` in favor of this
+unified rollback story.
 """
 
 from __future__ import annotations

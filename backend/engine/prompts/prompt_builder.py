@@ -172,10 +172,55 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
         if lsp_enabled
         else "- `search_code` returns nothing → try alternate search terms, do not fall back to shell."
     )
+    tracker_on = getattr(config, "enable_internal_task_tracker", False)
+    signal_on = getattr(config, "enable_signal_progress", False)
+    if tracker_on:
+        signal_blurb = ""
+        if signal_on:
+            signal_blurb = (
+                "\n\n**signal_progress** is enabled: use it per its tool description for deferral / "
+                "heartbeat-style notes when appropriate. It does not replace accurate `task_tracker` state."
+            )
+        task_tracker_discipline_block = (
+            "<TASK_TRACKING>\n"
+            "**task_tracker** (multi-step work, typically 3+ concrete steps): use `view` to read the plan, "
+            "`update` with the **full** `task_list` when the plan or any step status changes. "
+            "Allowed statuses are only `todo`, `doing`, and `done`—capture blockers in `result` or the step "
+            "description, not by inventing new status values.\n\n"
+            "**You** are the authority on whether a step is `done`; never mark `done` to satisfy a guess "
+            "from the environment (e.g. file-edit counts or generic tool success). Skip the tracker for "
+            "genuinely single-step tasks.\n\n"
+            "**Sync discipline:** after **verify** (your criterion: tests, repro, user confirmation, etc.), "
+            "if the plan should change, update `task_tracker` on the same turn when possible, otherwise "
+            "immediately on the next. Before ending a turn where you materially advanced or hit a blocker, "
+            "check whether the tracker still matches your mental model; sync if not, skip if unchanged.\n\n"
+            "When native multi-tool turns are allowed, **piggyback** a `task_tracker` call with substantive "
+            "tools when you already know the new plan state."
+            f"{signal_blurb}\n"
+            "</TASK_TRACKING>"
+        )
+    else:
+        task_tracker_discipline_block = ""
+
+    base_workflow = (
+        "Default loop: scope → reproduce → isolate → fix → verify.\n"
+        "For debug/fix tasks, re-run the same reproducer when possible."
+    )
+    if tracker_on:
+        problem_solving_workflow_body = (
+            base_workflow
+            + "\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update "
+            "the plan when your beliefs about progress changed."
+        )
+    else:
+        problem_solving_workflow_body = base_workflow
+
     return _load("system_partial_01_autonomy.md").format(
         autonomy_block=autonomy,
+        task_tracker_discipline_block=task_tracker_discipline_block,
         path_discovery_hint=path_hint,
         code_intelligence_fallback=code_intelligence_fallback,
+        problem_solving_workflow_body=problem_solving_workflow_body,
     )
 
 
@@ -231,22 +276,22 @@ def _render_mcp_and_permissions(
 
     if mcp_tool_names:
         total = len(mcp_tool_names)
-        cap = 10
 
         parts.append(
             f'🔌 **External MCP tools** ({total}): use **`call_mcp_tool(tool_name="...", arguments={{...}})`** '
             f"— argument shapes match the registered tool schema."
         )
-        if total <= cap:
-            for name in mcp_tool_names:
-                parts.append(f"- `{name}`: {mcp_tool_descriptions[name]}")
-        else:
-            # Group or just list few core ones
-            parts.append(
-                f"Too many tools to list ({total}). Core ones include: "
-                + ", ".join([f"`{n}`" for n in mcp_tool_names[:cap]])
-                + f" and {total-cap} more."
-            )
+        parts.append(
+            "**Tool-name discipline (critical):** Pass each tool name to "
+            "`call_mcp_tool(tool_name=...)` **exactly as listed below** — the names "
+            "are already flat. Do **not** add `server:`, `server/`, `server.`, "
+            "`server__` or any other prefix; those are not part of the name and "
+            "will fail. If a name you want is not in this list, that tool is "
+            "not available in this session — pick a different tool or an "
+            "alternative approach. Do not guess."
+        )
+        for name in mcp_tool_names:
+            parts.append(f"- `{name}`: {mcp_tool_descriptions[name]}")
 
         if mcp_server_hints:
             parts.append("")
@@ -294,17 +339,33 @@ def _render_mcp_and_permissions(
     communicate_tool_section = (
         "<COMMUNICATE_TOOL>\n"
         "Use `communicate_with_user` to ask for clarification, flag uncertainty, propose options "
-        "before risky actions, or escalate after 3 failed attempts on a sub-task. Do not generate "
-        "free-form questions as plain text mid-task — always go through this tool so the turn ends "
-        "cleanly and waits for user input.\n"
+        "before risky actions, or escalate after 3 failed attempts on a sub-task. On escalation, include a "
+        "**brief post-mortem**: what you tried, what failed, what you ruled out—then a specific question. "
+        "Do not generate free-form questions as plain text mid-task — always go through this tool so the turn "
+        "ends cleanly and waits for user input.\n"
         "</COMMUNICATE_TOOL>"
         if meta_cognition
         else ""
     )
+    lsp_enabled = getattr(config, "enable_lsp_query", False)
+    if lsp_enabled:
+        uncertainty_state_1_discover_line = (
+            "1. **Can be discovered** (unknown file path, unknown API, unknown config shape) → run `search_code`, "
+            "editor `view_*`, `lsp_query`, and other tools from **TOOL_ROUTING_LADDER** as appropriate. "
+            "Do NOT ask the user first."
+        )
+    else:
+        uncertainty_state_1_discover_line = (
+            "1. **Can be discovered** (unknown file path, unknown API, unknown config shape) → run `search_code`, "
+            "editor `view_*`, and other tools from **TOOL_ROUTING_LADDER** "
+            "(`read_symbol_definition`, `explore_tree_structure`, `analyze_project_structure`, etc.)—"
+            "**not** shell search/read for repo files. Do NOT ask the user first."
+        )
     parts.append("")
     parts.append(
         _load("system_partial_03_tail.md").format(
             communicate_tool_section=communicate_tool_section,
+            uncertainty_state_1_discover_line=uncertainty_state_1_discover_line,
         )
     )
 
@@ -403,10 +464,10 @@ def build_system_prompt(
 
     sections = [
         # Identity
-        "You are Grinta, an expert AI coding agent built by Youssef Mejdi."
+        "You are Grinta, an expert AI coding agent built by Youssef Mejdi. "
         "You solve complex technical tasks through methodical reasoning and tool execution.\n\n"
         "**Model identity:** The deployment calls you through an API using the configured "
-        "model id below."
+        "model id below.\n"
         f"Configured model id: `{model_id}`",
     ]
 
@@ -541,7 +602,7 @@ def build_workspace_context(
         if secrets:
             ri_lines.append("<CUSTOM_SECRETS>")
             ri_lines.append(
-                "You are have access to the following environment variables"
+                "You have access to the following environment variables"
             )
             for name, desc in secrets.items():
                 ri_lines.append(f"* $**{name}**: {desc}")

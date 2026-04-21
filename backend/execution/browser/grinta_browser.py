@@ -88,6 +88,125 @@ def _finalize_observation(cmd: str, obs: Observation) -> Observation:
     return obs
 
 
+def _resolve_page_target_id(browser: Any) -> str | None:
+    """Return a target_id guaranteed to be a top-level page/tab.
+
+    ``BrowserSession.take_screenshot`` uses the current ``agent_focus_target_id``
+    with no type check. If focus ever lands on an iframe/worker (can happen
+    after a redirect inside an embedded frame), ``Page.captureScreenshot``
+    silently hangs on Windows instead of erroring. So we mirror the logic in
+    ``ScreenshotWatchdog``: prefer focus when it *is* a page, otherwise fall
+    back to the last known page target.
+    """
+    try:
+        focused = browser.get_focused_target()
+    except Exception as exc:  # noqa: BLE001
+        _browser_trace(f'resolve_page_target: get_focused_target failed ({exc})')
+        focused = None
+    if focused is not None and getattr(focused, 'target_type', None) in ('page', 'tab'):
+        return focused.target_id
+    try:
+        pages = browser.get_page_targets()
+    except Exception as exc:  # noqa: BLE001
+        _browser_trace(f'resolve_page_target: get_page_targets failed ({exc})')
+        pages = []
+    if pages:
+        return pages[-1].target_id
+    return getattr(browser, 'agent_focus_target_id', None)
+
+
+async def _prepare_target_for_screenshot(browser: Any, target_id: str | None) -> Any:
+    """Best-effort fixes applied right before CDP ``Page.captureScreenshot``.
+
+    Two failure modes have been observed in the wild:
+
+    1. A ``window.alert()`` / ``confirm()`` dialog is open on the page.
+       Chrome blocks screenshot capture until the dialog is dismissed.
+       The stock ``PopupsWatchdog`` only attaches on ``TabCreatedEvent``,
+       which our direct-CDP navigate path bypasses — so we dismiss any
+       live dialog here defensively.
+    2. The tab lost foreground (another tool focused a different target).
+       ``Page.bringToFront`` is cheap and restores rendering.
+
+    Returns the CDP session used for the preflight so the caller can reuse
+    it for the actual capture (saves another ``get_or_create_cdp_session``
+    round-trip which itself waits up to 5s on focus validation).
+
+    All errors are swallowed; a missing-dialog response is the normal case
+    and must not make the caller give up on the screenshot.
+    """
+    try:
+        cdp = await asyncio.wait_for(
+            browser.get_or_create_cdp_session(target_id, focus=True),
+            timeout=5.0,
+        )
+    except Exception as exc:  # noqa: BLE001 — best-effort preflight
+        _browser_trace(f'screenshot preflight: no cdp session ({exc})')
+        return None
+
+    async def _safe(coro: Any, label: str, *, timeout: float = 1.0) -> None:
+        try:
+            await asyncio.wait_for(coro, timeout=timeout)
+        except Exception as exc:  # noqa: BLE001
+            _browser_trace(f'screenshot preflight {label}: {type(exc).__name__}')
+
+    await _safe(
+        cdp.cdp_client.send.Page.enable(session_id=cdp.session_id),
+        'Page.enable',
+    )
+    await _safe(
+        cdp.cdp_client.send.Page.bringToFront(session_id=cdp.session_id),
+        'bringToFront',
+    )
+    await _safe(
+        cdp.cdp_client.send.Page.handleJavaScriptDialog(
+            params={'accept': True},
+            session_id=cdp.session_id,
+        ),
+        'handleJavaScriptDialog',
+    )
+    return cdp
+
+
+async def _capture_via_cdp(
+    cdp: Any,
+    *,
+    full_page: bool,
+    jpeg_quality: int,
+    from_surface: bool,
+    timeout_sec: float,
+) -> bytes:
+    """Call ``Page.captureScreenshot`` directly and return PNG/JPEG bytes.
+
+    - ``format='jpeg'`` + ``optimizeForSpeed=True`` is ~3-5x faster than PNG
+      for typical pages and avoids the slow PNG encoder stalls observed on
+      Windows headful Chromium.
+    - ``fromSurface=False`` falls back to window capture instead of the GPU
+      compositor surface. On Windows the compositor path frequently hangs
+      when the tab isn't foregrounded or GPU is under pressure; window
+      capture is simpler and much more reliable.
+    """
+    import base64
+
+    params: dict[str, Any] = {
+        'format': 'jpeg',
+        'quality': jpeg_quality,
+        'captureBeyondViewport': full_page,
+        'optimizeForSpeed': True,
+        'fromSurface': from_surface,
+    }
+    result = await asyncio.wait_for(
+        cdp.cdp_client.send.Page.captureScreenshot(
+            params=params,
+            session_id=cdp.session_id,
+        ),
+        timeout=timeout_sec,
+    )
+    if not result or 'data' not in result:
+        raise RuntimeError('Page.captureScreenshot returned no data.')
+    return base64.b64decode(result['data'])
+
+
 class GrintaNativeBrowser:
     """Thin async wrapper around browser_use.Browser (BrowserSession)."""
 
@@ -279,21 +398,105 @@ class GrintaNativeBrowser:
             if cmd == 'screenshot':
                 b = await self._ensure_session()
                 full_page = bool(params.get('full_page', False))
-                try:
-                    raw = await asyncio.wait_for(
-                        b.take_screenshot(full_page=full_page, format='png'),
-                        timeout=BROWSER_SCREENSHOT_TIMEOUT_SEC,
-                    )
-                except TimeoutError:
+                jpeg_quality = 80
+                # Two attempts share the user-visible budget. The first uses
+                # the default GPU-compositor path (``fromSurface=True``) which
+                # matches Linux's fast path; the second retries with window
+                # capture (``fromSurface=False``) which is the Windows-reliable
+                # path when compositor capture is wedged.
+                primary_budget = max(8.0, BROWSER_SCREENSHOT_TIMEOUT_SEC * 0.55)
+                retry_budget = max(8.0, BROWSER_SCREENSHOT_TIMEOUT_SEC * 0.45)
+
+                t_shot = time.monotonic()
+                target_id = _resolve_page_target_id(b)
+                _browser_trace(
+                    f'screenshot begin target={str(target_id)[:8]} full_page={full_page} '
+                    f'budget={primary_budget:.0f}+{retry_budget:.0f}s'
+                )
+                # Preflight: dismiss any blocking JS dialog and bring the
+                # target to the foreground. Without this, pages that show
+                # ``alert()`` / ``confirm()`` (common in game/demo pages)
+                # freeze captureScreenshot until the dialog is closed.
+                cdp = await _prepare_target_for_screenshot(b, target_id)
+                if cdp is None:
                     return _finalize_observation(
                         cmd,
                         ErrorObservation(
                             content=(
-                                f'ERROR: Screenshot timed out after {BROWSER_SCREENSHOT_TIMEOUT_SEC:.0f}s.'
+                                'ERROR: Browser screenshot could not attach a CDP '
+                                'session to a page target. Run ``browser navigate`` '
+                                'to open/refresh a tab, then retry.'
                             )
                         ),
                     )
-                name = f'browser_{uuid.uuid4().hex[:12]}.png'
+
+                raw: bytes | None = None
+                last_exc: Exception | None = None
+                # Attempt 1: GPU-compositor path (Linux-fast).
+                try:
+                    raw = await _capture_via_cdp(
+                        cdp,
+                        full_page=full_page,
+                        jpeg_quality=jpeg_quality,
+                        from_surface=True,
+                        timeout_sec=primary_budget,
+                    )
+                    _browser_trace(
+                        f'screenshot done via compositor in '
+                        f'{(time.monotonic() - t_shot) * 1000:.0f}ms'
+                    )
+                except (TimeoutError, Exception) as exc:  # noqa: BLE001
+                    last_exc = exc
+                    _browser_trace(
+                        f'screenshot: compositor path failed ({type(exc).__name__}); '
+                        'retrying with fromSurface=False'
+                    )
+                # Attempt 2: window capture (Windows-reliable).
+                if raw is None:
+                    try:
+                        # Re-run preflight in case another dialog opened while we waited.
+                        cdp = await _prepare_target_for_screenshot(b, target_id) or cdp
+                        raw = await _capture_via_cdp(
+                            cdp,
+                            full_page=full_page,
+                            jpeg_quality=jpeg_quality,
+                            from_surface=False,
+                            timeout_sec=retry_budget,
+                        )
+                        _browser_trace(
+                            f'screenshot done via fromSurface=False in '
+                            f'{(time.monotonic() - t_shot) * 1000:.0f}ms'
+                        )
+                    except (TimeoutError, Exception) as exc:  # noqa: BLE001
+                        total = time.monotonic() - t_shot
+                        first = (
+                            type(last_exc).__name__ if last_exc else 'TimeoutError'
+                        )
+                        reason = (
+                            'The browser stayed busy or blocked on the page. '
+                            'Most common causes: a JavaScript alert/confirm/prompt '
+                            'dialog is still open (we tried to auto-dismiss it), '
+                            'a long CSS animation, or the tab lost rendering focus. '
+                            'Try ``browser snapshot`` to probe the DOM, or '
+                            '``browser navigate`` to the same URL to reset.'
+                        )
+                        _browser_trace(
+                            f'screenshot: both paths failed after {total:.1f}s '
+                            f'(primary={first}, retry={type(exc).__name__})'
+                        )
+                        return _finalize_observation(
+                            cmd,
+                            ErrorObservation(
+                                content=(
+                                    f'ERROR: Browser screenshot failed after {total:.0f}s '
+                                    '(tried compositor and window capture). '
+                                    f'First error: {first}. Retry error: '
+                                    f'{type(exc).__name__}. {reason}'
+                                )
+                            ),
+                        )
+
+                name = f'browser_{uuid.uuid4().hex[:12]}.jpg'
                 path = self._downloads / name
                 path.write_bytes(raw)
                 body = f'Screenshot saved to: {path} ({len(raw)} bytes)'

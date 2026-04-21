@@ -230,8 +230,19 @@ def _handle_finish_tool(arguments: dict) -> PlaybookFinishAction:
         outputs['blocked_by'] = arguments['blocked_by']
     if 'next_steps' in arguments:
         outputs['next_steps'] = arguments['next_steps']
-    if 'lessons_learned' in arguments:
-        outputs['lessons_learned'] = arguments['lessons_learned']
+    lessons = arguments.get('lessons_learned')
+    if lessons:
+        outputs['lessons_learned'] = lessons
+        # Persist lessons to the scratchpad so `recall(key="lessons")` in the
+        # next session actually returns something. Without this, the finish
+        # tool's `lessons_learned` field was write-only and died with the turn.
+        try:
+            from backend.engine.tools.note import append_to_note
+
+            append_to_note('lessons', str(lessons))
+        except Exception:
+            # Persistence is best-effort; never block finish on scratchpad I/O.
+            pass
     return PlaybookFinishAction(final_thought=message, outputs=outputs)
 
 
@@ -670,6 +681,9 @@ def _normalize_ast_code_editor_alias(
     return normalized_command, normalized_args
 
 
+_MAX_EDIT_SYMBOLS_PER_BATCH = 25
+
+
 def _handle_edit_symbol_body_command(editor, path: str, arguments: dict) -> Action:
     """Handle edit_symbol_body command."""
     function_name = arguments.get('function_name')
@@ -687,6 +701,94 @@ def _handle_edit_symbol_body_command(editor, path: str, arguments: dict) -> Acti
             path=path, impl_source=FileReadSource.DEFAULT, thought=result.message
         )
     return MessageAction(content=f'❌ Edit failed: {result.message}')
+
+
+def _handle_edit_symbols_command(editor, path: str, arguments: dict) -> Action:
+    """Apply multiple ``edit_symbol_body``-style replacements in one call.
+
+    On any failure after the file was modified, restores the file from a
+    pre-batch snapshot so the workspace does not stay half-refactored.
+    """
+    import os
+
+    raw_edits = arguments.get('edits')
+    if raw_edits is None and arguments.get('symbol_edits') is not None:
+        raw_edits = arguments['symbol_edits']
+    if not isinstance(raw_edits, list) or len(raw_edits) == 0:
+        raise FunctionCallValidationError(
+            "edit_symbols requires a non-empty 'edits' array "
+            "(objects with function_name or symbol, and new_body)"
+        )
+    if len(raw_edits) > _MAX_EDIT_SYMBOLS_PER_BATCH:
+        raise FunctionCallValidationError(
+            f'edit_symbols supports at most {_MAX_EDIT_SYMBOLS_PER_BATCH} edits per call'
+        )
+
+    normalized: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for i, item in enumerate(raw_edits):
+        if not isinstance(item, dict):
+            raise FunctionCallValidationError(f'edit_symbols edits[{i}] must be an object')
+        fn = item.get('function_name') or item.get('symbol')
+        nb = item.get('new_body')
+        if not fn or not isinstance(fn, str):
+            raise FunctionCallValidationError(
+                f'edit_symbols edits[{i}] requires function_name or symbol (non-empty string)'
+            )
+        if not isinstance(nb, str):
+            raise FunctionCallValidationError(
+                f'edit_symbols edits[{i}] requires new_body (string)'
+            )
+        key = fn.strip()
+        if key in seen:
+            raise FunctionCallValidationError(
+                f'edit_symbols: duplicate symbol {key!r} in batch'
+            )
+        seen.add(key)
+        normalized.append((key, nb))
+
+    backup: str | None = None
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding='utf-8') as f:
+                backup = f.read()
+        except OSError as e:
+            return MessageAction(
+                content=f'❌ edit_symbols: could not read {path} for backup: {e}'
+            )
+
+    messages: list[str] = []
+    for idx, (fn, nb) in enumerate(normalized):
+        result = editor.edit_function(path, fn, nb)
+        if not result.success:
+            if backup is not None:
+                try:
+                    with open(path, 'w', encoding='utf-8') as f:
+                        f.write(backup)
+                except OSError as restore_err:
+                    return MessageAction(
+                        content=(
+                            f'❌ edit_symbols failed at step {idx + 1} ({fn}): {result.message}. '
+                            f'Could not restore file: {restore_err}'
+                        )
+                    )
+            return MessageAction(
+                content=(
+                    f'❌ edit_symbols failed at step {idx + 1} ({fn}): {result.message} '
+                    '(file restored to pre-batch state)'
+                    if backup is not None
+                    else f'❌ edit_symbols failed at step {idx + 1} ({fn}): {result.message}'
+                )
+            )
+        messages.append(result.message)
+
+    summary = (
+        f'✓ edit_symbols applied {len(normalized)} replacement(s) in {path}:\n'
+        + '\n'.join(f'  - {m}' for m in messages)
+    )
+    return FileReadAction(
+        path=path, impl_source=FileReadSource.DEFAULT, thought=summary
+    )
 
 
 def _handle_rename_symbol_command(editor, path: str, arguments: dict) -> Action:
@@ -883,6 +985,7 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
     # Command dispatch map — editor-powered commands use the StructureEditor instance
     editor_command_handlers = {
         'edit_symbol_body': _handle_edit_symbol_body_command,
+        'edit_symbols': _handle_edit_symbols_command,
         'rename_symbol': _handle_rename_symbol_command,
         'find_symbol': _handle_find_symbol_command,
         'replace_range': _handle_replace_range_command,

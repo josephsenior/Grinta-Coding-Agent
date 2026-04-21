@@ -21,6 +21,9 @@ _PROVIDER_DEFAULT_URLS: dict[str, str] = {
     'deepseek': 'https://api.deepseek.com/v1',
     'openrouter': 'https://openrouter.ai/api/v1',
     'nvidia': 'https://integrate.api.nvidia.com/v1',
+    # Lightning AI: Grinta routes `llm_provider=lightning` through OpenAIClient
+    # (see get_direct_client) with this OpenAI-compatible root. If the key or
+    # path is wrong, the host may return HTML — see format_html_api_error_response.
     'lightning': 'https://lightning.ai/api/v1',
 }
 

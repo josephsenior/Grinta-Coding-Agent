@@ -271,6 +271,7 @@ def repair_literal_escapes(
 CONTENT_ARG_NAMES: tuple[str, ...] = (
     'file_text',
     'new_str',
+    'new_body',
     'content',
     'new_code',
     'section_content',
@@ -297,4 +298,18 @@ def repair_arguments_in_place(
         if report.changed:
             arguments[name] = report.content
             changes.append((name, report.replacements))
+    for batch_key in ('edits', 'symbol_edits'):
+        batch = arguments.get(batch_key)
+        if not isinstance(batch, list):
+            continue
+        for i, item in enumerate(batch):
+            if not isinstance(item, dict):
+                continue
+            nb = item.get('new_body')
+            if not isinstance(nb, str) or not nb:
+                continue
+            report = repair_literal_escapes(nb, path)
+            if report.changed:
+                item['new_body'] = report.content
+                changes.append((f'{batch_key}[{i}].new_body', report.replacements))
     return changes

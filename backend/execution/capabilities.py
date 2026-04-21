@@ -108,9 +108,8 @@ def detect_capabilities(
 
     # MCP can be supported either via HTTP/SSE servers (cross-platform) or via
     # stdio servers (requires spawning npx/uvx or other commands).
-    # MCP is always enabled; the ActionExecutionServer already filters out
-    # unsupported stdio servers on Windows and wrapper tools (e.g.
-    # mcp_capabilities_status) work without any real MCP servers.
+    # MCP is always enabled; servers that fail to connect are simply excluded
+    # from the tool list (the agent only ever sees live, working tools).
     can_mcp = True
 
     # Collect missing tools for diagnostic logging

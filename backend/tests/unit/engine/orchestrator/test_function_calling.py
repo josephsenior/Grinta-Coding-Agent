@@ -548,6 +548,71 @@ class TestValidateStructureEditorArgs:
             )
 
 
+class TestEditSymbolsBatch:
+    def test_edit_symbols_applies_multiple(self, tmp_path):
+        from backend.engine.function_calling import _handle_ast_code_editor_tool
+
+        py = tmp_path / 'm.py'
+        py.write_text(
+            "def a():\n    return 1\n\ndef b():\n    return 2\n",
+            encoding='utf-8',
+        )
+        result = _handle_ast_code_editor_tool(
+            {
+                'command': 'edit_symbols',
+                'path': str(py),
+                'edits': [
+                    {'function_name': 'a', 'new_body': '    return 10'},
+                    {'symbol': 'b', 'new_body': '    return 20'},
+                ],
+            }
+        )
+        from backend.ledger.action import FileReadAction
+
+        assert isinstance(result, FileReadAction)
+        assert result.thought is not None
+        assert '10' in py.read_text(encoding='utf-8')
+        assert '20' in py.read_text(encoding='utf-8')
+
+    def test_edit_symbols_restores_on_failure(self, tmp_path):
+        from backend.engine.function_calling import _handle_ast_code_editor_tool
+
+        original = "def a():\n    return 1\n\ndef b():\n    return 2\n"
+        py = tmp_path / 'm.py'
+        py.write_text(original, encoding='utf-8')
+        result = _handle_ast_code_editor_tool(
+            {
+                'command': 'edit_symbols',
+                'path': str(py),
+                'edits': [
+                    {'function_name': 'a', 'new_body': '    return 99'},
+                    {'function_name': 'nope_not_a_symbol', 'new_body': '    pass'},
+                ],
+            }
+        )
+        from backend.ledger.action import MessageAction
+
+        assert isinstance(result, MessageAction)
+        assert py.read_text(encoding='utf-8') == original
+
+    def test_edit_symbols_rejects_duplicate_symbols(self, tmp_path):
+        from backend.engine.function_calling import _handle_ast_code_editor_tool
+
+        py = tmp_path / 'm.py'
+        py.write_text("def a():\n    return 1\n", encoding='utf-8')
+        with pytest.raises(FunctionCallValidationError, match='duplicate'):
+            _handle_ast_code_editor_tool(
+                {
+                    'command': 'edit_symbols',
+                    'path': str(py),
+                    'edits': [
+                        {'function_name': 'a', 'new_body': '    return 2'},
+                        {'symbol': 'a', 'new_body': '    return 3'},
+                    ],
+                }
+            )
+
+
 # ---------------------------------------------------------------------------
 # _handle_edit_symbol_body_command (imported directly)
 # ---------------------------------------------------------------------------

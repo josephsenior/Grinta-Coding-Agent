@@ -30,6 +30,8 @@ class HUDState:
     autonomy_level: str = 'balanced'
     #: True when token usage shown in HUD is estimated rather than provider-reported.
     token_usage_estimated: bool = False
+    #: Resolved project/workspace root (absolute path) for CLI status display.
+    workspace_path: str = ''
 
 
 class HUDBar:
@@ -74,6 +76,15 @@ class HUDBar:
         if count == 1:
             return '1 skill'
         return f'{count} skills'
+
+    @staticmethod
+    def ellipsize_path(path: str, max_len: int) -> str:
+        """Shorten *path* for narrow terminals; keep the tail (folder name)."""
+        if max_len < 8 or not path or len(path) <= max_len:
+            return path
+        # Prefer single ellipsis + tail so the leaf directory stays visible.
+        tail = max_len - 1
+        return '…' + path[-tail:]
 
     @staticmethod
     def describe_model(model: str | None) -> tuple[str, str]:
@@ -210,6 +221,7 @@ class HUDBar:
             model_display = model
         else:
             model_display = f'{provider}/{model}'
+        # Compact glyphs: ``MCP·N`` / ``sk·N`` read faster than ``mN`` / ``kN``.
         parts = [
             (
                 model_display,
@@ -220,9 +232,9 @@ class HUDBar:
             (' ', 'grey27'),
             (f'${self.state.cost_usd:.3f}', 'dim'),
             (' ', 'grey27'),
-            (f'm{mcp_short}', 'dim'),
+            (f'MCP·{mcp_short}', 'dim'),
             (' ', 'grey27'),
-            (f'k{sk_short}', 'dim'),
+            (f'sk·{sk_short}', 'dim'),
             (' ', 'grey27'),
             (self._ledger_icon(), self._ledger_style()),
         ]
@@ -287,6 +299,16 @@ class HUDBar:
     def update_autonomy(self, level: str) -> None:
         """Update the autonomy level shown in the branded row."""
         self.state.autonomy_level = level
+
+    def update_workspace(self, root: str | Path | None) -> None:
+        """Set resolved workspace path for footer / Live HUD (empty if unknown)."""
+        if root is None or root == '':
+            self.state.workspace_path = ''
+            return
+        try:
+            self.state.workspace_path = str(Path(root).expanduser().resolve())
+        except (OSError, ValueError):
+            self.state.workspace_path = str(Path(str(root)))
 
     @staticmethod
     def _has_usage_signal(usage: Any) -> bool:

@@ -157,7 +157,11 @@ DEFAULT_AGENT_CONFIRM_ACTIONS = False
 DEFAULT_AGENT_AUTO_RETRY_ON_ERROR = True
 DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
 DEFAULT_AGENT_CMD_ENABLED = True
-DEFAULT_AGENT_THINK_ENABLED = True
+# Frontier models (Claude 3.5/4, GPT-5, Gemini 2.5/3) reason natively; the explicit
+# `think` tool duplicates that reasoning into an externally-visible tool call that
+# burns context without improving accuracy. Off by default; flip to True only for
+# legacy models without native reasoning, or for traceability during evals.
+DEFAULT_AGENT_THINK_ENABLED = False
 DEFAULT_AGENT_FINISH_ENABLED = True
 # Optional LLM-initiated compaction; automatic condensation still runs when needed.
 DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = False
@@ -176,8 +180,9 @@ DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER = 50.0
 DEFAULT_AGENT_MAX_AUTONOMOUS_ITERATIONS = 0
 DEFAULT_AGENT_STUCK_DETECTION_ENABLED = True
 DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS = 0
-DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED = False
-DEFAULT_AGENT_SIGNAL_PROGRESS_ENABLED = False
+# On by default; disable per-deploy via env (AGENT_*) or settings.json agent.* if needed.
+DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED = True
+DEFAULT_AGENT_SIGNAL_PROGRESS_ENABLED = True
 DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED = True
 DEFAULT_AGENT_SYSTEM_PROMPT_FILENAME = 'system_prompt'
 DEFAULT_AGENT_CLI_MODE = True
@@ -252,7 +257,7 @@ ROOT_GID = 0
 # ── Logging & Debug (env-var driven) ────────────────────────────────
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 DEBUG = _parse_bool_env('DEBUG')
-DEBUG_LLM = _parse_bool_env('DEBUG_LLM')
+DEBUG_LLM = _parse_bool_env('DEBUG_LLM', default='true')
 DEBUG_LLM_PROMPT = _parse_bool_env('DEBUG_LLM_PROMPT')
 LOG_JSON = _parse_bool_env('LOG_JSON', default='true')  # Default to JSON for production
 LOG_JSON_LEVEL_KEY = os.getenv('LOG_JSON_LEVEL_KEY', 'level')
@@ -261,7 +266,7 @@ OTEL_LOG_CORRELATION = _parse_bool_env(
     'OTEL_LOG_CORRELATION',
     default=os.getenv('OTEL_ENABLED', 'false'),
 )
-LOG_TO_FILE = _parse_bool_env('LOG_TO_FILE', default=str(LOG_LEVEL == 'DEBUG'))
+LOG_TO_FILE = _parse_bool_env('LOG_TO_FILE', default='true')
 LOG_ALL_EVENTS = _parse_bool_env('LOG_ALL_EVENTS')
 DEBUG_RUNTIME = _parse_bool_env('DEBUG_RUNTIME')
 
@@ -428,7 +433,7 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     # Logging & debug
     'LOG_LEVEL': ('INFO', 'Root log level (DEBUG / INFO / WARNING / ERROR)'),
     'DEBUG': ('false', 'Enable general debug mode'),
-    'DEBUG_LLM': ('false', 'Log raw LLM request/response payloads'),
+    'DEBUG_LLM': ('true', 'Log raw LLM request/response payloads'),
     'DEBUG_LLM_PROMPT': ('false', 'Log full prompt text sent to LLMs'),
     'APP_DEBUG_PROMPT_ROLES': (
         'false',
@@ -447,8 +452,8 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     'OTEL_LOG_CORRELATION': ('<OTEL_ENABLED>', 'Attach OTEL trace/span IDs to logs'),
     'OTEL_ENABLED': ('false', 'Master switch for OpenTelemetry integration'),
     'LOG_TO_FILE': (
-        '<true when LOG_LEVEL is DEBUG else false>',
-        'Append structured logs under repo logs/app.log; set LOG_TO_FILE=true (or use DEBUG) — required for full logs because the CLI keeps the app logger at ERROR when this is off',
+        'true',
+        'Append structured logs under repo logs/app.log; set LOG_TO_FILE=false to disable — when off the CLI keeps the app logger at ERROR on the console',
     ),
     'LOG_ALL_EVENTS': ('True', 'Log every event processed by the event stream'),
     'DEBUG_RUNTIME': ('false', 'Extra runtime container debug output'),

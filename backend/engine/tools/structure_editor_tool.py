@@ -25,6 +25,10 @@ COMMANDS:
     Required: path, function_name, new_body
    Example: Edit function "process_data" in Python/JS/Go/Rust/etc.
 
+1b. `edit_symbols` - Batch: multiple symbol body edits on the **same file** in one call (atomic rollback if any step fails).
+    Required: path, edits (array of { function_name or symbol, new_body }).
+    Use when refactoring several related methods/classes together to save turns and avoid broken intermediate states.
+
 2. `rename_symbol` - Rename a symbol throughout a file
     Required: path, old_name, new_name
    Example: Rename variable "oldName" to "newName" everywhere
@@ -55,7 +59,7 @@ COMMANDS:
     Required: path, new_str, insert_line
     insert_line=0 inserts at the beginning of the file
 
-9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `insert_text`, etc.). Symbol-level commands (`edit_symbol_body`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
+9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `insert_text`, etc.). Symbol-level commands (`edit_symbol_body`, `edit_symbols`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
 
 NOTE:
 - Prefer this tool for structure-aware code edits.
@@ -69,7 +73,7 @@ FEATURES:
 - Whitespace intelligence: Never fails on tabs vs. spaces
 
 BEST PRACTICES:
-1. Use `edit_symbol_body` instead of line-based replacements when possible
+1. Use `edit_symbol_body` or `edit_symbols` instead of line-based replacements when possible
 2. Use `find_symbol` first to verify symbol exists
 3. Trust the auto-indentation - it matches your file's style
 4. For typos, check error messages - they suggest corrections
@@ -77,7 +81,7 @@ BEST PRACTICES:
 
 _SHORT_STRUCTURE_EDITOR_DESCRIPTION = """Structure-aware editor for 40+ languages (Python, JS, TS, Go, Rust, Java, C++, etc.)
 
-Commands: edit_symbol_body, rename_symbol, find_symbol, replace_range, normalize_indent,
+Commands: edit_symbol_body, edit_symbols, rename_symbol, find_symbol, replace_range, normalize_indent,
           create_file, view_file, insert_text, undo_last_edit
 - Edits by symbol name (function/class), not line numbers
 - Auto-indents code to match file style
@@ -113,6 +117,7 @@ def create_structure_editor_tool(
                 'The command to execute',
                 [
                     'edit_symbol_body',
+                    'edit_symbols',
                     'rename_symbol',
                     'find_symbol',
                     'replace_range',
@@ -131,6 +136,32 @@ def create_structure_editor_tool(
             'new_body': {
                 'type': 'string',
                 'description': 'New content for the function (required for edit_symbol_body)',
+            },
+            'edits': {
+                'type': 'array',
+                'description': (
+                    'For edit_symbols only: ordered list of body replacements in this file. '
+                    'Each item: function_name or symbol (e.g. MyClass.method) plus new_body. '
+                    'Max 25 items; duplicate symbols in one batch are not allowed.'
+                ),
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'function_name': {
+                            'type': 'string',
+                            'description': 'Symbol to edit (same rules as edit_symbol_body)',
+                        },
+                        'symbol': {
+                            'type': 'string',
+                            'description': 'Alias for function_name',
+                        },
+                        'new_body': {
+                            'type': 'string',
+                            'description': 'New function/method body text',
+                        },
+                    },
+                    'required': ['new_body'],
+                },
             },
             'old_name': {
                 'type': 'string',

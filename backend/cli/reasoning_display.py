@@ -1,11 +1,10 @@
-"""Live reasoning panel — shows agent thinking step-by-step.
+"""Live reasoning panel — compact *activity* chrome while the agent works.
 
-Designed to be the *primary* signal the user follows while the agent works.
-Kept intentionally minimal:
-
-* one header row: spinner + active action + elapsed/cost on the right,
-* the latest streamed thoughts below (auto-wrapped, never ellipsised),
-* a subtle trailing cursor to signal that tokens are still arriving.
+Thought text is **not** duplicated here: model reasoning streams into this
+object for snapshotting, but :meth:`renderable` shows only the header (spinner
++ current action + elapsed/cost). Committed thoughts are flushed to the main
+transcript via :func:`backend.cli.transcript.format_reasoning_snapshot`, styled
+dim so they read as internal monologue rather than assistant reply.
 
 No duplicate Ctrl+C hint (the fake-prompt bar directly below the panel
 already shows "Agent working… ctrl+c to interrupt"), and no inline
@@ -44,6 +43,22 @@ _PANEL_CHROME_WIDTH = 6
 # Rich spinner in the header already conveys "thinking" — this cursor conveys
 # "tokens are still flowing for this specific thought".
 _STREAM_CURSOR = '▌'
+
+
+def _truncate_action_line(label: str, max_len: int) -> str:
+    """Ellipsis at end of label, preferring a word boundary when there is room."""
+    text = (label or '').strip()
+    if max_len <= 0 or len(text) <= max_len:
+        return text
+    if max_len <= 1:
+        return '…'
+    limit = max_len - 1
+    chunk = text[:limit]
+    if ' ' in chunk:
+        at = chunk.rfind(' ')
+        if at > max(6, limit // 4):
+            chunk = chunk[:at].rstrip()
+    return f'{chunk}…'
 
 
 def _thought_lines_for_display(line: str, max_width: int | None) -> list[str]:
@@ -178,6 +193,17 @@ class ReasoningDisplay:
         """Set cost baseline at the start of a turn."""
         self._cost_at_start = cost_usd
 
+    @staticmethod
+    def live_panel_shows_thought_rows() -> bool:
+        """Whether the Rich Live layout should reserve vertical space for thought lines.
+
+        When ``False`` (default), only the Thinking *header* (spinner + action)
+        appears in the live panel; thought bodies are transcript-only. This
+        avoids duplicating long CoT next to the draft reply and keeps the two
+        streams visually distinct.
+        """
+        return False
+
     # -- rendering ---------------------------------------------------------
 
     def __rich_console__(
@@ -209,7 +235,9 @@ class ReasoningDisplay:
         # Reserve room for the right-side meta + separators when trimming.
         reserved = len(meta_right) + 6 if meta_right else 4
         if max_width and len(action_label) > max(24, max_width - reserved):
-            action_label = f'{action_label[: max(8, max_width - reserved - 1)]}…'
+            action_label = _truncate_action_line(
+                action_label, max(12, max_width - reserved)
+            )
 
         rows: list[Any] = []
 
@@ -224,32 +252,31 @@ class ReasoningDisplay:
         )
         rows.append(header)
 
-        # Wrap every thought line *before* applying the line budget so the
-        # budget counts physical rows (what the terminal renders), not
-        # logical thought lines. This prevents a long unwrapped line from
-        # being mid-truncated by Rich when the panel height is clamped.
-        wrapped_rows: list[str] = []
-        for line in self._thought_lines:
-            wrapped_rows.extend(_thought_lines_for_display(line, max_width))
+        # Thought bodies are intentionally omitted from the live panel — they
+        # are flushed to the transcript (dim) so they are not mistaken for the
+        # assistant reply and do not compete with the draft-reply preview for
+        # vertical space. ``_thought_lines`` are still maintained for
+        # :meth:`snapshot_thoughts` / :meth:`CLIEventRenderer._flush_thinking_block`.
+        if self.live_panel_shows_thought_rows():
+            wrapped_rows: list[str] = []
+            for line in self._thought_lines:
+                wrapped_rows.extend(_thought_lines_for_display(line, max_width))
 
-        clipped = False
-        if max_lines is not None and max_lines >= 0 and len(wrapped_rows) > max_lines:
-            wrapped_rows = wrapped_rows[-max_lines:]
-            clipped = True
+            clipped = False
+            if max_lines is not None and max_lines >= 0 and len(wrapped_rows) > max_lines:
+                wrapped_rows = wrapped_rows[-max_lines:]
+                clipped = True
 
-        # Streaming cursor on the very last row so the user can see the
-        # model is actively generating tokens (vs the spinner which just
-        # says "the turn is busy").
-        if wrapped_rows and self._streaming:
-            wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
+            if wrapped_rows and self._streaming:
+                wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
 
-        for row in wrapped_rows:
-            rows.append(Text(row, style='#a3b5c9'))
+            for row in wrapped_rows:
+                rows.append(Text(row, style='#8b9eb5 dim'))
 
-        if clipped:
-            rows.append(
-                Text('… showing latest thoughts', style='#5d7286 italic')
-            )
+            if clipped:
+                rows.append(
+                    Text('… showing latest thoughts', style='#5d7286 italic')
+                )
 
         return format_callout_panel(
             'Thinking',

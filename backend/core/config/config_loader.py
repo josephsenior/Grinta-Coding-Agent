@@ -245,6 +245,27 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
                 ]
                 cfg.mcp.enabled = True
 
+        # Named agent profiles (`agent.<name>` in settings.json)
+        if 'agent' in data and isinstance(data.get('agent'), dict):
+            allowed_fields = set(AgentConfig.model_fields)
+            for agent_name, raw_updates in data['agent'].items():
+                if not isinstance(agent_name, str) or not isinstance(raw_updates, dict):
+                    continue
+                filtered = {k: v for k, v in raw_updates.items() if k in allowed_fields}
+                if not filtered:
+                    continue
+                try:
+                    base = cfg.get_agent_config(agent_name)
+                    merged = {**base.model_dump(), **filtered}
+                    cfg.agents[agent_name] = AgentConfig.model_validate(merged)
+                except Exception as exc:
+                    logger.app_logger.warning(
+                        'Skipping invalid agent overrides for %r in %s: %s',
+                        agent_name,
+                        json_file,
+                        exc,
+                    )
+
     finally:
         summary.emit()
 

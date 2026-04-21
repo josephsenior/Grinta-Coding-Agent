@@ -34,7 +34,9 @@ from backend.inference.exceptions import (
     RateLimitError,
     ServiceUnavailableError,
     Timeout,
+    format_html_api_error_response,
     is_context_window_error,
+    is_html_api_body,
 )
 from backend.inference.llm_utils import create_pretrained_tokenizer, get_token_count
 from backend.inference.metrics import Metrics
@@ -170,6 +172,13 @@ def _map_provider_exception(exc: Exception, model: str) -> Exception:
     heuristic_mapped = _try_heuristic_exception_mapping(exc, model, exc_str)
     if heuristic_mapped:
         return heuristic_mapped
+
+    raw = str(exc)
+    if is_html_api_body(raw):
+        return APIError(
+            format_html_api_error_response(raw, base_url=None, model=model),
+            model=model,
+        )
 
     return APIError(str(exc), model=model)
 

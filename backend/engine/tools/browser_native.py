@@ -31,7 +31,7 @@ Commands:
 - close: stop the browser session.
 - navigate: load a URL (http/https only). Completes at navigation commit; run snapshot if you need the fully rendered DOM text.
 - snapshot: return an accessibility/DOM text view of the current page (run before click/type to get element indices).
-- screenshot: capture PNG; params: full_page (bool, optional). Saves under workspace downloads and returns the path.
+- screenshot: capture JPEG (fast path, viewport-only by default); params: full_page (bool, optional). Saves under workspace downloads and returns the path.
 - click: params: index (int) — index from the last snapshot.
 - type: params: index (int), text (string), clear (bool, default true).
 

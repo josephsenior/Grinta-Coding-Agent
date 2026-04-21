@@ -153,6 +153,29 @@ def build_note_action(key: str, value: str) -> AgentThinkAction:
     return AgentThinkAction(thought=f'[SCRATCHPAD] Noted [{key}]')
 
 
+def append_to_note(key: str, value: str, max_entries: int = 50) -> None:
+    """Append `value` as a dated entry under `key` (newline-separated log).
+
+    Used for cross-session learning where we want to accumulate entries rather
+    than overwrite. Keeps at most `max_entries` most-recent entries to bound
+    scratchpad growth.
+    """
+    v = (value or '').strip()
+    if not v:
+        return
+    notes, updated = _parse_notes_blob(_read_notes_blob())
+    existing = notes.get(key, '').strip()
+    stamp = time.strftime('%Y-%m-%d %H:%M', time.gmtime())
+    new_entry = f'- [{stamp}] {v}'
+    lines = existing.splitlines() if existing else []
+    lines.append(new_entry)
+    if len(lines) > max_entries:
+        lines = lines[-max_entries:]
+    notes[key] = '\n'.join(lines)
+    updated[key] = time.time()
+    _write_notes_blob(notes, updated)
+
+
 def build_recall_action(key: str) -> AgentThinkAction:
     """Retrieve key (or all keys) from the scratchpad."""
     notes = _load_notes()
@@ -166,17 +189,14 @@ def build_recall_action(key: str) -> AgentThinkAction:
     if key in notes:
         return AgentThinkAction(thought=f'[SCRATCHPAD] [{key}] = {notes[key]!r}')
     if key == 'lessons':
-        # Bootstrap the canonical lessons key once so routing guidance does not
-        # repeatedly trigger not-found recall loops in early turns.
-        notes_with_meta, updated = _parse_notes_blob(_read_notes_blob())
-        notes_with_meta[key] = ''
-        updated[key] = time.time()
-        _write_notes_blob(notes_with_meta, updated)
+        # No lessons persisted yet — return a clear empty-state message without
+        # writing an empty key (finish() will populate it at end-of-session via
+        # append_to_note). This avoids the previous bootstrap hack that masked
+        # the genuine empty state and made `recall` look like a side-effect tool.
         return AgentThinkAction(
             thought=(
-                "[SCRATCHPAD] Initialized ['lessons'] as empty. "
-                'No stored lessons yet; continue the task and avoid recalling '
-                'this key again until you write to it with note.'
+                "[SCRATCHPAD] No lessons stored yet. Do not recall 'lessons' again this "
+                'session; it will be populated by `finish(lessons_learned=...)` for the next run.'
             )
         )
     return AgentThinkAction(
@@ -187,6 +207,7 @@ def build_recall_action(key: str) -> AgentThinkAction:
 __all__ = [
     '_SCRATCHPAD_META_KEY',
     '_load_notes',
+    'append_to_note',
     'build_note_action',
     'build_recall_action',
     'create_note_tool',

@@ -7,6 +7,7 @@ offering a lightweight and stable alternative to multi-provider abstraction libr
 from __future__ import annotations
 
 import threading
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -14,7 +15,13 @@ from typing import Any, cast
 
 import httpx
 from anthropic import Anthropic, AsyncAnthropic
-from google import genai
+
+# google-genai subclasses aiohttp.ClientSession; aiohttp emits DeprecationWarning
+# while ``_api_client`` is loading. A local catch is reliable regardless of
+# PYTHONWARNINGS / filter registration order.
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore', DeprecationWarning)
+    from google import genai
 from openai import AsyncOpenAI, OpenAI
 
 from backend.cli.tool_call_display import flatten_tool_call_for_history
@@ -440,6 +447,7 @@ class OpenAIClient(DirectLLMClient):
         profile: TransportProfile | None = None,
     ):
         self._model_name = model_name
+        self._api_base_url = base_url
         self._profile = profile or TransportProfile()
         self.client = OpenAI(
             api_key=api_key,
@@ -471,11 +479,34 @@ class OpenAIClient(DirectLLMClient):
             NotFoundError,
             RateLimitError,
             Timeout,
+            format_html_api_error_response,
             is_context_window_error,
+            is_html_api_body,
         )
         from backend.inference.exceptions import (
             APIError as ProviderAPIError,
         )
+
+        raw_msg = str(exc)
+        if is_html_api_body(raw_msg):
+            friendly = format_html_api_error_response(
+                raw_msg,
+                base_url=self._api_base_url,
+                model=self.model_name,
+            )
+            status_code = getattr(exc, 'status_code', None)
+            if status_code in (401, 403):
+                return AuthenticationError(
+                    friendly,
+                    llm_provider='openai',
+                    model=self.model_name,
+                    status_code=status_code,
+                )
+            return BadRequestError(
+                friendly,
+                llm_provider='openai',
+                model=self.model_name,
+            )
 
         if isinstance(exc, (openai.APITimeoutError, httpx.TimeoutException)):
             return Timeout(str(exc), llm_provider='openai', model=self.model_name)

@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+from pathlib import Path
 
 from backend.engine.tools.ignore_filter import (
     get_ignore_spec,
@@ -33,7 +34,8 @@ def create_analyze_project_structure_tool() -> dict:
                 "'symbols' (classes, functions, top-level names in a file), "
                 "'recent' (recently modified files in the repo), "
                 "'callers' (find all files that reference a symbol/function), "
-                "'test_coverage' (find test files that cover a given source file). "
+                "'test_coverage' (find test files that cover a given source file), "
+                "'file_outline' (compact signatures for a source file — less context than a full read). "
                 'Use this BEFORE multi-file edits to understand dependencies.'
             ),
             'parameters': {
@@ -45,6 +47,7 @@ def create_analyze_project_structure_tool() -> dict:
                             'tree',
                             'imports',
                             'symbols',
+                            'file_outline',
                             'recent',
                             'callers',
                             'test_coverage',
@@ -54,6 +57,8 @@ def create_analyze_project_structure_tool() -> dict:
                             'tree: directory tree (depth-limited). '
                             'imports: show what a file imports and what imports it. '
                             'symbols: list classes/functions/top-level names in a file. '
+                            'file_outline: AST signatures only (Python) or line-based heads (fallback) — '
+                            'for large files before view_file. '
                             'recent: git log of recently modified files. '
                             'callers: find all files referencing a given symbol name. '
                             'test_coverage: find test files that likely test a given source file. '
@@ -64,7 +69,7 @@ def create_analyze_project_structure_tool() -> dict:
                         'type': 'string',
                         'description': (
                             "For 'tree': root directory to scan (default '.'). "
-                            "For 'imports'/'symbols'/'test_coverage': path to the file to analyze."
+                            "For 'imports'/'symbols'/'file_outline'/'test_coverage': path to the file to analyze."
                         ),
                         'default': '.',
                     },
@@ -102,6 +107,8 @@ def build_analyze_project_structure_action(
         return _build_imports_action(path)
     if command == 'symbols':
         return _build_symbols_action(path)
+    if command == 'file_outline':
+        return _build_file_outline_action(path)
     if command == 'recent':
         return _build_recent_action()
     if command == 'callers':
@@ -119,7 +126,10 @@ def build_analyze_project_structure_action(
             )
         return _build_semantic_search_action(symbol, path)
     return AgentThinkAction(
-        thought=f'[ANALYZE_PROJECT_STRUCTURE] Unknown command: {command}. Use tree/imports/symbols/recent/callers/test_coverage.'
+        thought=(
+            f'[ANALYZE_PROJECT_STRUCTURE] Unknown command: {command}. '
+            'Use tree/imports/symbols/file_outline/recent/callers/test_coverage/semantic_search.'
+        )
     )
 
 def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
@@ -352,6 +362,100 @@ def _build_imports_action(path: str) -> AgentThinkAction:
             out.append('(no reverse imports found)')
 
     return AgentThinkAction(thought='\n'.join(out))
+
+def _build_file_outline_action(path: str) -> AgentThinkAction:
+    """Compact API-style outline: Python AST signatures, else line-based heads."""
+    base = os.path.basename(path)
+    out: list[str] = [f'=== FILE OUTLINE: {base} ===']
+    if not os.path.isfile(path):
+        out.append('(file not found)')
+        return AgentThinkAction(thought='\n'.join(out))
+
+    if path.endswith('.py'):
+        import ast
+
+        try:
+            src = Path(path).read_text(encoding='utf-8', errors='ignore')
+            tree = ast.parse(src)
+        except (OSError, SyntaxError, ValueError) as e:
+            out.append(f'(could not parse Python AST: {e}; falling back to line heads)')
+            return AgentThinkAction(
+                thought='\n'.join(out + _file_outline_fallback_lines(path))
+            )
+
+        def fmt_func(node: ast.FunctionDef | ast.AsyncFunctionDef, indent: str) -> str:
+            pref = 'async def' if isinstance(node, ast.AsyncFunctionDef) else 'def'
+            try:
+                args_s = ast.unparse(node.args)
+            except Exception:
+                args_s = '(...)'
+            ret = ''
+            if node.returns is not None:
+                try:
+                    ret = ' -> ' + ast.unparse(node.returns)
+                except Exception:
+                    ret = ' -> ...'
+            return f'{indent}{pref} {node.name}{args_s}{ret}'
+
+        count = 0
+        max_lines = 200
+        for node in tree.body:
+            if count >= max_lines:
+                out.append('… (truncated)')
+                break
+            if isinstance(node, ast.ClassDef):
+                out.append(f'class {node.name}')
+                count += 1
+                for item in node.body:
+                    if count >= max_lines:
+                        break
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        if item.name.startswith('__') and item.name not in (
+                            '__init__',
+                            '__new__',
+                        ):
+                            continue
+                        out.append(fmt_func(item, '  '))
+                        count += 1
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if not node.name.startswith('_'):
+                    out.append(fmt_func(node, ''))
+                    count += 1
+            elif isinstance(node, ast.Assign):
+                for t in node.targets:
+                    if isinstance(t, ast.Name) and not t.id.startswith('_'):
+                        try:
+                            out.append(f'{t.id} = …')
+                        except Exception:
+                            out.append('(assignment)')
+                        count += 1
+                        break
+        if len(out) <= 1:
+            out.append('(no outline entries)')
+        return AgentThinkAction(thought='\n'.join(out))
+
+    out.extend(_file_outline_fallback_lines(path))
+    return AgentThinkAction(thought='\n'.join(out))
+
+
+def _file_outline_fallback_lines(path: str) -> list[str]:
+    """Non-Python: first line of each plausible definition (regex), capped."""
+    sym_re = re.compile(r'^(class |def |async def |[A-Z_][A-Z_0-9]* *=)')
+    lines_out: list[str] = []
+    try:
+        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+            for i, line in enumerate(f, 1):
+                if sym_re.match(line):
+                    lines_out.append(f'{i}:{line.rstrip()}')
+                    if len(lines_out) >= 80:
+                        lines_out.append('… (truncated)')
+                        break
+    except OSError as e:
+        return [f'(error reading file: {e})']
+    if not lines_out:
+        lines_out.append('(no outline heads found — use symbols or view_file)')
+    return lines_out
+
 
 def _build_symbols_action(path: str) -> AgentThinkAction:
     """List classes, functions, and top-level assignments in a file."""

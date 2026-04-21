@@ -9,11 +9,15 @@ def create_memory_manager_tool():
     return create_tool_definition(
         name=MEMORY_MANAGER_TOOL_NAME,
         description=(
-            'Manage both structured working memory and long-term narrative memory. '
-            "Use 'semantic_recall' to perform a fuzzy search across indexed conversation memory, "
-            "or 'working_memory' to maintain a structured cognitive workspace "
-            'that survives context condensation (sections: hypothesis, findings, blockers, '
-            'file_context, decisions, plan).'
+            'Session-scoped memory. Two actions:\n'
+            "- 'working_memory': structured cognitive state for the CURRENT session "
+            '(sections: hypothesis, findings, blockers, file_context, decisions, plan). '
+            'Survives context condensation, but NOT session restart.\n'
+            "- 'semantic_recall': fuzzy/vector search across this session's indexed "
+            'conversation history when the visible window no longer shows what you need.\n\n'
+            'Do NOT confuse with `note`/`recall` — those are a FLAT KEY-VALUE '
+            'SCRATCHPAD that persists ACROSS sessions (workspace-level). Rule of thumb: '
+            'short-term + structured → memory_manager; long-term + simple key-value → note/recall.'
         ),
         properties={
             'action': {

@@ -24,6 +24,7 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     "explore_tree_structure": ("", "Explore tree"),
     "read_symbol_definition": ("", "Symbol"),
     "analyze_project_structure": ("", "Analyze project"),
+    "apply_patch": ("", "Apply patch"),
     "verify_file_lines": ("", "Verify lines"),
     "browser": ("", "Browser"),
     "delegate_task": ("", "Delegate"),
@@ -280,6 +281,14 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
     if tn == "analyze_project_structure":
         return "scan workspace"
 
+    if tn == "apply_patch":
+        # The ``patch`` argument is a multi-KB unified-diff blob; we never
+        # want it in the transcript (it's already rendered by the
+        # diff-panel when the edit observation returns). Keep the line
+        # short and stable — char counts would leak irrelevant detail and
+        # make UI diffs noisy on every patch of different size.
+        return "apply patch"
+
     if tn == "verify_file_lines":
         vf_path = args.get("path") or args.get("file")
         if isinstance(vf_path, str):
@@ -336,6 +345,16 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
     if tn == "ast_code_editor":
         ast_path = args.get("path")
         ast_cmd = args.get("command")
+        if ast_cmd == "edit_symbols":
+            edits = args.get("edits") or args.get("symbol_edits") or []
+            n = len(edits) if isinstance(edits, list) else 0
+            bits_sym = [
+                "edit_symbols",
+                str(ast_path) if ast_path else "",
+                f"{n} symbols" if n else "",
+            ]
+            joined = " · ".join(b for b in bits_sym if b)
+            return _trunc(joined, 120) if joined else "AST batch…"
         bits_ast = [str(x) for x in (ast_cmd, ast_path) if x]
         return _trunc(" · ".join(bits_ast), 120) if bits_ast else "AST edit…"
 

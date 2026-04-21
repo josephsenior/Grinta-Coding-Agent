@@ -24,6 +24,7 @@ if sys.platform != 'win32':
     raise WindowsOnlyModuleError('windows_bash.py')
 
 import os
+import re
 import subprocess
 from threading import RLock
 from typing import TYPE_CHECKING
@@ -34,6 +35,24 @@ from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (
     CmdOutputMetadata,
     CmdOutputObservation,
+)
+
+
+# ``Start-Process`` detaches a new process tree from our subprocess. Because
+# the PowerShell host returns as soon as the detach completes, the Popen PID
+# we register with ``TaskCancellationService`` is the (already-exited) shell
+# — not the python / node / whatever child that's actually listening on a
+# port. When the session ends we'd leak that child.
+#
+# We detect bare ``Start-Process`` invocations (word boundary, case-insensitive,
+# skipping occurrences inside quoted strings is not worth the complexity — a
+# false positive just means one extra ``Get-Process`` call) and wrap the whole
+# command in a before/after PID diff. Any newly-appeared PID is reported back
+# via an ASCII sentinel on stdout, which we parse out and register for
+# eventual cleanup.
+_START_PROCESS_RE = re.compile(r'(?i)(?<![A-Za-z0-9_-])Start-Process(?![A-Za-z0-9_-])')
+_SPAWNED_PID_MARKER_RE = re.compile(
+    r'___GRINTA_SPAWNED___([^_]*?)___END___\r?\n?'
 )
 
 if TYPE_CHECKING:
@@ -90,6 +109,69 @@ def _find_powershell_executable() -> str:
 
 
 from backend.execution.utils.unified_shell import BaseShellSession  # noqa: E402
+
+
+def _wrap_command_for_spawn_tracking(command: str) -> str:
+    """Wrap a PowerShell command so newly-spawned PIDs get reported back.
+
+    The wrapper snapshots the set of visible process IDs before the user
+    command runs and again in a ``finally`` block afterwards, emitting the
+    diff on stdout inside a sentinel (``___GRINTA_SPAWNED___<ids>___END___``).
+    Using ``finally`` ensures we still report spawned children when the user
+    command errors — important because a failed ``Start-Process`` invocation
+    can leave partial leftovers.
+
+    We deliberately avoid PowerShell string-escape gymnastics by relying on
+    script-block invocation (``& { ... }``); the user command is embedded
+    literally via a here-string so quotes, backticks, and variable refs in
+    the original command behave exactly as they would if we hadn't wrapped.
+    """
+    # Use a here-string so any quote characters in ``command`` are preserved
+    # without needing escapes. The trailing ``\n'@`` terminator must sit on
+    # its own line per PowerShell syntax.
+    here_string = f"@'\n{command}\n'@"
+    return (
+        '$__grinta_before = @(Get-Process -ErrorAction SilentlyContinue '
+        '| Select-Object -ExpandProperty Id); '
+        'try { '
+        f'Invoke-Expression -Command ({here_string}) '
+        '} finally { '
+        '$__grinta_after = @(Get-Process -ErrorAction SilentlyContinue '
+        '| Select-Object -ExpandProperty Id); '
+        '$__grinta_new = @($__grinta_after '
+        '| Where-Object { $__grinta_before -notcontains $_ }); '
+        'if ($__grinta_new.Count -gt 0) { '
+        "Write-Output ('___GRINTA_SPAWNED___' "
+        "+ ($__grinta_new -join ',') + '___END___') "
+        '} '
+        '}'
+    )
+
+
+def _extract_spawned_pids(stdout: str) -> tuple[str, list[int]]:
+    """Pull the spawn-tracking sentinel out of stdout and return (clean, pids).
+
+    The sentinel is always the *last* line emitted because it comes from the
+    ``finally`` block of :func:`_wrap_command_for_spawn_tracking`. We strip
+    every match — not just the last — to be defensive against nested
+    wrappers or partial user scripts that happen to echo the marker back.
+    """
+    if '___GRINTA_SPAWNED___' not in stdout:
+        return stdout, []
+
+    pids: list[int] = []
+    for match in _SPAWNED_PID_MARKER_RE.finditer(stdout):
+        raw = match.group(1)
+        for chunk in raw.split(','):
+            chunk = chunk.strip()
+            if chunk.isdigit():
+                pids.append(int(chunk))
+
+    cleaned = _SPAWNED_PID_MARKER_RE.sub('', stdout)
+    # The sentinel is emitted by Write-Output which inserts a newline; trim
+    # any trailing blank line the substitution leaves behind so the visible
+    # output looks identical to the unwrapped case.
+    return cleaned.rstrip('\r\n') + ('\n' if stdout.endswith('\n') else ''), pids
 
 
 class WindowsPowershellSession(BaseShellSession):
@@ -168,6 +250,17 @@ class WindowsPowershellSession(BaseShellSession):
         if not os.path.isdir(work_dir):
             work_dir = self.work_dir
 
+        # If the command detaches a process tree via Start-Process, wrap it
+        # so we can register the orphaned children for later cleanup. The
+        # original command is preserved verbatim inside the wrapper so
+        # syntax / variable scoping behave identically.
+        wrapped_for_spawn_tracking = _START_PROCESS_RE.search(command) is not None
+        effective_command = (
+            _wrap_command_for_spawn_tracking(command)
+            if wrapped_for_spawn_tracking
+            else command
+        )
+
         # Build PowerShell command
         # Use -NoProfile for faster startup, -Command to execute
         ps_command = [
@@ -175,7 +268,7 @@ class WindowsPowershellSession(BaseShellSession):
             '-NoProfile',
             '-NonInteractive',
             '-Command',
-            command,
+            effective_command,
         ]
 
         process = None
@@ -214,6 +307,22 @@ class WindowsPowershellSession(BaseShellSession):
                         'Get-Location | Select-Object -ExpandProperty Path',
                     ]
                 )
+
+            if wrapped_for_spawn_tracking:
+                stdout, new_pids = _extract_spawned_pids(stdout)
+                for pid in new_pids:
+                    # Skip the PowerShell host PID we already track via the
+                    # Popen handle — it's about to exit anyway.
+                    if pid == process.pid:
+                        continue
+                    self._cancellation.register_pid(pid)
+                if new_pids:
+                    logger.info(
+                        'Start-Process wrapper registered %d spawned pid(s) '
+                        'for session cleanup: %s',
+                        len(new_pids),
+                        new_pids,
+                    )
 
             return (stdout, stderr, return_code)
         except subprocess.TimeoutExpired:

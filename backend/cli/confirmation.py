@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
@@ -57,21 +58,35 @@ def _file_label(action: Action) -> str:
     return '—'
 
 
+def _confirmation_frame_style(risk_text: str) -> str:
+    if risk_text == 'HIGH':
+        return 'red'
+    if risk_text in {'MEDIUM', 'ASK'}:
+        return 'yellow'
+    if risk_text == 'LOW':
+        return 'green'
+    return 'dim'
+
+
 def render_confirmation(
     console: Console,
     pending_action: Action,
 ) -> bool:
     """Render a confirmation table and return True if the user approves."""
     risk_text, risk_style = _risk_label(pending_action)
+    frame_style = _confirmation_frame_style(risk_text)
 
     table = Table(
-        title='[bold]Action Approval Required[/bold]',
+        show_header=True,
+        header_style='bold dim',
         border_style='dim',
-        show_lines=True,
+        show_lines=False,
+        box=box.SIMPLE,
+        pad_edge=False,
     )
-    table.add_column('File', style='dim')
-    table.add_column('Action', style='default')
-    table.add_column('Risk', justify='center')
+    table.add_column('Target', style='dim', no_wrap=True)
+    table.add_column('What will run', style='default')
+    table.add_column('Risk', justify='center', no_wrap=True)
 
     table.add_row(
         _file_label(pending_action),
@@ -80,22 +95,38 @@ def render_confirmation(
     )
 
     console.print()
-    console.print(table)
+    console.print(
+        Panel(
+            table,
+            title='[bold]Approve this action?[/bold]',
+            title_align='left',
+            border_style=frame_style,
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+    )
 
     # Show the thought / rationale if present
     thought = getattr(pending_action, 'thought', '')
     if thought:
         console.print(
-            Panel(thought, title='Agent Rationale', border_style='dim', padding=(0, 2)),
+            Panel(
+                thought,
+                title='[dim]Why the agent wants this[/dim]',
+                title_align='left',
+                border_style='dim',
+                box=box.ROUNDED,
+                padding=(0, 2),
+            ),
         )
 
     console.print()
     console.print(
-        '[dim]Type [bold]y[/bold] to approve or [bold]n[/bold] to reject.[/dim]'
+        '[dim]Keys: [bold]y[/bold] approve · [bold]n[/bold] reject · [bold]Enter[/bold] confirms the prompt below[/dim]'
     )
     console.print()
     return Confirm.ask(
-        '[bold yellow]Approve this action?[/bold yellow] [dim](y/n)[/dim]',
+        '[bold]Proceed?[/bold] [dim](y/n)[/dim]',
         console=console,
     )
 

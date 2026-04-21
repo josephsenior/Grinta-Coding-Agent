@@ -1,10 +1,10 @@
 <EDITOR_AND_FILE_OPERATIONS>
-**Use editor tools for all file work.** Editors create parent dirs and normalize paths. Do not use shell to read project files.
-Editor `path` arguments are relative to the project root (see runtime working directory) or valid absolute paths on disk.
+(Routing for *which* read/edit tool to pick lives in `TOOL_ROUTING_LADDER` above — this section covers editor-specific mechanics only.)
+
+Editor `path` arguments are relative to the project root (see runtime working directory) or valid absolute paths on disk. Editors create parent dirs and normalize paths automatically.
 {confirm_paths} Edit the path the user gave; no shadow copies (file_v2.py); remove temp files when done.
 
-**CRITICAL READ-BEFORE-EDIT RULE:**
-You MUST explicitly read a file's contents before you edit it. NEVER edit a file blindly or solely from memory. Always run `read_file` or `grep_search` to verify precise line numbers, code structure, and whitespace before applying changes.
+**Read-before-edit (non-negotiable):** always `view_file` / `view_range` the target region before calling a replace/edit mode. After condensation or 5+ prior edits in this session, re-verify the target lines — in-memory line numbers drift. Fresh writes you just made in the same turn do NOT need re-reading.
 
 **Edit vs write vs patch (reliability):**
 - **Surgical edits** = small `old_str` → `new_str` replacements (or `edit_mode` primitives below). This is the primary, safe path.
@@ -12,8 +12,8 @@ You MUST explicitly read a file's contents before you edit it. NEVER edit a file
 - **Full file** = `create_file` / write tools when you are replacing or creating an entire file body — do not paste a whole file into a tiny replace.
 - **Unified diff / `patch` mode** = strict context apply or human-readable diff review — not the default way to mutate code; use it when you need exact hunk context or after previewing a diff.
 
-- **ast_code_editor**: Primary tool for structure-aware code edits (symbols, rename, range replacement, indentation normalization) across 40+ languages.
-- **str_replace_editor**: Primary tool for non-code/document edits and multi-file edits.
+- **ast_code_editor**: **Code specialist**—structure-aware edits (symbols, **`edit_symbols`** for several bodies in one file per call, rename, range replacement, indentation normalization) and efficient **source reads** when you will edit with AST primitives; 40+ languages.
+- **str_replace_editor**: **Document/config specialist**—prose, JSON/YAML/TOML, line- or patch-based edits, and **multi-file** text edits when AST is not the right fit.
   Prefer explicit `edit_mode` for reliability:
   - `format` for JSON/YAML/TOML mutations
   - `section` for anchor-bounded edits
@@ -27,7 +27,7 @@ You MUST explicitly read a file's contents before you edit it. NEVER edit a file
 </EDITOR_AND_FILE_OPERATIONS>
 
 <CODE_QUALITY>
-Minimal comments; High quality modular code; Minimal diff unless asked; explore before large edits; imports at top unless circular logic requires otherwise.
+Minimal comments; High quality modular code;Low cyclomatic complexity; Minimal diff unless asked; explore before large edits; imports at top unless circular logic requires otherwise.
 </CODE_QUALITY>
 
 <ENVIRONMENT_SETUP>
