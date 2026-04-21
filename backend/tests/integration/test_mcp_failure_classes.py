@@ -77,4 +77,10 @@ async def test_mcp_unavailable_tool_error_envelope() -> None:
     payload = json.loads(obs.content)
     assert payload['ok'] is False
     assert payload['error_code'] == 'MCP_TOOL_UNAVAILABLE'
-    assert payload['retryable'] is True
+    # Retrying the same unknown tool name cannot succeed — the agent must
+    # pick a different name from the live tool list, so this isn't retryable.
+    assert payload['retryable'] is False
+    # Error message must guide the agent toward the correct naming rule and
+    # away from the removed ``mcp_capabilities_status`` tool.
+    assert 'mcp_capabilities_status' not in payload['error']
+    assert 'server:' in payload['error']
