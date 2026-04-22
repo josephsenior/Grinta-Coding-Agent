@@ -588,6 +588,50 @@ async def test_terminal_read_applies_resize(mock_executor, tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_terminal_run_uses_simple_incremental_ids(mock_executor, tmp_path) -> None:
+    workspace = tmp_path / 'w'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.session_manager.sessions = {}
+
+    session = MagicMock()
+    session.read_output.return_value = ''
+    mock_executor.session_manager.create_session.return_value = session
+
+    obs1 = await mock_executor.terminal_run(
+        TerminalRunAction(command='echo 1', cwd=str(workspace))
+    )
+    obs2 = await mock_executor.terminal_run(
+        TerminalRunAction(command='echo 2', cwd=str(workspace))
+    )
+
+    assert obs1.__class__.__name__ == 'TerminalObservation'
+    assert obs2.__class__.__name__ == 'TerminalObservation'
+    assert obs1.session_id == 'terminal_1'
+    assert obs2.session_id == 'terminal_2'
+
+
+@pytest.mark.asyncio
+async def test_terminal_read_rejects_nonexistent_session_with_guidance(
+    mock_executor,
+) -> None:
+    mock_executor.session_manager.get_session.return_value = None
+    mock_executor.session_manager.sessions = {
+        'default': MagicMock(),
+        'terminal_1': MagicMock(),
+    }
+
+    obs = await mock_executor.terminal_read(
+        TerminalReadAction(session_id='terminal_session_0')
+    )
+
+    assert isinstance(obs, ErrorObservation)
+    assert "does not exist for action=read" in obs.content
+    assert 'Do not invent IDs like terminal_session_0' in obs.content
+    assert 'terminal_1' in obs.content
+
+
+@pytest.mark.asyncio
 async def test_terminal_run_rejects_invalid_resize_rows(
     mock_executor, tmp_path
 ) -> None:

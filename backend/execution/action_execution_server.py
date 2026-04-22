@@ -182,6 +182,7 @@ class RuntimeExecutor:
         # before the circuit breaker is the only recovery mechanism.
         self._last_cmd_failure_signature: tuple[str, int, str] | None = None
         self._same_cmd_failure_count: int = 0
+        self._terminal_session_seq: int = 0
 
         # MCP clients are created lazily on first use.
         self._mcp_config = mcp_config
@@ -940,11 +941,46 @@ class RuntimeExecutor:
             logger.debug('Terminal resize not applied: %s', exc)
         return None
 
+    def _next_terminal_session_id(self) -> str:
+        """Return a human-friendly unique terminal id for this runtime."""
+        sessions_obj = getattr(self.session_manager, 'sessions', None)
+        existing_ids = set(sessions_obj.keys()) if isinstance(sessions_obj, dict) else set()
+        while True:
+            self._terminal_session_seq += 1
+            candidate = f'terminal_{self._terminal_session_seq}'
+            if candidate not in existing_ids:
+                return candidate
+
+    def _missing_terminal_session_error(
+        self, session_id: str, *, operation: str
+    ) -> ErrorObservation:
+        """Return a clear agent-facing message for nonexistent terminal IDs."""
+        sessions_obj = getattr(self.session_manager, 'sessions', None)
+        active_ids = (
+            sorted(k for k in sessions_obj.keys() if k != 'default')
+            if isinstance(sessions_obj, dict)
+            else []
+        )
+        if active_ids:
+            suggestion = (
+                f"Active session IDs: {', '.join(active_ids[:8])}. "
+                "Use one returned by terminal_manager action=open."
+            )
+        else:
+            suggestion = (
+                'No active terminal sessions exist right now. '
+                'Call terminal_manager with action=open first, then reuse that session_id.'
+            )
+        return ErrorObservation(
+            f"Terminal session '{session_id}' does not exist for action={operation}. "
+            f'Do not invent IDs like terminal_session_0. {suggestion}'
+        )
+
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         """Start a new interactive terminal session."""
         try:
-            # Generate a unique session ID
-            session_id = f'term-{uuid.uuid4().hex[:8]}'
+            # Generate a simple human-friendly session ID.
+            session_id = self._next_terminal_session_id()
 
             # Determine working directory
             # Prefer provided CWD -> default session CWD -> initial CWD
@@ -1014,7 +1050,9 @@ class RuntimeExecutor:
         """Send input to an interactive terminal session."""
         session = self.session_manager.get_session(action.session_id)
         if not session:
-            return ErrorObservation(f'Terminal session {action.session_id} not found.')
+            return self._missing_terminal_session_error(
+                action.session_id, operation='input'
+            )
 
         scope_error = self._validate_interactive_session_scope(
             action.session_id, session
@@ -1060,8 +1098,8 @@ class RuntimeExecutor:
         """Read the output of an interactive terminal session."""
         session = self.session_manager.get_session(action.session_id)
         if not session:
-            return ErrorObservation(
-                f'Terminal session {action.session_id} not found or closed.'
+            return self._missing_terminal_session_error(
+                action.session_id, operation='read'
             )
 
         scope_error = self._validate_interactive_session_scope(
