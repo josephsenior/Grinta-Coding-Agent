@@ -401,21 +401,26 @@ class SessionOrchestrator:
         Note that it's fairly important that this closes properly, otherwise the state is incomplete.
         """
         self._lifecycle = LifecyclePhase.CLOSING
-        if self._step_task is not None and not self._step_task.done():
-            self._step_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._step_task
-        pending_service = self.services.pending_action
-        if pending_service is not None:
-            pending_service.shutdown()
-        if set_stop_state:
-            await self.set_agent_state_to(AgentState.STOPPED)
-        self.state_tracker.close(self.event_stream)
-        self.event_stream.unsubscribe(
-            EventStreamSubscriber.AGENT_CONTROLLER, self.id or ''
-        )
-        await self.services.retry.shutdown()
-        self._lifecycle = LifecyclePhase.CLOSED
+        stream = self.event_stream
+        try:
+            if self._step_task is not None and not self._step_task.done():
+                self._step_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self._step_task
+            pending_service = self.services.pending_action
+            if pending_service is not None:
+                pending_service.shutdown()
+            if set_stop_state:
+                await self.set_agent_state_to(AgentState.STOPPED)
+            self.state_tracker.close(stream)
+            stream.unsubscribe(EventStreamSubscriber.AGENT_CONTROLLER, self.id or '')
+            await self.services.retry.shutdown()
+        finally:
+            # Explicitly close the stream to avoid weakref finalizer warnings:
+            # "EventStream ... was GC'd without close(); resources may leak."
+            with contextlib.suppress(Exception):
+                stream.close()
+            self._lifecycle = LifecyclePhase.CLOSED
 
     def log(self, level: str, message: str, extra: dict | None = None) -> None:
         """Logs a message to the agent controller's logger.
