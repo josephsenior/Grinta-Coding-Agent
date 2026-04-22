@@ -13,7 +13,9 @@ import pytest
 def test_log_to_file_effective_explicit_true() -> None:
     from backend.cli import main as cli_main
 
-    with patch.dict(os.environ, {'LOG_TO_FILE': 'true', 'LOG_LEVEL': 'INFO'}, clear=False):
+    with patch.dict(
+        os.environ, {'LOG_TO_FILE': 'true', 'LOG_LEVEL': 'INFO'}, clear=False
+    ):
         assert cli_main._log_to_file_effective() is True
 
 
@@ -102,6 +104,6 @@ def test_parse_project_dir_from_argv_equals(
 
     proj = tmp_path / 'eqproj'
     proj.mkdir()
-    monkeypatch.setattr(sys, 'argv', [f'grinta', f'--project={proj}'])
+    monkeypatch.setattr(sys, 'argv', ['grinta', f'--project={proj}'])
     got = cli_main._parse_project_dir_from_argv()
     assert got == proj.resolve()

@@ -52,7 +52,9 @@ class PlaybookFinishAction(Action):
         if isinstance(completed, list):
             items = [str(item).strip() for item in completed if str(item).strip()]
             if items:
-                sections.append('Completed:\n' + '\n'.join(f'- {item}' for item in items))
+                sections.append(
+                    'Completed:\n' + '\n'.join(f'- {item}' for item in items)
+                )
 
         blocked_by = str(self.outputs.get('blocked_by', '') or '').strip()
         if blocked_by:
@@ -62,7 +64,9 @@ class PlaybookFinishAction(Action):
         if isinstance(next_steps, list):
             items = [str(item).strip() for item in next_steps if str(item).strip()]
             if items:
-                sections.append('Next steps:\n' + '\n'.join(f'- {item}' for item in items))
+                sections.append(
+                    'Next steps:\n' + '\n'.join(f'- {item}' for item in items)
+                )
 
         return sections
 
@@ -421,4 +425,3 @@ class BlackboardAction(Action):
         if self.command == 'keys':
             return 'Blackboard keys'
         return f'Blackboard get {self.key or "all"}'
-

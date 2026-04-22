@@ -104,7 +104,9 @@ class TestValidateStatusCallbacks:
         runtime = MagicMock(spec=[])
         controller = MagicMock(spec=[])
 
-        with patch('backend.core.bootstrap.agent_control_loop.logger.warning') as warning:
+        with patch(
+            'backend.core.bootstrap.agent_control_loop.logger.warning'
+        ) as warning:
             _validate_status_callbacks(runtime, controller)
 
         warning.assert_not_called()
@@ -115,7 +117,9 @@ class TestValidateStatusCallbacks:
         controller = MagicMock()
         controller.status_callback = lambda *args: None
 
-        with patch('backend.core.bootstrap.agent_control_loop.logger.warning') as warning:
+        with patch(
+            'backend.core.bootstrap.agent_control_loop.logger.warning'
+        ) as warning:
             _validate_status_callbacks(runtime, controller)
 
         assert warning.call_count == 2
@@ -142,7 +146,9 @@ class TestRunAgentUntilDone:
         'backend.core.bootstrap.agent_control_loop.asyncio.sleep',
         new_callable=AsyncMock,
     )
-    async def test_sets_callbacks_and_exits_when_already_terminal(self, mock_sleep) -> None:
+    async def test_sets_callbacks_and_exits_when_already_terminal(
+        self, mock_sleep
+    ) -> None:
         controller = MagicMock()
         controller.state.agent_state = AgentState.FINISHED
         runtime = MagicMock()
@@ -185,7 +191,9 @@ class TestRunAgentUntilDone:
         'backend.core.bootstrap.agent_control_loop.asyncio.sleep',
         new_callable=AsyncMock,
     )
-    async def test_initial_step_failure_is_logged_but_not_raised(self, mock_sleep) -> None:
+    async def test_initial_step_failure_is_logged_but_not_raised(
+        self, mock_sleep
+    ) -> None:
         controller = MagicMock()
         controller.state.agent_state = AgentState.RUNNING
         controller.step.side_effect = Exception('initial failure')

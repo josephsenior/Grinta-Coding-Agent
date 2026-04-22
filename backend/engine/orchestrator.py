@@ -32,6 +32,7 @@ from backend.core.errors import (
 )
 from backend.core.logger import app_logger as logger
 from backend.engine import message_serializer
+from backend.engine import prompt_role_debug as _prompt_role_debug
 from backend.engine.common import (
     FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
 )
@@ -44,7 +45,6 @@ from backend.engine.contracts import (
     PlannerProtocol,
     SafetyManagerProtocol,
 )
-from backend.engine import prompt_role_debug as _prompt_role_debug
 from backend.engine.executor import OrchestratorExecutor
 from backend.engine.memory_manager import ContextMemoryManager
 from backend.engine.planner import OrchestratorPlanner

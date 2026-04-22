@@ -34,6 +34,8 @@ def parse_tool_arguments_object(raw: str) -> dict[str, Any]:
 
     parsed: Any = json.loads(repaired_str)
     if not isinstance(parsed, dict):
-        msg = f'tool arguments must decode to a JSON object, got {type(parsed).__name__}'
+        msg = (
+            f'tool arguments must decode to a JSON object, got {type(parsed).__name__}'
+        )
         raise TypeError(msg)
     return parsed

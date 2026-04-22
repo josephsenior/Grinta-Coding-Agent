@@ -156,9 +156,7 @@ def create_runtime(
     """
     if event_stream is None:
         session_id = sid or generate_sid(config)
-        file_store = get_file_store(
-            config.file_store, get_local_data_root(config)
-        )
+        file_store = get_file_store(config.file_store, get_local_data_root(config))
         # worker_count=0 enables inline delivery: no thread pool, no races.
         event_stream = EventStream(
             session_id,

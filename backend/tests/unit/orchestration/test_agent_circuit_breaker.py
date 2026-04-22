@@ -598,9 +598,13 @@ class TestStrReplaceEditorTaxonomy:
             max_stuck_detections=100,
         )
         breaker = CircuitBreaker(config)
-        breaker.record_error(RuntimeError('no match'), tool_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        breaker.record_error(
+            RuntimeError('no match'), tool_name=STR_REPLACE_EDITOR_TOOL_NAME
+        )
         assert breaker.check(MagicMock()).tripped is False
-        breaker.record_error(RuntimeError('no match'), tool_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        breaker.record_error(
+            RuntimeError('no match'), tool_name=STR_REPLACE_EDITOR_TOOL_NAME
+        )
         result = breaker.check(MagicMock())
         assert result.tripped is True
         assert result.action == 'switch_context'

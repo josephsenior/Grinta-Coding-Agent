@@ -425,15 +425,20 @@ def _validate_connection(model: str, api_key: str, base_url: str | None) -> None
     try:
         with Live(spinner, console=_console, transient=True):
             import asyncio
+
             result = asyncio.run(_test_llm_call(model, api_key, base_url))
 
         if result is True:
             _console.print('  [green]✓[/green] Connection verified')
         elif isinstance(result, str):
             _console.print(f'  [yellow]⚠[/yellow] [dim]{result}[/dim]')
-            _console.print('  [dim]Settings saved anyway — you can fix this in /settings[/dim]')
+            _console.print(
+                '  [dim]Settings saved anyway — you can fix this in /settings[/dim]'
+            )
     except Exception:
-        _console.print('  [dim]⚠ Could not verify (will try when you send a message)[/dim]')
+        _console.print(
+            '  [dim]⚠ Could not verify (will try when you send a message)[/dim]'
+        )
 
 
 async def _test_llm_call(model: str, api_key: str, base_url: str | None) -> bool | str:
@@ -472,7 +477,9 @@ async def _test_llm_call(model: str, api_key: str, base_url: str | None) -> bool
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(f'{url}/chat/completions', json=body, headers=headers)
+            resp = await client.post(
+                f'{url}/chat/completions', json=body, headers=headers
+            )
             if resp.status_code == 200:
                 return True
             elif resp.status_code == 401:
@@ -569,7 +576,9 @@ def get_masked_api_key(config: AppConfig) -> str:
         return '(not set)'
 
 
-def update_model(model: str, provider: str | None = None, base_url: str | None = None) -> None:
+def update_model(
+    model: str, provider: str | None = None, base_url: str | None = None
+) -> None:
     settings = _load_raw_settings()
     settings['llm_model'] = model
     if provider:

@@ -56,8 +56,7 @@ class TaskTracker:
 
         try:
             return [
-                normalize_plan_step_payload(task, i + 1)
-                for i, task in enumerate(data)
+                normalize_plan_step_payload(task, i + 1) for i, task in enumerate(data)
             ]
         except TypeError:
             return []
@@ -67,8 +66,7 @@ class TaskTracker:
         from backend.orchestration.state.state import normalize_plan_step_payload
 
         normalized = [
-            normalize_plan_step_payload(task, i + 1)
-            for i, task in enumerate(task_list)
+            normalize_plan_step_payload(task, i + 1) for i, task in enumerate(task_list)
         ]
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.path, 'w', encoding='utf-8') as f:

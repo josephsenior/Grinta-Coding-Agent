@@ -1,4 +1,4 @@
-"""Detect and repair literal-escape residue in LLM-authored file content.
+r"""Detect and repair literal-escape residue in LLM-authored file content.
 
 Problem this solves
 -------------------
@@ -9,7 +9,7 @@ editor is::
 
     <div class=\"foo\">\n  hi
 
-(two-character sequences ``\` + `"`` and ``\` + `n``). If we write that
+(two-character sequences ``\\` + `"`` and ``\\` + `n``). If we write that
 verbatim to ``index.html`` the browser gets invalid markup and tree-sitter
 rejects it.
 
@@ -43,7 +43,6 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-
 
 # Markup / data files where literal ``\n`` / ``\"`` / ``\t`` pairs are NEVER
 # legal source text. For these we always repair on sight (no ratio check) —
@@ -160,8 +159,10 @@ _LITERAL_ESCAPE_RE = re.compile(r'(?<!\\)\\([ntr"\'])')
 _STRICT_DOUBLE_ESCAPE_RE = re.compile(r'\\\\([ntr"\'])')
 
 
-def has_literal_escape_residue(content: str, path: str | os.PathLike[str] | None) -> bool:
-    """Return True when ``content`` looks like it came out of a double-escape.
+def has_literal_escape_residue(
+    content: str, path: str | os.PathLike[str] | None
+) -> bool:
+    r"""Return True when ``content`` looks like it came out of a double-escape.
 
     Two policies depending on file type:
 
@@ -217,7 +218,7 @@ def has_literal_escape_residue(content: str, path: str | os.PathLike[str] | None
 def repair_literal_escapes(
     content: str, path: str | os.PathLike[str] | None
 ) -> RepairReport:
-    """Repair over-escaped content when residue is detected.
+    r"""Repair over-escaped content when residue is detected.
 
     Returns a ``RepairReport`` describing what happened. The ``content`` field
     always holds the version to write to disk — equal to the input when no

@@ -72,7 +72,10 @@ def _map_api_status_error(exc: Exception, model: str, provider: str) -> Exceptio
             status_code=status,
         )
     return APIError(
-        _safe_exception_text(exc), model=model, llm_provider=provider, status_code=status
+        _safe_exception_text(exc),
+        model=model,
+        llm_provider=provider,
+        status_code=status,
     )
 
 
@@ -100,7 +103,9 @@ def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
         ]
         for sdk_cls, our_cls, prov in simple_map:
             if isinstance(exc, sdk_cls):
-                return our_cls(_safe_exception_text(exc), model=model, llm_provider=prov)
+                return our_cls(
+                    _safe_exception_text(exc), model=model, llm_provider=prov
+                )
 
         if isinstance(exc, _oai.BadRequestError):
             return _map_bad_request_with_context_check(exc, model, 'openai')
@@ -125,7 +130,9 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
         ]
         for sdk_cls, our_cls, prov in simple_map:
             if isinstance(exc, sdk_cls):
-                return our_cls(_safe_exception_text(exc), model=model, llm_provider=prov)
+                return our_cls(
+                    _safe_exception_text(exc), model=model, llm_provider=prov
+                )
 
         if isinstance(exc, _anth.BadRequestError):
             return _map_bad_request_with_context_check(exc, model, 'anthropic')
@@ -147,7 +154,9 @@ def _try_google_exception_mapping(
             _safe_exception_text(exc), model=model, llm_provider='google'
         )
     if 'quota' in exc_str or 'rate' in exc_str:
-        return RateLimitError(_safe_exception_text(exc), model=model, llm_provider='google')
+        return RateLimitError(
+            _safe_exception_text(exc), model=model, llm_provider='google'
+        )
     return APIError(_safe_exception_text(exc), model=model, llm_provider='google')
 
 

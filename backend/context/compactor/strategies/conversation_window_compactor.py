@@ -53,9 +53,7 @@ class ConversationWindowCompactor(RollingCompactor):
 
         # --- collect file-action ids for paired-observation protection ---
         file_action_ids: set[int] = {
-            ev.id
-            for ev in events
-            if isinstance(ev, (FileWriteAction, FileEditAction))
+            ev.id for ev in events if isinstance(ev, (FileWriteAction, FileEditAction))
         }
 
         # --- build the protected set (must survive pruning) ---

@@ -160,7 +160,10 @@ class TestVectorStoreWarmup:
                 'backend.context.local_vector_store.ChromaDBBackend',
                 return_value=fake_backend,
             ),
-            patch('backend.context.vector_store.SQLiteBM25Backend', return_value=MagicMock()),
+            patch(
+                'backend.context.vector_store.SQLiteBM25Backend',
+                return_value=MagicMock(),
+            ),
         ):
             store = EnhancedVectorStore(collection_name='demo')
 

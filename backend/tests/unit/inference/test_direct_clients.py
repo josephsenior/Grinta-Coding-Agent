@@ -119,7 +119,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_openai_default(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('gpt-4o', api_key='sk-test')
@@ -155,7 +156,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_lightning_routing_strips_provider_prefix(self, _h, _ah, _oai, _aoai):
         client = get_direct_client(
@@ -172,7 +174,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_xai_grok_routing(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('xai/grok-3', api_key='key')
@@ -185,7 +188,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_grok_routing(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('grok-3-mini', api_key='key')
@@ -198,7 +202,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_ollama_routing_strips_prefix(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('ollama/llama3.2', api_key='')
@@ -212,7 +217,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_ollama_defaults_base_url(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('ollama/codestral', api_key='')
@@ -225,7 +231,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_ollama_custom_base_url_respected(self, _h, _ah, _oai, _aoai):
         client = get_direct_client(
@@ -242,7 +249,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_ollama_without_prefix(self, _h, _ah, _oai, _aoai):
         """Ambiguous local-looking names no longer route without an explicit prefix."""
@@ -256,7 +264,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_unknown_model_defaults_to_openai(self, _h, _ah, _oai, _aoai):
         with pytest.raises(ValueError, match='Provider is ambiguous'):
@@ -269,7 +278,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_explicit_custom_openai_model_routes(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('openai/my-custom-model', api_key='key')
@@ -282,7 +292,8 @@ class TestGetDirectClientRouting:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_custom_base_url_passthrough(self, _h, _ah, _oai, _aoai):
         client = get_direct_client(
@@ -304,7 +315,8 @@ class TestDirectLLMClientModelName:
         return_value=MagicMock(),
     )
     @patch(
-        'backend.inference.direct_clients.get_shared_http_client', return_value=MagicMock()
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
     )
     def test_model_name_set(self, _h, _ah, _oai, _aoai):
         client = get_direct_client('gpt-4o', api_key='k')

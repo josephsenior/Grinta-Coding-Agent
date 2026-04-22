@@ -40,8 +40,6 @@ Tool result line syntax is shared via :mod:`backend.inference.tool_result_format
 
 import copy
 import json
-
-from backend.core.tool_arguments_json import parse_tool_arguments_object
 import re
 from collections.abc import Iterable
 from threading import Lock
@@ -51,6 +49,7 @@ from backend.core.errors import (
     FunctionCallConversionError,
     FunctionCallValidationError,
 )
+from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_names import (
     FINISH_TOOL_NAME,
     LLM_BASED_EDIT_TOOL_NAME,
@@ -390,7 +389,9 @@ def _parse_tool_call_arguments(tool_call: dict) -> dict:
         return parse_tool_arguments_object(raw)
     except (KeyError, TypeError, ValueError) as e:
         raw = tool_call.get('function', {}).get('arguments', '')
-        preview = raw if isinstance(raw, str) and len(raw) <= 240 else f'{str(raw)[:237]}...'
+        preview = (
+            raw if isinstance(raw, str) and len(raw) <= 240 else f'{str(raw)[:237]}...'
+        )
         msg = f'Failed to parse arguments as JSON: {e}. Arguments: {preview}'
         raise FunctionCallConversionError(
             msg,

@@ -1,4 +1,5 @@
-import sys, re
+import re
+import sys
 
 f = 'backend/execution/utils/file_editor.py'
 text = open(f, encoding='utf-8').read()
@@ -36,13 +37,23 @@ new_block = '''def _apply_str_replace(
             else:
                 new_content = tolerant'''
 
-text2 = re.sub(r'def _apply_str_replace\(.*?\) -> str \| ToolResult:.*?new_content = fuzzy_result', new_block, text, flags=re.DOTALL)
+text2 = re.sub(
+    r'def _apply_str_replace\(.*?\) -> str \| ToolResult:.*?new_content = fuzzy_result',
+    new_block,
+    text,
+    flags=re.DOTALL,
+)
 if text == text2:
     print('NOTHING REPLACED')
     sys.exit(1)
 
 # we also need to remove _resolve_match_mode
-text2 = re.sub(r'\s*@staticmethod\s*def _resolve_match_mode\(.*?\)\s*-> str:.*?return \'normalize_ws\' if normalize_ws is not False else \'exact\'', '', text2, flags=re.DOTALL)
+text2 = re.sub(
+    r'\s*@staticmethod\s*def _resolve_match_mode\(.*?\)\s*-> str:.*?return \'normalize_ws\' if normalize_ws is not False else \'exact\'',
+    '',
+    text2,
+    flags=re.DOTALL,
+)
 
 open(f, 'w', encoding='utf-8').write(text2)
-print("SUCCESS!")
+print('SUCCESS!')

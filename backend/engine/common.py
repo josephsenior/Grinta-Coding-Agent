@@ -16,7 +16,9 @@ from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_types import make_function_chunk, make_tool_param
 from backend.ledger.action import Action
 
-_THINK_TAG_RE = re.compile(r'<redacted_thinking>.*?</redacted_thinking>', re.DOTALL | re.IGNORECASE)
+_THINK_TAG_RE = re.compile(
+    r'<redacted_thinking>.*?</redacted_thinking>', re.DOTALL | re.IGNORECASE
+)
 
 _THINK_INNER_RE = re.compile(
     r'<redacted_thinking>\s*(.*?)\s*</redacted_thinking>',
@@ -43,6 +45,7 @@ def strip_thinking_tags(text: str) -> str:
     """
     stripped = _THINK_TAG_RE.sub('', text)
     return re.sub(r'\n{3,}', '\n\n', stripped).strip()
+
 
 if TYPE_CHECKING:
     from backend.engine.contracts import ChatCompletionToolParam
@@ -177,8 +180,10 @@ def _coerce_message_content_text(content: Any) -> str:
     return strip_thinking_tags(_raw_message_content_text(content))
 
 
-def _canonicalize_tool_call_arguments(tool_call: Any, arguments: dict[str, Any]) -> None:
-    """Overwrite ``tool_call.function.arguments`` with canonical JSON.
+def _canonicalize_tool_call_arguments(
+    tool_call: Any, arguments: dict[str, Any]
+) -> None:
+    r"""Overwrite ``tool_call.function.arguments`` with canonical JSON.
 
     The raw wire-format string the LLM emitted can contain malformed escape
     sequences (e.g. ``\\y`` or an unterminated ``\\``) that are tolerated by
@@ -276,7 +281,9 @@ def common_response_to_actions(
     else:
         content = getattr(assistant_msg, 'content', None)
         text_content = _coerce_message_content_text(content)
-        cot = extract_redacted_thinking_inner(_raw_message_content_text(content)).strip()
+        cot = extract_redacted_thinking_inner(
+            _raw_message_content_text(content)
+        ).strip()
         from backend.ledger.action import MessageAction
 
         actions = [

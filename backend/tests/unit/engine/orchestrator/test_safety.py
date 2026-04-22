@@ -9,7 +9,11 @@ def test_safety_blocks_explicit_file_claim_in_plain_message():
 
     proceed, actions = safety.apply(
         "I've created grinta_feedback.md with the full write-up.",
-        [MessageAction(content="I've created grinta_feedback.md with the full write-up.")],
+        [
+            MessageAction(
+                content="I've created grinta_feedback.md with the full write-up."
+            )
+        ],
     )
 
     assert proceed is True
@@ -51,7 +55,9 @@ def test_safety_allows_structured_non_runnable_actions():
         "I've prepared two approaches for your feedback.",
         [
             ProposalAction(
-                options=[{'approach': 'Summarize tradeoffs directly', 'pros': [], 'cons': []}],
+                options=[
+                    {'approach': 'Summarize tradeoffs directly', 'pros': [], 'cons': []}
+                ],
                 rationale='Two approaches are available.',
             )
         ],

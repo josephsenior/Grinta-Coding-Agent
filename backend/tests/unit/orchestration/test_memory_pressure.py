@@ -177,6 +177,7 @@ class TestMemoryPressureMonitor:
         monitor._process = mock_process
 
         import time
+
         monitor._last_check = time.monotonic() - 100
 
         rss1 = monitor._sample_rss()
@@ -203,6 +204,7 @@ class TestMemoryPressureMonitor:
         assert rss1 == 500.0
 
         import time
+
         time.sleep(0.02)
 
         rss2 = monitor._sample_rss()

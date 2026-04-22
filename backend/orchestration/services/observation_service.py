@@ -14,7 +14,9 @@ from backend.orchestration.state.state import AgentState
 # has already advanced to the next action. Mismatches for these are silently
 # dropped — not errors. Imported lazily in _is_background_observation to
 # avoid circular imports at module load time.
-_BACKGROUND_OBSERVATION_NAMES = frozenset({'RecallObservation', 'RecallFailureObservation'})
+_BACKGROUND_OBSERVATION_NAMES = frozenset(
+    {'RecallObservation', 'RecallFailureObservation'}
+)
 
 if TYPE_CHECKING:
     from backend.orchestration.services.orchestration_context import (

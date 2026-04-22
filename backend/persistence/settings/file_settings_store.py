@@ -103,9 +103,7 @@ class FileSettingsStore(SettingsStore):
         llm_api_key_json: str | None
         if llm_api_key:
             settings_path = Path(get_app_settings_root()) / self.path
-            persist_llm_api_key_to_dotenv(
-                llm_api_key, settings_json_path=settings_path
-            )
+            persist_llm_api_key_to_dotenv(llm_api_key, settings_json_path=settings_path)
             llm_api_key_json = LLM_API_KEY_SETTINGS_PLACEHOLDER
         else:
             llm_api_key_json = llm_api_key

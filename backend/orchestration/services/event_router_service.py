@@ -56,7 +56,9 @@ _CHECKPOINT_INTERMEDIATE_TOOLS = frozenset({'checkpoint', 'revert_to_checkpoint'
 _USER_INPUT_HINTS = (
     re.compile(r'\?\s*$'),
     re.compile(r'\b(?:can|could|would|should|do)\s+you\b'),
-    re.compile(r'\b(?:please confirm|clarify|let me know|which option|what would you like)\b'),
+    re.compile(
+        r'\b(?:please confirm|clarify|let me know|which option|what would you like)\b'
+    ),
 )
 _COMPLETION_HANDOFF_MARKERS = (
     'next step',
@@ -75,7 +77,9 @@ def _truncate_delegate_progress(text: str, limit: int = 120) -> str:
     return collapsed[: max(limit - 1, 0)].rstrip() + '…'
 
 
-def _summarize_delegate_worker_event(event: Action | Observation) -> tuple[str, str] | None:
+def _summarize_delegate_worker_event(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
     """Return a compact worker-progress summary for parent-side swarm UI."""
     if isinstance(event, FileReadAction):
         return 'running', f'Viewed {event.path}'
@@ -105,15 +109,21 @@ def _summarize_delegate_worker_event(event: Action | Observation) -> tuple[str, 
         return 'running', note or 'Reported progress'
 
     if isinstance(event, PlaybookFinishAction):
-        summary = _truncate_delegate_progress((event.message or '').splitlines()[0], 140)
+        summary = _truncate_delegate_progress(
+            (event.message or '').splitlines()[0], 140
+        )
         return 'done', summary or 'Completed'
 
     if isinstance(event, AgentRejectAction):
-        reason = _truncate_delegate_progress(str(event.outputs.get('reason', '') or ''), 140)
+        reason = _truncate_delegate_progress(
+            str(event.outputs.get('reason', '') or ''), 140
+        )
         return 'failed', reason or 'Rejected delegated task'
 
     if isinstance(event, ErrorObservation):
-        first_line = _truncate_delegate_progress((event.content or '').splitlines()[0], 140)
+        first_line = _truncate_delegate_progress(
+            (event.content or '').splitlines()[0], 140
+        )
         return 'failed', first_line or 'Worker error'
 
     if isinstance(event, AgentStateChangedObservation):
@@ -678,8 +688,8 @@ class EventRouterService:
                         async def _execute():
                             try:
                                 parent_runtime._set_action_timeout(event)
-                                observation = (
-                                    await parent_runtime._execute_action(event)
+                                observation = await parent_runtime._execute_action(
+                                    event
                                 )
                             except Exception as exc:
                                 observation = ErrorObservation(
@@ -691,9 +701,7 @@ class EventRouterService:
                             attach_observation_cause(
                                 observation, event, context='worker_runtime_bridge'
                             )
-                            observation.tool_call_metadata = (
-                                event.tool_call_metadata
-                            )
+                            observation.tool_call_metadata = event.tool_call_metadata
                             source = event.source or EventSource.AGENT
                             _worker_stream_ref.add_event(observation, source)
 

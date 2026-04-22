@@ -152,8 +152,13 @@ def get_session_suggestions(
         return []
 
     suggestions: list[tuple[str, str]] = []
-    for index, (sid, meta, _event_count) in enumerate(_list_session_entries(root)[:limit], 1):
-        title = str(meta.get('title', meta.get('name', 'Untitled session')) or 'Untitled session')
+    for index, (sid, meta, _event_count) in enumerate(
+        _list_session_entries(root)[:limit], 1
+    ):
+        title = str(
+            meta.get('title', meta.get('name', 'Untitled session'))
+            or 'Untitled session'
+        )
         model = str(meta.get('llm_model', '') or '')
         updated = str(meta.get('last_updated_at', meta.get('created_at', '')) or '')
         if len(updated) > 19:

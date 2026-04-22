@@ -32,9 +32,7 @@ _GREP_EXCLUDED_DIRS = (
 )
 
 
-def _grep_cross_file_refs(
-    symbol_name: str, search_root: str | None = None
-) -> int:
+def _grep_cross_file_refs(symbol_name: str, search_root: str | None = None) -> int:
     """Count cross-file occurrences of *symbol_name* using rg or grep.
 
     Returns the number of matching lines (a rough proxy for reference count).
@@ -111,10 +109,10 @@ def check_blast_radius(
             )
             if ref_count > threshold:
                 warning = (
-                    f"\n\n[WARNING: BLAST RADIUS EXCEEDS {threshold}] "
+                    f'\n\n[WARNING: BLAST RADIUS EXCEEDS {threshold}] '
                     f"The symbol '{symbol_name}' appears in ~{ref_count} "
-                    f"locations across the project. Please consider if "
-                    f"those call sites need updating."
+                    f'locations across the project. Please consider if '
+                    f'those call sites need updating.'
                 )
                 logger.info(
                     'Blast radius warning (grep fallback) for %s (~%d refs)',

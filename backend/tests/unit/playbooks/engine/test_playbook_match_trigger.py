@@ -87,4 +87,6 @@ def test_roasted_review_alias_trigger_matches() -> None:
         source='.',
         type=PlaybookType.KNOWLEDGE,
     )
-    assert pb.match_trigger('please run /codereview-roasted now') == '/codereview-roasted'
+    assert (
+        pb.match_trigger('please run /codereview-roasted now') == '/codereview-roasted'
+    )

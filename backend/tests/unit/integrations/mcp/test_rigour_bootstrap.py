@@ -7,9 +7,7 @@ from pathlib import Path
 from backend.integrations.mcp.rigour_bootstrap import ensure_minimal_rigour_yml_for_mcp
 
 
-def test_writes_minimal_rigour_yml_when_missing(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_writes_minimal_rigour_yml_when_missing(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         'backend.integrations.mcp.rigour_bootstrap.get_effective_workspace_root',
         lambda: tmp_path,
@@ -20,9 +18,7 @@ def test_writes_minimal_rigour_yml_when_missing(
     assert 'preset: api' in text
 
 
-def test_skips_when_rigour_yml_already_exists(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_skips_when_rigour_yml_already_exists(tmp_path: Path, monkeypatch) -> None:
     existing = 'version: 1\ncustom: true\n'
     (tmp_path / 'rigour.yml').write_text(existing, encoding='utf-8')
     monkeypatch.setattr(

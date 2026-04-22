@@ -34,7 +34,9 @@ class _RuntimeStub(Runtime):
     def edit(self, action: FileEditAction) -> Observation:
         raise NotImplementedError
 
-    def copy_to(self, host_src: str, runtime_dest: str, recursive: bool = False) -> None:
+    def copy_to(
+        self, host_src: str, runtime_dest: str, recursive: bool = False
+    ) -> None:
         raise NotImplementedError
 
     def copy_from(self, path: str) -> Path:
@@ -49,7 +51,9 @@ class _RuntimeStub(Runtime):
 
 def test_run_action_preserves_tool_result_for_tool_backed_think_action() -> None:
     runtime = object.__new__(_RuntimeStub)
-    action = AgentThinkAction(thought='[CHECKPOINT] Saved #1: phase 1', source_tool='checkpoint')
+    action = AgentThinkAction(
+        thought='[CHECKPOINT] Saved #1: phase 1', source_tool='checkpoint'
+    )
     action.tool_result = {'tool': 'checkpoint', 'ok': True, 'status': 'saved'}
 
     observation = runtime.run_action(action)

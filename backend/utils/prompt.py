@@ -275,13 +275,18 @@ class OrchestratorPromptManager(PromptManager):
         _on_windows = sys.platform == 'win32'
         terminal_tool = get_terminal_tool_name()
         context.setdefault('is_windows', _on_windows)
-        context.setdefault('windows_with_bash', _on_windows and terminal_tool == 'execute_bash' and is_windows_with_bash())
+        context.setdefault(
+            'windows_with_bash',
+            _on_windows and terminal_tool == 'execute_bash' and is_windows_with_bash(),
+        )
         context.setdefault('terminal_tool_name', terminal_tool)
         context.setdefault('mcp_tool_names', self.mcp_tool_names)
         context.setdefault('mcp_tool_descriptions', self.mcp_tool_descriptions)
         context.setdefault('mcp_server_hints', self.mcp_server_hints)
         context.setdefault('active_llm_model', self._active_llm_model_id())
-        context.setdefault('function_calling_mode', self._resolve_function_calling_mode())
+        context.setdefault(
+            'function_calling_mode', self._resolve_function_calling_mode()
+        )
         content = super().get_system_message(**context)
         # Avoid duplicating identity: system_prompt already opens with the app identity.
         if not _content_has_app_identity(content):

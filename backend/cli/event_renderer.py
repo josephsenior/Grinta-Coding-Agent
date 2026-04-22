@@ -144,6 +144,7 @@ def _show_reasoning_text() -> bool:
         'off',
     )
 
+
 # Patterns for extracting / stripping <redacted_thinking> blocks from reasoning models.
 _THINK_EXTRACT_RE = re.compile(
     r'<redacted_thinking>(.*?)(?:</redacted_thinking>|$)', re.DOTALL | re.IGNORECASE
@@ -559,7 +560,7 @@ def _build_task_panel(task_list: list[dict[str, Any]]) -> Any:
         badge.append('[', style='dim')
         badge.append(
             status.upper(),
-            style=f"bold {TASK_STATUS_PANEL_STYLES.get(status, 'dim')}",
+            style=f'bold {TASK_STATUS_PANEL_STYLES.get(status, "dim")}',
         )
         badge.append(']', style='dim')
 
@@ -572,7 +573,10 @@ def _build_task_panel(task_list: list[dict[str, Any]]) -> Any:
     empty_state: Any = (
         table
         if task_list
-        else Text('No tasks in the tracker yet — the agent may add some as it works.', style='dim')
+        else Text(
+            'No tasks in the tracker yet — the agent may add some as it works.',
+            style='dim',
+        )
     )
     return format_callout_panel(
         f'Tasks ({len(task_list)})',
@@ -595,7 +599,7 @@ def _build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
         badge.append('[', style='dim')
         badge.append(
             status.upper(),
-            style=f"bold {_DELEGATE_WORKER_STATUS_STYLES.get(status, 'dim')}",
+            style=f'bold {_DELEGATE_WORKER_STATUS_STYLES.get(status, "dim")}',
         )
         badge.append(']', style='dim')
 
@@ -692,6 +696,7 @@ def _use_recoverable_notice_style(error_text: str) -> bool:
     if _contains_any(lower, _RECOVERABLE_NOTICE_FRAGMENTS):
         return True
     return False
+
 
 # Subscriber ID for the CLI renderer.
 _SUBSCRIBER = EventStreamSubscriber.CLI
@@ -1072,11 +1077,7 @@ def _build_recovery_text(
         sum_style = 'yellow'
         step_style = 'yellow'
     # Cyan notice panels already use ``guidance.summary`` as the headline body.
-    if (
-        guidance.summary
-        and not guidance.omit_summary_in_recovery
-        and not for_notice
-    ):
+    if guidance.summary and not guidance.omit_summary_in_recovery and not for_notice:
         sum_block = _wrap_panel_text_block(
             guidance.summary,
             wrap_width=wrap_width,
@@ -1153,7 +1154,9 @@ def _build_error_panel(
     summary, detail = _split_error_text(error_text)
     guidance = _error_guidance(error_text)
     use_notice = (
-        force_notice if force_notice is not None else _use_recoverable_notice_style(error_text)
+        force_notice
+        if force_notice is not None
+        else _use_recoverable_notice_style(error_text)
     )
     accent = 'cyan' if use_notice else accent_style
     border = '#5dade2' if use_notice else accent_style
@@ -1662,17 +1665,11 @@ class CLIEventRenderer:
                     # Header-only Thinking panel: give the draft-reply preview
                     # the bulk of the Live viewport.
                     reasoning_max_lines = 6
-                    stream_max_lines = max(
-                        10, min(28, available - 5)
-                    )
+                    stream_max_lines = max(10, min(28, available - 5))
             elif self._streaming_accumulated:
                 stream_max_lines = max(10, min(28, available))
             elif self._reasoning.active:
-                reasoning_max_lines = (
-                    max(12, min(32, available))
-                    if thought_rows
-                    else 6
-                )
+                reasoning_max_lines = max(12, min(32, available)) if thought_rows else 6
 
         if self._streaming_accumulated:
             live_sections.append(
@@ -1965,11 +1962,21 @@ class CLIEventRenderer:
                     detail = human_msg or 'workspace reverted'
                 elif source_tool == 'search_code':
                     verb, title = 'Search Code', 'Tool'
-                    lines = [ln for ln in (human_msg or '').splitlines() if ln.strip() and not ln.startswith('Error running ripgrep:')]
-                    if not lines or any('No matches found.' in ln for ln in lines[:5]) or any('No matching files found' in ln for ln in lines[:5]):
+                    lines = [
+                        ln
+                        for ln in (human_msg or '').splitlines()
+                        if ln.strip() and not ln.startswith('Error running ripgrep:')
+                    ]
+                    if (
+                        not lines
+                        or any('No matches found.' in ln for ln in lines[:5])
+                        or any('No matching files found' in ln for ln in lines[:5])
+                    ):
                         detail = 'No matches found.'
                     else:
-                        match_count = sum(1 for line in lines if re.match(r'^.*:\d+:', line)) or len(lines)
+                        match_count = sum(
+                            1 for line in lines if re.match(r'^.*:\d+:', line)
+                        ) or len(lines)
                         detail = f'Found {match_count} match lines.'
                 else:
                     verb = source_tool.replace('_', ' ').title()
@@ -2711,7 +2718,10 @@ class CLIEventRenderer:
             content = getattr(obs, 'content', '')
             if content:
                 lower_c = content.lower()
-                if 'stream timed out' in lower_c or 'retrying without streaming' in lower_c:
+                if (
+                    'stream timed out' in lower_c
+                    or 'retrying without streaming' in lower_c
+                ):
                     self._append_history(_build_llm_stream_fallback_panel())
                 else:
                     self._append_history(
@@ -2779,7 +2789,9 @@ class CLIEventRenderer:
             raw = getattr(obs, 'content', '') or ''
             content = raw.strip()
             session_id = (getattr(obs, 'session_id', '') or '').strip()
-            n_lines = len([ln for ln in content.splitlines() if ln.strip()]) if content else 0
+            n_lines = (
+                len([ln for ln in content.splitlines() if ln.strip()]) if content else 0
+            )
             cap = 2000
             truncated = len(raw) > cap
             body = (raw[:cap] + '…' if truncated else raw) if raw else ''
@@ -3160,24 +3172,46 @@ class CLIEventRenderer:
 
             # If tool JSON didn't match, check for explicit <search_results> tags
             if '<search_results>' in s:
-                m = re.search(r'<search_results>\s*(?P<payload>.*?)\s*</search_results>', s, re.S)
+                m = re.search(
+                    r'<search_results>\s*(?P<payload>.*?)\s*</search_results>', s, re.S
+                )
                 payload = m.group('payload') if m else s
-                lines = [ln for ln in payload.splitlines() if ln.strip() and not ln.startswith('Error running ripgrep:')]
-                if not lines or any('No matches found.' in ln for ln in lines[:5]) or any('No matching files found' in ln for ln in lines[:5]):
+                lines = [
+                    ln
+                    for ln in payload.splitlines()
+                    if ln.strip() and not ln.startswith('Error running ripgrep:')
+                ]
+                if (
+                    not lines
+                    or any('No matches found.' in ln for ln in lines[:5])
+                    or any('No matching files found' in ln for ln in lines[:5])
+                ):
                     summary = 'No matches found.'
                 else:
-                    match_count = sum(1 for line in lines if re.match(r'^.*:\\d+:', line)) or len(lines)
-                    summary = f'Found {match_count} match{"es" if match_count != 1 else ""}.'
+                    match_count = sum(
+                        1 for line in lines if re.match(r'^.*:\\d+:', line)
+                    ) or len(lines)
+                    summary = (
+                        f'Found {match_count} match{"es" if match_count != 1 else ""}.'
+                    )
                 self._append_history(Text(summary, style='cyan'))
             else:
                 # Also detect plain ripgrep-like output without XML tags and condense it
                 plain_lines = [ln for ln in s.splitlines() if ln.strip()]
-                if plain_lines and any(re.match(r'^.*:\\d+:', ln) for ln in plain_lines[:5]):
-                    match_count = sum(1 for line in plain_lines if re.match(r'^.*:\\d+:', line)) or len(plain_lines)
-                    summary = f'Found {match_count} match{"es" if match_count != 1 else ""}.'
+                if plain_lines and any(
+                    re.match(r'^.*:\\d+:', ln) for ln in plain_lines[:5]
+                ):
+                    match_count = sum(
+                        1 for line in plain_lines if re.match(r'^.*:\\d+:', line)
+                    ) or len(plain_lines)
+                    summary = (
+                        f'Found {match_count} match{"es" if match_count != 1 else ""}.'
+                    )
                     self._append_history(Text(summary, style='cyan'))
                 else:
-                    self._append_history(Padding(Markdown(display_content), (0, 0, 1, 0)))
+                    self._append_history(
+                        Padding(Markdown(display_content), (0, 0, 1, 0))
+                    )
         for attachment in attachments or []:
             self._append_history(attachment)
         self._append_history(Text(''))

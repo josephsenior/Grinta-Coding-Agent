@@ -199,7 +199,9 @@ class CircuitBreaker:
 
         # 2.5 Deterministic same-tool failures (str_replace_editor taxonomy)
         str_replace_hard = self.get_tool_error_count(STR_REPLACE_EDITOR_TOOL_NAME)
-        str_replace_syntax = self.get_tool_error_count(STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME)
+        str_replace_syntax = self.get_tool_error_count(
+            STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+        )
 
         # Syntax rejects: much higher budget than match-not-found / path /
         # guard failures. Since the default write path now downgrades the
@@ -305,7 +307,9 @@ class CircuitBreaker:
         self.recent_errors.append(str(error))
         self.recent_actions_success.append(False)
         if tool_name:
-            self._per_tool_errors[tool_name] = self._per_tool_errors.get(tool_name, 0) + 1
+            self._per_tool_errors[tool_name] = (
+                self._per_tool_errors.get(tool_name, 0) + 1
+            )
 
     def record_success(self, tool_name: str = '') -> None:
         """Record a successful action."""

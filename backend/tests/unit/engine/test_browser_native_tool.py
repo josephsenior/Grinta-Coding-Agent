@@ -40,8 +40,6 @@ def test_build_rejects_unknown_command():
 
 
 def test_handle_browser_tool_wraps_security():
-    act = _handle_browser_tool(
-        {'command': 'snapshot', 'security_risk': 'HIGH'}
-    )
+    act = _handle_browser_tool({'command': 'snapshot', 'security_risk': 'HIGH'})
     assert isinstance(act, BrowserToolAction)
     assert act.security_risk == ActionSecurityRisk.HIGH

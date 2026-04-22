@@ -190,6 +190,19 @@ class FileEditor:
             end_line: Optional end line number for range edit (1-indexed)
             enable_linting: Whether to enable linting (currently not implemented)
             dry_run: If True, compute preview result without writing changes
+            edit_mode: Sub-command mode when ``command`` is ``edit`` (e.g. format patch)
+            format_kind: Which structured format op applies (e.g. CSS, Prettier)
+            format_op: Format operation name (e.g. insert_rule)
+            format_path: JSON pointer or path within a structured file
+            format_value: New value for the format operation
+            anchor_type: Anchor strategy for section edits (e.g. line, regex)
+            anchor_value: Anchor string or pattern
+            anchor_occurrence: Which match to use when multiple anchors match
+            section_action: For section flow: add, remove, or replace
+            section_content: Replacement or inserted section text
+            patch_text: Full-file or diff patch when using patch-based flows
+            expected_hash: Optional client-supplied content hash (legacy)
+            expected_file_hash: Optional per-file content hash for compare-and-swap
             **_: Additional keyword arguments (ignored)
 
         Returns:
@@ -566,19 +579,25 @@ class FileEditor:
         if count == 0:
             return ToolResult(
                 output='',
-                error=self._build_no_match_error(file_content, old_str, mode='normalize_ws'),
+                error=self._build_no_match_error(
+                    file_content, old_str, mode='normalize_ws'
+                ),
                 new_content=file_content,
             )
         if count > 1:
             return ToolResult(
                 output='',
-                error=self._build_no_match_error(file_content, old_str, mode='normalize_ws'),
+                error=self._build_no_match_error(
+                    file_content, old_str, mode='normalize_ws'
+                ),
                 new_content=file_content,
             )
 
         # sliding window
         lines_orig = file_content.splitlines(keepends=True)
-        lines_norm = [self._normalize_whitespace_for_match(line_text) for line_text in lines_orig]
+        lines_norm = [
+            self._normalize_whitespace_for_match(line_text) for line_text in lines_orig
+        ]
         norm_old_lines = norm_old.splitlines()
         if not norm_old_lines:
             return ToolResult(
@@ -606,7 +625,9 @@ class FileEditor:
                 if valid_match:
                     return ToolResult(
                         output='',
-                        error=self._build_no_match_error(file_content, old_str, mode='normalize_ws'),
+                        error=self._build_no_match_error(
+                            file_content, old_str, mode='normalize_ws'
+                        ),
                         new_content=file_content,
                     )
                 valid_match = (s, curr)
@@ -617,7 +638,9 @@ class FileEditor:
 
         return ToolResult(
             output='',
-            error=self._build_no_match_error(file_content, old_str, mode='normalize_ws'),
+            error=self._build_no_match_error(
+                file_content, old_str, mode='normalize_ws'
+            ),
             new_content=file_content,
         )
 
@@ -726,8 +749,7 @@ class FileEditor:
             import re as _re
 
             nums = {
-                int(m.group(1))
-                for m in _re.finditer(r'(?i)\bline\s+(\d{1,6})\b', msg)
+                int(m.group(1)) for m in _re.finditer(r'(?i)\bline\s+(\d{1,6})\b', msg)
             }
         except Exception:
             return msg
@@ -760,8 +782,7 @@ class FileEditor:
 
             if has_literal_escape_residue(content, file_path):
                 return (
-                    msg
-                    + '\n\n[HINT] The content contains literal backslash-escape '
+                    msg + '\n\n[HINT] The content contains literal backslash-escape '
                     'sequences (e.g. \\n, \\") that appear to be double-escaped. '
                     'In your next tool call, use a single backslash for newlines '
                     '(a real newline character, not the characters "\\" + "n") '
@@ -914,7 +935,9 @@ class FileEditor:
             return matches[0].group(0)
         return None
 
-    def _find_actual_substring_for_replace(self, haystack: str, needle: str) -> str | None:
+    def _find_actual_substring_for_replace(
+        self, haystack: str, needle: str
+    ) -> str | None:
         """Resolve model straight quotes to on-disk substring (Claude: normalizeQuotes + index slice).
 
         First exact match, then search in quote-normalized space; slice original by same indices
@@ -1146,7 +1169,9 @@ class FileEditor:
         expected_hash: str | None = None,
     ) -> str | ToolResult:
         if expected_hash:
-            current_slice = self._slice_text_by_line_range(content, start_line, end_line)
+            current_slice = self._slice_text_by_line_range(
+                content, start_line, end_line
+            )
             if self._sha256_text(current_slice) != expected_hash:
                 return ToolResult(
                     output='',
@@ -1165,7 +1190,9 @@ class FileEditor:
         format_path: str | None,
         format_value: Any,
     ) -> str | ToolResult:
-        kind = (format_kind or (file_path.suffix.lstrip('.') if file_path else '')).lower()
+        kind = (
+            format_kind or (file_path.suffix.lstrip('.') if file_path else '')
+        ).lower()
         kind_map = {'yml': 'yaml'}
         kind = kind_map.get(kind, kind)
         op = (format_op or 'set').lower()
@@ -1294,7 +1321,9 @@ class FileEditor:
                 if m and m.group(2).strip() == anchor_value.strip():
                     matches.append((idx, len(m.group(1))))
             if len(matches) < occ or occ < 1:
-                return ToolResult(output='', error='Section anchor not found.', new_content=content)
+                return ToolResult(
+                    output='', error='Section anchor not found.', new_content=content
+                )
             start_idx, level = matches[occ - 1]
             end_idx = len(lines)
             for j in range(start_idx + 1, len(lines)):
@@ -1306,7 +1335,9 @@ class FileEditor:
             pattern = anchor_value if kind == 'regex' else re.escape(anchor_value)
             matches = list(re.finditer(pattern, content, re.MULTILINE))
             if len(matches) < occ or occ < 1:
-                return ToolResult(output='', error='Section anchor not found.', new_content=content)
+                return ToolResult(
+                    output='', error='Section anchor not found.', new_content=content
+                )
             target = matches[occ - 1]
             start_idx = content[: target.start()].count('\n')
             end_idx = len(lines)
@@ -1329,7 +1360,9 @@ class FileEditor:
             )
         return ''.join(result_lines)
 
-    def _apply_unified_patch(self, content: str, patch_text: str | None) -> str | ToolResult:
+    def _apply_unified_patch(
+        self, content: str, patch_text: str | None
+    ) -> str | ToolResult:
         if not patch_text:
             return ToolResult(
                 output='',
@@ -1505,7 +1538,7 @@ class FileEditor:
             if is_create:
                 preview_lines = content.splitlines()[:20]
                 preview_str = '\n'.join(
-                    f'{i+1}\t{line}' for i, line in enumerate(preview_lines)
+                    f'{i + 1}\t{line}' for i, line in enumerate(preview_lines)
                 )
                 if len(content.splitlines()) > 20:
                     preview_str += '\n...\n(File truncated)'

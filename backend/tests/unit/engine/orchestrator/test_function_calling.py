@@ -363,7 +363,9 @@ class TestHandleTaskTrackerTool:
 
     def test_task_item_not_dict_raises(self):
         with pytest.raises(FunctionCallValidationError):
-            _handle_task_tracker_tool({'command': 'update', 'task_list': ['not a dict']})
+            _handle_task_tracker_tool(
+                {'command': 'update', 'task_list': ['not a dict']}
+            )
 
     def test_normalizes_missing_task_fields(self):
         args = {
@@ -383,9 +385,7 @@ class TestHandleTaskTrackerTool:
                     'description': 'Top level',
                     'status': 'todo',
                     'result': 'In progress note',
-                    'subtasks': [
-                        {'description': 'Child step', 'status': 'done'}
-                    ],
+                    'subtasks': [{'description': 'Child step', 'status': 'done'}],
                 }
             ],
         }
@@ -554,7 +554,7 @@ class TestEditSymbolsBatch:
 
         py = tmp_path / 'm.py'
         py.write_text(
-            "def a():\n    return 1\n\ndef b():\n    return 2\n",
+            'def a():\n    return 1\n\ndef b():\n    return 2\n',
             encoding='utf-8',
         )
         result = _handle_ast_code_editor_tool(
@@ -577,7 +577,7 @@ class TestEditSymbolsBatch:
     def test_edit_symbols_restores_on_failure(self, tmp_path):
         from backend.engine.function_calling import _handle_ast_code_editor_tool
 
-        original = "def a():\n    return 1\n\ndef b():\n    return 2\n"
+        original = 'def a():\n    return 1\n\ndef b():\n    return 2\n'
         py = tmp_path / 'm.py'
         py.write_text(original, encoding='utf-8')
         result = _handle_ast_code_editor_tool(
@@ -599,7 +599,7 @@ class TestEditSymbolsBatch:
         from backend.engine.function_calling import _handle_ast_code_editor_tool
 
         py = tmp_path / 'm.py'
-        py.write_text("def a():\n    return 1\n", encoding='utf-8')
+        py.write_text('def a():\n    return 1\n', encoding='utf-8')
         with pytest.raises(FunctionCallValidationError, match='duplicate'):
             _handle_ast_code_editor_tool(
                 {

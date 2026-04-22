@@ -48,7 +48,9 @@ def _apply_system_cache_control(
     if system_content is None:
         return None
     if model_supports_prompt_cache_hints(model):
-        text = system_content if isinstance(system_content, str) else str(system_content)
+        text = (
+            system_content if isinstance(system_content, str) else str(system_content)
+        )
         if 'betas' not in kwargs:
             kwargs['betas'] = ['prompt-caching-2024-07-31']
         return [{'type': 'text', 'text': text, 'cache_control': {'type': 'ephemeral'}}]

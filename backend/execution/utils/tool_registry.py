@@ -16,7 +16,9 @@ from typing import Literal
 from backend.core.logger import app_logger as logger
 
 
-def resolve_windows_powershell_preference(*, has_bash: bool, has_powershell: bool) -> bool:
+def resolve_windows_powershell_preference(
+    *, has_bash: bool, has_powershell: bool
+) -> bool:
     """Return True when Windows terminal contract should use PowerShell.
 
     Preference is controlled by ``APP_WINDOWS_SHELL_PREFERENCE`` with values:

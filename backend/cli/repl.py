@@ -29,7 +29,6 @@ from backend.ledger.action import MessageAction
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-
     from backend.ledger.stream import EventStream
 
 
@@ -598,8 +597,8 @@ class Repl:
         autonomy_label = data['autonomy_label']
         controls = f'{state_label}  │  {autonomy_label}  │  Tab for commands'
         telemetry = (
-            f"provider: {data['provider']}  │  model: {data['model']}  │  {data['token_display']}  │  {data['cost']}  │  "
-            f"{data['calls']}  │  {data['mcp']}  │  {data['skills']}  │  {data['ledger']}"
+            f'provider: {data["provider"]}  │  model: {data["model"]}  │  {data["token_display"]}  │  {data["cost"]}  │  '
+            f'{data["calls"]}  │  {data["mcp"]}  │  {data["skills"]}  │  {data["ledger"]}'
         )
         return f' {controls}\n {telemetry} '
 
@@ -609,7 +608,7 @@ class Repl:
         frags: list[tuple[str, str]] = []
         frags.append(('class:prompt.brand', 'GRINTA'))
         frags.append(('class:prompt.dim', '  '))
-        frags.append((self._prompt_state_style(), f" {data['state_label'].upper()} "))
+        frags.append((self._prompt_state_style(), f' {data["state_label"].upper()} '))
         frags.append(('class:prompt.dim', '  '))
         frags.append((self._prompt_autonomy_style(), data['autonomy_label']))
         if not compact:
@@ -639,18 +638,18 @@ class Repl:
             )
         base.extend(
             [
-            ('class:prompt.dim', 'provider:'),
-            ('class:prompt.sep', ' '),
-            ('class:prompt.model', data['provider']),
-            ('class:prompt.sep', sep),
-            ('class:prompt.dim', 'model:'),
-            ('class:prompt.sep', ' '),
-            ('class:prompt.model', data['model']),
-            ('class:prompt.sep', sep),
-            ('class:prompt.value', data['token_display']),
-            ('class:prompt.sep', sep),
-            ('class:prompt.value', data['cost']),
-        ]
+                ('class:prompt.dim', 'provider:'),
+                ('class:prompt.sep', ' '),
+                ('class:prompt.model', data['provider']),
+                ('class:prompt.sep', sep),
+                ('class:prompt.dim', 'model:'),
+                ('class:prompt.sep', ' '),
+                ('class:prompt.model', data['model']),
+                ('class:prompt.sep', sep),
+                ('class:prompt.value', data['token_display']),
+                ('class:prompt.sep', sep),
+                ('class:prompt.value', data['cost']),
+            ]
         )
 
         # Optional fields in priority order.
@@ -700,7 +699,7 @@ class Repl:
         model = (
             data['model']
             if data['provider'] in {'(not set)', '(unknown)'}
-            else f"{data['provider']}/{data['model']}"
+            else f'{data["provider"]}/{data["model"]}'
         )
 
         fragments: list[tuple[str, str]] = []
@@ -710,9 +709,7 @@ class Repl:
 
         if width < 72:
             ws = (data.get('workspace') or '').strip()
-            ws_prefix = (
-                f'{HUDBar.ellipsize_path(ws, 28)} · ' if ws else ''
-            )
+            ws_prefix = f'{HUDBar.ellipsize_path(ws, 28)} · ' if ws else ''
             line = (
                 f'{ws_prefix}{data["state_label"]} · {data["autonomy_label"]} · '
                 f'{model} · {data["token_display"]} · {data["cost"]}'

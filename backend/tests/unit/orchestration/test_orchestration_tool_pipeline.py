@@ -196,7 +196,6 @@ class TestCircuitBreakerMiddlewarePipeline:
     @pytest.mark.asyncio
     async def test_observe_str_replace_syntax_uses_syntax_bucket(self):
         from backend.ledger.observation import ErrorObservation
-
         from backend.orchestration.agent_circuit_breaker import (
             STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME,
             STR_REPLACE_EDITOR_TOOL_NAME,
@@ -207,7 +206,9 @@ class TestCircuitBreakerMiddlewarePipeline:
         controller.circuit_breaker_service = service
         mw = CircuitBreakerMiddleware(controller)
         action = MagicMock()
-        action.tool_call_metadata = MagicMock(function_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        action.tool_call_metadata = MagicMock(
+            function_name=STR_REPLACE_EDITOR_TOOL_NAME
+        )
         ctx = ToolInvocationContext(
             controller=controller, action=action, state=MagicMock()
         )
@@ -222,7 +223,6 @@ class TestCircuitBreakerMiddlewarePipeline:
     @pytest.mark.asyncio
     async def test_observe_str_replace_non_syntax_uses_hard_bucket(self):
         from backend.ledger.observation import ErrorObservation
-
         from backend.orchestration.agent_circuit_breaker import (
             STR_REPLACE_EDITOR_TOOL_NAME,
         )
@@ -232,7 +232,9 @@ class TestCircuitBreakerMiddlewarePipeline:
         controller.circuit_breaker_service = service
         mw = CircuitBreakerMiddleware(controller)
         action = MagicMock()
-        action.tool_call_metadata = MagicMock(function_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        action.tool_call_metadata = MagicMock(
+            function_name=STR_REPLACE_EDITOR_TOOL_NAME
+        )
         ctx = ToolInvocationContext(
             controller=controller, action=action, state=MagicMock()
         )

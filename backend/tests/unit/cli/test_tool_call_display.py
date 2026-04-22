@@ -18,9 +18,7 @@ from backend.cli.tool_call_display import (
 
 class TestToolCallDisplay(unittest.TestCase):
     def test_summarize_bash(self) -> None:
-        s = summarize_tool_arguments(
-            'execute_bash', {'command': 'git status --short'}
-        )
+        s = summarize_tool_arguments('execute_bash', {'command': 'git status --short'})
         self.assertIn('git status', s)
         self.assertTrue(s.startswith('$'))
 
@@ -84,21 +82,15 @@ class TestToolCallDisplay(unittest.TestCase):
         self.assertIn('npm', h)
 
     def test_looks_like_tool_args(self) -> None:
-        self.assertTrue(
-            looks_like_streaming_tool_arguments('  {"command": "ls"}')
-        )
+        self.assertTrue(looks_like_streaming_tool_arguments('  {"command": "ls"}'))
         self.assertFalse(looks_like_streaming_tool_arguments('Hello {'))
 
     def test_redact_streamed_tool_call_markers(self) -> None:
-        raw = (
-            '[Tool call] str_replace_editor({"command":"create_file","path":"a.txt"})'
-        )
+        raw = '[Tool call] str_replace_editor({"command":"create_file","path":"a.txt"})'
         self.assertEqual(redact_streamed_tool_call_markers(raw).strip(), '')
 
     def test_strip_tool_call_marker_lines_keeps_json_shape(self) -> None:
-        raw = (
-            '[Tool call] str_replace_editor({"command":"create_file","path":"a.txt"})'
-        )
+        raw = '[Tool call] str_replace_editor({"command":"create_file","path":"a.txt"})'
         self.assertEqual(strip_tool_call_marker_lines(raw).strip(), raw.strip())
 
     def test_redact_removes_friendly_tool_call_lines(self) -> None:

@@ -234,12 +234,18 @@ class ActionExecutionService:
                 cb_service = getattr(controller, 'circuit_breaker_service', None)
                 if cb_service is not None:
                     error_lower = error_signature.lower()
-                    if 'str_replace_editor' in error_lower or '[str_replace_editor' in error_lower:
+                    if (
+                        'str_replace_editor' in error_lower
+                        or '[str_replace_editor' in error_lower
+                    ):
                         bucket = classify_str_replace_editor_error_bucket(str(exc))
                         cb_service.record_error(exc, tool_name=bucket)
 
                 effective_max_retries = max_identical_retries
-                if '[APPLY_PATCH_CLASS:malformed_patch]' in error_signature or '[APPLY_PATCH_CLASS:context_mismatch]' in error_signature:
+                if (
+                    '[APPLY_PATCH_CLASS:malformed_patch]' in error_signature
+                    or '[APPLY_PATCH_CLASS:context_mismatch]' in error_signature
+                ):
                     effective_max_retries = 1
 
                 if identical_error_count > effective_max_retries:
@@ -324,7 +330,7 @@ class ActionExecutionService:
         return None
 
     def _handle_malformed_request_error(self, exc: Exception) -> Action | None:
-        """Recover from ``BadRequestError: Invalid \\escape``-style failures.
+        r"""Recover from ``BadRequestError: Invalid \\escape``-style failures.
 
         The API rejected our request body because the ``tool_calls`` we
         replayed contain malformed JSON in ``function.arguments``. Fix #1

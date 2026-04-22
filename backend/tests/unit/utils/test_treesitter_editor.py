@@ -592,9 +592,7 @@ class TestCoverageGaps:
                 raise Exception('test exception')
 
             mp.setattr(editor, 'get_parser', raise_exc)
-            is_valid, msg = editor._validate_syntax(
-                'const x =', 'f.js', 'javascript'
-            )
+            is_valid, msg = editor._validate_syntax('const x =', 'f.js', 'javascript')
             # Should skip validation and return True on exception
             assert is_valid is True
             assert 'Validation skipped' in msg

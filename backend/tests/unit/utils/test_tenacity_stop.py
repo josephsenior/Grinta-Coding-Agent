@@ -149,6 +149,7 @@ class TestStopIfShouldExit:
                     m.should_exit.side_effect = RuntimeError('Fail')
                     return m
                 import importlib
+
                 return importlib.import_module(name)
 
             with patch('importlib.import_module', side_effect=side_effect):

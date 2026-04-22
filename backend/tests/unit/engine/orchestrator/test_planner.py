@@ -463,7 +463,9 @@ class TestBuildLlmParams:
         assert '<FIRST_TURN_ORIENTATION>' not in control
 
     def test_first_turn_orientation_is_not_injected_even_when_opted_in(self):
-        p = _make_planner(config=_make_config(enable_first_turn_orientation_prompt=True))
+        p = _make_planner(
+            config=_make_config(enable_first_turn_orientation_prompt=True)
+        )
         state = _make_state()
         state.iteration_flag.current_value = 1
         messages = [{'role': 'user', 'content': 'Please fix the failing backend test'}]
@@ -479,7 +481,9 @@ class TestBuildLlmParams:
         assert '<FIRST_TURN_ORIENTATION>' not in control
 
     def test_first_turn_orientation_never_appears_across_retries(self):
-        p = _make_planner(config=_make_config(enable_first_turn_orientation_prompt=True))
+        p = _make_planner(
+            config=_make_config(enable_first_turn_orientation_prompt=True)
+        )
         state = _make_state()
         state.iteration_flag.current_value = 1
         messages = [{'role': 'user', 'content': 'Please fix one failing test'}]

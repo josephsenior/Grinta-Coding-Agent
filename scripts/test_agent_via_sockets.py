@@ -25,15 +25,15 @@ def _build_scenarios() -> list[dict[str, Any]]:
                 'working_memory',
             ),
             'prompt': (
-                "You are running a resilience drill with partial requirements.\n"
+                'You are running a resilience drill with partial requirements.\n'
                 "Goal: leave the workspace in a 'safe baseline' state.\n\n"
-                "Tasks (decide exact order if needed, but explain brief rationale):\n"
+                'Tasks (decide exact order if needed, but explain brief rationale):\n'
                 "1) Create 'agent_capability_test.txt' with content: Initial state\n"
-                "2) Save a checkpoint for this baseline.\n"
-                "3) Change the file content to: State updated by experiment\n"
-                "4) Add a concise working-memory note that includes: Test completed successfully\n"
-                "5) Restore the checkpoint so the file ends at Initial state.\n\n"
-                "Constraint: if any instruction conflicts with safety or tool limits, choose the safest valid path and continue."
+                '2) Save a checkpoint for this baseline.\n'
+                '3) Change the file content to: State updated by experiment\n'
+                '4) Add a concise working-memory note that includes: Test completed successfully\n'
+                '5) Restore the checkpoint so the file ends at Initial state.\n\n'
+                'Constraint: if any instruction conflicts with safety or tool limits, choose the safest valid path and continue.'
             ),
         },
         {
@@ -46,13 +46,13 @@ def _build_scenarios() -> list[dict[str, Any]]:
                 'reasoned_planning',
             ),
             'prompt': (
-                "Treat this as an ambiguous incident triage.\n"
-                "You need to leave a compact handoff artifact.\n\n"
+                'Treat this as an ambiguous incident triage.\n'
+                'You need to leave a compact handoff artifact.\n\n'
                 "1) Create 'triage_notes.txt' with 3 plausible root-cause hypotheses.\n"
-                "2) Read one existing repository file of your choice that helps disambiguate.\n"
+                '2) Read one existing repository file of your choice that helps disambiguate.\n'
                 "3) Create 'triage_summary.md' with sections: Findings, Uncertainties, Next Safe Step.\n"
-                "4) Update the summary once after re-evaluating your own assumptions.\n\n"
-                "If uncertain, state assumptions explicitly rather than guessing."
+                '4) Update the summary once after re-evaluating your own assumptions.\n\n'
+                'If uncertain, state assumptions explicitly rather than guessing.'
             ),
         },
         {
@@ -64,17 +64,17 @@ def _build_scenarios() -> list[dict[str, Any]]:
                 'state_tracking',
             ),
             'prompt': (
-                "Capability stress test with deliberate ambiguity:\n"
-                "- You may use checkpointing, but only if it helps recoverability.\n"
-                "- You should avoid unnecessary writes.\n\n"
-                "Outcome requirements:\n"
+                'Capability stress test with deliberate ambiguity:\n'
+                '- You may use checkpointing, but only if it helps recoverability.\n'
+                '- You should avoid unnecessary writes.\n\n'
+                'Outcome requirements:\n'
                 "1) Produce 'agent_judgement_report.txt' with:\n"
-                "   - chosen strategy,\n"
-                "   - one discarded strategy,\n"
-                "   - why your final approach is safer.\n"
-                "2) If you use checkpoint, document why in the report.\n"
-                "3) Add a short working-memory note marking completion.\n\n"
-                "Prefer reversible actions when confidence is low."
+                '   - chosen strategy,\n'
+                '   - one discarded strategy,\n'
+                '   - why your final approach is safer.\n'
+                '2) If you use checkpoint, document why in the report.\n'
+                '3) Add a short working-memory note marking completion.\n\n'
+                'Prefer reversible actions when confidence is low.'
             ),
         },
         {
@@ -86,12 +86,12 @@ def _build_scenarios() -> list[dict[str, Any]]:
                 'edit_after_review',
             ),
             'prompt': (
-                "Run a decision-quality exercise.\n"
+                'Run a decision-quality exercise.\n'
                 "1) Create 'decision_log.json' with fields: scenario, assumptions, actions, confidence.\n"
-                "2) Add at least 2 actions where one is reversible and one is not.\n"
-                "3) Re-read the file and reduce overconfidence if needed.\n"
-                "4) If confidence < 0.7, prefer a reversible final action and mention rollback considerations.\n\n"
-                "Keep the final JSON valid."
+                '2) Add at least 2 actions where one is reversible and one is not.\n'
+                '3) Re-read the file and reduce overconfidence if needed.\n'
+                '4) If confidence < 0.7, prefer a reversible final action and mention rollback considerations.\n\n'
+                'Keep the final JSON valid.'
             ),
         },
     ]
@@ -136,7 +136,7 @@ def _run_batch_mode() -> int:
 
     selected = indices[:run_count]
     print(f'Batch mode: running {run_count} scenario(s)')
-    print('Order:', ', '.join(f"{i}:{scenarios[i]['name']}" for i in selected))
+    print('Order:', ', '.join(f'{i}:{scenarios[i]["name"]}' for i in selected))
 
     results: list[tuple[int, str, int, float]] = []
     worst_code = 0
@@ -179,8 +179,8 @@ async def main() -> int:
     scenario = _choose_scenario()
     test_file_name = str(scenario['primary_file'])
     test_file = os.path.join(os.path.abspath(os.path.dirname(__file__)), test_file_name)
-    print(f"Selected scenario: {scenario['name']}")
-    print(f"Expected capability mix: {', '.join(scenario['capabilities'])}")
+    print(f'Selected scenario: {scenario["name"]}')
+    print(f'Expected capability mix: {", ".join(scenario["capabilities"])}')
     agent_workspace_file_path: str | None = None
     if os.path.exists(test_file):
         os.remove(test_file)
@@ -247,7 +247,10 @@ async def main() -> int:
         def _is_initialized_event(event: dict) -> bool:
             # "Real" event-stream events carry an id; the server can also emit
             # a synthetic default state on connection without one.
-            return bool(event.get('id') is not None and _agent_state(event) == 'AWAITING_USER_INPUT')
+            return bool(
+                event.get('id') is not None
+                and _agent_state(event) == 'AWAITING_USER_INPUT'
+            )
 
         def _is_terminal_event(event: dict) -> bool:
             state = _agent_state(event)
@@ -282,8 +285,12 @@ async def main() -> int:
                 last_agent_state = state
 
             msg = event.get('message') or event.get('content')
-            head = state or observation or action or evt_type or (
-                'status' if status_update else 'event'
+            head = (
+                state
+                or observation
+                or action
+                or evt_type
+                or ('status' if status_update else 'event')
             )
             tail = _safe_preview(msg)
             print(f'[EVENT] {head} id={event_id} {tail}')
@@ -305,9 +312,9 @@ async def main() -> int:
                 if extras:
                     print(f'        extras={extras}')
                 if event.get('status') is not None:
-                    print(f"        status={event.get('status')}")
+                    print(f'        status={event.get("status")}')
                 if event.get('error') is not None:
-                    print(f"        error={event.get('error')}")
+                    print(f'        error={event.get("error")}')
 
             if _is_initialized_event(event):
                 initialized.set()
@@ -340,7 +347,9 @@ async def main() -> int:
         print(f'Socket.IO connected (post-send): {client.is_ws_connected}')
 
         wait_seconds = int(os.environ.get('APP_WAIT_SECONDS', '300'))
-        print(f'Waiting for agent to process ({wait_seconds}s or until terminal state)...')
+        print(
+            f'Waiting for agent to process ({wait_seconds}s or until terminal state)...'
+        )
         try:
             await asyncio.wait_for(terminal.wait(), timeout=wait_seconds)
             terminal_reached = True
@@ -354,9 +363,7 @@ async def main() -> int:
             print(f'\nFinal file contents ({test_file_name}):')
             print(final)
             if terminal_reached and last_agent_state in {'ERROR', 'REJECTED'}:
-                print(
-                    f'\nTest failed: terminal agent state is {last_agent_state}.'
-                )
+                print(f'\nTest failed: terminal agent state is {last_agent_state}.')
                 exit_code = 3
             elif terminal_reached and saw_finish_event:
                 print('\nTest passed: finish event observed with file evidence.')
@@ -386,12 +393,12 @@ async def main() -> int:
                 'not your repo root.'
             )
             if terminal_reached and last_agent_state in {'ERROR', 'REJECTED'}:
-                print(
-                    f'\nTest failed: terminal agent state is {last_agent_state}.'
-                )
+                print(f'\nTest failed: terminal agent state is {last_agent_state}.')
                 exit_code = 3
             elif terminal_reached and saw_finish_event:
-                print('\nTest passed: finish event observed with workspace file evidence.')
+                print(
+                    '\nTest passed: finish event observed with workspace file evidence.'
+                )
                 exit_code = 0
             elif terminal_reached and last_agent_state in {'FINISHED', 'STOPPED'}:
                 print(
@@ -413,9 +420,7 @@ async def main() -> int:
         else:
             print(f'\n{test_file_name} was not created.')
             if terminal_reached and last_agent_state in {'ERROR', 'REJECTED'}:
-                print(
-                    f'\nTest failed: terminal agent state is {last_agent_state}.'
-                )
+                print(f'\nTest failed: terminal agent state is {last_agent_state}.')
                 exit_code = 3
             elif terminal_reached:
                 if last_agent_state == 'AWAITING_USER_CONFIRMATION':

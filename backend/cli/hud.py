@@ -129,17 +129,18 @@ class HUDBar:
         ctx = self._format_tokens(self.state.context_tokens)
         lim = (
             self._format_tokens(self.state.context_limit)
-            if self.state.context_limit else '?'
+            if self.state.context_limit
+            else '?'
         )
-        token_display = f'{ctx} tokens' if self.state.context_limit == 0 else f'{ctx}/{lim}'
+        token_display = (
+            f'{ctx} tokens' if self.state.context_limit == 0 else f'{ctx}/{lim}'
+        )
         if self.state.token_usage_estimated:
             token_display += ' est'
         mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
         skills_label = self._format_skills_label(self._bundled_skill_count)
         model_display = (
-            model
-            if provider in {'(not set)', '(unknown)'}
-            else f'{provider}/{model}'
+            model if provider in {'(not set)', '(unknown)'} else f'{provider}/{model}'
         )
         parts = [
             f' {model_display}',
@@ -426,7 +427,10 @@ class HUDBar:
                     + int(accumulated_usage.get('cache_read_tokens', 0) or 0)
                     + int(accumulated_usage.get('cache_write_tokens', 0) or 0)
                 )
-                if total > 0 or int(accumulated_usage.get('context_window', 0) or 0) > 0:
+                if (
+                    total > 0
+                    or int(accumulated_usage.get('context_window', 0) or 0) > 0
+                ):
                     self.state.context_tokens = total
                     self.state.context_limit = int(
                         accumulated_usage.get('context_window', 0) or 0
@@ -439,14 +443,11 @@ class HUDBar:
             if usages:
                 latest = usages[-1] if isinstance(usages, list) else usages
                 if isinstance(latest, dict):
-                    total = (
-                        int(latest.get('prompt_tokens', 0) or 0)
-                        + int(latest.get('completion_tokens', 0) or 0)
+                    total = int(latest.get('prompt_tokens', 0) or 0) + int(
+                        latest.get('completion_tokens', 0) or 0
                     )
                     self.state.context_tokens = total
-                    self.state.context_limit = int(
-                        latest.get('context_window', 0) or 0
-                    )
+                    self.state.context_limit = int(latest.get('context_window', 0) or 0)
                     self.state.token_usage_estimated = bool(
                         latest.get('usage_estimated', False)
                     )

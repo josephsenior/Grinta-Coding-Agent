@@ -37,7 +37,9 @@ def _prompt_model_change(console: Console) -> bool:
         provider_map[idx] = (key, label)
         idx += 1
     custom_idx = idx
-    console.print(f'  [cyan]{custom_idx:>2}[/cyan]  [dim]Custom (OpenAI-compatible)[/dim]')
+    console.print(
+        f'  [cyan]{custom_idx:>2}[/cyan]  [dim]Custom (OpenAI-compatible)[/dim]'
+    )
     console.print()
 
     choice = Prompt.ask('  Provider number', default='', console=console).strip()

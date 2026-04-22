@@ -97,7 +97,9 @@ class SmartConfigCache:
         merged_settings = merge_settings_with_cache(
             user_id, settings, global_config, self._user_settings_cache, current_time
         )
-        logger.debug('User settings memory cache miss for %s - loaded and cached', user_id)
+        logger.debug(
+            'User settings memory cache miss for %s - loaded and cached', user_id
+        )
         return merged_settings
 
     def invalidate_user_cache(self, user_id: str) -> None:

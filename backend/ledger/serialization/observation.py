@@ -34,6 +34,7 @@ from backend.ledger.observation.reject import UserRejectObservation
 from backend.ledger.observation.status import StatusObservation
 from backend.ledger.observation.success import SuccessObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
+from backend.ledger.observation.terminal import TerminalObservation
 
 observations = (
     NullObservation,
@@ -54,6 +55,7 @@ observations = (
     TaskTrackingObservation,
     StatusObservation,
     LspQueryObservation,
+    TerminalObservation,
 )
 
 

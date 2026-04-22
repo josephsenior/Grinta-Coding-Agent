@@ -276,7 +276,7 @@ async def test_chained_scaffold_failure_adds_scaffold_guidance(mock_executor):
     mock_session.cwd = '/tmp'
     mock_session.execute.return_value = CmdOutputObservation(
         content=(
-            "npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, "
+            'npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, '
             "open '/tmp/react-app/package.json'\n"
             'npm error A complete log of this run can be found in: /tmp/npm-debug.log'
         ),
@@ -588,7 +588,9 @@ async def test_terminal_read_applies_resize(mock_executor, tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_terminal_run_rejects_invalid_resize_rows(mock_executor, tmp_path) -> None:
+async def test_terminal_run_rejects_invalid_resize_rows(
+    mock_executor, tmp_path
+) -> None:
     workspace = tmp_path / 'w'
     workspace.mkdir()
     mock_executor._initial_cwd = str(workspace)

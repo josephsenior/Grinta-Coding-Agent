@@ -30,6 +30,7 @@ def strip_tool_result_validation_annotations(text: str) -> str:
     """Remove internal tool-validation tags; keeps scrollback readable."""
     return _APP_RESULT_VALIDATION_RE.sub('', text or '').strip()
 
+
 _GROUND_PREFIX = '    > '
 # Activity rows use a fixed verb column so details line up across tools.
 _ACTIVITY_PRIMARY_INDENT = '  '
@@ -70,9 +71,9 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
 def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> Text:
     """Continuation row for user-visible results — consistent with shell result style."""
     styles: dict[str, tuple[str, str, str]] = {
-        'ok':      ('✓', 'dim', 'dim'),
-        'err':     ('✗', 'dim red',   'dim red'),
-        'neutral': ('•', 'dim',       'dim'),
+        'ok': ('✓', 'dim', 'dim'),
+        'err': ('✗', 'dim red', 'dim red'),
+        'neutral': ('•', 'dim', 'dim'),
     }
     icon, icon_style, text_style = styles.get(kind, styles['neutral'])
     line = Text(_ACTIVITY_SECONDARY_INDENT, style='')

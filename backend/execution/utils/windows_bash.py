@@ -37,7 +37,6 @@ from backend.ledger.observation.commands import (
     CmdOutputObservation,
 )
 
-
 # ``Start-Process`` detaches a new process tree from our subprocess. Because
 # the PowerShell host returns as soon as the detach completes, the Popen PID
 # we register with ``TaskCancellationService`` is the (already-exited) shell
@@ -51,9 +50,7 @@ from backend.ledger.observation.commands import (
 # via an ASCII sentinel on stdout, which we parse out and register for
 # eventual cleanup.
 _START_PROCESS_RE = re.compile(r'(?i)(?<![A-Za-z0-9_-])Start-Process(?![A-Za-z0-9_-])')
-_SPAWNED_PID_MARKER_RE = re.compile(
-    r'___GRINTA_SPAWNED___([^_]*?)___END___\r?\n?'
-)
+_SPAWNED_PID_MARKER_RE = re.compile(r'___GRINTA_SPAWNED___([^_]*?)___END___\r?\n?')
 
 if TYPE_CHECKING:
     from backend.ledger.action import CmdRunAction

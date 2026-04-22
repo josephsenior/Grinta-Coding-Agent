@@ -75,7 +75,9 @@ def test_openai_client_maps_html_401_to_auth() -> None:
         class Html401(Exception):
             status_code = 401
 
-        mapped = client._map_openai_error(Html401('<!DOCTYPE html><title>Login</title>'))
+        mapped = client._map_openai_error(
+            Html401('<!DOCTYPE html><title>Login</title>')
+        )
         assert isinstance(mapped, AuthenticationError)
 
     _run()

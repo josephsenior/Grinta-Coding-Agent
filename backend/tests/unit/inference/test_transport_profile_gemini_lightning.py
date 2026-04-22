@@ -33,6 +33,7 @@ GEMINI_MODEL = 'google/gemini-3-flash-preview'
 # Shared mock helpers
 # ---------------------------------------------------------------------------
 
+
 def _mock_patches():
     """Return the four patches needed to instantiate OpenAIClient without I/O."""
     return [
@@ -67,6 +68,7 @@ def _gemini_lightning_client():
 # 1. Profile resolution
 # ---------------------------------------------------------------------------
 
+
 class TestTransportProfileResolution:
     def test_google_on_lightning_gets_cross_family_profile(self):
         """Google model family + non-native endpoint → no metadata, no tool replay."""
@@ -96,6 +98,7 @@ class TestTransportProfileResolution:
 # ---------------------------------------------------------------------------
 # 2. Client routing and model name preservation
 # ---------------------------------------------------------------------------
+
 
 class TestClientRouting:
     @patch('backend.inference.direct_clients.AsyncOpenAI')
@@ -187,6 +190,7 @@ class TestClientRouting:
 # 3. Request parameters that must survive unchanged
 # ---------------------------------------------------------------------------
 
+
 class TestRequestParamsPreserved:
     def setup_method(self):
         patches = _mock_patches()
@@ -248,6 +252,7 @@ class TestRequestParamsPreserved:
 # ---------------------------------------------------------------------------
 # 4. Message content that must survive unchanged
 # ---------------------------------------------------------------------------
+
 
 class TestMessageContentPreserved:
     def setup_method(self):
@@ -337,6 +342,7 @@ class TestMessageContentPreserved:
 # ---------------------------------------------------------------------------
 # 5. History normalization (the one capability difference)
 # ---------------------------------------------------------------------------
+
 
 class TestHistoryNormalization:
     def setup_method(self):
@@ -492,6 +498,7 @@ class TestHistoryNormalization:
 # ---------------------------------------------------------------------------
 # 6. Same-family (OpenAI) on Lightning preserves tool replay
 # ---------------------------------------------------------------------------
+
 
 class TestOpenAIOnLightningPreservesToolReplay:
     @patch('backend.inference.direct_clients.AsyncOpenAI')

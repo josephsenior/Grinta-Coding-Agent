@@ -105,12 +105,12 @@ def build_python_exec_command(script: str) -> str:
         return f'python -c "{py_expr}"'
 
     return (
-        "if command -v python3 >/dev/null 2>&1; then "
-        f"python3 -c \"{py_expr}\"; "
-        "elif command -v python >/dev/null 2>&1; then "
-        f"python -c \"{py_expr}\"; "
-        "elif command -v py >/dev/null 2>&1; then "
-        f"py -3 -c \"{py_expr}\"; "
+        'if command -v python3 >/dev/null 2>&1; then '
+        f'python3 -c "{py_expr}"; '
+        'elif command -v python >/dev/null 2>&1; then '
+        f'python -c "{py_expr}"; '
+        'elif command -v py >/dev/null 2>&1; then '
+        f'py -3 -c "{py_expr}"; '
         "else echo '[MISSING_TOOL] python/python3/py not found in PATH'; exit 127; fi"
     )
 

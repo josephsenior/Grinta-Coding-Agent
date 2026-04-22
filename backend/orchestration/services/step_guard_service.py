@@ -172,15 +172,23 @@ class StepGuardService:
                 f'CIRCUIT BREAKER FORCED STRATEGY SWITCH: {result.reason}\n\n'
                 f'{result.recommendation}'
             )
-            obs = ErrorObservation(content=content, error_id='CIRCUIT_BREAKER_FORCED_SWITCH')
-            attach_observation_cause(obs, _pending_action_for_observation_cause(controller), context='step_guard.forced_switch')
+            obs = ErrorObservation(
+                content=content, error_id='CIRCUIT_BREAKER_FORCED_SWITCH'
+            )
+            attach_observation_cause(
+                obs,
+                _pending_action_for_observation_cause(controller),
+                context='step_guard.forced_switch',
+            )
             controller.event_stream.add_event(obs, EventSource.ENVIRONMENT)
             if state and hasattr(state, 'set_planning_directive'):
                 state.set_planning_directive(
                     'STRATEGY SWITCH REQUIRED: You must use a different tool or strategy now.',
                     source='StepGuardService',
                 )
-            _clear_agent_queued_actions(controller, 'Forced strategy switch due to deterministic failures')
+            _clear_agent_queued_actions(
+                controller, 'Forced strategy switch due to deterministic failures'
+            )
             return True
 
         error_obs = ErrorObservation(

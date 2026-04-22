@@ -135,6 +135,7 @@ class SmartErrorHandler:
             Context string
 
         """
+
         def _count_label(count: int, singular: str, plural: str) -> str:
             return f'{count} {singular if count == 1 else plural}'
 

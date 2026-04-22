@@ -91,7 +91,9 @@ class ChromaDBBackend(VectorBackend):
         )
 
         # Embedding model — lazy-loaded in a background thread so __init__ is instant.
-        self._model_name = os.getenv('EMBEDDING_MODEL', 'nomic-ai/nomic-embed-text-v1.5')
+        self._model_name = os.getenv(
+            'EMBEDDING_MODEL', 'nomic-ai/nomic-embed-text-v1.5'
+        )
         self._model: Any | None = None
         self._model_lock = threading.Lock()
         self._model_loader_thread: threading.Thread | None = None
@@ -104,7 +106,8 @@ class ChromaDBBackend(VectorBackend):
             if stored_model and stored_model != self._model_name:
                 logger.info(
                     'Embedding model changed (%s → %s), recreating collection',
-                    stored_model, self._model_name,
+                    stored_model,
+                    self._model_name,
                 )
                 self.client.delete_collection(name=collection_name)
                 self.collection = self._create_collection(collection_name)
@@ -132,7 +135,9 @@ class ChromaDBBackend(VectorBackend):
         """Load the embedding model. Thread-safe, called from background thread."""
         with self._model_lock:
             if self._model is None:
-                logger.info("Loading embedding model '%s' (local-only)…", self._model_name)
+                logger.info(
+                    "Loading embedding model '%s' (local-only)…", self._model_name
+                )
 
                 # Force fully offline — never phone home to HuggingFace.
                 os.environ.setdefault('HF_HUB_OFFLINE', '1')
@@ -149,7 +154,9 @@ class ChromaDBBackend(VectorBackend):
                 model_source = self._model_name
                 if snapshot_fn is not None:
                     try:
-                        local_path = snapshot_fn(repo_id=self._model_name, local_files_only=True)
+                        local_path = snapshot_fn(
+                            repo_id=self._model_name, local_files_only=True
+                        )
                         model_source = local_path
                     except Exception as e:
                         logger.error(
@@ -157,11 +164,17 @@ class ChromaDBBackend(VectorBackend):
                             self._model_name,
                             e,
                         )
-                        raise RuntimeError(f'Embedding model {self._model_name} not available locally') from e
+                        raise RuntimeError(
+                            f'Embedding model {self._model_name} not available locally'
+                        ) from e
 
-                with contextlib.redirect_stderr(io.StringIO()), \
-                     contextlib.redirect_stdout(io.StringIO()):
-                    self._model = SentenceTransformer(model_source, trust_remote_code=True)
+                with (
+                    contextlib.redirect_stderr(io.StringIO()),
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    self._model = SentenceTransformer(
+                        model_source, trust_remote_code=True
+                    )
                 logger.info('Embedding model loaded from %s', model_source)
 
     def warm_model_in_background(self) -> None:

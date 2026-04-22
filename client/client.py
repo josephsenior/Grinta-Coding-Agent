@@ -189,7 +189,9 @@ class AppClient:
             if isinstance(detail, list):  # FastAPI validation errors
                 detail = '; '.join(str(e.get('msg', e)) for e in detail)
         except Exception:
-            detail = getattr(resp, 'text', '') or getattr(resp, 'reason_phrase', '') or ''
+            detail = (
+                getattr(resp, 'text', '') or getattr(resp, 'reason_phrase', '') or ''
+            )
         code = status_code
         prefix = {
             400: 'Bad request',
@@ -263,7 +265,9 @@ class AppClient:
 
     async def start_agent(self, conversation_id: str) -> dict[str, Any]:
         """POST /api/conversations/{id}/start."""
-        return await self._post(f'/conversations/{conversation_id}/start', json={'providers_set': []})
+        return await self._post(
+            f'/conversations/{conversation_id}/start', json={'providers_set': []}
+        )
 
     async def stop_agent(self, conversation_id: str) -> dict[str, Any]:
         """POST /api/conversations/{id}/stop."""
@@ -324,7 +328,6 @@ class AppClient:
                 pass
             return {'session_limit': None, 'daily_limit': None}
 
-
     # ── secrets ───────────────────────────────────────────────────
 
     async def get_secrets(self) -> dict[str, Any]:
@@ -348,9 +351,7 @@ class AppClient:
 
     async def get_workspace_changes(self, conversation_id: str) -> list[dict[str, Any]]:
         """GET /api/git/changes?conversation_id=...."""
-        data = await self._get(
-            f'/conversations/{conversation_id}/files/git/changes'
-        )
+        data = await self._get(f'/conversations/{conversation_id}/files/git/changes')
         return data if isinstance(data, list) else data.get('changes', [])
 
     async def get_file_diff(

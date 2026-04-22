@@ -89,7 +89,7 @@ def test_disabled_via_config() -> None:
 def test_allows_powershell_to_temp() -> None:
     assert (
         evaluate_editor_only_shell_block(
-            command="Set-Content -Path $env:TEMP\\scratch.txt -Value x",
+            command='Set-Content -Path $env:TEMP\\scratch.txt -Value x',
             security_config=_cfg(),
             workspace_root='/workspace',
         )

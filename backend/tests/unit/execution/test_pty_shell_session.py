@@ -83,13 +83,17 @@ class TestDefaultShellArgv:
         argv = _default_shell_argv()
         if IS_WINDOWS:
             assert any(
-                tok.lower().endswith(('pwsh.exe', 'pwsh', 'powershell.exe',
-                                      'powershell', 'cmd.exe'))
+                tok.lower().endswith(
+                    ('pwsh.exe', 'pwsh', 'powershell.exe', 'powershell', 'cmd.exe')
+                )
                 for tok in argv
             )
         else:
-            assert argv[0] in {'bash', 'sh'} or argv[0].endswith('/bash') \
+            assert (
+                argv[0] in {'bash', 'sh'}
+                or argv[0].endswith('/bash')
                 or argv[0].endswith('/sh')
+            )
 
 
 class TestOutputBetweenLastTwoPs1:
@@ -172,9 +176,7 @@ class TestExecuteErrorPaths:
         obs = session.execute(CmdRunAction(command='echo hi'))
         assert isinstance(obs, ErrorObservation)
 
-    def test_execute_with_dead_pty_returns_error_observation(
-        self, tmp_path
-    ) -> None:
+    def test_execute_with_dead_pty_returns_error_observation(self, tmp_path) -> None:
         session = PtyInteractiveShellSession(work_dir=str(tmp_path))
         session._initialized = True
         fake_pty = MagicMock()
@@ -249,8 +251,7 @@ class TestFactoryWiring:
                 raise PtyUnavailableError('forced for test')
 
         monkeypatch.setattr(
-            'backend.execution.utils.pty_shell_session.'
-            'PtyInteractiveShellSession',
+            'backend.execution.utils.pty_shell_session.PtyInteractiveShellSession',
             _FakeRaisingPty,
         )
 
@@ -276,18 +277,14 @@ class TestSessionManagerInteractiveFlag:
             fake.initialize.return_value = None
             return fake
 
-        monkeypatch.setattr(
-            sm_mod, 'create_shell_session', fake_create_shell_session
-        )
+        monkeypatch.setattr(sm_mod, 'create_shell_session', fake_create_shell_session)
 
         manager = sm_mod.SessionManager(
             work_dir=str(tmp_path),
             username='test',
             tool_registry=MagicMock(),
         )
-        manager.create_session(
-            session_id='iface', cwd=str(tmp_path), interactive=True
-        )
+        manager.create_session(session_id='iface', cwd=str(tmp_path), interactive=True)
         assert captured.get('interactive') is True
 
     def test_session_manager_defaults_interactive_false(
@@ -303,9 +300,7 @@ class TestSessionManagerInteractiveFlag:
             fake.initialize.return_value = None
             return fake
 
-        monkeypatch.setattr(
-            sm_mod, 'create_shell_session', fake_create_shell_session
-        )
+        monkeypatch.setattr(sm_mod, 'create_shell_session', fake_create_shell_session)
 
         manager = sm_mod.SessionManager(
             work_dir=str(tmp_path),

@@ -10,6 +10,7 @@ Run from repo root with NVIDIA_API_KEY set (or in .env):
     # Linux/macOS:
     NVIDIA_API_KEY=your-key python scripts/test_nvidia_kimi.py
 """
+
 from __future__ import annotations
 
 import os
@@ -18,6 +19,7 @@ import sys
 # Load .env from project root if present
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
     pass
@@ -40,7 +42,9 @@ def main() -> int:
     base_url = 'https://integrate.api.nvidia.com/v1'
     print(f'Resolving client for model={model!r}, base_url={base_url!r} ...')
     client = get_direct_client(model, api_key=api_key, base_url=base_url)
-    print(f"Client: {type(client).__name__}, model_name={getattr(client, 'model_name', '?')}")
+    print(
+        f'Client: {type(client).__name__}, model_name={getattr(client, "model_name", "?")}'
+    )
 
     messages = [{'role': 'user', 'content': 'Reply with exactly: Hello from Kimi.'}]
     # Disable reasoning/thinking so the reply is in content (NVIDIA Kimi uses reasoning by default)
@@ -52,7 +56,9 @@ def main() -> int:
         print(f'Request failed: {e}')
         return 1
 
-    text = (response.choices[0].message.content or '').strip() if response.choices else ''
+    text = (
+        (response.choices[0].message.content or '').strip() if response.choices else ''
+    )
     print(f'Response ({len(text)} chars): {text!r}')
     if not text:
         print('No content in response.')

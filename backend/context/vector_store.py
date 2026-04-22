@@ -96,6 +96,7 @@ class ReRanker:
         if self._model is None:
             try:
                 import os as _os
+
                 _os.environ.setdefault('HF_HUB_OFFLINE', '1')
                 _os.environ.setdefault('TRANSFORMERS_OFFLINE', '1')
 
@@ -110,10 +111,16 @@ class ReRanker:
                 model_source = self.model_name
                 if snapshot_fn is not None:
                     try:
-                        local_path = snapshot_fn(repo_id=self.model_name, local_files_only=True)
+                        local_path = snapshot_fn(
+                            repo_id=self.model_name, local_files_only=True
+                        )
                         model_source = local_path
                     except Exception as e:
-                        logger.warning('Required local re-ranker model %s not found: %s', self.model_name, e)
+                        logger.warning(
+                            'Required local re-ranker model %s not found: %s',
+                            self.model_name,
+                            e,
+                        )
                         self.enabled = False
                         return
 

@@ -1,4 +1,4 @@
-"""End-to-end verification that the reliability fixes unstick the chess scenario.
+r"""End-to-end verification that the reliability fixes unstick the chess scenario.
 
 Reproduces the exact failure mode observed in
 ``logs/workspaces/ultimatedemo__9bb5826979f7/app.log`` — Kimi K2.5 emits
@@ -34,9 +34,8 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from backend.core.content_escape_repair import repair_arguments_in_place
-from backend.execution.utils.file_editor import FileEditor
-
+from backend.core.content_escape_repair import repair_arguments_in_place  # noqa: E402
+from backend.execution.utils.file_editor import FileEditor  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixture payloads: what Kimi K2.5 produced on the wire. We build them from
@@ -104,7 +103,7 @@ _CHESS_JS_CLEAN = """const INITIAL = [
   ['R','N','B','Q','K','B','N','R']
 ];
 const GLYPH = { K:'\u2654', Q:'\u2655', R:'\u2656', B:'\u2657', N:'\u2658', P:'\u2659',
-                k:'\u265A', q:'\u265B', r:'\u265C', b:'\u265D', n:'\u265E', p:'\u265F' };
+                k:'\u265a', q:'\u265b', r:'\u265c', b:'\u265d', n:'\u265e', p:'\u265f' };
 let board, turn, selected, legalTargets, capturedW, capturedB;
 
 function isWhite(p) { return p && p === p.toUpperCase(); }
@@ -193,7 +192,7 @@ reset();
 
 
 def _over_escape(clean: str, double_backslash: bool = False) -> str:
-    """Return the clean source with real newlines/quotes replaced by escape residue.
+    r"""Return the clean source with real newlines/quotes replaced by escape residue.
 
     ``double_backslash=False`` models the common Kimi K2.5 single-pass
     over-escape (``\\n`` / ``\\"`` on the wire); ``True`` models the
@@ -321,14 +320,18 @@ def main() -> int:
 
     print('\n--- first 3 lines ---')
     for p in ('index.html', 'styles.css', 'chess.js'):
-        head = '\n    '.join((workspace / p).read_text(encoding='utf-8').splitlines()[:3])
+        head = '\n    '.join(
+            (workspace / p).read_text(encoding='utf-8').splitlines()[:3]
+        )
         print(f'  {p}:\n    {head}')
 
     print('\n--- summary ---')
     if _FAILED:
         print('RESULT: FAIL -- one or more assertions failed.')
         return 1
-    print('RESULT: PASS -- all three chess files created from Kimi-style over-escaped input.')
+    print(
+        'RESULT: PASS -- all three chess files created from Kimi-style over-escaped input.'
+    )
     print(f'               Open {workspace / "index.html"} in a browser to play.')
     return 0
 

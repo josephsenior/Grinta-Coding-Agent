@@ -21,8 +21,8 @@ import json
 import os
 from pathlib import Path
 
-from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
+from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 from backend.inference.provider_resolver import discover_all_local_models
 
 

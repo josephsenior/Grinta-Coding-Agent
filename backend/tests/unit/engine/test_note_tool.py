@@ -7,7 +7,9 @@ import json
 from backend.engine.tools import note as note_tools
 
 
-def test_recall_lessons_empty_returns_clear_message_without_write(monkeypatch, tmp_path):
+def test_recall_lessons_empty_returns_clear_message_without_write(
+    monkeypatch, tmp_path
+):
     """Recalling 'lessons' before any have been stored must NOT bootstrap-write
     an empty key. The previous behavior masked the true empty state and made
     `recall` look like a side-effectful tool. finish() now owns lessons

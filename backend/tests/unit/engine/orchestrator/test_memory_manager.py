@@ -227,9 +227,7 @@ class TestCondenseHistory:
 
         result = m.condense_history(state)
 
-        state.ack_memory_pressure.assert_called_once_with(
-            source='ContextMemoryManager'
-        )
+        state.ack_memory_pressure.assert_called_once_with(source='ContextMemoryManager')
         assert result.pending_action is condensation.action
 
     def test_short_history_skips_forced_compaction_under_memory_pressure(self):
@@ -251,9 +249,7 @@ class TestCondenseHistory:
         result = m.condense_history(state)
 
         fake_compactor.get_compaction.assert_not_called()
-        state.ack_memory_pressure.assert_called_once_with(
-            source='ContextMemoryManager'
-        )
+        state.ack_memory_pressure.assert_called_once_with(source='ContextMemoryManager')
         assert result.events == fake_view.events
 
     def test_noop_condensation_without_request_returns_history(self):

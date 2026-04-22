@@ -34,7 +34,10 @@ if 'browser_use' not in sys.modules:
     sys.modules['browser_use'] = stub
 
 from backend.execution.browser import grinta_browser as gb  # noqa: E402
-from backend.ledger.observation import CmdOutputObservation, ErrorObservation  # noqa: E402
+from backend.ledger.observation import (  # noqa: E402
+    CmdOutputObservation,
+    ErrorObservation,
+)
 
 
 class _FakeTarget:
@@ -126,7 +129,9 @@ class _FakeBrowser:
 
 def test_resolve_page_target_prefers_focused_page() -> None:
     state = _SharedMockState()
-    browser = _FakeBrowser(state, focused_type='page', page_targets=('t-page-1', 't-page-2'))
+    browser = _FakeBrowser(
+        state, focused_type='page', page_targets=('t-page-1', 't-page-2')
+    )
     assert gb._resolve_page_target_id(browser) == 't-page-1'
 
 

@@ -196,8 +196,7 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
                 # provider override (which would indicate a proxy like Lightning
                 # AI or OpenRouter is being used).
                 _native_google = (
-                    model_str.startswith('google/')
-                    or model_str.startswith('gemini-')
+                    model_str.startswith('google/') or model_str.startswith('gemini-')
                 ) and not provider
                 if not _native_google:
                     llm_dict['base_url'] = raw_url
@@ -251,7 +250,9 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
                 try:
                     parsed.append(MCPServerConfig(**entry))
                 except Exception as exc:
-                    logger.app_logger.debug('Skipping invalid mcp_config server %r: %s', entry, exc)
+                    logger.app_logger.debug(
+                        'Skipping invalid mcp_config server %r: %s', entry, exc
+                    )
             if parsed:
                 existing_names = {s.name for s in cfg.mcp.servers}
                 cfg.mcp.servers = list(cfg.mcp.servers) + [
@@ -314,7 +315,6 @@ def _get_active_agent_config(cfg: AppConfig) -> AgentConfig:
     return cfg.get_agent_config(agent_name)
 
 
-
 def _ensure_active_agent_auto_compactor(cfg: AppConfig) -> None:
     from backend.core.config.compactor_config import AutoCompactorConfig
 
@@ -325,7 +325,10 @@ def _ensure_active_agent_auto_compactor(cfg: AppConfig) -> None:
             llm_config=cfg.get_llm_config_from_agent(cfg.default_agent)
         )
         return
-    if isinstance(compactor_config, AutoCompactorConfig) and compactor_config.llm_config is None:
+    if (
+        isinstance(compactor_config, AutoCompactorConfig)
+        and compactor_config.llm_config is None
+    ):
         agent_config.compactor_config = AutoCompactorConfig(
             llm_config=cfg.get_llm_config_from_agent(cfg.default_agent)
         )

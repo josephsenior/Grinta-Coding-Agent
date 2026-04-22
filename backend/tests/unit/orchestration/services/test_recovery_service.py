@@ -37,9 +37,7 @@ def ctrl(mock_context):
 
 class TestRecoveryService:
     @pytest.mark.asyncio
-    async def test_emits_error_and_returns_to_user_on_timeout(
-        self, mock_context, ctrl
-    ):
+    async def test_emits_error_and_returns_to_user_on_timeout(self, mock_context, ctrl):
         svc = RecoveryService(mock_context)
         await svc.react_to_exception(Timeout('slow'))
 
@@ -80,9 +78,7 @@ class TestRecoveryService:
         await svc.react_to_exception(RateLimitError('rate limited'))
 
         ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
-        mock_context.set_agent_state.assert_awaited_once_with(
-            AgentState.RATE_LIMITED
-        )
+        mock_context.set_agent_state.assert_awaited_once_with(AgentState.RATE_LIMITED)
 
     @pytest.mark.asyncio
     async def test_authentication_sets_notify_ui_only(self, mock_context, ctrl):
@@ -154,7 +150,10 @@ class TestTaskReconciliationDirective:
 
     @pytest.mark.asyncio
     async def test_survivable_error_with_doing_step_injects_directive(
-        self, mock_context, ctrl, state_with_doing_step,
+        self,
+        mock_context,
+        ctrl,
+        state_with_doing_step,
     ):
         ctrl.state = state_with_doing_step
         ctrl.get_agent_state.return_value = AgentState.RUNNING
@@ -169,7 +168,9 @@ class TestTaskReconciliationDirective:
 
     @pytest.mark.asyncio
     async def test_survivable_error_without_doing_step_no_directive(
-        self, mock_context, ctrl,
+        self,
+        mock_context,
+        ctrl,
     ):
         step = MagicMock(status='todo', id='1')
         plan = MagicMock(steps=[step])
@@ -188,7 +189,10 @@ class TestTaskReconciliationDirective:
 
     @pytest.mark.asyncio
     async def test_no_directive_when_existing_directive_present(
-        self, mock_context, ctrl, state_with_doing_step,
+        self,
+        mock_context,
+        ctrl,
+        state_with_doing_step,
     ):
         state_with_doing_step.turn_signals.planning_directive = 'already set'
         ctrl.state = state_with_doing_step
@@ -201,7 +205,9 @@ class TestTaskReconciliationDirective:
 
     @pytest.mark.asyncio
     async def test_no_directive_when_no_plan_exists(
-        self, mock_context, ctrl,
+        self,
+        mock_context,
+        ctrl,
     ):
         state = MagicMock()
         state.turn_signals = MagicMock(planning_directive=None)

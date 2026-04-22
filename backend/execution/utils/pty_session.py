@@ -354,9 +354,7 @@ class InteractiveSession:
         try:
             written = self._backend.write(data)  # type: ignore[union-attr]
         except Exception as exc:
-            raise InteractiveSessionError(
-                f'failed to write to session: {exc}'
-            ) from exc
+            raise InteractiveSessionError(f'failed to write to session: {exc}') from exc
         if isinstance(written, int):
             return written
         return len(data)
@@ -527,7 +525,9 @@ class InteractiveSession:
             except KeyboardInterrupt:
                 # Interpreter shutdown (e.g. Ctrl+C) can raise here on Windows; avoid
                 # noisy "Exception ignored in atexit" while the process is exiting.
-                logger.debug('reader thread join interrupted during close', exc_info=True)
+                logger.debug(
+                    'reader thread join interrupted during close', exc_info=True
+                )
         self._closed = True
         logger.debug(
             'InteractiveSession closed (pid=%s, exit=%s)',

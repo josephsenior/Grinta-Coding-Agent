@@ -77,17 +77,14 @@ def test_format_activity_delta_secondary_shows_colored_add_remove_counts() -> No
 
 
 def test_strip_tool_result_validation_annotations() -> None:
-    raw = (
-        'hello\n\n'
-        '<APP_RESULT_VALIDATION>\n'
-        'warnings: x\n'
-        '</APP_RESULT_VALIDATION>\n'
-    )
+    raw = 'hello\n\n<APP_RESULT_VALIDATION>\nwarnings: x\n</APP_RESULT_VALIDATION>\n'
     assert strip_tool_result_validation_annotations(raw) == 'hello'
 
 
 def test_format_activity_block_includes_secondary_when_set() -> None:
-    g = format_activity_block('Viewed', 'src/a.py', secondary='12 lines', secondary_kind='neutral')
+    g = format_activity_block(
+        'Viewed', 'src/a.py', secondary='12 lines', secondary_kind='neutral'
+    )
     plain = ''.join(getattr(seg, 'plain', str(seg)) for seg in g.renderables)
     assert 'Viewed' in plain
     assert 'src/a.py' in plain
@@ -129,9 +126,9 @@ def test_format_activity_shell_block_uses_card_and_command() -> None:
         result_kind='ok',
     )
     buf = io.StringIO()
-    Console(file=buf, width=88, force_terminal=True, color_system=None, legacy_windows=False).print(
-        g
-    )
+    Console(
+        file=buf, width=88, force_terminal=True, color_system=None, legacy_windows=False
+    ).print(g)
     out = buf.getvalue()
     assert 'Ran' in out
     assert '$ ls -la' in out
@@ -155,9 +152,9 @@ def test_format_reasoning_snapshot_empty() -> None:
 def test_format_reasoning_snapshot_lines() -> None:
     g = format_reasoning_snapshot(['  first line  ', '', 'second'])
     buf = io.StringIO()
-    Console(file=buf, width=88, force_terminal=True, color_system=None, legacy_windows=False).print(
-        g
-    )
+    Console(
+        file=buf, width=88, force_terminal=True, color_system=None, legacy_windows=False
+    ).print(g)
     out = buf.getvalue()
     assert 'first line' in out
     assert 'second' in out

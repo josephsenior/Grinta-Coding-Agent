@@ -59,7 +59,9 @@ def get_default_models_to_prewarm() -> list[str]:
     return out
 
 
-def ensure_models_available(models: list[str], fail_on_missing: bool = True) -> dict[str, str]:
+def ensure_models_available(
+    models: list[str], fail_on_missing: bool = True
+) -> dict[str, str]:
     """Ensure each model in `models` is present in the local HF snapshot cache.
 
     Args:

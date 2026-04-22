@@ -65,7 +65,9 @@ def test_working_memory_clear_section_all_clears_all_sections(
         encoding='utf-8',
     )
 
-    action = wm.build_working_memory_action({'command': 'clear_section', 'section': 'all'})
+    action = wm.build_working_memory_action(
+        {'command': 'clear_section', 'section': 'all'}
+    )
 
     assert 'Cleared all sections' in action.thought
     payload = json.loads(memory_file.read_text(encoding='utf-8'))
@@ -96,9 +98,7 @@ def test_task_tracker_persists_active_plan_under_app_dir(tmp_path, monkeypatch) 
     ]
 
 
-def test_smart_compactor_reads_doing_ids_from_app_plan(
-    tmp_path, monkeypatch
-) -> None:
+def test_smart_compactor_reads_doing_ids_from_app_plan(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         'backend.core.workspace_resolution.workspace_agent_state_dir',
         lambda project_root=None: tmp_path,

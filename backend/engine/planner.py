@@ -149,6 +149,7 @@ class OrchestratorPlanner:
         from backend.engine.tools.task_tracker import (
             create_task_tracker_tool,
         )
+
         if getattr(self._config, 'enable_internal_task_tracker', False):
             tools.append(create_task_tracker_tool())
         tools.append(create_search_code_tool())

@@ -10,6 +10,7 @@ from backend.ledger.observation import (
     AgentThinkObservation,
     ErrorObservation,
     LspQueryObservation,
+    TerminalObservation,
 )
 from backend.ledger.serialization.event import (
     event_from_dict,
@@ -114,6 +115,21 @@ class TestEventToDict:
         assert d['observation'] == 'lsp_query_result'
         assert 'LSP unavailable' in d['message']
         assert d['extras']['available'] is False
+
+    def test_terminal_observation_roundtrip_preserves_cause(self):
+        """Stream add_event round-trips observations; cause must survive for pending clear."""
+        obs = TerminalObservation(session_id='term-deadbeef', content='user\n$ ')
+        obs._cause = 6
+        obs._source = EventSource.ENVIRONMENT
+
+        data = event_to_dict(obs)
+        assert data['observation'] == 'terminal'
+        assert data.get('cause') == 6
+
+        back = event_from_dict(data)
+        assert isinstance(back, TerminalObservation)
+        assert back.session_id == 'term-deadbeef'
+        assert back.cause == 6
 
     def test_tool_backed_think_action_preserves_tool_result_roundtrip(self):
         action = AgentThinkAction(

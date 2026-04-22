@@ -52,9 +52,7 @@ TRAFFIC_CONTROL_REMINDER = (
 )
 ERROR_ACTION_NOT_EXECUTED_STOPPED_ID = 'AGENT_ERROR$ERROR_ACTION_NOT_EXECUTED_STOPPED'
 ERROR_ACTION_NOT_EXECUTED_ERROR_ID = 'AGENT_ERROR$ERROR_ACTION_NOT_EXECUTED_ERROR'
-ERROR_ACTION_NOT_EXECUTED_STOPPED = (
-    'Run cancelled (Stop or Ctrl+C) before this tool finished — the action was not executed.'
-)
+ERROR_ACTION_NOT_EXECUTED_STOPPED = 'Run cancelled (Stop or Ctrl+C) before this tool finished — the action was not executed.'
 ERROR_ACTION_NOT_EXECUTED_ERROR = (
     'Runtime error or restart prevented this action from completing (unlike cancelling with '
     'Stop or Ctrl+C). The execution environment may have crashed or been recycled. '
@@ -769,7 +767,9 @@ class SessionOrchestrator:
                 action_type = getattr(batch[i], 'action', type(batch[i]).__name__)
                 logger.warning(
                     '[P2-B] Parallel batch action %d (%s) failed: %s',
-                    i, action_type, result,
+                    i,
+                    action_type,
+                    result,
                 )
         await self._handle_post_execution()
         return True

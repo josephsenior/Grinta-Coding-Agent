@@ -336,7 +336,9 @@ class BrowseInteractiveActionSchema(ActionSchemaV1):
 class BrowserToolActionSchema(ActionSchemaV1):
     """Schema for native browser-use tool actions (in-process, no nested Agent)."""
 
-    action_type: Literal['browser_tool'] = Field(ActionType.BROWSER_TOOL.value, frozen=True)
+    action_type: Literal['browser_tool'] = Field(
+        ActionType.BROWSER_TOOL.value, frozen=True
+    )
     runnable: bool = Field(True, frozen=True)
     command: str = Field(..., min_length=1, description='browser subcommand')
     params: dict[str, Any] = Field(
@@ -456,9 +458,7 @@ class StreamingChunkActionSchema(ActionSchemaV1):
         default=False,
         description='True when streaming tool call arguments (not content)',
     )
-    tool_call_name: str = Field(
-        default='', description='Name of the tool being called'
-    )
+    tool_call_name: str = Field(default='', description='Name of the tool being called')
     thinking_chunk: str = Field(
         default='', description='New thinking/reasoning token from the model'
     )

@@ -61,5 +61,3 @@ class TestMergeSettingsWithCache:
         settings = self._make_settings('upd')
         merge_settings_with_cache('user_0', settings, None, cache, 999.0)
         assert len(cache) == 256
-
-

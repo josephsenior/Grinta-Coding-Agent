@@ -936,10 +936,16 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
         with (
             patch.object(self.ctrl, '_run_control_flags_safely', return_value=True),
             patch.object(
-                type(self.ctrl), '_pending_action', new_callable=PropertyMock, return_value=None
+                type(self.ctrl),
+                '_pending_action',
+                new_callable=PropertyMock,
+                return_value=None,
             ),
             patch.object(
-                self.ctrl, '_try_parallel_read_batch', new_callable=AsyncMock, return_value=False
+                self.ctrl,
+                '_try_parallel_read_batch',
+                new_callable=AsyncMock,
+                return_value=False,
             ),
             patch.object(self.ctrl, '_can_drain_pending', side_effect=[True, False]),
             patch.object(self.ctrl, '_handle_post_execution', new_callable=AsyncMock),

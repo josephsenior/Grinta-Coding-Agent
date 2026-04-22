@@ -139,33 +139,25 @@ class TestBufferSemantics:
 
 class TestLifecycleGuards:
     def test_double_start_raises(self) -> None:
-        session = InteractiveSession(
-            InteractiveSessionConfig(argv=_one_shot_argv('x'))
-        )
+        session = InteractiveSession(InteractiveSessionConfig(argv=_one_shot_argv('x')))
         session._started = True  # simulate prior start without real spawn
         with pytest.raises(InteractiveSessionError):
             session.start()
 
     def test_write_before_start_raises(self) -> None:
-        session = InteractiveSession(
-            InteractiveSessionConfig(argv=_one_shot_argv('x'))
-        )
+        session = InteractiveSession(InteractiveSessionConfig(argv=_one_shot_argv('x')))
         with pytest.raises(InteractiveSessionError):
             session.write('hi')
 
     def test_write_after_close_raises(self) -> None:
-        session = InteractiveSession(
-            InteractiveSessionConfig(argv=_one_shot_argv('x'))
-        )
+        session = InteractiveSession(InteractiveSessionConfig(argv=_one_shot_argv('x')))
         session._started = True
         session._closed = True
         with pytest.raises(InteractiveSessionError):
             session.write('hi')
 
     def test_resize_requires_positive_dimensions(self) -> None:
-        session = InteractiveSession(
-            InteractiveSessionConfig(argv=_one_shot_argv('x'))
-        )
+        session = InteractiveSession(InteractiveSessionConfig(argv=_one_shot_argv('x')))
         session._started = True
         session._backend = MagicMock()
         with pytest.raises(InteractiveSessionError):
@@ -184,9 +176,7 @@ class TestPtyUnavailableHandling:
             raise PtyUnavailableError('forced for test')
 
         monkeypatch.setattr(mod, '_spawn_backend', _raise)
-        session = InteractiveSession(
-            InteractiveSessionConfig(argv=_one_shot_argv('x'))
-        )
+        session = InteractiveSession(InteractiveSessionConfig(argv=_one_shot_argv('x')))
         with pytest.raises(PtyUnavailableError):
             session.start()
 
@@ -276,9 +266,7 @@ class TestLivePtySession:
             _, offset = session.read_since(0)
 
             session.send_line('echo second-chunk')
-            assert _wait_for(
-                lambda: 'second-chunk' in session.peek(), timeout=5.0
-            )
+            assert _wait_for(lambda: 'second-chunk' in session.peek(), timeout=5.0)
             tail, next_offset = session.read_since(offset)
             assert 'second-chunk' in tail
             assert next_offset >= offset

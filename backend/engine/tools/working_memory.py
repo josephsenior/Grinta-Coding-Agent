@@ -143,7 +143,9 @@ def _update_all_sections(content: str) -> AgentThinkAction:
     - Otherwise, stores the entire content into the 'findings' section.
     """
     if not content:
-        return AgentThinkAction(thought="[WORKING_MEMORY] 'content' is required for update.")
+        return AgentThinkAction(
+            thought="[WORKING_MEMORY] 'content' is required for update."
+        )
 
     memory = _load_memory()
     updated: list[str] = []
@@ -165,7 +167,7 @@ def _update_all_sections(content: str) -> AgentThinkAction:
             memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
             _save_memory(memory)
             return AgentThinkAction(
-                thought=f"[WORKING_MEMORY] Updated sections: {', '.join(updated)}."
+                thought=f'[WORKING_MEMORY] Updated sections: {", ".join(updated)}.'
             )
 
     # 2) Parse a simple multi-section text block.
@@ -202,7 +204,9 @@ def _update_all_sections(content: str) -> AgentThinkAction:
     if updated:
         memory['_last_updated'] = time.strftime('%Y-%m-%d %H:%M:%S')
         _save_memory(memory)
-        return AgentThinkAction(thought=f"[WORKING_MEMORY] Updated sections: {', '.join(updated)}.")
+        return AgentThinkAction(
+            thought=f'[WORKING_MEMORY] Updated sections: {", ".join(updated)}.'
+        )
 
     # 3) Fallback: store everything as findings.
     memory['findings'] = content

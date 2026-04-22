@@ -203,7 +203,9 @@ class EventStream(EventStore):
         self._stop_event: asyncio.Event | None = None
         self._stop_sentinel = object()
         if not self._inline_delivery:
-            self._queue_thread = threading.Thread(target=self._run_queue_loop, daemon=True)
+            self._queue_thread = threading.Thread(
+                target=self._run_queue_loop, daemon=True
+            )
             self._queue_thread.start()
         else:
             # In inline mode the queue thread is not used; mark ready immediately.
@@ -407,10 +409,14 @@ class EventStream(EventStore):
         if sanitized_event.id is not None:
             self._persist.persist_event(payload, sanitized_event.id, cache_payload)
 
+        # Arm pending with *sanitized_event*, the same object the stream delivers
+        # to subscribers (runtime, controller). A round-trip can diverge from the
+        # original in-place ``event``; ``observation.cause`` is keyed to the
+        # delivered action's id, so the pending map must use that id.
         hook = self.pre_runnable_action_dispatch
-        if hook is not None and getattr(event, 'runnable', False):
+        if hook is not None and getattr(sanitized_event, 'runnable', False):
             try:
-                hook(event)
+                hook(sanitized_event)
             except Exception as exc:  # pragma: no cover - hook must not break delivery
                 logger.error(
                     'pre_runnable_action_dispatch failed: %s',

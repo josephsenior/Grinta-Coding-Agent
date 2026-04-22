@@ -21,6 +21,7 @@ from backend.ledger.action import AgentThinkAction
 
 ANALYZE_PROJECT_STRUCTURE_TOOL_NAME = 'analyze_project_structure'
 
+
 def create_analyze_project_structure_tool() -> dict:
     """Return the OpenAI function-calling tool definition for analyze_project_structure."""
     return {
@@ -90,6 +91,7 @@ def create_analyze_project_structure_tool() -> dict:
         },
     }
 
+
 def build_analyze_project_structure_action(
     arguments: dict,
 ) -> AgentThinkAction:
@@ -132,6 +134,7 @@ def build_analyze_project_structure_action(
         )
     )
 
+
 def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
     """Directory tree with file sizes, respecting .gitignore."""
     depth = max(1, min(depth, 5))
@@ -139,7 +142,9 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
     spec = get_ignore_spec(root)
 
     if not os.path.exists(root):
-        return AgentThinkAction(thought=f'[ANALYZE_PROJECT_STRUCTURE] Path not found: {path}')
+        return AgentThinkAction(
+            thought=f'[ANALYZE_PROJECT_STRUCTURE] Path not found: {path}'
+        )
 
     def rel_depth(relative_path: str) -> int:
         if relative_path in ('', '.'):
@@ -168,6 +173,7 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
         if not filepath.endswith('.py'):
             return []
         import ast
+
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
@@ -175,12 +181,21 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
             symbols = []
             for node in tree.body:
                 if isinstance(node, ast.ClassDef):
-                    methods = [m.name for m in node.body if isinstance(m, ast.FunctionDef) and not m.name.startswith('__')]
+                    methods = [
+                        m.name
+                        for m in node.body
+                        if isinstance(m, ast.FunctionDef)
+                        and not m.name.startswith('__')
+                    ]
                     if methods:
-                        symbols.append(f"      class {node.name} (methods: {', '.join(methods[:3])}{'...' if len(methods)>3 else ''})")
+                        symbols.append(
+                            f'      class {node.name} (methods: {", ".join(methods[:3])}{"..." if len(methods) > 3 else ""})'
+                        )
                     else:
                         symbols.append(f'      class {node.name}')
-                elif isinstance(node, ast.FunctionDef) and not node.name.startswith('_'):
+                elif isinstance(node, ast.FunctionDef) and not node.name.startswith(
+                    '_'
+                ):
                     symbols.append(f'      def {node.name}')
             return symbols
         except Exception:
@@ -191,9 +206,14 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
         try:
             res = subprocess.run(
                 ['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
-                cwd=cwd, capture_output=True, text=False, check=True
+                cwd=cwd,
+                capture_output=True,
+                text=False,
+                check=True,
             )
-            return {f.decode('utf-8', errors='ignore') for f in res.stdout.split(b'\0') if f}
+            return {
+                f.decode('utf-8', errors='ignore') for f in res.stdout.split(b'\0') if f
+            }
         except Exception:
             return set()
 
@@ -201,7 +221,9 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
     use_git = len(git_files) > 0
 
     lines = [f'[ANALYZE_PROJECT_STRUCTURE] Mapping project semantic structure ({path})']
-    lines.append('Note: Large directories are truncated. Showing key classes/functions for Python files.')
+    lines.append(
+        'Note: Large directories are truncated. Showing key classes/functions for Python files.'
+    )
     lines.append(
         'Recovery hint: do not repeat this tool with identical arguments; pick a specific subpath or run a concrete test/build/runtime command next.'
     )
@@ -255,7 +277,9 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
         if use_git:
             valid_filenames = []
             for f in sort_files(filenames):
-                rel_file = os.path.relpath(os.path.join(current_root, f), root).replace(os.sep, '/')
+                rel_file = os.path.relpath(os.path.join(current_root, f), root).replace(
+                    os.sep, '/'
+                )
                 if rel_file in git_files:
                     valid_filenames.append(f)
         else:
@@ -282,18 +306,23 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
                 emitted += 1
 
             if emitted >= max_total_items:
-                lines.append(f'\n(Output truncated at {max_total_items} total items. Try lower depth or a more specific path directory.)')
+                lines.append(
+                    f'\n(Output truncated at {max_total_items} total items. Try lower depth or a more specific path directory.)'
+                )
                 break
 
         if hidden_files > 0 and emitted < max_total_items:
             hint_path = relative_root.replace(os.sep, '/') or '.'
-            lines.append(f"  ... and {hidden_files} more files inside {relative_root or '.'} hidden. Use path='{hint_path}' to explore.")
+            lines.append(
+                f"  ... and {hidden_files} more files inside {relative_root or '.'} hidden. Use path='{hint_path}' to explore."
+            )
             emitted += 1
 
         if emitted >= max_total_items:
             break
 
     return AgentThinkAction(thought='\n'.join(lines))
+
 
 def _build_imports_action(path: str) -> AgentThinkAction:
     """Show what a file imports AND what other files import it."""
@@ -315,15 +344,26 @@ def _build_imports_action(path: str) -> AgentThinkAction:
 
     # Try ripgrep first
     import shutil
+
     rg = shutil.which('rg')
     found_any = False
 
     if rg:
         try:
-            res = subprocess.run([
-                rg, '-l', f'(import|from).*{basename}',
-                '--type', 'py', '--glob', '!__pycache__'
-            ], capture_output=True, text=True, check=False)
+            res = subprocess.run(
+                [
+                    rg,
+                    '-l',
+                    f'(import|from).*{basename}',
+                    '--type',
+                    'py',
+                    '--glob',
+                    '!__pycache__',
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             if res.stdout.strip():
                 lines = res.stdout.splitlines()[:30]
                 out.extend(lines)
@@ -335,7 +375,7 @@ def _build_imports_action(path: str) -> AgentThinkAction:
         # Fallback to python traversal
         count = 0
         import_re = re.compile(f'(import|from).*{re.escape(basename)}')
-        root = os.getcwd() # Or some relevant root
+        root = os.getcwd()  # Or some relevant root
         spec = get_ignore_spec(root)
 
         for root_dir, dirs, files in os.walk('.'):
@@ -362,6 +402,7 @@ def _build_imports_action(path: str) -> AgentThinkAction:
             out.append('(no reverse imports found)')
 
     return AgentThinkAction(thought='\n'.join(out))
+
 
 def _build_file_outline_action(path: str) -> AgentThinkAction:
     """Compact API-style outline: Python AST signatures, else line-based heads."""
@@ -479,13 +520,16 @@ def _build_symbols_action(path: str) -> AgentThinkAction:
         out.append('(file not found)')
     return AgentThinkAction(thought='\n'.join(out))
 
+
 def _build_recent_action() -> AgentThinkAction:
     """Recently modified files via git log."""
     out = ['=== RECENTLY MODIFIED FILES (last 20 commits) ===']
     try:
         res = subprocess.run(
             ['git', 'log', '--oneline', '--name-only', '-20', '--pretty=format:%h %s'],
-            capture_output=True, text=True, check=False
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if res.stdout.strip():
             out.extend(res.stdout.splitlines()[:100])
@@ -495,12 +539,14 @@ def _build_recent_action() -> AgentThinkAction:
         out.append('(git not available or error running git)')
     return AgentThinkAction(thought='\n'.join(out))
 
+
 def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
     """Find all files that reference a given symbol (function, class, variable)."""
     trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
     out = [f'=== CALLERS OF {trunc_sym} ===']
 
     import shutil
+
     rg = shutil.which('rg')
     safe_scope = scope if scope and scope != '.' else '.'
     root = os.path.abspath('.')
@@ -508,13 +554,31 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
 
     if rg:
         try:
-            res = subprocess.run([
-                rg, '-n', '--word-regexp', symbol,
-                '--type', 'py', '--type', 'js', '--type', 'ts',
-                # relies on .gitignore, but add failsafes
-                '--glob', '!__pycache__', '--glob', '!node_modules', '--glob', '!.git',
-                safe_scope
-            ], capture_output=True, text=True, check=False)
+            res = subprocess.run(
+                [
+                    rg,
+                    '-n',
+                    '--word-regexp',
+                    symbol,
+                    '--type',
+                    'py',
+                    '--type',
+                    'js',
+                    '--type',
+                    'ts',
+                    # relies on .gitignore, but add failsafes
+                    '--glob',
+                    '!__pycache__',
+                    '--glob',
+                    '!node_modules',
+                    '--glob',
+                    '!.git',
+                    safe_scope,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             if res.stdout.strip():
                 out.extend(res.stdout.splitlines()[:50])
                 return AgentThinkAction(thought='\n'.join(out))
@@ -551,19 +615,22 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
         out.append(f'(no references found for {trunc_sym})')
     return AgentThinkAction(thought='\n'.join(out))
 
+
 def _build_test_coverage_action(path: str) -> AgentThinkAction:
     """Find test files that likely cover a given source file."""
     basename = os.path.splitext(os.path.basename(path))[0]
     dirname = os.path.dirname(path) or '.'
     out = [
         f'=== TEST COVERAGE FOR {os.path.basename(path)} ===',
-        '--- Tests by naming convention ---'
+        '--- Tests by naming convention ---',
     ]
 
     root = os.path.abspath('.')
     spec = get_ignore_spec(root)
 
-    name_re = re.compile(rf'^(test_{re.escape(basename)}\.py|{re.escape(basename)}_test\.py)$')
+    name_re = re.compile(
+        rf'^(test_{re.escape(basename)}\.py|{re.escape(basename)}_test\.py)$'
+    )
     count = 0
     test_files = []
 
@@ -575,8 +642,10 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
             if name_re.match(f):
                 test_files.append(os.path.join(root_dir, f))
                 count += 1
-                if count >= 20: break  # noqa: E701
-        if count >= 20: break  # noqa: E701
+                if count >= 20:
+                    break  # noqa: E701
+        if count >= 20:
+            break  # noqa: E701
 
     out.extend(test_files)
     if not test_files:
@@ -596,16 +665,18 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
             if f.startswith('test_') or f.endswith('_test.py'):
                 fpath = os.path.join(root_dir, f)
                 if fpath in test_files:
-                    continue # Already found
+                    continue  # Already found
                 try:
                     with open(fpath, 'r', encoding='utf-8', errors='ignore') as fl:
                         if import_re.search(fl.read()):
                             import_test_files.append(fpath)
                             count += 1
-                            if count >= 20: break  # noqa: E701
+                            if count >= 20:
+                                break  # noqa: E701
                 except Exception:
                     pass
-        if count >= 20: break  # noqa: E701
+        if count >= 20:
+            break  # noqa: E701
 
     out.extend(import_test_files)
     if not import_test_files:
@@ -623,14 +694,17 @@ def _build_test_coverage_action(path: str) -> AgentThinkAction:
             if f == 'conftest.py':
                 conftest_files.append(os.path.join(root_dir, f))
                 count += 1
-                if count >= 10: break  # noqa: E701
-        if count >= 10: break  # noqa: E701
+                if count >= 10:
+                    break  # noqa: E701
+        if count >= 10:
+            break  # noqa: E701
 
     out.extend(conftest_files)
     if not conftest_files:
         out.append('(none)')
 
     return AgentThinkAction(thought='\n'.join(out))
+
 
 def _build_semantic_search_action(symbol: str, path: str) -> AgentThinkAction:
     """Robust AST-based reference search using the semantic_analyzer script."""
@@ -642,8 +716,14 @@ def _build_semantic_search_action(symbol: str, path: str) -> AgentThinkAction:
     try:
         res = subprocess.run(
             [sys.executable, script_path, 'find_references', symbol, path],
-            capture_output=True, text=True, check=False
+            capture_output=True,
+            text=True,
+            check=False,
         )
-        return AgentThinkAction(thought=res.stdout if res.stdout.strip() else f'(no output from semantic search for {symbol})')
+        return AgentThinkAction(
+            thought=res.stdout
+            if res.stdout.strip()
+            else f'(no output from semantic search for {symbol})'
+        )
     except Exception as e:
         return AgentThinkAction(thought=f'(error running semantic search: {e})')

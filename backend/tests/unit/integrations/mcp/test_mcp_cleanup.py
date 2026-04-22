@@ -14,7 +14,10 @@ from __future__ import annotations
 import pytest
 
 from backend.core.config.mcp_config import MCPServerConfig
-from backend.integrations.mcp.mcp_utils import _apply_exa_mcp_url_auth, _resolve_server_env
+from backend.integrations.mcp.mcp_utils import (
+    _apply_exa_mcp_url_auth,
+    _resolve_server_env,
+)
 from backend.integrations.mcp.wrappers import (
     WRAPPER_TOOL_REGISTRY,
     wrapper_tool_params,

@@ -27,11 +27,6 @@ from backend.engine.tools import (
     create_summarize_context_tool,
     create_think_tool,
 )
-from backend.engine.tools.browser_native import (
-    BROWSER_TOOL_NAME,
-    build_browser_tool_action,
-    create_browser_tool,
-)
 from backend.engine.tools.analyze_project_structure import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
     build_analyze_project_structure_action,
@@ -39,6 +34,10 @@ from backend.engine.tools.analyze_project_structure import (
 from backend.engine.tools.blackboard import (
     BLACKBOARD_TOOL_NAME,
     build_blackboard_action,
+)
+from backend.engine.tools.browser_native import (
+    BROWSER_TOOL_NAME,
+    build_browser_tool_action,
 )
 from backend.engine.tools.checkpoint import (
     CHECKPOINT_TOOL_NAME,
@@ -397,7 +396,9 @@ def _filter_valid_editor_kwargs(other_kwargs: dict) -> dict:
     return valid_kwargs_for_editor
 
 
-def _preview_str_replace_edit(path: str, command: str, kwargs: dict) -> AgentThinkAction:
+def _preview_str_replace_edit(
+    path: str, command: str, kwargs: dict
+) -> AgentThinkAction:
     """Generate a unified diff preview of what an insert_text edit would produce."""
     import difflib
     import os
@@ -489,7 +490,7 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     if command not in valid_commands:
         raise FunctionCallValidationError(
             f"Unknown command '{command}' for str_replace_editor tool. "
-            f"Valid commands: {sorted(valid_commands)}"
+            f'Valid commands: {sorted(valid_commands)}'
         )
     path = str(normalized_args.get('path', path))
     other_kwargs = {
@@ -509,7 +510,7 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
             view_range=other_kwargs.get('view_range'),
         )
 
-    view_range = other_kwargs.pop('view_range', None)
+    other_kwargs.pop('view_range', None)
     valid_kwargs = _filter_valid_editor_kwargs(other_kwargs)
 
     action = FileEditAction(
@@ -753,7 +754,7 @@ def _handle_edit_symbols_command(editor, path: str, arguments: dict) -> Action:
     if not isinstance(raw_edits, list) or len(raw_edits) == 0:
         raise FunctionCallValidationError(
             "edit_symbols requires a non-empty 'edits' array "
-            "(objects with function_name or symbol, and new_body)"
+            '(objects with function_name or symbol, and new_body)'
         )
     if len(raw_edits) > _MAX_EDIT_SYMBOLS_PER_BATCH:
         raise FunctionCallValidationError(
@@ -764,7 +765,9 @@ def _handle_edit_symbols_command(editor, path: str, arguments: dict) -> Action:
     seen: set[str] = set()
     for i, item in enumerate(raw_edits):
         if not isinstance(item, dict):
-            raise FunctionCallValidationError(f'edit_symbols edits[{i}] must be an object')
+            raise FunctionCallValidationError(
+                f'edit_symbols edits[{i}] must be an object'
+            )
         fn = item.get('function_name') or item.get('symbol')
         nb = item.get('new_body')
         if not fn or not isinstance(fn, str):
@@ -858,8 +861,8 @@ def _handle_find_symbol_command(editor, path: str, arguments: dict) -> Action:
     if result:
         message = (
             f"✓ Found '{symbol_name}' in {path}:\n"
-            f"  Type: {result.node_type}\n"
-            f"  Lines: {result.line_start}-{result.line_end}"
+            f'  Type: {result.node_type}\n'
+            f'  Lines: {result.line_start}-{result.line_end}'
         )
         if result.parent_name:
             message += f'\n  Parent: {result.parent_name}'
@@ -1050,7 +1053,7 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
             all_cmds = list(editor_command_handlers) + list(simple_command_handlers)
             raise FunctionCallValidationError(
                 f"Unknown command '{command}' for ast_code_editor tool. "
-                f"Valid commands: {all_cmds}"
+                f'Valid commands: {all_cmds}'
             )
 
     except FunctionCallValidationError:

@@ -346,9 +346,7 @@ class TestLoadFromJson:
         with patch('backend.core.config.config_loader.logger.app_logger.warning') as w:
             load_from_json(cfg, str(json_file))
         w.assert_called()
-        assert (
-            cfg.get_llm_config().api_key.get_secret_value() == 'key-from-env'
-        )
+        assert cfg.get_llm_config().api_key.get_secret_value() == 'key-from-env'
 
     def test_load_from_json_llm_api_key_literal_ignored_without_env(
         self, tmp_path, monkeypatch: pytest.MonkeyPatch

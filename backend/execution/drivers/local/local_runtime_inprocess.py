@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from backend.core.config.security_config import SecurityConfig
+from backend.core.constants import BROWSER_TOOL_SYNC_TIMEOUT_SECONDS
 from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logger import app_logger as logger
@@ -35,15 +36,14 @@ from backend.ledger.action import (
     FileWriteAction,
     MCPAction,
 )
+from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
     TerminalRunAction,
 )
-from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.observation import Observation
 from backend.security.analyzer import SecurityAnalyzer
-from backend.core.constants import BROWSER_TOOL_SYNC_TIMEOUT_SECONDS
 from backend.utils.async_utils import call_async_from_sync
 
 if TYPE_CHECKING:
@@ -504,7 +504,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             try:
                 self._browser_loop_runner.close()
             except Exception:
-                logger.debug('LocalRuntimeInProcess browser loop close failed', exc_info=True)
+                logger.debug(
+                    'LocalRuntimeInProcess browser loop close failed', exc_info=True
+                )
             self._browser_loop_runner = None
         if self._executor:
             # RuntimeExecutor cleanup (this is synchronous)

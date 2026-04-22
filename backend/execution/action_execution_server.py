@@ -614,9 +614,7 @@ class RuntimeExecutor:
             content,
         )
         if scaffold_failure:
-            observation.content += (
-                f'\n\n[SCAFFOLD_SETUP_FAILED] {scaffold_failure}'
-            )
+            observation.content += f'\n\n[SCAFFOLD_SETUP_FAILED] {scaffold_failure}'
             return
 
         for pattern, tag, guidance_template in self._ENV_ERROR_PATTERNS:
@@ -686,7 +684,10 @@ class RuntimeExecutor:
         lower_content = content.lower()
         if '/bin/bash' not in lower_content and 'bash:' not in lower_content:
             return None
-        if 'command not found' not in lower_content and 'not recognized as' not in lower_content:
+        if (
+            'command not found' not in lower_content
+            and 'not recognized as' not in lower_content
+        ):
             return None
 
         _bash_fix = (
@@ -695,7 +696,9 @@ class RuntimeExecutor:
             'Do NOT use any PowerShell cmdlets.'
         )
 
-        missing_match = re.search(r'([A-Za-z][A-Za-z0-9-]*)\s*:\s*command not found', content)
+        missing_match = re.search(
+            r'([A-Za-z][A-Za-z0-9-]*)\s*:\s*command not found', content
+        )
         if missing_match:
             missing_cmd = missing_match.group(1)
             if missing_cmd in _POWERSHELL_BUILTIN_COMMANDS:
@@ -738,7 +741,10 @@ class RuntimeExecutor:
         lower_content = content.lower()
         if 'could not read package.json' not in lower_content:
             return None
-        if 'enoent' not in lower_content and 'no such file or directory' not in lower_content:
+        if (
+            'enoent' not in lower_content
+            and 'no such file or directory' not in lower_content
+        ):
             return None
 
         return (
@@ -1033,9 +1039,7 @@ class RuntimeExecutor:
                     predicted_cwd, policy_error = (
                         self._evaluate_interactive_terminal_command(
                             write_content,
-                            Path(
-                                getattr(session, 'cwd', self._initial_cwd)
-                            ).resolve(),
+                            Path(getattr(session, 'cwd', self._initial_cwd)).resolve(),
                         )
                     )
                     if policy_error is not None:
@@ -1513,8 +1517,8 @@ class RuntimeExecutor:
             self.browser = None
         if self._native_browser is not None:
             try:
-                from backend.utils.async_utils import call_async_from_sync
                 from backend.core.constants import GENERAL_TIMEOUT
+                from backend.utils.async_utils import call_async_from_sync
 
                 call_async_from_sync(self._native_browser.shutdown, GENERAL_TIMEOUT)
             except Exception:
@@ -1552,6 +1556,7 @@ async def lifespan(app: FastAPI):
             ensure_models_available,
             get_default_models_to_prewarm,
         )
+
         prebundle_env = os.getenv('PREBUNDLED_MODELS', '')
         models = get_default_models_to_prewarm()
         if prebundle_env:

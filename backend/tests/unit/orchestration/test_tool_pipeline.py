@@ -273,7 +273,3 @@ class TestCreateContext:
         assert ctx.state is state
         assert ctx.blocked is False
         assert ctx.metadata == {}
-
-
-
-

@@ -1,4 +1,5 @@
 """Headless agent test — validates core agent loop end-to-end."""
+
 import asyncio
 import os
 import sys
@@ -22,9 +23,9 @@ def _agent_state(event: dict) -> str:
 
 async def run_task(description: str, task: str) -> dict:
     """Run a single agent task and return results."""
-    print(f"\n{'='*60}")
+    print(f'\n{"=" * 60}')
     print(f'TASK: {description}')
-    print(f"{'='*60}")
+    print(f'{"=" * 60}')
 
     client = AppClient(base_url=SERVER)
     tool_calls = []
@@ -77,7 +78,9 @@ async def run_task(description: str, task: str) -> dict:
         if final_status is None:
             print(f'  TIMEOUT after {elapsed:.0f}s ({len(tool_calls)} tool calls)')
         else:
-            print(f'  Completed: {final_status} in {elapsed:.1f}s with {len(tool_calls)} tool calls')
+            print(
+                f'  Completed: {final_status} in {elapsed:.1f}s with {len(tool_calls)} tool calls'
+            )
 
     except Exception as e:
         elapsed = time.time() - t0
@@ -112,14 +115,16 @@ async def main():
     results.append(r)
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f'\n{"=" * 60}')
     print('RESULTS SUMMARY')
-    print(f"{'='*60}")
+    print(f'{"=" * 60}')
     for r in results:
         status = r['status'] or 'TIMEOUT'
-        print(f"  {r['description']}: {status} | {r['elapsed']:.0f}s | {len(r['tool_calls'])} tools")
+        print(
+            f'  {r["description"]}: {status} | {r["elapsed"]:.0f}s | {len(r["tool_calls"])} tools'
+        )
         if r['tool_calls']:
-            print(f"    Tools: {', '.join(r['tool_calls'])}")
+            print(f'    Tools: {", ".join(r["tool_calls"])}')
 
 
 if __name__ == '__main__':

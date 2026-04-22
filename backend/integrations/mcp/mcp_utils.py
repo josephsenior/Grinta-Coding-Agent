@@ -748,6 +748,7 @@ async def _execute_direct_tool(
 ) -> MCPObservation:
     """Execute a direct MCP tool call and return observation."""
     from backend.engine.tools.prompt import get_terminal_tool_name as _terminal_tool
+
     try:
         if cached := get_cached(action.name, action.arguments):
             logger.debug('Cache hit for MCP tool %s', action.name)

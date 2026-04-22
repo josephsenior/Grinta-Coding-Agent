@@ -15,7 +15,7 @@ class TerminalObservation(Observation):
 
     session_id: str
     content: str
-    observation_type: ClassVar[str] = ObservationType.TERMINAL
+    observation: ClassVar[str] = ObservationType.TERMINAL
 
     @property
     def message(self) -> str:

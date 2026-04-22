@@ -241,7 +241,7 @@ def _content_from_assistant_message(
 
 
 def _canonicalize_tool_call_arguments_dict(call_dict: dict[str, Any]) -> None:
-    """Ensure ``function.arguments`` is a canonical JSON string (safety net).
+    r"""Ensure ``function.arguments`` is a canonical JSON string (safety net).
 
     This runs every time an assistant tool-call message is rebuilt for the
     API. Even if upstream canonicalization missed a case (e.g. legacy events
@@ -263,8 +263,7 @@ def _canonicalize_tool_call_arguments_dict(call_dict: dict[str, Any]) -> None:
         # BadRequestError handler will detect the failure and surface a
         # recoverable error to the model instead of looping forever.
         logger.debug(
-            'Could not canonicalize legacy tool-call arguments (len=%d); '
-            'leaving raw.',
+            'Could not canonicalize legacy tool-call arguments (len=%d); leaving raw.',
             len(raw_arguments),
         )
         return
@@ -275,9 +274,7 @@ def _canonicalize_tool_call_arguments_dict(call_dict: dict[str, Any]) -> None:
             parsed, ensure_ascii=False, allow_nan=False
         )
     except (TypeError, ValueError):
-        logger.debug(
-            'Could not serialize canonical tool-call arguments; leaving raw.'
-        )
+        logger.debug('Could not serialize canonical tool-call arguments; leaving raw.')
 
 
 def _convert_tool_calls(raw_tool_calls: Any) -> list[ToolCall] | None:
@@ -345,9 +342,7 @@ def _handle_agent_finish_action(action: PlaybookFinishAction) -> list[Message]:
     """Handle PlaybookFinishAction by converting thought/conclusion to message."""
     role = _role_from_source(getattr(action, 'source', None))
     _merge_tool_metadata_thought(action)
-    content_items: list[TextContent | ImageContent] = [
-        TextContent(text=action.message)
-    ]
+    content_items: list[TextContent | ImageContent] = [TextContent(text=action.message)]
     return [Message(role=role, content=content_items)]
 
 

@@ -674,5 +674,5 @@ def _format_directory_listing(
 def _hidden_items_command_hint(display_path_normalized: str) -> str:
     """Return a platform-aware hint for viewing hidden directory entries."""
     if sys.platform == 'win32':
-        return 'Use `Get-ChildItem -Force ' f'{display_path_normalized}` to see them.'
+        return f'Use `Get-ChildItem -Force {display_path_normalized}` to see them.'
     return f"You can use 'ls -la {display_path_normalized}' to see them."  # type: ignore

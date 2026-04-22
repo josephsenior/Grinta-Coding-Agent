@@ -274,7 +274,9 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         emitted = self.mock_controller.event_stream.add_event.call_args[0][0]
         self.assertIsInstance(emitted, ErrorObservation)
         self.assertEqual(emitted.error_id, 'CHECKPOINT_FLOW_INCOMPLETE')
-        self.assertIn('revert_to_checkpoint is an intermediate control tool', emitted.content)
+        self.assertIn(
+            'revert_to_checkpoint is an intermediate control tool', emitted.content
+        )
 
     @patch.dict('os.environ', {'LOG_ALL_EVENTS': 'true'})
     async def test_handle_message_action_log_all_events(self):

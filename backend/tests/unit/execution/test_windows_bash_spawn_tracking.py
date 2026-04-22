@@ -20,7 +20,6 @@ import sys
 
 import pytest
 
-
 if sys.platform != 'win32':
     pytest.skip(
         'windows_bash only imports on Windows; helpers are tested via '
@@ -76,7 +75,7 @@ class TestCommandWrapper:
 
     def test_emits_sentinel_only_when_new_pids_exist(self) -> None:
         wrapped = _wrap_command_for_spawn_tracking('Start-Process python')
-        assert "if ($__grinta_new.Count -gt 0)" in wrapped
+        assert 'if ($__grinta_new.Count -gt 0)' in wrapped
         assert "'___GRINTA_SPAWNED___'" in wrapped
         assert "'___END___'" in wrapped
 
@@ -112,9 +111,7 @@ class TestSpawnedPidExtraction:
         assert 'server started' in cleaned
 
     def test_extracts_multiple_pids(self) -> None:
-        stdout = (
-            'Running\n___GRINTA_SPAWNED___1001,1002,1003___END___\n'
-        )
+        stdout = 'Running\n___GRINTA_SPAWNED___1001,1002,1003___END___\n'
         _cleaned, pids = _extract_spawned_pids(stdout)
         assert pids == [1001, 1002, 1003]
 

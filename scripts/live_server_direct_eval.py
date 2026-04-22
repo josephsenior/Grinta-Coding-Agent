@@ -159,44 +159,44 @@ def prepare_complex_refactor() -> None:
     )
     write_text(
         EVAL_WORKSPACE / 'complex_refactor' / 'reporting' / 'stats.py',
-        "def moving_average(values, window):\n"
-        "    if window <= 0:\n"
+        'def moving_average(values, window):\n'
+        '    if window <= 0:\n'
         "        raise ValueError('window must be positive')\n"
-        "    if len(values) < window:\n"
-        "        return []\n"
-        "    averages = []\n"
-        "    for idx in range(len(values) - window):\n"
-        "        chunk = values[idx:idx + window]\n"
-        "        averages.append(sum(chunk) // window)\n"
-        "    return averages\n\n"
-        "def summarize(values):\n"
-        "    total = 0\n"
-        "    for value in values:\n"
-        "        total += value\n"
-        "    average = total / len(values) if values else 0.0\n"
+        '    if len(values) < window:\n'
+        '        return []\n'
+        '    averages = []\n'
+        '    for idx in range(len(values) - window):\n'
+        '        chunk = values[idx:idx + window]\n'
+        '        averages.append(sum(chunk) // window)\n'
+        '    return averages\n\n'
+        'def summarize(values):\n'
+        '    total = 0\n'
+        '    for value in values:\n'
+        '        total += value\n'
+        '    average = total / len(values) if values else 0.0\n'
         "    return {'count': len(values), 'total': total, 'average': average}\n",
     )
     write_text(
         EVAL_WORKSPACE / 'complex_refactor' / 'reporting' / 'formatting.py',
-        "def format_summary(summary):\n"
+        'def format_summary(summary):\n'
         "    return f\"count={summary['count']} total={summary['total']} average={summary['average']:.2f}\"\n",
     )
     write_text(
         EVAL_WORKSPACE / 'complex_refactor' / 'test_reporting.py',
-        "import unittest\n\n"
-        "from reporting.formatting import format_summary\n"
-        "from reporting.stats import moving_average, summarize\n\n\n"
-        "class ReportingTests(unittest.TestCase):\n"
-        "    def test_moving_average(self):\n"
-        "        self.assertEqual(moving_average([1, 2, 3, 4], 2), [1.5, 2.5, 3.5])\n\n"
-        "    def test_short_window(self):\n"
-        "        self.assertEqual(moving_average([1, 2], 3), [])\n\n"
-        "    def test_summary_format(self):\n"
-        "        summary = summarize([2, 4, 6])\n"
+        'import unittest\n\n'
+        'from reporting.formatting import format_summary\n'
+        'from reporting.stats import moving_average, summarize\n\n\n'
+        'class ReportingTests(unittest.TestCase):\n'
+        '    def test_moving_average(self):\n'
+        '        self.assertEqual(moving_average([1, 2, 3, 4], 2), [1.5, 2.5, 3.5])\n\n'
+        '    def test_short_window(self):\n'
+        '        self.assertEqual(moving_average([1, 2], 3), [])\n\n'
+        '    def test_summary_format(self):\n'
+        '        summary = summarize([2, 4, 6])\n'
         "        self.assertEqual(summary, {'count': 3, 'total': 12, 'average': 4.0})\n"
         "        self.assertEqual(format_summary(summary), 'count=3 total=12 average=4.00')\n\n"
         "if __name__ == '__main__':\n"
-        "    unittest.main()\n",
+        '    unittest.main()\n',
     )
 
 
@@ -239,7 +239,9 @@ async def create_conversation(client: AppClient) -> str:
     return conv_id
 
 
-async def run_prompt(prompt: str, *, disconnect_after_tool: bool = False, disconnect_pause: float = 8.0) -> tuple[ScenarioTrace, bool]:
+async def run_prompt(
+    prompt: str, *, disconnect_after_tool: bool = False, disconnect_pause: float = 8.0
+) -> tuple[ScenarioTrace, bool]:
     trace = ScenarioTrace()
     terminal = asyncio.Event()
     first_tool = asyncio.Event()
@@ -252,13 +254,28 @@ async def run_prompt(prompt: str, *, disconnect_after_tool: bool = False, discon
         nonlocal prompt_sent
         trace.record(event)
         extras = event.get('extras') or {}
-        state = str(extras.get('agent_state') or '').upper() if isinstance(extras, dict) else ''
+        state = (
+            str(extras.get('agent_state') or '').upper()
+            if isinstance(extras, dict)
+            else ''
+        )
         action = str(event.get('action') or '')
-        if action and action not in {'streaming_chunk', 'message', 'recall', 'system_message', 'change_agent_state', 'add_memory', 'system'}:
+        if action and action not in {
+            'streaming_chunk',
+            'message',
+            'recall',
+            'system_message',
+            'change_agent_state',
+            'add_memory',
+            'system',
+        }:
             first_tool.set()
         if not prompt_sent and state == 'AWAITING_USER_INPUT':
             initialized.set()
-        elif state in {'AWAITING_USER_INPUT', 'FINISHED', 'STOPPED', 'ERROR', 'REJECTED'} or action == 'finish':
+        elif (
+            state in {'AWAITING_USER_INPUT', 'FINISHED', 'STOPPED', 'ERROR', 'REJECTED'}
+            or action == 'finish'
+        ):
             terminal.set()
 
     try:
@@ -274,7 +291,9 @@ async def run_prompt(prompt: str, *, disconnect_after_tool: bool = False, discon
             trace.disconnected_at_event_id = trace.last_event_id
             await client.leave_conversation()
             await asyncio.sleep(disconnect_pause)
-            await client.join_conversation(conv_id, on_event=on_event, latest_event_id=trace.last_event_id)
+            await client.join_conversation(
+                conv_id, on_event=on_event, latest_event_id=trace.last_event_id
+            )
 
         await asyncio.wait_for(terminal.wait(), timeout=300)
         return trace, True
@@ -309,12 +328,27 @@ async def run_server_restart_scenario() -> dict[str, Any]:
         trace.record(event)
         action = str(event.get('action') or '')
         extras = event.get('extras') or {}
-        state = str(extras.get('agent_state') or '').upper() if isinstance(extras, dict) else ''
-        if action and action not in {'streaming_chunk', 'message', 'recall', 'system_message', 'change_agent_state', 'add_memory', 'system'}:
+        state = (
+            str(extras.get('agent_state') or '').upper()
+            if isinstance(extras, dict)
+            else ''
+        )
+        if action and action not in {
+            'streaming_chunk',
+            'message',
+            'recall',
+            'system_message',
+            'change_agent_state',
+            'add_memory',
+            'system',
+        }:
             progress.set()
         if not prompt_sent and state == 'AWAITING_USER_INPUT':
             initialized.set()
-        elif state in {'AWAITING_USER_INPUT', 'FINISHED', 'STOPPED', 'ERROR', 'REJECTED'} or action == 'finish':
+        elif (
+            state in {'AWAITING_USER_INPUT', 'FINISHED', 'STOPPED', 'ERROR', 'REJECTED'}
+            or action == 'finish'
+        ):
             terminal.set()
 
     restart_proc: subprocess.Popen[str] | None = None
@@ -347,14 +381,31 @@ async def run_server_restart_scenario() -> dict[str, Any]:
 
         reconnect_client = AppClient(BASE_URL)
         try:
+
             async def on_reconnect(event: dict[str, Any]) -> None:
                 trace.record(event)
                 extras = event.get('extras') or {}
-                state = str(extras.get('agent_state') or '').upper() if isinstance(extras, dict) else ''
-                if state in {'AWAITING_USER_INPUT', 'FINISHED', 'STOPPED', 'ERROR', 'REJECTED'} or str(event.get('action') or '') == 'finish':
+                state = (
+                    str(extras.get('agent_state') or '').upper()
+                    if isinstance(extras, dict)
+                    else ''
+                )
+                if (
+                    state
+                    in {
+                        'AWAITING_USER_INPUT',
+                        'FINISHED',
+                        'STOPPED',
+                        'ERROR',
+                        'REJECTED',
+                    }
+                    or str(event.get('action') or '') == 'finish'
+                ):
                     terminal.set()
 
-            await reconnect_client.join_conversation(conv_id, on_event=on_reconnect, latest_event_id=trace.last_event_id)
+            await reconnect_client.join_conversation(
+                conv_id, on_event=on_reconnect, latest_event_id=trace.last_event_id
+            )
             try:
                 await asyncio.wait_for(terminal.wait(), timeout=90)
             except asyncio.TimeoutError:
@@ -373,8 +424,10 @@ async def run_server_restart_scenario() -> dict[str, Any]:
         return {
             'conversation_id': conv_id,
             'killed_pids': killed,
-                'health_project_root': health.get('checks', {}).get('config', {}).get('project_root'),
-                'health_recovery': health.get('checks', {}).get('recovery'),
+            'health_project_root': health.get('checks', {})
+            .get('config', {})
+            .get('project_root'),
+            'health_recovery': health.get('checks', {}).get('recovery'),
             'settings_recovery': settings_snapshot.get('recovery_snapshot'),
             'conversation_state_after_restart': conv_state,
             'event_count': len(trace.events),
@@ -416,7 +469,9 @@ async def main() -> int:
             'tool_actions': trace1.tool_actions,
             'tests_passed': tests_ok1,
             'test_output_tail': test_output1,
-            'stats_py_tail': stats_path.read_text(encoding='utf-8')[-1200:] if stats_path.exists() else None,
+            'stats_py_tail': stats_path.read_text(encoding='utf-8')[-1200:]
+            if stats_path.exists()
+            else None,
         }
     except Exception as exc:
         results['complex_fix'] = {'error': str(exc)}

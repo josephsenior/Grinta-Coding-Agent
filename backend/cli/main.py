@@ -145,8 +145,14 @@ def _silence_all_loggers() -> None:
         lg.propagate = False
 
     for name in (
-        'uvicorn', 'httpcore', 'httpx', 'asyncio', 'filelock',
-        'openai', 'httpx._client', 'charset_normalizer',
+        'uvicorn',
+        'httpcore',
+        'httpx',
+        'asyncio',
+        'filelock',
+        'openai',
+        'httpx._client',
+        'charset_normalizer',
     ):
         logging.getLogger(name).setLevel(logging.CRITICAL)
 
@@ -187,6 +193,7 @@ def show_grinta_splash(console: Any | None = None) -> None:
 
     try:
         import pyfiglet as _pyfiglet
+
         _raw = _pyfiglet.figlet_format('GRINTA', font='slant').splitlines()
         while _raw and not _raw[-1].strip():
             _raw.pop()
@@ -201,7 +208,9 @@ def show_grinta_splash(console: Any | None = None) -> None:
         ]
 
     _TAGLINE = 'AI agent. Pure grit.'
-    _HINT = 'Type /help for commands · Ctrl+C interrupts the agent · /quit or exit to leave'
+    _HINT = (
+        'Type /help for commands · Ctrl+C interrupts the agent · /quit or exit to leave'
+    )
 
     def _body(visible: int, *, tagline: bool = False) -> Group:
         figlet = Text()
@@ -239,7 +248,9 @@ def show_grinta_splash(console: Any | None = None) -> None:
 
     from rich.live import Live
 
-    with Live(_frame(0), console=console, refresh_per_second=30, transient=False) as live:
+    with Live(
+        _frame(0), console=console, refresh_per_second=30, transient=False
+    ) as live:
         for i in range(1, len(_figlet_lines) + 1):
             live.update(_frame(i))
             time.sleep(0.08)
@@ -403,11 +414,13 @@ def main(
     _configure_redirected_streams()
     if cleanup_storage:
         from backend.cli.storage_cleanup import run_storage_cleanup_command
+
         run_storage_cleanup_command(project)
         return
     model, project, handled = _resolve_invocation(model=model, project=project)
     if handled:
         from backend.cli.storage_cleanup import run_storage_cleanup_command
+
         run_storage_cleanup_command(project)
         return
     try:

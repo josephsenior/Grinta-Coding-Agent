@@ -23,7 +23,9 @@ for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
 time.sleep(2)
 
 print('Starting fresh live server...')
-server_proc = subprocess.Popen([sys.executable, 'start_server.py'], stdout=sys.stdout, stderr=sys.stderr)
+server_proc = subprocess.Popen(
+    [sys.executable, 'start_server.py'], stdout=sys.stdout, stderr=sys.stderr
+)
 
 print('Waiting for server to become healthy...')
 # Try up to 30 times (60 seconds)
@@ -45,11 +47,14 @@ if not server_up:
 
 print('Server is UP! Running test scenario...')
 
+
 async def run_scenario():
     sio = socketio.AsyncClient()
 
     print('Creating conversation HTTP POST...')
-    res = requests.post('http://127.0.0.1:3000/api/v1/conversations', json={}, timeout=60)  # noqa: ASYNC210
+    res = requests.post(  # noqa: ASYNC210
+        'http://127.0.0.1:3000/api/v1/conversations', json={}, timeout=60
+    )
     res.raise_for_status()
     conv = res.json()
     sid = conv['conversation_id']
@@ -74,7 +79,7 @@ async def run_scenario():
             print('------------------------------------')
 
         if data.get('type') == 'observation' and 'output' in data:
-            print(f"> Tool Output: {str(data['output'])[:100]}...")
+            print(f'> Tool Output: {str(data["output"])[:100]}...')
 
         if data.get('state') == 'awaiting_user_input':
             print('Agent has finished execution.')
@@ -87,15 +92,19 @@ async def run_scenario():
 
     msg = "Create a Python script in a folder named `real_world_task` containing a script `app.py` that starts a tiny FastAPI server on port 8080 returning {'message': 'Hello World'}. Also write a `requirements.txt` for it in that folder. Use tool calls to write the files."
     print('Sending prompt...')
-    await sio.emit('app_user_action', {
-        'action': 'message',
-        'args': {'content': msg, 'image_urls': [], 'file_urls': []}
-    })
+    await sio.emit(
+        'app_user_action',
+        {
+            'action': 'message',
+            'args': {'content': msg, 'image_urls': [], 'file_urls': []},
+        },
+    )
 
     try:
         await sio.wait()
     except asyncio.CancelledError:
         pass
+
 
 asyncio.run(run_scenario())
 

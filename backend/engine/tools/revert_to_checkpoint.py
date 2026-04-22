@@ -108,7 +108,7 @@ def build_revert_to_checkpoint_action(arguments: dict) -> AgentThinkAction:
                 reason_code='CHECKPOINT_NOT_FOUND',
                 reason=(
                     f"Checkpoint ID '{checkpoint_id}' was not found. "
-                    "Use checkpoint view to list available checkpoints."
+                    'Use checkpoint view to list available checkpoints.'
                 ),
                 retryable=True,
                 changed_state=False,

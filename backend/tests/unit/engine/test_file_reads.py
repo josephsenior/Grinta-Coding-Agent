@@ -18,7 +18,9 @@ def test_try_batch_file_reads_uses_bash_commands_when_bash_contract_is_active():
         ]
     )
 
-    with patch('backend.engine.file_reads.uses_powershell_terminal', return_value=False):
+    with patch(
+        'backend.engine.file_reads.uses_powershell_terminal', return_value=False
+    ):
         batched = try_batch_file_reads(cast(deque[Action], pending_actions))
 
     assert isinstance(batched, CmdRunAction)

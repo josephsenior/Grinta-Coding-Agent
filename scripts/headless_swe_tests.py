@@ -26,13 +26,13 @@ SCENARIOS: list[dict[str, Any]] = [
         'name': 'simple_file_create',
         'prompt': (
             "Create a file called 'hello.txt' in the workspace with the content:\n"
-            "Hello from App!\n"
-            "Then confirm it was created by reading it back."
+            'Hello from App!\n'
+            'Then confirm it was created by reading it back.'
         ),
         'check': lambda events: any(
-            'hello.txt' in str(e.get('message', '')) or
-            e.get('action') == 'finish' or
-            e.get('observation') == 'agent_finish'
+            'hello.txt' in str(e.get('message', ''))
+            or e.get('action') == 'finish'
+            or e.get('observation') == 'agent_finish'
             for e in events
         ),
         'description': 'Basic file creation + read-back',
@@ -41,11 +41,11 @@ SCENARIOS: list[dict[str, Any]] = [
         'name': 'python_script_write_and_run',
         'prompt': (
             "Create a Python script called 'fizzbuzz.py' that prints FizzBuzz for numbers 1-20.\n"
-            "Then run the script and show me the output."
+            'Then run the script and show me the output.'
         ),
         'check': lambda events: any(
-            'Fizz' in str(e.get('message', '')) or
-            'fizzbuzz' in str(e.get('message', '')).lower()
+            'Fizz' in str(e.get('message', ''))
+            or 'fizzbuzz' in str(e.get('message', '')).lower()
             for e in events
         ),
         'description': 'Write Python code, execute it, verify output',
@@ -54,30 +54,29 @@ SCENARIOS: list[dict[str, Any]] = [
         'name': 'bug_fix_task',
         'prompt': (
             "Create a file 'calculator.py' with this buggy code:\n\n"
-            "```python\n"
-            "def add(a, b):\n"
-            "    return a - b  # BUG: should be +\n\n"
-            "def multiply(a, b):\n"
-            "    return a * b\n\n"
+            '```python\n'
+            'def add(a, b):\n'
+            '    return a - b  # BUG: should be +\n\n'
+            'def multiply(a, b):\n'
+            '    return a * b\n\n'
             "if __name__ == '__main__':\n"
             "    print(f'2 + 3 = {add(2, 3)}')\n"
             "    print(f'4 * 5 = {multiply(4, 5)}')\n"
-            "```\n\n"
-            "Then fix the bug in the add function and run the script to verify the fix."
+            '```\n\n'
+            'Then fix the bug in the add function and run the script to verify the fix.'
         ),
         'check': lambda events: any(
-            '2 + 3 = 5' in str(e.get('message', ''))
-            for e in events
+            '2 + 3 = 5' in str(e.get('message', '')) for e in events
         ),
         'description': 'Create buggy code, diagnose, fix, verify',
     },
     {
         'name': 'multi_file_project',
         'prompt': (
-            "Create a small project with these files:\n"
+            'Create a small project with these files:\n'
             "1. 'utils.py' with a function `greet(name)` that returns f'Hello, {name}!'\n"
             "2. 'test_utils.py' with a simple test that calls greet('World') and asserts the result\n"
-            "3. Run the test file and confirm it passes"
+            '3. Run the test file and confirm it passes'
         ),
         'check': lambda events: any(
             e.get('action') == 'finish' or e.get('observation') == 'agent_finish'
@@ -88,14 +87,14 @@ SCENARIOS: list[dict[str, Any]] = [
     {
         'name': 'git_and_checkpoint',
         'prompt': (
-            "Initialize a git repository in the workspace.\n"
+            'Initialize a git repository in the workspace.\n'
             "Create a file 'README.md' with content '# My Project\\nVersion 1.0'.\n"
             "Stage and commit it with message 'Initial commit'.\n"
-            "Then list the git log to confirm the commit."
+            'Then list the git log to confirm the commit.'
         ),
         'check': lambda events: any(
-            'Initial commit' in str(e.get('message', '')) or
-            'commit' in str(e.get('message', '')).lower()
+            'Initial commit' in str(e.get('message', ''))
+            or 'commit' in str(e.get('message', '')).lower()
             for e in events
         ),
         'description': 'Git init, add, commit, log',
@@ -237,14 +236,17 @@ def _detect_issues(result: TestResult, events: list[dict]) -> None:
     if len(result.tool_calls) > 3:
         for i in range(len(result.tool_calls) - 2):
             if (
-                result.tool_calls[i] == result.tool_calls[i + 1] == result.tool_calls[i + 2]
+                result.tool_calls[i]
+                == result.tool_calls[i + 1]
+                == result.tool_calls[i + 2]
             ):
                 result.issues.append(f'repeated_tool_call:{result.tool_calls[i]}')
                 break
 
     # 2. Error events
     error_events = [
-        e for e in events
+        e
+        for e in events
         if _agent_state_from(e) == 'ERROR' or e.get('action') == 'error'
     ]
     if error_events:
@@ -261,7 +263,8 @@ def _detect_issues(result: TestResult, events: list[dict]) -> None:
 
     # 5. Context limit errors
     context_errors = [
-        e for e in events
+        e
+        for e in events
         if 'context' in str(e.get('message', '')).lower()
         and 'limit' in str(e.get('message', '')).lower()
     ]
@@ -285,6 +288,7 @@ async def main() -> int:
 
     # Verify server is up
     import httpx
+
     try:
         async with httpx.AsyncClient() as http:
             resp = await http.get(f'{BASE_URL}/api/health/live', timeout=5)
@@ -300,7 +304,7 @@ async def main() -> int:
         scenarios = [s for s in SCENARIOS if s['name'] == scenario_filter]
         if not scenarios:
             print(f'Unknown scenario: {scenario_filter}')
-            print(f"Available: {', '.join(s['name'] for s in SCENARIOS)}")
+            print(f'Available: {", ".join(s["name"] for s in SCENARIOS)}')
             return 1
     else:
         scenarios = SCENARIOS
@@ -308,30 +312,34 @@ async def main() -> int:
     results: list[TestResult] = []
 
     for i, scenario in enumerate(scenarios, 1):
-        print(f"\n{'─' * 78}")
-        print(f"[{i}/{len(scenarios)}] {scenario['name']}: {scenario['description']}")
-        print(f"{'─' * 78}")
+        print(f'\n{"─" * 78}')
+        print(f'[{i}/{len(scenarios)}] {scenario["name"]}: {scenario["description"]}')
+        print(f'{"─" * 78}')
         result = await run_scenario(scenario)
-        print(f'  → {result.status} ({result.duration:.1f}s, {len(result.tool_calls)} tool calls)')
+        print(
+            f'  → {result.status} ({result.duration:.1f}s, {len(result.tool_calls)} tool calls)'
+        )
         if result.error:
             print(f'  → Error: {result.error}')
         if result.issues:
-            print(f"  → Issues: {', '.join(result.issues)}")
+            print(f'  → Issues: {", ".join(result.issues)}')
         results.append(result)
 
     # Summary
-    print(f"\n{'=' * 78}")
+    print(f'\n{"=" * 78}')
     print('RESULTS SUMMARY')
-    print(f"{'=' * 78}")
+    print(f'{"=" * 78}')
     for r in results:
         print(r.summary_line())
-    print(f"{'─' * 78}")
+    print(f'{"─" * 78}')
 
     passed = sum(1 for r in results if r.status == 'PASS')
     failed = sum(1 for r in results if r.status == 'FAIL')
     errors = sum(1 for r in results if r.status == 'ERROR')
     timeouts = sum(1 for r in results if r.status == 'TIMEOUT')
-    print(f'Total: {len(results)}  Pass: {passed}  Fail: {failed}  Error: {errors}  Timeout: {timeouts}')
+    print(
+        f'Total: {len(results)}  Pass: {passed}  Fail: {failed}  Error: {errors}  Timeout: {timeouts}'
+    )
 
     # Aggregate issues
     all_issues = []

@@ -213,7 +213,10 @@ def test_execute_llm_step_async_offloads_message_preparation_to_thread():
     async def _fake_to_thread(fn, *args, **kwargs):
         return fn(*args, **kwargs)
 
-    with patch('backend.engine.orchestrator.asyncio.to_thread', new=AsyncMock(side_effect=_fake_to_thread)) as mock_to_thread:
+    with patch(
+        'backend.engine.orchestrator.asyncio.to_thread',
+        new=AsyncMock(side_effect=_fake_to_thread),
+    ) as mock_to_thread:
         action = asyncio.run(orch._execute_llm_step_async(state, condensed))
 
     assert action is first

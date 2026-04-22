@@ -6,19 +6,10 @@ from backend.execution.utils.file_editor import FileEditor, ToolResult, normaliz
 def test_ws_tolerant_replace_failure_message_improved():
     fe = FileEditor()
     # Content with two simple functions
-    content = (
-        'def a():\n'
-        '    return 1\n'
-        '\n'
-        'def b():\n'
-        '    return 2\n'
-    )
+    content = 'def a():\n    return 1\n\ndef b():\n    return 2\n'
 
     # old_str not present; multi-line pattern
-    old_str = (
-        'def c():\n'
-        '    return 3\n'
-    )
+    old_str = 'def c():\n    return 3\n'
 
     res = fe._apply_str_replace(content, old_str, 'REPLACED')
     assert isinstance(res, ToolResult)
@@ -67,7 +58,9 @@ def test_edit_mode_patch_applies_single_hunk(tmp_path):
     target.write_bytes(b'a\nb\nc\n')
     editor = FileEditor(workspace_root=str(tmp_path))
     patch = '@@ -1,3 +1,3 @@\n a\n-b\n+B\n c\n'
-    result = editor(command='edit', path='sample.txt', edit_mode='patch', patch_text=patch)
+    result = editor(
+        command='edit', path='sample.txt', edit_mode='patch', patch_text=patch
+    )
     assert result.error is None
     assert target.read_text(encoding='utf-8') == 'a\nB\nc\n'
 

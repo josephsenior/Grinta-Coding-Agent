@@ -116,7 +116,6 @@ class RecoveryService:
 
         if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
             try:
-
                 from backend.ledger.observation import AgentThinkObservation
 
                 controller.event_stream.add_event(

@@ -113,7 +113,7 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
 
     # Build fake async streaming chunks (OpenAI-style format)
     async def fake_astream(**kwargs):
-# sourcery skip: no-loop-in-tests
+        # sourcery skip: no-loop-in-tests
         for token in ['Hello', ', ', 'world', '!']:
             yield {
                 'id': 'chatcmpl-test',
@@ -553,7 +553,9 @@ def test_response_to_actions_passes_through_plain_message_after_guard_disabled(
     response = SimpleNamespace(
         choices=[
             SimpleNamespace(
-                message=SimpleNamespace(content="I've created grinta_feedback.md for you.")
+                message=SimpleNamespace(
+                    content="I've created grinta_feedback.md for you."
+                )
             )
         ]
     )
@@ -599,7 +601,10 @@ def test_response_to_actions_allows_conversational_plain_message(monkeypatch):
     actions = executor._response_to_actions(response)
 
     assert len(actions) == 1
-    assert actions[0].content == 'I have prepared a rating of the system and the tools for you.'  # type: ignore
+    assert (
+        actions[0].content
+        == 'I have prepared a rating of the system and the tools for you.'
+    )  # type: ignore
 
 
 def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):
@@ -628,7 +633,9 @@ def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):
     response = SimpleNamespace(
         choices=[
             SimpleNamespace(
-                message=SimpleNamespace(content="I've prepared two approaches for your feedback.")
+                message=SimpleNamespace(
+                    content="I've prepared two approaches for your feedback."
+                )
             )
         ]
     )

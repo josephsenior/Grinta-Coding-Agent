@@ -259,7 +259,9 @@ class TestMaybeSetupGitHooks:
 
     def test_hooks_directory_creation_fails(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(content='#!/bin/bash')
+        runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(
+            content='#!/bin/bash'
+        )
         runtime._run_results = [
             CmdOutputObservation(content='mkdir failed', command='mkdir', exit_code=1)
         ]
@@ -268,7 +270,9 @@ class TestMaybeSetupGitHooks:
 
     def test_chmod_pre_commit_script_fails(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(content='#!/bin/bash')
+        runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(
+            content='#!/bin/bash'
+        )
         runtime._run_results = [
             CmdOutputObservation(content='', command='mkdir', exit_code=0),  # mkdir
             CmdOutputObservation(
@@ -280,7 +284,9 @@ class TestMaybeSetupGitHooks:
 
     def test_preserve_existing_hook(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(content='#!/bin/bash')
+        runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(
+            content='#!/bin/bash'
+        )
         runtime._read_results['.git/hooks/pre-commit'] = MagicMock(
             content='#!/bin/bash\nexisting hook'
         )
@@ -305,7 +311,9 @@ class TestMaybeSetupGitHooks:
 
     def test_skip_if_app_installed(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(content='#!/bin/bash')
+        runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(
+            content='#!/bin/bash'
+        )
         runtime._read_results['.git/hooks/pre-commit'] = MagicMock(
             content='#!/bin/bash\n# This hook was installed by APP\n'
         )
@@ -324,7 +332,9 @@ class TestMaybeSetupGitHooks:
 
     def test_preserve_fails(self):
         runtime = _FakeGitRuntime()
-        runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(content='#!/bin/bash')
+        runtime._read_results['.grinta/pre-commit.sh'] = MagicMock(
+            content='#!/bin/bash'
+        )
         runtime._read_results['.git/hooks/pre-commit'] = MagicMock(content='existing')
         runtime._run_results = [
             CmdOutputObservation(content='', command='mkdir', exit_code=0),  # mkdir

@@ -214,6 +214,13 @@ class ToolResultValidator(ToolInvocationMiddleware):
 
         # 4. Empty result detection
         def check_empty(ctx: ToolInvocationContext, obs: Observation) -> str | None:
+            # PTY: first read() after opening a session is often blank or only
+            # newlines (timing, prompt not flushed). Session id proves success;
+            # output may arrive on a later terminal_read/terminal_input turn.
+            if type(obs).__name__ == 'TerminalObservation':
+                sid = getattr(obs, 'session_id', None)
+                if isinstance(sid, str) and sid.strip():
+                    return None
             content = getattr(obs, 'content', None)
             if content is not None and isinstance(content, str) and not content.strip():
                 return 'Tool returned empty result'
@@ -222,28 +229,46 @@ class ToolResultValidator(ToolInvocationMiddleware):
         self.add_rule('empty_result', check_empty, severity='warning')
 
         # 5. Wrong shell detection (e.g. Unix commands on PowerShell, PowerShell on Bash)
-        def check_wrong_shell(ctx: ToolInvocationContext, obs: Observation) -> str | None:
+        def check_wrong_shell(
+            ctx: ToolInvocationContext, obs: Observation
+        ) -> str | None:
             content = getattr(obs, 'content', '')
             if not isinstance(content, str):
                 return None
 
             import re
+
             # Check PowerShell errors for Unix tools
-            if 'CommandNotFoundException' in content or 'is not recognized as the name of a cmdlet' in content:
+            if (
+                'CommandNotFoundException' in content
+                or 'is not recognized as the name of a cmdlet' in content
+            ):
                 for tool in ['grep', 'ls', 'cat', 'find', 'sed', 'awk', 'chmod']:
-                    if re.search(rf'\b{tool}\b.*is not recognized', content, re.IGNORECASE) or f'ObjectNotFound: ({tool}:String)' in content:
+                    if (
+                        re.search(
+                            rf'\b{tool}\b.*is not recognized', content, re.IGNORECASE
+                        )
+                        or f'ObjectNotFound: ({tool}:String)' in content
+                    ):
                         return (
                             f"You attempted to use Unix tools ('{tool}') in PowerShell but they are missing or aliased incorrectly. "
-                            f"DO NOT use Unix tools here. ALWAYS use `search_code`, `str_replace_editor` (view_file), or native PowerShell cmdlets."
+                            f'DO NOT use Unix tools here. ALWAYS use `search_code`, `str_replace_editor` (view_file), or native PowerShell cmdlets.'
                         )
 
             # Check Bash errors for PowerShell tools
             if 'command not found' in content:
-                for tool in ['Get-ChildItem', 'Select-String', 'Get-Content', 'Get-Process']:
-                    if re.search(rf'\b{tool}: command not found', content, re.IGNORECASE):
+                for tool in [
+                    'Get-ChildItem',
+                    'Select-String',
+                    'Get-Content',
+                    'Get-Process',
+                ]:
+                    if re.search(
+                        rf'\b{tool}: command not found', content, re.IGNORECASE
+                    ):
                         return (
                             f"You attempted to use a PowerShell cmdlet ('{tool}') in Bash. "
-                            f"DO NOT use PowerShell cmdlets here. Use Unix tools or `search_code`."
+                            f'DO NOT use PowerShell cmdlets here. Use Unix tools or `search_code`.'
                         )
 
             return None

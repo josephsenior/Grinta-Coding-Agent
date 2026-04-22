@@ -385,9 +385,7 @@ class TestReadChangelog:
         entries = read_today_changelog(tmp_path)
         assert any(e['event'] == 'today_event' for e in entries)
 
-    def test_skips_invalid_json_lines(
-        self, tmp_path: Path, grinta_home: None
-    ) -> None:
+    def test_skips_invalid_json_lines(self, tmp_path: Path, grinta_home: None) -> None:
         ensure_project_state_dir(tmp_path)
         changelog = _project_context(tmp_path) / _CHANGELOG_FILE
         today = datetime.now(UTC).strftime('%Y-%m-%d')
@@ -422,9 +420,7 @@ class TestReadChangelog:
         entries = read_today_changelog(tmp_path)
         assert entries == []
 
-    def test_returns_empty_on_os_error(
-        self, tmp_path: Path, grinta_home: None
-    ) -> None:
+    def test_returns_empty_on_os_error(self, tmp_path: Path, grinta_home: None) -> None:
         ensure_project_state_dir(tmp_path)
         changelog = _project_context(tmp_path) / _CHANGELOG_FILE
         changelog.write_text('{"event": "ev"}\n', encoding='utf-8')
@@ -449,9 +445,7 @@ class TestTodayStats:
             lines.append(json.dumps(e))
         changelog.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
-    def test_empty_when_no_changelog(
-        self, tmp_path: Path, grinta_home: None
-    ) -> None:
+    def test_empty_when_no_changelog(self, tmp_path: Path, grinta_home: None) -> None:
         stats = today_stats(tmp_path)
         assert stats['sessions'] == 0
         assert stats['edits'] == 0
@@ -532,9 +526,7 @@ class TestTodayStats:
         stats = today_stats(tmp_path)
         assert stats['files'] == 0
 
-    def test_keys_present_in_result(
-        self, tmp_path: Path, grinta_home: None
-    ) -> None:
+    def test_keys_present_in_result(self, tmp_path: Path, grinta_home: None) -> None:
         stats = today_stats(tmp_path)
         expected_keys = {
             'sessions',

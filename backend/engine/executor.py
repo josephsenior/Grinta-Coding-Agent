@@ -165,7 +165,9 @@ class OrchestratorExecutor:
         checkpoint.commit(ckpt_token)
 
         execution_time = time.time() - start_time
-        actions = self._without_blank_agent_messages(self._response_to_actions(response))
+        actions = self._without_blank_agent_messages(
+            self._response_to_actions(response)
+        )
         return ExecutionResult(actions, response, execution_time, error_message)
 
     # ------------------------------------------------------------------ #
@@ -234,7 +236,7 @@ class OrchestratorExecutor:
                 thinking_accumulate = ''
 
                 def _merge_stream_fragment(existing: str, incoming: str) -> str:
-                    """Merge streamed fragments with safe append-only defaults.
+                    r"""Merge streamed fragments with safe append-only defaults.
 
                     OpenAI-compatible providers emit *append-only* deltas on the
                     content / tool-call fields. A small number of non-standard
@@ -274,9 +276,7 @@ class OrchestratorExecutor:
                         return incoming
                     if incoming == existing:
                         return existing
-                    if len(incoming) > len(existing) and incoming.startswith(
-                        existing
-                    ):
+                    if len(incoming) > len(existing) and incoming.startswith(existing):
                         return incoming
                     if (
                         len(existing) >= 2
@@ -295,9 +295,7 @@ class OrchestratorExecutor:
                     content_accumulate = _merge_stream_fragment(
                         content_accumulate, text_piece
                     )
-                    display_acc = redact_streamed_tool_call_markers(
-                        content_accumulate
-                    )
+                    display_acc = redact_streamed_tool_call_markers(content_accumulate)
                     if event_stream:
                         ev = StreamingChunkAction(
                             chunk=text_piece,
@@ -433,6 +431,7 @@ class OrchestratorExecutor:
                         # Notify the UI so the user doesn't think it's hung.
                         if event_stream:
                             from backend.ledger.observation import StatusObservation
+
                             status_ev = StatusObservation(
                                 content='Stream timed out — retrying without streaming…'
                             )
@@ -602,7 +601,9 @@ class OrchestratorExecutor:
                 await asyncio.wait_for(consume_task, timeout=timeout_seconds)
 
             # finalize streams
-            visible_accum = redact_streamed_tool_call_markers(content_accumulate).strip()
+            visible_accum = redact_streamed_tool_call_markers(
+                content_accumulate
+            ).strip()
             if event_stream and content_accumulate:
                 ev = StreamingChunkAction(
                     chunk='', accumulated=visible_accum, is_final=True
@@ -705,7 +706,9 @@ class OrchestratorExecutor:
         checkpoint.commit(ckpt_token)
 
         execution_time = time.time() - start_time
-        actions = self._without_blank_agent_messages(self._response_to_actions(response))
+        actions = self._without_blank_agent_messages(
+            self._response_to_actions(response)
+        )
         return ExecutionResult(actions, response, execution_time, error_message)
 
     def _raise_if_recovery_blocked(self, event_stream: EventStream | None) -> None:
@@ -1001,7 +1004,9 @@ class OrchestratorExecutor:
             )
             actions = [self._build_recoverable_tool_call_error_action(exc)]
 
-        _, validated_actions = self._safety.apply(self._extract_response_text(response), actions)
+        _, validated_actions = self._safety.apply(
+            self._extract_response_text(response), actions
+        )
         return validated_actions
 
     def _extract_response_text(self, response: ModelResponse) -> str:

@@ -13,8 +13,8 @@ from backend.ledger.action.terminal import (
     TerminalRunAction,
 )
 from backend.ledger.observation import NullObservation
-from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.code_nav import LspQueryObservation
+from backend.ledger.observation.commands import CmdOutputObservation
 
 
 def _make_runtime() -> LocalRuntimeInProcess:

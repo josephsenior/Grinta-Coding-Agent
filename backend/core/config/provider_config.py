@@ -294,7 +294,7 @@ class ProviderConfigurationManager:
             if not any(api_key.startswith(prefix) for prefix in prefixes):
                 logger.debug(
                     "API key for %s doesn't match expected prefixes %s "
-                    "(may be a proxy/custom key — continuing)",
+                    '(may be a proxy/custom key — continuing)',
                     provider,
                     config.api_key_prefixes,
                 )

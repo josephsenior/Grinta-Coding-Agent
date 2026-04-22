@@ -129,9 +129,7 @@ class TestHandleCmdRunTool:
         assert '[SHELL]' in (action.thought or '')
 
     def test_separated_windows_drive_no_glue_hint(self):
-        action = _handle_cmd_run_tool(
-            {'command': 'ls -F components/C:/Users/x/foo/'}
-        )
+        action = _handle_cmd_run_tool({'command': 'ls -F components/C:/Users/x/foo/'})
         assert isinstance(action, CmdRunAction)
         assert not (action.thought or '').strip()
 

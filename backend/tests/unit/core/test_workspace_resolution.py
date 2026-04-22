@@ -52,7 +52,9 @@ def test_reserved_user_app_data_dir_matches_dot_app() -> None:
     assert is_reserved_user_app_data_dir(Path.home() / '.grinta') is True
 
 
-def test_resolve_cli_workspace_directory_uses_cwd_when_unset(tmp_path, monkeypatch) -> None:
+def test_resolve_cli_workspace_directory_uses_cwd_when_unset(
+    tmp_path, monkeypatch
+) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv('PROJECT_ROOT', raising=False)
     monkeypatch.delenv('APP_PROJECT_ROOT', raising=False)

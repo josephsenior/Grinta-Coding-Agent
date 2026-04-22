@@ -1743,7 +1743,12 @@ async def test_renderer_browser_cmd_output_does_not_print_ghost_terminal_card() 
         loop=asyncio.get_running_loop(),
     )
 
-    for cmd in ('browser navigate', 'browser screenshot', 'browser snapshot', 'browser click'):
+    for cmd in (
+        'browser navigate',
+        'browser screenshot',
+        'browser snapshot',
+        'browser click',
+    ):
         obs = CmdOutputObservation(
             content=f'Done: {cmd}',
             command=cmd,
@@ -1861,7 +1866,9 @@ async def test_renderer_file_view_still_uses_lines() -> None:
 
 
 @pytest.mark.asyncio
-async def test_renderer_non_browser_cmd_with_browser_prefix_word_still_rendered() -> None:
+async def test_renderer_non_browser_cmd_with_browser_prefix_word_still_rendered() -> (
+    None
+):
     """Regression for the *widening* of the filter: the original
     ``startswith('browser ')`` check would have silently eaten any user
     shell command that starts with the word "browser " (e.g.
@@ -1894,8 +1901,7 @@ async def test_renderer_non_browser_cmd_with_browser_prefix_word_still_rendered(
     # CmdRunAction; here we're exercising the filter in isolation).
     assert 'Terminal' in output, (
         'Non-browser-tool command was suppressed by the browser-activity '
-        "filter; the Terminal card should still have been rendered:\n"
-        + output
+        'filter; the Terminal card should still have been rendered:\n' + output
     )
 
 
@@ -1917,9 +1923,7 @@ def test_format_reasoning_snapshot_appends_ellipsis_when_mid_sentence() -> None:
     # When the last line already ends in sentence-terminal punctuation, we
     # must *not* add an ellipsis (that would read as doubled punctuation).
     console2 = _make_console()
-    group2 = format_reasoning_snapshot(
-        ['I will build it as a single HTML file.']
-    )
+    group2 = format_reasoning_snapshot(['I will build it as a single HTML file.'])
     console2.print(group2)
     assert '…' not in _console_output(console2)
 
@@ -2560,11 +2564,11 @@ async def test_renderer_prefers_actionable_npm_error_line() -> None:
     )
     obs = CmdOutputObservation(
         content=(
-            "npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, "
+            'npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, '
             "open 'C:\\Users\\GIGABYTE\\Desktop\\react-app\\package.json'\n"
-            "npm error enoent This is related to npm not being able to find a file.\n"
-            "npm error A complete log of this run can be found in: "
-            "C:\\Users\\GIGABYTE\\AppData\\Local\\npm-cache\\_logs\\debug.log"
+            'npm error enoent This is related to npm not being able to find a file.\n'
+            'npm error A complete log of this run can be found in: '
+            'C:\\Users\\GIGABYTE\\AppData\\Local\\npm-cache\\_logs\\debug.log'
         ),
         command='npm create vite@latest . -- --template react && npm install',
         metadata={'exit_code': 38},
@@ -2606,8 +2610,7 @@ async def test_renderer_cmd_output_stdout_is_suppressed_on_success() -> None:
     # incidental As (from words like "command", "Ran") in card chrome are
     # fine, so we bound rather than assert-zero.
     assert output.count('A') < 20, (
-        f'stdout leaked into Terminal card; got {output.count("A")} As:\n'
-        + output
+        f'stdout leaked into Terminal card; got {output.count("A")} As:\n' + output
     )
     # But the card itself must still render (verb + done summary).
     assert 'done' in output.lower() or 'Ran' in output
@@ -2795,7 +2798,9 @@ def test_reasoning_display_auto_scroll_shows_latest_lines() -> None:
         rd.update_thought(f'thought {i:02d}')
 
     console = _make_console(width=90)
-    with patch.object(ReasoningDisplay, 'live_panel_shows_thought_rows', return_value=True):
+    with patch.object(
+        ReasoningDisplay, 'live_panel_shows_thought_rows', return_value=True
+    ):
         console.print(rd.renderable(max_width=90, max_lines=4))
     output = _console_output(console)
 

@@ -24,28 +24,46 @@ def user_home_tmp(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv('USERPROFILE', str(fake))
 
 
-def test_cleanup_project_storage_moves_legacy_roots(tmp_path: Path, user_home_tmp) -> None:
+def test_cleanup_project_storage_moves_legacy_roots(
+    tmp_path: Path, user_home_tmp
+) -> None:
     _write_file(tmp_path / 'sessions' / 'sess-a' / 'metadata.json', 'session-a')
     _write_file(
         tmp_path / 'users' / 'u1' / 'conversations' / 'sess-b' / 'metadata.json',
         'session-b',
     )
-    _write_file(tmp_path / '.grinta' / 'conversations' / 'sess-c' / 'metadata.json', 'session-c')
     _write_file(
-        tmp_path / '.grinta' / 'conversations' / 'oss_user' / 'sess-d' / 'metadata.json',
+        tmp_path / '.grinta' / 'conversations' / 'sess-c' / 'metadata.json', 'session-c'
+    )
+    _write_file(
+        tmp_path
+        / '.grinta'
+        / 'conversations'
+        / 'oss_user'
+        / 'sess-d'
+        / 'metadata.json',
         'session-d',
     )
 
     report = cleanup_project_storage(tmp_path)
 
     canonical_root = Path(get_project_local_data_root(tmp_path))
-    assert (canonical_root / 'sessions' / 'sess-a' / 'metadata.json').read_text(encoding='utf-8') == 'session-a'
-    assert (canonical_root / 'sessions' / 'sess-c' / 'metadata.json').read_text(encoding='utf-8') == 'session-c'
+    assert (canonical_root / 'sessions' / 'sess-a' / 'metadata.json').read_text(
+        encoding='utf-8'
+    ) == 'session-a'
+    assert (canonical_root / 'sessions' / 'sess-c' / 'metadata.json').read_text(
+        encoding='utf-8'
+    ) == 'session-c'
     assert (
         canonical_root / 'users' / 'u1' / 'conversations' / 'sess-b' / 'metadata.json'
     ).read_text(encoding='utf-8') == 'session-b'
     assert (
-        canonical_root / 'users' / 'oss_user' / 'conversations' / 'sess-d' / 'metadata.json'
+        canonical_root
+        / 'users'
+        / 'oss_user'
+        / 'conversations'
+        / 'sess-d'
+        / 'metadata.json'
     ).read_text(encoding='utf-8') == 'session-d'
     assert not (tmp_path / 'sessions').exists()
     assert not (tmp_path / 'users').exists()
@@ -53,7 +71,9 @@ def test_cleanup_project_storage_moves_legacy_roots(tmp_path: Path, user_home_tm
     assert report.migrated_entries >= 4
 
 
-def test_cleanup_project_storage_archives_conflicts(tmp_path: Path, user_home_tmp) -> None:
+def test_cleanup_project_storage_archives_conflicts(
+    tmp_path: Path, user_home_tmp
+) -> None:
     canonical_root = Path(get_project_local_data_root(tmp_path))
     canonical_file = canonical_root / 'sessions' / 'sess-a' / 'metadata.json'
     _write_file(canonical_file, 'canonical')
@@ -62,12 +82,20 @@ def test_cleanup_project_storage_archives_conflicts(tmp_path: Path, user_home_tm
     report = cleanup_project_storage(tmp_path)
 
     assert canonical_file.read_text(encoding='utf-8') == 'canonical'
-    archived = report.conflict_root / 'content-conflict' / 'sessions' / 'sess-a' / 'metadata.json'
+    archived = (
+        report.conflict_root
+        / 'content-conflict'
+        / 'sessions'
+        / 'sess-a'
+        / 'metadata.json'
+    )
     assert archived.read_text(encoding='utf-8') == 'legacy'
     assert report.archived_conflicts == 1
 
 
-def test_cleanup_project_storage_removes_duplicate_files(tmp_path: Path, user_home_tmp) -> None:
+def test_cleanup_project_storage_removes_duplicate_files(
+    tmp_path: Path, user_home_tmp
+) -> None:
     canonical_root = Path(get_project_local_data_root(tmp_path))
     canonical_file = canonical_root / 'sessions' / 'sess-a' / 'metadata.json'
     _write_file(canonical_file, 'same')
@@ -99,12 +127,14 @@ def test_cleanup_project_storage_moves_legacy_storage_grinta_state(
 
     canonical_root = Path(get_project_local_data_root(tmp_path))
     agent_root = workspace_agent_state_dir(tmp_path)
-    assert (canonical_root / 'sessions' / 'sess-z' / 'metadata.json').read_text(encoding='utf-8') == 'session-z'
+    assert (canonical_root / 'sessions' / 'sess-z' / 'metadata.json').read_text(
+        encoding='utf-8'
+    ) == 'session-z'
     assert (canonical_root / '.jwt_secret').read_text(encoding='utf-8') == 'secret'
     assert (agent_root / 'agent_notes.json').read_text(encoding='utf-8') == 'notes'
     assert (agent_root / 'blackboard.json').read_text(encoding='utf-8') == '{"k": "v"}'
-    assert (
-        agent_root / 'rollback_checkpoints' / 'manifest.json'
-    ).read_text(encoding='utf-8') == '{}'
+    assert (agent_root / 'rollback_checkpoints' / 'manifest.json').read_text(
+        encoding='utf-8'
+    ) == '{}'
     assert not (tmp_path / 'storage').exists()
     assert report.migrated_entries >= 5

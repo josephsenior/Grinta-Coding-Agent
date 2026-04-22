@@ -81,7 +81,10 @@ class TestRollbackManager:
         assert rm.checkpoints_dir.exists()
         from backend.core.workspace_resolution import workspace_agent_state_dir
 
-        assert rm.checkpoints_dir == workspace_agent_state_dir(workspace) / 'rollback_checkpoints'
+        assert (
+            rm.checkpoints_dir
+            == workspace_agent_state_dir(workspace) / 'rollback_checkpoints'
+        )
         assert rm.max_checkpoints == 20
 
     def test_create_checkpoint(self, workspace):

@@ -43,7 +43,9 @@ def test_invalid_id_clears(obs: ErrorObservation) -> None:
     assert obs.cause is None
 
 
-def test_copies_tool_call_metadata_from_action_when_missing(obs: ErrorObservation) -> None:
+def test_copies_tool_call_metadata_from_action_when_missing(
+    obs: ErrorObservation,
+) -> None:
     meta = ToolCallMetadata(
         function_name='browser',
         tool_call_id='tc_1',
@@ -55,7 +57,9 @@ def test_copies_tool_call_metadata_from_action_when_missing(obs: ErrorObservatio
     assert obs.tool_call_metadata == meta
 
 
-def test_preserves_existing_observation_tool_call_metadata(obs: ErrorObservation) -> None:
+def test_preserves_existing_observation_tool_call_metadata(
+    obs: ErrorObservation,
+) -> None:
     src = ToolCallMetadata(
         function_name='browser',
         tool_call_id='tc_src',

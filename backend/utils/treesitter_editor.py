@@ -229,16 +229,12 @@ def _render_python_syntax_error(e: SyntaxError, code: str, file_path: str) -> st
 def _what_to_try_line_python(msg: str) -> str:
     lower = msg.lower()
     if 'unexpected eof' in lower or 'end of file' in lower:
-        return (
-            'What to try: add the missing closing delimiter (`)`, `]`, `}`, or finish the string/block).'
-        )
+        return 'What to try: add the missing closing delimiter (`)`, `]`, `}`, or finish the string/block).'
     if 'indent' in lower:
         return 'What to try: fix indentation so blocks align with `def`, `class`, `if`, etc.'
     if 'invalid syntax' in lower and '(' in msg:
         return 'What to try: check unmatched parentheses, brackets, or a missing `:` before a block.'
-    return (
-        'What to try: follow the parser message above (often a missing `,`, `:`, `)`, or quote).'
-    )
+    return 'What to try: follow the parser message above (often a missing `,`, `:`, `)`, or quote).'
 
 
 def _find_first_missing_node(node: Any) -> Any | None:
@@ -261,9 +257,7 @@ def _what_to_try_for_expected_token(expected: str | None, language: str) -> str:
         )
     exp = expected.strip()
     if len(exp) > 32:
-        return (
-            'What to try: the grammar expected a specific token here; narrow the edit and re-parse.'
-        )
+        return 'What to try: the grammar expected a specific token here; narrow the edit and re-parse.'
     if exp in {')', ']', '}', '>'}:
         return f'What to try: insert `{exp}` to close an unmatched opening bracket.'
     if exp in {';', ','}:
@@ -297,7 +291,9 @@ def _format_treesitter_error_block(
     if not isinstance(start_col, int) or start_col < 0:
         start_col = 0
 
-    missing = node if getattr(node, 'is_missing', False) else _find_first_missing_node(node)
+    missing = (
+        node if getattr(node, 'is_missing', False) else _find_first_missing_node(node)
+    )
     expected = None
     if missing is not None:
         expected = getattr(missing, 'type', None) or None
@@ -315,7 +311,9 @@ def _format_treesitter_error_block(
         if len(preview) > 120:
             preview = preview[:117] + '...'
         parts.append(f'Found: {preview!r}')
-    elif getattr(node, 'type', None) == 'ERROR' and not getattr(node, 'is_missing', False):
+    elif getattr(node, 'type', None) == 'ERROR' and not getattr(
+        node, 'is_missing', False
+    ):
         parts.append(
             'Found: unexpected token(s) at this position (see source line below).'
         )

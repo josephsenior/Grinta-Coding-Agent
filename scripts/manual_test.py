@@ -14,6 +14,7 @@ _IDLE_CUTOFF = 120
 _CONNECT_RETRIES = 5
 _CREATE_CONV_RETRIES = 8
 
+
 def _create_conversation() -> str:
     print('Creating conversation...')
     last_error: Exception | None = None
@@ -29,12 +30,15 @@ def _create_conversation() -> str:
             return cid
         except Exception as exc:
             last_error = exc
-            print(f'Create conversation attempt {attempt}/{_CREATE_CONV_RETRIES} failed: {exc}')
+            print(
+                f'Create conversation attempt {attempt}/{_CREATE_CONV_RETRIES} failed: {exc}'
+            )
             if attempt < _CREATE_CONV_RETRIES:
                 time.sleep(2)
     raise RuntimeError(
         f'Could not create conversation after {_CREATE_CONV_RETRIES} attempts: {last_error}'
     )
+
 
 class EventCollector:
     def __init__(self) -> None:
@@ -80,7 +84,7 @@ class EventCollector:
             if obs:
                 print(f'[AGENT OBSERVATION]: {str(obs)[:200]}...')
             if agent_state:
-                pass # print(f"[AGENT STATE]: {agent_state}")
+                pass  # print(f"[AGENT STATE]: {agent_state}")
 
             if agent_state == 'AWAITING_USER_INPUT' and has_id:
                 self._initialized.set()
@@ -88,7 +92,11 @@ class EventCollector:
             if agent_state == 'RUNNING':
                 self._saw_running = True
 
-            if action == 'finish' or obs == 'agent_finish' or agent_state in ('FINISHED', 'STOPPED', 'ERROR', 'REJECTED'):
+            if (
+                action == 'finish'
+                or obs == 'agent_finish'
+                or agent_state in ('FINISHED', 'STOPPED', 'ERROR', 'REJECTED')
+            ):
                 self._terminal.set()
 
     def connect_to(self, conversation_id: str) -> None:
@@ -128,7 +136,11 @@ class EventCollector:
             if self._terminal.is_set():
                 print('Terminal state reached. Finishing wait.')
                 return
-            if (self._saw_running and self._last_event_at > 0 and (time.monotonic() - self._last_event_at) > _IDLE_CUTOFF):
+            if (
+                self._saw_running
+                and self._last_event_at > 0
+                and (time.monotonic() - self._last_event_at) > _IDLE_CUTOFF
+            ):
                 print(f'Idle cutoff reached ({_IDLE_CUTOFF}s). Finishing wait.')
                 return
             time.sleep(1)
@@ -137,6 +149,7 @@ class EventCollector:
     def disconnect(self) -> None:
         if self.sio.connected:
             self.sio.disconnect()
+
 
 def test_prompt(prompt: str):
     cid = _create_conversation()
@@ -151,6 +164,11 @@ def test_prompt(prompt: str):
     finally:
         collector.disconnect()
 
+
 if __name__ == '__main__':
-    prompt = ' '.join(sys.argv[1:]) if len(sys.argv) > 1 else 'I want you to write a complex python script that calculates fibonacci series and saves the execution logs into a markdown file, running it, and updating another file called summary.md with execution results'
+    prompt = (
+        ' '.join(sys.argv[1:])
+        if len(sys.argv) > 1
+        else 'I want you to write a complex python script that calculates fibonacci series and saves the execution logs into a markdown file, running it, and updating another file called summary.md with execution results'
+    )
     test_prompt(prompt)

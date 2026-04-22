@@ -79,5 +79,3 @@ class TestGetCompletionCostCatalog:
             cost = get_completion_cost('m', 500_000, 250_000)
             expected = (500_000 / 1_000_000) * 2.0 + (250_000 / 1_000_000) * 8.0
             assert cost == pytest.approx(expected)
-
-

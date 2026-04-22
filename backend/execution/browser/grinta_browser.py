@@ -19,7 +19,11 @@ from backend.core.constants import (
     BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC,
 )
 from backend.core.logger import app_logger as logger
-from backend.ledger.observation import CmdOutputObservation, ErrorObservation, Observation
+from backend.ledger.observation import (
+    CmdOutputObservation,
+    ErrorObservation,
+    Observation,
+)
 
 _MAX_SNAPSHOT_CHARS = 120_000
 _MAX_URL_LEN = 2048
@@ -57,7 +61,9 @@ async def _navigate_direct_cdp(
     Uses the same CDP call as BrowserSession._navigate_and_wait at wait_until=commit.
     """
     if not getattr(browser, 'agent_focus_target_id', None):
-        raise RuntimeError('Browser has no focused page; call start or navigate on a running session.')
+        raise RuntimeError(
+            'Browser has no focused page; call start or navigate on a running session.'
+        )
     _browser_trace('CDP get_or_create_cdp_session…')
     cdp_session = await browser.get_or_create_cdp_session(None, focus=True)
     _browser_trace(f'CDP Page.navigate (inner cap {timeout_sec:.0f}s)…')
@@ -144,9 +150,9 @@ async def _prepare_target_for_screenshot(browser: Any, target_id: str | None) ->
         _browser_trace(f'screenshot preflight: no cdp session ({exc})')
         return None
 
-    async def _safe(coro: Any, label: str, *, timeout: float = 1.0) -> None:
+    async def _safe(coro: Any, label: str, *, wait_s: float = 1.0) -> None:
         try:
-            await asyncio.wait_for(coro, timeout=timeout)
+            await asyncio.wait_for(coro, timeout=wait_s)
         except Exception as exc:  # noqa: BLE001
             _browser_trace(f'screenshot preflight {label}: {type(exc).__name__}')
 
@@ -294,7 +300,9 @@ class GrintaNativeBrowser:
                 url = str(params.get('url') or '').strip()
                 err = _validate_http_url(url)
                 if err:
-                    return _finalize_observation(cmd, ErrorObservation(content=f'ERROR: {err}'))
+                    return _finalize_observation(
+                        cmd, ErrorObservation(content=f'ERROR: {err}')
+                    )
                 t_nav = time.monotonic()
                 b = await self._ensure_session()
                 new_tab = bool(params.get('new_tab', False))
@@ -469,9 +477,7 @@ class GrintaNativeBrowser:
                         )
                     except (TimeoutError, Exception) as exc:  # noqa: BLE001
                         total = time.monotonic() - t_shot
-                        first = (
-                            type(last_exc).__name__ if last_exc else 'TimeoutError'
-                        )
+                        first = type(last_exc).__name__ if last_exc else 'TimeoutError'
                         reason = (
                             'The browser stayed busy or blocked on the page. '
                             'Most common causes: a JavaScript alert/confirm/prompt '
@@ -601,7 +607,11 @@ class GrintaNativeBrowser:
             _browser_trace(f'exception: {type(e).__name__}: {e}')
             msg = str(e).strip() or type(e).__name__
             hint = ''
-            if 'chromium' in msg.lower() or 'browser' in msg.lower() and 'executable' in msg.lower():
+            if (
+                'chromium' in msg.lower()
+                or 'browser' in msg.lower()
+                and 'executable' in msg.lower()
+            ):
                 hint = ' If the browser binary is missing, run: uvx browser-use install'
             return _finalize_observation(
                 cmd,

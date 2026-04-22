@@ -5,7 +5,9 @@ import time
 import requests
 
 print('Starting server...')
-server_proc = subprocess.Popen([sys.executable, 'start_server.py'], stdout=sys.stdout, stderr=sys.stderr)
+server_proc = subprocess.Popen(
+    [sys.executable, 'start_server.py'], stdout=sys.stdout, stderr=sys.stderr
+)
 
 print('Waiting for server to boot...')
 time.sleep(10)
@@ -24,7 +26,9 @@ else:
     print('WARNING: Server did not become healthy string. Attempting test anyway.')
 
 print('Running test script...')
-test_proc = subprocess.run([sys.executable, 'scripts/run_real_task.py'], capture_output=True, text=True)
+test_proc = subprocess.run(
+    [sys.executable, 'scripts/run_real_task.py'], capture_output=True, text=True
+)
 print('--- TEST STDOUT ---')
 print(test_proc.stdout)
 print('--- TEST STDERR ---')

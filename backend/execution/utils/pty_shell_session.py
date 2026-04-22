@@ -97,6 +97,7 @@ def _norm_tty_text(text: str) -> str:
     """Normalize CRLF so PS1 JSON regex/JSON sees stable newlines (Windows PTYs)."""
     return text.replace('\r\n', '\n').replace('\r', '\n')
 
+
 # Aliases recognized by ``write_input(is_control=True)``. Keys are normalized
 # to lower case and stripped. Values are control-sequence alias names fed into
 # :data:`CONTROL_SEQUENCES`.
@@ -240,7 +241,9 @@ class PtyInteractiveShellSession(BaseShellSession):
                 self._ps1_ready = False
                 return
             self._ps1_ready = True
-            logger.info('Pty bash session JSON PS1 ready (execute will report exit/cwd).')
+            logger.info(
+                'Pty bash session JSON PS1 ready (execute will report exit/cwd).'
+            )
         except Exception as exc:  # noqa: BLE001
             logger.warning('Failed to install JSON PS1 in PTY bash: %s', exc)
             self._ps1_ready = False

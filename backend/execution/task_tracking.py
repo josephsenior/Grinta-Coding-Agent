@@ -24,7 +24,9 @@ from backend.persistence.locations import get_conversation_dir
 
 logger = logging.getLogger(__name__)
 
-_TASK_TRACKER_NOOP_PREFIX = '[TASK_TRACKER] Update skipped because the plan is unchanged.'
+_TASK_TRACKER_NOOP_PREFIX = (
+    '[TASK_TRACKER] Update skipped because the plan is unchanged.'
+)
 
 if TYPE_CHECKING:
     from backend.ledger.action import TaskTrackingAction

@@ -24,6 +24,7 @@ from backend.ledger.action.agent import (
     TaskTrackingAction,
     UncertaintyAction,
 )
+from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.empty import NullAction
@@ -32,7 +33,6 @@ from backend.ledger.action.files import (
     FileReadAction,
     FileWriteAction,
 )
-from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.action.message import (
     MessageAction,

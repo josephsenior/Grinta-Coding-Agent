@@ -246,6 +246,7 @@ def create_shell_session(
     """
     if tools is None:
         from backend.engine.tools.prompt import _get_global_tool_registry
+
         tools = cast(ShellToolRegistryLike, _get_global_tool_registry())
 
     resolved_tools = tools

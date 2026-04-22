@@ -67,11 +67,7 @@ class TestHasLiteralEscapeResidue:
         # Python docstring showing escape syntax, surrounded by real newlines.
         # Ratio of literal ``\n`` pairs to real newlines is ~1:3, under the 2x
         # gate, so we leave it alone.
-        content = (
-            'def f():\n'
-            '    """Use \\n for newlines."""\n'
-            '    return 1\n'
-        )
+        content = 'def f():\n    """Use \\n for newlines."""\n    return 1\n'
         assert not has_literal_escape_residue(content, 'f.py')
 
     def test_empty_and_non_string(self) -> None:

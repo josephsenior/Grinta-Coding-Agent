@@ -113,7 +113,7 @@ class ActionVerifier:
                 'import os; '
                 f'p={path!r}; '
                 "lines=sum(1 for _ in open(p, encoding='utf-8')); "
-                "size=os.path.getsize(p); "
+                'size=os.path.getsize(p); '
                 "print(f'{lines} lines, {size} bytes')"
             )
             content_cmd = CmdRunAction(

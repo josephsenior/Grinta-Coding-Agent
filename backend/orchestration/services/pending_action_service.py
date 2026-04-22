@@ -260,7 +260,9 @@ class PendingActionService:
             if math.isfinite(eff):
                 delays.append(eff + 2.0)
         if self._legacy_pending is not None:
-            eff = self._effective_timeout_seconds(self._timeout, self._legacy_pending[0])
+            eff = self._effective_timeout_seconds(
+                self._timeout, self._legacy_pending[0]
+            )
             if math.isfinite(eff):
                 delays.append(eff + 2.0)
         if not delays:

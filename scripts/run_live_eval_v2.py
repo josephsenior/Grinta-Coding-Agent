@@ -9,6 +9,7 @@ import requests
 import socketio
 
 with open('live_eval_log.txt', 'w', encoding='utf-8') as clog:
+
     def log_print(msg):
         print(msg)
         clog.write(msg + '\n')
@@ -19,7 +20,11 @@ with open('live_eval_log.txt', 'w', encoding='utf-8') as clog:
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
             try:
                 cmdline = ' '.join(proc.info['cmdline'] or []).lower()
-                if 'uvicorn' in cmdline or 'start_server.py' in cmdline or 'app.py' in cmdline:
+                if (
+                    'uvicorn' in cmdline
+                    or 'start_server.py' in cmdline
+                    or 'app.py' in cmdline
+                ):
                     if sys.executable.lower() in cmdline or 'python' in cmdline:
                         log_print(f'Killing old server process {proc.pid}')
                         proc.kill()
@@ -30,7 +35,9 @@ with open('live_eval_log.txt', 'w', encoding='utf-8') as clog:
 
         log_print('Starting fresh live server...')
         with open('server_stdout.log', 'w') as s_out:
-            server_proc = subprocess.Popen([sys.executable, 'start_server.py'], stdout=s_out, stderr=s_out)
+            server_proc = subprocess.Popen(
+                [sys.executable, 'start_server.py'], stdout=s_out, stderr=s_out
+            )
 
         log_print('Waiting for server to become healthy...')
         server_up = False
@@ -56,7 +63,9 @@ with open('live_eval_log.txt', 'w', encoding='utf-8') as clog:
             sio = socketio.AsyncClient()
 
             log_print('Creating conversation HTTP POST...')
-            res = requests.post('http://127.0.0.1:3000/api/v1/conversations', json={}, timeout=60)  # noqa: ASYNC210
+            res = requests.post(  # noqa: ASYNC210
+                'http://127.0.0.1:3000/api/v1/conversations', json={}, timeout=60
+            )
             res.raise_for_status()
             conv = res.json()
             sid = conv['conversation_id']
@@ -86,16 +95,21 @@ with open('live_eval_log.txt', 'w', encoding='utf-8') as clog:
                     await sio.disconnect()
 
             log_print('Connecting WS...')
-            await sio.connect(f'http://127.0.0.1:3000?conversation_id={sid}&latest_event_id=-1')
+            await sio.connect(
+                f'http://127.0.0.1:3000?conversation_id={sid}&latest_event_id=-1'
+            )
 
             await asyncio.sleep(1)
 
             msg = "Create a Python script in a folder named `real_world_task` containing a script `app.py` that starts a tiny FastAPI server on port 8080 returning {'message': 'Hello World'}. Also write a `requirements.txt` for it in that folder. Use tool calls to write the files."
             log_print(f'Sending prompt... {msg}')
-            await sio.emit('app_user_action', {
-                'action': 'message',
-                'args': {'content': msg, 'image_urls': [], 'file_urls': []}
-            })
+            await sio.emit(
+                'app_user_action',
+                {
+                    'action': 'message',
+                    'args': {'content': msg, 'image_urls': [], 'file_urls': []},
+                },
+            )
 
             log_print('Waiting for agent to finish...')
             try:

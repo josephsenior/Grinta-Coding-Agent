@@ -43,7 +43,9 @@ def test_chromadb_backend_defaults_to_project_storage_memory_chroma(tmp_path) ->
     assert (tmp_path / '.grinta' / 'storage' / 'memory' / 'chroma').exists()
 
 
-def test_sqlite_bm25_backend_defaults_to_project_storage_memory_sqlite(tmp_path) -> None:
+def test_sqlite_bm25_backend_defaults_to_project_storage_memory_sqlite(
+    tmp_path,
+) -> None:
     with patch(
         'backend.context.local_vector_store.get_active_local_data_root',
         return_value=str(tmp_path / '.grinta' / 'storage'),

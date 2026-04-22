@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, cast
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -257,7 +257,9 @@ class TestToolPairingMessageShape:
         initial_user = MessageAction(content='check example.com')
         initial_user.source = EventSource.USER
 
-        action = BrowserToolAction(command='navigate', params={'url': 'https://example.com'})
+        action = BrowserToolAction(
+            command='navigate', params={'url': 'https://example.com'}
+        )
         action.source = EventSource.AGENT
         action.tool_call_metadata = self._tool_meta('tc_ok')
 
@@ -285,7 +287,9 @@ class TestToolPairingMessageShape:
         initial_user = MessageAction(content='check example.com')
         initial_user.source = EventSource.USER
 
-        action = BrowserToolAction(command='navigate', params={'url': 'https://example.com'})
+        action = BrowserToolAction(
+            command='navigate', params={'url': 'https://example.com'}
+        )
         action.source = EventSource.AGENT
         action.tool_call_metadata = self._tool_meta('tc_missing')
 

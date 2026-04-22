@@ -87,7 +87,10 @@ class TaskValidationService:
                 active_steps.append(
                     (
                         str(getattr(step, 'id', '?') or '?'),
-                        str(getattr(step, 'description', 'Untitled step') or 'Untitled step'),
+                        str(
+                            getattr(step, 'description', 'Untitled step')
+                            or 'Untitled step'
+                        ),
                         status,
                     )
                 )

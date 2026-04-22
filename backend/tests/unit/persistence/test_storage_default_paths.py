@@ -43,9 +43,7 @@ def test_get_local_data_root_empty_uses_grinta_under_settings_parent(
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv('PROJECT_ROOT', raising=False)
     monkeypatch.delenv('APP_PROJECT_ROOT', raising=False)
-    cfg = AppConfig.model_validate(
-        {'local_data_root': '', 'project_root': None}
-    )
+    cfg = AppConfig.model_validate({'local_data_root': '', 'project_root': None})
     assert Path(get_local_data_root(cfg)) == _workspace_store(fake_home, tmp_path)
 
 
@@ -59,7 +57,9 @@ def test_get_local_data_root_respects_project_root_env(tmp_path, monkeypatch) ->
     assert Path(get_local_data_root(cfg)) == _workspace_store(fake_home, ws)
 
 
-def test_get_local_data_root_redirects_bare_workspace_path(tmp_path, monkeypatch) -> None:
+def test_get_local_data_root_redirects_bare_workspace_path(
+    tmp_path, monkeypatch
+) -> None:
     fake_home = _fake_user_home(monkeypatch, tmp_path)
     ws = tmp_path / 'repo'
     ws.mkdir()
@@ -107,10 +107,14 @@ def test_get_local_data_root_redirects_when_workspace_unresolved_but_cwd_is_proj
     dot = AppConfig.model_validate({'local_data_root': '.', 'project_root': None})
     assert Path(get_local_data_root(dot)) == _workspace_store(fake_home, repo)
 
-    sess = AppConfig.model_validate({'local_data_root': 'sessions', 'project_root': None})
+    sess = AppConfig.model_validate(
+        {'local_data_root': 'sessions', 'project_root': None}
+    )
     assert Path(get_local_data_root(sess)) == _workspace_store(fake_home, repo)
 
-    stor = AppConfig.model_validate({'local_data_root': 'storage', 'project_root': None})
+    stor = AppConfig.model_validate(
+        {'local_data_root': 'storage', 'project_root': None}
+    )
     assert Path(get_local_data_root(stor)) == _workspace_store(fake_home, repo)
 
 
@@ -127,7 +131,9 @@ def test_get_project_local_data_root_migrates_legacy_in_repo_storage(
     assert not dest.exists()
     root = Path(get_project_local_data_root(ws))
     assert root == dest.resolve()
-    assert (root / 'sessions' / 's1' / 'marker.txt').read_text(encoding='utf-8') == 'migrated'
+    assert (root / 'sessions' / 's1' / 'marker.txt').read_text(
+        encoding='utf-8'
+    ) == 'migrated'
     assert not (ws / '.grinta' / 'storage').exists()
 
 

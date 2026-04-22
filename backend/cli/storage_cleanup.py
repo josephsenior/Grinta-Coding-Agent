@@ -88,7 +88,9 @@ def run_storage_cleanup_command(
 ) -> int:
     """Run storage cleanup and print a concise summary."""
     active_console = console or Console()
-    resolved_project = Path(project).expanduser().resolve() if project else Path.cwd().resolve()
+    resolved_project = (
+        Path(project).expanduser().resolve() if project else Path.cwd().resolve()
+    )
     try:
         report = cleanup_project_storage(resolved_project)
     except ValueError as exc:
@@ -119,7 +121,9 @@ def run_storage_cleanup_command(
     return 0
 
 
-def _migration_specs(project_root: Path, canonical_root: Path) -> tuple[_MigrationSpec, ...]:
+def _migration_specs(
+    project_root: Path, canonical_root: Path
+) -> tuple[_MigrationSpec, ...]:
     agent_root = workspace_agent_state_dir(project_root)
     bucket_root = workspace_grinta_root(project_root)
     return (
@@ -194,7 +198,9 @@ def _migration_specs(project_root: Path, canonical_root: Path) -> tuple[_Migrati
         ),
         _MigrationSpec(project_root / 'sessions', canonical_root / 'sessions'),
         _MigrationSpec(project_root / 'users', canonical_root / 'users'),
-        _MigrationSpec(project_root / 'storage' / 'sessions', canonical_root / 'sessions'),
+        _MigrationSpec(
+            project_root / 'storage' / 'sessions', canonical_root / 'sessions'
+        ),
         _MigrationSpec(project_root / 'storage' / 'users', canonical_root / 'users'),
     )
 
@@ -240,7 +246,9 @@ def _merge_file(source: Path, destination: Path, report: StorageCleanupReport) -
     _archive_conflict(source, report, reason='content-conflict')
 
 
-def _archive_conflict(source: Path, report: StorageCleanupReport, *, reason: str) -> None:
+def _archive_conflict(
+    source: Path, report: StorageCleanupReport, *, reason: str
+) -> None:
     archive_root = report.conflict_root / reason
     relative = source.relative_to(report.project_root)
     destination = _dedupe_path(archive_root / relative)
@@ -283,7 +291,9 @@ def _remove_dir_if_empty(path: Path, report: StorageCleanupReport) -> None:
         report.removed_empty_dirs += 1
 
 
-def _prune_empty_branch(path: Path, stop_at: Path, report: StorageCleanupReport) -> None:
+def _prune_empty_branch(
+    path: Path, stop_at: Path, report: StorageCleanupReport
+) -> None:
     current = path
     while current != stop_at and current.exists() and current.is_dir():
         if any(current.iterdir()):

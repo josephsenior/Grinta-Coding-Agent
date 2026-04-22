@@ -66,7 +66,13 @@ def _redirection_write_blocked(command: str) -> bool:
         target = m.group(1).strip('`"\'')
         if not target or target in {'&1', '&2', '-'}:
             continue
-        if target.lower() in {'/dev/null', 'nul', '$null', '/dev/stdout', '/dev/stderr'}:
+        if target.lower() in {
+            '/dev/null',
+            'nul',
+            '$null',
+            '/dev/stdout',
+            '/dev/stderr',
+        }:
             continue
         if target.lower().endswith(('.log', '.tmp')):
             continue

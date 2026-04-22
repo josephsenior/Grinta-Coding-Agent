@@ -263,7 +263,11 @@ class ReasoningDisplay:
                 wrapped_rows.extend(_thought_lines_for_display(line, max_width))
 
             clipped = False
-            if max_lines is not None and max_lines >= 0 and len(wrapped_rows) > max_lines:
+            if (
+                max_lines is not None
+                and max_lines >= 0
+                and len(wrapped_rows) > max_lines
+            ):
                 wrapped_rows = wrapped_rows[-max_lines:]
                 clipped = True
 
@@ -274,9 +278,7 @@ class ReasoningDisplay:
                 rows.append(Text(row, style='#8b9eb5 dim'))
 
             if clipped:
-                rows.append(
-                    Text('… showing latest thoughts', style='#5d7286 italic')
-                )
+                rows.append(Text('… showing latest thoughts', style='#5d7286 italic'))
 
         return format_callout_panel(
             'Thinking',

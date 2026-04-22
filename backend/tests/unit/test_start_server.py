@@ -22,7 +22,9 @@ def test_get_knowledge_base_store_defaults_to_file_backend(monkeypatch) -> None:
     monkeypatch.delenv('APP_KB_STORAGE_PATH', raising=False)
 
     instance = MagicMock()
-    with patch.object(kb_store_module, 'KnowledgeBaseStore', return_value=instance) as store:
+    with patch.object(
+        kb_store_module, 'KnowledgeBaseStore', return_value=instance
+    ) as store:
         result = kb_store_module.get_knowledge_base_store()
 
     assert result is instance
@@ -35,7 +37,9 @@ def test_get_knowledge_base_store_uses_custom_storage_path(
     monkeypatch.setenv('APP_KB_STORAGE_PATH', str(tmp_path))
 
     instance = MagicMock()
-    with patch.object(kb_store_module, 'KnowledgeBaseStore', return_value=instance) as store:
+    with patch.object(
+        kb_store_module, 'KnowledgeBaseStore', return_value=instance
+    ) as store:
         result = kb_store_module.get_knowledge_base_store()
 
     assert result is instance

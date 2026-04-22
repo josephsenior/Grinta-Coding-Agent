@@ -82,9 +82,7 @@ class TestShouldCondense:
         assert m.should_condense() is False
 
     def test_false_during_warning_cooldown(self):
-        m = _make_monitor(
-            warn_mb=400, crit_mb=1200, check_interval_s=0, cooldown_s=30
-        )
+        m = _make_monitor(warn_mb=400, crit_mb=1200, check_interval_s=0, cooldown_s=30)
         with patch.object(m, '_sample_rss', return_value=500.0):
             with patch(
                 'backend.orchestration.memory_pressure.time.monotonic',
@@ -98,9 +96,7 @@ class TestShouldCondense:
                 assert m.should_condense() is False
 
     def test_critical_bypasses_warning_cooldown(self):
-        m = _make_monitor(
-            warn_mb=400, crit_mb=800, check_interval_s=0, cooldown_s=30
-        )
+        m = _make_monitor(warn_mb=400, crit_mb=800, check_interval_s=0, cooldown_s=30)
         with patch.object(m, '_sample_rss', return_value=900.0):
             with patch(
                 'backend.orchestration.memory_pressure.time.monotonic',

@@ -10,34 +10,36 @@ def test_analyze_project_structure_tree(tmp_path) -> None:
     (tmp_path / 'src').mkdir()
     (tmp_path / 'src' / 'main.py').write_text("print('hello')", encoding='utf-8')
 
-    action = build_analyze_project_structure_action({
-        'command': 'tree',
-        'path': str(tmp_path)
-    })
+    action = build_analyze_project_structure_action(
+        {'command': 'tree', 'path': str(tmp_path)}
+    )
 
     assert 'src/main.py' in action.thought
     assert '<dir> src' in action.thought
+
 
 def test_analyze_project_structure_imports(tmp_path) -> None:
     test_file = tmp_path / 'module.py'
     test_file.write_text('import os\nfrom pathlib import Path\n', encoding='utf-8')
 
-    action = build_analyze_project_structure_action({
-        'command': 'imports',
-        'path': str(test_file)
-    })
+    action = build_analyze_project_structure_action(
+        {'command': 'imports', 'path': str(test_file)}
+    )
 
     assert 'import os' in action.thought
     assert 'from pathlib import Path' in action.thought
 
+
 def test_analyze_project_structure_symbols(tmp_path) -> None:
     test_file = tmp_path / 'module.py'
-    test_file.write_text('class MyClass:\n    pass\n\ndef my_func():\n    pass\n\nMY_VAR = 1\n', encoding='utf-8')
+    test_file.write_text(
+        'class MyClass:\n    pass\n\ndef my_func():\n    pass\n\nMY_VAR = 1\n',
+        encoding='utf-8',
+    )
 
-    action = build_analyze_project_structure_action({
-        'command': 'symbols',
-        'path': str(test_file)
-    })
+    action = build_analyze_project_structure_action(
+        {'command': 'symbols', 'path': str(test_file)}
+    )
 
     assert 'class MyClass:' in action.thought
     assert 'def my_func():' in action.thought
@@ -54,10 +56,12 @@ def test_analyze_project_structure_file_outline_python(tmp_path) -> None:
         '    pass\n',
         encoding='utf-8',
     )
-    action = build_analyze_project_structure_action({
-        'command': 'file_outline',
-        'path': str(test_file),
-    })
+    action = build_analyze_project_structure_action(
+        {
+            'command': 'file_outline',
+            'path': str(test_file),
+        }
+    )
     assert 'FILE OUTLINE' in action.thought
     assert 'class Foo' in action.thought
     assert 'def bar' in action.thought

@@ -340,7 +340,9 @@ class TestPendingActionService(unittest.TestCase):
     def test_cmd_run_action_uses_long_timeout_floor(self, mock_time):
         """Long-running shell commands should outlive default pending timeout."""
         service = PendingActionService(self.mock_context, timeout=120.0)
-        action = CmdRunAction(command='python -m venv .venv && pip install -r requirements.txt')
+        action = CmdRunAction(
+            command='python -m venv .venv && pip install -r requirements.txt'
+        )
 
         mock_time.return_value = 100.0
         service.set(action)

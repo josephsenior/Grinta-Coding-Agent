@@ -324,9 +324,11 @@ def _resolve_transport_profile(
     # Metadata: only the real OpenAI API accepts the `metadata` request field.
     is_native_openai = model_family == 'openai' and (
         not base_url
-        or str(base_url).strip().rstrip('/').lower().startswith(
-            'https://api.openai.com'
-        )
+        or str(base_url)
+        .strip()
+        .rstrip('/')
+        .lower()
+        .startswith('https://api.openai.com')
     )
 
     # Tool replay: Google-family models require proprietary thought_signature
@@ -368,9 +370,10 @@ def _normalize_cross_family_tool_messages(
                 arguments = str(fn.get('arguments') or '{}')
                 tool_lines.append(flatten_tool_call_for_history(name, arguments))
             normalized = {k: v for k, v in msg.items() if k != 'tool_calls'}
-            normalized['content'] = '\n'.join(
-                part for part in [text, *tool_lines] if part
-            ) or '[Assistant requested tool execution.]'
+            normalized['content'] = (
+                '\n'.join(part for part in [text, *tool_lines] if part)
+                or '[Assistant requested tool execution.]'
+            )
             cleaned.append(normalized)
             continue
 
@@ -925,7 +928,9 @@ class AnthropicClient(DirectLLMClient):
                     elif event.type == 'message_delta':
                         _delta_usage = getattr(event, 'usage', None)
                         if _delta_usage is not None:
-                            _output_tokens = int(getattr(_delta_usage, 'output_tokens', 0) or 0)
+                            _output_tokens = int(
+                                getattr(_delta_usage, 'output_tokens', 0) or 0
+                            )
                     # Convert Anthropic events to OpenAI-like chunks for compatibility
                     if (
                         event.type == 'content_block_start'
@@ -1384,8 +1389,12 @@ class GeminiClient(DirectLLMClient):
             async for chunk in stream:
                 _um = getattr(chunk, 'usage_metadata', None)
                 if _um is not None:
-                    _gemini_input_tokens = int(getattr(_um, 'prompt_token_count', 0) or 0)
-                    _gemini_output_tokens = int(getattr(_um, 'candidates_token_count', 0) or 0)
+                    _gemini_input_tokens = int(
+                        getattr(_um, 'prompt_token_count', 0) or 0
+                    )
+                    _gemini_output_tokens = int(
+                        getattr(_um, 'candidates_token_count', 0) or 0
+                    )
                 fcs = getattr(chunk, 'function_calls', None)
                 if fcs:
                     for fc in fcs:

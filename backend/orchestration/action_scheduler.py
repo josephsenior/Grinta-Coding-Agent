@@ -35,7 +35,9 @@ class ActionScheduler:
         self,
         *,
         enabled: bool,
-        parallel_safe_action_prefixes: tuple[str, ...] = DEFAULT_PARALLEL_SAFE_ACTION_PREFIXES,
+        parallel_safe_action_prefixes: tuple[
+            str, ...
+        ] = DEFAULT_PARALLEL_SAFE_ACTION_PREFIXES,
         max_parallel_batch_size: int = DEFAULT_MAX_PARALLEL_BATCH_SIZE,
     ) -> None:
         self.enabled = enabled

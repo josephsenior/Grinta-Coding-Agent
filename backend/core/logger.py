@@ -327,9 +327,7 @@ def _grinta_install_tree_root() -> str:
     the user's repo tree). ``segment`` is derived from ``PROJECT_ROOT`` so each
     workspace is isolated while you keep one Grinta checkout for debugging.
     """
-    return os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    )
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _workspace_logs_segment() -> str:
@@ -359,7 +357,7 @@ def get_log_dir() -> str:
 def __getattr__(name: str) -> Any:
     if name == 'LOG_DIR':
         return get_log_dir()
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
 
 
 LOQUACIOUS_LOGGERS = [

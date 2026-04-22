@@ -21,6 +21,7 @@ from backend.ledger.observation import (
     ErrorObservation,
     Observation,
 )
+from backend.ledger.observation.terminal import TerminalObservation
 from backend.orchestration.tool_pipeline import ToolInvocationContext
 from backend.orchestration.tool_result_validator import (
     ToolResultValidator,
@@ -482,6 +483,29 @@ class TestObserve:
 
         result = ctx.metadata['validation_result']
         # Should not have empty result warnings
+        empty_warnings = [w for w in result.warnings if 'empty' in w.lower()]
+        assert not empty_warnings
+
+    @pytest.mark.asyncio
+    async def test_empty_result_rule_skips_blank_pty_with_session(
+        self,
+    ) -> None:
+        """First PTY read is often empty; session_id means the tool opened OK."""
+        validator = ToolResultValidator()
+
+        action = MagicMock()
+        action.__class__.__name__ = 'TerminalRunAction'
+        obs = TerminalObservation(
+            session_id='term-abc12345',
+            content='   \n',
+        )
+        controller = MagicMock()
+        state = MagicMock()
+        ctx = ToolInvocationContext(controller=controller, action=action, state=state)
+
+        await validator.observe(ctx, obs)
+
+        result = ctx.metadata['validation_result']
         empty_warnings = [w for w in result.warnings if 'empty' in w.lower()]
         assert not empty_warnings
 

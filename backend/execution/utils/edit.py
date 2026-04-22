@@ -70,7 +70,7 @@ def _extract_code(string: str) -> str | None:
             content = content[first_newline + 1 :]
             content = content.rstrip()
             if content.endswith('```'):
-                content = content[: -3].rstrip()
+                content = content[:-3].rstrip()
         else:
             # Opening fence with no closing — just strip the fence line
             if content.startswith('```python'):
