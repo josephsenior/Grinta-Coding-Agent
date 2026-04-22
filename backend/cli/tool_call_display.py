@@ -30,7 +30,7 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     "delegate_task": ("", "Delegate"),
     "signal_progress": ("", "Progress"),
     "shared_task_board": ("", "Board"),
-    "terminal_manager": ("", "Terminal"),
+    "terminal_manager": ("", "PTY"),
     "communicate_with_user": ("", "Message you"),
     "call_mcp_tool": ("�", "MCP"),
     "checkpoint": ("", "Checkpoint"),
@@ -72,6 +72,14 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
         return "Edited"
     if tn in {"execute_bash", "execute_powershell"}:
         return "Ran"
+    if tn == "terminal_manager":
+        op = str(a.get("action") or "").strip().lower()
+        if op == "open":
+            return "Started"
+        if op == "input":
+            return "Sent"
+        if op == "read":
+            return "Read"
     mapping = {
         "edit_file": "Edited",
         "ast_code_editor": "Refactored",
@@ -91,7 +99,6 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
         "delegate_task": "Delegated",
         "signal_progress": "Noted",
         "shared_task_board": "Checked",
-        "terminal_manager": "Opened",
         "communicate_with_user": "Messaged",
         "call_mcp_tool": "Invoked",
         "checkpoint": "Saved",
@@ -139,6 +146,10 @@ def tool_activity_stats_hint(tool_name: str, args: dict[str, Any]) -> str | None
         sym = args.get("symbol") or args.get("name")
         if isinstance(sym, str) and sym.strip():
             return f"symbol: {sym}"
+    if tn == "terminal_manager":
+        t_sid = args.get("session_id")
+        if isinstance(t_sid, str) and t_sid.strip() and str(args.get("action", "")).lower() != "open":
+            return f"session: {_trunc(t_sid, 36)}"
     if tn in {"code_intelligence", "lsp_query"}:
         lsp_q = args.get("command") or args.get("query_type")
         if isinstance(lsp_q, str) and lsp_q.strip():
@@ -197,6 +208,76 @@ def _trunc(s: str, max_len: int = 100) -> str:
     if len(s) <= max_len:
         return s
     return s[: max_len - 1] + "…"
+
+
+def _summarize_terminal_manager_args(args: dict[str, Any]) -> str:
+    """Human-readable line for ``terminal_manager`` (open / input / read)."""
+    op = str(args.get("action") or "").strip().lower()
+    if op == "open":
+        cmd = args.get("command")
+        cwd = args.get("cwd")
+        if isinstance(cmd, str) and cmd.strip():
+            line = f"open · $ {_trunc(cmd, 100)}"
+            if isinstance(cwd, str) and cwd.strip():
+                line = f"{line} · cwd {_trunc(cwd, 48)}"
+            return line
+        return "open (no command yet)"
+    if op == "input":
+        sid = str(args.get("session_id") or "")
+        inv = str(args.get("input") or "")
+        ctrl = args.get("control")
+        if isinstance(ctrl, str) and ctrl.strip():
+            bits = ["input", f"ctrl {ctrl}"]
+            if sid.strip():
+                bits.insert(1, _trunc(sid, 24))
+            return " · ".join(bits)
+        if inv.strip():
+            if sid.strip():
+                return f"input · {_trunc(sid, 20)} · {_trunc(inv, 70)}"
+            return f"input · {_trunc(inv, 90)}"
+        if sid.strip():
+            return f"input · {_trunc(sid, 40)}"
+        return "input…"
+    if op == "read":
+        sid = str(args.get("session_id") or "")
+        if sid.strip():
+            return f"read · {_trunc(sid, 44)}"
+        return "read (no session)"
+    return "terminal…"
+
+
+def _streaming_hint_terminal_manager(partial_json: str) -> str:
+    """Best-effort label while ``terminal_manager`` JSON is still streaming."""
+    m_act = re.search(r'"action"\s*:\s*"(open|input|read)"', partial_json)
+    if not m_act:
+        return ""
+    op = m_act.group(1)
+    if op == "open":
+        m_cmd = re.search(r'"command"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json, re.DOTALL)
+        if m_cmd:
+            raw_c = m_cmd.group(1).replace("\\n", "\n").replace('\\"', '"')
+            return f"open · $ {_trunc(raw_c, 90)}"
+        return "open"
+    if op == "input":
+        m_sid = re.search(r'"session_id"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
+        sid = m_sid.group(1) if m_sid else ""
+        m_ctrl = re.search(r'"control"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
+        m_inp = re.search(r'"input"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json, re.DOTALL)
+        parts: list[str] = ["input"]
+        if sid:
+            parts.append(_trunc(sid, 22))
+        if m_ctrl:
+            parts.append(f"ctrl {m_ctrl.group(1)[:24]}")
+        elif m_inp:
+            raw = m_inp.group(1).replace("\\n", "\n").replace('\\"', '"')
+            parts.append(_trunc(raw, 55))
+        return " · ".join(parts)
+    if op == "read":
+        m_sid = re.search(r'"session_id"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
+        if m_sid:
+            return f"read · {_trunc(m_sid.group(1), 40)}"
+        return "read"
+    return ""
 
 
 def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
@@ -359,10 +440,7 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
         return _trunc(" · ".join(bits_ast), 120) if bits_ast else "AST edit…"
 
     if tn == "terminal_manager":
-        tm_cmd = args.get("command") or args.get("action")
-        if tm_cmd:
-            return str(tm_cmd)
-        return "terminal…"
+        return _summarize_terminal_manager_args(args)
 
     if tn == "shared_task_board":
         op = args.get("operation") or args.get("command")
@@ -411,6 +489,12 @@ def streaming_args_hint(tool_name: str, partial_json: str) -> str:
     """Human-readable fragment from partially streamed arguments (no JSON braces)."""
     if not partial_json or not partial_json.strip():
         return ""
+
+    tn = (tool_name or "").strip()
+    if tn == "terminal_manager":
+        frag = _streaming_hint_terminal_manager(partial_json)
+        if frag:
+            return frag
 
     # Fast path: full parse
     parsed = parse_tool_arguments_json(partial_json)

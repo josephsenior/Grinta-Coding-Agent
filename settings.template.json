@@ -1,6 +1,6 @@
 {
   "llm_provider": "",
   "llm_model": "",
-  "llm_api_key": "",
+  "llm_api_key": "${LLM_API_KEY}",
   "llm_base_url": ""
 }

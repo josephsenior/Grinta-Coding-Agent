@@ -10,7 +10,7 @@ Canonical startup:
 ## Table of Contents
 
 1. Installation
-2. Configuration
+2. Configuration (incl. pending actions, terminal, Stop/Cancel, Ctrl+C)
 3. First Task
 4. Optional Raw HTTP Backend
 5. LLM Provider Setup
@@ -73,6 +73,37 @@ Common environment variables:
 - `LLM_API_KEY`
 - `LLM_MODEL`
 - `APP_ROOT` (forces where `settings.json` is resolved)
+
+### Pending actions and the terminal manager
+
+The default `pending_action_timeout` (in `settings.json`) is the base watchdog for
+how long the orchestration waits for a tool’s observation. Interactive shell
+commands (`cmd_run`) and `terminal_manager` (PTY) actions use a **higher built-in
+floor** (aligned with long-running installs and slow PTY startup), so they are
+less likely to hit a spurious “pending action” timeout at the default.
+
+If you still see timeouts for other tools, or you need an even longer global
+window, increase `pending_action_timeout` in `settings.json` (or set it to `0` to
+disable the watchdog, which is not recommended for routine use).
+
+### REPL: Ctrl+C
+
+At the **input prompt**, Ctrl+C is ignored as an exit (use `/quit` or `exit` to
+leave). **While the agent is running**, Ctrl+C is intended to cancel the run; on
+Windows with some terminals, you may need to press it more than once for the
+interrupt to register.
+
+### Stop, Ctrl+C, and in-flight tool calls
+
+If you press **Stop** or **Ctrl+C** while a tool call is still running, the
+orchestration may show an error such as “Run cancelled … before this tool
+finished.” That means **you interrupted the step**, not that the tool (or
+`terminal_manager`) is broken. A separate message is used when the **runtime**
+crashes or restarts without you cancelling.
+
+Multi-step tools (for example `terminal_manager`: **open** → **read** / **input**)
+need each step to complete unless you intend to cancel; stopping mid-sequence
+leaves tasks incomplete and can show that message for the interrupted call.
 
 ---
 

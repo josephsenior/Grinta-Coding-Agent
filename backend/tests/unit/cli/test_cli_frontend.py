@@ -31,6 +31,7 @@ from backend.cli.repl import (
     _supports_prompt_session,
 )
 from backend.core.config import AppConfig
+from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 from backend.core.enums import ActionSecurityRisk, AgentState, EventSource
 from backend.inference.metrics import Metrics, ResponseLatency, TokenUsage
 from backend.ledger.action import (
@@ -1441,11 +1442,14 @@ def test_atomic_settings_write(tmp_path: Path) -> None:
 
     settings_file = tmp_path / 'settings.json'
     with patch('backend.cli.config_manager._settings_path', return_value=settings_file):
-        data = {'llm_api_key': 'sk-test123', 'llm_model': 'test/model'}
+        data = {
+            'llm_api_key': LLM_API_KEY_SETTINGS_PLACEHOLDER,
+            'llm_model': 'test/model',
+        }
         _save_raw_settings(data)
 
         loaded = _load_raw_settings()
-        assert loaded['llm_api_key'] == 'sk-test123'
+        assert loaded['llm_api_key'] == LLM_API_KEY_SETTINGS_PLACEHOLDER
         assert loaded['llm_model'] == 'test/model'
 
         # No stale .tmp files left behind
@@ -1557,9 +1561,12 @@ def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
                     result = run_onboarding()
 
     saved = json.loads(settings_file.read_text(encoding='utf-8'))
-    assert saved['llm_api_key'] == 'sk-ant-api03-test-value'
+    assert saved['llm_api_key'] == LLM_API_KEY_SETTINGS_PLACEHOLDER
     assert saved['llm_model'] == 'anthropic/claude-sonnet-4-20250514'
     assert saved['llm_provider'] == 'anthropic'
+    env_file = settings_file.parent / '.env'
+    assert env_file.is_file()
+    assert 'sk-ant-api03-test-value' in env_file.read_text(encoding='utf-8')
     assert result is loaded_config
 
 

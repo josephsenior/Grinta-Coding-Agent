@@ -12,6 +12,7 @@ from backend.core.constants import (
     BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     CMD_PENDING_ACTION_TIMEOUT_FLOOR,
     MCP_PENDING_ACTION_TIMEOUT_FLOOR,
+    TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR,
 )
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventSource
@@ -47,6 +48,7 @@ class PendingActionService:
         """MCP tool calls often need longer than the default (cold npx, network).
 
         Delegated tasks run sub-agents that may take many minutes; use infinite timeout.
+        Terminal* actions (terminal_manager) use a high floor like CmdRunAction.
         """
         if base <= 0:
             return math.inf
@@ -72,6 +74,13 @@ class PendingActionService:
         if type(action).__name__ == 'BrowserToolAction':
             # Align with LocalRuntime browser_tool sync bridge (cold start + one operation budget).
             return max(float(base), float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS))
+        if type(action).__name__ in (
+            'TerminalRunAction',
+            'TerminalInputAction',
+            'TerminalReadAction',
+        ):
+            # PTY / interactive work can be slow; align with shell pending floor.
+            return max(float(base), float(TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR))
         return float(base)
 
     @staticmethod

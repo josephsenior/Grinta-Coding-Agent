@@ -13,11 +13,50 @@ from __future__ import annotations
 
 import pytest
 
-from backend.integrations.mcp.mcp_utils import _resolve_server_env
+from backend.core.config.mcp_config import MCPServerConfig
+from backend.integrations.mcp.mcp_utils import _apply_exa_mcp_url_auth, _resolve_server_env
 from backend.integrations.mcp.wrappers import (
     WRAPPER_TOOL_REGISTRY,
     wrapper_tool_params,
 )
+
+
+class TestExaMcpUrlAuth:
+    def test_appends_exa_api_key_from_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv('EXA_API_KEY', 'exa_secret_key')
+        srv = MCPServerConfig(
+            name='exa',
+            type='shttp',
+            transport='shttp',
+            url='https://mcp.exa.ai/mcp',
+        )
+        out = _apply_exa_mcp_url_auth(srv)
+        assert out.api_key is None
+        assert 'exaApiKey=exa_secret_key' in (out.url or '')
+
+    def test_skips_when_query_already_present(self) -> None:
+        srv = MCPServerConfig(
+            name='exa',
+            type='shttp',
+            transport='shttp',
+            url='https://mcp.exa.ai/mcp?exaApiKey=already',
+            api_key='unused',
+        )
+        out = _apply_exa_mcp_url_auth(srv)
+        assert out.url == srv.url
+        assert out.api_key == 'unused'
+
+    def test_non_exa_server_unchanged(self) -> None:
+        srv = MCPServerConfig(
+            name='other',
+            type='shttp',
+            transport='shttp',
+            url='https://example.com/mcp',
+            api_key='k',
+        )
+        assert _apply_exa_mcp_url_auth(srv) == srv
 
 
 class TestWrapperToolRegistry:
@@ -28,7 +67,6 @@ class TestWrapperToolRegistry:
         # The surviving wrappers are pure cache/search helpers that the agent
         # can actually use; no meta-diagnostic tools.
         assert set(WRAPPER_TOOL_REGISTRY.keys()) == {
-            'search_components',
             'get_component_cached',
             'get_block_cached',
         }
@@ -48,7 +86,7 @@ class TestWrapperToolRegistry:
             available_server_tools=['list_components', 'get_component']
         )
         names = {p['function']['name'] for p in params}
-        assert names == {'search_components', 'get_component_cached'}
+        assert names == {'get_component_cached'}
 
 
 class TestResolveServerEnv:
@@ -109,6 +147,51 @@ class TestResolveServerEnv:
             'LITERAL': 'stays',
             'FROM_TEMPLATE': 'pat_value',
         }
+
+    def test_project_root_template_substitution(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv('PROJECT_ROOT', 'C:\\workspace\\demo')
+        resolved = _resolve_server_env({'RIGOUR_CWD': '${PROJECT_ROOT}'})
+        assert resolved == {'RIGOUR_CWD': 'C:\\workspace\\demo'}
+
+    def test_project_root_template_without_env_uses_effective_workspace(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        monkeypatch.delenv('PROJECT_ROOT', raising=False)
+        monkeypatch.delenv('APP_PROJECT_ROOT', raising=False)
+
+        def _gewr():
+            return tmp_path
+
+        monkeypatch.setattr(
+            'backend.core.workspace_resolution.get_effective_workspace_root',
+            _gewr,
+        )
+        resolved = _resolve_server_env({'RIGOUR_CWD': '${PROJECT_ROOT}'})
+        assert resolved == {'RIGOUR_CWD': str(tmp_path.resolve())}
+
+    def test_project_root_template_falls_back_to_cwd(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        monkeypatch.delenv('PROJECT_ROOT', raising=False)
+        monkeypatch.delenv('APP_PROJECT_ROOT', raising=False)
+        monkeypatch.setattr(
+            'backend.core.workspace_resolution.get_effective_workspace_root',
+            lambda: None,
+        )
+        monkeypatch.chdir(tmp_path)
+        resolved = _resolve_server_env({'RIGOUR_CWD': '${PROJECT_ROOT}'})
+        assert resolved == {'RIGOUR_CWD': str(tmp_path.resolve())}
+
+    def test_github_token_env_not_used_for_github_mcp_placeholder(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """``GITHUB_TOKEN`` alone does not satisfy the GitHub MCP env slot."""
+        monkeypatch.delenv('GITHUB_PERSONAL_ACCESS_TOKEN', raising=False)
+        monkeypatch.setenv('GITHUB_TOKEN', 'ghp_from_github_token')
+        resolved = _resolve_server_env({'GITHUB_PERSONAL_ACCESS_TOKEN': ''})
+        assert resolved == {}
 
 
 class TestPromptMcpSection:

@@ -120,7 +120,9 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         description=(
             'Seconds to wait for an observation matching a pending tool call '
             'before emitting a pending-action timeout error. '
-            '0 or negative disables the timeout (no watchdog).'
+            '0 or negative disables the timeout (no watchdog). '
+            'Shell (cmd_run) and terminal_manager (PTY) actions use a higher '
+            'built-in floor than this default; raise this value for other slow tools.'
         ),
     )
     max_budget_per_task: float | None = Field(

@@ -34,6 +34,39 @@ class TestToolCallDisplay(unittest.TestCase):
         s = summarize_tool_arguments('apply_patch', {'patch': 'diff --git a b'})
         self.assertEqual(s, 'apply patch')
 
+    def test_summarize_terminal_manager_open(self) -> None:
+        s = summarize_tool_arguments(
+            'terminal_manager',
+            {
+                'action': 'open',
+                'command': 'pytest -q',
+                'cwd': '/tmp/proj',
+            },
+        )
+        self.assertIn('open', s)
+        self.assertIn('pytest', s)
+        self.assertIn('cwd', s)
+
+    def test_summarize_terminal_manager_read(self) -> None:
+        s = summarize_tool_arguments(
+            'terminal_manager',
+            {'action': 'read', 'session_id': 'sess-abc-123'},
+        )
+        self.assertIn('read', s)
+        self.assertIn('sess-abc-123', s)
+
+    def test_streaming_hint_terminal_open_partial(self) -> None:
+        h = streaming_args_hint(
+            'terminal_manager',
+            '{"action": "open", "command": "npm test',
+        )
+        self.assertIn('open', h)
+        h2 = streaming_args_hint(
+            'terminal_manager',
+            '{"action": "open", "command": "npm test", "cwd": "x"}',
+        )
+        self.assertIn('npm test', h2)
+
     def test_format_invocation_line(self) -> None:
         icon, line = format_tool_invocation_line(
             'str_replace_editor',

@@ -639,14 +639,50 @@ def _handle_mcp_tool(
     return MCPAction(name=tool_call_name, arguments=normalized_args)
 
 
+def _merge_mcp_gateway_inner_arguments(arguments: Mapping[str, Any]) -> dict[str, Any]:
+    """Merge MCP tool args from ``call_mcp_tool`` into one dict.
+
+    Frontier models often place parameter keys beside ``tool_name`` instead of
+    nesting them under ``arguments``. Without this merge, the MCP child sees
+    an empty object and returns -32602 (e.g. Context7 ``resolve-library-id``).
+    """
+    raw_inner = arguments.get('arguments')
+    if isinstance(raw_inner, Mapping):
+        inner: dict[str, Any] = dict(raw_inner)
+    else:
+        inner = {}
+
+    for key, value in arguments.items():
+        if key in ('tool_name', 'arguments'):
+            continue
+        if value is None:
+            continue
+        if key not in inner or inner.get(key) in (None, ''):
+            inner[key] = value
+
+    return inner
+
+
+def _apply_context7_resolve_library_defaults(inner: dict[str, Any]) -> None:
+    """Context7 ``resolve-library-id`` requires both ``libraryName`` and ``query``."""
+    if not inner.get('libraryName') or inner.get('query') not in (None, ''):
+        return
+    ln = str(inner['libraryName']).strip()
+    if not ln:
+        return
+    inner['query'] = (
+        f'Documentation, setup, and API reference for {ln} — pick the best-matching library.'
+    )
+
+
 def _handle_execute_mcp_tool_tool(arguments: dict[str, Any]) -> MCPAction:
     """Handle the call_mcp_tool gateway — route to the real MCP tool."""
     tool_name = _require_tool_argument(arguments, 'tool_name', 'call_mcp_tool')
-    inner_args = arguments.get('arguments', {})
-    if not isinstance(inner_args, Mapping):
-        inner_args = {}
+    inner_args = _merge_mcp_gateway_inner_arguments(arguments)
+    if tool_name == 'resolve-library-id':
+        _apply_context7_resolve_library_defaults(inner_args)
     logger.info('MCP gateway routing to tool: %s', tool_name)
-    return MCPAction(name=tool_name, arguments=dict(inner_args))
+    return MCPAction(name=tool_name, arguments=inner_args)
 
 
 def _validate_ast_code_editor_args(arguments: dict, tool_name: str) -> tuple[str, str]:

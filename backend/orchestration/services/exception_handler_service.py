@@ -9,7 +9,11 @@ from __future__ import annotations
 import traceback
 from typing import TYPE_CHECKING
 
-from backend.core.errors import AgentRuntimeError, LLMContextWindowExceedError
+from backend.core.errors import (
+    AgentRuntimeError,
+    LLMContextWindowExceedError,
+    LLMMalformedActionError,
+)
 from backend.core.logger import app_logger as logger
 from backend.inference.exceptions import (
     APIConnectionError,
@@ -43,6 +47,7 @@ _PASSTHROUGH_EXCEPTIONS = (
     ContentPolicyViolationError,
     ContextWindowExceededError,
     LLMContextWindowExceedError,
+    LLMMalformedActionError,
 )
 
 

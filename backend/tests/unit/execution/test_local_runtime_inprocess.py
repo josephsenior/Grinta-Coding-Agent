@@ -7,6 +7,12 @@ from backend.execution.drivers.local.local_runtime_inprocess import (
 )
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
+from backend.ledger.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
+from backend.ledger.observation import NullObservation
 from backend.ledger.observation.commands import CmdOutputObservation
 from backend.ledger.observation.code_nav import LspQueryObservation
 
@@ -21,6 +27,42 @@ def _make_runtime() -> LocalRuntimeInProcess:
         )
     runtime._runtime_initialized = True
     return runtime
+
+
+def test_terminal_run_forwards_to_runtime_executor() -> None:
+    runtime = _make_runtime()
+    obs = NullObservation(content='session-1')
+    executor = MagicMock()
+    executor.terminal_run = AsyncMock(return_value=obs)
+    runtime._executor = executor
+    action = TerminalRunAction(command='echo hi')
+    result = runtime.terminal_run(action)
+    assert result is obs
+    executor.terminal_run.assert_awaited_once_with(action)
+
+
+def test_terminal_input_forwards_to_runtime_executor() -> None:
+    runtime = _make_runtime()
+    obs = NullObservation(content='')
+    executor = MagicMock()
+    executor.terminal_input = AsyncMock(return_value=obs)
+    runtime._executor = executor
+    action = TerminalInputAction(session_id='s1', input='y')
+    result = runtime.terminal_input(action)
+    assert result is obs
+    executor.terminal_input.assert_awaited_once_with(action)
+
+
+def test_terminal_read_forwards_to_runtime_executor() -> None:
+    runtime = _make_runtime()
+    obs = NullObservation(content='out')
+    executor = MagicMock()
+    executor.terminal_read = AsyncMock(return_value=obs)
+    runtime._executor = executor
+    action = TerminalReadAction(session_id='s1')
+    result = runtime.terminal_read(action)
+    assert result is obs
+    executor.terminal_read.assert_awaited_once_with(action)
 
 
 def test_lsp_query_forwards_to_runtime_executor() -> None:

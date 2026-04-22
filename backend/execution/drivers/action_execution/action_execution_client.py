@@ -9,6 +9,7 @@ import httpx
 from backend.execution.base import Runtime
 from backend.execution.utils.request import send_request
 from backend.execution.utils.system_stats import update_last_execution_time
+from backend.utils.http_session import HttpSession
 
 if TYPE_CHECKING:
     from backend.core.config import AppConfig
@@ -98,6 +99,7 @@ class ActionExecutionClient(Runtime):
             project_root=project_root,
         )
         self._vscode_token: str | None = None
+        self._action_server_session = HttpSession()
 
     async def connect(self) -> None:
         pass
@@ -281,7 +283,7 @@ class ActionExecutionClient(Runtime):
     def _send_action_server_request(self, method: str, path: str, **kwargs) -> Any:
         url = f'{getattr(self, "action_execution_server_url", "")}{path}'
         try:
-            return send_request(None, method, url, **kwargs)  # type: ignore[arg-type]
+            return send_request(self._action_server_session, method, url, **kwargs)
         except httpx.TimeoutException:
             raise TimeoutError(f'Request to action server timed out: {method} {path}')
 

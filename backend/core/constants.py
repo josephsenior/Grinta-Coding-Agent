@@ -44,6 +44,8 @@ DEFAULT_MCP_HOST = 'localhost:3000'
 
 # ── Security ────────────────────────────────────────────────────────
 SECRET_PLACEHOLDER = '**********'
+# settings.json must not store the real LLM secret; use LLM_API_KEY in .env instead.
+LLM_API_KEY_SETTINGS_PLACEHOLDER = '${LLM_API_KEY}'
 
 # ── Cache ───────────────────────────────────────────────────────────
 SETTINGS_CACHE_TTL = 60  # seconds
@@ -65,6 +67,8 @@ MCP_PENDING_ACTION_TIMEOUT_FLOOR = 180.0
 # Foreground shell commands (env setup, installs, builds) often run far longer than
 # the default pending-action timeout while still progressing normally.
 CMD_PENDING_ACTION_TIMEOUT_FLOOR = 600.0
+# PTY / terminal_manager (Terminal* actions): same headroom as shell commands.
+TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR = CMD_PENDING_ACTION_TIMEOUT_FLOOR
 # Native browser: per-stage fail-fast budgets (see GrintaNativeBrowser).
 BROWSER_SESSION_START_TIMEOUT_SEC = 90.0
 BROWSER_CDP_NAVIGATE_TIMEOUT_SEC = 20.0
@@ -435,14 +439,6 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     'DEBUG': ('false', 'Enable general debug mode'),
     'DEBUG_LLM': ('true', 'Log raw LLM request/response payloads'),
     'DEBUG_LLM_PROMPT': ('false', 'Log full prompt text sent to LLMs'),
-    'APP_DEBUG_PROMPT_ROLES': (
-        'false',
-        'Log per-astep message-role histogram and compaction flags after build_messages',
-    ),
-    'APP_DEBUG_REASONING_ASTEP': (
-        'false',
-        'Log reasoning panel transitions with the current astep id for prompt-vs-UI correlation',
-    ),
     'APP_CLI_SHOW_REASONING_TEXT': (
         'true',
         'Render reasoning/thinking text in CLI panels; set false/0 to suppress provider reasoning leakage',

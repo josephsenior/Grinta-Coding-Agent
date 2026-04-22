@@ -157,6 +157,13 @@ class BaseShellSession(UnifiedShellSession, ABC):
         msg = f'{self.__class__.__name__} does not implement write_input()'
         raise NotImplementedError(msg)
 
+    def resize(self, rows: int, cols: int) -> None:
+        """Resize the interactive TTY (rows x columns).
+
+        Subprocess-backed shells ignore this. PTY and tmux-backed sessions
+        may override to update the emulated terminal dimensions.
+        """
+
     def close(self) -> None:
         """Close the shell session and clean up resources."""
         self._closed = True
@@ -218,6 +225,8 @@ def create_shell_session(
     no_change_timeout_seconds: int = 30,
     max_memory_mb: int | None = None,
     cancellation_service: TaskCancellationService | None = None,
+    *,
+    interactive: bool = False,
 ) -> UnifiedShellSession:
     """Factory function to create the appropriate shell session.
 
@@ -228,6 +237,9 @@ def create_shell_session(
         no_change_timeout_seconds: Timeout for no output change
         max_memory_mb: Optional memory limit
         cancellation_service: Optional hook to cancel in-flight shell work
+        interactive: If True, return a PTY-backed session that supports
+            real-time ``read_output`` / ``write_input`` cross-platform. Falls
+            back to the legacy session if the PTY backend is unavailable.
 
     Returns:
         Appropriate shell session implementation
@@ -261,6 +273,29 @@ def create_shell_session(
         'max_memory_mb': max_memory_mb,
         'cancellation_service': cancellation_service,
     }
+
+    if interactive:
+        try:
+            from backend.execution.utils.pty_session import PtyUnavailableError
+            from backend.execution.utils.pty_shell_session import (
+                PtyInteractiveShellSession,
+            )
+
+            logger.info('Using PtyInteractiveShellSession (OS-agnostic PTY)')
+            return PtyInteractiveShellSession(**session_kwargs)
+        except PtyUnavailableError as exc:
+            logger.warning(
+                'Interactive PTY backend unavailable (%s); falling back to '
+                'default shell session. Interactive read_output / write_input '
+                'may be limited.',
+                exc,
+            )
+        except Exception as exc:
+            logger.warning(
+                'Failed to start interactive PTY shell (%s); falling back to '
+                'default shell session.',
+                exc,
+            )
 
     # Windows: Prefer PowerShell by default for native compatibility.
     # Users can force bash with APP_WINDOWS_SHELL_PREFERENCE=bash.

@@ -3,7 +3,11 @@
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from backend.core.errors import LLMContextWindowExceedError, ModelProviderError
+from backend.core.errors import (
+    LLMContextWindowExceedError,
+    LLMMalformedActionError,
+    ModelProviderError,
+)
 from backend.inference.exceptions import (
     APIConnectionError,
     APIError,
@@ -186,6 +190,17 @@ class TestExceptionHandlerService(unittest.IsolatedAsyncioTestCase):
     async def test_handle_step_exception_model_provider_error(self, mock_logger):
         """Test handle_step_exception forwards ModelProviderError."""
         exc = ModelProviderError('LLM returned no response')
+
+        await self.service.handle_step_exception(exc)
+
+        self.mock_controller.recovery_service.react_to_exception.assert_called_once_with(
+            exc
+        )
+
+    @patch('backend.orchestration.services.exception_handler_service.logger')
+    async def test_handle_step_exception_malformed_action_error(self, mock_logger):
+        """Test handle_step_exception forwards LLMMalformedActionError."""
+        exc = LLMMalformedActionError('Bad action')
 
         await self.service.handle_step_exception(exc)
 

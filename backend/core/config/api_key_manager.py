@@ -6,7 +6,6 @@ import builtins
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, SecretStr
@@ -166,45 +165,11 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             )
             return fallback_key
 
-        # As a last-resort fallback (especially during early startup before full
-        # config loading), try to read the default JSON settings file directly so
-        # that file-based config can provide the first API key source.
-        try:
-            from backend.core.constants import DEFAULT_CONFIG_FILE
-
-            cfg_path = Path(DEFAULT_CONFIG_FILE)
-            if cfg_path.is_file():
-                import json
-
-                with cfg_path.open('r', encoding='utf-8') as f:
-                    data = json.load(f)
-                raw_key = data.get('llm_api_key')
-                if raw_key:
-                    key = SecretStr(str(raw_key))
-                    # Prefer llm_model from the same file so the key is indexed and
-                    # logged under the user's chosen provider (not e.g. default gemini).
-                    file_model_raw = data.get('llm_model')
-                    file_model = (
-                        str(file_model_raw).strip()
-                        if file_model_raw is not None
-                        else ''
-                    )
-                    model_for_store = file_model or model
-                    store_provider = self._extract_provider(model_for_store)
-                    self.set_api_key(model_for_store, key)
-                    logger.info(
-                        'Loaded API key from %s for provider %s (model %s)',
-                        cfg_path.name,
-                        store_provider,
-                        model_for_store,
-                    )
-                    return key
-        except Exception as exc:  # pragma: no cover - best-effort fallback
-            logger.debug(
-                'Failed to load API key for provider %s from settings file: %s',
-                provider,
-                exc,
-            )
+        # Last-resort before startup config load: unified LLM key from the environment
+        # only (secrets belong in .env as LLM_API_KEY, not in settings.json).
+        env_llm = (os.environ.get('LLM_API_KEY') or '').strip()
+        if env_llm:
+            return SecretStr(env_llm)
 
         # Provide helpful guidance for missing API keys
         provider_config = provider_config_manager.get_provider_config(provider)

@@ -61,13 +61,19 @@ class SessionManager:
                 logger.warning('Failed to import ToolRegistry')
 
     def create_session(
-        self, session_id: Optional[str] = None, cwd: Optional[str] = None
+        self,
+        session_id: Optional[str] = None,
+        cwd: Optional[str] = None,
+        *,
+        interactive: bool = False,
     ) -> UnifiedShellSession:
         """Create and initialize a new shell session.
 
         Args:
             session_id: Optional ID for the session. If None, one will be generated.
             cwd: Optional working directory. Defaults to initial work_dir.
+            interactive: If True, allocate a PTY-backed session supporting
+                real-time ``read_output`` / ``write_input`` cross-platform.
 
         Returns:
             The created UnifiedShellSession.
@@ -75,7 +81,12 @@ class SessionManager:
         if not session_id:
             session_id = str(uuid.uuid4())
 
-        logger.info('Creating session %s (cwd=%s)', session_id, cwd or self.work_dir)
+        logger.info(
+            'Creating session %s (cwd=%s, interactive=%s)',
+            session_id,
+            cwd or self.work_dir,
+            interactive,
+        )
 
         try:
             session = create_shell_session(
@@ -87,6 +98,7 @@ class SessionManager:
                 ),
                 max_memory_mb=self.max_memory_gb * 1024 if self.max_memory_gb else None,
                 cancellation_service=self.cancellation_service,
+                interactive=interactive,
             )
             session.initialize()
             self.sessions[session_id] = session

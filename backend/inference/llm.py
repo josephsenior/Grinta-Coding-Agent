@@ -47,27 +47,43 @@ if TYPE_CHECKING:
     from backend.core.config import LLMConfig
 
 
+def _safe_exception_text(exc: Exception) -> str:
+    """Return a robust exception message even if ``__str__`` is broken."""
+    try:
+        return str(exc)
+    except Exception:
+        return f'{type(exc).__name__} (unprintable exception)'
+
+
 def _map_api_status_error(exc: Exception, model: str, provider: str) -> Exception:
     """Map APIStatusError by status code."""
     status = getattr(exc, 'status_code', None)
     if status == 408:
-        return Timeout(str(exc), model=model, llm_provider=provider)
+        return Timeout(_safe_exception_text(exc), model=model, llm_provider=provider)
     if status == 503:
-        return ServiceUnavailableError(str(exc), model=model, llm_provider=provider)
+        return ServiceUnavailableError(
+            _safe_exception_text(exc), model=model, llm_provider=provider
+        )
     if isinstance(status, int) and 500 <= status <= 599:
         return InternalServerError(
-            str(exc), model=model, llm_provider=provider, status_code=status
+            _safe_exception_text(exc),
+            model=model,
+            llm_provider=provider,
+            status_code=status,
         )
-    return APIError(str(exc), model=model, llm_provider=provider, status_code=status)
+    return APIError(
+        _safe_exception_text(exc), model=model, llm_provider=provider, status_code=status
+    )
 
 
 def _map_bad_request_with_context_check(
     exc: Exception, model: str, provider: str
 ) -> Exception:
     """Map BadRequestError, checking for context window overflow."""
-    if is_context_window_error(str(exc).lower(), exc):
-        return ContextWindowExceededError(str(exc), model=model, llm_provider=provider)
-    return BadRequestError(str(exc), model=model, llm_provider=provider)
+    text = _safe_exception_text(exc)
+    if is_context_window_error(text.lower(), exc):
+        return ContextWindowExceededError(text, model=model, llm_provider=provider)
+    return BadRequestError(text, model=model, llm_provider=provider)
 
 
 def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
@@ -84,7 +100,7 @@ def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
         ]
         for sdk_cls, our_cls, prov in simple_map:
             if isinstance(exc, sdk_cls):
-                return our_cls(str(exc), model=model, llm_provider=prov)
+                return our_cls(_safe_exception_text(exc), model=model, llm_provider=prov)
 
         if isinstance(exc, _oai.BadRequestError):
             return _map_bad_request_with_context_check(exc, model, 'openai')
@@ -109,7 +125,7 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
         ]
         for sdk_cls, our_cls, prov in simple_map:
             if isinstance(exc, sdk_cls):
-                return our_cls(str(exc), model=model, llm_provider=prov)
+                return our_cls(_safe_exception_text(exc), model=model, llm_provider=prov)
 
         if isinstance(exc, _anth.BadRequestError):
             return _map_bad_request_with_context_check(exc, model, 'anthropic')
@@ -127,10 +143,12 @@ def _try_google_exception_mapping(
     if 'google' not in exc_name and 'generativeai' not in exc_name:
         return None
     if is_context_window_error(exc_str, exc):
-        return ContextWindowExceededError(str(exc), model=model, llm_provider='google')
+        return ContextWindowExceededError(
+            _safe_exception_text(exc), model=model, llm_provider='google'
+        )
     if 'quota' in exc_str or 'rate' in exc_str:
-        return RateLimitError(str(exc), model=model, llm_provider='google')
-    return APIError(str(exc), model=model, llm_provider='google')
+        return RateLimitError(_safe_exception_text(exc), model=model, llm_provider='google')
+    return APIError(_safe_exception_text(exc), model=model, llm_provider='google')
 
 
 def _try_heuristic_exception_mapping(
@@ -142,9 +160,9 @@ def _try_heuristic_exception_mapping(
         or 'content policy' in exc_str
         or 'safety' in exc_str
     ):
-        return ContentPolicyViolationError(str(exc), model=model)
+        return ContentPolicyViolationError(_safe_exception_text(exc), model=model)
     if is_context_window_error(exc_str, exc):
-        return ContextWindowExceededError(str(exc), model=model)
+        return ContextWindowExceededError(_safe_exception_text(exc), model=model)
     return None
 
 
@@ -163,7 +181,7 @@ def _map_provider_exception(exc: Exception, model: str) -> Exception:
             return mapped
 
     exc_name = type(exc).__name__.lower()
-    exc_str = str(exc).lower()
+    exc_str = _safe_exception_text(exc).lower()
 
     google_mapped = _try_google_exception_mapping(exc, model, exc_name, exc_str)
     if google_mapped:
@@ -173,14 +191,14 @@ def _map_provider_exception(exc: Exception, model: str) -> Exception:
     if heuristic_mapped:
         return heuristic_mapped
 
-    raw = str(exc)
+    raw = _safe_exception_text(exc)
     if is_html_api_body(raw):
         return APIError(
             format_html_api_error_response(raw, base_url=None, model=model),
             model=model,
         )
 
-    return APIError(str(exc), model=model)
+    return APIError(_safe_exception_text(exc), model=model)
 
 
 __all__ = ['LLM', '_map_provider_exception']

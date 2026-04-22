@@ -860,10 +860,12 @@ class TestConstants(unittest.TestCase):
         self.assertIn('resume', TRAFFIC_CONTROL_REMINDER)
 
     def test_error_action_not_executed_stopped(self):
-        self.assertIn('Stop button', ERROR_ACTION_NOT_EXECUTED_STOPPED)
+        self.assertIn('Ctrl+C', ERROR_ACTION_NOT_EXECUTED_STOPPED)
+        self.assertIn('cancelled', ERROR_ACTION_NOT_EXECUTED_STOPPED.lower())
 
     def test_error_action_not_executed_error(self):
-        self.assertIn('runtime error', ERROR_ACTION_NOT_EXECUTED_ERROR)
+        self.assertIn('Runtime error', ERROR_ACTION_NOT_EXECUTED_ERROR)
+        self.assertIn('Ctrl+C', ERROR_ACTION_NOT_EXECUTED_ERROR)
 
 
 if __name__ == '__main__':

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from backend.core.schemas.base import EventSchemaV1
 from backend.core.schemas.enums import ActionType
@@ -223,6 +223,25 @@ class TerminalRunActionSchema(ActionSchemaV1):
     runnable: bool = Field(True, frozen=True)
     command: str = Field(..., min_length=1, description='Command to start session')
     cwd: str | None = Field(default=None, description='Working directory')
+    rows: int | None = Field(
+        default=None,
+        ge=1,
+        le=500,
+        description='Optional TTY height; if set, ``cols`` must also be set.',
+    )
+    cols: int | None = Field(
+        default=None,
+        ge=1,
+        le=2000,
+        description='Optional TTY width; if set, ``rows`` must also be set.',
+    )
+
+    @model_validator(mode='after')
+    def _pair_rows_cols_run(self) -> Self:
+        if (self.rows is None) != (self.cols is None):
+            msg = 'terminal_run: rows and cols must both be set or both omitted'
+            raise ValueError(msg)
+        return self
 
 
 class TerminalInputActionSchema(ActionSchemaV1):
@@ -233,8 +252,37 @@ class TerminalInputActionSchema(ActionSchemaV1):
     )
     runnable: bool = Field(True, frozen=True)
     session_id: str = Field(..., min_length=1, description='Terminal session ID')
-    input: str = Field(..., description='Input string')
+    input: str = Field(
+        default='',
+        description='Text to send (optional if using only ``control`` and/or resize).',
+    )
     is_control: bool = Field(default=False, description='Is control char (C-c, etc.)')
+    control: str | None = Field(
+        default=None,
+        description=(
+            'Named control sequence (e.g. C-c, esc). Sent with control semantics; '
+            'optional shortcut instead of ``input`` + ``is_control``.'
+        ),
+    )
+    rows: int | None = Field(
+        default=None,
+        ge=1,
+        le=500,
+        description='Optional TTY height; if set, ``cols`` must also be set.',
+    )
+    cols: int | None = Field(
+        default=None,
+        ge=1,
+        le=2000,
+        description='Optional TTY width; if set, ``rows`` must also be set.',
+    )
+
+    @model_validator(mode='after')
+    def _pair_rows_cols_input(self) -> Self:
+        if (self.rows is None) != (self.cols is None):
+            msg = 'terminal_input: rows and cols must both be set or both omitted'
+            raise ValueError(msg)
+        return self
 
 
 class TerminalReadActionSchema(ActionSchemaV1):
@@ -245,6 +293,25 @@ class TerminalReadActionSchema(ActionSchemaV1):
     )
     runnable: bool = Field(True, frozen=True)
     session_id: str = Field(..., min_length=1, description='Terminal session ID')
+    rows: int | None = Field(
+        default=None,
+        ge=1,
+        le=500,
+        description='Optional TTY height; if set, ``cols`` must also be set.',
+    )
+    cols: int | None = Field(
+        default=None,
+        ge=1,
+        le=2000,
+        description='Optional TTY width; if set, ``rows`` must also be set.',
+    )
+
+    @model_validator(mode='after')
+    def _pair_rows_cols_read(self) -> Self:
+        if (self.rows is None) != (self.cols is None):
+            msg = 'terminal_read: rows and cols must both be set or both omitted'
+            raise ValueError(msg)
+        return self
 
 
 class BrowseInteractiveActionSchema(ActionSchemaV1):

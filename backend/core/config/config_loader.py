@@ -171,8 +171,22 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
                     llm_dict['model'] = str(raw_m).strip()
                 else:
                     llm_dict['model'] = None
-            if 'llm_api_key' in data and data['llm_api_key']:
-                llm_dict['api_key'] = data['llm_api_key']
+            from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
+
+            raw_sk = data.get('llm_api_key')
+            if raw_sk is not None:
+                s = str(raw_sk).strip()
+                if s and s != LLM_API_KEY_SETTINGS_PLACEHOLDER:
+                    logger.app_logger.warning(
+                        'settings.json has a literal llm_api_key; it is ignored. '
+                        'Set LLM_API_KEY in .env and use "%s" for llm_api_key in settings.json.',
+                        LLM_API_KEY_SETTINGS_PLACEHOLDER,
+                    )
+            env_llm_key = (os.environ.get('LLM_API_KEY') or '').strip()
+            if env_llm_key:
+                llm_dict['api_key'] = env_llm_key
+            else:
+                llm_dict.pop('api_key', None)
             provider = data.get('llm_provider') or llm_dict.get('provider')
             if 'llm_base_url' in data and data['llm_base_url']:
                 raw_url = str(data['llm_base_url']).strip()
@@ -551,10 +565,12 @@ def load_app_config(
 ) -> AppConfig:
     """Load the configuration from environment variables and the specified config file.
 
-    Precedence (highest to lowest):
-    1. settings.json (explicit user configuration)
-    2. Environment variables (deployment-specific overrides)
-    3. Defaults (hardcoded fallbacks)
+    **LLM API key** comes only from ``LLM_API_KEY`` in the process environment
+    (typically set via repo-root ``.env``). In ``settings.json``, ``llm_api_key`` must be
+    ``"${LLM_API_KEY}"`` or empty; a literal secret there is ignored with a warning.
+
+    For other fields, settings.json generally overrides environment defaults loaded first;
+    see ``load_from_json`` / ``load_from_env`` implementation.
     """
     rebuild_config_models()
 

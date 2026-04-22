@@ -313,5 +313,46 @@ class TestOrchestratorPromptManager:
         ):
             result = opm.get_system_message()
 
-        assert 'Your terminal is **PowerShell** running on Windows.' in result
+        assert 'Your terminal is **PowerShell** on Windows.' in result
         assert 'Your terminal is **Git Bash** running on Windows.' not in result
+
+
+class TestPromptBuilderSectionTokens:
+    def test_count_section_tokens_positive(self) -> None:
+        from backend.engine.prompts.prompt_builder import _count_section_tokens
+
+        n, label = _count_section_tokens('hello world', 'gpt-4')
+        assert n >= 1
+        assert label
+
+    def test_measure_system_prompt_sections_and_build_match(self) -> None:
+        from backend.engine.prompts.prompt_builder import (
+            build_system_prompt,
+            measure_system_prompt_sections,
+        )
+
+        cfg = MagicMock()
+        cfg.autonomy_level = 'balanced'
+        cfg.enable_checkpoints = False
+        cfg.enable_lsp_query = False
+        cfg.enable_internal_task_tracker = False
+        cfg.enable_signal_progress = False
+        cfg.enable_permissions = False
+        cfg.enable_meta_cognition = False
+
+        kwargs = dict(
+            active_llm_model='gpt-4',
+            is_windows=False,
+            config=cfg,
+            mcp_tool_names=[],
+            mcp_tool_descriptions={},
+            mcp_server_hints=[],
+            function_calling_mode='native',
+        )
+        report = measure_system_prompt_sections(**kwargs)
+        assert report['total_tokens'] > 100
+        assert report['total_chars'] > 400
+        assert len(report['sections']) >= 7
+        assert report['sections'][0]['tokens'] >= report['sections'][-1]['tokens']
+        built = build_system_prompt(**kwargs)
+        assert len(built) == report['total_chars']

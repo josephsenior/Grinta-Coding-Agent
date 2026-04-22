@@ -39,6 +39,11 @@ from backend.ledger.action.message import (
     StreamingChunkAction,
     SystemMessageAction,
 )
+from backend.ledger.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 
 actions = (
     NullAction,
@@ -66,6 +71,9 @@ actions = (
     BlackboardAction,
     LspQueryAction,
     BrowserToolAction,
+    TerminalRunAction,
+    TerminalInputAction,
+    TerminalReadAction,
 )
 ACTION_TYPE_TO_CLASS = {action_class.action: action_class for action_class in actions}
 

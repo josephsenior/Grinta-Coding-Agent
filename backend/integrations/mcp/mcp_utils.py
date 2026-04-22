@@ -8,7 +8,9 @@ import json
 import os
 import re
 import shutil
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
 
 if TYPE_CHECKING:
     from backend.context.agent_memory import Memory
@@ -73,8 +75,15 @@ def _resolve_server_env(raw_env: dict[str, str] | None) -> dict[str, str] | None
         drop the key (same rationale).
       * anything else         -> passed through verbatim.
 
-    This lets a user put ``GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxx`` in their
-    ``.env`` while keeping the MCP config free of secrets.
+    **GitHub MCP:** Set **`GITHUB_PERSONAL_ACCESS_TOKEN`** in ``.env`` (same
+    name the server reads). The bundled config uses an empty placeholder;
+    we resolve it from ``os.environ`` like any other key—**``GITHUB_TOKEN`` is
+    not consulted.**
+
+    **``${PROJECT_ROOT}``:** If the variable is unset, uses
+    :func:`backend.core.workspace_resolution.get_effective_workspace_root`
+    (same order as the CLI: env, settings, cwd), then ``os.getcwd()`` so MCP
+    children like Rigour always receive a concrete path.
     """
     if not raw_env:
         return raw_env
@@ -93,14 +102,54 @@ def _resolve_server_env(raw_env: dict[str, str] | None) -> dict[str, str] | None
 
         match = _ENV_VAR_PATTERN.match(value.strip())
         if match:
-            from_env = os.environ.get(match.group(1))
+            var_name = match.group(1)
+            from_env = os.environ.get(var_name)
             if from_env:
                 resolved[key] = from_env
+                continue
+            if var_name == 'PROJECT_ROOT':
+                from backend.core.workspace_resolution import (
+                    get_effective_workspace_root,
+                )
+
+                eff = get_effective_workspace_root()
+                if eff is not None:
+                    resolved[key] = str(eff.resolve())
+                else:
+                    try:
+                        resolved[key] = str(Path.cwd().resolve())
+                    except OSError:
+                        pass
+                continue
             continue
 
         resolved[key] = value
+
     return resolved
 
+
+def _apply_exa_mcp_url_auth(server: MCPServerConfig) -> MCPServerConfig:
+    """Align hosted Exa MCP with OpenCode: auth via ``exaApiKey`` query parameter.
+
+    Exa documents ``https://mcp.exa.ai/mcp?exaApiKey=...``. Grinta's HTTP MCP
+    client also sends ``Authorization: Bearer`` when ``api_key`` is set; Exa
+    expects the query form, so we fold ``api_key`` / ``EXA_API_KEY`` into the
+    URL and clear ``api_key`` to avoid conflicting headers.
+    """
+    if server.type not in ('sse', 'shttp') or not server.url:
+        return server
+    if 'mcp.exa.ai' not in server.url:
+        return server
+    if 'exaApiKey=' in server.url:
+        return server
+    key = (server.api_key or '').strip()
+    if not key:
+        key = (os.environ.get('EXA_API_KEY') or '').strip()
+    if not key:
+        return server
+    sep = '&' if '?' in server.url else '?'
+    new_url = f'{server.url}{sep}exaApiKey={quote(key, safe="")}'
+    return server.model_copy(update={'url': new_url, 'api_key': None})
 
 
 def convert_mcps_to_tools(mcps: list[MCPClient] | None) -> list[dict]:
@@ -237,6 +286,13 @@ async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
     if resolved_env is not server.env:
         server = server.model_copy(update={'env': resolved_env})
 
+    if server.name == 'rigour':
+        from backend.integrations.mcp.rigour_bootstrap import (
+            ensure_minimal_rigour_yml_for_mcp,
+        )
+
+        ensure_minimal_rigour_yml_for_mcp(resolved_env if resolved_env else server.env)
+
     try:
         await asyncio.wait_for(client.connect_stdio(server), timeout=timeout_sec)
         _log_successful_connection(client, server.name, 'STDIO')
@@ -269,6 +325,7 @@ async def _connect_http_server(
     timeout_sec = _get_mcp_connect_timeout_sec()
 
     try:
+        server = _apply_exa_mcp_url_auth(server)
         await asyncio.wait_for(
             client.connect_http(server, conversation_id=conversation_id),
             timeout=timeout_sec,

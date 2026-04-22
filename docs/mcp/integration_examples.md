@@ -28,8 +28,10 @@ mcp_servers:
       - "-y"
       - "@modelcontextprotocol/server-github"
     env:
-      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+      GITHUB_PERSONAL_ACCESS_TOKEN: ""
 ```
+
+Set `GITHUB_PERSONAL_ACCESS_TOKEN` in your environment (for example `.env`).
 
 ## 2. Using MCP Tools in Agents
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastmcp import Client
@@ -17,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 
 from backend.core.config.mcp_config import MCPServerConfig
 from backend.core.logger import app_logger as logger
+from backend.core.workspace_resolution import get_effective_workspace_root
 from backend.integrations.mcp.error_collector import mcp_error_collector
 from backend.integrations.mcp.tool import MCPClientTool
 
@@ -283,10 +285,20 @@ class MCPClient(BaseModel):
             # keep_alive=False: default True skips transport.disconnect() on session exit,
             # leaving _stdio_transport_connect_task to die with BrokenResourceError and
             # asyncio "Task exception was never retrieved" (fastmcp client/transports.py).
+            cwd_path = get_effective_workspace_root()
+            cwd: str | None
+            if cwd_path is not None:
+                cwd = str(cwd_path.resolve())
+            else:
+                try:
+                    cwd = str(Path.cwd().resolve())
+                except OSError:
+                    cwd = None
             transport = StdioTransport(
                 command=server.command,
                 args=server.args or [],
                 env=server.env,
+                cwd=cwd,
                 keep_alive=False,
             )
             self.client = Client(transport, timeout=connect_timeout)

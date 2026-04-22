@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
@@ -10,6 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from backend.core.config.agent_config import AgentConfig
+from backend.core.config.api_key_manager import api_key_manager
 from backend.core.config.app_config import AppConfig
 from backend.core.config.compactor_config import AutoCompactorConfig
 from backend.core.config.config_loader import (
@@ -325,6 +327,67 @@ class TestLoadFromJson:
         cfg = AppConfig()
         load_from_json(cfg, str(json_file))
         assert cfg.get_llm_config().model == 'groq/meta-llama/llama-4-scout'
+
+    def test_load_from_json_llm_api_key_warns_on_literal_uses_env(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'llm_model': 'meta-llama/llama-4-scout',
+                    'llm_provider': 'groq',
+                    'llm_api_key': 'key-from-settings-json',
+                }
+            )
+        )
+        cfg = AppConfig()
+        monkeypatch.setenv('LLM_API_KEY', 'key-from-env')
+        with patch('backend.core.config.config_loader.logger.app_logger.warning') as w:
+            load_from_json(cfg, str(json_file))
+        w.assert_called()
+        assert (
+            cfg.get_llm_config().api_key.get_secret_value() == 'key-from-env'
+        )
+
+    def test_load_from_json_llm_api_key_literal_ignored_without_env(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'llm_model': 'meta-llama/llama-4-scout',
+                    'llm_provider': 'groq',
+                    'llm_api_key': 'only-in-json',
+                }
+            )
+        )
+        cfg = AppConfig()
+        monkeypatch.delenv('LLM_API_KEY', raising=False)
+        with api_key_manager.suppress_env_export_context():
+            load_from_json(cfg, str(json_file))
+        assert cfg.get_llm_config().api_key is None
+
+    def test_load_from_json_llm_api_key_placeholder_uses_env(
+        self, tmp_path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
+
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'llm_model': 'meta-llama/llama-4-scout',
+                    'llm_provider': 'groq',
+                    'llm_api_key': LLM_API_KEY_SETTINGS_PLACEHOLDER,
+                }
+            )
+        )
+        cfg = AppConfig()
+        monkeypatch.setenv('LLM_API_KEY', 'from-dotenv')
+        load_from_json(cfg, str(json_file))
+        assert cfg.get_llm_config().api_key.get_secret_value() == 'from-dotenv'
 
     def test_load_from_json_file_not_found(self):
         cfg = AppConfig()

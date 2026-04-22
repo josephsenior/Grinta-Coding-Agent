@@ -209,9 +209,7 @@ When the model determines it needs to search GitHub, it calls the native gateway
 
 The persistence of the MCP client session matters. Each MCP server connection is opened once at startup and kept alive for the lifetime of the conversation. The client supports automatic reconnection with exponential back-off — up to five reconnect attempts with increasing delays from a 0.5-second base. If the connection drops mid-session, the client re-enters the session and refreshes the tool list without the agent ever knowing. That resilience is invisible to the model. It just calls the gateway and gets results.
 
-The MCP integration also supports both transport protocols — stdio for CLI-first usage and HTTP (SSE) for richer integrations — and connects to all configured servers in parallel during bootstrap so one slow server does not stall the agent's startup. There is even a synthetic wrapper layer that provides composite tools like fuzzy search over cached component lists, reducing unnecessary round trips to remote MCP servers.
-
-On top of all that, there is a diagnostic tool: `mcp_capabilities_status`, which reports the MCP health state — how many servers are configured, how many are connected, what tools are available. The model can call this to understand its own external capabilities at runtime.
+The MCP integration also supports both transport protocols — stdio for CLI-first usage and HTTP (SSE) for richer integrations — and connects to all configured servers in parallel during bootstrap so one slow server does not stall the agent's startup. A thin synthetic wrapper layer can expose cache-aware variants of selected MCP tools (for example shadcn ``get_component_cached`` / ``get_block_cached``) to avoid redundant round trips when definitions are already cached.
 
 This separation of concerns is the holy grail. The LLM's context window stays pristine. The model only has to master one interaction pattern for the entire outside world. And the agent retains infinite extensibility without sacrificing the tight, native control loop of its core cognition.
 

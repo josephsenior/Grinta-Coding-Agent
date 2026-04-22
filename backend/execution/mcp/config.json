@@ -4,7 +4,7 @@
     "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"],
-      "usage_hint": "Up-to-date library and framework docs (APIs, examples, version notes)—use when accuracy beats training-data recall."
+      "usage_hint": "Context7 docs MCP. Two-step: (1) ``resolve-library-id`` with **both** ``libraryName`` and ``query`` strings. (2) ``query-docs`` with ``libraryId`` (e.g. /facebook/react) from step 1 plus ``query``. Optional: CONTEXT7_API_KEY in env for higher limits."
     },
     "shadcn": {
       "command": "npx",
@@ -14,7 +14,7 @@
     "github": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
-      "usage_hint": "GitHub API for repos, issues, PRs, and metadata—requires GITHUB_PERSONAL_ACCESS_TOKEN in this server’s env.",
+      "usage_hint": "GitHub API for repos, issues, PRs, metadata. Set **GITHUB_PERSONAL_ACCESS_TOKEN** in ``.env`` (classic or fine-grained PAT with repo scope). Bad credentials = expired/revoked token or missing scopes.",
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": ""
       }
@@ -24,20 +24,19 @@
       "args": ["mcp-server-fetch"],
       "usage_hint": "Fetch a URL’s raw body (HTML/JSON/text) when you need content without driving a browser."
     },
-    "duckduckgo": {
-      "command": "npx",
-      "args": ["-y", "duckduckgo-mcp-server"],
-      "usage_hint": "Web search snippets and links for discovery before deeper fetch or browser work."
-    },
-    "magic": {
-      "command": "npx",
-      "args": ["-y", "@21st-dev/magic@latest"],
-      "usage_hint": "Rapid UI/component scaffolding (21st.dev Magic)—use when the user wants quick generated UI."
-    },
     "rigour": {
       "command": "npx",
       "args": ["-y", "@rigour-labs/mcp"],
-      "usage_hint": "Rigour Labs MCP—structured quality/rigor workflows; follow each exposed tool’s description."
+      "usage_hint": "**Rigour** — local code governance / quality gates. No API key. If the project has no ``rigour.yml``, Grinta creates a **minimal** one so the server can start (upstream ``npx rigour init`` is broken on npm). Prefer **`rigour_check`** / **`rigour_status`** after substantive edits. **`RIGOUR_CWD`** is the open workspace.",
+      "env": {
+        "RIGOUR_CWD": "${PROJECT_ROOT}"
+      }
+    },
+    "exa": {
+      "type": "shttp",
+      "transport": "shttp",
+      "url": "https://mcp.exa.ai/mcp",
+      "usage_hint": "**Exa** hosted MCP (same URL as OpenCode). Prefer **`web_search_exa`** for real web search; other tools depend on your Exa plan (see Exa MCP docs). Set **EXA_API_KEY** in ``.env``—Grinta appends ``exaApiKey=`` to the URL automatically. Without a key, connection may be limited or fail per Exa policy. For raw URLs without search, **fetch** is still fine."
     }
   },
   "tools": []

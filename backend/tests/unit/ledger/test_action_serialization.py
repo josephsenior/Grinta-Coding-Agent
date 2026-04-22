@@ -13,6 +13,11 @@ from backend.ledger.action import (
     NullAction,
 )
 from backend.ledger.action.code_nav import LspQueryAction
+from backend.ledger.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 from backend.ledger.serialization.action import (
     ACTION_TYPE_TO_CLASS,
     _normalize_security_risk,
@@ -127,6 +132,36 @@ class TestActionFromDict:
         assert evt.command == 'list_symbols'
         assert evt.file == 'sample.py'
 
+    def test_terminal_run_action(self):
+        d = {
+            'action': 'terminal_run',
+            'args': {'command': 'python -V', 'cwd': '.', 'rows': 24, 'cols': 80},
+        }
+        evt = action_from_dict(d)
+        assert isinstance(evt, TerminalRunAction)
+        assert evt.command == 'python -V'
+        assert evt.cwd == '.'
+        assert evt.rows == 24
+        assert evt.cols == 80
+
+    def test_terminal_input_action(self):
+        d = {
+            'action': 'terminal_input',
+            'args': {'session_id': 's1', 'input': 'echo hi', 'rows': 30, 'cols': 100},
+        }
+        evt = action_from_dict(d)
+        assert isinstance(evt, TerminalInputAction)
+        assert evt.session_id == 's1'
+        assert evt.input == 'echo hi'
+        assert evt.rows == 30
+        assert evt.cols == 100
+
+    def test_terminal_read_action(self):
+        d = {'action': 'terminal_read', 'args': {'session_id': 's2'}}
+        evt = action_from_dict(d)
+        assert isinstance(evt, TerminalReadAction)
+        assert evt.session_id == 's2'
+
     def test_is_confirmed_remapped(self):
         """Verify that is_confirmed is removed and mapped to confirmation_state in args."""
         from backend.ledger.serialization.action import _process_action_args
@@ -148,3 +183,6 @@ class TestActionTypeToClass:
         assert 'read' in ACTION_TYPE_TO_CLASS
         assert 'edit' in ACTION_TYPE_TO_CLASS
         assert 'lsp_query' in ACTION_TYPE_TO_CLASS
+        assert 'terminal_run' in ACTION_TYPE_TO_CLASS
+        assert 'terminal_input' in ACTION_TYPE_TO_CLASS
+        assert 'terminal_read' in ACTION_TYPE_TO_CLASS

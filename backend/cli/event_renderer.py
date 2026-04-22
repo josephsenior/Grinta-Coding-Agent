@@ -49,10 +49,10 @@ from backend.cli.tool_call_display import (
     redact_internal_result_markers,
     redact_streamed_tool_call_markers,
     redact_task_list_json_blobs,
+    streaming_args_hint,
     tool_headline,
     try_format_message_as_tool_json,
 )
-from backend.engine import prompt_role_debug as _prompt_role_debug
 from backend.cli.transcript import (
     format_activity_block,
     format_activity_delta_secondary,
@@ -71,6 +71,7 @@ from backend.core.task_status import (
     TASK_STATUS_TODO,
     normalize_task_status,
 )
+from backend.engine import prompt_role_debug as _prompt_role_debug
 from backend.ledger import EventStreamSubscriber
 from backend.ledger.action import (
     Action,
@@ -96,6 +97,7 @@ from backend.ledger.action import (
     StreamingChunkAction,
     TaskTrackingAction,
     TerminalInputAction,
+    TerminalReadAction,
     TerminalRunAction,
     UncertaintyAction,
 )
@@ -2232,14 +2234,51 @@ class CLIEventRenderer:
             if len(cmd) > 12_000:
                 cmd = cmd[:11_997] + '…'
             self._pending_shell_command = cmd
+            # Persist open + command in the scrollback, not only the Thinking header.
+            label = f'$ {cmd}' if cmd else '$ (empty)'
+            self._print_activity('Open', label, None, title='PTY', shell_rail=True)
+            self._ensure_reasoning()
+            pty_line = f'PTY · {label}'
+            thought = getattr(action, 'thought', '') or ''
+            _sync_reasoning_after_tool_line(self._reasoning, pty_line, thought)
             self.refresh()
             return
 
         if isinstance(action, TerminalInputAction):
+            self._clear_streaming_preview()
             self._flush_pending_tool_cards()
-            inp = getattr(action, 'input', '')
-            inp_display = inp[:60] + '…' if len(inp) > 60 else inp
-            self._print_activity('Sent input', inp_display, None, title='Terminal')
+            sess = (getattr(action, 'session_id', '') or '').strip()
+            inp = getattr(action, 'input', '') or ''
+            ctrl = getattr(action, 'control', None)
+            is_ctl = bool(getattr(action, 'is_control', False))
+            if ctrl and str(ctrl).strip():
+                inp_display = f'ctrl {ctrl}'[:60]
+            elif is_ctl and inp:
+                inp_display = inp[:60] + ('…' if len(inp) > 60 else '')
+            else:
+                inp_display = inp[:60] + ('…' if len(inp) > 60 else '')
+            self._print_activity('Send', inp_display, sess or None, title='PTY')
+            self._ensure_reasoning()
+            if sess and inp_display:
+                line = f'PTY input · {sess} · {inp_display}'
+            elif sess:
+                line = f'PTY input · {sess}'
+            else:
+                line = f'PTY input · {inp_display or "…"}'
+            thought = getattr(action, 'thought', '') or ''
+            _sync_reasoning_after_tool_line(self._reasoning, line, thought)
+            self.refresh()
+            return
+
+        if isinstance(action, TerminalReadAction):
+            self._clear_streaming_preview()
+            self._flush_pending_tool_cards()
+            sess = (getattr(action, 'session_id', '') or '').strip()
+            self._print_activity('Read', sess or '…', None, title='PTY')
+            self._ensure_reasoning()
+            line = f'PTY read · {sess}' if sess else 'PTY read · …'
+            thought = getattr(action, 'thought', '') or ''
+            _sync_reasoning_after_tool_line(self._reasoning, line, thought)
             self.refresh()
             return
 
@@ -2397,7 +2436,12 @@ class CLIEventRenderer:
             tool_name = action.tool_call_name or 'tool'
             _icon, headline = tool_headline(tool_name, use_icons=self._cli_tool_icons)
             self._ensure_reasoning()
-            self._reasoning.update_action(f'{headline}…')
+            raw = (action.accumulated or '').strip()
+            hint = streaming_args_hint(tool_name, raw)
+            if hint:
+                self._reasoning.update_action(f'{headline}: {hint}')
+            else:
+                self._reasoning.update_action(f'{headline}…')
             self.refresh()
             return
 
@@ -2732,11 +2776,38 @@ class CLIEventRenderer:
         if isinstance(obs, TerminalObservation):
             self._stop_reasoning()
             self._flush_pending_tool_cards()
-            content = getattr(obs, 'content', '')
-            if content.strip():
-                display = content[:2000]
+            raw = getattr(obs, 'content', '') or ''
+            content = raw.strip()
+            session_id = (getattr(obs, 'session_id', '') or '').strip()
+            n_lines = len([ln for ln in content.splitlines() if ln.strip()]) if content else 0
+            cap = 2000
+            truncated = len(raw) > cap
+            body = (raw[:cap] + '…' if truncated else raw) if raw else ''
+            meta: list[str] = []
+            if session_id:
+                meta.append(f'session {session_id}')
+            if n_lines and content:
+                meta.append(f'{n_lines} line{"s" if n_lines != 1 else ""}')
+            if truncated:
+                meta.append('truncated')
+            if not content and not session_id:
+                return
+            if meta:
                 self._append_history(
-                    Syntax(display, 'text', word_wrap=True, theme='ansi_dark')
+                    Text('  PTY output · ' + ' · '.join(meta), style='dim')
+                )
+            if content:
+                self._append_history(
+                    Syntax(
+                        body,
+                        'text',
+                        word_wrap=True,
+                        theme='ansi_dark',
+                    )
+                )
+            elif session_id:
+                self._append_history(
+                    format_activity_result_secondary('(no output yet)', kind='neutral')
                 )
             return
 

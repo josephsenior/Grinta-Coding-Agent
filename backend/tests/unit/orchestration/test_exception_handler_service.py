@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from backend.core.errors import ModelProviderError
+from backend.core.errors import LLMMalformedActionError, ModelProviderError
 from backend.inference.exceptions import RateLimitError, Timeout
 from backend.orchestration.services.exception_handler_service import (
     _PASSTHROUGH_EXCEPTIONS,
@@ -23,6 +23,7 @@ class TestPassthroughList:
         assert 'RateLimitError' in names
         assert 'AuthenticationError' in names
         assert 'ContextWindowExceededError' in names
+        assert 'LLMMalformedActionError' in names
 
     def test_all_are_exception_subclasses(self):
         for exc_cls in _PASSTHROUGH_EXCEPTIONS:
@@ -65,6 +66,12 @@ class TestExceptionHandlerService:
 
     async def test_model_provider_error_passthrough(self, svc, ctrl):
         exc = ModelProviderError('LLM returned no response')
+        await svc.handle_step_exception(exc)
+        reported = ctrl.recovery_service.react_to_exception.call_args[0][0]
+        assert reported is exc
+
+    async def test_malformed_action_error_passthrough(self, svc, ctrl):
+        exc = LLMMalformedActionError('bad action payload')
         await svc.handle_step_exception(exc)
         reported = ctrl.recovery_service.react_to_exception.call_args[0][0]
         assert reported is exc

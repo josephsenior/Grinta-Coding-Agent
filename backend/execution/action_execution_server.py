@@ -912,6 +912,28 @@ class RuntimeExecutor:
             'health_status': detected.health_status,
         }
 
+    def _apply_terminal_resize_if_requested(
+        self, session: Any, rows: int | None, cols: int | None
+    ) -> ErrorObservation | None:
+        """Resize the TTY if ``rows`` and ``cols`` are set; return an error on bad input."""
+        if rows is None and cols is None:
+            return None
+        if rows is None or cols is None:
+            return ErrorObservation(
+                'Terminal resize requires both `rows` and `cols` (or omit both).'
+            )
+        r, c = int(rows), int(cols)
+        if not (1 <= r <= 500 and 1 <= c <= 2000):
+            return ErrorObservation(
+                f'Invalid terminal size: rows={r}, cols={c} '
+                '(allowed: rows 1–500, cols 1–2000).'
+            )
+        try:
+            session.resize(r, c)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug('Terminal resize not applied: %s', exc)
+        return None
+
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         """Start a new interactive terminal session."""
         try:
@@ -937,10 +959,20 @@ class RuntimeExecutor:
 
             cwd = str(self._resolve_effective_cwd(action.cwd, cwd))
 
-            # Create the new session via manager
+            # Create the new session via manager.  ``interactive=True`` picks
+            # the OS-agnostic PTY backend so ``write_input`` / ``read_output``
+            # work on Windows and on POSIX without tmux (with graceful fallback
+            # if the PTY backend is unavailable).
             session = self.session_manager.create_session(
-                session_id=session_id, cwd=cwd
+                session_id=session_id, cwd=cwd, interactive=True
             )
+
+            resize_err = self._apply_terminal_resize_if_requested(
+                session, action.rows, action.cols
+            )
+            if resize_err is not None:
+                self.session_manager.close_session(session_id)
+                return resize_err
 
             if action.command:
                 predicted_cwd, policy_error = (
@@ -985,24 +1017,31 @@ class RuntimeExecutor:
             return scope_error
 
         try:
+            resize_err = self._apply_terminal_resize_if_requested(
+                session, action.rows, action.cols
+            )
+            if resize_err is not None:
+                return resize_err
+
+            if action.control is not None and str(action.control).strip() != '':
+                session.write_input(str(action.control), is_control=True)
+
             write_content = action.input
-            # Add newline if not a control sequence, unless user explicitly handles it?
-            # TerminalInputAction usually implies raw input.
-            # If user types "ls", they usually mean "ls\n".
-            # Control sequences are separate.
-
             predicted_cwd: Path | None = None
-            if not action.is_control:
-                predicted_cwd, policy_error = (
-                    self._evaluate_interactive_terminal_command(
-                        write_content,
-                        Path(getattr(session, 'cwd', self._initial_cwd)).resolve(),
+            if write_content:
+                if not action.is_control:
+                    predicted_cwd, policy_error = (
+                        self._evaluate_interactive_terminal_command(
+                            write_content,
+                            Path(
+                                getattr(session, 'cwd', self._initial_cwd)
+                            ).resolve(),
+                        )
                     )
-                )
-                if policy_error is not None:
-                    return policy_error
+                    if policy_error is not None:
+                        return policy_error
 
-            session.write_input(write_content, is_control=action.is_control)
+                session.write_input(write_content, is_control=action.is_control)
             if predicted_cwd is not None and hasattr(session, '_cwd'):
                 session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
             # Wait briefly for output to appear
@@ -1028,6 +1067,12 @@ class RuntimeExecutor:
             return scope_error
 
         try:
+            resize_err = self._apply_terminal_resize_if_requested(
+                session, action.rows, action.cols
+            )
+            if resize_err is not None:
+                return resize_err
+
             content = session.read_output()
             return TerminalObservation(session_id=action.session_id, content=content)
         except Exception as e:

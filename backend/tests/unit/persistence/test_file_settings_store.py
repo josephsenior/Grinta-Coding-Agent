@@ -7,7 +7,9 @@ import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pydantic import SecretStr
 
+from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 from backend.persistence.settings.file_settings_store import (
     FileSettingsStore,
     _file_settings_cache,
@@ -157,6 +159,45 @@ class TestFileSettingsStoreStore:
             mock_write.assert_awaited_once()
             # Cache should be cleared
             assert store.path not in _file_settings_cache
+
+    async def test_store_persists_secret_to_dotenv_and_placeholder_in_json(
+        self, tmp_path
+    ):
+        fs = MagicMock()
+        store = FileSettingsStore(file_store=fs)
+        mock_settings = MagicMock()
+
+        with (
+            patch(
+                'backend.persistence.settings.file_settings_store.model_dump_with_options',
+                return_value={
+                    'llm_model': 'openai/gpt-4.1',
+                    'llm_api_key': SecretStr('file-store-secret'),
+                    'llm_base_url': None,
+                    'mcp_config': None,
+                },
+            ),
+            patch(
+                'backend.persistence.settings.file_settings_store.persist_llm_api_key_to_dotenv',
+            ) as mock_persist,
+            patch(
+                'backend.persistence.settings.file_settings_store.get_app_settings_root',
+                return_value=str(tmp_path),
+            ),
+            patch(
+                'backend.persistence.settings.file_settings_store.call_sync_from_async',
+                new_callable=AsyncMock,
+            ) as mock_write,
+        ):
+            await store.store(mock_settings)
+
+        mock_persist.assert_called_once_with(
+            'file-store-secret',
+            settings_json_path=tmp_path / store.path,
+        )
+        written = mock_write.call_args[0][2]
+        data = json.loads(written)
+        assert data['llm_api_key'] == LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 
 # ── get_instance ──────────────────────────────────────────────────────

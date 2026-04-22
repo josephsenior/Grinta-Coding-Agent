@@ -369,9 +369,12 @@ The Orchestrator can use MCP tools:
 
 ```
 # Available by default:
-- shadcn-ui (UI components)
+- context7 (library docs)
+- shadcn (UI components)
+- github (repos, issues, PRs)
 - fetch (HTTP requests)
-- duckduckgo (web search)
+- rigour (local governance / quality gates via @rigour-labs/mcp; no API key)
+- exa (Exa hosted MCP / web search; optional EXA_API_KEY in .env)
 
 # Example prompt:
 "Use the fetch tool to get data from https://api.example.com

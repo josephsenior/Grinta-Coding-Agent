@@ -7,6 +7,15 @@ from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
+from backend.core.constants import (
+    DEFAULT_PENDING_ACTION_TIMEOUT,
+    TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR,
+)
+from backend.ledger.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 from backend.orchestration.services.pending_action_service import PendingActionService
 
 
@@ -30,6 +39,22 @@ class TestPendingActionServiceInit:
         svc = PendingActionService(_make_context(), timeout=30.0)
         assert svc.get() is None
         assert svc.info() is None
+
+
+# ── effective timeout by action type ────────────────────────────────
+
+
+class TestEffectiveTimeout:
+    def test_terminal_actions_use_terminal_floor(self) -> None:
+        base = float(DEFAULT_PENDING_ACTION_TIMEOUT)
+        for action in (TerminalRunAction(), TerminalInputAction(), TerminalReadAction()):
+            eff = PendingActionService._effective_timeout_seconds(base, action)
+            assert eff == max(base, TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR)
+
+    def test_terminal_action_respects_higher_base(self) -> None:
+        high = 900.0
+        action = TerminalRunAction()
+        assert PendingActionService._effective_timeout_seconds(high, action) == high
 
 
 # ── set / get ────────────────────────────────────────────────────────

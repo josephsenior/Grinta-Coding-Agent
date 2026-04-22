@@ -15,6 +15,8 @@ from rich.text import Text
 
 from backend.core.app_paths import get_app_settings_root
 from backend.core.config import AppConfig, load_app_config
+from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
+from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 logger = logging.getLogger(__name__)
 
@@ -247,10 +249,10 @@ def run_onboarding() -> AppConfig:
     # ── Validate connection ──
     _validate_connection(full_model, api_key, base_url)
 
-    # ── Persist ──
+    # ── Persist ── (secret in .env only; settings.json references LLM_API_KEY)
     settings = _load_raw_settings()
     settings['llm_model'] = full_model
-    settings['llm_api_key'] = api_key
+    settings['llm_api_key'] = LLM_API_KEY_SETTINGS_PLACEHOLDER
     if provider_key and provider_key != 'custom':
         settings['llm_provider'] = provider_key
     elif custom_provider_name:
@@ -258,6 +260,7 @@ def run_onboarding() -> AppConfig:
     if base_url:
         settings['llm_base_url'] = base_url
     _save_raw_settings(settings)
+    persist_llm_api_key_to_dotenv(api_key, settings_json_path=_settings_path())
 
     _console.print()
     _console.print(
@@ -578,8 +581,9 @@ def update_model(model: str, provider: str | None = None, base_url: str | None =
 
 def update_api_key(key: str) -> None:
     settings = _load_raw_settings()
-    settings['llm_api_key'] = key
+    settings['llm_api_key'] = LLM_API_KEY_SETTINGS_PLACEHOLDER
     _save_raw_settings(settings)
+    persist_llm_api_key_to_dotenv(key, settings_json_path=_settings_path())
 
 
 def update_budget(budget: float) -> None:

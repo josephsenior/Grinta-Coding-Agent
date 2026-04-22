@@ -55,6 +55,14 @@ class LifecycleService:
             EventStreamSubscriber.AGENT_CONTROLLER, controller.on_event, controller.id
         )
 
+        if hasattr(event_stream, 'pre_runnable_action_dispatch'):
+
+            def _arm_stream_pending(a) -> None:  # type: ignore[no-untyped-def]
+                if getattr(a, 'runnable', False):
+                    controller.action_service.set_pending_action(a)
+
+            event_stream.pre_runnable_action_dispatch = _arm_stream_pending
+
         from backend.core.enums import LifecyclePhase
 
         controller._lifecycle = LifecyclePhase.ACTIVE

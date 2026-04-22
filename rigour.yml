@@ -1,0 +1,7 @@
+version: 1
+preset: api
+gates:
+  max_file_lines: 500
+  forbid_todos: true
+  required_files: []
+ignore: []

@@ -5,22 +5,18 @@ from __future__ import annotations
 import json
 
 from backend.core.config.quickstart import generate_quickstart_config
+from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 
 class TestGenerateQuickstartConfig:
     def test_default_values(self):
         result = generate_quickstart_config()
         data = json.loads(result)
-        assert data['llm_api_key'] == ''
+        assert data['llm_api_key'] == LLM_API_KEY_SETTINGS_PLACEHOLDER
         assert data['llm_model'] == 'gemini-2.5-flash'
         assert data['max_budget_per_task'] == 5.0
         assert data['llm_base_url'] == ''
         assert data['project_root'] == './workspace'
-
-    def test_custom_api_key(self):
-        result = generate_quickstart_config(api_key='sk-test123')
-        data = json.loads(result)
-        assert data['llm_api_key'] == 'sk-test123'
 
     def test_custom_model(self):
         result = generate_quickstart_config(model='gpt-4o')
@@ -44,13 +40,12 @@ class TestGenerateQuickstartConfig:
 
     def test_all_custom(self):
         result = generate_quickstart_config(
-            api_key='key1',
             model='llama3',
             base_url='http://localhost:11434',
             max_budget=1.0,
         )
         data = json.loads(result)
-        assert data['llm_api_key'] == 'key1'
+        assert data['llm_api_key'] == LLM_API_KEY_SETTINGS_PLACEHOLDER
         assert data['llm_model'] == 'llama3'
         assert data['llm_base_url'] == 'http://localhost:11434'
         assert data['max_budget_per_task'] == 1.0

@@ -6,11 +6,14 @@ import asyncio
 import json
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import SecretStr
 
-from backend.core.constants import SETTINGS_CACHE_TTL
+from backend.core.app_paths import get_app_settings_root
+from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
+from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER, SETTINGS_CACHE_TTL
 from backend.core.pydantic_compat import model_dump_with_options
 from backend.persistence import get_file_store
 from backend.persistence.data_models.settings import Settings
@@ -94,10 +97,22 @@ class FileSettingsStore(SettingsStore):
         llm_api_key = minimal.get('llm_api_key')
         if isinstance(llm_api_key, SecretStr):
             llm_api_key = llm_api_key.get_secret_value()
+        elif llm_api_key is not None:
+            llm_api_key = str(llm_api_key).strip() or None
+
+        llm_api_key_json: str | None
+        if llm_api_key:
+            settings_path = Path(get_app_settings_root()) / self.path
+            persist_llm_api_key_to_dotenv(
+                llm_api_key, settings_json_path=settings_path
+            )
+            llm_api_key_json = LLM_API_KEY_SETTINGS_PLACEHOLDER
+        else:
+            llm_api_key_json = llm_api_key
 
         normalized: dict = {
             'llm_model': minimal.get('llm_model'),
-            'llm_api_key': llm_api_key,
+            'llm_api_key': llm_api_key_json,
             'llm_base_url': minimal.get('llm_base_url'),
         }
         mcp = minimal.get('mcp_config')

@@ -53,11 +53,11 @@ TRAFFIC_CONTROL_REMINDER = (
 ERROR_ACTION_NOT_EXECUTED_STOPPED_ID = 'AGENT_ERROR$ERROR_ACTION_NOT_EXECUTED_STOPPED'
 ERROR_ACTION_NOT_EXECUTED_ERROR_ID = 'AGENT_ERROR$ERROR_ACTION_NOT_EXECUTED_ERROR'
 ERROR_ACTION_NOT_EXECUTED_STOPPED = (
-    'Stop button pressed. The action has not been executed.'
+    'Run cancelled (Stop or Ctrl+C) before this tool finished — the action was not executed.'
 )
 ERROR_ACTION_NOT_EXECUTED_ERROR = (
-    'The action has not been executed due to a runtime error. '
-    'The runtime system may have crashed and restarted due to resource constraints. '
+    'Runtime error or restart prevented this action from completing (unlike cancelling with '
+    'Stop or Ctrl+C). The execution environment may have crashed or been recycled. '
     'Any previously established system state, dependencies, or environment variables '
     'may have been lost.'
 )

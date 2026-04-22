@@ -5,7 +5,11 @@ import pytest
 
 from backend.execution.action_execution_server import RuntimeExecutor
 from backend.ledger.action import CmdRunAction, FileReadAction
-from backend.ledger.action.terminal import TerminalInputAction, TerminalReadAction
+from backend.ledger.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 from backend.ledger.observation import (
     CmdOutputObservation,
     ErrorObservation,
@@ -528,3 +532,72 @@ async def test_terminal_read_blocks_session_that_escaped_workspace(
     assert isinstance(obs, ErrorObservation)
     assert 'closed by hardened_local policy' in obs.content
     mock_executor.session_manager.close_session.assert_called_with('term-4')
+
+
+@pytest.mark.asyncio
+async def test_terminal_input_applies_resize_and_control_field(
+    mock_executor, tmp_path
+) -> None:
+    workspace = tmp_path / 'w'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+
+    session = MagicMock()
+    session.cwd = str(workspace)
+    session.read_output.return_value = 'out'
+    mock_executor.session_manager.get_session.return_value = session
+
+    with patch(
+        'backend.execution.action_execution_server.asyncio.sleep', return_value=None
+    ):
+        obs = await mock_executor.terminal_input(
+            TerminalInputAction(
+                session_id='t-rsz',
+                input='',
+                control='C-c',
+                rows=30,
+                cols=100,
+            )
+        )
+
+    assert obs.__class__.__name__ == 'TerminalObservation'
+    session.resize.assert_called_once_with(30, 100)
+    assert session.write_input.call_count == 1
+    session.write_input.assert_any_call('C-c', is_control=True)
+
+
+@pytest.mark.asyncio
+async def test_terminal_read_applies_resize(mock_executor, tmp_path) -> None:
+    workspace = tmp_path / 'w'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+
+    session = MagicMock()
+    session.cwd = str(workspace)
+    session.read_output.return_value = 'buf'
+    mock_executor.session_manager.get_session.return_value = session
+
+    obs = await mock_executor.terminal_read(
+        TerminalReadAction(session_id='t-read', rows=24, cols=80)
+    )
+
+    assert obs.__class__.__name__ == 'TerminalObservation'
+    assert obs.content == 'buf'
+    session.resize.assert_called_once_with(24, 80)
+    session.read_output.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_terminal_run_rejects_invalid_resize_rows(mock_executor, tmp_path) -> None:
+    workspace = tmp_path / 'w'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.session_manager.create_session.return_value = MagicMock()
+
+    obs = await mock_executor.terminal_run(
+        TerminalRunAction(command='echo 1', cwd=str(workspace), rows=0, cols=80)
+    )
+
+    assert isinstance(obs, ErrorObservation)
+    assert 'Invalid terminal size' in obs.content
+    mock_executor.session_manager.close_session.assert_called()

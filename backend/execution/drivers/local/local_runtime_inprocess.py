@@ -35,6 +35,11 @@ from backend.ledger.action import (
     FileWriteAction,
     MCPAction,
 )
+from backend.ledger.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.observation import Observation
 from backend.security.analyzer import SecurityAnalyzer
@@ -319,6 +324,24 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(self._executor.edit, 15.0, action)
+
+    def terminal_run(self, action: TerminalRunAction) -> Observation:
+        """Start an interactive terminal session via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        return call_async_from_sync(self._executor.terminal_run, 130.0, action)
+
+    def terminal_input(self, action: TerminalInputAction) -> Observation:
+        """Send input to a terminal session via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        return call_async_from_sync(self._executor.terminal_input, 30.0, action)
+
+    def terminal_read(self, action: TerminalReadAction) -> Observation:
+        """Read terminal output via RuntimeExecutor."""
+        if self._executor is None:
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
+        return call_async_from_sync(self._executor.terminal_read, 30.0, action)
 
     def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute LSP query via RuntimeExecutor."""

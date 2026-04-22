@@ -7,12 +7,16 @@ Contains argument parsing and config-override logic for CLI entry points.
 from __future__ import annotations
 
 import json
+import os
 from typing import TYPE_CHECKING
+
+from pydantic import SecretStr
 
 from backend.core import logger
 from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.app_config import AppConfig
 from backend.core.config.llm_config import LLMConfig
+from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 if TYPE_CHECKING:
     import argparse
@@ -50,7 +54,17 @@ def get_llm_config_arg(
     if 'llm_model' in json_config:
         llm.model = json_config['llm_model']
     if 'llm_api_key' in json_config:
-        llm.api_key = json_config['llm_api_key']
+        raw = json_config['llm_api_key']
+        s = str(raw).strip() if raw is not None else ''
+        if s and s != LLM_API_KEY_SETTINGS_PLACEHOLDER:
+            logger.app_logger.warning(
+                'Ignoring literal llm_api_key in %s; set LLM_API_KEY in .env and use %s in JSON.',
+                json_file,
+                LLM_API_KEY_SETTINGS_PLACEHOLDER,
+            )
+    env_k = (os.environ.get('LLM_API_KEY') or '').strip()
+    if env_k:
+        llm.api_key = SecretStr(env_k)
     if 'llm_base_url' in json_config:
         llm.base_url = json_config['llm_base_url']
     return llm

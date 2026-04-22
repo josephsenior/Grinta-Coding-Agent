@@ -7,6 +7,7 @@ assembled via f-strings and simple loops.
 Public API
 ----------
 build_system_prompt(**ctx)   → full system prompt string
+measure_system_prompt_sections(**ctx) → token/char breakdown (for budgeting; run ``python -m backend.engine.prompts.prompt_builder``)
 build_workspace_context(...) → additional_info block
 build_playbook_info(...)     → playbook block
 build_knowledge_base_info(.) → knowledge-base block
@@ -31,6 +32,30 @@ _DIR = Path(__file__).parent
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _count_section_tokens(text: str, model_id: str) -> tuple[int, str]:
+    """Best-effort token count for budgeting. Returns (tokens, encoding_label)."""
+    try:
+        import tiktoken  # type: ignore
+
+        enc = None
+        label = 'cl100k_base'
+        mid = (model_id or '').strip()
+        if mid:
+            try:
+                enc = tiktoken.encoding_for_model(mid)
+                label = f'model:{mid}'
+            except Exception:
+                enc = None
+        if enc is None:
+            enc = tiktoken.get_encoding('cl100k_base')
+            if not mid:
+                label = 'cl100k_base'
+        return len(enc.encode(text)), label
+    except Exception:
+        est = max(0, len(text) // 4)
+        return est, 'chars_div_4_fallback'
 
 
 @lru_cache(maxsize=32)
@@ -350,16 +375,15 @@ def _render_mcp_and_permissions(
     lsp_enabled = getattr(config, "enable_lsp_query", False)
     if lsp_enabled:
         uncertainty_state_1_discover_line = (
-            "1. **Can be discovered** (unknown file path, unknown API, unknown config shape) → run `search_code`, "
-            "editor `view_*`, `lsp_query`, and other tools from **TOOL_ROUTING_LADDER** as appropriate. "
+            "1. **Can be discovered** (unknown file path, unknown API, unknown config shape) → follow "
+            "**TOOL_ROUTING_LADDER** (e.g. `search_code`, editor `view_*`, `lsp_query`). "
             "Do NOT ask the user first."
         )
     else:
         uncertainty_state_1_discover_line = (
-            "1. **Can be discovered** (unknown file path, unknown API, unknown config shape) → run `search_code`, "
-            "editor `view_*`, and other tools from **TOOL_ROUTING_LADDER** "
-            "(`read_symbol_definition`, `explore_tree_structure`, `analyze_project_structure`, etc.)—"
-            "**not** shell search/read for repo files. Do NOT ask the user first."
+            "1. **Can be discovered** (unknown file path, unknown API, unknown config shape) → follow "
+            "**TOOL_ROUTING_LADDER** (e.g. `search_code`, editor `view_*`, structure/symbol tools)—"
+            "not shell search/read of repo files. Do NOT ask the user first."
         )
     parts.append("")
     parts.append(
@@ -436,6 +460,143 @@ def _render_permissions(config: Any, perm: Any) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _collect_system_prompt_sections(
+    *,
+    active_llm_model: str = "",
+    is_windows: bool = False,
+    windows_with_bash: bool = False,
+    cli_mode: bool = False,
+    config: Any = None,
+    mcp_tool_names: list[str] | None = None,
+    mcp_tool_descriptions: dict[str, str] | None = None,
+    mcp_server_hints: list[dict[str, str]] | None = None,
+    terminal_tool_name: str | None = None,
+    function_calling_mode: str | None = None,
+) -> list[tuple[str, str]]:
+    """Ordered (name, body) sections before joining with blank lines."""
+    model_id = active_llm_model or "unknown"
+    resolved_terminal_tool = _resolve_terminal_command_tool(
+        is_windows=is_windows,
+        terminal_tool_name=terminal_tool_name,
+    )
+    shell_is_powershell = resolved_terminal_tool == "execute_powershell"
+
+    sections: list[tuple[str, str]] = [
+        (
+            'identity_header',
+            "You are Grinta, an expert AI coding agent built by Youssef Mejdi. "
+            "You solve complex technical tasks through methodical reasoning and tool execution.\n\n"
+            "**Model identity:** The deployment calls you through an API using the configured "
+            "model id below.\n"
+            f"Configured model id: `{model_id}`",
+        ),
+    ]
+
+    if windows_with_bash:
+        sections.append(
+            (
+                'shell_identity_git_bash_windows',
+                "<SHELL_IDENTITY>\n"
+                "Your terminal is **Git Bash** running on Windows. Use **bash syntax exclusively**.\n"
+                "- Correct: `ls`, `cat`, `grep`, `find`, `echo`, `cd`, `mkdir`, `rm`, `pwd`, `which`\n"
+                "- FORBIDDEN: `Get-ChildItem`, `Get-Process`, `Get-Content`, `Select-String`, "
+                "`$PSVersionTable`, `Write-Output`, `Set-Location`, or any other PowerShell cmdlet.\n"
+                "- Windows-style paths (`C:\\Users\\...`) in the working directory are normal "
+                "for Git Bash on Windows.\n"
+                "- Use `which <tool>` to check if a tool (node, npm, etc.) is on PATH before using it.\n"
+                "- Use `python` (not `python3`) to invoke the Python interpreter.\n"
+                "</SHELL_IDENTITY>",
+            )
+        )
+    elif shell_is_powershell:
+        sections.append(
+            (
+                'shell_identity_powershell_windows',
+                "<SHELL_IDENTITY>\n"
+                "Your terminal is **PowerShell** on Windows. Use PowerShell syntax: chain with `;` (not `&&` / `||`); "
+                "prefer `-ErrorAction SilentlyContinue` or `try/catch` instead of `|| true`; use `Start-Process` / "
+                "`Start-Job` instead of a trailing `&`.\n\n"
+                "**Directory listing:** Quick folder listings are fine (`Get-ChildItem`, `dir`, `gci`, `ls` as aliases) "
+                "when you only need names in a path you already chose—still use **TOOL_ROUTING_LADDER** for "
+                "repo-wide **content** search (`search_code`, editors, structure tools), not `Select-String` / "
+                "`Get-Content` across the tree.\n\n"
+                "**Do not use Unix-only habits here:** `find`, `cat`, `grep`, `head`, `tail`, `touch`, `rm -rf`, "
+                "`pkill`, `timeout`, `which`, or `&&` / `||`.\n"
+                "</SHELL_IDENTITY>",
+            )
+        )
+    elif not is_windows:
+        sections.append(
+            (
+                'shell_identity_unix',
+                "<SHELL_IDENTITY>\n"
+                "Your terminal is **Bash / Zsh** running on a Unix-like system. Use standard bash syntax.\n"
+                "</SHELL_IDENTITY>",
+            )
+        )
+
+    sections += [
+        ('system_partial_00_routing', _render_routing(shell_is_powershell, config, function_calling_mode)),
+        ('security_risk_policy', _render_security(cli_mode)),
+        ('system_partial_01_autonomy', _render_autonomy(config, shell_is_powershell)),
+        ('system_partial_02_tools', _render_tool_reference(shell_is_powershell, config)),
+        (
+            'mcp_permissions_partial_03_tail',
+            _render_mcp_and_permissions(
+                mcp_tool_names or [],
+                mcp_tool_descriptions or {},
+                mcp_server_hints or [],
+                config,
+            ),
+        ),
+        ('system_partial_04_critical', _render_critical(resolved_terminal_tool)),
+    ]
+    return sections
+
+
+def measure_system_prompt_sections(
+    *,
+    active_llm_model: str = "",
+    is_windows: bool = False,
+    windows_with_bash: bool = False,
+    cli_mode: bool = False,
+    config: Any = None,
+    mcp_tool_names: list[str] | None = None,
+    mcp_tool_descriptions: dict[str, str] | None = None,
+    mcp_server_hints: list[dict[str, str]] | None = None,
+    terminal_tool_name: str | None = None,
+    function_calling_mode: str | None = None,
+) -> dict[str, Any]:
+    """Token/char budget per section (tiktoken when available). Sections sorted by tokens descending."""
+    mid = active_llm_model or 'unknown'
+    sections = _collect_system_prompt_sections(
+        active_llm_model=active_llm_model,
+        is_windows=is_windows,
+        windows_with_bash=windows_with_bash,
+        cli_mode=cli_mode,
+        config=config,
+        mcp_tool_names=mcp_tool_names,
+        mcp_tool_descriptions=mcp_tool_descriptions,
+        mcp_server_hints=mcp_server_hints,
+        terminal_tool_name=terminal_tool_name,
+        function_calling_mode=function_calling_mode,
+    )
+    per: list[dict[str, Any]] = []
+    for name, body in sections:
+        tok, enc = _count_section_tokens(body, mid)
+        per.append({'name': name, 'tokens': tok, 'chars': len(body), 'encoding': enc})
+    per.sort(key=lambda r: r['tokens'], reverse=True)
+    joined = '\n\n'.join(body for _, body in sections)
+    tot, enc_tot = _count_section_tokens(joined, mid)
+    return {
+        'model_id': mid,
+        'sections': per,
+        'total_tokens': tot,
+        'total_chars': len(joined),
+        'total_encoding': enc_tot,
+    }
+
+
 def build_system_prompt(
     *,
     active_llm_model: str = "",
@@ -454,76 +615,19 @@ def build_system_prompt(
 
     Drop-in replacement for the old ``system_prompt`` rendering.
     """
-    model_id = active_llm_model or "unknown"
-    resolved_terminal_tool = _resolve_terminal_command_tool(
+    sections = _collect_system_prompt_sections(
+        active_llm_model=active_llm_model,
         is_windows=is_windows,
+        windows_with_bash=windows_with_bash,
+        cli_mode=cli_mode,
+        config=config,
+        mcp_tool_names=mcp_tool_names,
+        mcp_tool_descriptions=mcp_tool_descriptions,
+        mcp_server_hints=mcp_server_hints,
         terminal_tool_name=terminal_tool_name,
+        function_calling_mode=function_calling_mode,
     )
-    # Drive shell-specific prompt wording from the active terminal tool contract.
-    shell_is_powershell = resolved_terminal_tool == "execute_powershell"
-
-    sections = [
-        # Identity
-        "You are Grinta, an expert AI coding agent built by Youssef Mejdi. "
-        "You solve complex technical tasks through methodical reasoning and tool execution.\n\n"
-        "**Model identity:** The deployment calls you through an API using the configured "
-        "model id below.\n"
-        f"Configured model id: `{model_id}`",
-    ]
-
-    # Shell identity disambiguation for Windows + Git Bash
-    if windows_with_bash:
-        sections.append(
-            "<SHELL_IDENTITY>\n"
-            "Your terminal is **Git Bash** running on Windows. Use **bash syntax exclusively**.\n"
-            "- Correct: `ls`, `cat`, `grep`, `find`, `echo`, `cd`, `mkdir`, `rm`, `pwd`, `which`\n"
-            "- FORBIDDEN: `Get-ChildItem`, `Get-Process`, `Get-Content`, `Select-String`, "
-            "`$PSVersionTable`, `Write-Output`, `Set-Location`, or any other PowerShell cmdlet.\n"
-            "- Windows-style paths (`C:\\Users\\...`) in the working directory are normal "
-            "for Git Bash on Windows.\n"
-            "- Use `which <tool>` to check if a tool (node, npm, etc.) is on PATH before using it.\n"
-            "- Use `python` (not `python3`) to invoke the Python interpreter.\n"
-            "</SHELL_IDENTITY>"
-        )
-    elif shell_is_powershell:
-        sections.append(
-            "<SHELL_IDENTITY>\n"
-            "Your terminal is **PowerShell** running on Windows. Use **PowerShell syntax exclusively**.\n"
-            "- Correct: `Get-ChildItem`, `Get-Content`, `Select-String`, `Where-Object`, native cmdlets, or cross-platform Node/Python tools.\n"
-            "- FORBIDDEN: `&&`, `||`, `find`, `cat`, `grep`, `head`, `tail`, `touch`, `rm -rf`, `pkill`, `timeout`, `which`.\n"
-            "- To chain commands, use `;` instead of `&&`.\n"
-            "- To ignore errors instead of `|| true`, use `-ErrorAction SilentlyContinue` or a `try-catch` block.\n"
-            "- To background a task, use `Start-Process` or `Start-Job` instead of appending `&` to the end of the line.\n"
-            "</SHELL_IDENTITY>"
-        )
-    elif not is_windows:
-        sections.append(
-            "<SHELL_IDENTITY>\n"
-            "Your terminal is **Bash / Zsh** running on a Unix-like system. Use standard bash syntax.\n"
-            "</SHELL_IDENTITY>"
-        )
-
-    sections += [
-        # Routing
-        _render_routing(shell_is_powershell, config, function_calling_mode),
-        # Security
-        _render_security(cli_mode),
-        # Autonomy & execution
-        _render_autonomy(config, shell_is_powershell),
-        # Tool reference
-        _render_tool_reference(shell_is_powershell, config),
-        # MCP & permissions tail
-        _render_mcp_and_permissions(
-            mcp_tool_names or [],
-            mcp_tool_descriptions or {},
-            mcp_server_hints or [],
-            config,
-        ),
-        # Critical rules (last for recency)
-        _render_critical(resolved_terminal_tool),
-    ]
-
-    return "\n\n".join(sections)
+    return '\n\n'.join(body for _, body in sections)
 
 
 def build_workspace_context(
@@ -685,3 +789,36 @@ def build_remember_prompt_template(events: str) -> str:
         "Include your prompt within <update_prompt> tags.\n\n"
         "<update_prompt>\n\n</update_prompt>"
     )
+
+
+def _cli_measure_default() -> None:
+    """Print a default baseline budget (balanced config, no MCP tools)."""
+    from types import SimpleNamespace
+
+    cfg = SimpleNamespace(
+        autonomy_level='balanced',
+        enable_checkpoints=False,
+        enable_lsp_query=False,
+        enable_internal_task_tracker=False,
+        enable_signal_progress=False,
+        enable_permissions=False,
+        enable_meta_cognition=False,
+    )
+
+    report = measure_system_prompt_sections(
+        active_llm_model='gpt-4',
+        is_windows=False,
+        config=cfg,
+        mcp_tool_names=[],
+        mcp_tool_descriptions={},
+        mcp_server_hints=[],
+        function_calling_mode='native',
+    )
+    print(f"model_id={report['model_id']} total_tokens≈{report['total_tokens']} ({report['total_encoding']}) chars={report['total_chars']}")
+    print('section'.ljust(42), 'tokens', 'chars')
+    for row in report['sections']:
+        print(row['name'][:41].ljust(42), row['tokens'], row['chars'])
+
+
+if __name__ == '__main__':
+    _cli_measure_default()

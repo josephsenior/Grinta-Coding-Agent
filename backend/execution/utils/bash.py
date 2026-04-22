@@ -1014,3 +1014,13 @@ class BashSession(BaseShellSession):
             # For regular input, send as keys
             logger.debug('SENDING INPUT: %s', data)
             pane.send_keys(data, enter=True)
+
+    def resize(self, rows: int, cols: int) -> None:
+        """Resize the tmux pane to match a PTY (rows x columns in cells)."""
+        pane = self.pane
+        if pane is None:
+            return
+        try:
+            pane.cmd('resize-pane', '-x', str(cols), '-y', str(rows))
+        except Exception as exc:  # noqa: BLE001
+            logger.debug('tmux resize-pane failed: %s', exc)

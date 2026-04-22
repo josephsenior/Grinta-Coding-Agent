@@ -110,6 +110,8 @@ On Python file writes, the security layer performs a separate check: AST-level v
 
 That is the difference between a prototype and a real tool.
 
+A later addendum picks up the thread when the story could grow without erasing this chapter: [The Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md). Same wars, new layer of decisions.
+
 ---
 
 ← [The Model-Agnostic Reckoning](10-model-agnostic-reckoning.md) | [The Book of Grinta](README.md) | [Open Source Was the Better Business](12-open-source-was-the-better-business.md) →

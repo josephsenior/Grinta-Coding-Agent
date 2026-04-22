@@ -525,6 +525,19 @@ class TestMapProviderException:
         assert result.model == 'test-model'
         assert 'Unknown error' in str(result)
 
+    def test_fallback_handles_unprintable_exception(self):
+        """Mapping should survive provider exceptions with broken ``__str__``."""
+
+        class BrokenProviderError(Exception):
+            def __str__(self) -> str:
+                raise AttributeError("'NoneType' object has no attribute 'request'")
+
+        result = _map_provider_exception(BrokenProviderError(), model='test-model')
+
+        assert isinstance(result, APIError)
+        assert result.model == 'test-model'
+        assert 'unprintable exception' in str(result)
+
     def test_openai_delegation(self):
         """Test that OpenAI exceptions are delegated to _map_openai_exception."""
         try:

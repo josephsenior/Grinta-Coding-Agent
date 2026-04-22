@@ -16,6 +16,8 @@ class TerminalRunAction(Action):
 
     command: str = ''
     cwd: str | None = None
+    rows: int | None = None
+    cols: int | None = None
     action: ClassVar[str] = ActionType.TERMINAL_RUN
     runnable: ClassVar[bool] = True
     confirmation_state: ActionConfirmationStatus = ActionConfirmationStatus.CONFIRMED
@@ -38,6 +40,9 @@ class TerminalInputAction(Action):
     session_id: str = ''
     input: str = ''
     is_control: bool = False
+    control: str | None = None
+    rows: int | None = None
+    cols: int | None = None
     action: ClassVar[str] = ActionType.TERMINAL_INPUT
     runnable: ClassVar[bool] = True
     confirmation_state: ActionConfirmationStatus = ActionConfirmationStatus.CONFIRMED
@@ -52,7 +57,11 @@ class TerminalInputAction(Action):
 
     def __str__(self) -> str:
         """Return a readable summary."""
-        return f'**TerminalInputAction (session={self.session_id}, is_control={self.is_control})**\nINPUT:\n{self.input}'
+        return (
+            f'**TerminalInputAction (session={self.session_id}, is_control='
+            f'{self.is_control}, control={self.control!r}, rows={self.rows}, '
+            f'cols={self.cols})**\nINPUT:\n{self.input}'
+        )
 
 
 @dataclass
@@ -60,6 +69,8 @@ class TerminalReadAction(Action):
     """Action to read the output buffer of an existing terminal session."""
 
     session_id: str = ''
+    rows: int | None = None
+    cols: int | None = None
     action: ClassVar[str] = ActionType.TERMINAL_READ
     runnable: ClassVar[bool] = True
     confirmation_state: ActionConfirmationStatus = ActionConfirmationStatus.CONFIRMED
@@ -72,4 +83,7 @@ class TerminalReadAction(Action):
 
     def __str__(self) -> str:
         """Return a readable summary."""
-        return f'**TerminalReadAction (session={self.session_id})**'
+        return (
+            f'**TerminalReadAction (session={self.session_id}, rows={self.rows}, '
+            f'cols={self.cols})**'
+        )

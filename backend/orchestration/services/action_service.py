@@ -8,6 +8,7 @@ from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import Action, NullAction
 from backend.ledger.action.message import MessageAction
+from backend.ledger.stream import EventStream
 
 if TYPE_CHECKING:
     from backend.orchestration.services.confirmation_service import ConfirmationService
@@ -93,15 +94,23 @@ class ActionService:
         ):
             await controller.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
 
+        es = controller.event_stream
         controller.event_stream.add_event(action, action.source or EventSource.AGENT)
 
-        # Register pending AFTER add_event so action.id is the real assigned
-        # stream ID. Only runnable actions receive an observation from the runtime,
-        # so only they need pending tracking. Agent-level actions (MessageAction,
-        # AgentThinkAction, etc.) transition state synchronously and never produce
-        # an observation to clear the pending slot.
+        # When the real EventStream has no pre-dispatch hook, register pending
+        # *after* add_event (so action.id is assigned). If
+        # ``pre_runnable_action_dispatch`` is set, it already ran *inside* add_event
+        # before inline delivery — avoids a race where the runtime observation
+        # arrives before the pending map. Use ``isinstance(..., EventStream)`` so
+        # unit tests with ``MagicMock`` event streams are not mis-detected as having
+        # a hook (MagicMock attributes are truthy).
         if action.runnable:
-            self.set_pending_action(action)
+            hooked = (
+                isinstance(es, EventStream)
+                and es.pre_runnable_action_dispatch is not None
+            )
+            if not hooked:
+                self.set_pending_action(action)
 
         if ctx:
             ctx.action_id = action.id

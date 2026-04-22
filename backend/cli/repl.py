@@ -363,6 +363,8 @@ class Repl:
         self._footer_system_status: str = ''
         self._footer_system_kind: str = 'system'
         self._pt_session: Any | None = None
+        #: Shown once per REPL run when Ctrl+C is pressed at the input prompt.
+        self._prompt_ctrl_c_hint_shown: bool = False
 
     def _invalidate_pt(self) -> None:
         sess = self._pt_session
@@ -709,11 +711,11 @@ class Repl:
         if width < 72:
             ws = (data.get('workspace') or '').strip()
             ws_prefix = (
-                f"{HUDBar.ellipsize_path(ws, 28)} · " if ws else ''
+                f'{HUDBar.ellipsize_path(ws, 28)} · ' if ws else ''
             )
             line = (
-                f"{ws_prefix}{data['state_label']} · {data['autonomy_label']} · "
-                f"{model} · {data['token_display']} · {data['cost']}"
+                f'{ws_prefix}{data["state_label"]} · {data["autonomy_label"]} · '
+                f'{model} · {data["token_display"]} · {data["cost"]}'
             )
             add('class:prompt.dim', line)
             self._append_footer_system_fragments(fragments, add)
@@ -1097,6 +1099,14 @@ class Repl:
                     else:
                         user_input = await session.prompt_async()
                 except KeyboardInterrupt:
+                    if not self._prompt_ctrl_c_hint_shown:
+                        self._console.print(
+                            '[dim]Ctrl+C at the prompt does not exit the REPL; '
+                            'type /quit or exit. While the agent is running, '
+                            'Ctrl+C cancels the run (on some terminals you may need '
+                            'to press it more than once).[/dim]'
+                        )
+                        self._prompt_ctrl_c_hint_shown = True
                     continue
                 except EOFError:
                     self._console.print('EOF Error received in prompt loop.')

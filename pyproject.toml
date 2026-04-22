@@ -67,6 +67,8 @@ dependencies = [
   "optimum[onnxruntime]>=2.1.0",
   "pyfiglet>=1.0.4",
   "ripgrep==14.1.0",
+  "ptyprocess>=0.7,<1; sys_platform != 'win32'",
+  "pywinpty>=2.0,<3; sys_platform == 'win32'",
 ]
 
 urls = { Repository = "https://github.com/josephsenior/Grinta-Agent", Issues = "https://github.com/josephsenior/Grinta-Agent/issues", Discussions = "https://github.com/josephsenior/Grinta-Agent/discussions" }

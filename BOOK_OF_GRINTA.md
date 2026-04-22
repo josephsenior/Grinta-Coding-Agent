@@ -44,7 +44,7 @@ Seven months. Three distinct phases. One principle.
 
 **Month 6 (February 2026):** The Pivot. I deleted the cloud. I removed Redis from the core runtime. I moved the async database driver into an optional dependency group. I removed the Textual TUI. I removed the cloud runtime providers. I stripped Grinta down to its engine — 43 required packages, zero cloud dependencies — and shipped the foundation release.
 
-**Month 7 (March–April 2026):** The Refinement. Decomposing monoliths into focused modules, pushing orchestration responsibilities into clearer service boundaries, and consolidating the context subsystem after a wave of exploratory variants. Hardening the local security profile. Building the CLI with tab completion, fuzzy command matching, slash commands, and an animated ASCII splash screen. Writing this document.
+**Month 7 (March–April 2026):** The Refinement. Decomposing monoliths into focused modules, pushing orchestration responsibilities into clearer service boundaries, and consolidating the context subsystem after a wave of exploratory variants. Hardening the local security profile. Building the CLI with tab completion, fuzzy command matching, slash commands, and an animated ASCII splash screen. Writing this document. Alongside that work, the terminal story grew a deliberate second layer: a native, OS-agnostic PTY path for **opt-in** interactive shells (no Docker required), sitting next to the original batch/tmux model instead of replacing it — because growing means adding truth, not erasing the chapter you already wrote about the console wars.
 
 ---
 
@@ -65,6 +65,7 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act VI — Reliability Under Fire:** [18](19-surviving-the-crash.md), [19](20-circuit-breakers-and-hallucinations.md), [20](21-the-safety-sandbox-is-not-optional.md), [21](22-who-grades-the-agent.md), [22](23-the-middleware-contract.md), [23](24-the-identity-and-execution-crisis.md)
 - **Act VII — Incident Addenda and Prompt Discipline:** [24](25-the-parallelization-trap.md), [25](26-the-perfect-prompt-illusion.md)
 - **Act VIII — Operational Reality & Production:** [26](27-the-observability-black-hole.md), [27](28-token-economics-and-the-finops-trap.md), [28](29-the-latency-veil-and-human-trust.md), [29](30-the-weight-divide-local-vs-hosted.md), [30](31-the-myth-of-the-committee.md)
+- **Act IX — Addendum (The Terminal, Revisited):** [31](32-the-two-lives-of-the-terminal.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
@@ -102,6 +103,7 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [28](29-the-latency-veil-and-human-trust.md) | **The Latency Veil and Human Trust** | Human-in-the-loop (HITL), streaming UX, and the balance of asking for permission vs. forgiveness. |
 | [29](30-the-weight-divide-local-vs-hosted.md) | **The Weight Divide: Local vs Hosted** | The operational realities of deploying heavy local weights vs. depending on frontier AI API latency. |
 | [30](31-the-myth-of-the-committee.md) | **The Myth of the Committee** | Why we killed the multi-agent swarm in favor of a single orchestrator with execution modes. |
+| [31](32-the-two-lives-of-the-terminal.md) | **The Two Lives of the Terminal** | Native PTY for opt-in interactive shells without Docker; why the default session stayed “batch first”; and how that decision sits on top of the Console Wars chapter instead of deleting it. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
 ---

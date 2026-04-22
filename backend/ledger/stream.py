@@ -220,6 +220,12 @@ class EventStream(EventStore):
         self._activity_listener_seq = 0
         self._write_page_cache: list[dict] = []
 
+        # If set, called for runnable Actions after id assignment and persistence
+        # but *before* subscriber delivery. Required so pending-action state is
+        # registered before synchronous (inline) runtime handlers can emit
+        # observations (otherwise cause-based routing sees no outstanding row).
+        self.pre_runnable_action_dispatch: Callable[[Any], None] | None = None
+
         # Register for global metrics aggregation
         try:  # pragma: no cover - defensive
             EventStream._GLOBAL_STREAMS.add(self)
@@ -400,6 +406,17 @@ class EventStream(EventStore):
         # so transient out-of-order flushes do not cause ordering bugs.
         if sanitized_event.id is not None:
             self._persist.persist_event(payload, sanitized_event.id, cache_payload)
+
+        hook = self.pre_runnable_action_dispatch
+        if hook is not None and getattr(event, 'runnable', False):
+            try:
+                hook(event)
+            except Exception as exc:  # pragma: no cover - hook must not break delivery
+                logger.error(
+                    'pre_runnable_action_dispatch failed: %s',
+                    exc,
+                    exc_info=True,
+                )
 
         if source == EventSource.USER or self._inline_delivery:
             self._dispatch_event_inline(sanitized_event)
