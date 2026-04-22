@@ -32,6 +32,7 @@ def ctrl(mock_context):
     c.pending_action_service.get.return_value = None
     c.retry_service = MagicMock()
     c.retry_service.schedule_retry_after_failure = AsyncMock(return_value=False)
+    c.get_agent_state = MagicMock(return_value=AgentState.RUNNING)
     return c
 
 
@@ -79,6 +80,19 @@ class TestRecoveryService:
 
         ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
         mock_context.set_agent_state.assert_awaited_once_with(AgentState.RATE_LIMITED)
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_after_user_stop_skips_state_transition(
+        self, mock_context, ctrl
+    ):
+        ctrl.get_agent_state.return_value = AgentState.STOPPED
+        ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(RateLimitError('late 429'))
+
+        mock_context.set_agent_state.assert_not_awaited()
+        ctrl.retry_service.schedule_retry_after_failure.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_authentication_sets_notify_ui_only(self, mock_context, ctrl):

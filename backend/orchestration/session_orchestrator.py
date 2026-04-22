@@ -268,6 +268,7 @@ class SessionOrchestrator:
             ContextWindowMiddleware,
             CostQuotaMiddleware,
             LoggingMiddleware,
+            ProgressPolicyMiddleware,
             SafetyValidatorMiddleware,
             TelemetryMiddleware,
         )
@@ -277,6 +278,7 @@ class SessionOrchestrator:
             SafetyValidatorMiddleware(self),
             BlackboardMiddleware(self),
             CircuitBreakerMiddleware(self),
+            ProgressPolicyMiddleware(),
             CostQuotaMiddleware(self),
             ContextWindowMiddleware(self),
             RollbackMiddleware(),

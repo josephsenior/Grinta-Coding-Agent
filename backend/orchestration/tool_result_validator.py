@@ -214,10 +214,13 @@ class ToolResultValidator(ToolInvocationMiddleware):
 
         # 4. Empty result detection
         def check_empty(ctx: ToolInvocationContext, obs: Observation) -> str | None:
-            # PTY: first read() after opening a session is often blank or only
-            # newlines (timing, prompt not flushed). Session id proves success;
-            # output may arrive on a later terminal_read/terminal_input turn.
             if type(obs).__name__ == 'TerminalObservation':
+                has_new = getattr(obs, 'has_new_output', None)
+                if has_new is False:
+                    return (
+                        'Terminal read produced no new output; switch strategy '
+                        'or send input before repeating read'
+                    )
                 sid = getattr(obs, 'session_id', None)
                 if isinstance(sid, str) and sid.strip():
                     return None

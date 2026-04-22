@@ -41,6 +41,9 @@ class TerminalInputAction(Action):
     input: str = ''
     is_control: bool = False
     control: str | None = None
+    #: When True (default), append a newline to non-control ``input`` if it does
+    #: not already end with ``\\n`` / ``\\r\\n`` (submit the line in one call).
+    submit: bool = True
     rows: int | None = None
     cols: int | None = None
     action: ClassVar[str] = ActionType.TERMINAL_INPUT
@@ -59,8 +62,8 @@ class TerminalInputAction(Action):
         """Return a readable summary."""
         return (
             f'**TerminalInputAction (session={self.session_id}, is_control='
-            f'{self.is_control}, control={self.control!r}, rows={self.rows}, '
-            f'cols={self.cols})**\nINPUT:\n{self.input}'
+            f'{self.is_control}, control={self.control!r}, submit={self.submit}, '
+            f'rows={self.rows}, cols={self.cols})**\nINPUT:\n{self.input}'
         )
 
 
@@ -69,6 +72,8 @@ class TerminalReadAction(Action):
     """Action to read the output buffer of an existing terminal session."""
 
     session_id: str = ''
+    offset: int | None = None
+    mode: str = 'delta'
     rows: int | None = None
     cols: int | None = None
     action: ClassVar[str] = ActionType.TERMINAL_READ
@@ -84,6 +89,6 @@ class TerminalReadAction(Action):
     def __str__(self) -> str:
         """Return a readable summary."""
         return (
-            f'**TerminalReadAction (session={self.session_id}, rows={self.rows}, '
-            f'cols={self.cols})**'
+            f'**TerminalReadAction (session={self.session_id}, offset={self.offset}, '
+            f'mode={self.mode}, rows={self.rows}, cols={self.cols})**'
         )

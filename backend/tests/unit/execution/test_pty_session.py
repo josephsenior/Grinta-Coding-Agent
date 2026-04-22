@@ -15,6 +15,7 @@ from backend.execution.utils.pty_session import (
     InteractiveSessionConfig,
     InteractiveSessionError,
     PtyUnavailableError,
+    _sanitize_terminal_text_chunk,
     create_interactive_session,
 )
 
@@ -135,6 +136,47 @@ class TestBufferSemantics:
         chunk, offset = session.read_since(0)
         assert chunk == '5678'
         assert offset == 8
+
+    def test_append_strips_standard_ansi_sequences(self) -> None:
+        session = self._make_session()
+        session._append_to_buffer('ok \x1b[32mgreen\x1b[0m text')
+        assert session.peek() == 'ok green text'
+
+    def test_append_strips_orphan_conpty_chunk_stream(self) -> None:
+        session = self._make_session()
+        session._append_to_buffer('0;1;40;1_0;0;32;1_8;1;32;1_')
+        assert session.peek() == ''
+
+
+class TestTerminalChunkSanitizer:
+    def test_preserves_plain_text(self) -> None:
+        clean, carry = _sanitize_terminal_text_chunk('hello world')
+        assert clean == 'hello world'
+        assert carry == ''
+
+    def test_strips_escape_sequences(self) -> None:
+        clean, carry = _sanitize_terminal_text_chunk('\x1b[31mred\x1b[0m')
+        assert clean == 'red'
+        assert carry == ''
+
+    def test_tracks_partial_escape_across_chunks(self) -> None:
+        clean1, carry1 = _sanitize_terminal_text_chunk('x\x1b')
+        assert clean1 == 'x'
+        assert carry1 == '\x1b'
+        clean2, carry2 = _sanitize_terminal_text_chunk('[32mok\x1b[0m', carry=carry1)
+        assert clean2 == 'ok'
+        assert carry2 == ''
+
+    def test_strips_multi_token_orphan_chunks(self) -> None:
+        s = '[17;29;0;1;40;1_[67;46;3;1;40;1_'
+        clean, carry = _sanitize_terminal_text_chunk(s)
+        assert clean == ''
+        assert carry == ''
+
+    def test_keeps_single_near_match_literal(self) -> None:
+        clean, carry = _sanitize_terminal_text_chunk('value 12;34_ stays')
+        assert clean == 'value 12;34_ stays'
+        assert carry == ''
 
 
 class TestLifecycleGuards:

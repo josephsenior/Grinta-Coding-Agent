@@ -47,6 +47,26 @@ _RATE_LIMITED_EXCEPTIONS = (
 )
 
 
+def _recovery_may_set_state(controller, new_state: AgentState) -> bool:
+    """True only when the formal state graph allows ``current → new_state``.
+
+    Late exceptions (e.g. provider 429) can arrive after the user interrupted
+    and the controller is already ``STOPPED``; forcing ``RATE_LIMITED`` then
+    raises :class:`InvalidStateTransitionError`.
+    """
+    from backend.orchestration.services.state_transition_service import (
+        VALID_TRANSITIONS,
+    )
+
+    try:
+        current = controller.get_agent_state()
+    except Exception:
+        logger.debug('get_agent_state failed during recovery guard', exc_info=True)
+        return False
+    allowed = VALID_TRANSITIONS.get(current)
+    return allowed is not None and new_state in allowed
+
+
 def _resolve_pending_action_service(controller):
     controller_dict = getattr(controller, '__dict__', {})
     services = controller_dict.get('services')
@@ -111,10 +131,18 @@ class RecoveryService:
         #     against infinite failure loops.
         # ------------------------------------------------------------------ #
         if isinstance(exc, _HARD_STOP_EXCEPTIONS):
-            await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
+            if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
+                await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
             return
 
         if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
+            if not _recovery_may_set_state(controller, AgentState.RATE_LIMITED):
+                logger.info(
+                    'Skipping rate-limit recovery transition (state=%s); '
+                    'error was still recorded.',
+                    controller.get_agent_state(),
+                )
+                return
             try:
                 from backend.ledger.observation import AgentThinkObservation
 
@@ -141,7 +169,8 @@ class RecoveryService:
             logger.warning(
                 'Timeout: returning to AWAITING_USER_INPUT so the CLI prompt is usable again'
             )
-            await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
+            if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
+                await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
             return
 
         # Agent-survivable error: brief pause so we don't hammer the provider,

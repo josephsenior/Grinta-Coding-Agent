@@ -30,9 +30,9 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'delegate_task': ('', 'Delegate'),
     'signal_progress': ('', 'Progress'),
     'shared_task_board': ('', 'Board'),
-    'terminal_manager': ('', 'PTY'),
+    'terminal_manager': ('', 'Terminal'),
     'communicate_with_user': ('', 'Message you'),
-    'call_mcp_tool': ('�', 'MCP'),
+    'call_mcp_tool': ('', 'MCP'),
     'checkpoint': ('', 'Checkpoint'),
     'revert_to_checkpoint': ('', 'Revert'),
     'session_diff': ('', 'Session diff'),
@@ -221,7 +221,8 @@ def _summarize_terminal_manager_args(args: dict[str, Any]) -> str:
         cmd = args.get('command')
         cwd = args.get('cwd')
         if isinstance(cmd, str) and cmd.strip():
-            line = f'open · $ {_trunc(cmd, 100)}'
+            # No '$' prefix: open command is literal PTY text, not a Unix-style prompt display.
+            line = f'open · {_trunc(cmd, 100)}'
             if isinstance(cwd, str) and cwd.strip():
                 line = f'{line} · cwd {_trunc(cwd, 48)}'
             return line
@@ -262,7 +263,7 @@ def _streaming_hint_terminal_manager(partial_json: str) -> str:
         )
         if m_cmd:
             raw_c = m_cmd.group(1).replace('\\n', '\n').replace('\\"', '"')
-            return f'open · $ {_trunc(raw_c, 90)}'
+            return f'open · {_trunc(raw_c, 90)}'
         return 'open'
     if op == 'input':
         m_sid = re.search(r'"session_id"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)

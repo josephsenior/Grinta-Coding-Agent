@@ -508,7 +508,7 @@ async def test_terminal_input_allows_cd_within_workspace_and_tracks_cwd(
         )
 
     assert obs.__class__.__name__ == 'TerminalObservation'
-    session.write_input.assert_called_once_with(f'cd {target}', is_control=False)
+    session.write_input.assert_called_once_with(f'cd {target}\n', is_control=False)
     assert session._cwd == str(target.resolve())
 
 
@@ -532,6 +532,53 @@ async def test_terminal_read_blocks_session_that_escaped_workspace(
     assert isinstance(obs, ErrorObservation)
     assert 'closed by hardened_local policy' in obs.content
     mock_executor.session_manager.close_session.assert_called_with('term-4')
+
+
+@pytest.mark.asyncio
+async def test_terminal_input_submit_false_does_not_append_newline(
+    mock_executor, tmp_path
+) -> None:
+    workspace = tmp_path / 'w'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+
+    session = MagicMock()
+    session.cwd = str(workspace)
+    session.read_output.return_value = ''
+    mock_executor.session_manager.get_session.return_value = session
+
+    with patch(
+        'backend.execution.action_execution_server.asyncio.sleep', return_value=None
+    ):
+        obs = await mock_executor.terminal_input(
+            TerminalInputAction(session_id='t-sub', input='partial', submit=False)
+        )
+
+    assert obs.__class__.__name__ == 'TerminalObservation'
+    session.write_input.assert_called_once_with('partial', is_control=False)
+
+
+@pytest.mark.asyncio
+async def test_terminal_read_delta_empty_adds_empty_hints(
+    mock_executor, tmp_path
+) -> None:
+    workspace = tmp_path / 'w'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+
+    session = MagicMock()
+    session.cwd = str(workspace)
+    session.read_output_since.return_value = ('', 42, 0)
+    mock_executor.session_manager.get_session.return_value = session
+
+    obs = await mock_executor.terminal_read(
+        TerminalReadAction(session_id='t-hint', offset=10, mode='delta')
+    )
+
+    assert obs.__class__.__name__ == 'TerminalObservation'
+    payload = obs.tool_result['payload']
+    assert payload['delta_empty'] is True
+    assert payload['empty_reason'] == 'no_new_bytes_since_offset'
 
 
 @pytest.mark.asyncio
@@ -626,9 +673,58 @@ async def test_terminal_read_rejects_nonexistent_session_with_guidance(
     )
 
     assert isinstance(obs, ErrorObservation)
-    assert "does not exist for action=read" in obs.content
+    assert 'does not exist for action=read' in obs.content
     assert 'Do not invent IDs like terminal_session_0' in obs.content
     assert 'terminal_1' in obs.content
+
+
+@pytest.mark.asyncio
+async def test_terminal_open_guardrail_blocks_repetitive_open_loop(
+    mock_executor, tmp_path
+) -> None:
+    workspace = tmp_path / 'w'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.session_manager.sessions = {}
+
+    session = MagicMock()
+    session.read_output.return_value = ''
+    mock_executor.session_manager.create_session.return_value = session
+
+    # First three opens are allowed to support small batch startup.
+    for _ in range(3):
+        obs = await mock_executor.terminal_run(
+            TerminalRunAction(command='whoami', cwd=str(workspace))
+        )
+        assert obs.__class__.__name__ == 'TerminalObservation'
+
+    # Repeating open with no read/input should be blocked.
+    blocked = await mock_executor.terminal_run(
+        TerminalRunAction(command='whoami', cwd=str(workspace))
+    )
+    assert isinstance(blocked, ErrorObservation)
+    assert 'open loop detected' in blocked.content
+    assert 'action=read or action=input' in blocked.content
+    assert 'terminal_1' in blocked.content
+
+
+@pytest.mark.asyncio
+async def test_terminal_open_guardrail_allows_multi_session_batch_with_varied_commands(
+    mock_executor, tmp_path
+) -> None:
+    workspace = tmp_path / 'w'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.session_manager.sessions = {}
+
+    session = MagicMock()
+    session.read_output.return_value = ''
+    mock_executor.session_manager.create_session.return_value = session
+
+    commands = ['whoami', 'pwd', 'hostname', 'echo ok', 'Get-Date']
+    for cmd in commands:
+        obs = await mock_executor.terminal_run(TerminalRunAction(command=cmd, cwd=str(workspace)))
+        assert obs.__class__.__name__ == 'TerminalObservation'
 
 
 @pytest.mark.asyncio
@@ -647,3 +743,103 @@ async def test_terminal_run_rejects_invalid_resize_rows(
     assert isinstance(obs, ErrorObservation)
     assert 'Invalid terminal size' in obs.content
     mock_executor.session_manager.close_session.assert_called()
+
+
+@pytest.mark.asyncio
+async def test_terminal_read_delta_reports_next_offset_and_progress(mock_executor):
+    mock_session = MagicMock()
+    mock_session.read_output_since.return_value = ('lineA\nlineB\n', 42, 0)
+    mock_executor.session_manager.get_session.return_value = mock_session
+
+    obs = await mock_executor.terminal_read(
+        TerminalReadAction(session_id='terminal_1', offset=0, mode='delta')
+    )
+
+    assert obs.__class__.__name__ == 'TerminalObservation'
+    assert obs.next_offset == 42
+    assert obs.has_new_output is True
+    assert obs.state == 'SESSION_OUTPUT_DELTA'
+    assert isinstance(obs.tool_result, dict)
+    assert obs.tool_result.get('payload', {}).get('next_offset') == 42
+
+
+@pytest.mark.asyncio
+async def test_terminal_read_delta_no_new_output_marks_no_progress(mock_executor):
+    mock_session = MagicMock()
+    mock_session.read_output_since.return_value = ('', 42, 0)
+    mock_executor.session_manager.get_session.return_value = mock_session
+
+    obs = await mock_executor.terminal_read(
+        TerminalReadAction(session_id='terminal_1', offset=42, mode='delta')
+    )
+
+    assert obs.__class__.__name__ == 'TerminalObservation'
+    assert obs.has_new_output is False
+    assert isinstance(obs.tool_result, dict)
+    assert obs.tool_result.get('progress') is False
+
+
+@pytest.mark.asyncio
+async def test_terminal_read_delta_uses_stored_cursor_when_offset_none(
+    mock_executor,
+) -> None:
+    """Delta read with offset=None must use last ``next_offset``, not always 0."""
+    mock_session = MagicMock()
+    mock_session.read_output_since.return_value = ('tail\n', 99, 0)
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_executor._terminal_read_cursor['terminal_1'] = 77
+
+    obs = await mock_executor.terminal_read(
+        TerminalReadAction(session_id='terminal_1', mode='delta')
+    )
+
+    assert obs.__class__.__name__ == 'TerminalObservation'
+    mock_session.read_output_since.assert_called_once_with(77)
+    assert obs.next_offset == 99
+    assert mock_executor._terminal_read_cursor['terminal_1'] == 99
+
+
+@pytest.mark.asyncio
+async def test_terminal_input_post_read_uses_stored_cursor(mock_executor, tmp_path):
+    """After input, delta read must use session cursor so we do not re-read from 0."""
+    workspace = tmp_path / 'w'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+
+    offsets_seen: list[int] = []
+
+    def read_since(off: int):
+        offsets_seen.append(int(off))
+        return ('', 300, 0)
+
+    session = MagicMock()
+    session.cwd = str(workspace)
+    session.read_output_since = read_since
+    mock_executor.session_manager.get_session.return_value = session
+    mock_executor._terminal_read_cursor['t-cursor'] = 250
+
+    with patch(
+        'backend.execution.action_execution_server.asyncio.sleep', return_value=None
+    ):
+        obs = await mock_executor.terminal_input(
+            TerminalInputAction(session_id='t-cursor', control='enter')
+        )
+
+    assert obs.__class__.__name__ == 'TerminalObservation'
+    assert offsets_seen == [250]
+    assert obs.has_new_output is False
+    assert mock_executor._terminal_read_cursor['t-cursor'] == 300
+
+
+def test_pty_output_transcript_caption_notes_no_new_bytes_when_flag_false() -> None:
+    from backend.cli.event_renderer import _pty_output_transcript_caption
+
+    cap = _pty_output_transcript_caption(
+        session_id='t1',
+        n_lines=5,
+        truncated=False,
+        has_output=True,
+        raw='',
+        has_new_output=False,
+    )
+    assert 'no new bytes since last read' in cap

@@ -365,6 +365,21 @@ class PtyInteractiveShellSession(BaseShellSession):
             return ''
         return self._pty.read(consume=False)
 
+    def read_output_since(self, offset: int) -> tuple[str, int, int]:
+        """Return non-consuming output delta since ``offset``.
+
+        Returns:
+            tuple[str, int, int]:
+                - delta text
+                - next output cursor offset
+                - total dropped chars due to ring-buffer trimming
+        """
+        if self._pty is None:
+            return '', max(0, int(offset)), 0
+        safe_offset = max(0, int(offset))
+        text, next_offset = self._pty.read_since(safe_offset)
+        return text, next_offset, self._pty.dropped_chars
+
     def write_input(self, data: str, is_control: bool = False) -> None:
         """Write raw input or a named control sequence to the PTY.
 

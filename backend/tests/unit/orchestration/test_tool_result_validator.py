@@ -526,3 +526,23 @@ class TestObserve:
         await validator.observe(ctx, obs)
 
         assert 'validation_result' in ctx.metadata
+
+    @pytest.mark.asyncio
+    async def test_terminal_no_new_output_emits_no_progress_warning(self):
+        validator = ToolResultValidator()
+        action = MagicMock()
+        action.__class__.__name__ = 'TerminalReadAction'
+        obs = TerminalObservation(
+            session_id='terminal_1',
+            content='',
+            has_new_output=False,
+            next_offset=5,
+        )
+        controller = MagicMock()
+        state = MagicMock()
+        ctx = ToolInvocationContext(controller=controller, action=action, state=state)
+
+        await validator.observe(ctx, obs)
+
+        result = ctx.metadata['validation_result']
+        assert any('no new output' in w.lower() for w in result.warnings)

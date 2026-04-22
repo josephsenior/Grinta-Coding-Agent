@@ -257,6 +257,13 @@ class TerminalInputActionSchema(ActionSchemaV1):
         description='Text to send (optional if using only ``control`` and/or resize).',
     )
     is_control: bool = Field(default=False, description='Is control char (C-c, etc.)')
+    submit: bool = Field(
+        default=True,
+        description=(
+            'When True (default), append ``\\\\n`` to non-control ``input`` if it does '
+            'not already end with a newline. Set False for passwords or partial lines.'
+        ),
+    )
     control: str | None = Field(
         default=None,
         description=(

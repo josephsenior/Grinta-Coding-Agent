@@ -40,6 +40,7 @@ class StepGuardService:
     """Ensures controller steps are safe w.r.t. circuit breaker and stuck detection."""
 
     _WARNING_TRIP_COUNTS_KEY = '__step_guard_warning_trip_counts'
+    _REPLAN_REQUIRED_KEY = '__step_guard_replan_required'
 
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
@@ -135,6 +136,27 @@ class StepGuardService:
             return False
         return True
 
+    def _get_replan_flag(self, controller) -> bool:
+        state = getattr(controller, 'state', None)
+        if state is None:
+            return False
+        extra = getattr(state, 'extra_data', None)
+        if not isinstance(extra, dict):
+            return False
+        return bool(extra.get(self._REPLAN_REQUIRED_KEY, False))
+
+    def _set_replan_flag(self, controller, value: bool) -> None:
+        state = getattr(controller, 'state', None)
+        if state is None:
+            return
+        if not hasattr(state, 'extra_data') or not isinstance(state.extra_data, dict):
+            state.extra_data = {}
+        state.extra_data[self._REPLAN_REQUIRED_KEY] = bool(value)
+        if hasattr(state, 'set_extra'):
+            state.set_extra(
+                self._REPLAN_REQUIRED_KEY, bool(value), source='StepGuardService'
+            )
+
     async def _check_circuit_breaker(self, controller) -> bool | None:
         cb_service = getattr(controller, 'circuit_breaker_service', None)
         if not cb_service:
@@ -217,6 +239,12 @@ class StepGuardService:
         if not stuck_service:
             return True
 
+        # Deterministic control-state transition: once stuck is detected,
+        # force one planner re-entry turn before normal action flow resumes.
+        if self._get_replan_flag(controller):
+            self._set_replan_flag(controller, False)
+            return True
+
         # Always compute and expose the repetition score for proactive self-correction
         rep_score = stuck_service.compute_repetition_score()
         state = getattr(controller, 'state', None)
@@ -235,8 +263,9 @@ class StepGuardService:
         # Inject a replan directive; let the circuit breaker handle
         # escalation and eventual stopping.
         logger.warning('Stuck detected — injecting replan directive')
+        self._set_replan_flag(controller, True)
         self._inject_replan_directive(controller)
-        return True
+        return False
 
     @staticmethod
     def _normalize_path(p: str) -> str:

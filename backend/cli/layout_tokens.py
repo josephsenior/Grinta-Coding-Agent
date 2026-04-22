@@ -25,6 +25,20 @@ ACTIVITY_PANEL_PADDING = (0, 1)
 # to provide a small visual gap between adjacent activity cards.
 ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 2, 0)
 
+# User-facing activity card titles (rounded panels under "Tools & commands").
+# Keep these short Title Case nouns so the transcript scans consistently.
+ACTIVITY_CARD_TITLE_FILES = 'Files'
+ACTIVITY_CARD_TITLE_TERMINAL = 'Terminal'
+ACTIVITY_CARD_TITLE_BROWSER = 'Browser'
+ACTIVITY_CARD_TITLE_MCP = 'MCP'
+ACTIVITY_CARD_TITLE_MEMORY = 'Memory'
+ACTIVITY_CARD_TITLE_CODE = 'Code'
+ACTIVITY_CARD_TITLE_DELEGATION = 'Delegation'
+ACTIVITY_CARD_TITLE_CHECKPOINT = 'Checkpoint'
+ACTIVITY_CARD_TITLE_SEARCH = 'Search'
+ACTIVITY_CARD_TITLE_TOOL = 'Tool'
+ACTIVITY_CARD_TITLE_SHELL = 'Shell'
+
 
 def frame_transcript_body(renderable: Any) -> Any:
     """Left/right inset for committed transcript blocks."""

@@ -6,7 +6,9 @@ import asyncio
 import contextlib
 import logging
 import os
+import re
 import shutil
+import subprocess
 import sys
 import time
 from dataclasses import dataclass
@@ -110,6 +112,12 @@ _SLASH_COMMANDS = (
     ),
     SlashCommandSpec(
         '/status', 'Show the current HUD snapshot', '/status', help_section='control'
+    ),
+    SlashCommandSpec(
+        '/copy',
+        'Copy last assistant message to system clipboard',
+        '/copy',
+        help_section='control',
     ),
     SlashCommandSpec(
         '/clear', 'Clear the visible transcript', '/clear', help_section='control'
@@ -224,6 +232,125 @@ def _closest_command_names(command: str, *, limit: int = 2) -> list[str]:
         if match not in suggestions:
             suggestions.append(match)
     return suggestions
+
+
+def _copy_to_system_clipboard(text: str) -> tuple[bool, str]:
+    """Copy plain text to OS clipboard with multi-platform fallbacks."""
+    if not text.strip():
+        return False, 'No assistant reply available to copy yet.'
+
+    try:
+        import pyperclip  # type: ignore
+
+        pyperclip.copy(text)
+        return True, 'Copied last assistant reply to clipboard.'
+    except Exception:
+        pass
+
+    candidates: list[list[str]] = []
+    if sys.platform.startswith('win'):
+        candidates = [['clip']]
+    elif sys.platform == 'darwin':
+        candidates = [['pbcopy']]
+    else:
+        candidates = [['wl-copy'], ['xclip', '-selection', 'clipboard'], ['xsel', '--clipboard', '--input']]
+
+    for cmd in candidates:
+        if not shutil.which(cmd[0]):
+            continue
+        try:
+            subprocess.run(cmd, input=text, text=True, check=True)
+            return True, 'Copied last assistant reply to clipboard.'
+        except Exception:
+            continue
+
+    return (
+        False,
+        'Clipboard copy failed. Install `pyperclip` (recommended) or a system clipboard tool and retry.',
+    )
+
+
+# Leaked bracket-param sequences (e.g. Windows Terminal / ConPTY) — often no ESC.
+_ORPHAN_BRACKET_CSI = re.compile(
+    r'\[+(?:\d+;){2,}[\d;:_\s-]*[OI]?(?=\[|$| |\Z)',
+    re.MULTILINE,
+)
+# Bracketless leaked parameter chunks seen in some ConPTY/Cursor terminals:
+# e.g. ``0;1;40;1_0;0;32;1_8;1;32;1_``.
+_ORPHAN_PARAM_CHUNK_STREAM = re.compile(
+    r'(?<![A-Za-z0-9])(?:\[?(?:\d+;){2,}\d+[OI]?_){2,}',
+    re.MULTILINE,
+)
+_ORPHAN_PARAM_CHUNK_SINGLE = re.compile(
+    r'(?<![A-Za-z0-9])\[?(?:\d+;){4,}\d+[OI]?_',
+    re.MULTILINE,
+)
+# Well-formed 7-bit CSI and OSC (bell or ST-terminated).
+_CSI_OSC_DCS = re.compile(
+    r'(?:\x1B\][^\x07\x1B]*(?:\x07|\x1B\\))'
+    r'|(?:\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))',
+    re.DOTALL,
+)
+
+
+def _strip_leaked_terminal_artifacts(text: str) -> str:
+    """Remove terminal escape/CSI leaks the host injects (e.g. after Ctrl+C + selection)."""
+    if not text:
+        return text
+    out = text
+    for _ in range(16):
+        prev = out
+        out = _CSI_OSC_DCS.sub('', out)
+        out = _ORPHAN_BRACKET_CSI.sub('', out)
+        out = _ORPHAN_PARAM_CHUNK_STREAM.sub('', out)
+        out = _ORPHAN_PARAM_CHUNK_SINGLE.sub('', out)
+        # focus in/out and similar two-letter CSI finals without a leading esc byte
+        out = re.sub(r'\[+(?:O|I)+', '', out)
+        if out == prev:
+            break
+    return out
+
+
+def _looks_like_terminal_selection_noise(text: str) -> bool:
+    """Best-effort: whole buffer is only leaked terminal control noise."""
+    sample = (text or '').strip()
+    if len(sample) < 8:
+        return False
+    cleaned = _strip_leaked_terminal_artifacts(sample)
+    return not cleaned.strip()
+
+
+def _attach_prompt_buffer_csi_sanitizer(session: Any) -> None:
+    """Strip host-injected control-sequence text from the line buffer in real time.
+
+    Without this, leaked ``[nn;...`` sequences from the terminal appear *in* the
+    input line; filtering only on submit is too late for the user.
+    """
+    buf = getattr(session, 'default_buffer', None)
+    if buf is None:
+        return
+    from prompt_toolkit.document import Document
+
+    sinking = [False]
+
+    def _on_text_changed(_: object) -> None:
+        if sinking[0]:
+            return
+        current = buf.text
+        clean = _strip_leaked_terminal_artifacts(current)
+        if clean == current:
+            return
+        sinking[0] = True
+        try:
+            pos = min(buf.cursor_position, len(clean))
+            buf.document = Document(clean, pos)
+        finally:
+            sinking[0] = False
+
+    try:
+        buf.on_text_changed += _on_text_changed
+    except Exception:  # pragma: no cover
+        logger.debug('Could not attach CSI sanitizer to prompt buffer', exc_info=True)
 
 
 def _build_command_completer(
@@ -804,6 +931,7 @@ class Repl:
             reserve_space_for_menu=8,
             enable_history_search=True,
             multiline=False,
+            mouse_support=False,
             style=prompt_style,
             erase_when_done=True,
             placeholder=self._prompt_placeholder,
@@ -902,6 +1030,7 @@ class Repl:
             session: Any | None = None
             if _supports_prompt_session(sys.stdin, sys.stdout):
                 session = self._create_prompt_session()
+                _attach_prompt_buffer_csi_sanitizer(session)
             self._pt_session = session
 
             # -- renderer (no event-stream subscription yet) ------------------
@@ -1070,12 +1199,14 @@ class Repl:
             # -- enter input loop ---------------------------------------------
             controller = None
             bootstrap_task = None
+            # RATE_LIMITED is intentionally omitted: the retry worker resumes the
+            # agent after backoff; run_agent_until_done must keep running until a
+            # true terminal state so controller.step() chains stay attached.
             end_states = [
                 AgentState.AWAITING_USER_INPUT,
                 AgentState.FINISHED,
                 AgentState.ERROR,
                 AgentState.STOPPED,
-                AgentState.RATE_LIMITED,
             ]
 
             self._hud.update_ledger('Starting')
@@ -1120,6 +1251,13 @@ class Repl:
 
                 text = user_input.strip()
                 if not text:
+                    continue
+                if _looks_like_terminal_selection_noise(text):
+                    if self._renderer is not None:
+                        self._renderer.add_system_message(
+                            'Ignored terminal control sequence noise from selection/copy input.',
+                            title='warning',
+                        )
                     continue
 
                 if text.startswith('/'):
@@ -1183,24 +1321,28 @@ class Repl:
                     break
 
                 # -- user message: start Live for agent turn
-                # Print the user message statically since prompt_toolkit erases it
                 self._set_footer_system_line('')
                 if self._next_action is not None:
                     initial_action = self._next_action
                     self._next_action = None
                     msg_content = getattr(initial_action, 'content', None)
                     if msg_content is not None:
+                        # Start Live before committing the user bubble to scrollback.
+                        # Printing first then starting Live can erase the bubble on some
+                        # terminals (Rich redraw vs prompt_toolkit run_in_terminal).
+                        self._renderer.start_live()
                         await self._renderer.add_user_message(str(msg_content))
                     else:
                         if self._renderer is not None:
                             self._renderer.add_system_message(
                                 'Condensing context\u2026', title='grinta'
                             )
+                        self._renderer.start_live()
                 else:
                     self._last_user_message = text
+                    self._renderer.start_live()
                     await self._renderer.add_user_message(text)
                     initial_action = MessageAction(content=text)
-                self._renderer.start_live()
                 self._renderer.begin_turn()
 
                 controller, agent_task = await self._ensure_controller_loop(
@@ -1330,13 +1472,14 @@ class Repl:
         sync with the agent.  A brief yield after task completion is enough to
         let any in-flight deliveries finish.
         """
+        # RATE_LIMITED is not idle: we wait here while RetryService backoff runs,
+        # then RUNNING resumes until the user-facing terminal states below.
         idle_states = {
             AgentState.AWAITING_USER_INPUT,
             AgentState.FINISHED,
             AgentState.ERROR,
             AgentState.STOPPED,
             AgentState.REJECTED,
-            AgentState.RATE_LIMITED,  # Keep the loop attached during background retries
         }
 
         # Disabled by default to avoid aborting long-running sessions.
@@ -1748,6 +1891,19 @@ class Repl:
             if self._renderer is not None:
                 self._renderer.add_system_message(
                     self._hud.plain_text(), title='status'
+                )
+            return True
+
+        if cmd == '/copy':
+            last_reply = (
+                self._renderer.last_assistant_message_text
+                if self._renderer is not None
+                else ''
+            )
+            ok, msg = _copy_to_system_clipboard(last_reply)
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    msg, title='clipboard' if ok else 'warning'
                 )
             return True
 

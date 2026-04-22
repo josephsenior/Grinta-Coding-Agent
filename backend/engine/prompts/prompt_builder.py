@@ -279,10 +279,16 @@ def _render_tool_reference(is_windows: bool, config: Any = None) -> str:
     )
 
 
-def _render_critical(terminal_command_tool: str) -> str:
+def _render_critical(terminal_command_tool: str, *, enable_think: bool) -> str:
     """Render last-mile critical execution rules with dynamic terminal tool naming."""
+    think_execution_rule = (
+        '**`think` does not execute** — after reasoning, you must still call tools.'
+        if enable_think
+        else '**Reasoning alone does not execute** — after reasoning, you must still call tools.'
+    )
     return _load('system_partial_04_critical.md').format(
-        terminal_command_tool=terminal_command_tool
+        terminal_command_tool=terminal_command_tool,
+        think_execution_rule=think_execution_rule,
     )
 
 
@@ -361,6 +367,7 @@ def _render_mcp_and_permissions(
 
     # Static tail sections
     meta_cognition = getattr(config, 'enable_meta_cognition', False)
+    enable_think = bool(getattr(config, 'enable_think', False))
     communicate_tool_section = (
         '<COMMUNICATE_TOOL>\n'
         'Use `communicate_with_user` to ask for clarification, flag uncertainty, propose options '
@@ -386,10 +393,19 @@ def _render_mcp_and_permissions(
             'not shell search/read of repo files. Do NOT ask the user first.'
         )
     parts.append('')
+    thinking_tool_section = (
+        '<THINKING_TOOL>\n'
+        'Use the `think` tool for multi-step planning, complex debugging, or architecture trade-off analysis. '
+        '`think` records reasoning only; it does not execute actions.\n'
+        '</THINKING_TOOL>'
+        if enable_think
+        else ''
+    )
     parts.append(
         _load('system_partial_03_tail.md').format(
             communicate_tool_section=communicate_tool_section,
             uncertainty_state_1_discover_line=uncertainty_state_1_discover_line,
+            thinking_tool_section=thinking_tool_section,
         )
     )
 
@@ -555,7 +571,13 @@ def _collect_system_prompt_sections(
                 config,
             ),
         ),
-        ('system_partial_04_critical', _render_critical(resolved_terminal_tool)),
+        (
+            'system_partial_04_critical',
+            _render_critical(
+                resolved_terminal_tool,
+                enable_think=bool(getattr(config, 'enable_think', False)),
+            ),
+        ),
     ]
     return sections
 

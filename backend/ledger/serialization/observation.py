@@ -128,7 +128,7 @@ from backend.ledger.serialization.common import (  # noqa: E402
 )
 
 
-def _extract_observation_data(observation: dict) -> tuple[str, dict, dict]:
+def _extract_observation_data(observation: dict) -> tuple[str, dict, dict, dict | None]:
     """Extract content, extras, and metadata from observation dict."""
     observation.pop('observation')
     observation.pop('message', None)
@@ -146,14 +146,15 @@ def _extract_observation_data(observation: dict) -> tuple[str, dict, dict]:
         else:
             extras.pop(field, None)
 
-    # Remove transient runtime-only fields that are set as attributes after
-    # construction and must not be passed back to __init__ on deserialization.
-    observation.pop('tool_result', None)
+    # Keep structured tool_result payload across serialization/deserialization,
+    # but apply it post-init because dataclass constructors do not accept it.
+    raw_tool_result = observation.pop('tool_result', None)
+    tool_result = raw_tool_result if isinstance(raw_tool_result, dict) else None
 
     # Remaining keys (e.g., command, metadata) should be treated as extras/kwargs
     if observation:
         extras.update(observation)
-    return content, extras, metadata
+    return content, extras, metadata, tool_result
 
 
 def _process_cmd_output_metadata(extras: dict) -> None:
@@ -198,7 +199,7 @@ def observation_from_dict(observation: dict) -> Observation:
     observation = observation.copy()
     _validate_observation_dict(observation)
     observation_class = _get_observation_class(observation['observation'])
-    content, extras, metadata = _extract_observation_data(observation)
+    content, extras, metadata, tool_result = _extract_observation_data(observation)
 
     if observation_class.__name__ == 'CmdOutputObservation':
         _process_cmd_output_metadata(extras)
@@ -208,4 +209,6 @@ def observation_from_dict(observation: dict) -> Observation:
     obs = observation_class(content=content, **extras)
     for attr, value in metadata.items():
         setattr(obs, attr, value)
+    if tool_result is not None:
+        obs.tool_result = dict(tool_result)
     return obs

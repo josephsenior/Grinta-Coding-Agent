@@ -1258,6 +1258,40 @@ async def test_wait_for_agent_idle_default_timeout_disabled(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
+async def test_wait_for_agent_idle_rate_limited_not_treated_as_idle() -> None:
+    """RATE_LIMITED must not end _wait_for_agent_idle while backoff is pending.
+
+    Regression: including RATE_LIMITED in idle_states returned to the prompt
+    immediately even though RetryService had scheduled an automatic resume.
+    """
+    repl = Repl(_make_config(), _make_console())
+    repl.set_renderer(None)
+    controller = MagicMock()
+
+    calls = {'n': 0}
+
+    def _state() -> AgentState:
+        calls['n'] += 1
+        if calls['n'] < 8:
+            return AgentState.RATE_LIMITED
+        return AgentState.AWAITING_USER_INPUT
+
+    controller.get_agent_state.side_effect = _state
+
+    async def never_finish() -> None:
+        await asyncio.sleep(999)
+
+    agent_task = asyncio.create_task(never_finish())
+    await repl._wait_for_agent_idle(controller, agent_task)
+
+    agent_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await agent_task
+
+    assert calls['n'] >= 8
+
+
+@pytest.mark.asyncio
 async def test_repl_run_shows_ready_before_background_bootstrap() -> None:
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
     events: list[str] = []

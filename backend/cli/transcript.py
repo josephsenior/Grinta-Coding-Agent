@@ -17,11 +17,16 @@ from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
 
-from backend.cli.layout_tokens import ACTIVITY_PANEL_PADDING, CALLOUT_PANEL_PADDING
+from backend.cli.layout_tokens import (
+    ACTIVITY_CARD_TITLE_TERMINAL,
+    ACTIVITY_PANEL_PADDING,
+    CALLOUT_PANEL_PADDING,
+)
 
 # Stripped from user-visible transcripts (still present on stored observations for the LLM).
+# Handles well-formed closers and streaming/unclosed fragments (``.*?`` then ``\Z``).
 _APP_RESULT_VALIDATION_RE = re.compile(
-    r'\s*<APP_RESULT_VALIDATION\b[^>]*>.*?</APP_RESULT_VALIDATION>',
+    r'\s*<APP_RESULT_VALIDATION\b[^>]*>.*?(?:</APP_RESULT_VALIDATION>|\Z)',
     re.DOTALL | re.IGNORECASE,
 )
 
@@ -200,7 +205,7 @@ def format_activity_shell_block(
         result_message=result_message,
         result_kind=result_kind,
         extra_lines=extra_lines,
-        title=title or 'Terminal',
+        title=title or ACTIVITY_CARD_TITLE_TERMINAL,
     )
 
 

@@ -153,8 +153,18 @@ class TestActionFromDict:
         assert isinstance(evt, TerminalInputAction)
         assert evt.session_id == 's1'
         assert evt.input == 'echo hi'
+        assert evt.submit is True
         assert evt.rows == 30
         assert evt.cols == 100
+
+    def test_terminal_input_action_submit_false(self):
+        d = {
+            'action': 'terminal_input',
+            'args': {'session_id': 's1', 'input': 'secret', 'submit': False},
+        }
+        evt = action_from_dict(d)
+        assert isinstance(evt, TerminalInputAction)
+        assert evt.submit is False
 
     def test_terminal_read_action(self):
         d = {'action': 'terminal_read', 'args': {'session_id': 's2'}}

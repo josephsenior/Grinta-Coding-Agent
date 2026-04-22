@@ -183,6 +183,12 @@ class RuntimeExecutor:
         self._last_cmd_failure_signature: tuple[str, int, str] | None = None
         self._same_cmd_failure_count: int = 0
         self._terminal_session_seq: int = 0
+        self._terminal_sessions_awaiting_interaction: list[str] = []
+        self._terminal_open_commands_no_interaction: list[str] = []
+        # Per interactive session: last delta-read byte cursor (``next_offset`` from PTY).
+        # Keeps ``terminal_input`` post-write reads from using offset=0, which would
+        # re-fetch the whole retained buffer and falsely signal progress every time.
+        self._terminal_read_cursor: dict[str, int] = {}
 
         # MCP clients are created lazily on first use.
         self._mcp_config = mcp_config
@@ -377,6 +383,7 @@ class RuntimeExecutor:
             return None
 
         self.session_manager.close_session(session_id)
+        self._clear_terminal_read_cursor(session_id)
         return ErrorObservation(
             content=(
                 'Interactive terminal session closed by hardened_local policy: '
@@ -951,6 +958,45 @@ class RuntimeExecutor:
             if candidate not in existing_ids:
                 return candidate
 
+    @staticmethod
+    def _normalize_terminal_command(command: str) -> str:
+        """Normalize command text for loop detection comparisons."""
+        return ' '.join((command or '').strip().lower().split())
+
+    def _mark_terminal_session_interaction(self, session_id: str) -> None:
+        """Mark a terminal session as used (read/input happened)."""
+        if session_id in self._terminal_sessions_awaiting_interaction:
+            self._terminal_sessions_awaiting_interaction = [
+                sid
+                for sid in self._terminal_sessions_awaiting_interaction
+                if sid != session_id
+            ]
+        # Once progress is made, clear no-interaction open history so new batches are valid.
+        self._terminal_open_commands_no_interaction.clear()
+
+    def _terminal_open_guardrail_error(self, command: str) -> ErrorObservation | None:
+        """Block pathological open-only loops while allowing valid batch session opens."""
+        pending = list(self._terminal_sessions_awaiting_interaction)
+        if len(pending) < 3:
+            return None
+
+        normalized = self._normalize_terminal_command(command)
+        recent = self._terminal_open_commands_no_interaction[-3:]
+        # Repetitive opens with no reads/inputs usually indicate a stuck loop.
+        repetitive = bool(recent) and all(c == normalized for c in recent)
+
+        # Hard cap keeps runaway loops bounded even if commands vary.
+        if not repetitive and len(pending) < 6:
+            return None
+
+        sample_ids = ', '.join(pending[:8]) if pending else 'none'
+        return ErrorObservation(
+            'terminal_manager open loop detected: multiple sessions were opened but '
+            'none were used via action=read or action=input. '
+            f'Current command={command!r}. '
+            f'Use one of these existing session_id values next: {sample_ids}.'
+        )
+
     def _missing_terminal_session_error(
         self, session_id: str, *, operation: str
     ) -> ErrorObservation:
@@ -976,9 +1022,86 @@ class RuntimeExecutor:
             f'Do not invent IDs like terminal_session_0. {suggestion}'
         )
 
+    @staticmethod
+    def _terminal_mode(mode: str | None) -> str:
+        normalized = (mode or 'delta').strip().lower()
+        if normalized not in {'delta', 'snapshot'}:
+            return 'delta'
+        return normalized
+
+    @staticmethod
+    def _terminal_read_empty_hints(*, mode: str, has_new_output: bool) -> dict[str, Any]:
+        """Structured hints when a read returns no new bytes (honest, not heuristics)."""
+        if has_new_output:
+            return {}
+        if mode == 'delta':
+            return {
+                'delta_empty': True,
+                'empty_reason': 'no_new_bytes_since_offset',
+            }
+        return {
+            'snapshot_empty': True,
+            'empty_reason': 'no_printable_output_in_buffer',
+        }
+
+    def _read_terminal_with_mode(
+        self,
+        *,
+        session: Any,
+        mode: str,
+        offset: int | None,
+    ) -> tuple[str, int | None, bool, int | None]:
+        """Read terminal output using either delta cursor or snapshot semantics."""
+        if mode == 'snapshot':
+            content = session.read_output()
+            has_new_output = bool((content or '').strip())
+            return content, None, has_new_output, None
+
+        safe_offset = max(0, int(offset or 0))
+        read_since = getattr(session, 'read_output_since', None)
+        if callable(read_since):
+            try:
+                result = read_since(safe_offset)
+                if (
+                    isinstance(result, tuple)
+                    and len(result) == 3
+                    and isinstance(result[0], str)
+                ):
+                    content, next_offset, dropped_chars = result
+                else:
+                    raise ValueError('invalid read_output_since result shape')
+            except Exception:
+                content = session.read_output()
+                next_offset = len(content or '')
+                dropped_chars = None
+        else:
+            # Fallback for older/alternate session implementations.
+            content = session.read_output()
+            next_offset = len(content or '')
+            dropped_chars = None
+        has_new_output = bool(content)
+        return content, int(next_offset), has_new_output, dropped_chars
+
+    def _get_terminal_read_cursor(self, session_id: str) -> int:
+        return int(self._terminal_read_cursor.get(session_id, 0))
+
+    def _advance_terminal_read_cursor(
+        self, session_id: str, next_offset: int | None, *, mode: str = 'delta'
+    ) -> None:
+        if (mode or '').lower() != 'delta' or next_offset is None:
+            return
+        self._terminal_read_cursor[session_id] = int(next_offset)
+
+    def _clear_terminal_read_cursor(self, session_id: str) -> None:
+        self._terminal_read_cursor.pop(session_id, None)
+
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         """Start a new interactive terminal session."""
         try:
+            guard_err = self._terminal_open_guardrail_error(action.command or '')
+            if guard_err is not None:
+                return guard_err
+
             # Generate a simple human-friendly session ID.
             session_id = self._next_terminal_session_id()
 
@@ -1014,6 +1137,7 @@ class RuntimeExecutor:
             )
             if resize_err is not None:
                 self.session_manager.close_session(session_id)
+                self._clear_terminal_read_cursor(session_id)
                 return resize_err
 
             if action.command:
@@ -1025,6 +1149,7 @@ class RuntimeExecutor:
                 )
                 if policy_error is not None:
                     self.session_manager.close_session(session_id)
+                    self._clear_terminal_read_cursor(session_id)
                     return policy_error
                 # Send the initial command if provided
                 logger.debug(
@@ -1038,9 +1163,48 @@ class RuntimeExecutor:
                 if predicted_cwd is not None and hasattr(session, '_cwd'):
                     session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
 
-            # Return initial output
-            content = session.read_output()
-            return TerminalObservation(session_id=session_id, content=content)
+            # Return initial output as typed structured envelope.
+            content, next_offset, has_new_output, dropped_chars = (
+                self._read_terminal_with_mode(
+                    session=session,
+                    mode='delta',
+                    offset=0,
+                )
+            )
+            self._terminal_sessions_awaiting_interaction.append(session_id)
+            self._terminal_open_commands_no_interaction.append(
+                self._normalize_terminal_command(action.command or '')
+            )
+            obs = TerminalObservation(
+                session_id=session_id,
+                content=content,
+                next_offset=next_offset,
+                has_new_output=has_new_output,
+                dropped_chars=dropped_chars,
+                state='SESSION_OPENED',
+            )
+            empty_hints = self._terminal_read_empty_hints(
+                mode='delta', has_new_output=has_new_output
+            )
+            obs.tool_result = {
+                'tool': 'terminal_manager',
+                'ok': True,
+                'error_code': None,
+                'retryable': False,
+                'state': 'SESSION_OPENED',
+                'next_actions': ['read', 'input'],
+                'payload': {
+                    'session_id': session_id,
+                    'mode': 'delta',
+                    'next_offset': next_offset,
+                    'has_new_output': has_new_output,
+                    'dropped_chars': dropped_chars,
+                    **empty_hints,
+                },
+                'progress': bool(has_new_output),
+            }
+            self._advance_terminal_read_cursor(session_id, next_offset, mode='delta')
+            return obs
 
         except Exception as e:
             logger.error('Error starting terminal session: %s', e, exc_info=True)
@@ -1074,22 +1238,71 @@ class RuntimeExecutor:
             predicted_cwd: Path | None = None
             if write_content:
                 if not action.is_control:
+                    policy_line = write_content.rstrip('\r\n')
                     predicted_cwd, policy_error = (
                         self._evaluate_interactive_terminal_command(
-                            write_content,
+                            policy_line,
                             Path(getattr(session, 'cwd', self._initial_cwd)).resolve(),
                         )
                     )
                     if policy_error is not None:
                         return policy_error
 
-                session.write_input(write_content, is_control=action.is_control)
+                to_send = write_content
+                if (
+                    action.submit
+                    and not action.is_control
+                    and to_send
+                    and not to_send.endswith(('\n', '\r\n'))
+                ):
+                    to_send = f'{to_send}\n'
+
+                session.write_input(to_send, is_control=action.is_control)
             if predicted_cwd is not None and hasattr(session, '_cwd'):
                 session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
             # Wait briefly for output to appear
             await asyncio.sleep(0.2)
-            content = session.read_output()
-            return TerminalObservation(session_id=action.session_id, content=content)
+            read_offset = self._get_terminal_read_cursor(action.session_id)
+            content, next_offset, has_new_output, dropped_chars = (
+                self._read_terminal_with_mode(
+                    session=session,
+                    mode='delta',
+                    offset=read_offset,
+                )
+            )
+            self._advance_terminal_read_cursor(
+                action.session_id, next_offset, mode='delta'
+            )
+            self._mark_terminal_session_interaction(action.session_id)
+            empty_hints = self._terminal_read_empty_hints(
+                mode='delta', has_new_output=has_new_output
+            )
+            obs = TerminalObservation(
+                session_id=action.session_id,
+                content=content,
+                next_offset=next_offset,
+                has_new_output=has_new_output,
+                dropped_chars=dropped_chars,
+                state='SESSION_INTERACTED',
+            )
+            obs.tool_result = {
+                'tool': 'terminal_manager',
+                'ok': True,
+                'error_code': None,
+                'retryable': False,
+                'state': 'SESSION_INTERACTED',
+                'next_actions': ['read', 'input'],
+                'payload': {
+                    'session_id': action.session_id,
+                    'mode': 'delta',
+                    'next_offset': next_offset,
+                    'has_new_output': has_new_output,
+                    'dropped_chars': dropped_chars,
+                    **empty_hints,
+                },
+                'progress': bool(has_new_output),
+            }
+            return obs
         except Exception as e:
             logger.error('Error sending input to terminal %s: %s', action.session_id, e)
             return ErrorObservation(f'Failed to send input: {e}')
@@ -1115,8 +1328,59 @@ class RuntimeExecutor:
             if resize_err is not None:
                 return resize_err
 
-            content = session.read_output()
-            return TerminalObservation(session_id=action.session_id, content=content)
+            mode = self._terminal_mode(action.mode)
+            read_offset = (
+                action.offset
+                if action.offset is not None
+                else (
+                    self._get_terminal_read_cursor(action.session_id)
+                    if mode == 'delta'
+                    else 0
+                )
+            )
+            content, next_offset, has_new_output, dropped_chars = (
+                self._read_terminal_with_mode(
+                    session=session,
+                    mode=mode,
+                    offset=read_offset,
+                )
+            )
+            self._advance_terminal_read_cursor(action.session_id, next_offset, mode=mode)
+            self._mark_terminal_session_interaction(action.session_id)
+            empty_hints = self._terminal_read_empty_hints(
+                mode=mode, has_new_output=has_new_output
+            )
+            obs = TerminalObservation(
+                session_id=action.session_id,
+                content=content,
+                next_offset=next_offset,
+                has_new_output=has_new_output,
+                dropped_chars=dropped_chars,
+                state='SESSION_OUTPUT_DELTA' if mode == 'delta' else 'SESSION_OUTPUT_SNAPSHOT',
+            )
+            obs.tool_result = {
+                'tool': 'terminal_manager',
+                'ok': True,
+                'error_code': None,
+                'retryable': False,
+                'state': (
+                    'SESSION_OUTPUT_DELTA'
+                    if mode == 'delta'
+                    else 'SESSION_OUTPUT_SNAPSHOT'
+                ),
+                'next_actions': ['read', 'input'],
+                'payload': {
+                    'session_id': action.session_id,
+                    'mode': mode,
+                    'request_offset': action.offset,
+                    'next_offset': next_offset,
+                    'has_new_output': has_new_output,
+                    'dropped_chars': dropped_chars,
+                    **empty_hints,
+                },
+                'progress': bool(has_new_output),
+            }
+            return obs
         except Exception as e:
             logger.error('Error reading terminal %s: %s', action.session_id, e)
             return ErrorObservation(f'Failed to read terminal: {e}')

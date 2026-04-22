@@ -33,6 +33,17 @@ from rich.text import Text
 from backend.cli.hud import HUDBar
 from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
+    ACTIVITY_CARD_TITLE_BROWSER,
+    ACTIVITY_CARD_TITLE_CHECKPOINT,
+    ACTIVITY_CARD_TITLE_CODE,
+    ACTIVITY_CARD_TITLE_DELEGATION,
+    ACTIVITY_CARD_TITLE_FILES,
+    ACTIVITY_CARD_TITLE_MEMORY,
+    ACTIVITY_CARD_TITLE_MCP,
+    ACTIVITY_CARD_TITLE_SEARCH,
+    ACTIVITY_CARD_TITLE_SHELL,
+    ACTIVITY_CARD_TITLE_TERMINAL,
+    ACTIVITY_CARD_TITLE_TOOL,
     ACTIVITY_PANEL_PADDING,
     CALLOUT_PANEL_PADDING,
     TRANSCRIPT_LEFT_INSET,
@@ -645,6 +656,7 @@ _IDLE_STATES = {
 
 # Provider / network / quota issues: calm “notice” styling (cyan) instead of red.
 _RECOVERABLE_NOTICE_FRAGMENTS = (
+    'stuck loop detected',
     'timeout',
     'timed out',
     'did not answer before',
@@ -788,6 +800,47 @@ def _error_panel_text_wrap_width(console_width: int | None) -> int | None:
     area = max(20, console_width - TRANSCRIPT_LEFT_INSET - TRANSCRIPT_RIGHT_INSET)
     inner = area - 2 - 4
     return max(16, inner)
+
+
+def _pty_output_transcript_caption(
+    *,
+    session_id: str,
+    n_lines: int,
+    truncated: bool,
+    has_output: bool,
+    raw: str,
+    has_new_output: bool | None = None,
+) -> str:
+    """One line for the transcript: session, line count, optional validator hint (from raw XML)."""
+    m = re.search(
+        r'<APP_RESULT_VALIDATION[^>]*>[\s\S]*?warnings?:\s*([^\n<]+)',
+        raw,
+        re.IGNORECASE | re.DOTALL,
+    )
+    hint = ''
+    if m:
+        w = m.group(1).strip()
+        if len(w) > 100:
+            w = w[:97] + '…'
+        hint = w
+    parts: list[str] = [f'{ACTIVITY_CARD_TITLE_TERMINAL.lower()} output']
+    if session_id:
+        parts.append(session_id)
+    if has_output and n_lines:
+        if has_new_output is False:
+            parts.append(
+                f'{n_lines} line{"s" if n_lines != 1 else ""} · no new bytes since last read'
+            )
+        else:
+            parts.append(f'{n_lines} line{"s" if n_lines != 1 else ""}')
+    elif not has_output and session_id and n_lines == 0:
+        parts.append('no new text')
+    if truncated:
+        parts.append('truncated')
+    line = ' · '.join(parts)
+    if hint:
+        return f'{line} — {hint}'
+    return line
 
 
 def _wrap_panel_text_block(text: str, *, wrap_width: int | None) -> str:
@@ -1057,6 +1110,21 @@ def _error_guidance(error_text: str) -> ErrorGuidance | None:
                 'If it fails again, use the detail above to inspect the specific exception.',
             ),
         )
+    if _contains_any(
+        lower,
+        (
+            'stuck loop detected',
+            'stuck recovery:',
+            'mandatory recovery:',
+        ),
+    ):
+        return ErrorGuidance(
+            summary='The model repeated the same action without new output.',
+            steps=(
+                'It is being nudged to read fresh state or run a different step.',
+                'You can wait, or add a short message to redirect it.',
+            ),
+        )
     return None
 
 
@@ -1109,6 +1177,8 @@ def _notice_panel_title(error_text: str) -> str:
         ('connection', 'unreachable', 'connect error', 'dns', 'ssl', 'certificate'),
     ):
         return 'Connection issue'
+    if 'stuck loop' in lower:
+        return 'Stuck pattern'
     if _contains_any(lower, ('timeout', 'timed out', 'did not answer')):
         return 'Request timed out'
     return 'Heads-up'
@@ -1223,6 +1293,55 @@ def _system_message_tag(title: str) -> tuple[str, str]:
     return f'[{label}]', 'cyan'
 
 
+def _normalize_system_title(title: str) -> str:
+    """Normalize arbitrary titles to stable, user-facing label casing."""
+    raw = (title or '').strip()
+    if not raw:
+        return 'Info'
+    lowered = raw.lower()
+    canonical = {
+        'grinta': 'System',
+        'system': 'System',
+        'warning': 'Warning',
+        'status': 'Status',
+        'error': 'Error',
+        'autonomy': 'Autonomy',
+        'model': 'Model',
+        'clipboard': 'Clipboard',
+    }
+    if lowered in canonical:
+        return canonical[lowered]
+    if 'timeout' in lowered:
+        return 'Timeout'
+    return raw[:1].upper() + raw[1:]
+
+
+def _build_system_notice_panel(
+    text: str,
+    *,
+    title: str,
+    tone: str = 'info',
+) -> Panel:
+    """Unified panel chrome for non-error system messages."""
+    normalized_title = _normalize_system_title(title)
+    tones: dict[str, tuple[str, str]] = {
+        'warning': ('#f59e0b', 'yellow'),
+        'success': ('#10b981', '#86efac'),
+        'info': ('#38bdf8', '#93c5fd'),
+    }
+    border_style, body_style = tones.get(tone, tones['info'])
+    panel_title = Text(normalized_title, style=f'bold {border_style}')
+    body = Text((text or '').strip(), style=body_style)
+    return Panel(
+        body,
+        title=panel_title,
+        title_align='left',
+        border_style=border_style,
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+
 class CLIEventRenderer:
     """Bridges EventStream → live rich layout.
 
@@ -1267,6 +1386,7 @@ class CLIEventRenderer:
         self._subscribed = False
         self._max_budget = max_budget
         self._pending_events: deque[Any] = deque()
+        self._last_assistant_message_text: str = ''
         self._budget_warned_80 = False
         self._budget_warned_100 = False
         # Per-turn metric snapshots (used to compute deltas at turn completion)
@@ -1324,6 +1444,11 @@ class CLIEventRenderer:
     @property
     def pending_event_count(self) -> int:
         return len(self._pending_events)
+
+    @property
+    def last_assistant_message_text(self) -> str:
+        """Most recent committed assistant message rendered in transcript."""
+        return self._last_assistant_message_text
 
     def set_cli_tool_icons(self, enabled: bool) -> None:
         """Toggle emoji tool headlines (e.g. after /settings)."""
@@ -1498,7 +1623,11 @@ class CLIEventRenderer:
         group = Group(spacer, framed, spacer)
 
         if self._live is not None:
+            # Same path as committed transcript lines during a turn: print into
+            # scrollback while Live is active, then refresh so the layout stays
+            # coherent (printing before Live started could be erased on refresh).
             self._console.print(group)
+            self.refresh(force=True)
             return
 
         sess: Any | None = None
@@ -1515,15 +1644,18 @@ class CLIEventRenderer:
         self._console.print(group)
 
     def add_system_message(self, text: str, *, title: str = 'Info') -> None:
-        lower_title = title.strip().lower()
+        normalized_title = _normalize_system_title(title)
+        lower_title = normalized_title.lower()
         if lower_title == 'error':
             use_notice = _use_recoverable_notice_style(text)
             self._print_or_buffer(
-                _build_error_panel(
-                    text,
-                    title='Error',
-                    force_notice=use_notice,
-                    content_width=self._console.width,
+                frame_transcript_body(
+                    _build_error_panel(
+                        text,
+                        title='Error',
+                        force_notice=use_notice,
+                        content_width=self._console.width,
+                    )
                 )
             )
             if use_notice:
@@ -1534,30 +1666,25 @@ class CLIEventRenderer:
             return
         if 'timeout' in lower_title:
             self._print_or_buffer(
-                _build_error_panel(
-                    text,
-                    title=title,
-                    force_notice=True,
-                    content_width=self._console.width,
+                frame_transcript_body(
+                    _build_error_panel(
+                        text,
+                        title=normalized_title,
+                        force_notice=True,
+                        content_width=self._console.width,
+                    )
                 )
             )
             self._hud.update_ledger('Idle')
             self._hud.update_agent_state('Ready')
             return
-        if lower_title == 'warning':
-            tag, color = _system_message_tag(title)
-            warning = Text()
-            warning.append(f'{tag} ', style=f'bold {color}')
-            warning.append(f'{title}: ', style=f'bold {color}')
-            warning.append(text, style=color)
-            self._print_or_buffer(warning)
-            return
-
-        tag, color = _system_message_tag(title)
-        message = Text()
-        message.append(f'{tag} ', style=f'bold {color}')
-        message.append(text, style='dim' if color == 'cyan' else color)
-        self._print_or_buffer(message)
+        tone = 'warning' if lower_title == 'warning' else 'info'
+        panel = _build_system_notice_panel(
+            text,
+            title=normalized_title,
+            tone=tone,
+        )
+        self._print_or_buffer(frame_transcript_body(panel))
 
     def add_markdown_block(self, title: str, text: str) -> None:
         from rich.rule import Rule
@@ -1954,14 +2081,14 @@ class CLIEventRenderer:
                 human_msg = _TOOL_RESULT_TAG_RE.sub('', human_msg).strip()
 
                 if source_tool == 'checkpoint':
-                    verb, title = 'Saved', 'Checkpoint'
+                    verb, title = 'Saved', ACTIVITY_CARD_TITLE_CHECKPOINT
                     # Use the tag's human message or a user-friendly default.
                     detail = human_msg or 'checkpoint'
                 elif source_tool == 'revert_to_checkpoint':
-                    verb, title = 'Reverted', 'Checkpoint'
+                    verb, title = 'Reverted', ACTIVITY_CARD_TITLE_CHECKPOINT
                     detail = human_msg or 'workspace reverted'
                 elif source_tool == 'search_code':
-                    verb, title = 'Search Code', 'Tool'
+                    verb, title = 'Search Code', ACTIVITY_CARD_TITLE_SEARCH
                     lines = [
                         ln
                         for ln in (human_msg or '').splitlines()
@@ -1980,7 +2107,7 @@ class CLIEventRenderer:
                         detail = f'Found {match_count} match lines.'
                 else:
                     verb = source_tool.replace('_', ' ').title()
-                    title = 'Tool'
+                    title = ACTIVITY_CARD_TITLE_TOOL
                     detail = str(human_msg)[:150] or source_tool
                 self._emit_activity_turn_header()
                 kind = 'err' if 'Failure' in (human_msg or '') else 'ok'
@@ -2024,7 +2151,7 @@ class CLIEventRenderer:
                 )
                 self._pending_shell_command = None
                 self._pending_shell_action = ('Ran', display_label)
-                self._pending_shell_title = headline or 'Shell'
+                self._pending_shell_title = headline or ACTIVITY_CARD_TITLE_SHELL
                 self._pending_shell_is_internal = True
                 self.refresh()
                 return
@@ -2069,7 +2196,7 @@ class CLIEventRenderer:
                 verb = 'Edited'
                 detail = path
             self._buffer_pending_activity(
-                title='File',
+                title=ACTIVITY_CARD_TITLE_FILES,
                 verb=verb,
                 detail=detail,
                 secondary=stats,
@@ -2088,7 +2215,7 @@ class CLIEventRenderer:
             content = getattr(action, 'content', '') or ''
             n_lines = len(content.splitlines()) if content else 0
             self._buffer_pending_activity(
-                title='File',
+                title=ACTIVITY_CARD_TITLE_FILES,
                 verb='Created',
                 detail=action.path,
                 kind='file_write',
@@ -2108,7 +2235,9 @@ class CLIEventRenderer:
             detail = query or 'workspace context'
             if len(detail) > 100:
                 detail = detail[:97] + '…'
-            self._print_activity('Recalled', detail, None, title='Memory')
+            self._print_activity(
+                'Recalled', detail, None, title=ACTIVITY_CARD_TITLE_MEMORY
+            )
             self.refresh()
             return
 
@@ -2128,7 +2257,7 @@ class CLIEventRenderer:
             else:
                 detail = path
             self._buffer_pending_activity(
-                title='File',
+                title=ACTIVITY_CARD_TITLE_FILES,
                 verb='Viewed',
                 detail=detail,
                 kind='file_read',
@@ -2147,7 +2276,7 @@ class CLIEventRenderer:
             args_dict = raw_args if isinstance(raw_args, dict) else {}
             verb, detail, stats = format_tool_activity_rows(name, args_dict)
             self._buffer_pending_activity(
-                title='MCP',
+                title=ACTIVITY_CARD_TITLE_MCP,
                 verb=verb,
                 detail=detail,
                 secondary=stats,
@@ -2168,7 +2297,9 @@ class CLIEventRenderer:
             params = getattr(action, 'params', None) or {}
             url = params.get('url') if isinstance(params, dict) else None
             detail = str(url)[:80] if url else str(cmd)
-            self._print_activity(str(cmd), detail, None, title='Browser')
+            self._print_activity(
+                str(cmd), detail, None, title=ACTIVITY_CARD_TITLE_BROWSER
+            )
             thought = getattr(action, 'thought', '') or ''
             _sync_reasoning_after_tool_line(self._reasoning, detail, thought)
             self.refresh()
@@ -2185,7 +2316,9 @@ class CLIEventRenderer:
                 detail = url
             else:
                 detail = 'interactive session'
-            self._print_activity('Opened', detail, None, title='Browser')
+            self._print_activity(
+                'Opened', detail, None, title=ACTIVITY_CARD_TITLE_BROWSER
+            )
             thought = getattr(action, 'thought', '') or ''
             _sync_reasoning_after_tool_line(self._reasoning, detail, thought)
             self.refresh()
@@ -2201,7 +2334,7 @@ class CLIEventRenderer:
             detail = symbol or file
             stats = str(cmd) if cmd else None
             self._buffer_pending_activity(
-                title='Code',
+                title=ACTIVITY_CARD_TITLE_CODE,
                 verb='Analyzed',
                 detail=detail,
                 secondary=stats,
@@ -2242,10 +2375,17 @@ class CLIEventRenderer:
                 cmd = cmd[:11_997] + '…'
             self._pending_shell_command = cmd
             # Persist open + command in the scrollback, not only the Thinking header.
-            label = f'$ {cmd}' if cmd else '$ (empty)'
-            self._print_activity('Open', label, None, title='PTY', shell_rail=True)
+            # No '$' prefix (matches tool_call_display): PTY command is literal, not a shell prompt.
+            label = cmd if cmd else '(empty)'
+            self._print_activity(
+                'Open',
+                label,
+                None,
+                title=ACTIVITY_CARD_TITLE_TERMINAL,
+                shell_rail=True,
+            )
             self._ensure_reasoning()
-            pty_line = f'PTY · {label}'
+            pty_line = f'{ACTIVITY_CARD_TITLE_TERMINAL} · {label}'
             thought = getattr(action, 'thought', '') or ''
             _sync_reasoning_after_tool_line(self._reasoning, pty_line, thought)
             self.refresh()
@@ -2264,14 +2404,16 @@ class CLIEventRenderer:
                 inp_display = inp[:60] + ('…' if len(inp) > 60 else '')
             else:
                 inp_display = inp[:60] + ('…' if len(inp) > 60 else '')
-            self._print_activity('Send', inp_display, sess or None, title='PTY')
+            self._print_activity(
+                'Send', inp_display, sess or None, title=ACTIVITY_CARD_TITLE_TERMINAL
+            )
             self._ensure_reasoning()
             if sess and inp_display:
-                line = f'PTY input · {sess} · {inp_display}'
+                line = f'{ACTIVITY_CARD_TITLE_TERMINAL} input · {sess} · {inp_display}'
             elif sess:
-                line = f'PTY input · {sess}'
+                line = f'{ACTIVITY_CARD_TITLE_TERMINAL} input · {sess}'
             else:
-                line = f'PTY input · {inp_display or "…"}'
+                line = f'{ACTIVITY_CARD_TITLE_TERMINAL} input · {inp_display or "…"}'
             thought = getattr(action, 'thought', '') or ''
             _sync_reasoning_after_tool_line(self._reasoning, line, thought)
             self.refresh()
@@ -2281,9 +2423,15 @@ class CLIEventRenderer:
             self._clear_streaming_preview()
             self._flush_pending_tool_cards()
             sess = (getattr(action, 'session_id', '') or '').strip()
-            self._print_activity('Read', sess or '…', None, title='PTY')
+            self._print_activity(
+                'Read', sess or '…', None, title=ACTIVITY_CARD_TITLE_TERMINAL
+            )
             self._ensure_reasoning()
-            line = f'PTY read · {sess}' if sess else 'PTY read · …'
+            line = (
+                f'{ACTIVITY_CARD_TITLE_TERMINAL} read · {sess}'
+                if sess
+                else f'{ACTIVITY_CARD_TITLE_TERMINAL} read · …'
+            )
             thought = getattr(action, 'thought', '') or ''
             _sync_reasoning_after_tool_line(self._reasoning, line, thought)
             self.refresh()
@@ -2296,7 +2444,7 @@ class CLIEventRenderer:
             self._reset_delegate_panel(batch_id=action.id if action.id > 0 else None)
             desc_display, secondary = _summarize_delegate_action(action)
             self._buffer_pending_activity(
-                title='Agent',
+                title=ACTIVITY_CARD_TITLE_DELEGATION,
                 verb='Delegated',
                 detail=desc_display,
                 secondary=secondary,
@@ -2787,39 +2935,39 @@ class CLIEventRenderer:
             self._stop_reasoning()
             self._flush_pending_tool_cards()
             raw = getattr(obs, 'content', '') or ''
-            content = raw.strip()
+            display = strip_tool_result_validation_annotations(raw)
+            content = display.strip()
             session_id = (getattr(obs, 'session_id', '') or '').strip()
             n_lines = (
                 len([ln for ln in content.splitlines() if ln.strip()]) if content else 0
             )
             cap = 2000
-            truncated = len(raw) > cap
-            body = (raw[:cap] + '…' if truncated else raw) if raw else ''
-            meta: list[str] = []
-            if session_id:
-                meta.append(f'session {session_id}')
-            if n_lines and content:
-                meta.append(f'{n_lines} line{"s" if n_lines != 1 else ""}')
-            if truncated:
-                meta.append('truncated')
-            if not content and not session_id:
+            truncated = len(display) > cap
+            body = (display[:cap] + '…' if truncated else display) if display else ''
+            if not content and not session_id and not raw.strip():
                 return
-            if meta:
-                self._append_history(
-                    Text('  PTY output · ' + ' · '.join(meta), style='dim')
-                )
+            caption = _pty_output_transcript_caption(
+                session_id=session_id,
+                n_lines=n_lines,
+                truncated=truncated,
+                has_output=bool(content),
+                raw=raw,
+                has_new_output=getattr(obs, 'has_new_output', None),
+            )
+            self._append_history(
+                format_activity_result_secondary(caption, kind='neutral')
+            )
             if content:
                 self._append_history(
-                    Syntax(
-                        body,
-                        'text',
-                        word_wrap=True,
-                        theme='ansi_dark',
+                    Padding(
+                        Syntax(
+                            body,
+                            'text',
+                            word_wrap=True,
+                            theme='ansi_dark',
+                        ),
+                        pad=(0, 0, 0, 2),
                     )
-                )
-            elif session_id:
-                self._append_history(
-                    format_activity_result_secondary('(no output yet)', kind='neutral')
                 )
             return
 
@@ -3155,6 +3303,7 @@ class CLIEventRenderer:
         """Render a committed assistant message block in the transcript."""
         if not display_content:
             return
+        self._last_assistant_message_text = display_content
 
         # Render assistant content directly (no "Assistant" header).
         # Keep a small top spacer for readability.
@@ -3235,7 +3384,11 @@ class CLIEventRenderer:
         self._emit_activity_turn_header()  # not a duplicate
         if shell_rail:
             inner = format_activity_shell_block(
-                verb, detail, secondary=stats, secondary_kind='neutral'
+                verb,
+                detail,
+                secondary=stats,
+                secondary_kind='neutral',
+                title=title,
             )
         else:
             inner = format_activity_block(
@@ -3319,7 +3472,9 @@ class CLIEventRenderer:
         self._pending_shell_is_internal = False
         self._emit_activity_turn_header()  # not a duplicate
         if is_internal:
-            inner = format_activity_block(verb, label, title=title or 'Shell')
+            inner = format_activity_block(
+                verb, label, title=title or ACTIVITY_CARD_TITLE_SHELL
+            )
         else:
             inner = format_activity_shell_block(verb, label)
         self._print_or_buffer(Padding(inner, pad=ACTIVITY_BLOCK_BOTTOM_PAD))

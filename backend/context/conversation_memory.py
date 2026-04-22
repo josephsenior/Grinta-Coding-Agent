@@ -34,9 +34,10 @@ from backend.context.tool_call_tracker import (
 from backend.context.vector_store import EnhancedVectorStore
 from backend.core.config.agent_config import AgentConfig
 from backend.core.logger import app_logger as logger
-from backend.core.message import Message
+from backend.core.message import Message, TextContent
 from backend.core.schemas import ActionType
 from backend.core.workspace_context import ensure_project_state_dir
+from backend.inference.tool_result_format import encode_tool_result_payload
 from backend.ledger.action import (
     Action,
     MessageAction,
@@ -72,6 +73,18 @@ def _tool_ok_for_observation(obs: Observation) -> bool | None:
             return None
         return ec == 0
     return True
+
+
+def _json_safe_tool_message_content(message: Message) -> object:
+    """Return a JSON-serializable representation of tool message content."""
+    try:
+        serialized = message.serialize_model()
+        if isinstance(serialized, dict) and 'content' in serialized:
+            return serialized.get('content')
+    except Exception:
+        logger.debug('Failed to serialize tool message content', exc_info=True)
+    # Last-resort fallback to a plain string representation.
+    return str(message.content)
 
 
 @dataclass
@@ -676,11 +689,28 @@ class ContextMemory:
 
         # Handle tool call metadata
         if (tool_call_metadata := getattr(obs, 'tool_call_metadata', None)) is not None:
+            tool_name = tool_call_metadata.function_name
+            encoded_content: list[TextContent]
+            tool_result = getattr(obs, 'tool_result', None)
+            if isinstance(tool_result, dict):
+                encoded_content = [
+                    TextContent(
+                        text=encode_tool_result_payload(
+                            tool_name,
+                            {
+                                'message': _json_safe_tool_message_content(message),
+                                'tool_result': tool_result,
+                            },
+                        )
+                    )
+                ]
+            else:
+                encoded_content = message.content
             tool_call_id_to_message[tool_call_metadata.tool_call_id] = Message(
                 role='tool',
-                content=message.content,
+                content=encoded_content,
                 tool_call_id=tool_call_metadata.tool_call_id,
-                name=tool_call_metadata.function_name,
+                name=tool_name,
                 tool_ok=_tool_ok_for_observation(obs),
             )
             return []

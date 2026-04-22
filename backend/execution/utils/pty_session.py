@@ -14,10 +14,11 @@ exposes a small unified API for:
 - resizing the terminal window
 - waiting for termination / graceful close / force kill
 
-This primitive intentionally does NOT interpret ANSI / escape sequences — raw
-output is surfaced as ``str`` (with configurable replacement on decode errors)
-and the consumer renders it. It is designed to be wired into higher-level
-shell abstractions (``UnifiedShellSession``, agent tools, REPL UI).
+Decoded PTY output is stored as ``str``. A small deterministic sanitizer strips
+ANSI/OSC/DCS control sequences and common ConPTY orphan-parameter leaks before
+text enters the buffer, while preserving newlines/tabs/carriage returns for
+shell transcripts. It is designed to be wired into higher-level shell
+abstractions (``UnifiedShellSession``, agent tools, REPL UI).
 """
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ IS_WINDOWS = os.name == 'nt'
 DEFAULT_BUFFER_CHARS = 1_048_576
 DEFAULT_READ_CHUNK = 4096
 DEFAULT_DIMENSIONS: tuple[int, int] = (24, 80)
+_MAX_SANITIZE_CARRY = 256
 
 # Common terminal control sequences keyed by human-friendly aliases.
 # Values are the literal characters written to the PTY.
@@ -79,6 +81,159 @@ class PtyUnavailableError(RuntimeError):
 
 class InteractiveSessionError(RuntimeError):
     """Raised for misuse (write after close, invalid state, etc.)."""
+
+
+def _is_token_boundary(text: str, idx: int) -> bool:
+    """True when ``idx`` is at start or follows a non-alnum separator."""
+    if idx <= 0:
+        return True
+    return not text[idx - 1].isalnum()
+
+
+def _parse_orphan_param_token(text: str, start: int) -> int | None:
+    """Parse one leaked ConPTY-ish token like ``[17;29;0;1;40;1_``."""
+    i = start
+    n = len(text)
+    if i < n and text[i] == '[':
+        i += 1
+    first = i
+    while i < n and text[i].isdigit():
+        i += 1
+    if i == first:
+        return None
+    groups = 0
+    while i < n and text[i] == ';':
+        i += 1
+        g_start = i
+        while i < n and text[i].isdigit():
+            i += 1
+        if i == g_start:
+            return None
+        groups += 1
+    if groups < 2:
+        return None
+    if i < n and text[i] in ('O', 'I'):
+        i += 1
+    if i >= n:
+        return -1
+    if text[i] != '_':
+        return None
+    return i + 1
+
+
+def _sanitize_terminal_text_chunk(
+    text: str,
+    carry: str = '',
+) -> tuple[str, str]:
+    """Remove terminal control traffic and leaked orphan parameter chunks.
+
+    Returns ``(clean_text, next_carry)`` where ``next_carry`` stores an
+    incomplete trailing sequence to be prefixed to the next PTY chunk.
+    """
+    if not text and not carry:
+        return '', ''
+    src = (carry or '') + (text or '')
+    out: list[str] = []
+    i = 0
+    n = len(src)
+
+    while i < n:
+        ch = src[i]
+        code = ord(ch)
+
+        # Escape-prefixed control sequence (must run before C0 filtering: ESC is 0x1b).
+        if ch == '\x1b':
+            if i + 1 >= n:
+                return ''.join(out), src[i:]
+            nxt = src[i + 1]
+            # CSI: ESC [ ... final-byte
+            if nxt == '[':
+                j = i + 2
+                while j < n and 0x30 <= ord(src[j]) <= 0x3F:
+                    j += 1
+                while j < n and 0x20 <= ord(src[j]) <= 0x2F:
+                    j += 1
+                if j >= n:
+                    return ''.join(out), src[i:]
+                if 0x40 <= ord(src[j]) <= 0x7E:
+                    i = j + 1
+                    continue
+                i += 1
+                continue
+            # OSC: ESC ] ... BEL or ESC \
+            if nxt == ']':
+                j = i + 2
+                while j < n:
+                    if src[j] == '\x07':
+                        i = j + 1
+                        break
+                    if src[j] == '\x1b':
+                        if j + 1 >= n:
+                            return ''.join(out), src[i:]
+                        if src[j + 1] == '\\':
+                            i = j + 2
+                            break
+                    j += 1
+                else:
+                    return ''.join(out), src[i:]
+                continue
+            # DCS/SOS/PM/APC string controls terminated by ESC \
+            if nxt in ('P', 'X', '^', '_'):
+                j = i + 2
+                while j < n:
+                    if src[j] == '\x1b':
+                        if j + 1 >= n:
+                            return ''.join(out), src[i:]
+                        if src[j + 1] == '\\':
+                            i = j + 2
+                            break
+                    j += 1
+                else:
+                    return ''.join(out), src[i:]
+                continue
+            # 2-byte escape forms.
+            if '@' <= nxt <= '_':
+                i += 2
+                continue
+            # Unknown escape shape: drop ESC only.
+            i += 1
+            continue
+
+        # Drop C0 controls except common layout controls.
+        if code < 0x20 and ch not in ('\n', '\r', '\t'):
+            i += 1
+            continue
+
+        # Bracketless/bare orphan parameter chunks (ConPTY leaks).
+        if (ch.isdigit() or ch == '[') and _is_token_boundary(src, i):
+            j = i
+            token_count = 0
+            while True:
+                end = _parse_orphan_param_token(src, j)
+                if end is None:
+                    break
+                if end < 0:
+                    if token_count > 0:
+                        return ''.join(out), src[i:]
+                    break
+                token_count += 1
+                j = end
+            if token_count >= 2:
+                i = j
+                continue
+
+        out.append(ch)
+        i += 1
+
+    carry_out = ''
+    if n and src[-1] == '\x1b':
+        # Preserve trailing ESC in case it prefixes next chunk.
+        if out and out[-1] == '\x1b':
+            out.pop()
+        carry_out = '\x1b'
+    if len(carry_out) > _MAX_SANITIZE_CARRY:
+        carry_out = carry_out[-_MAX_SANITIZE_CARRY:]
+    return ''.join(out), carry_out
 
 
 @dataclass
@@ -200,6 +355,7 @@ class InteractiveSession:
         self._closed = False
         self._exit_code: int | None = None
         self._eof = False
+        self._sanitize_carry = ''
 
     @property
     def pid(self) -> int | None:
@@ -320,10 +476,17 @@ class InteractiveSession:
     def _append_to_buffer(self, text: str) -> None:
         if not text:
             return
+        clean, next_carry = _sanitize_terminal_text_chunk(
+            text,
+            carry=self._sanitize_carry,
+        )
+        self._sanitize_carry = next_carry
+        if not clean:
+            return
         with self._lock:
-            self._buffer.append(text)
-            self._buffer_chars += len(text)
-            self._produced_chars += len(text)
+            self._buffer.append(clean)
+            self._buffer_chars += len(clean)
+            self._produced_chars += len(clean)
             self._trim_locked()
         self._data_event.set()
 
@@ -591,5 +754,6 @@ __all__ = [
     'InteractiveSessionConfig',
     'InteractiveSessionError',
     'PtyUnavailableError',
+    '_sanitize_terminal_text_chunk',
     'create_interactive_session',
 ]

@@ -15,6 +15,10 @@ class TerminalObservation(Observation):
 
     session_id: str
     content: str
+    next_offset: int | None = None
+    has_new_output: bool | None = None
+    dropped_chars: int | None = None
+    state: str | None = None
     observation: ClassVar[str] = ObservationType.TERMINAL
 
     @property

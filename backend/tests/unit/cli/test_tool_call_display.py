@@ -44,6 +44,7 @@ class TestToolCallDisplay(unittest.TestCase):
         self.assertIn('open', s)
         self.assertIn('pytest', s)
         self.assertIn('cwd', s)
+        self.assertNotIn('open · $', s)
 
     def test_summarize_terminal_manager_read(self) -> None:
         s = summarize_tool_arguments(

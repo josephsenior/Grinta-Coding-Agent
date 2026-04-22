@@ -120,6 +120,7 @@ def __getattr__(name: str) -> Any:
         'ContextWindowMiddleware',
         'CostQuotaMiddleware',
         'LoggingMiddleware',
+        'ProgressPolicyMiddleware',
         'SafetyValidatorMiddleware',
         'TelemetryMiddleware',
     ):

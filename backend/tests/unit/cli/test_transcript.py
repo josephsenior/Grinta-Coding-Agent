@@ -81,6 +81,12 @@ def test_strip_tool_result_validation_annotations() -> None:
     assert strip_tool_result_validation_annotations(raw) == 'hello'
 
 
+def test_strip_tool_result_validation_unclosed_tag() -> None:
+    """Streaming or malformed tool results may omit the closing tag."""
+    raw = 'out\n<APP_RESULT_VALIDATION>warnings: nope\n'
+    assert strip_tool_result_validation_annotations(raw) == 'out'
+
+
 def test_format_activity_block_includes_secondary_when_set() -> None:
     g = format_activity_block(
         'Viewed', 'src/a.py', secondary='12 lines', secondary_kind='neutral'

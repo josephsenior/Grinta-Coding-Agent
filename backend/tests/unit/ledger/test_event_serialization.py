@@ -131,6 +131,28 @@ class TestEventToDict:
         assert back.session_id == 'term-deadbeef'
         assert back.cause == 6
 
+    def test_terminal_observation_roundtrip_preserves_tool_result(self):
+        obs = TerminalObservation(
+            session_id='terminal_1',
+            content='ok',
+            next_offset=10,
+            has_new_output=True,
+        )
+        obs.tool_result = {
+            'tool': 'terminal_manager',
+            'ok': True,
+            'state': 'SESSION_OUTPUT_DELTA',
+            'payload': {'next_offset': 10},
+        }
+        obs._source = EventSource.ENVIRONMENT
+
+        data = event_to_dict(obs)
+        back = event_from_dict(data)
+
+        assert isinstance(back, TerminalObservation)
+        assert isinstance(back.tool_result, dict)
+        assert back.tool_result.get('state') == 'SESSION_OUTPUT_DELTA'
+
     def test_tool_backed_think_action_preserves_tool_result_roundtrip(self):
         action = AgentThinkAction(
             thought='[CHECKPOINT] Saved #1: phase 1', source_tool='checkpoint'
