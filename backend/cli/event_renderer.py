@@ -38,8 +38,8 @@ from backend.cli.layout_tokens import (
     ACTIVITY_CARD_TITLE_CODE,
     ACTIVITY_CARD_TITLE_DELEGATION,
     ACTIVITY_CARD_TITLE_FILES,
-    ACTIVITY_CARD_TITLE_MCP,
     ACTIVITY_CARD_TITLE_MEMORY,
+    ACTIVITY_CARD_TITLE_MCP,
     ACTIVITY_CARD_TITLE_SEARCH,
     ACTIVITY_CARD_TITLE_SHELL,
     ACTIVITY_CARD_TITLE_TERMINAL,
@@ -1872,14 +1872,151 @@ class CLIEventRenderer:
         # -- separator (mirrors _prompt_bottom_toolbar) ---------------------
         items.append(Text('─' * width, style='#3a5368'))
 
-        compact = width < 80
-        fragments = self._hud._format_fragments(compact=compact, max_width=width)
-        
-        line = Text()
-        for style, content in fragments:
-            line.append(content, style=style)
-            
-        items.append(line)
+        state_label = hud.agent_state_label or 'Running'
+        autonomy = hud.autonomy_level or 'balanced'
+
+        # Tight bullet separator — the old "  •  " (5 chars) made the row
+        # feel crowded; " · " keeps the visual rhythm while reclaiming
+        # ~2 chars per delimiter for denser information without clutter.
+        SEP = (' · ', '#3a5368')
+
+        if width < 72:
+            # Compact single-line mode for very narrow terminals.
+            model_short = (
+                model
+                if provider in {'(not set)', '(unknown)'}
+                else f'{provider}/{model}'
+            )
+            ctx = (
+                HUDBar._format_tokens(hud.context_tokens)
+                if hud.context_tokens > 0
+                else '0'
+            )
+            line = Text()
+            ws_compact = (hud.workspace_path or '').strip()
+            if ws_compact:
+                line.append(
+                    HUDBar.ellipsize_path(ws_compact, 22),
+                    style='dim #94a3b8',
+                )
+                line.append(SEP[0], style=SEP[1])
+            line.append(state_label, style='dim')
+            line.append(SEP[0], style=SEP[1])
+            line.append(f'autonomy:{autonomy}', style='dim')
+            line.append(SEP[0], style=SEP[1])
+            line.append(model_short, style='dim')
+            line.append(SEP[0], style=SEP[1])
+            line.append(ctx, style='dim')
+            line.append(SEP[0], style=SEP[1])
+            line.append(f'${hud.cost_usd:.4f}', style='dim')
+            items.append(line)
+            return Group(*items)
+
+        # -- row 1: brand + state badge + autonomy -------------------------
+        row1 = Text()
+        row1.append('GRINTA', style='bold #7dd3fc')
+        row1.append('  ', style='')
+        _BADGE_STYLES = {
+            'Running': '#93c5fd bold',
+            'Ready': '#86efac bold',
+            'Done': '#86efac bold',
+            'Finished': '#86efac bold',
+            'Needs approval': '#fcd34d bold',
+            'Needs attention': '#fca5a5 bold',
+            'Stopped': '#fca5a5 bold',
+        }
+        row1.append(
+            f' {state_label.upper()} ',
+            style=_BADGE_STYLES.get(state_label, '#93c5fd bold'),
+        )
+        row1.append('  ', style='')
+        auto_style = '#8bd8ff'
+        if 'full' in autonomy:
+            auto_style = '#f1bf63 bold'
+        elif 'supervised' in autonomy:
+            auto_style = '#f0a3ff bold'
+        row1.append(f'autonomy:{autonomy}', style=auto_style)
+        items.append(row1)
+
+        ws_full = (hud.workspace_path or '').strip()
+        if ws_full:
+            row_ws = Text()
+            row_ws.append('workspace ', style='dim #64748b')
+            row_ws.append(
+                HUDBar.ellipsize_path(ws_full, max(28, width - 14)),
+                style='#94a3b8',
+            )
+            items.append(row_ws)
+
+        # -- row 2: model · tokens · cost · ledger (+ optionals) -----------
+        ctx = (
+            HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
+        )
+        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else '?'
+        if hud.context_tokens == 0 and hud.context_limit == 0:
+            token_display = '0 tokens'
+        elif hud.context_limit == 0:
+            token_display = f'{ctx} tokens'
+        else:
+            token_display = f'{ctx}/{lim}'
+
+        mcp_label = HUDBar._format_mcp_servers_label(hud.mcp_servers)
+        skills_label = HUDBar._format_skills_label(self._hud.bundled_skill_count)
+
+        ledger_style = '#8fdfb1 bold'
+        if hud.ledger_status in {'Review', 'Paused'}:
+            ledger_style = '#f1bf63 bold'
+        elif hud.ledger_status not in {'Healthy', 'Ready', 'Idle', 'Starting'}:
+            ledger_style = '#ff9ea8 bold'
+
+        # "provider/model" combined — the explicit "provider:" and "model:"
+        # labels were redundant visual weight. Provider is already implied
+        # by the prefix of the model slug.
+        if provider in {'(not set)', '(unknown)'}:
+            model_display = model
+        else:
+            model_display = f'{provider}/{model}'
+
+        primary_parts: list[tuple[str, str]] = [
+            (model_display, 'bold #dbe7f3'),
+            SEP,
+            (token_display, '#b4c4d5'),
+            SEP,
+            (f'${hud.cost_usd:.4f}', '#b4c4d5'),
+            SEP,
+            (hud.ledger_status, ledger_style),
+        ]
+        optional_parts: list[tuple[str, str]] = [
+            (f'{hud.llm_calls} calls', '#b4c4d5'),
+            (mcp_label, '#b4c4d5'),
+            (skills_label, '#b4c4d5'),
+        ]
+        parts: list[tuple[str, str]] = list(primary_parts)
+        for content, style in optional_parts:
+            parts.append(SEP)
+            parts.append((content, style))
+
+        total_len = sum(len(c) for c, _ in parts)
+        if total_len <= width:
+            row2 = Text()
+            for content, style in parts:
+                row2.append(content, style=style)
+            items.append(row2)
+        else:
+            # Split: essentials on line 1, optionals on line 2.
+            row2a = Text()
+            for content, style in primary_parts:
+                row2a.append(content, style=style)
+            items.append(row2a)
+            row2b = Text()
+            first = True
+            for content, style in optional_parts:
+                if not first:
+                    row2b.append(SEP[0], style=SEP[1])
+                row2b.append(content, style=style)
+                first = False
+            items.append(row2b)
+
         return Group(*items)
 
     # -- action handlers ---------------------------------------------------
@@ -2368,10 +2505,10 @@ class CLIEventRenderer:
             if question:
                 clarify_parts.append(Text(question, style='yellow'))
             for i, opt in enumerate(options, 1):
-                option_line = Text()
-                option_line.append(f'{i}. ', style='bold #f1bf63')
-                option_line.append(str(opt), style='#e2e8f0')
-                clarify_parts.append(option_line)
+                line = Text()
+                line.append(f'{i}. ', style='bold #f1bf63')
+                line.append(str(opt), style='#e2e8f0')
+                clarify_parts.append(line)
             if clarify_parts:
                 self._append_history(
                     format_callout_panel(
@@ -2390,10 +2527,10 @@ class CLIEventRenderer:
             info_needed = getattr(action, 'requested_information', '')
             uncertainty_parts: list[Any] = []
             for concern in concerns[:5]:
-                concern_line = Text()
-                concern_line.append('• ', style='dim')
-                concern_line.append(str(concern), style='dim')
-                uncertainty_parts.append(concern_line)
+                line = Text()
+                line.append('• ', style='dim')
+                line.append(str(concern), style='dim')
+                uncertainty_parts.append(line)
             if info_needed:
                 uncertainty_parts.append(Text(f'Need: {info_needed}', style='yellow'))
             if uncertainty_parts:
@@ -2422,13 +2559,13 @@ class CLIEventRenderer:
                 label = opt.get('name', opt.get('title', f'Option {i + 1}'))
                 desc = opt.get('description', '')
                 marker = ' (recommended)' if i == recommended else ''
-                proposal_line = Text()
-                proposal_line.append(f'{i + 1}. ', style='bold #a78bfa')
-                proposal_line.append(
+                line = Text()
+                line.append(f'{i + 1}. ', style='bold #a78bfa')
+                line.append(
                     f'{label}{marker}',
                     style='bold #f1bf63' if i == recommended else 'bold #e2e8f0',
                 )
-                proposal_parts.append(proposal_line)
+                proposal_parts.append(line)
                 if desc:
                     proposal_parts.append(Text(f'   {desc}', style='dim'))
             if proposal_parts:

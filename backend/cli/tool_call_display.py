@@ -254,14 +254,14 @@ def _summarize_terminal_manager_args(args: dict[str, Any]) -> str:
 def _streaming_hint_terminal_manager(partial_json: str) -> str:
     """Best-effort label while ``terminal_manager`` JSON is still streaming."""
     m_act = re.search(r'"action"\s*:\s*"(open|input|read)"', partial_json)
-    if m_act is None:
+    if not m_act:
         return ''
     op = m_act.group(1)
     if op == 'open':
         m_cmd = re.search(
             r'"command"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json, re.DOTALL
         )
-        if m_cmd is not None:
+        if m_cmd:
             raw_c = m_cmd.group(1).replace('\\n', '\n').replace('\\"', '"')
             return f'open · {_trunc(raw_c, 90)}'
         return 'open'
@@ -271,17 +271,17 @@ def _streaming_hint_terminal_manager(partial_json: str) -> str:
         m_ctrl = re.search(r'"control"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
         m_inp = re.search(r'"input"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json, re.DOTALL)
         parts: list[str] = ['input']
-        if sid != '':
+        if sid:
             parts.append(_trunc(sid, 22))
-        if m_ctrl is not None:
+        if m_ctrl:
             parts.append(f'ctrl {m_ctrl.group(1)[:24]}')
-        elif m_inp is not None:
+        elif m_inp:
             raw = m_inp.group(1).replace('\\n', '\n').replace('\\"', '"')
             parts.append(_trunc(raw, 55))
         return ' · '.join(parts)
     if op == 'read':
         m_sid = re.search(r'"session_id"\s*:\s*"((?:\\.|[^"\\])*)"', partial_json)
-        if m_sid is not None:
+        if m_sid:
             return f'read · {_trunc(m_sid.group(1), 40)}'
         return 'read'
     return ''
@@ -527,17 +527,17 @@ def streaming_args_hint(tool_name: str, partial_json: str) -> str:
     ]
     for pat, _kind in patterns:
         m = re.search(pat, partial_json, re.DOTALL)
-        if m is None:
+        if not m:
             continue
         raw = m.group(1).replace('\\n', '\n').replace('\\"', '"')
         piece = _trunc(raw, 90)
-        if piece != '' and piece not in hints:
+        if piece and piece not in hints:
             hints.append(piece)
 
-    if len(hints) == 0:
+    if not hints:
         # Unquoted partial values (streaming mid-token) — very rough
         m = re.search(r'"command"\s*:\s*"([^"]*)$', partial_json)
-        if m is not None and m.group(1).strip() != '':
+        if m and m.group(1).strip():
             hints.append(_trunc(m.group(1), 90))
 
     return ' · '.join(hints[:3]) if hints else ''
@@ -594,13 +594,10 @@ def strip_protocol_echo_blocks(text: str) -> str:
     kept_parts: list[str] = []
     for part in parts:
         stripped = part.strip()
-        if stripped == '':
+        if not stripped:
             kept_parts.append(part)
             continue
-        starts_with_protocol_echo = any(
-            stripped.startswith(prefix) for prefix in _PROTOCOL_ECHO_PREFIXES
-        )
-        if starts_with_protocol_echo:
+        if any(stripped.startswith(prefix) for prefix in _PROTOCOL_ECHO_PREFIXES):
             continue
         kept_parts.append(part)
 
@@ -609,10 +606,7 @@ def strip_protocol_echo_blocks(text: str) -> str:
     kept_lines: list[str] = []
     for line in lines:
         stripped = line.lstrip()
-        starts_with_protocol_echo = any(
-            stripped.startswith(prefix) for prefix in _PROTOCOL_ECHO_PREFIXES
-        )
-        if starts_with_protocol_echo:
+        if any(stripped.startswith(prefix) for prefix in _PROTOCOL_ECHO_PREFIXES):
             continue
         kept_lines.append(line)
     return ''.join(kept_lines)
@@ -670,7 +664,7 @@ def redact_streamed_tool_call_markers(text: str) -> str:
         lstripped = rest.lstrip()
         ws = len(rest) - len(lstripped)
         m = re.match(r'^([A-Za-z0-9_]+)\(', lstripped)
-        if m is None:
+        if not m:
             out.append(text[j:rest_start])
             i = rest_start
             continue
@@ -679,8 +673,7 @@ def redact_streamed_tool_call_markers(text: str) -> str:
         tail = text[args_begin:].lstrip()
         json_shift = len(text[args_begin:]) - len(tail)
         json_start = args_begin + json_shift
-        has_open_curly = json_start < n and text[json_start] == '{'
-        if not has_open_curly:
+        if json_start >= n or text[json_start] != '{':
             out.append(text[j])
             i = j + 1
             continue

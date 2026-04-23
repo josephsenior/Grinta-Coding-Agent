@@ -15,7 +15,6 @@ from backend.cli.transcript import (
     format_activity_result_secondary,
     format_activity_secondary,
 )
-from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE
 
 
 class DiffPanel:
@@ -60,9 +59,9 @@ class DiffPanel:
                 parts.append(delta)
             yield Panel(
                 Group(*parts),
-                title=Text('File', style=CLR_CARD_TITLE),
+                title=Text('File', style='bold #9ca3af'),
                 title_align='left',
-                border_style=CLR_CARD_BORDER,
+                border_style='dim',
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
@@ -96,9 +95,9 @@ class DiffPanel:
             parts.append(diff_text)
             yield Panel(
                 Group(*parts),
-                title=Text('File', style=CLR_CARD_TITLE),
+                title=Text('File', style='bold #9ca3af'),
                 title_align='left',
-                border_style=CLR_CARD_BORDER,
+                border_style='dim',
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
@@ -116,9 +115,9 @@ class DiffPanel:
             parts.append(Text(diff_str[:3000]))
             yield Panel(
                 Group(*parts),
-                title=Text('File', style=CLR_CARD_TITLE),
+                title=Text('File', style='bold #9ca3af'),
                 title_align='left',
-                border_style=CLR_CARD_BORDER,
+                border_style='dim',
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
@@ -134,9 +133,9 @@ class DiffPanel:
 
             yield Panel(
                 Group(*filtered_parts),
-                title=Text('File', style=CLR_CARD_TITLE),
+                title=Text('File', style='bold #9ca3af'),
                 title_align='left',
-                border_style=CLR_CARD_BORDER,
+                border_style='dim',
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
