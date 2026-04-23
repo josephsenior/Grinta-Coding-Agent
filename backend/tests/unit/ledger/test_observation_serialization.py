@@ -12,6 +12,7 @@ from backend.ledger.observation import (
     ErrorObservation,
     FileReadObservation,
     MCPObservation,
+    RecallObservation,
 )
 from backend.ledger.observation.commands import CmdOutputMetadata
 from backend.ledger.serialization.observation import (
@@ -101,6 +102,20 @@ class TestObservationFromDict:
         d = {'observation': 'mcp', 'content': 'mcp result', 'extras': {}}
         obs = observation_from_dict(d)
         assert isinstance(obs, MCPObservation)
+
+    def test_recall_observation_with_legacy_private_timestamp(self):
+        d = {
+            'observation': 'recall',
+            'content': '',
+            'extras': {
+                'recall_type': 'workspace_context',
+                '_timestamp': '2026-04-23T16:18:32.813984+00:00',
+            },
+        }
+        obs = observation_from_dict(d)
+        assert isinstance(obs, RecallObservation)
+        assert obs.recall_type == RecallType.WORKSPACE_CONTEXT
+        assert obs.timestamp is not None
 
     def test_unknown_type_raises(self):
         d = {'observation': 'definitely_not_real'}

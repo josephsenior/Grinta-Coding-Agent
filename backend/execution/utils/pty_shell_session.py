@@ -398,6 +398,11 @@ class PtyInteractiveShellSession(BaseShellSession):
             logger.warning("write_input called on uninitialized PTY session")
             return
         if not is_control:
+            if IS_WINDOWS:
+                # ConPTY (Windows) requires CR (\r) to submit a line.  A bare
+                # LF alone puts PowerShell into multi-line continuation mode
+                # (the ``>>`` prompt) instead of executing the command.
+                data = data.replace("\r\n", "\n").replace("\n", "\r\n")
             try:
                 self._pty.write(data)
             except InteractiveSessionError as exc:

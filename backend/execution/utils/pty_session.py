@@ -522,8 +522,14 @@ class InteractiveSession:
             return written
         return len(data)
 
-    def send_line(self, line: str, *, newline: str = '\n') -> int:
-        r"""Write a line followed by a newline sequence (default ``\n``)."""
+    def send_line(self, line: str, *, newline: str | None = None) -> int:
+        r"""Write a line followed by a newline sequence.
+
+        Defaults to ``\r\n`` on Windows (ConPTY requires CR to submit) and
+        ``\n`` on POSIX.  Pass an explicit ``newline`` to override.
+        """
+        if newline is None:
+            newline = '\r\n' if IS_WINDOWS else '\n'
         return self.write(f'{line}{newline}')
 
     def send_control(self, key: str) -> int:

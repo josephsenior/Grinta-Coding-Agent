@@ -180,6 +180,14 @@ def _process_recall_observation_data(extras: dict) -> None:
         ]
 
 
+def _normalize_legacy_metadata_keys(extras: dict, metadata: dict) -> None:
+    """Lift legacy underscore metadata from extras into metadata."""
+    for field in METADATA_FIELDS:
+        private_key = f'_{field}'
+        if private_key in extras:
+            metadata.setdefault(field, extras.pop(private_key))
+
+
 def observation_from_dict(observation: dict) -> Observation:
     """Deserialize observation from dictionary representation.
 
@@ -200,6 +208,7 @@ def observation_from_dict(observation: dict) -> Observation:
     _validate_observation_dict(observation)
     observation_class = _get_observation_class(observation['observation'])
     content, extras, metadata, tool_result = _extract_observation_data(observation)
+    _normalize_legacy_metadata_keys(extras, metadata)
 
     if observation_class.__name__ == 'CmdOutputObservation':
         _process_cmd_output_metadata(extras)
