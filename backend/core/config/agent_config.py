@@ -170,7 +170,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_terminal: bool = Field(default=True)
     enable_editor: bool = Field(default=True)
     enable_working_memory: bool = Field(default=True)
-    enable_lsp_query: bool = Field(default=True)
+    enable_lsp_query: bool = Field(default=False)
     enable_signal_progress: bool = Field(default=DEFAULT_AGENT_SIGNAL_PROGRESS_ENABLED)
     enable_swarming: bool = Field(default=False)
     enable_blackboard: bool = Field(default=False)

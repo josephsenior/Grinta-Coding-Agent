@@ -94,11 +94,11 @@ def build_lsp_query_action(arguments: dict) -> LspQueryAction:
 
     if not command:
         raise FunctionCallValidationError(
-            'Missing required argument "command" in tool call code_intelligence'
+            f'Missing required argument "command" in tool call {CODE_INTELLIGENCE_TOOL_NAME}'
         )
     if not file:
         raise FunctionCallValidationError(
-            'Missing required argument "file" in tool call code_intelligence'
+            f'Missing required argument "file" in tool call {CODE_INTELLIGENCE_TOOL_NAME}'
         )
 
     return LspQueryAction(

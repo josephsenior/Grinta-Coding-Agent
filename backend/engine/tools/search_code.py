@@ -38,8 +38,7 @@ Modes:
 1. Text/regex search — set `pattern` to a regex pattern to find matching lines inside files.
 2. File discovery — omit `pattern` entirely, and set `file_pattern` to a glob pattern to list matching files.
 
-Use this when target location is unknown. For precise symbol refs at known positions, use `lsp_query`. \
-For dependency traversal, use `explore_tree_structure`.
+Use this when target location is unknown. For dependency traversal, use `explore_tree_structure`.
 """
 
 SEARCH_CODE_TOOL_NAME = 'search_code'

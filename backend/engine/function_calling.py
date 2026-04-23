@@ -53,7 +53,7 @@ from backend.engine.tools.explore_code import (
     build_read_symbol_definition_action,
 )
 from backend.engine.tools.lsp_query import (
-    CODE_INTELLIGENCE_TOOL_NAME,
+    LSP_QUERY_TOOL_NAME,
     build_lsp_query_action,
 )
 from backend.engine.tools.memory_manager import (
@@ -1143,7 +1143,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         VERIFY_FILE_LINES_TOOL_NAME: _handle_verify_file_lines_tool,
         DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
-        CODE_INTELLIGENCE_TOOL_NAME: build_lsp_query_action,
+        LSP_QUERY_TOOL_NAME: build_lsp_query_action,
         SIGNAL_PROGRESS_TOOL_NAME: build_signal_progress_action,
         BLACKBOARD_TOOL_NAME: build_blackboard_action,
         TERMINAL_MANAGER_TOOL_NAME: handle_terminal_manager_tool,

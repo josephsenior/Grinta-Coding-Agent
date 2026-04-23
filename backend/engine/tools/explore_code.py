@@ -14,7 +14,7 @@ Traverse a pre-built code graph to explore dependencies around entities.
 Direction: upstream (what it depends on), downstream (what depends on it), or both.
 Entity types: directory, file, class, function. Dependency types: contains, imports, invokes, inherits.
 Entity ID format: 'path/file.py:Class.method' (e.g. 'src/api.py:UserAPI.get_user').
-For text search use `search_code`; for precise refs at known positions use `lsp_query`.
+For text search use `search_code`.
 """
 
 
@@ -56,7 +56,7 @@ def create_explore_tree_structure_tool():
 _READ_SYMBOL_DEFINITION_DESCRIPTION = """
 Retrieve the full implementation of a symbol or file from the code graph.
 Format: 'path/file.py:Class.method' for symbols, or just 'path/file.py' for full file contents.
-For text search use `search_code`; for refs at known positions use `lsp_query`.
+For text search use `search_code`.
 """
 
 
