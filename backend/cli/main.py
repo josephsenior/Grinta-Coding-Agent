@@ -188,8 +188,21 @@ def show_grinta_splash(console: Any | None = None) -> None:
 
     console = console or Console()
 
-    _R = 'bold dim'
+    _R = 'bold red'
     _D = 'dim'
+
+    _logo = [
+        r"  [red]▄▄████████████████████████████████▄▄[/red]  ",
+        r"[red]▄██████████████████████████████████████▄[/red]",
+        r"[red]▀▀▀▀▀▀▀██████████████████████████▀▀▀▀▀▀▀[/red]",
+        r"       [red]███[/red][black]▄▄▄▄▄[/black][red]████████████[/red][black]▄▄▄▄▄[/black][red]███[/red]       ",
+        r"       [red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red][black]▄[/black][red]████[/red][black]▄[/black][red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red]       ",
+        r"       [red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red][black]▀▄▄▄▄▀[/black][red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red]       ",
+        r"       [red]███[/red][black]▀▀▀▀▀[/black][red]████████████[/red][black]▀▀▀▀▀[/black][red]███[/red]       ",
+        r"     [red]▄████████████████████████████▄[/red]     ",
+        r"   [red]▄████████████████████████████████▄[/red]   ",
+        r"                                        ",
+    ]
 
     try:
         import pyfiglet as _pyfiglet
@@ -197,15 +210,37 @@ def show_grinta_splash(console: Any | None = None) -> None:
         _raw = _pyfiglet.figlet_format('GRINTA', font='slant').splitlines()
         while _raw and not _raw[-1].strip():
             _raw.pop()
-        _figlet_lines: list[str] = _raw
+        
+        width = max((len(ln) for ln in _raw), default=60)
+        _figlet_lines: list[Text] = []
+        for ln in _logo:
+            t = Text.from_markup(ln.strip('\r\n'))
+            pad = max(0, width - len(t))
+            _figlet_lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
+        for ln in _raw:
+            t = Text(ln, style=_R)
+            pad = max(0, width - len(t))
+            _figlet_lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
+        
     except Exception:
-        _figlet_lines = [
+        _raw = [
             '  ____ ____  ___ _   _ _____  _',
             ' / ___|  _ \\|_ _| \\ | |_   _|/ \\',
             '| |  _| |_) || ||  \\| | | | / _ \\',
             '| |_| |  _ < | || |\\  | | |/ ___ \\',
             ' \\____|_| \\_\\___|_| \\_| |_/_/   \\_\\',
         ]
+        
+        width = max((len(ln) for ln in _raw), default=60)
+        _figlet_lines = []
+        for ln in _logo:
+            t = Text.from_markup(ln.strip('\r\n'))
+            pad = max(0, width - len(t))
+            _figlet_lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
+        for ln in _raw:
+            t = Text(ln, style=_R)
+            pad = max(0, width - len(t))
+            _figlet_lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
 
     _TAGLINE = 'AI agent. Pure grit.'
     _HINT = (
@@ -214,13 +249,13 @@ def show_grinta_splash(console: Any | None = None) -> None:
 
     def _body(visible: int, *, tagline: bool = False) -> Group:
         figlet = Text()
-        for i, line in enumerate(_figlet_lines):
+        for i, text_obj in enumerate(_figlet_lines):
             if i > 0:
                 figlet.append('\n')
             if i < visible:
-                figlet.append(line, style=_R)
+                figlet.append(text_obj)
             else:
-                figlet.append(' ' * len(line))
+                figlet.append(' ' * len(text_obj))
         parts: list = [Align.center(figlet), Text('')]
         if tagline:
             parts.append(Text(_TAGLINE, style='italic dim', justify='center'))
