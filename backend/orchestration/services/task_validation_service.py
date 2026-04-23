@@ -70,7 +70,8 @@ class TaskValidationService:
 
         return await self._emit_finish_block(
             '⚠️ FINISH BLOCKED: The task plan still has active steps. '
-            'Update `task_tracker` so completed work is marked `done` and unfinished work is marked deliberately before finishing.\n\n'
+            'You must ensure all tasks are in a terminal state (`done`, `skipped`, or `blocked`) '
+            'before calling the finish tool.\n\n'
             f'Active steps:\n{bullets}{more}',
             error_id='TASK_TRACKER_INCOMPLETE',
             cause_action=action,

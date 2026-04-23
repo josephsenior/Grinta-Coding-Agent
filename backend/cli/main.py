@@ -114,7 +114,11 @@ def _app_logger_level_after_silence() -> int:
     if not _log_to_file_effective():
         return logging.ERROR
     name = os.getenv('LOG_LEVEL', 'INFO').upper()
-    mapping = logging.getLevelNamesMapping()
+    # Python 3.11+ provides getLevelNamesMapping(). Fallback for older versions.
+    if hasattr(logging, 'getLevelNamesMapping'):
+        mapping = logging.getLevelNamesMapping()
+    else:
+        mapping = logging._levelToName  # type: ignore
     return mapping.get(name, logging.INFO)
 
 
@@ -175,7 +179,8 @@ def _configure_redirected_streams(*streams: object | None) -> None:
             try:
                 reconfigure(encoding='utf-8', errors='replace')
             except Exception:
-                continue
+                # Log or handle reconfiguration failure if necessary, rather than silent continue
+                pass
 
 
 def show_grinta_splash(console: Any | None = None) -> None:
@@ -211,10 +216,14 @@ def show_grinta_splash(console: Any | None = None) -> None:
         while _raw and not _raw[-1].strip():
             _raw.pop()
         
-        width = max((len(ln) for ln in _raw), default=60)
+        # Calculate consistent width for alignment
+        logo_width = 40  # matches length of _logo lines
+        text_width = max((len(ln) for ln in _raw), default=0)
+        width = max(logo_width, text_width)
+
         _figlet_lines: list[Text] = []
         for ln in _logo:
-            t = Text.from_markup(ln.strip('\r\n'))
+            t = Text.from_markup(ln.strip())
             pad = max(0, width - len(t))
             _figlet_lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
         for ln in _raw:
@@ -231,10 +240,13 @@ def show_grinta_splash(console: Any | None = None) -> None:
             ' \\____|_| \\_\\___|_| \\_| |_/_/   \\_\\',
         ]
         
-        width = max((len(ln) for ln in _raw), default=60)
+        logo_width = 40
+        text_width = max((len(ln) for ln in _raw), default=0)
+        width = max(logo_width, text_width)
+
         _figlet_lines = []
         for ln in _logo:
-            t = Text.from_markup(ln.strip('\r\n'))
+            t = Text.from_markup(ln.strip())
             pad = max(0, width - len(t))
             _figlet_lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
         for ln in _raw:
