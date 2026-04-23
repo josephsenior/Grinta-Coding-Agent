@@ -2,28 +2,34 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic._internal._model_construction import ModelMetaclass
+
+
+def _canonical_model_instancecheck(cls: type[Any], instance: Any) -> bool:
+    if type.__instancecheck__(cls, instance):
+        return True
+    # Check if the class names match. This allows isinstance(reloaded_obj, original_class) to be True.
+    return type(instance).__name__ == cls.__name__
+
+
+def _canonical_model_subclasscheck(cls: type[Any], subclass: type[Any]) -> bool:
+    if type.__subclasscheck__(cls, subclass):
+        return True
+    # Check if the class names match. This allows issubclass(reloaded_class, original_class) to be True.
+    return getattr(subclass, '__name__', None) == cls.__name__
 
 
 class CanonicalModelMetaclass(ModelMetaclass):
     """Metaclass that ensures Pydantic models behave consistently across reloads.
 
     Instead of trying to return the same class object (which causes issues with super()),
-    this metaclass overrides __instancecheck__ and __subclasscheck__ to support
-    isinstance() and issubclass() checks across reloaded versions of the same class.
+    this metaclass overrides ``isinstance`` / ``issubclass`` behavior across reloads.
     """
 
-    def __instancecheck__(cls, instance):
-        if super().__instancecheck__(instance):
-            return True
-        # Check if the class names match. This allows isinstance(reloaded_obj, original_class) to be True.
-        return type(instance).__name__ == cls.__name__
-
-    def __subclasscheck__(cls, subclass):
-        if super().__subclasscheck__(subclass):
-            return True
-        # Check if the class names match. This allows issubclass(reloaded_class, original_class) to be True.
-        return getattr(subclass, '__name__', None) == cls.__name__
+    __instancecheck__ = _canonical_model_instancecheck  # type: ignore[assignment]
+    __subclasscheck__ = _canonical_model_subclasscheck  # type: ignore[assignment]
 
 
 class CanonicalMeta(type):
@@ -33,19 +39,19 @@ class CanonicalMeta(type):
     same class by comparing class names.
     """
 
-    def __instancecheck__(cls, instance: object) -> bool:
+    def __instancecheck__(self, instance: object) -> bool:
         if super().__instancecheck__(instance):
             return True
         # Check if the class names match.
         inst_type = type(instance)
-        if getattr(inst_type, '__name__', None) != getattr(cls, '__name__', None):
+        if getattr(inst_type, '__name__', None) != getattr(self, '__name__', None):
             # Special case for base classes to allow subclasses from other reloads
             if cls.__name__ in ('Action', 'Observation', 'Event'):
                 return any(b.__name__ == cls.__name__ for b in inst_type.__mro__)
             return False
 
         # If it's an Action/Observation, we can also check the type attribute
-        cls_type = getattr(cls, 'action', getattr(cls, 'observation', None))
+        cls_type = getattr(self, 'action', getattr(self, 'observation', None))
         inst_type_attr = getattr(
             instance, 'action', getattr(instance, 'observation', None)
         )
@@ -54,7 +60,7 @@ class CanonicalMeta(type):
 
         return True
 
-    def __subclasscheck__(cls, subclass: type) -> bool:
+    def __subclasscheck__(self, subclass: type) -> bool:
         if super().__subclasscheck__(subclass):
             return True
         # Check if the class names match.

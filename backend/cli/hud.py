@@ -10,6 +10,15 @@ from rich.console import Console, ConsoleOptions, RenderResult
 from rich.text import Text
 
 import backend
+from backend.cli.theme import (
+    CLR_HUD_DETAIL,
+    CLR_HUD_MODEL,
+    CLR_SEP,
+    CLR_STATUS_ERR,
+    CLR_STATUS_OK,
+    CLR_STATUS_WARN,
+    HUD_BG,
+)
 
 
 @dataclass
@@ -113,18 +122,21 @@ class HUDBar:
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         width = options.max_width
+        
+        full_fragments = self._format_fragments(compact=False, max_width=width)
+        full_len = sum(len(txt) for _, txt in full_fragments)
+        
         # Use compact if terminal is narrow or if the full bar would overflow.
-        use_compact = width < 80 or self._full_bar_length() > width - 2
+        use_compact = width < 80 or full_len > width - 2
         bar = self._format_compact() if use_compact else self._format()
         yield bar
 
     # Shared tight bullet separator. Matches the live branded row so the
     # committed footer and the in-progress footer feel like the same bar.
     _SEP_TEXT = ' · '
-    _SEP_STYLE = '#3a5368'
+    _SEP_STYLE = CLR_SEP
 
-    def _full_bar_length(self) -> int:
-        """Approximate character length of the full-format HUD bar."""
+    def _format_fragments(self, compact: bool = False, max_width: int = 120) -> list[tuple[str, str]]:
         provider, model = self.describe_model(self.state.model)
         ctx = self._format_tokens(self.state.context_tokens)
         lim = (
@@ -132,115 +144,83 @@ class HUDBar:
             if self.state.context_limit
             else '?'
         )
-        token_display = (
-            f'{ctx} tokens' if self.state.context_limit == 0 else f'{ctx}/{lim}'
-        )
+        
+        if self.state.context_tokens == 0 and self.state.context_limit == 0:
+            token_display = '0t' if compact else '0 tokens'
+        elif self.state.context_limit == 0:
+            token_display = f'{ctx}t' if compact else f'{ctx} tokens'
+        else:
+            token_display = ctx if compact else f'{ctx}/{lim}'
+        
         if self.state.token_usage_estimated:
-            token_display += ' est'
-        mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
-        skills_label = self._format_skills_label(self._bundled_skill_count)
-        model_display = (
-            model if provider in {'(not set)', '(unknown)'} else f'{provider}/{model}'
-        )
-        parts = [
-            f' {model_display}',
-            f'{self._SEP_TEXT}{token_display}',
-            f'{self._SEP_TEXT}${self.state.cost_usd:.4f}',
-            f'{self._SEP_TEXT}{self.state.llm_calls} calls',
-            f'{self._SEP_TEXT}{mcp_label}',
-            f'{self._SEP_TEXT}{skills_label}',
-            f'{self._SEP_TEXT}{self.state.ledger_status}',
-        ]
-        return sum(len(p) for p in parts) + 1  # +1 for leading space
+            token_display += '~' if compact else ' est'
+        
+        provider_model = model if provider in {'(not set)', '(unknown)'} else f'{provider}/{model}'
+        
+        # State + Autonomy
+        state_label = self.state.agent_state_label.upper()
+        if state_label in {'RUNNING'}:
+            state_color = 'bold #93c5fd'
+        elif state_label in {'READY', 'DONE', 'FINISHED'}:
+            state_color = 'bold #86efac'
+        elif state_label in {'NEEDS APPROVAL'}:
+            state_color = 'bold #fcd34d'
+        else:
+            state_color = 'bold #fca5a5'
+            
+        auto_level = self.state.autonomy_level.lower()
+        if 'full' in auto_level:
+            auto_color = 'bold #f1bf63'
+        elif 'supervised' in auto_level:
+            auto_color = 'bold #f0a3ff'
+        else:
+            auto_color = '#8bd8ff'
+
+        fragments: list[tuple[str, str]] = []
+        fragments.append(('bold #7dd3fc', ' GRINTA '))
+        fragments.append((state_color, state_label))
+        fragments.append(('dim', ' · '))
+        fragments.append((auto_color, f'autonomy:{auto_level}'))
+        
+        ws_path = (self.state.workspace_path or '').strip()
+        if ws_path:
+            fragments.append(('dim', ' · '))
+            fragments.append(('#94a3b8', self.ellipsize_path(ws_path, min(28, max_width - 80))))
+        
+        fragments.append(('dim', ' · '))
+        fragments.append((CLR_HUD_MODEL, provider_model))
+        fragments.append(('dim', ' · '))
+        fragments.append((CLR_HUD_DETAIL, token_display))
+        fragments.append(('dim', ' · '))
+        fragments.append((CLR_HUD_DETAIL, f'${self.state.cost_usd:.4f}'))
+        
+        if not compact:
+            mcp_num = str(self.state.mcp_servers or '?')
+            skills_num = str(self._bundled_skill_count)
+            fragments.append(('dim', ' · '))
+            fragments.append((CLR_HUD_DETAIL, f'MCP·{mcp_num}'))
+            fragments.append(('dim', ' · '))
+            fragments.append((CLR_HUD_DETAIL, f'sk·{skills_num}'))
+            fragments.append(('dim', ' · '))
+            fragments.append((self._ledger_style(), self.state.ledger_status))
+        else:
+            fragments.append(('dim', ' · '))
+            fragments.append((self._ledger_style(), self._ledger_icon()))
+            
+        fragments.append(('', ' '))
+        return fragments
 
     def _format(self) -> Text:
-        provider, model = self.describe_model(self.state.model)
-        ctx = self._format_tokens(self.state.context_tokens)
-        lim = (
-            self._format_tokens(self.state.context_limit)
-            if self.state.context_limit
-            else '?'
-        )
-        # Show a clean placeholder before the first LLM call.
-        if self.state.context_tokens == 0 and self.state.context_limit == 0:
-            token_display = '0 tokens'
-        elif self.state.context_limit == 0:
-            token_display = f'{ctx} tokens'
-        else:
-            token_display = f'{ctx}/{lim}'
-        if self.state.token_usage_estimated:
-            token_display += ' est'
-        mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
-        skills_label = self._format_skills_label(self._bundled_skill_count)
-        # Combined "provider/model" — the explicit "provider:" and "model:"
-        # labels were visual weight without information gain.
-        if provider in {'(not set)', '(unknown)'}:
-            model_display = model
-        else:
-            model_display = f'{provider}/{model}'
-        SEP = (self._SEP_TEXT, self._SEP_STYLE)
-        parts = [
-            (' ', ''),
-            (model_display, 'bold #dbe7f3'),
-            SEP,
-            (token_display, '#b4c4d5'),
-            SEP,
-            (f'${self.state.cost_usd:.4f}', '#b4c4d5'),
-            SEP,
-            (f'{self.state.llm_calls} calls', '#b4c4d5'),
-            SEP,
-            (mcp_label, '#b4c4d5'),
-            SEP,
-            (skills_label, '#b4c4d5'),
-            SEP,
-            (self.state.ledger_status, self._ledger_style()),
-        ]
+        """Full format for > 80 cols."""
         txt = Text()
-        for content, style in parts:
+        for style, content in self._format_fragments(compact=False):
             txt.append(content, style=style)
         return txt
 
     def _format_compact(self) -> Text:
         """Compact format for narrow terminals (< 80 cols)."""
-        provider, model = self.describe_model(self.state.model)
-        ctx = self._format_tokens(self.state.context_tokens)
-        if self.state.context_tokens == 0 and self.state.context_limit == 0:
-            token_display = '0t'
-        elif self.state.context_limit == 0:
-            token_display = f'{ctx}t'
-        else:
-            token_display = ctx
-        if self.state.token_usage_estimated:
-            token_display += '~'
-        mcp_short = (
-            '?'
-            if self.state.mcp_servers is None
-            else str(min(self.state.mcp_servers, 99))
-        )
-        sk_short = str(min(self._bundled_skill_count, 99))
-        if provider in {'(not set)', '(unknown)'}:
-            model_display = model
-        else:
-            model_display = f'{provider}/{model}'
-        # Compact glyphs: ``MCP·N`` / ``sk·N`` read faster than ``mN`` / ``kN``.
-        parts = [
-            (
-                model_display,
-                'dim',
-            ),
-            (' ', 'grey27'),
-            (token_display, 'dim'),
-            (' ', 'grey27'),
-            (f'${self.state.cost_usd:.3f}', 'dim'),
-            (' ', 'grey27'),
-            (f'MCP·{mcp_short}', 'dim'),
-            (' ', 'grey27'),
-            (f'sk·{sk_short}', 'dim'),
-            (' ', 'grey27'),
-            (self._ledger_icon(), self._ledger_style()),
-        ]
         txt = Text()
-        for content, style in parts:
+        for style, content in self._format_fragments(compact=True):
             txt.append(content, style=style)
         return txt
 
@@ -259,12 +239,12 @@ class HUDBar:
 
     def _ledger_style(self) -> str:
         if self.state.ledger_status in {'Healthy', 'Ready', 'Idle', 'Starting'}:
-            return '#8fdfb1 bold'
+            return f'{CLR_STATUS_OK} bold'
         if self.state.ledger_status == 'Review':
-            return '#fcd34d bold'
+            return f'{CLR_STATUS_WARN} bold'
         if self.state.ledger_status == 'Paused':
-            return '#fcd34d'
-        return '#fca5a5 bold'
+            return CLR_STATUS_WARN
+        return f'{CLR_STATUS_ERR} bold'
 
     @staticmethod
     def _format_tokens(n: int) -> str:
@@ -463,7 +443,7 @@ class HUDBar:
         pad = max(0, width - len(bar.plain) - 2)
         console.print(
             Text('  ') + bar + Text(' ' * pad),
-            style='on grey15',
+            style=f'on {HUD_BG}',
             highlight=False,
             end='',
         )

@@ -98,12 +98,12 @@ class TestDefaultShellArgv:
 
 class TestOutputBetweenLastTwoPs1:
     def test_parses_segment_and_exit(self) -> None:
-        p1 = {
+        p1: dict[str, str | int] = {
             'pid': 100,
             'exit_code': 0,
             'username': 'u',
             'hostname': 'h',
-            'working_dir': '/tmp',
+            'working_dir': '/workspace',
             'py_interpreter_path': '/usr/bin/python',
         }
         p2 = {**p1, 'exit_code': 0, 'pid': 200}
@@ -113,7 +113,7 @@ class TestOutputBetweenLastTwoPs1:
         out, meta = _output_between_last_two_ps1(buf, 'echo grinta-ps1-slice')
         assert 'grinta-ps1-slice' in out
         assert meta.exit_code == 0
-        assert meta.working_dir == '/tmp'
+        assert meta.working_dir == '/workspace'
 
     def test_too_few_blocks_returns_error_meta(self) -> None:
         out, meta = _output_between_last_two_ps1('nope', 'x')

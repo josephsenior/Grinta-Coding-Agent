@@ -145,7 +145,11 @@ class ChromaDBBackend(VectorBackend):
 
                 snapshot_fn: Any = None
                 try:
-                    from huggingface_hub import snapshot_download as snapshot_fn
+                    from huggingface_hub import (
+                        snapshot_download as huggingface_snapshot_download,
+                    )
+
+                    snapshot_fn = huggingface_snapshot_download
                 except Exception:
                     pass
                 from sentence_transformers import SentenceTransformer

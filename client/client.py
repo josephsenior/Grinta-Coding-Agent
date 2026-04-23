@@ -183,11 +183,17 @@ class AppClient:
         detail: str = ''
         try:
             body = resp.json()
-            detail = (
-                body.get('detail') or body.get('message') or body.get('error') or ''
-            )
-            if isinstance(detail, list):  # FastAPI validation errors
-                detail = '; '.join(str(e.get('msg', e)) for e in detail)
+            if isinstance(body, dict):
+                detail_raw = (
+                    body.get('detail') or body.get('message') or body.get('error')
+                )
+                if isinstance(detail_raw, list):  # FastAPI validation errors
+                    detail = '; '.join(
+                        str(e.get('msg', e)) if isinstance(e, dict) else str(e)
+                        for e in detail_raw
+                    )
+                elif detail_raw:
+                    detail = str(detail_raw)
         except Exception:
             detail = (
                 getattr(resp, 'text', '') or getattr(resp, 'reason_phrase', '') or ''

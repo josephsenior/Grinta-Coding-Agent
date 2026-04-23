@@ -140,6 +140,9 @@ def create_terminal_manager_tool() -> dict[str, Any]:
 def _opt_int(v: object) -> int | None:
     if v is None or v == '':
         return None
+    if not isinstance(v, (int, str, bytes, bytearray)):
+        msg = f'Expected an integer-compatible value, got {type(v).__name__}'
+        raise TypeError(msg)
     return int(v)
 
 

@@ -49,16 +49,18 @@ class TestConversationMetadataDefaults:
             title='Test',
             selected_repository=None,
         )
-        assert md.user_id is None
-        assert md.selected_branch is None
-        assert md.vcs_provider is None
-        assert md.trigger is None
-        assert md.pr_number == []
-        assert md.llm_model is None
-        assert md.accumulated_cost == 0.0
-        assert md.prompt_tokens == 0
-        assert md.completion_tokens == 0
-        assert md.total_tokens == 0
+        assert (
+            md.user_id,
+            md.selected_branch,
+            md.vcs_provider,
+            md.trigger,
+            md.pr_number,
+            md.llm_model,
+            md.accumulated_cost,
+            md.prompt_tokens,
+            md.completion_tokens,
+            md.total_tokens,
+        ) == (None, None, None, None, [], None, 0.0, 0, 0, 0)
 
     def test_created_at_auto(self):
         before = datetime.now(UTC)

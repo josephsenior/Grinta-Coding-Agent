@@ -212,14 +212,12 @@ class PathValidator:
 
 def _validate_path_string(path: str) -> str:
     """Validate path string: empty check, URL decode, null bytes, length, dangerous chars, traversal."""
-    if not path or not isinstance(path, str):
+    if not path:
         raise PathValidationError('Path must be a non-empty string', path)
     try:
         path = unquote(path)
     except Exception as e:
         raise PathValidationError(f'Invalid URL encoding: {e}', path) from e
-    if '\x00' in path:
-        raise PathValidationError('Path contains null bytes', path)
     if len(path) > MAX_PATH_LENGTH:
         raise PathValidationError(
             f'Path too long (max {MAX_PATH_LENGTH}): {len(path)}', path
@@ -230,12 +228,18 @@ def _validate_path_string(path: str) -> str:
                 f'Path contains dangerous character: {repr(char)}', path
             )
     normalized_input = path.replace('\\', '/')
-    for pattern in PATH_TRAVERSAL_PATTERNS:
-        if pattern in normalized_input:
-            raise PathValidationError(f'Path traversal detected: {pattern}', path)
+    matched_pattern = next(
+        (pattern for pattern in PATH_TRAVERSAL_PATTERNS if pattern in normalized_input),
+        None,
+    )
+    has_dotdot_segment = _DOTDOT_SEGMENT_RE.search(normalized_input) is not None
+    if matched_pattern is not None:
+        raise PathValidationError(
+            f'Path traversal detected: {matched_pattern}', path
+        )
     # Check for ".." as a standalone path segment (avoids false positives on
     # bracket patterns like Next.js catch-all routes:  [...nextauth])
-    if _DOTDOT_SEGMENT_RE.search(normalized_input):
+    if has_dotdot_segment:
         raise PathValidationError('Path traversal detected: ..', path)
     return path
 

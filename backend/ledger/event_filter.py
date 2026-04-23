@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from backend.ledger.serialization.event import event_to_dict
@@ -93,15 +94,29 @@ class EventFilter:
 
     def _check_date_filters(self, event: Event) -> bool:
         """Check if event passes date-based filters."""
-        if event.timestamp is None:
+        event_timestamp = event.timestamp
+        if event_timestamp is None:
             return True
 
+        start_date = self._parse_filter_date(self.start_date)
+        end_date = self._parse_filter_date(self.end_date)
+
         # Check start date
-        if self.start_date and event.timestamp < self.start_date:
+        if start_date is not None and event_timestamp < start_date:
             return False
 
         # Check end date
-        return not self.end_date or event.timestamp <= self.end_date
+        return end_date is None or event_timestamp <= end_date
+
+    @staticmethod
+    def _parse_filter_date(raw_value: str | None) -> datetime | None:
+        """Parse ISO-format filter dates, ignoring invalid values."""
+        if not raw_value:
+            return None
+        try:
+            return datetime.fromisoformat(raw_value)
+        except ValueError:
+            return None
 
     def _check_hidden_filter(self, event: Event) -> bool:
         """Check if event passes hidden filter."""

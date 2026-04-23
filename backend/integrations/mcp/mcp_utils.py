@@ -62,7 +62,7 @@ def _get_mcp_connect_timeout_sec() -> float:
 _ENV_VAR_PATTERN = re.compile(r'^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$')
 
 
-def _resolve_server_env(raw_env: dict[str, str] | None) -> dict[str, str] | None:
+def _resolve_server_env(raw_env: dict[str, Any] | None) -> dict[str, str] | None:
     """Resolve MCP server env values against ``os.environ``.
 
     Rules (applied per key/value):
@@ -85,13 +85,15 @@ def _resolve_server_env(raw_env: dict[str, str] | None) -> dict[str, str] | None
     (same order as the CLI: env, settings, cwd), then ``os.getcwd()`` so MCP
     children like Rigour always receive a concrete path.
     """
-    if not raw_env:
-        return raw_env
+    if raw_env is None:
+        return None
+    if len(raw_env) == 0:
+        return {}
 
     resolved: dict[str, str] = {}
     for key, value in raw_env.items():
         if not isinstance(value, str):
-            resolved[key] = value
+            resolved[key] = str(value)
             continue
 
         if value == '':
@@ -101,29 +103,29 @@ def _resolve_server_env(raw_env: dict[str, str] | None) -> dict[str, str] | None
             continue
 
         match = _ENV_VAR_PATTERN.match(value.strip())
-        if match:
-            var_name = match.group(1)
-            from_env = os.environ.get(var_name)
-            if from_env:
-                resolved[key] = from_env
-                continue
-            if var_name == 'PROJECT_ROOT':
-                from backend.core.workspace_resolution import (
-                    get_effective_workspace_root,
-                )
-
-                eff = get_effective_workspace_root()
-                if eff is not None:
-                    resolved[key] = str(eff.resolve())
-                else:
-                    try:
-                        resolved[key] = str(Path.cwd().resolve())
-                    except OSError:
-                        pass
-                continue
+        if match is None:
+            resolved[key] = value
             continue
 
-        resolved[key] = value
+        var_name = match.group(1)
+        from_env = os.environ.get(var_name)
+        if from_env:
+            resolved[key] = from_env
+            continue
+        if var_name == 'PROJECT_ROOT':
+            from backend.core.workspace_resolution import (
+                get_effective_workspace_root,
+            )
+
+            eff = get_effective_workspace_root()
+            if eff is not None:
+                resolved[key] = str(eff.resolve())
+            else:
+                try:
+                    resolved[key] = str(Path.cwd().resolve())
+                except OSError:
+                    pass
+        continue
 
     return resolved
 
@@ -642,11 +644,11 @@ def _repair_args_with_schema(
     args: dict[str, Any], input_schema: dict[str, Any] | None
 ) -> tuple[dict[str, Any], bool]:
     """Repair argument types against the MCP tool's declared input schema."""
-    if not isinstance(args, dict) or not isinstance(input_schema, dict):
+    if input_schema is None or not isinstance(input_schema, dict):
         return args, False
 
     properties = input_schema.get('properties')
-    if not isinstance(properties, dict) or not properties:
+    if not isinstance(properties, dict) or len(properties) == 0:
         return args, False
 
     repaired = copy.deepcopy(args)

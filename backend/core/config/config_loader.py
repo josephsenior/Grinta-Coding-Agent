@@ -270,9 +270,10 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
                 if not filtered:
                     continue
                 try:
-                    base = cfg.get_agent_config(agent_name)
-                    merged = {**base.model_dump(), **filtered}
-                    cfg.agents[agent_name] = AgentConfig.model_validate(merged)
+                    agent_base = cfg.get_agent_config(agent_name)
+                    merged = {**agent_base.model_dump(), **filtered}
+                    agent_configs: dict[str, AgentConfig] = cfg.agents
+                    agent_configs[agent_name] = AgentConfig.model_validate(merged)
                 except Exception as exc:
                     logger.app_logger.warning(
                         'Skipping invalid agent overrides for %r in %s: %s',

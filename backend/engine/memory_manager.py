@@ -206,9 +206,9 @@ class ContextMemoryManager:
                     )
                     cloned.source = source
                     if hasattr(event, 'id'):
-                        cloned.id = getattr(event, 'id')
+                        cloned.id = event.id
                     if hasattr(event, 'timestamp'):
-                        cloned.timestamp = getattr(event, 'timestamp')
+                        cloned.timestamp = event.timestamp
                     return cloned
             except Exception:
                 continue

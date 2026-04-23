@@ -288,10 +288,9 @@ class AppConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         """
         llm_spec = agent_config.llm_config
-        if isinstance(llm_spec, LLMConfig):
+        if llm_spec is not None:
             return llm_spec
-        llm_config_name = llm_spec if llm_spec is not None else 'llm'
-        return self.get_llm_config(llm_config_name)
+        return self.get_llm_config('llm')
 
     def get_llm_config_from_agent(self, name: str = 'agent') -> LLMConfig:
         """Get LLM configuration for named agent.

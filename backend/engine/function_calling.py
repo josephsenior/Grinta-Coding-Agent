@@ -631,11 +631,11 @@ def _handle_mcp_tool(
     )
 
     # Basic validation - ensure arguments is a dict
-    if isinstance(arguments, Mapping):
-        normalized_args = dict(arguments)
-    else:
+    if arguments is None:
         logger.warning('MCP tool arguments is not a mapping, got: %s', type(arguments))
         normalized_args = {}
+    else:
+        normalized_args = dict(arguments)
 
     return MCPAction(name=tool_call_name, arguments=normalized_args)
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from backend.execution.drivers.action_execution.action_execution_client import (
@@ -13,7 +14,7 @@ from backend.utils.http_session import HttpSession
 def test_send_action_server_request_uses_http_session() -> None:
     client = ActionExecutionClient.__new__(ActionExecutionClient)
     client._action_server_session = HttpSession()
-    client.action_execution_server_url = 'http://127.0.0.1:9'
+    cast(Any, client).action_execution_server_url = 'http://127.0.0.1:9'
 
     with patch(
         'backend.execution.drivers.action_execution.action_execution_client.send_request'

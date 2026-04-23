@@ -83,7 +83,8 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(self.service._task_loop)
 
         # Cleanup
-        task = cast(asyncio.Task[Any], self.service._retry_worker_task)
+        task = self.service._retry_worker_task
+        assert task is not None
         task.cancel()
         try:
             await task

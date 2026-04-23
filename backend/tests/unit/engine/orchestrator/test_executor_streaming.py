@@ -600,11 +600,14 @@ def test_response_to_actions_allows_conversational_plain_message(monkeypatch):
 
     actions = executor._response_to_actions(response)
 
+    from backend.ledger.action import MessageAction
+
     assert len(actions) == 1
+    assert isinstance(actions[0], MessageAction)
     assert (
         actions[0].content
         == 'I have prepared a rating of the system and the tools for you.'
-    )  # type: ignore
+    )
 
 
 def test_response_to_actions_allows_structured_non_runnable_action(monkeypatch):

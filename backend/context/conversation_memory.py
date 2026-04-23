@@ -34,7 +34,7 @@ from backend.context.tool_call_tracker import (
 from backend.context.vector_store import EnhancedVectorStore
 from backend.core.config.agent_config import AgentConfig
 from backend.core.logger import app_logger as logger
-from backend.core.message import Message, TextContent
+from backend.core.message import ImageContent, Message, TextContent
 from backend.core.schemas import ActionType
 from backend.core.workspace_context import ensure_project_state_dir
 from backend.inference.tool_result_format import encode_tool_result_payload
@@ -690,7 +690,7 @@ class ContextMemory:
         # Handle tool call metadata
         if (tool_call_metadata := getattr(obs, 'tool_call_metadata', None)) is not None:
             tool_name = tool_call_metadata.function_name
-            encoded_content: list[TextContent]
+            encoded_content: list[TextContent | ImageContent]
             tool_result = getattr(obs, 'tool_result', None)
             if isinstance(tool_result, dict):
                 encoded_content = [

@@ -109,7 +109,8 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             raise ValueError(f'Server name cannot be empty: {e}') from e
 
         v = v.strip()
-        if not re.match('^[a-zA-Z0-9_-]+$', v):
+        matches_name = re.fullmatch(r'[a-zA-Z0-9_-]+', v) is not None
+        if not matches_name:
             msg = 'Server name can only contain letters, numbers, hyphens, and underscores'
             raise ValueError(msg)
         return v
@@ -146,14 +147,18 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             except ValueError as e:
                 msg = f'Invalid argument format: {e!s}. Use shell-like format, e.g., "arg1 arg2" or \'--config "value with spaces"\''
                 raise ValueError(msg) from e
-        return v or []
+        if v is None:
+            return []
+        return list(v)
 
     @field_validator('env', mode='before')
     @classmethod
     def parse_env(cls, v) -> dict[str, str]:
         """Parse environment variables from string or return dict as-is."""
         if not isinstance(v, str):
-            return v or {}
+            if v is None:
+                return {}
+            return dict(v)
         if not v.strip():
             return {}
         env = {}
@@ -166,10 +171,11 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 raise ValueError(msg)
             key, value = pair.split('=', 1)
             key = key.strip()
-            if not key:
+            if key == '':
                 msg = 'Environment variable key cannot be empty'
                 raise ValueError(msg)
-            if not re.match('^[a-zA-Z_][a-zA-Z0-9_]*$', key):
+            valid_env_key = re.fullmatch(r'[a-zA-Z_][a-zA-Z0-9_]*', key) is not None
+            if not valid_env_key:
                 msg = f"Invalid environment variable name '{key}'. Must start with letter or underscore, contain only alphanumeric characters and underscores"
                 raise ValueError(msg)
             env[key] = value
@@ -181,7 +187,7 @@ class MCPServerConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         if v is None:
             return None
         s = str(v).strip()
-        if not s:
+        if s == '':
             return None
         if len(s) > 800:
             return s[:800].rstrip()

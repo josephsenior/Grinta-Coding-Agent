@@ -34,7 +34,7 @@ class TestFileOperation:
     def test_defaults(self):
         op = FileOperation(
             operation_type=FileOperationType.WRITE,
-            file_path='/tmp/a.txt',
+            file_path='/workspace/a.txt',
         )
         assert op.new_content is None
         assert op.old_content is None
@@ -43,7 +43,7 @@ class TestFileOperation:
     def test_full_construction(self):
         op = FileOperation(
             operation_type=FileOperationType.EDIT,
-            file_path='/tmp/b.txt',
+            file_path='/workspace/b.txt',
             new_content='new',
             old_content='old',
             existed_before=True,
@@ -56,6 +56,10 @@ class TestFileOperation:
 # ===================================================================
 # FileTransaction — write / edit / delete / rollback
 # ===================================================================
+
+
+async def _raise_value_error(message: str) -> None:
+    raise ValueError(message)
 
 
 class TestFileTransaction:
@@ -236,8 +240,7 @@ class TestFileTransaction:
         with pytest.raises(ValueError, match='boom'):
             async with txn:
                 await txn.write_file(file_path, 'temporary')
-                raise ValueError('boom')
-
+                await _raise_value_error('boom')
         # Should have been rolled back
         assert not os.path.exists(file_path)
 

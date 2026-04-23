@@ -36,27 +36,28 @@ _TEMP_HINT = re.compile(
 _LOG_OR_TMP_SUFFIX = re.compile(r'(?i)\.(?:log|tmp)(?:\s|$|"|\')')
 
 
+def _search_matches(pattern: re.Pattern[str], text: str) -> bool:
+    return pattern.search(text) is not None
+
+
 def _command_targets_only_logs_or_temp(command: str) -> bool:
     """Heuristic: cmdlet/redirection only touches .log/.tmp or a temp directory."""
-    if _TEMP_HINT.search(command):
-        return True
-    # Set-Content foo.log ...
-    if _LOG_OR_TMP_SUFFIX.search(command):
-        return True
-    return False
+    return _search_matches(_TEMP_HINT, command) or _search_matches(
+        _LOG_OR_TMP_SUFFIX, command
+    )
 
 
 def _powershell_write_blocked(command: str) -> bool:
-    if not (_PS_FILE_WRITER.search(command) or _PS_NEW_FILE.search(command)):
+    writes_file = _search_matches(_PS_FILE_WRITER, command)
+    creates_file = _search_matches(_PS_NEW_FILE, command)
+    if not writes_file and not creates_file:
         return False
-    if _command_targets_only_logs_or_temp(command):
-        return False
-    return True
+    return not _command_targets_only_logs_or_temp(command)
 
 
 def _redirection_write_blocked(command: str) -> bool:
     """True if a shell redirect writes to a non-log file (stdout/err to file)."""
-    if _TEMP_HINT.search(command):
+    if _search_matches(_TEMP_HINT, command):
         return False
     # Match > or >> targets; skip 2>&1 style when it's only merging streams into prior redirect.
     for m in re.finditer(
@@ -64,9 +65,10 @@ def _redirection_write_blocked(command: str) -> bool:
         command,
     ):
         target = m.group(1).strip('`"\'')
-        if not target or target in {'&1', '&2', '-'}:
+        lowered = target.lower()
+        if target == '' or target in {'&1', '&2', '-'}:
             continue
-        if target.lower() in {
+        if lowered in {
             '/dev/null',
             'nul',
             '$null',
@@ -74,36 +76,35 @@ def _redirection_write_blocked(command: str) -> bool:
             '/dev/stderr',
         }:
             continue
-        if target.lower().endswith(('.log', '.tmp')):
-            continue
-        # Windows NUL / null device
-        if re.match(r'(?i)nul$', target):
+        if lowered.endswith(('.log', '.tmp')):
             continue
         return True
     return False
 
 
 def _tee_blocked(command: str) -> bool:
-    if not re.search(r'(?i)(?:^|[\s;|])\btee\b', command):
+    has_tee = re.search(r'(?i)(?:^|[\s;|])\btee\b', command) is not None
+    if not has_tee:
         return False
-    if _LOG_OR_TMP_SUFFIX.search(command) or _TEMP_HINT.search(command):
-        return False
-    return True
+    return not _command_targets_only_logs_or_temp(command)
 
 
 def _dd_blocked(command: str) -> bool:
-    if not re.search(r'(?i)\bdd\b', command):
+    has_dd = re.search(r'(?i)\bdd\b', command) is not None
+    if not has_dd:
         return False
-    if not re.search(r'(?i)\bof=', command):
+    has_output_file = re.search(r'(?i)\bof=', command) is not None
+    if not has_output_file:
         return False
-    return not _TEMP_HINT.search(command)
+    return not _search_matches(_TEMP_HINT, command)
 
 
 def _likely_toolchain_command(command: str) -> bool:
     first = command.lstrip()
-    if _TOOLCHAIN_LINE.match(first):
+    matches_toolchain_line = _TOOLCHAIN_LINE.match(first) is not None
+    if matches_toolchain_line:
         return True
-    return bool(_TOOLCHAIN_ANYWHERE.search(command))
+    return _TOOLCHAIN_ANYWHERE.search(command) is not None
 
 
 def _env_allow_shell_writes() -> bool:

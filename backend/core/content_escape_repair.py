@@ -231,8 +231,6 @@ def repair_literal_escapes(
     output against NVIDIA's OpenAI-compatible endpoint), and no HTML/CSS
     grammar accepts ``\\n`` as source text.
     """
-    if not isinstance(content, str):
-        return RepairReport(content, False, 0, 'not_applicable')
     if not _is_structured_text_path(path):
         return RepairReport(content, False, 0, 'not_applicable')
     if not has_literal_escape_residue(content, path):
@@ -281,7 +279,7 @@ CONTENT_ARG_NAMES: tuple[str, ...] = (
 
 
 def repair_arguments_in_place(
-    arguments: dict, path: str | os.PathLike[str] | None
+    arguments: object, path: str | os.PathLike[str] | None
 ) -> list[tuple[str, int]]:
     """Repair any content-bearing string field of ``arguments`` in place.
 

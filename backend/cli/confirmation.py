@@ -17,6 +17,7 @@ from backend.ledger.action import (
     FileEditAction,
     FileWriteAction,
 )
+from backend.cli.theme import CLR_RISK_ASK, CLR_RISK_HIGH, CLR_RISK_LOW, CLR_RISK_MEDIUM
 
 
 def _risk_label(action: Action) -> tuple[str, str]:
@@ -29,12 +30,12 @@ def _risk_label(action: Action) -> tuple[str, str]:
         risk = ActionSecurityRisk.UNKNOWN
 
     if risk == ActionSecurityRisk.HIGH:
-        return ('HIGH', 'bold red')
+        return ('HIGH', CLR_RISK_HIGH)
     if risk == ActionSecurityRisk.MEDIUM:
-        return ('MEDIUM', 'yellow')
+        return ('MEDIUM', CLR_RISK_MEDIUM)
     if risk == ActionSecurityRisk.LOW:
-        return ('LOW', 'green')
-    return ('ASK', 'yellow')
+        return ('LOW', CLR_RISK_LOW)
+    return ('ASK', CLR_RISK_ASK)
 
 
 def _action_label(action: Action) -> str:

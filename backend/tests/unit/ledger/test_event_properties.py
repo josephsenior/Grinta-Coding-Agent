@@ -83,12 +83,17 @@ class TestEventTimestamp:
         e = Event()
         dt = datetime(2025, 6, 15, 12, 0, 0)
         e.timestamp = dt
-        assert e.timestamp == '2025-06-15T12:00:00'
+        assert e.timestamp == dt
+
+    def test_get_from_serialized_string(self):
+        e = Event()
+        e._timestamp = '2025-06-15T12:00:00'
+        assert e.timestamp == datetime(2025, 6, 15, 12, 0, 0)
 
     def test_set_non_datetime_ignored(self):
         e = Event()
-        e.timestamp = 'not-a-datetime'  # type: ignore
-        # timestamp setter checks isinstance(value, datetime)
+        e._timestamp = 'not-a-datetime'
+        # Invalid serialized values should not surface as usable datetimes.
         assert e.timestamp is None
 
 
@@ -98,9 +103,9 @@ class TestEventSource:
         e.source = EventSource.USER
         assert e.source == EventSource.USER
 
-    def test_set_valid_string(self):
+    def test_get_valid_serialized_string(self):
         e = Event()
-        e.source = EventSource.USER.value
+        e._source = EventSource.USER.value
         assert e.source == EventSource.USER
 
     def test_set_none(self):

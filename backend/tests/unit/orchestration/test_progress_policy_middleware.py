@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -9,9 +10,11 @@ from backend.orchestration.middleware.progress_policy import ProgressPolicyMiddl
 from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
-def _ctx_for(action: CmdRunAction | TerminalInputAction) -> ToolInvocationContext:
-    controller = SimpleNamespace()
-    state = SimpleNamespace(extra_data={})
+def _ctx_for(
+    action: CmdRunAction | TerminalInputAction | TerminalReadAction,
+) -> ToolInvocationContext:
+    controller = cast(Any, SimpleNamespace())
+    state = cast(Any, SimpleNamespace(extra_data={}))
     return ToolInvocationContext(controller=controller, action=action, state=state)
 
 
@@ -25,8 +28,11 @@ async def test_progress_policy_blocks_repeated_signature_without_progress() -> N
         assert ctx.blocked is False
 
     await mw.execute(ctx)
-    assert ctx.blocked is True
-    assert 'POLICY_GATE_REPLAN_REQUIRED' in (ctx.block_reason or '')
+    assert (
+        ctx.blocked
+        and isinstance(ctx.block_reason, str)
+        and 'POLICY_GATE_REPLAN_REQUIRED' in ctx.block_reason
+    )
 
 
 @pytest.mark.asyncio
@@ -88,10 +94,10 @@ async def test_progress_policy_blocks_repeated_terminal_read_earlier() -> None:
     ctx = _ctx_for(act)
 
     await mw.execute(ctx)
-    assert ctx.blocked is False
+    assert not ctx.blocked
     await mw.execute(ctx)
-    assert ctx.blocked is False
+    assert not ctx.blocked
 
     await mw.execute(ctx)
-    assert ctx.blocked is True
+    assert ctx.blocked
     assert 'POLICY_GATE_REPLAN_REQUIRED' in (ctx.block_reason or '')

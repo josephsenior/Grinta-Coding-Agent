@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
+from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 from backend.ledger.action.commands import CmdRunAction
@@ -112,7 +113,7 @@ class TestOnPlan:
         ctx = MagicMock()
         ctx.metadata = {}
         ctx.action = CmdRunAction(command='ls')
-        ctx.action.action = 'run_command'
+        cast(Any, ctx.action).action = 'run_command'
 
         tt.on_plan(ctx)
 

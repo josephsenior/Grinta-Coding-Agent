@@ -53,6 +53,18 @@ _NETWORK_COMMAND_ALIASES = {
     'iwr': 'invoke-webrequest',
     'irm': 'invoke-restmethod',
 }
+_PACKAGE_COMMAND_PATTERNS: tuple[tuple[str, str], ...] = (
+    (r'\b(?:python\s+-m\s+pip|pip(?:3)?)\s+install\b', 'pip_install'),
+    (r'\buv\s+(?:pip\s+install|add)\b', 'uv_install'),
+    (r'\bpoetry\s+add\b', 'poetry_add'),
+    (r'\bconda\s+install\b', 'conda_install'),
+    (r'\bpipx\s+install\b', 'pipx_install'),
+    (r'\bnpm\s+install\b', 'npm_install'),
+    (r'\bpnpm\s+add\b', 'pnpm_add'),
+    (r'\byarn\s+add\b', 'yarn_add'),
+    (r'\binstall-module\b', 'install_module'),
+    (r'\binstall-package\b', 'install_package'),
+)
 
 
 @dataclass(slots=True)
@@ -100,26 +112,9 @@ def extract_git_subcommand(command: str) -> str | None:
 
 def classify_package_command(command: str) -> str | None:
     lowered = command.lower()
-    if re.search(r'\b(?:python\s+-m\s+pip|pip(?:3)?)\s+install\b', lowered):
-        return 'pip_install'
-    if re.search(r'\buv\s+(?:pip\s+install|add)\b', lowered):
-        return 'uv_install'
-    if re.search(r'\bpoetry\s+add\b', lowered):
-        return 'poetry_add'
-    if re.search(r'\bconda\s+install\b', lowered):
-        return 'conda_install'
-    if re.search(r'\bpipx\s+install\b', lowered):
-        return 'pipx_install'
-    if re.search(r'\bnpm\s+install\b', lowered):
-        return 'npm_install'
-    if re.search(r'\bpnpm\s+add\b', lowered):
-        return 'pnpm_add'
-    if re.search(r'\byarn\s+add\b', lowered):
-        return 'yarn_add'
-    if re.search(r'\binstall-module\b', lowered):
-        return 'install_module'
-    if re.search(r'\binstall-package\b', lowered):
-        return 'install_package'
+    for pattern, label in _PACKAGE_COMMAND_PATTERNS:
+        if re.search(pattern, lowered):
+            return label
     return None
 
 

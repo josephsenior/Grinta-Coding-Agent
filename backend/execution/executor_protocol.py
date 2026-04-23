@@ -21,6 +21,11 @@ from backend.ledger.action import (
     FileWriteAction,
     LspQueryAction,
 )
+from backend.ledger.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 from backend.ledger.observation import Observation
 
 
@@ -73,3 +78,11 @@ class RuntimeExecutorProtocol(Protocol):
     async def edit(self, action: FileEditAction) -> Observation: ...
 
     async def lsp_query(self, action: LspQueryAction) -> Observation: ...
+
+    async def terminal_run(self, action: TerminalRunAction) -> Observation: ...
+
+    async def terminal_input(self, action: TerminalInputAction) -> Observation: ...
+
+    async def terminal_read(self, action: TerminalReadAction) -> Observation: ...
+
+    async def browser_tool(self, action: Any) -> Observation: ...

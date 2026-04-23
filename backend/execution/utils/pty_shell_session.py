@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from backend.ledger.observation import Observation
 
 
-IS_WINDOWS = os.name == 'nt'
+IS_WINDOWS = os.name == "nt"
 
 # Small pause after writes to let the PTY drain into the reader buffer before
 # the caller grabs output. Not a correctness requirement — just a usability
@@ -73,8 +73,8 @@ def _output_between_last_two_ps1(
             exit_code=-1,
             working_dir=None,
             suffix=(
-                '\n[Could not isolate command output: expected PS1 JSON markers '
-                'before and after the command.]\n'
+                "\n[Could not isolate command output: expected PS1 JSON markers "
+                "before and after the command.]\n"
             ),
         )
     prev_m, last_m = matches[-2], matches[-1]
@@ -88,62 +88,62 @@ def _argv_looks_like_bash(argv: list[str]) -> bool:
     if not argv or not argv[0]:
         return False
     base = os.path.basename(argv[0].lower())
-    if base in {'bash', 'bash.exe', 'msys-bash.exe'}:
+    if base in {"bash", "bash.exe", "msys-bash.exe"}:
         return True
-    return 'bash' in base
+    return "bash" in base
 
 
 def _norm_tty_text(text: str) -> str:
     """Normalize CRLF so PS1 JSON regex/JSON sees stable newlines (Windows PTYs)."""
-    return text.replace('\r\n', '\n').replace('\r', '\n')
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 # Aliases recognized by ``write_input(is_control=True)``. Keys are normalized
 # to lower case and stripped. Values are control-sequence alias names fed into
 # :data:`CONTROL_SEQUENCES`.
 _CONTROL_ALIASES: dict[str, str] = {
-    'c-c': 'c',
-    'ctrl-c': 'c',
-    'ctrl+c': 'c',
-    '^c': 'c',
-    '\x03': 'c',
-    'c-d': 'd',
-    'ctrl-d': 'd',
-    'ctrl+d': 'd',
-    '^d': 'd',
-    '\x04': 'd',
-    'c-z': 'z',
-    'ctrl-z': 'z',
-    'ctrl+z': 'z',
-    '\x1a': 'z',
-    'c-\\': 'backslash',
-    'ctrl-\\': 'backslash',
-    '\x1c': 'backslash',
-    'esc': 'esc',
-    'escape': 'esc',
-    '\x1b': 'esc',
-    'tab': 'tab',
-    '\t': 'tab',
-    'enter': 'enter',
-    'return': 'enter',
-    '\r': 'enter',
+    "c-c": "c",
+    "ctrl-c": "c",
+    "ctrl+c": "c",
+    "^c": "c",
+    "\x03": "c",
+    "c-d": "d",
+    "ctrl-d": "d",
+    "ctrl+d": "d",
+    "^d": "d",
+    "\x04": "d",
+    "c-z": "z",
+    "ctrl-z": "z",
+    "ctrl+z": "z",
+    "\x1a": "z",
+    "c-\\": "backslash",
+    "ctrl-\\": "backslash",
+    "\x1c": "backslash",
+    "esc": "esc",
+    "escape": "esc",
+    "\x1b": "esc",
+    "tab": "tab",
+    "\t": "tab",
+    "enter": "enter",
+    "return": "enter",
+    "\r": "enter",
 }
 
 
 def _default_shell_argv() -> list[str]:
     """Pick a reasonable long-lived interactive shell for this OS."""
     if IS_WINDOWS:
-        pwsh = shutil.which('pwsh')
+        pwsh = shutil.which("pwsh")
         if pwsh:
-            return [pwsh, '-NoLogo', '-NoProfile']
-        powershell = shutil.which('powershell')
+            return [pwsh, "-NoLogo", "-NoProfile"]
+        powershell = shutil.which("powershell")
         if powershell:
-            return [powershell, '-NoLogo', '-NoProfile']
-        return ['cmd.exe']
-    bash = shutil.which('bash')
+            return [powershell, "-NoLogo", "-NoProfile"]
+        return ["cmd.exe"]
+    bash = shutil.which("bash")
     if bash:
-        return [bash, '--norc', '--noprofile', '-i']
-    return ['sh', '-i']
+        return [bash, "--norc", "--noprofile", "-i"]
+    return ["sh", "-i"]
 
 
 class PtyInteractiveShellSession(BaseShellSession):
@@ -162,6 +162,9 @@ class PtyInteractiveShellSession(BaseShellSession):
     for bash.  Pass ``enable_ps1_metadata=False`` to disable PS1 in code.
     """
 
+    _initialized = False
+    _cwd = ""
+
     def __init__(
         self,
         work_dir: str,
@@ -175,6 +178,8 @@ class PtyInteractiveShellSession(BaseShellSession):
         buffer_chars: int = 1_048_576,
         enable_ps1_metadata: bool | None = None,
     ) -> None:
+        self._initialized = False
+        self._cwd = os.path.abspath(work_dir)
         super().__init__(
             work_dir=work_dir,
             username=username,
@@ -191,10 +196,10 @@ class PtyInteractiveShellSession(BaseShellSession):
 
     def _want_ps1_metadata(self) -> bool:
         """Return True if we should use JSON PS1 tracking for this shell process."""
-        if os.environ.get('GRINTA_PTY_PS1', '').strip().lower() in (
-            '0',
-            'false',
-            'no',
+        if os.environ.get("GRINTA_PTY_PS1", "").strip().lower() in (
+            "0",
+            "false",
+            "no",
         ):
             return False
         if self._enable_ps1_param is not None:
@@ -202,8 +207,8 @@ class PtyInteractiveShellSession(BaseShellSession):
                 return False
             if not _argv_looks_like_bash(self._shell_argv):
                 logger.warning(
-                    'enable_ps1_metadata=True but the PTY command is not bash; '
-                    'disabling JSON PS1 tracking.'
+                    "enable_ps1_metadata=True but the PTY command is not bash; "
+                    "disabling JSON PS1 tracking."
                 )
                 return False
             return True
@@ -224,41 +229,42 @@ class PtyInteractiveShellSession(BaseShellSession):
             ps1 = CmdOutputMetadata.to_ps1_prompt()
             # Set PS1/PS2; use shlex so embedded JSON double-quotes survive the shell
             # transport (``BashSession`` does the same via a tmux ``send_keys`` string).
-            pty.write(f'export PS1={shlex.quote(ps1)}\n')
+            pty.write(f"export PS1={shlex.quote(ps1)}\n")
             pty.write('export PS2=""\n')
-            pty.write('\n')
+            pty.write("\n")
             time.sleep(0.2)
             if not pty.wait_for_output(
-                lambda p: bool(
+                predicate=lambda p: bool(
                     CmdOutputMetadata.matches_ps1_metadata(_norm_tty_text(p))
                 ),
                 timeout=25.0,
             ):
                 logger.warning(
-                    'JSON PS1 not detected in PTY bash output; '
-                    'falling back to best-effort execute().'
+                    "JSON PS1 not detected in PTY bash output; "
+                    "falling back to best-effort execute()."
                 )
                 self._ps1_ready = False
                 return
             self._ps1_ready = True
             logger.info(
-                'Pty bash session JSON PS1 ready (execute will report exit/cwd).'
+                "Pty bash session JSON PS1 ready (execute will report exit/cwd)."
             )
         except Exception as exc:  # noqa: BLE001
-            logger.warning('Failed to install JSON PS1 in PTY bash: %s', exc)
+            logger.warning("Failed to install JSON PS1 in PTY bash: %s", exc)
             self._ps1_ready = False
 
     def initialize(self) -> None:
         """Spawn the interactive shell under a PTY."""
-        if self._initialized:
+        if self._pty is not None:
             return
-        if not os.path.isdir(self._cwd):
-            os.makedirs(self._cwd, exist_ok=True)
-            logger.info('Created working directory: %s', self._cwd)
+        cwd = self.work_dir
+        if not os.path.isdir(cwd):
+            os.makedirs(cwd, exist_ok=True)
+            logger.info("Created working directory: %s", cwd)
 
         config = InteractiveSessionConfig(
             argv=self._shell_argv,
-            cwd=self._cwd,
+            cwd=cwd,
             dimensions=self._dimensions,
             buffer_chars=self._buffer_chars,
         )
@@ -269,18 +275,18 @@ class PtyInteractiveShellSession(BaseShellSession):
             raise
         except Exception as exc:
             raise RuntimeError(
-                f'Failed to initialize PTY shell session: {exc}'
+                f"Failed to initialize PTY shell session: {exc}"
             ) from exc
 
         self._pty = session
         self._initialized = True
         self._install_bash_json_ps1()
         logger.info(
-            'PtyInteractiveShellSession initialized (pid=%s, argv=%s, cwd=%s, '
-            'ps1_ready=%s)',
+            "PtyInteractiveShellSession initialized (pid=%s, argv=%s, cwd=%s, "
+            "ps1_ready=%s)",
             session.pid,
             self._shell_argv,
-            self._cwd,
+            cwd,
             self._ps1_ready,
         )
 
@@ -290,7 +296,7 @@ class PtyInteractiveShellSession(BaseShellSession):
         """Wait for a new PS1 block and build the observation (command already sent)."""
         w = self._ps1_wait_timeout()
         if not pty.wait_for_output(
-            lambda p, nb=ps1_count_before: len(
+            predicate=lambda p, nb=ps1_count_before: len(
                 CmdOutputMetadata.matches_ps1_metadata(_norm_tty_text(p))
             )
             > nb,
@@ -299,9 +305,9 @@ class PtyInteractiveShellSession(BaseShellSession):
             tail = pty.peek()
             meta = CmdOutputMetadata(
                 exit_code=-1,
-                working_dir=self._cwd,
+                working_dir=self.cwd,
                 suffix=(
-                    f'\n[Timed out after {w:.0f}s waiting for a new PS1 JSON block.]\n'
+                    f"\n[Timed out after {w:.0f}s waiting for a new PS1 JSON block.]\n"
                 ),
             )
             return CmdOutputObservation(
@@ -311,10 +317,10 @@ class PtyInteractiveShellSession(BaseShellSession):
             )
         full = pty.peek()
         content, metadata = _output_between_last_two_ps1(full, command)
-        if metadata.working_dir and str(metadata.working_dir) != self._cwd:
+        if metadata.working_dir and str(metadata.working_dir) != self.cwd:
             self._cwd = str(metadata.working_dir)
         metadata.suffix = (
-            f'\n[The command completed with exit code {metadata.exit_code}.]\n'
+            f"\n[The command completed with exit code {metadata.exit_code}.]\n"
         )
         return CmdOutputObservation(
             content=content,
@@ -324,15 +330,15 @@ class PtyInteractiveShellSession(BaseShellSession):
 
     def execute(self, action: CmdRunAction) -> Observation:
         """Run one command. On bash, uses JSON PS1 markers for exit/cwd when available."""
-        if not self._initialized or self._closed:
+        if self._pty is None or self._closed:
             return ErrorObservation(
-                content='PTY shell session is not initialized or has been closed.'
+                content="PTY shell session is not initialized or has been closed."
             )
         pty = self._pty
-        if pty is None or not pty.is_alive():
-            return ErrorObservation(content='PTY shell session is not alive.')
+        if not pty.is_alive():
+            return ErrorObservation(content="PTY shell session is not alive.")
 
-        command = (action.command or '').strip()
+        command = (action.command or "").strip()
         if command and self._want_ps1_metadata() and self._ps1_ready:
             buffer = pty.peek()
             n_before = len(
@@ -341,18 +347,18 @@ class PtyInteractiveShellSession(BaseShellSession):
             try:
                 pty.send_line(command)
             except InteractiveSessionError as exc:
-                return ErrorObservation(content=f'Failed to send command: {exc}')
+                return ErrorObservation(content=f"Failed to send command: {exc}")
             return self._execute_with_ps1_after_send(pty, command, n_before)
 
         if command:
             try:
                 pty.send_line(command)
             except InteractiveSessionError as exc:
-                return ErrorObservation(content=f'Failed to send command: {exc}')
+                return ErrorObservation(content=f"Failed to send command: {exc}")
             time.sleep(_POST_WRITE_SETTLE_SECONDS)
 
         content = pty.read(consume=False)
-        metadata = CmdOutputMetadata(exit_code=0, working_dir=self._cwd)
+        metadata = CmdOutputMetadata(exit_code=0, working_dir=self.cwd)
         return CmdOutputObservation(
             content=content,
             command=command,
@@ -362,7 +368,7 @@ class PtyInteractiveShellSession(BaseShellSession):
     def read_output(self) -> str:
         """Return the current buffered PTY output without consuming it."""
         if self._pty is None:
-            return ''
+            return ""
         return self._pty.read(consume=False)
 
     def read_output_since(self, offset: int) -> tuple[str, int, int]:
@@ -375,7 +381,7 @@ class PtyInteractiveShellSession(BaseShellSession):
                 - total dropped chars due to ring-buffer trimming
         """
         if self._pty is None:
-            return '', max(0, int(offset)), 0
+            return "", max(0, int(offset)), 0
         safe_offset = max(0, int(offset))
         text, next_offset = self._pty.read_since(safe_offset)
         return text, next_offset, self._pty.dropped_chars
@@ -389,24 +395,24 @@ class PtyInteractiveShellSession(BaseShellSession):
         caller can still push arbitrary control sequences.
         """
         if self._pty is None:
-            logger.warning('write_input called on uninitialized PTY session')
+            logger.warning("write_input called on uninitialized PTY session")
             return
         if not is_control:
             try:
                 self._pty.write(data)
             except InteractiveSessionError as exc:
-                logger.warning('PTY write failed: %s', exc)
+                logger.warning("PTY write failed: %s", exc)
             return
 
         key = data.strip().lower() if len(data) > 1 else data
-        alias = _CONTROL_ALIASES.get(key if isinstance(key, str) else '')
+        alias = _CONTROL_ALIASES.get(key if isinstance(key, str) else "")
         try:
             if alias is not None and alias in CONTROL_SEQUENCES:
                 self._pty.send_control(alias)
             else:
                 self._pty.write(data)
         except InteractiveSessionError as exc:
-            logger.warning('PTY control write failed: %s', exc)
+            logger.warning("PTY control write failed: %s", exc)
 
     def resize(self, rows: int, cols: int) -> None:
         """Resize the underlying PTY window. No-op if not yet started."""
@@ -415,7 +421,7 @@ class PtyInteractiveShellSession(BaseShellSession):
         try:
             self._pty.resize(rows, cols)
         except InteractiveSessionError as exc:
-            logger.warning('PTY resize failed: %s', exc)
+            logger.warning("PTY resize failed: %s", exc)
 
     def close(self) -> None:
         """Terminate the child shell and shut down the reader thread."""
@@ -423,15 +429,15 @@ class PtyInteractiveShellSession(BaseShellSession):
             try:
                 self._pty.close(grace_seconds=1.0)
             except Exception as exc:
-                logger.debug('Error closing PTY session: %s', exc)
+                logger.debug("Error closing PTY session: %s", exc)
             self._pty = None
         super().close()
 
 
 __all__ = [
-    'PtyInteractiveShellSession',
-    '_argv_looks_like_bash',
-    '_default_shell_argv',
-    '_output_between_last_two_ps1',
-    '_remove_command_prefix',
+    "PtyInteractiveShellSession",
+    "_argv_looks_like_bash",
+    "_default_shell_argv",
+    "_output_between_last_two_ps1",
+    "_remove_command_prefix",
 ]

@@ -9,6 +9,11 @@ import pytest
 from backend.execution.utils.log_capture import capture_logs
 
 
+async def _raise_inside_capture(logger_name: str) -> None:
+    async with capture_logs(logger_name):
+        raise ValueError('oops')
+
+
 class TestCaptureLogs:
     async def test_captures_error_logs(self):
         logger = logging.getLogger('test.capture.error')
@@ -41,6 +46,5 @@ class TestCaptureLogs:
         logger = logging.getLogger('test.capture.exc')
         original_handlers = logger.handlers[:]
         with pytest.raises(ValueError):
-            async with capture_logs('test.capture.exc'):
-                raise ValueError('oops')
+            await _raise_inside_capture('test.capture.exc')
         assert logger.handlers == original_handlers

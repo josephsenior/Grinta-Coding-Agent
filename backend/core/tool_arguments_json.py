@@ -8,7 +8,7 @@ from typing import Any
 from json_repair import repair_json
 
 
-def parse_tool_arguments_object(raw: str) -> dict[str, Any]:
+def parse_tool_arguments_object(raw: object) -> dict[str, Any]:
     """Parse one JSON object from an LLM tool-call arguments string.
 
     Payloads always go through ``json_repair`` then ``json.loads`` — one path.

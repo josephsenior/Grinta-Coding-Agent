@@ -38,6 +38,20 @@ _FAILURE_LINE_PATTERNS: list[str] = [
 _PYTEST_PASSED_RE = re.compile(r'(\d+)\s+passed', re.IGNORECASE)
 _PYTEST_FAILED_RE = re.compile(r'(\d+)\s+failed', re.IGNORECASE)
 
+_SUMMARY_LINE_PATTERNS: tuple[str, ...] = (
+    r'=+\s*\d+\s+(passed|failed|error|skipped)',
+    r'^test result:\s+(ok|FAILED)\.',
+    r'^Tests:\s+\d+\s+failed,\s+\d+\s+passed,\s+\d+\s+total',
+    r'^(ok|FAIL)\s+\S+\s+\d+(\.\d+)?s$',
+    r'^Ran\s+\d+\s+tests?\s+in\s+\d+',
+    r'^\s*\d+\s+passing\s*\(',
+    r'\d+\s+examples?,\s+\d+\s+failures?',
+    r'Tests run:\s*\d+,\s*Failures:\s*\d+',
+    r'Tests:\s*\d+,\s*Assertions:\s*\d+',
+    r'^(OK|FAILED)\s*\(',
+    r'^\s*\d+\s+failing',
+)
+
 
 def extract_test_summary(output: str) -> str | None:
     """Build a ``[TEST_SUMMARY]`` block from pytest/jest/go/cargo-style stdout.
@@ -63,41 +77,16 @@ def extract_test_summary(output: str) -> str | None:
         if not stripped:
             continue
 
-        # --- Existing framework summary detection ---
-        if re.search(r'=+\s*\d+\s+(passed|failed|error|skipped)', stripped):
-            summary_lines.append(stripped)
-        elif re.search(r'^test result:\s+(ok|FAILED)\.', stripped):
-            summary_lines.append(stripped)
-        elif re.search(
-            r'^Tests:\s+\d+\s+failed,\s+\d+\s+passed,\s+\d+\s+total', stripped
-        ):
-            summary_lines.append(stripped)
-        elif re.search(r'^(ok|FAIL)\s+\S+\s+\d+(\.\d+)?s$', stripped):
-            summary_lines.append(stripped)
-        # --- New framework summary detection ---
-        elif re.search(r'^Ran\s+\d+\s+tests?\s+in\s+\d+', stripped):
-            summary_lines.append(stripped)
-        elif re.search(r'^\s*\d+\s+passing\s*\(', stripped):
-            summary_lines.append(stripped)
-        elif re.search(r'\d+\s+examples?,\s+\d+\s+failures?', stripped):
-            summary_lines.append(stripped)
-        elif re.search(r'Tests run:\s*\d+,\s*Failures:\s*\d+', stripped):
-            summary_lines.append(stripped)
-        elif re.search(r'Tests:\s*\d+,\s*Assertions:\s*\d+', stripped):
-            summary_lines.append(stripped)
-        # --- unittest "FAILED (failures=N)" / "OK" ---
-        elif re.search(r'^(OK|FAILED)\s*\(', stripped):
-            summary_lines.append(stripped)
-        # --- mocha "N failing" ---
-        elif re.search(r'^\s*\d+\s+failing', stripped):
+        if any(re.search(pat, stripped) for pat in _SUMMARY_LINE_PATTERNS):
             summary_lines.append(stripped)
 
-        if any(
+        has_failure_marker = any(
             re.search(pat, stripped, re.IGNORECASE) for pat in _FAILURE_LINE_PATTERNS
-        ):
-            if re.search(r'^FAILED\s+\S+', stripped) or re.search(
-                r'^--- FAIL:', stripped
-            ):
+        )
+        if has_failure_marker:
+            is_failed_pytest = re.search(r'^FAILED\s+\S+', stripped) is not None
+            is_failed_go = re.search(r'^--- FAIL:', stripped) is not None
+            if is_failed_pytest or is_failed_go:
                 failure_lines.append(stripped)
 
     # Extract Python traceback blocks (up to 5 tracebacks, first 10 lines each).

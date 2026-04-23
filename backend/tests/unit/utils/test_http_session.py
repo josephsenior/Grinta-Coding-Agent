@@ -8,6 +8,10 @@ import pytest
 
 from backend.utils.http_session import HttpSession, SessionClosedError
 
+
+def _raise_session_closed(message: str) -> None:
+    raise SessionClosedError(message)
+
 # ── HttpSession ────────────────────────────────────────────────────────
 
 
@@ -223,5 +227,5 @@ class TestSessionClosedError:
     def test_can_be_raised_and_caught(self):
         """Test error can be raised and caught."""
         with pytest.raises(SessionClosedError) as exc_info:
-            raise SessionClosedError('closed')
+            _raise_session_closed('closed')
         assert 'closed' in str(exc_info.value)

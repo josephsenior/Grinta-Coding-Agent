@@ -7,6 +7,10 @@ import pytest
 from backend.execution.utils.windows_exceptions import DotNetMissingError
 
 
+def _raise_dotnet_missing(message: str, *, details: str | None = None) -> None:
+    raise DotNetMissingError(message, details=details)
+
+
 class TestDotNetMissingError:
     # ── Inheritance ─────────────────────────────────────────────────
 
@@ -35,16 +39,16 @@ class TestDotNetMissingError:
 
     def test_can_be_raised_and_caught(self) -> None:
         with pytest.raises(DotNetMissingError) as exc_info:
-            raise DotNetMissingError('dotnet not found')
+            _raise_dotnet_missing('dotnet not found')
         assert exc_info.value.message == 'dotnet not found'
 
     def test_caught_as_exception(self) -> None:
         with pytest.raises(Exception):
-            raise DotNetMissingError('no .NET')
+            _raise_dotnet_missing('no .NET')
 
     def test_with_details_raised_correctly(self) -> None:
         with pytest.raises(DotNetMissingError) as exc_info:
-            raise DotNetMissingError('error', details='detail text')
+            _raise_dotnet_missing('error', details='detail text')
         assert exc_info.value.details == 'detail text'
 
     # ── args are preserved via super().__init__ ──────────────────────

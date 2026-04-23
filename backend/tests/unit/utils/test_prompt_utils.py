@@ -1,9 +1,20 @@
 """Tests for backend.utils.prompt module — data classes and PromptManager basics."""
 
 from types import SimpleNamespace
+from typing import Any, TypedDict
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+class _PromptBuilderKwargs(TypedDict):
+    active_llm_model: str
+    is_windows: bool
+    config: Any
+    mcp_tool_names: list[str]
+    mcp_tool_descriptions: dict[str, str]
+    mcp_server_hints: list[dict[str, str]]
+    function_calling_mode: str
 
 
 class TestRuntimeInfo:
@@ -342,15 +353,15 @@ class TestPromptBuilderSectionTokens:
         cfg.enable_permissions = False
         cfg.enable_meta_cognition = False
 
-        kwargs = dict(
-            active_llm_model='gpt-4',
-            is_windows=False,
-            config=cfg,
-            mcp_tool_names=[],
-            mcp_tool_descriptions={},
-            mcp_server_hints=[],
-            function_calling_mode='native',
-        )
+        kwargs: _PromptBuilderKwargs = {
+            'active_llm_model': 'gpt-4',
+            'is_windows': False,
+            'config': cfg,
+            'mcp_tool_names': [],
+            'mcp_tool_descriptions': {},
+            'mcp_server_hints': [],
+            'function_calling_mode': 'native',
+        }
         report = measure_system_prompt_sections(**kwargs)
         assert report['total_tokens'] > 100
         assert report['total_chars'] > 400

@@ -1,6 +1,7 @@
 """Tests for backend.utils.import_utils — dynamic import and validation."""
 
 import sys
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -14,6 +15,10 @@ from backend.utils.import_utils import (
     get_impl,
     import_from,
 )
+
+
+def _call_raise_invalid_impl(base: type[Any], impl: type[Any]) -> None:
+    _raise_invalid_impl(base, impl)
 
 
 class TestImportFrom:
@@ -83,7 +88,7 @@ class TestGetImpl:
             pass
 
         # Add to module so import_from can find it
-        sys.modules[__name__].SubClass = SubClass
+        setattr(cast(Any, sys.modules[__name__]), 'SubClass', SubClass)
 
         result = get_impl(BaseClass, f'{__name__}.SubClass')
         assert result is SubClass
@@ -97,7 +102,7 @@ class TestGetImpl:
         class UnrelatedClass:
             pass
 
-        sys.modules[__name__].UnrelatedClass = UnrelatedClass
+        setattr(cast(Any, sys.modules[__name__]), 'UnrelatedClass', UnrelatedClass)
 
         with pytest.raises(AssertionError, match='not a subclass'):
             get_impl(BaseClass, f'{__name__}.UnrelatedClass')
@@ -116,7 +121,7 @@ class TestGetImpl:
         class MyDict(dict):
             pass
 
-        sys.modules[__name__].MyDict = MyDict
+        setattr(cast(Any, sys.modules[__name__]), 'MyDict', MyDict)
         result = get_impl(dict, f'{__name__}.MyDict')
         assert result is MyDict
 
@@ -207,8 +212,8 @@ class TestMatchesQualifiedNameInMro:
         """Test class without __module__ attribute."""
         # Use MagicMock which doesn't have __module__ by default
         base = MagicMock(spec=[])
-        base.__module__ = None
-        base.__name__ = None
+        setattr(cast(Any, base), '__module__', None)
+        setattr(cast(Any, base), '__name__', None)
 
         impl = MagicMock(spec=[])
         impl.__mro__ = (impl,)
@@ -280,8 +285,8 @@ class TestMatchesReimportedBase:
         """Test with missing __module__ or __name__."""
         # Use MagicMock which doesn't have __module__ by default
         base = MagicMock(spec=[])
-        base.__module__ = None
-        base.__name__ = None
+        setattr(cast(Any, base), '__module__', None)
+        setattr(cast(Any, base), '__name__', None)
 
         impl = MagicMock(spec=[])
 
@@ -310,7 +315,7 @@ class TestRaiseInvalidImpl:
         with pytest.raises(
             AssertionError, match='Implementation class is not a subclass'
         ):
-            _raise_invalid_impl(Base, Impl)
+            _call_raise_invalid_impl(Base, Impl)
 
     def test_error_message_contains_details(self):
         """Test error message contains base and impl details."""
@@ -328,7 +333,7 @@ class TestRaiseInvalidImpl:
         Impl.__name__ = 'Impl'
 
         with pytest.raises(AssertionError, match='base=base_mod.Base'):
-            _raise_invalid_impl(Base, Impl)
+            _call_raise_invalid_impl(Base, Impl)
 
         with pytest.raises(AssertionError, match='impl=impl_mod.Impl'):
-            _raise_invalid_impl(Base, Impl)
+            _call_raise_invalid_impl(Base, Impl)

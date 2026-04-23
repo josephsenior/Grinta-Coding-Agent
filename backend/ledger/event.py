@@ -17,7 +17,7 @@ Functions:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -33,6 +33,8 @@ class Event:
     """Base dataclass for stream events emitted by the runtime."""
 
     INVALID_ID = -1
+    _timestamp: datetime | str | None = field(default=None, init=False, repr=False)
+    _source: EventSource | str | None = field(default=None, init=False, repr=False)
 
     @property
     def message(self) -> str | None:
@@ -69,27 +71,44 @@ class Event:
         self._sequence = value
 
     @property
-    def timestamp(self) -> str | None:
-        """Get event timestamp in ISO format."""
-        if hasattr(self, '_timestamp') and isinstance(self._timestamp, str):
-            ts = self._timestamp
-            return str(ts) if ts is not None else None
+    def timestamp(self) -> datetime | None:
+        """Get event timestamp as a datetime when present."""
+        ts: Any = getattr(self, '_timestamp', None)
+        if isinstance(ts, datetime):
+            return ts
+        if isinstance(ts, str):
+            try:
+                return datetime.fromisoformat(ts)
+            except ValueError:
+                return None
         return None
 
     @timestamp.setter
-    def timestamp(self, value: datetime | None) -> None:
-        """Set event timestamp from datetime object. Accepts None to clear."""
-        if isinstance(value, datetime):
-            self._timestamp = value.isoformat()
-        elif value is None:
-            self._timestamp = None  # type: ignore[assignment]
+    def timestamp(self, value: datetime | str | None) -> None:
+        """Set event timestamp from a datetime or ISO-formatted string."""
+        if value is None:
+            self._timestamp = None
+        elif isinstance(value, str):
+            try:
+                self._timestamp = datetime.fromisoformat(value)
+            except ValueError:
+                self._timestamp = None
+        else:
+            self._timestamp = value
 
     @property
     def source(self) -> EventSource | None:
         """Get event source (USER, AGENT, ENVIRONMENT, etc.)."""
-        if hasattr(self, '_source'):
-            src = self._source
-            return EventSource(src) if src is not None else None
+        src: Any = getattr(self, '_source', None)
+        if src is None:
+            return None
+        if isinstance(src, EventSource):
+            return src
+        if isinstance(src, str):
+            try:
+                return EventSource(src)
+            except ValueError:
+                return None
         return None
 
     @source.setter
@@ -101,12 +120,10 @@ class Event:
         """
         if value is None:
             self._source = None
-        elif isinstance(value, EventSource):
-            self._source = value.value
         elif isinstance(value, str):
             # Validate that the string corresponds to a known EventSource
             try:
-                self._source = EventSource(value).value
+                self._source = EventSource(value)
             except ValueError:
                 self._source = value  # preserve unknown sources from old payloads
         else:
@@ -206,7 +223,7 @@ class Event:
         """
         if not hasattr(self, '_tool_result'):
             return None
-        value: Any = getattr(self, '_tool_result')
+        value: Any = self._tool_result
         return value if isinstance(value, dict) else None
 
     @tool_result.setter

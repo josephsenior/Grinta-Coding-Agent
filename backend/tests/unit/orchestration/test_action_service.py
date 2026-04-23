@@ -127,10 +127,11 @@ class TestPrepareMetrics:
             ctx_mock, _make_pending_service(), _make_confirmation_service()
         )
         action = MagicMock(spec=Action)
-        action.llm_metrics = None
+        cast(Any, action).llm_metrics = None
         svc._prepare_metrics_for_action(action)
-        assert action.llm_metrics is not None
-        assert action.llm_metrics.accumulated_cost == 0.5
+        metrics = cast(Any, action).llm_metrics
+        assert metrics is not None
+        assert metrics.accumulated_cost == 0.5
 
     def test_copies_token_usage_history_from_real_metrics(self):
         ctx_mock = _make_context()
@@ -144,10 +145,11 @@ class TestPrepareMetrics:
             ctx_mock, _make_pending_service(), _make_confirmation_service()
         )
         action = MagicMock(spec=Action)
-        action.llm_metrics = None
+        cast(Any, action).llm_metrics = None
 
         svc._prepare_metrics_for_action(action)
 
-        assert action.llm_metrics is not None
-        assert len(action.llm_metrics.token_usages) == 1
-        assert action.llm_metrics.token_usages[0].prompt_tokens == 100
+        metrics = cast(Any, action).llm_metrics
+        assert metrics is not None
+        assert len(metrics.token_usages) == 1
+        assert metrics.token_usages[0].prompt_tokens == 100

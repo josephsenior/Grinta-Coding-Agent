@@ -108,8 +108,9 @@ def parse_tool_call_arguments(tool_call: Any) -> dict[str, Any]:
         return parse_tool_arguments_object(raw_arguments)
     except (AttributeError, TypeError, ValueError) as e:
         preview = raw_arguments
-        if isinstance(preview, str) and len(preview) > 240:
-            preview = f'{preview[:237]}...'
+        if isinstance(preview, str):
+            if len(preview) > 240:
+                preview = f'{str(preview)[:237]}...'
         msg = f'Failed to parse tool call arguments: {e}. Raw arguments: {preview}'
         raise FunctionCallValidationError(msg) from e
 
@@ -207,7 +208,7 @@ def _canonicalize_tool_call_arguments(
     if fn is None:
         return
     try:
-        setattr(fn, 'arguments', canonical)
+        fn.arguments = canonical
     except (AttributeError, TypeError):
         # Some SDK objects are frozen dataclasses / BaseModel with no setattr
         # hook. In that case the caller relies on build_tool_call_metadata
@@ -269,7 +270,7 @@ def common_response_to_actions(
     if tool_calls := getattr(assistant_msg, 'tool_calls', None):
         # Pass mcp_tool_names through tool_call object for the factory function
         for tc in tool_calls:
-            setattr(tc, '_mcp_tool_names', mcp_tool_names)
+            tc._mcp_tool_names = mcp_tool_names
 
         actions = process_tool_calls(
             assistant_msg,

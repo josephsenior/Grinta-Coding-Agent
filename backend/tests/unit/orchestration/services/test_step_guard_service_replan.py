@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -30,7 +31,7 @@ async def test_stuck_detection_forces_one_replan_turn() -> None:
         get_controller=lambda: controller,
         agent_config=SimpleNamespace(warning_first_trip_enabled=False),
     )
-    service = StepGuardService(context)
+    service = StepGuardService(cast(Any, context))
 
     assert await service.ensure_can_step() is False
     # Next turn consumes the replan latch and allows execution.
@@ -44,6 +45,6 @@ async def test_non_stuck_path_allows_step() -> None:
         get_controller=lambda: controller,
         agent_config=SimpleNamespace(warning_first_trip_enabled=False),
     )
-    service = StepGuardService(context)
+    service = StepGuardService(cast(Any, context))
 
     assert await service.ensure_can_step() is True

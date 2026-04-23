@@ -812,45 +812,20 @@ class Repl:
         return result
 
     def _prompt_bottom_toolbar(self) -> Any:
-        """Two-line status under the input; no filled backgrounds (terminal default)."""
+        """One-line status under the input; no filled backgrounds (terminal default)."""
         width = shutil.get_terminal_size((110, 24)).columns
         data = self._prompt_panel_data()
-        compact = width < 110
 
         # Keep HUD state/autonomy in sync so the Live-mode HUD matches.
         self._hud.update_agent_state(data['state_label'])
         level = data['autonomy_label'].replace('autonomy:', '')
         self._hud.update_autonomy(level)
 
-        # Keep the compact line readable by folding provider/model into one token.
-        model = (
-            data['model']
-            if data['provider'] in {'(not set)', '(unknown)'}
-            else f'{data["provider"]}/{data["model"]}'
-        )
-
-        fragments: list[tuple[str, str]] = []
-
+        fragments = self._hud._format_fragments(compact=width < 80, max_width=width)
+        
         def add(style: str, text: str) -> None:
             fragments.append((style, text))
-
-        if width < 72:
-            ws = (data.get('workspace') or '').strip()
-            ws_prefix = f'{HUDBar.ellipsize_path(ws, 28)} · ' if ws else ''
-            line = (
-                f'{ws_prefix}{data["state_label"]} · {data["autonomy_label"]} · '
-                f'{model} · {data["token_display"]} · {data["cost"]}'
-            )
-            add('class:prompt.dim', line)
-            self._append_footer_system_fragments(fragments, add)
-            return fragments
-
-        add('class:prompt.dim', '\u2500' * width)
-        add('', '\n')
-        fragments.extend(self._prompt_stats_row1_fragments(data, compact))
-        add('', '\n')
-        # Pass actual terminal width so row 2 never overflows.
-        fragments.extend(self._prompt_stats_row2_fragments(data, compact, width=width))
+            
         self._append_footer_system_fragments(fragments, add)
         return fragments
 
@@ -1736,7 +1711,7 @@ class Repl:
             config,
             conversation_stats,
         )
-        runtime.controller = controller
+        cast(Any, runtime).controller = controller
         self._controller = controller
 
         early_cb = create_status_callback(controller)

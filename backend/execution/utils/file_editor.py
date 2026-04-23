@@ -1315,16 +1315,16 @@ class FileEditor:
         lines = content.splitlines(keepends=True)
         if kind == 'markdown_heading':
             heading_re = re.compile(r'^(#{1,6})\s+(.*)$')
-            matches = []
+            heading_matches: list[tuple[int, int]] = []
             for idx, line in enumerate(lines):
                 m = heading_re.match(line.strip('\r\n'))
                 if m and m.group(2).strip() == anchor_value.strip():
-                    matches.append((idx, len(m.group(1))))
-            if len(matches) < occ or occ < 1:
+                    heading_matches.append((idx, len(m.group(1))))
+            if len(heading_matches) < occ or occ < 1:
                 return ToolResult(
                     output='', error='Section anchor not found.', new_content=content
                 )
-            start_idx, level = matches[occ - 1]
+            start_idx, level = heading_matches[occ - 1]
             end_idx = len(lines)
             for j in range(start_idx + 1, len(lines)):
                 m = heading_re.match(lines[j].strip('\r\n'))
@@ -1333,12 +1333,12 @@ class FileEditor:
                     break
         else:
             pattern = anchor_value if kind == 'regex' else re.escape(anchor_value)
-            matches = list(re.finditer(pattern, content, re.MULTILINE))
-            if len(matches) < occ or occ < 1:
+            pattern_matches = list(re.finditer(pattern, content, re.MULTILINE))
+            if len(pattern_matches) < occ or occ < 1:
                 return ToolResult(
                     output='', error='Section anchor not found.', new_content=content
                 )
-            target = matches[occ - 1]
+            target = pattern_matches[occ - 1]
             start_idx = content[: target.start()].count('\n')
             end_idx = len(lines)
 

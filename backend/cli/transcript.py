@@ -22,6 +22,15 @@ from backend.cli.layout_tokens import (
     ACTIVITY_PANEL_PADDING,
     CALLOUT_PANEL_PADDING,
 )
+from backend.cli.theme import (
+    CLR_CARD_BORDER,
+    CLR_CARD_TITLE,
+    CLR_REASONING_SNAP,
+    CLR_SECONDARY,
+    CLR_SECONDARY_ERR,
+    CLR_SECONDARY_OK,
+    CLR_SECTION_RULE,
+)
 
 # Stripped from user-visible transcripts (still present on stored observations for the LLM).
 # Handles well-formed closers and streaming/unclosed fragments (``.*?`` then ``\Z``).
@@ -65,20 +74,20 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
     """Dim continuation row (exit status, stats, previews)."""
     line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
     styles = {
-        'ok': 'dim green',
-        'err': 'dim red',
-        'neutral': 'dim',
+        'ok': CLR_SECONDARY_OK,
+        'err': CLR_SECONDARY_ERR,
+        'neutral': CLR_SECONDARY,
     }
-    line.append(message, style=styles.get(kind, styles['neutral']))
+    line.append(message, style=styles.get(kind, CLR_SECONDARY))
     return line
 
 
 def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> Text:
     """Continuation row for user-visible results — consistent with shell result style."""
     styles: dict[str, tuple[str, str, str]] = {
-        'ok': ('✓', 'dim', 'dim'),
-        'err': ('✗', 'dim red', 'dim red'),
-        'neutral': ('•', 'dim', 'dim'),
+        'ok': ('✓', CLR_SECONDARY_OK, CLR_SECONDARY_OK),
+        'err': ('✗', CLR_SECONDARY_ERR, CLR_SECONDARY_ERR),
+        'neutral': ('•', CLR_SECONDARY, CLR_SECONDARY),
     }
     icon, icon_style, text_style = styles.get(kind, styles['neutral'])
     line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
@@ -101,12 +110,12 @@ def format_activity_delta_secondary(
     line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
     wrote = False
     if added:
-        line.append(f'+ {added:,} {added_label}', style='dim green')
+        line.append(f'+ {added:,} {added_label}', style=CLR_SECONDARY_OK)
         wrote = True
     if removed:
         if wrote:
-            line.append('  ', style='dim')
-        line.append(f'- {removed:,} {removed_label}', style='dim red')
+            line.append('  ', style=CLR_SECONDARY)
+        line.append(f'- {removed:,} {removed_label}', style=CLR_SECONDARY_ERR)
     return line
 
 
@@ -131,12 +140,12 @@ def format_activity_block(
         parts.extend(extra_lines)
     content = Group(*parts)
     if title is not None:
-        panel_title = Text(title, style='bold #9ca3af')
+        panel_title = Text(title, style=CLR_CARD_TITLE)
         return Panel(
             content,
             title=panel_title,
             title_align='left',
-            border_style='#3a5368',
+            border_style=CLR_CARD_BORDER,
             box=box.ROUNDED,
             padding=ACTIVITY_PANEL_PADDING,
         )
@@ -145,7 +154,7 @@ def format_activity_block(
 
 def format_activity_turn_header() -> Rule:
     """Section divider before the first tool/shell row each agent turn."""
-    return Rule(title='Tools & commands', style='dim cyan', align='left')
+    return Rule(title='Tools & commands', style=CLR_SECTION_RULE, align='left')
 
 
 _REASONING_SENTENCE_ENDERS = ('.', '!', '?', ':', ';', '"', "'", ')', ']', '…')
@@ -174,7 +183,7 @@ def format_reasoning_snapshot(lines: list[str]) -> Group:
         cleaned[-1] = f'{last}…'
     # Stronger separation from assistant Markdown (default foreground): dimmer
     # blue-gray + italic so internal reasoning never reads as the main reply.
-    return Group(*[Text(line, style='italic #64748b dim') for line in cleaned])
+    return Group(*[Text(line, style=CLR_REASONING_SNAP) for line in cleaned])
 
 
 def format_activity_shell_block(

@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import importlib
 import logging
 import time
 from collections import OrderedDict
 from typing import Any
 
-from .local_vector_store import SQLiteBM25Backend
+_LOCAL_VECTOR_STORE = importlib.import_module("backend.context.local_vector_store")
+SQLiteBM25Backend = getattr(_LOCAL_VECTOR_STORE, "SQLiteBM25Backend")
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +105,11 @@ class ReRanker:
                 logger.info('Loading re-ranker model (local-only): %s', self.model_name)
                 snapshot_fn: Any = None
                 try:
-                    from huggingface_hub import snapshot_download as snapshot_fn
+                    from huggingface_hub import (
+                        snapshot_download as huggingface_snapshot_download,
+                    )
+
+                    snapshot_fn = huggingface_snapshot_download
                 except Exception:
                     pass
                 from sentence_transformers import CrossEncoder
@@ -210,9 +216,9 @@ class EnhancedVectorStore:
             cache_ttl: Cache TTL in seconds
 
         """
-        from .local_vector_store import ChromaDBBackend
+        chroma_backend_cls = getattr(_LOCAL_VECTOR_STORE, "ChromaDBBackend")
 
-        self.backend: ChromaDBBackend = ChromaDBBackend(
+        self.backend: Any = chroma_backend_cls(
             collection_name,
             warm_model_in_background=warm_embeddings_in_background,
         )

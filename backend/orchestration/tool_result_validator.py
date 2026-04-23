@@ -247,11 +247,18 @@ class ToolResultValidator(ToolInvocationMiddleware):
                 or 'is not recognized as the name of a cmdlet' in content
             ):
                 for tool in ['grep', 'ls', 'cat', 'find', 'sed', 'awk', 'chmod']:
-                    if (
+                    missing_unix_tool = (
                         re.search(
-                            rf'\b{tool}\b.*is not recognized', content, re.IGNORECASE
+                            rf'\b{tool}\b.*is not recognized',
+                            content,
+                            re.IGNORECASE,
                         )
-                        or f'ObjectNotFound: ({tool}:String)' in content
+                        is not None
+                    )
+                    object_not_found = f'ObjectNotFound: ({tool}:String)' in content
+                    if (
+                        missing_unix_tool
+                        or object_not_found
                     ):
                         return (
                             f"You attempted to use Unix tools ('{tool}') in PowerShell but they are missing or aliased incorrectly. "
