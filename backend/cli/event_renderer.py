@@ -808,39 +808,37 @@ def _pty_output_transcript_caption(
     n_lines: int,
     truncated: bool,
     has_output: bool,
-    raw: str,
     has_new_output: bool | None = None,
 ) -> str:
-    """One line for the transcript: session, line count, optional validator hint (from raw XML)."""
-    m = re.search(
-        r'<APP_RESULT_VALIDATION[^>]*>[\s\S]*?warnings?:\s*([^\n<]+)',
-        raw,
-        re.IGNORECASE | re.DOTALL,
-    )
-    hint = ''
-    if m:
-        w = m.group(1).strip()
-        if len(w) > 100:
-            w = w[:97] + '…'
-        hint = w
+    """One line for the transcript: session and line count."""
     parts: list[str] = [f'{ACTIVITY_CARD_TITLE_TERMINAL.lower()} output']
     if session_id:
         parts.append(session_id)
     if has_output and n_lines:
-        if has_new_output is False:
-            parts.append(
-                f'{n_lines} line{"s" if n_lines != 1 else ""} · no new bytes since last read'
-            )
-        else:
-            parts.append(f'{n_lines} line{"s" if n_lines != 1 else ""}')
-    elif not has_output and session_id and n_lines == 0:
-        parts.append('no new text')
+        parts.append(f'{n_lines} line{"s" if n_lines != 1 else ""}')
     if truncated:
         parts.append('truncated')
-    line = ' · '.join(parts)
-    if hint:
-        return f'{line} — {hint}'
-    return line
+    return ' · '.join(parts)
+
+
+def _strip_pty_echo(text: str, sent_cmd: str) -> str:
+    """Remove PTY character-echo lines from a terminal delta.
+
+    When text is injected into a PTY the shell echoes each keystroke at the
+    current cursor position.  The resulting line in the buffer looks like
+    ``[cursor-noise]<sent_cmd>`` — e.g. ``Get-ChildItem old.txtGet-ChildItem -Name``.
+    Stripping it keeps the displayed output clean.
+    """
+    cmd = sent_cmd.strip().rstrip('\r\n')
+    if not cmd or not text:
+        return text
+    lines = text.split('\n')
+    filtered = [ln for ln in lines if not ln.rstrip().endswith(cmd)]
+    # Only apply if at least one line was removed to avoid silently blanking output.
+    if len(filtered) < len(lines):
+        result = '\n'.join(filtered).strip()
+        return result if result else text
+    return text
 
 
 def _wrap_panel_text_block(text: str, *, wrap_width: int | None) -> str:
@@ -1409,6 +1407,8 @@ class CLIEventRenderer:
         ) = None
         #: Last shell command label; paired with :class:`CmdOutputObservation` for one dim result row.
         self._pending_shell_command: str | None = None
+        #: Raw input most recently sent via TerminalInputAction (used to strip PTY echo).
+        self._last_terminal_input_sent: str = ''
         #: Buffered (verb, label) from CmdRunAction — printed as a combined card on CmdOutputObservation.
         self._pending_shell_action: tuple[str, str] | None = None
         #: Headline for internal shell-backed tool actions (e.g. Analyze project, Search code).
@@ -2400,10 +2400,13 @@ class CLIEventRenderer:
             is_ctl = bool(getattr(action, 'is_control', False))
             if ctrl and str(ctrl).strip():
                 inp_display = f'ctrl {ctrl}'[:60]
+                self._last_terminal_input_sent = ''
             elif is_ctl and inp:
                 inp_display = inp[:60] + ('…' if len(inp) > 60 else '')
+                self._last_terminal_input_sent = ''
             else:
                 inp_display = inp[:60] + ('…' if len(inp) > 60 else '')
+                self._last_terminal_input_sent = inp.strip().rstrip('\r\n')
             self._print_activity(
                 'Send', inp_display, sess or None, title=ACTIVITY_CARD_TITLE_TERMINAL
             )
@@ -2420,12 +2423,10 @@ class CLIEventRenderer:
             return
 
         if isinstance(action, TerminalReadAction):
+            # Read is a polling operation — don't clutter the transcript with a
+            # full card; just keep the reasoning panel up-to-date.
             self._clear_streaming_preview()
-            self._flush_pending_tool_cards()
             sess = (getattr(action, 'session_id', '') or '').strip()
-            self._print_activity(
-                'Read', sess or '…', None, title=ACTIVITY_CARD_TITLE_TERMINAL
-            )
             self._ensure_reasoning()
             line = (
                 f'{ACTIVITY_CARD_TITLE_TERMINAL} read · {sess}'
@@ -2938,12 +2939,22 @@ class CLIEventRenderer:
             display = strip_tool_result_validation_annotations(raw)
             content = display.strip()
             session_id = (getattr(obs, 'session_id', '') or '').strip()
+            has_new = getattr(obs, 'has_new_output', None)
+            # Suppress entirely when there's nothing new — these are just polling
+            # reads and the "no new text" caption is noise for the human user.
+            if has_new is False and not content:
+                self._last_terminal_input_sent = ''
+                return
+            # Strip PTY character-echo lines produced when the agent injects input.
+            if content and self._last_terminal_input_sent:
+                content = _strip_pty_echo(content, self._last_terminal_input_sent)
+                self._last_terminal_input_sent = ''
             n_lines = (
                 len([ln for ln in content.splitlines() if ln.strip()]) if content else 0
             )
             cap = 2000
             truncated = len(display) > cap
-            body = (display[:cap] + '…' if truncated else display) if display else ''
+            body = (content[:cap] + '…' if truncated else content) if content else ''
             if not content and not session_id and not raw.strip():
                 return
             caption = _pty_output_transcript_caption(
@@ -2951,8 +2962,7 @@ class CLIEventRenderer:
                 n_lines=n_lines,
                 truncated=truncated,
                 has_output=bool(content),
-                raw=raw,
-                has_new_output=getattr(obs, 'has_new_output', None),
+                has_new_output=has_new,
             )
             self._append_history(
                 format_activity_result_secondary(caption, kind='neutral')

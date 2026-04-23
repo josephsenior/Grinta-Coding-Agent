@@ -399,10 +399,13 @@ class PtyInteractiveShellSession(BaseShellSession):
             return
         if not is_control:
             if IS_WINDOWS:
-                # ConPTY (Windows) requires CR (\r) to submit a line.  A bare
-                # LF alone puts PowerShell into multi-line continuation mode
-                # (the ``>>`` prompt) instead of executing the command.
-                data = data.replace("\r\n", "\n").replace("\n", "\r\n")
+                # ConPTY (Windows) uses bare CR (\r) as the Enter/submit signal.
+                # A bare LF puts PowerShell into multi-line continuation mode
+                # (the ``>>`` prompt).  CRLF also causes problems: the \n
+                # arrives after the command has already been submitted by \r
+                # and PowerShell treats it as stray input, triggering ``>>``.  
+                # Normalise any newline variant → \r only.
+                data = data.replace("\r\n", "\n").replace("\n", "\r")
             try:
                 self._pty.write(data)
             except InteractiveSessionError as exc:

@@ -525,11 +525,12 @@ class InteractiveSession:
     def send_line(self, line: str, *, newline: str | None = None) -> int:
         r"""Write a line followed by a newline sequence.
 
-        Defaults to ``\r\n`` on Windows (ConPTY requires CR to submit) and
+        Defaults to ``\r`` on Windows (bare CR is the ConPTY submit signal;
+        trailing LF causes PowerShell to enter ``>>`` continuation mode) and
         ``\n`` on POSIX.  Pass an explicit ``newline`` to override.
         """
         if newline is None:
-            newline = '\r\n' if IS_WINDOWS else '\n'
+            newline = '\r' if IS_WINDOWS else '\n'
         return self.write(f'{line}{newline}')
 
     def send_control(self, key: str) -> int:
