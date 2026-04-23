@@ -3,7 +3,6 @@
 This directory contains the core components of Grinta.
 
 This diagram provides an overview of the roles of each component and how they communicate and collaborate.
-![Grinta System Architecture Diagram (July 4, 2024)](../docs/static/img/system_architecture_overview.png)
 
 ## Classes
 
