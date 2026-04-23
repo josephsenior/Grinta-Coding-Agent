@@ -88,7 +88,7 @@ class TestGetImpl:
             pass
 
         # Add to module so import_from can find it
-        setattr(cast(Any, sys.modules[__name__]), 'SubClass', SubClass)
+        cast(Any, sys.modules[__name__]).SubClass = SubClass
 
         result = get_impl(BaseClass, f'{__name__}.SubClass')
         assert result is SubClass
@@ -102,7 +102,7 @@ class TestGetImpl:
         class UnrelatedClass:
             pass
 
-        setattr(cast(Any, sys.modules[__name__]), 'UnrelatedClass', UnrelatedClass)
+        cast(Any, sys.modules[__name__]).UnrelatedClass = UnrelatedClass
 
         with pytest.raises(AssertionError, match='not a subclass'):
             get_impl(BaseClass, f'{__name__}.UnrelatedClass')
@@ -121,7 +121,7 @@ class TestGetImpl:
         class MyDict(dict):
             pass
 
-        setattr(cast(Any, sys.modules[__name__]), 'MyDict', MyDict)
+        cast(Any, sys.modules[__name__]).MyDict = MyDict
         result = get_impl(dict, f'{__name__}.MyDict')
         assert result is MyDict
 
@@ -212,8 +212,8 @@ class TestMatchesQualifiedNameInMro:
         """Test class without __module__ attribute."""
         # Use MagicMock which doesn't have __module__ by default
         base = MagicMock(spec=[])
-        setattr(cast(Any, base), '__module__', None)
-        setattr(cast(Any, base), '__name__', None)
+        cast(Any, base).__module__ = None
+        cast(Any, base).__name__ = None
 
         impl = MagicMock(spec=[])
         impl.__mro__ = (impl,)
@@ -285,8 +285,8 @@ class TestMatchesReimportedBase:
         """Test with missing __module__ or __name__."""
         # Use MagicMock which doesn't have __module__ by default
         base = MagicMock(spec=[])
-        setattr(cast(Any, base), '__module__', None)
-        setattr(cast(Any, base), '__name__', None)
+        cast(Any, base).__module__ = None
+        cast(Any, base).__name__ = None
 
         impl = MagicMock(spec=[])
 

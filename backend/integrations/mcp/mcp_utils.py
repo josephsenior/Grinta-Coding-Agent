@@ -38,11 +38,11 @@ from backend.integrations.mcp.wrappers import (
     WRAPPER_TOOL_REGISTRY,
     wrapper_tool_params,
 )
+from backend.execution import LocalRuntimeInProcess
 from backend.ledger.observation.mcp import MCPObservation
 
 # Populated by ``convert_mcps_to_tools`` for the current fetch cycle (cleared in ``fetch_mcp_tools_from_config``).
 _last_mcp_conversion_errors: list[str] = []
-from backend.execution import LocalRuntimeInProcess
 
 
 def _get_mcp_connect_timeout_sec() -> float:
@@ -500,7 +500,7 @@ async def fetch_mcp_tools_from_config(
                     await c.disconnect()
                 except asyncio.CancelledError:
                     raise
-                except BaseExceptionGroup as eg:
+                except BaseExceptionGroup as eg:  # noqa: F821  # pylint: disable=undefined-variable
                     logger.debug('MCP probe disconnect (exception group): %s', eg)
                 except Exception as e:
                     logger.debug('MCP probe disconnect: %s', e, exc_info=True)

@@ -393,7 +393,7 @@ def _stream_chunks_to_tool_args(chunks: list[str]) -> str:
 
 
 def test_append_only_delta_preserves_content_even_when_chunk_is_substring_of_prefix():
-    """Regression: ``_merge_stream_fragment`` used to silently drop a delta if
+    r"""Regression: ``_merge_stream_fragment`` used to silently drop a delta if
     it appeared anywhere in the accumulated prefix.
 
     Observed in logs (Kimi K2.5, CSS body): after streaming ~500 chars of
@@ -599,8 +599,6 @@ def test_response_to_actions_allows_conversational_plain_message(monkeypatch):
     )
 
     actions = executor._response_to_actions(response)
-
-    from backend.ledger.action import MessageAction
 
     assert len(actions) == 1
     assert isinstance(actions[0], MessageAction)

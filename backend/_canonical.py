@@ -39,19 +39,19 @@ class CanonicalMeta(type):
     same class by comparing class names.
     """
 
-    def __instancecheck__(self, instance: object) -> bool:
+    def __instancecheck__(cls, instance: object) -> bool:
         if super().__instancecheck__(instance):
             return True
         # Check if the class names match.
         inst_type = type(instance)
-        if getattr(inst_type, '__name__', None) != getattr(self, '__name__', None):
+        if getattr(inst_type, '__name__', None) != getattr(cls, '__name__', None):
             # Special case for base classes to allow subclasses from other reloads
             if cls.__name__ in ('Action', 'Observation', 'Event'):
                 return any(b.__name__ == cls.__name__ for b in inst_type.__mro__)
             return False
 
         # If it's an Action/Observation, we can also check the type attribute
-        cls_type = getattr(self, 'action', getattr(self, 'observation', None))
+        cls_type = getattr(cls, 'action', getattr(cls, 'observation', None))
         inst_type_attr = getattr(
             instance, 'action', getattr(instance, 'observation', None)
         )
@@ -60,7 +60,7 @@ class CanonicalMeta(type):
 
         return True
 
-    def __subclasscheck__(self, subclass: type) -> bool:
+    def __subclasscheck__(cls, subclass: type) -> bool:
         if super().__subclasscheck__(subclass):
             return True
         # Check if the class names match.

@@ -313,4 +313,4 @@ class ToolResultValidator(ToolInvocationMiddleware):
 
         block = '\n'.join(lines)[:1500]
         annotation = f'\n\n<APP_RESULT_VALIDATION>\n{block}\n</APP_RESULT_VALIDATION>'
-        setattr(observation, 'content', content + annotation)
+        observation.content = content + annotation

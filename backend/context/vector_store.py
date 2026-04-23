@@ -21,7 +21,7 @@ from collections import OrderedDict
 from typing import Any
 
 _LOCAL_VECTOR_STORE = importlib.import_module("backend.context.local_vector_store")
-SQLiteBM25Backend = getattr(_LOCAL_VECTOR_STORE, "SQLiteBM25Backend")
+SQLiteBM25Backend = _LOCAL_VECTOR_STORE.SQLiteBM25Backend
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +216,7 @@ class EnhancedVectorStore:
             cache_ttl: Cache TTL in seconds
 
         """
-        chroma_backend_cls = getattr(_LOCAL_VECTOR_STORE, "ChromaDBBackend")
+        chroma_backend_cls = _LOCAL_VECTOR_STORE.ChromaDBBackend
 
         self.backend: Any = chroma_backend_cls(
             collection_name,
