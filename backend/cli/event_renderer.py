@@ -2374,12 +2374,10 @@ class CLIEventRenderer:
             if len(cmd) > 12_000:
                 cmd = cmd[:11_997] + '…'
             self._pending_shell_command = cmd
-            # Persist open + command in the scrollback, not only the Thinking header.
-            # No '$' prefix (matches tool_call_display): PTY command is literal, not a shell prompt.
             label = cmd if cmd else '(empty)'
             self._print_activity(
-                'Open',
-                label,
+                'Launch',
+                f'$ {label}',
                 None,
                 title=ACTIVITY_CARD_TITLE_TERMINAL,
                 shell_rail=True,
@@ -2407,8 +2405,9 @@ class CLIEventRenderer:
             else:
                 inp_display = inp[:60] + ('…' if len(inp) > 60 else '')
                 self._last_terminal_input_sent = inp.strip().rstrip('\r\n')
+            cmd_detail = f'[{sess}]  $ {inp_display}' if sess else f'$ {inp_display}'
             self._print_activity(
-                'Send', inp_display, sess or None, title=ACTIVITY_CARD_TITLE_TERMINAL
+                'Run', cmd_detail, None, title=ACTIVITY_CARD_TITLE_TERMINAL
             )
             self._ensure_reasoning()
             if sess and inp_display:
@@ -2957,27 +2956,41 @@ class CLIEventRenderer:
             body = (content[:cap] + '…' if truncated else content) if content else ''
             if not content and not session_id and not raw.strip():
                 return
-            caption = _pty_output_transcript_caption(
-                session_id=session_id,
-                n_lines=n_lines,
-                truncated=truncated,
-                has_output=bool(content),
-                has_new_output=has_new,
-            )
-            self._append_history(
-                format_activity_result_secondary(caption, kind='neutral')
-            )
             if content:
+                title_parts: list[str] = []
+                if session_id:
+                    title_parts.append(session_id)
+                if n_lines:
+                    title_parts.append(f'{n_lines} line{"s" if n_lines != 1 else ""}')
+                if truncated:
+                    title_parts.append('truncated')
+                panel_title = Text(
+                    '  ·  '.join(title_parts) if title_parts else 'output',
+                    style='dim #9ca3af',
+                )
                 self._append_history(
                     Padding(
-                        Syntax(
-                            body,
-                            'text',
-                            word_wrap=True,
-                            theme='ansi_dark',
+                        Panel(
+                            Syntax(body, 'text', word_wrap=True, theme='ansi_dark'),
+                            title=panel_title,
+                            title_align='left',
+                            border_style='#1e3a4a',
+                            box=box.ROUNDED,
+                            padding=(0, 1),
                         ),
-                        pad=(0, 0, 0, 2),
+                        pad=(0, 0, 1, 0),
                     )
+                )
+            else:
+                caption = _pty_output_transcript_caption(
+                    session_id=session_id,
+                    n_lines=n_lines,
+                    truncated=truncated,
+                    has_output=bool(content),
+                    has_new_output=has_new,
+                )
+                self._append_history(
+                    format_activity_result_secondary(caption, kind='neutral')
                 )
             return
 

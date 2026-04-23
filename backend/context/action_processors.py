@@ -29,6 +29,11 @@ from backend.ledger.action.agent import (
 )
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.mcp import MCPAction
+from backend.ledger.action.terminal import (
+    TerminalInputAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 
 _META_COGNITION_ACTION_TYPES = (
     ClarificationRequestAction,
@@ -94,6 +99,9 @@ def _is_tool_based_action(action: Action) -> bool:
         FileReadAction,
         MCPAction,
         TaskTrackingAction,
+        TerminalRunAction,
+        TerminalInputAction,
+        TerminalReadAction,
         *_META_COGNITION_ACTION_TYPES,
     )
     if isinstance(action, tool_action_classes):
