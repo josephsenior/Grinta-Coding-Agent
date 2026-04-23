@@ -220,7 +220,10 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
             'immediately on the next. Before ending a turn where you materially advanced or hit a blocker, '
             'check whether the tracker still matches your mental model; sync if not, skip if unchanged.\n\n'
             'When native multi-tool turns are allowed, **piggyback** a `task_tracker` call with substantive '
-            'tools when you already know the new plan state.'
+            'tools when you already know the new plan state.\n\n'
+            '**Tracker follows actions, not the reverse:** if a tool call succeeded, immediately advance the '
+            'tracker to reflect that reality — do not re-execute an action because the tracker still shows a '
+            'prior state. The tracker is a record of what happened, not a script that drives repetition.'
             f'{signal_blurb}\n'
             '</TASK_TRACKING>'
         )

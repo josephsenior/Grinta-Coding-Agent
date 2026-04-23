@@ -22,4 +22,5 @@ Never rerun the same failing command unchanged. After 3 failed approaches on the
 
 <WORK_HABITS>
 **Multi-file creation:** list all paths first, create each file, verify once after writes.
+**Research-then-implement chain:** after completing any information-gathering step (web lookup, search, read), immediately proceed to the implementation steps in the same run — do not pause to report intermediate findings unless there is genuine ambiguity that requires user input to resolve.
 </WORK_HABITS>
