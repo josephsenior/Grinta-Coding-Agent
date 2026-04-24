@@ -154,6 +154,10 @@ class RetryService:
         self._retry_queue = queue
         self._retry_pending = True
 
+        # Connection errors are out of the agent's control; compensate the iteration
+        # budget so recovery overhead doesn't burn into the task runway.
+        self._compensate_iterations_for_connection_error(exc)
+
         human_message = (
             f'⚠️ Encountered {type(exc).__name__}. Automatic retry scheduled in '
             f'{int(initial_delay)}s (max {task.max_attempts} attempts).'
@@ -262,6 +266,37 @@ class RetryService:
 
     def _is_retry_backend_failure(self, exc: Exception) -> bool:
         return isinstance(exc, ConnectionError | OSError)
+
+    def _compensate_iterations_for_connection_error(self, exc: Exception) -> None:
+        """Add iteration headroom when a network outage triggers a retry.
+
+        Connection errors (APIConnectionError, Timeout) are out of the agent's
+        control. Each such event grants 8 extra iterations so recovery tool calls
+        don't drain the task budget.  Rate-limit and server errors are intentionally
+        excluded — those are provider-side throttling and should not inflate the budget.
+        """
+        from backend.inference.exceptions import APIConnectionError, Timeout
+
+        if not isinstance(exc, (APIConnectionError, Timeout)):
+            return
+        try:
+            iteration_flag = getattr(
+                self.controller.state, 'iteration_flag', None
+            )
+            if iteration_flag is None:
+                return
+            current_max = getattr(iteration_flag, 'max_value', None)
+            if current_max is not None:
+                iteration_flag.max_value = current_max + 8
+                logger.info(
+                    'Connection error (%s): granted 8 extra iterations to controller %s '
+                    '(budget now %d)',
+                    type(exc).__name__,
+                    self.controller.id,
+                    iteration_flag.max_value,
+                )
+        except Exception as budget_exc:  # pragma: no cover - defensive
+            logger.debug('Could not compensate iteration budget: %s', budget_exc)
 
     async def _process_tasks(self, tasks: list[RetryTask]) -> None:
         queue = self._retry_queue

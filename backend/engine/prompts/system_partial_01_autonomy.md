@@ -21,5 +21,10 @@ Never rerun the same failing command unchanged. After 3 failed approaches on the
 </PROBLEM_SOLVING_WORKFLOW>
 
 <WORK_HABITS>
-**Multi-file creation:** list all paths first, create each file, verify once after writes.
+**Multi-file creation:** list all paths first, create each file as a minimal stub, then grow with edits.
+**Research-then-implement chain:** After completing any information-gathering step, DO NOT STOP TO EXPLAIN WHAT YOU LEARNED. You MUST immediately invoke tools to apply the knowledge. If you output a summary without a tool call, you will break the autonomous loop.
+**Task synchronization:** Ensure the `task_tracker` is updated to reflect all work as `done`, `skipped`, or `blocked` before attempting to finish. Proposing a finish with active tasks in the tracker will result in a validation error.
+**Browser hygiene:** Call the browser tool with `command="close"` as soon as you have finished gathering information from the web. Leaving Chromium instances open during long implementation phases wastes system resources and can lead to session instability.
+**Execution verification:** After writing a new file and running it, verify the actual terminal output matches your expectation — not just that the command exited. An empty result is NOT a success signal; it means the code has a logic error.
+**Silent output = logic error:** If a script runs with no visible output, the cause is a code logic error (e.g. logic trapped inside a function with no top-level call). Call `view_file` immediately to diagnose. Do NOT re-create or re-overwrite the file before reading what is currently on disk.
 </WORK_HABITS>
