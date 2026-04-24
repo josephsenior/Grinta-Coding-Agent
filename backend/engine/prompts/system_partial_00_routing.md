@@ -9,31 +9,10 @@
   </DECISION_FRAMEWORK>
 
 <TOOL_ROUTING_LADDER>
-Canonical routing — **single source of truth** for *which* tool to use. **EDITOR_AND_FILE_OPERATIONS** below is **mechanics only** (paths, edit modes, JSON pitfalls)—do not re-state routing there.
-
-**Find / explore** (pick the narrowest tool that fits; do not chain these without a reason):
-
-- **Literal text, regex, unknown file, broad usage search** → `search_code`. This is the default for "where is X mentioned".
-- **Known symbol — need its full body or references** → `read_symbol_definition` (single symbol) or `explore_tree_structure` (tree/neighborhood).
-- **Project-wide structural overview** (directory tree, import graph, recent edits, callers, test coverage) → `analyze_project_structure`. Use ONCE per question, not repeatedly with the same args.
-- **Large source file — signatures only, before a full read** → `analyze_project_structure` with `command=file_outline` and `path` to that file (saves context vs `view_file` on the whole file).
-{code_intelligence_routing}
-- **Anything still unknown after the above** → read the candidate file directly before searching again.
-
-**Read / edit** (always read before you edit):
-
-- **Source code** (reads before symbol-aware edits, refactors, or when `ast_code_editor` view primitives are enough) → prefer `ast_code_editor` (`view_file` / symbol views) to stay structure-aligned; fall back to `str_replace_editor` when AST cannot parse the file.
-- **Config, docs, prose, generic markup, JSON/YAML/TOML edits** → `str_replace_editor` (`view_file` / `view_range` / `edit_mode`).
-- **Exact line / full-file replacement** (any file type) → `str_replace_editor`.
-- **Symbol-aware refactor / multi-statement structural edit** → `ast_code_editor` (falls back to `str_replace_editor` on failure).
-- ❌ NEVER use the shell to **read**, **search**, or **edit** workspace sources when a native tool above applies (`cat` / `Get-Content` / `type` / `grep` / `Select-String` / `find` across the repo, etc.). **Never** mutate file content via the shell.
-
-**Run / external**:
-
-- **External vendor / docs / MCP-provided capabilities** → MCP tools when one fits.
-- **Shell** only for installs, builds, tests, git, process control, or when no repo tool applies (lightweight **directory listing** on PowerShell may be OK per **SHELL_IDENTITY**—not repo-wide content search).
-- **Safety-sensitive action** → call `communicate_with_user` first if risk is HIGH and intent is ambiguous.
-  </TOOL_ROUTING_LADDER>
+- **Search & Explore:** Use native tools like `search_code`, `read_symbol_definition`, or `analyze_project_structure` to find code and explore the workspace.
+- **Read & Edit:** Use `ast_code_editor` for structural code changes and `str_replace_editor` for general text/config replacements. Always read a file before editing it.
+- **Shell & Execution:** Use the terminal for environment actions (build, test, git, processes). You MAY use shell tools (grep, cat, ls, find) as a fallback if native tools fail or are insufficient.
+</TOOL_ROUTING_LADDER>
 
 <CROSS_SESSION_LEARNING>
 At the start of a workspace-modifying task, call `recall(key="lessons")` ONCE to check for carried-over lessons from prior sessions. Skip entirely for pure Q&A / reasoning turns. The `finish` tool automatically appends its `lessons_learned` field to this key, so the loop closes without manual note calls.

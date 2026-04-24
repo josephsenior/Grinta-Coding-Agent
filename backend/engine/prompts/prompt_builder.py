@@ -208,26 +208,10 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
             )
         task_tracker_discipline_block = (
             "<TASK_TRACKING>\n"
-            "**task_tracker** (multi-step work, typically 3+ concrete steps): use `view` to read the plan, "
-            "`update` with the **full** `task_list` when the plan or any step status changes. "
-            "Allowed statuses are `todo`, `doing`, `done`, `skipped`, and `blocked`. Use `skipped` for "
-            "explicitly bypassed steps and `blocked` for steps that cannot proceed; capture details in "
-            "`result` or the step description.\n\n"
-            "**You** are the authority on whether a step is `done`; never mark `done` to satisfy a guess "
-            "from the environment (e.g. file-edit counts or generic tool success). Skip the tracker for "
-            "genuinely single-step tasks.\n\n"
-            "**Sync discipline:** after **verify** (your criterion: tests, repro, user confirmation, etc.), "
-            "if the plan should change, update `task_tracker` on the same turn when possible, otherwise "
-            "immediately on the next. Before ending a turn where you materially advanced or hit a blocker, "
-            "check whether the tracker still matches your mental model; sync if not, skip if unchanged.\n\n"
-            "When native multi-tool turns are allowed, **piggyback** a `task_tracker` call with substantive "
-            "tools when you already know the new plan state.\n\n"
-            "**Tracker follows actions, not the reverse:** if a tool call succeeded, immediately advance the "
-            "tracker to reflect that reality — do not re-execute an action because the tracker still shows a "
-            "prior state. The tracker is a record of what happened, not a script that drives repetition.\n\n"
-            "**Final step synchronization (CRITICAL):** You MUST NOT call the finish tool if the `task_tracker` "
-            "contains steps in `todo` or `doing` state. You must update the tracker to a terminal state (`done`, `skipped`, `blocked`) "
-            "on the SAME TURN as your final verification or on the turn immediately preceding your finish call."
+            "**task_tracker**: For multi-step tasks, use `view` to read the plan and `update` to replace the full `task_list`.\n"
+            "Allowed statuses: `todo`, `doing`, `done`, `skipped`, `blocked`.\n"
+            "**Syncing**: Update the tracker immediately when step statuses change. Piggyback updates with other tool calls when possible.\n"
+            "**Completion (CRITICAL)**: You MUST NOT call the finish tool if any steps are still in `todo` or `doing`."
             f"{signal_blurb}\n"
             "</TASK_TRACKING>"
         )
@@ -521,13 +505,13 @@ def _collect_system_prompt_sections(
                 "shell_identity_git_bash_windows",
                 "<SHELL_IDENTITY>\n"
                 "Your terminal is **Git Bash** running on Windows. Use **bash syntax exclusively**.\n"
-                "- Correct: `ls`, `cat`, `grep`, `find`, `echo`, `cd`, `mkdir`, `rm`, `pwd`, `which`\n"
+                "- Allowed tools: `ls`, `cat`, `grep`, `find`, `echo`, `cd`, `mkdir`, `rm`, `pwd`, `which`.\n"
+                "  (Prefer native tools from the **TOOL_ROUTING_LADDER** first.)\n"
                 "- FORBIDDEN: `Get-ChildItem`, `Get-Process`, `Get-Content`, `Select-String`, "
                 "`$PSVersionTable`, `Write-Output`, `Set-Location`, or any other PowerShell cmdlet.\n"
-                "- Windows-style paths (`C:\\Users\\...`) in the working directory are normal "
-                "for Git Bash on Windows.\n"
-                "- Use `which <tool>` to check if a tool (node, npm, etc.) is on PATH before using it.\n"
-                "- Use `python` (not `python3`) to invoke the Python interpreter.\n"
+                "- Windows-style paths (`C:\\Users\\...`) in the working directory are normal.\n"
+                "- Use `which <tool>` to check if on PATH.\n"
+                "- Use `python` (not `python3`) to invoke Python.\n"
                 "</SHELL_IDENTITY>",
             )
         )
@@ -539,10 +523,8 @@ def _collect_system_prompt_sections(
                 "Your terminal is **PowerShell** on Windows. Use PowerShell syntax: chain with `;` (not `&&` / `||`); "
                 "prefer `-ErrorAction SilentlyContinue` or `try/catch` instead of `|| true`; use `Start-Process` / "
                 "`Start-Job` instead of a trailing `&`.\n\n"
-                "**Directory listing:** Quick folder listings are fine (`Get-ChildItem`, `dir`, `gci`, `ls` as aliases) "
-                "when you only need names in a path you already chose—still use **TOOL_ROUTING_LADDER** for "
-                "repo-wide **content** search (`search_code`, editors, structure tools), not `Select-String` / "
-                "`Get-Content` across the tree.\n\n"
+                "**Directory/Content listing:** You may use `Get-ChildItem` (or `ls`, `dir`) and `Select-String` if needed, "
+                "but prefer native tools from the **TOOL_ROUTING_LADDER** (`search_code`, editors, structure tools) first.\n\n"
                 "**Do not use Unix-only habits here:** `find`, `cat`, `grep`, `head`, `tail`, `touch`, `rm -rf`, "
                 "`pkill`, `timeout`, `which`, or `&&` / `||`.\n"
                 "</SHELL_IDENTITY>",
@@ -554,6 +536,7 @@ def _collect_system_prompt_sections(
                 "shell_identity_unix",
                 "<SHELL_IDENTITY>\n"
                 "Your terminal is **Bash / Zsh** running on a Unix-like system. Use standard bash syntax.\n"
+                "You may use shell tools (grep, cat, ls, find) if needed, but prefer native tools first.\n"
                 "</SHELL_IDENTITY>",
             )
         )
