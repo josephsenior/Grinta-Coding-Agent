@@ -267,10 +267,10 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
     if level == "full":
         autonomy = (
             f"<AUTONOMY>\nFULL AUTONOMOUS MODE: Execute all planned steps end-to-end without "
-            f"confirmation. On tool failure, pivot to alternative tools immediately within the "
-            f"same turn (e.g. ast_code_editor → str_replace_editor). Auto-retry "
-            f"recoverable errors. Report back only after completing the full plan or after "
-            f"exhausting all tool alternatives on a blocking sub-task. "
+            f"confirmation. On tool failure, pivot to an alternative tool in the same turn "
+            f"(e.g. ast_code_editor → str_replace_editor). Auto-retry recoverable errors. "
+            f"Report back only after completing the plan or exhausting tool alternatives on a "
+            f"blocking sub-task. "
             f"{cp_line}\n</AUTONOMY>"
         )
 
@@ -290,15 +290,14 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
         signal_blurb = ""
         if signal_on:
             signal_blurb = (
-                "\n\n**signal_progress** is enabled: use it per its tool description for deferral / "
-                "heartbeat-style notes when appropriate. It does not replace accurate `task_tracker` state."
+                "\n\n**signal_progress** is enabled: use it for deferral or heartbeat-style notes when appropriate. It does not replace accurate `task_tracker` state."
             )
         task_tracker_discipline_block = (
             "<TASK_TRACKING>\n"
-            "**task_tracker**: For multi-step tasks, use `view` to read the plan and `update` to replace the full `task_list`.\n"
+            "**task_tracker**: For multi-step tasks, use `view` to inspect the plan and `update` to replace the full `task_list`.\n"
             "Allowed statuses: `todo`, `doing`, `done`, `skipped`, `blocked`.\n"
-            "**Syncing**: Update the tracker immediately when step statuses change. Piggyback updates with other tool calls when possible.\n"
-            "**Completion (CRITICAL)**: You MUST NOT call the finish tool if any steps are still in `todo` or `doing`."
+            "**Syncing**: Update the tracker as statuses change; piggyback updates when possible.\n"
+            "**Completion (CRITICAL)**: Do NOT call `finish` if any steps are still in `todo` or `doing`."
             f"{signal_blurb}\n"
             "</TASK_TRACKING>"
         )
@@ -312,8 +311,7 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
     if tracker_on:
         problem_solving_workflow_body = (
             base_workflow
-            + "\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update "
-            "the plan when your beliefs about progress changed."
+            + "\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update the plan when progress changed."
         )
         task_sync_instruction = (
             "**Task synchronization:** Update `task_tracker` to `done`, `skipped`, or `blocked` before attempting to finish."
