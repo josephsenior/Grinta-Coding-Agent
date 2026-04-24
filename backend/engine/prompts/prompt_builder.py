@@ -227,8 +227,7 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
             "prior state. The tracker is a record of what happened, not a script that drives repetition.\n\n"
             "**Final step synchronization (CRITICAL):** You MUST NOT call the finish tool if the `task_tracker` "
             "contains steps in `todo` or `doing` state. You must update the tracker to a terminal state (`done`, `skipped`, `blocked`) "
-            "on the SAME TURN as your final verification or on the turn immediately preceding your finish call. "
-            "A finish call with an active/un-synced tracker is an operational failure."
+            "on the SAME TURN as your final verification or on the turn immediately preceding your finish call."
             f"{signal_blurb}\n"
             "</TASK_TRACKING>"
         )

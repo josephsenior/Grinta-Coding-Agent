@@ -5,10 +5,12 @@ import os
 import pytest
 
 from backend.orchestration.file_state_tracker import (
+    FileStateMiddleware,
     FileStateTracker,
     _normalize_path_key,
     file_manifest_path,
 )
+from backend.orchestration.tool_pipeline import ToolInvocationContext
 
 
 def test_manifest_path_uses_agent_state_dir(
@@ -78,3 +80,108 @@ def test_invalidate_read_snapshot(tmp_path, monkeypatch: pytest.MonkeyPatch) -> 
     assert _normalize_path_key('x.txt') in tracker._read_snapshots
     tracker.invalidate_read_snapshot('x.txt')
     assert _normalize_path_key('x.txt') not in tracker._read_snapshots
+
+
+# ---------------------------------------------------------------------------
+# FileStateMiddleware enforcement tests
+# ---------------------------------------------------------------------------
+
+def _make_ctx(action, *, controller=None, state=None) -> ToolInvocationContext:
+    """Build a minimal ToolInvocationContext for middleware tests."""
+    from unittest.mock import MagicMock
+
+    return ToolInvocationContext(
+        controller=controller or MagicMock(),
+        action=action,
+        state=state or MagicMock(),
+    )
+
+
+def _file_edit_action(path: str, command: str):
+    """Minimal stand-in for FileEditAction."""
+    from unittest.mock import MagicMock
+
+    a = MagicMock()
+    a.__class__.__name__ = 'FileEditAction'
+    a.path = path
+    a.command = command
+    return a
+
+
+@pytest.mark.asyncio
+async def test_middleware_blocks_str_replace_without_prior_read(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Editing a file that has never been read in this session must be blocked."""
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / 'target.py'
+    f.write_text('x = 1\n', encoding='utf-8')
+
+    mw = FileStateMiddleware()
+    action = _file_edit_action(str(f), 'str_replace')
+    ctx = _make_ctx(action)
+
+    await mw.execute(ctx)
+
+    assert ctx.blocked is True
+    assert 'FILE_STATE_GUARD' in (ctx.block_reason or '')
+
+
+@pytest.mark.asyncio
+async def test_middleware_allows_str_replace_after_read(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Editing a file that was already read in this session must not be blocked."""
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / 'target.py'
+    f.write_text('x = 1\n', encoding='utf-8')
+
+    mw = FileStateMiddleware()
+    mw.tracker.record(str(f), 'read')
+    action = _file_edit_action(str(f), 'str_replace')
+    ctx = _make_ctx(action)
+
+    await mw.execute(ctx)
+
+    assert ctx.blocked is False
+
+
+@pytest.mark.asyncio
+async def test_middleware_allows_edit_on_new_nonexistent_file(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Creating a new file that does not exist yet must not be blocked."""
+    monkeypatch.chdir(tmp_path)
+    new_path = str(tmp_path / 'brand_new.py')
+
+    mw = FileStateMiddleware()
+    action = _file_edit_action(new_path, 'str_replace')
+    ctx = _make_ctx(action)
+
+    await mw.execute(ctx)
+
+    assert ctx.blocked is False
+
+
+@pytest.mark.asyncio
+async def test_middleware_blocks_mutating_edit_on_stale_file(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Editing a file that changed on disk since the last read must be blocked."""
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / 'stale.py'
+    f.write_text('v1\n', encoding='utf-8')
+
+    mw = FileStateMiddleware()
+    # Simulate: file was read, snapshot taken, then disk changed.
+    mw.tracker.record(str(f), 'read')
+    mw.tracker.record_read_snapshot_from_disk(str(f))
+    f.write_text('v2\n', encoding='utf-8')  # disk change after read
+
+    action = _file_edit_action(str(f), 'write')
+    ctx = _make_ctx(action)
+
+    await mw.execute(ctx)
+
+    assert ctx.blocked is True
+    assert 'FILE_STATE_GUARD' in (ctx.block_reason or '')

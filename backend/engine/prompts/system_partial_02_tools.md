@@ -4,8 +4,6 @@
 Editor `path` arguments are relative to the project root (see runtime working directory) or valid absolute paths on disk. Editors create parent dirs and normalize paths automatically.
 {confirm_paths} Edit the path the user gave; no shadow copies (file_v2.py); remove temp files when done.
 
-**Read-before-edit (non-negotiable):** always **`view_file`** on the target (use the `view_range` argument for a line window) before `insert_text`, `edit_mode`, or structure edits. After condensation or 5+ prior edits in this session, re-verify the target lines — in-memory line numbers drift. Fresh writes you just made in the same turn do NOT need re-reading.
-
 **Edit vs write vs patch (reliability):**
 - **Surgical edits** = small steps: `str_replace_editor` **`insert_text`** (after a line you viewed), **`edit_mode`** (`section` / `range` / `format` / `patch`), or **`ast_code_editor`** (`edit_symbol_body` / `edit_symbols`, `replace_range`, etc.). Prefer structure-aware commands for code when they apply.
 - **Greenfield / new files** = start with a **minimal, parsing-valid stub** (imports, one function/class shell, closing delimiters) that passes the language parser, then grow with small follow-up edits. Do **not** paste an entire large file in one `create_file` / one-shot write — it fails syntax validation and burns context.

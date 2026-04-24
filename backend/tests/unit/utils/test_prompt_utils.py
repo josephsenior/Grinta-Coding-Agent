@@ -382,3 +382,93 @@ class TestPromptBuilderSectionTokens:
         assert report['sections'][0]['tokens'] >= report['sections'][-1]['tokens']
         built = build_system_prompt(**kwargs)
         assert len(built) == report['total_chars']
+
+
+def _make_budget_cfg(**overrides: object) -> MagicMock:
+    cfg = MagicMock()
+    cfg.autonomy_level = overrides.get('autonomy_level', 'balanced')
+    cfg.enable_checkpoints = False
+    cfg.enable_lsp_query = False
+    cfg.enable_internal_task_tracker = bool(
+        overrides.get('enable_internal_task_tracker', False)
+    )
+    cfg.enable_signal_progress = False
+    cfg.enable_permissions = False
+    cfg.enable_meta_cognition = False
+    cfg.enable_think = False
+    cfg.cli_mode = bool(overrides.get('cli_mode', False))
+    return cfg
+
+
+class TestPromptBudgetRegression:
+    """Token-budget regression guard.
+
+    Ceilings are set at post-compression baseline + ~10 % headroom.
+    A test failure here means new prompt text was added without a corresponding
+    reduction — not that the implementation is broken.
+    """
+
+    def test_unix_balanced_no_mcp_token_ceiling(self) -> None:
+        from backend.engine.prompts.prompt_builder import measure_system_prompt_sections
+
+        report = measure_system_prompt_sections(
+            active_llm_model='gpt-4',
+            is_windows=False,
+            config=_make_budget_cfg(),
+            mcp_tool_names=[],
+            mcp_tool_descriptions={},
+            mcp_server_hints=[],
+            function_calling_mode='native',
+        )
+        # Floor: prompt must be substantive.
+        assert report['total_tokens'] >= 800, 'Prompt shrank unexpectedly'
+        # Ceiling: guards against prompt bloat regressions.
+        # Baseline post-compression: 4 203 tokens.  Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 4_650, (
+            f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
+            '(baseline 4 203). Reduce prompt text or raise this ceiling deliberately.'
+        )
+
+    def test_windows_ps_balanced_no_mcp_token_ceiling(self) -> None:
+        from backend.engine.prompts.prompt_builder import measure_system_prompt_sections
+
+        report = measure_system_prompt_sections(
+            active_llm_model='gpt-4',
+            is_windows=True,
+            config=_make_budget_cfg(),
+            mcp_tool_names=[],
+            mcp_tool_descriptions={},
+            mcp_server_hints=[],
+            function_calling_mode='native',
+        )
+        assert report['total_tokens'] >= 800, 'Prompt shrank unexpectedly'
+        # Baseline post-compression: 4 379 tokens.  Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 4_820, (
+            f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
+            '(baseline 4 379). Reduce prompt text or raise this ceiling deliberately.'
+        )
+
+    def test_full_autonomy_tracker_mcp_token_ceiling(self) -> None:
+        from backend.engine.prompts.prompt_builder import measure_system_prompt_sections
+
+        cfg = _make_budget_cfg(
+            autonomy_level='full', enable_internal_task_tracker=True
+        )
+        report = measure_system_prompt_sections(
+            active_llm_model='gpt-4',
+            is_windows=False,
+            config=cfg,
+            mcp_tool_names=['search_github', 'read_file'],
+            mcp_tool_descriptions={
+                'search_github': 'Search GitHub',
+                'read_file': 'Read a file',
+            },
+            mcp_server_hints=[{'server': 'github', 'hint': 'Use for GitHub ops'}],
+            function_calling_mode='native',
+        )
+        assert report['total_tokens'] >= 1_000, 'Prompt shrank unexpectedly'
+        # Baseline post-compression: 5 103 tokens.  Ceiling = baseline + ~10 %.
+        assert report['total_tokens'] <= 5_620, (
+            f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
+            '(baseline 5 103). Reduce prompt text or raise this ceiling deliberately.'
+        )
