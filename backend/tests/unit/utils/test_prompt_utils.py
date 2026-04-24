@@ -508,12 +508,17 @@ class TestOrchestratorPromptManager:
         ]
 
         result = opm.get_system_message()
+        addendum = opm.get_mcp_user_addendum()
 
-        assert 'call_mcp_tool(tool_name="...", arguments={...})' in result
-        assert '`github_search`' in result
-        assert 'Search GitHub code' in result
-        assert 'Configured MCP servers' in result
-        assert '**`github`:** Use for repository metadata and code search' in result
+        assert 'call_mcp_tool(tool_name="...", arguments={...})' not in result
+        assert '`github_search`' not in result
+        assert 'Configured MCP servers' not in result
+
+        assert 'call_mcp_tool(tool_name="...", arguments={...})' in addendum
+        assert '`github_search`' in addendum
+        assert 'Search GitHub code' in addendum
+        assert 'Configured MCP servers' in addendum
+        assert '**`github`:** Use for repository metadata and code search' in addendum
 
 
 class TestPromptBuilderSectionTokens:

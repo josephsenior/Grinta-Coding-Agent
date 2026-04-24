@@ -135,8 +135,9 @@ class SimpleBashSession(BaseShellSession):
 
     def _start_subprocess(self, command: str) -> subprocess.Popen:
         """Initialize and register the subprocess."""
+        argv = self._wrap_subprocess_argv(['bash', '-c', command], cwd=self._cwd)
         process = subprocess.Popen(
-            ['bash', '-c', command],
+            argv,
             cwd=self._cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

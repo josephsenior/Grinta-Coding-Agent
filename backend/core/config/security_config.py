@@ -45,18 +45,22 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "'strict' enforces conversation ownership and rejects anonymous access."
         ),
     )
-    execution_profile: Literal['standard', 'hardened_local'] = Field(
+    execution_profile: Literal['standard', 'hardened_local', 'sandboxed_local'] = Field(
         default='standard',
         description=(
             "Runtime execution profile. 'standard' preserves current local behavior. "
-            "'hardened_local' adds stricter local policy gates for commands and file access."
+            "'hardened_local' adds stricter local policy gates for commands and file access. "
+            "'sandboxed_local' adds those same policy gates plus OS-native process isolation "
+            '(bubblewrap on Linux, sandbox-exec on macOS, AppContainer on Windows) '
+            'for non-interactive command execution.'
         ),
     )
     allow_network_commands: bool = Field(
         default=False,
         description=(
             "When execution_profile='hardened_local', allow network-capable shell commands "
-            'such as curl, wget, scp, rsync, and netcat.'
+            "such as curl, wget, scp, rsync, and netcat. When execution_profile='sandboxed_local', "
+            'this controls whether the sandbox backend grants network access.'
         ),
     )
     allow_package_installs: bool = Field(

@@ -172,6 +172,8 @@ class PtyInteractiveShellSession(BaseShellSession):
         no_change_timeout_seconds: int = 30,
         max_memory_mb: int | None = None,
         cancellation_service: TaskCancellationService | None = None,
+        security_config: object | None = None,
+        workspace_root: str | None = None,
         *,
         shell_argv: list[str] | None = None,
         dimensions: tuple[int, int] = (24, 120),
@@ -186,6 +188,8 @@ class PtyInteractiveShellSession(BaseShellSession):
             no_change_timeout_seconds=no_change_timeout_seconds,
             max_memory_mb=max_memory_mb,
             cancellation_service=cancellation_service,
+            security_config=security_config,
+            workspace_root=workspace_root,
         )
         self._shell_argv = list(shell_argv) if shell_argv else _default_shell_argv()
         self._dimensions = dimensions

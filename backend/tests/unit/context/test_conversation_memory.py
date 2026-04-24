@@ -51,6 +51,7 @@ def _make_config(**overrides):
 def _make_prompt_manager():
     pm = MagicMock()
     pm.get_system_message.return_value = 'You are Grinta, an expert AI coding agent.'
+    pm.get_mcp_user_addendum.return_value = ''
     return pm
 
 
@@ -94,6 +95,24 @@ class TestErrorObservationNotifyUiOnly:
         )
         assert len(out) == 1
         assert out[0].role == 'user'
+
+
+class TestMcpUserAddendum:
+    def test_normalize_system_messages_inserts_mcp_addendum_after_system(self):
+        mem = _make_memory()
+        mem.prompt_manager.get_mcp_user_addendum.return_value = (
+            '<MCP_TOOLS>\n`github_search`\n</MCP_TOOLS>'
+        )
+
+        messages = [_text_msg('user', 'Implement the fix')]
+
+        normalized = mem._normalize_system_messages(messages)
+
+        assert normalized[0].role == 'system'
+        assert normalized[1].role == 'user'
+        assert extract_first_text(normalized[1]) == '<MCP_TOOLS>\n`github_search`\n</MCP_TOOLS>'
+        assert normalized[2].role == 'user'
+        assert extract_first_text(normalized[2]) == 'Implement the fix'
 
 
 class TestToolResultPropagation:

@@ -4,6 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Install: pipx](https://img.shields.io/badge/install-pipx-brightgreen)](docs/INSTALL.md)
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Tests](https://github.com/josephsenior/Grinta-Agent/actions/workflows/py-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Agent/actions/workflows/py-tests.yml)
@@ -11,40 +12,48 @@
 [![E2E](https://github.com/josephsenior/Grinta-Agent/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Agent/actions/workflows/e2e-tests.yml)
 [![Codecov](https://codecov.io/gh/josephsenior/Grinta-Agent/branch/main/graph/badge.svg)](https://codecov.io/gh/josephsenior/Grinta-Agent)
 
-> Autonomous coding that closes the loop: plan, execute, validate, finish.
+> Local-first autonomous coding agent. Plan → execute → validate → finish.
 
-Grinta is an open-source, local-first autonomous coding agent built for real repository work. It reads code, plans multi-step execution, performs changes and command runs, validates results, and only finishes when completion criteria are satisfied.
+<p align="center">
+  <img alt="Grinta in action" src="docs/grinta-demo.gif" width="720">
+</p>
 
-## Project Description
+## Install in 30 seconds
 
-Grinta focuses on task completion integrity, not just code generation. The runtime combines orchestration safeguards, local execution policy checks, and durable session state so long-running tasks can recover, self-correct, and stay within clear operating boundaries.
+```bash
+pipx install grinta-ai
+grinta init          # one-time wizard: pick provider + paste key
+grinta               # launch the REPL in the current directory
+```
 
-## Core Topics
+That is the whole setup. The `grinta init` wizard auto-detects local Ollama and LM Studio servers and writes a working `settings.json` for you. Other install paths (uv, Homebrew, Scoop, Docker) are in [docs/INSTALL.md](docs/INSTALL.md).
 
-- Autonomous coding workflows and task completion gates
-- Session orchestration, retries, stuck detection, and circuit breakers
-- Local-first execution with policy-driven safety controls
-- Model-agnostic provider routing (cloud and local)
-- Context compaction and durable run-state recovery for long sessions
+## What you get
 
-## Why Grinta
+- **Task completion, not just file edits.** Validation gates and stuck detection block premature "done".
+- **Model-agnostic.** OpenAI, Anthropic, Google, OpenRouter, Ollama, LM Studio — same prompt surface, same tools.
+- **Local-first.** Code, sessions, checkpoints, and audit log all live under `.grinta/` in your project.
+- **Strong safety rails.** Risk-classified actions, CRITICAL refusal gate, secret masking, and a session-wide audit trail.
+- **Durable long sessions.** Event-stream ledger, automatic compaction, manual `/checkpoint`, and revert.
+- **Lean TUI.** Cost / tokens / latency / breaker state visible in the HUD; rich slash commands (`/help`).
 
-- Task completion, not just file edits.
-- Local-first runtime with strong safety guardrails.
-- Durable long-session behavior with event-oriented state and recovery.
-- Model-agnostic inference with direct provider support and OpenAI-compatible routing.
-- Strong stuck detection and circuit-breaker behavior to avoid silent runaway loops.
+## Common slash commands
 
-## Security Boundary
+| Command       | What it does                                              |
+| ------------- | --------------------------------------------------------- |
+| `/help`       | Full slash-command reference                              |
+| `/cost`       | Tokens, calls, USD spent this session                     |
+| `/diff`       | `git diff --stat` of the workspace                        |
+| `/think`      | Toggle the optional reasoning scratchpad                  |
+| `/checkpoint` | Snapshot the workspace (revertable)                       |
+| `/status`     | Full HUD snapshot                                         |
+| `/compact`    | Force context compaction now                              |
 
-Grinta currently executes actions on the local host.
+## Security boundary
 
-- `hardened_local` adds stricter local execution policy checks.
-- `hardened_local` is not sandboxing and not process isolation.
+Grinta executes actions on the local host. `hardened_local` adds stricter policy checks but **is not** sandboxing or process isolation. Read [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md) **before pointing Grinta at code you do not trust** — for hostile codebases, run inside a VM or container.
 
-Use Grinta for trusted local workflows and repositories.
-
-## Architecture (High Level)
+## Architecture (high level)
 
 ```mermaid
 graph TB
@@ -59,9 +68,15 @@ graph TB
     Orch --> FinishGate[Task validation\nbefore finish]
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for implementation details.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the deep dive.
 
-## Quick Start
+## The story behind Grinta
+
+Grinta is a single-author project, written and rewritten in public. The journey — what was killed, what was wrong, what got rebuilt — lives in the **Book of Grinta**:
+
+[`preface-why-this-story-matters.md`](preface-why-this-story-matters.md) → [`00-the-meaning-of-grinta.md`](00-the-meaning-of-grinta.md) → … → [`31-the-myth-of-the-committee.md`](31-the-myth-of-the-committee.md). Full index in [BOOK_OF_GRINTA.md](BOOK_OF_GRINTA.md).
+
+## Quick start (from source)
 
 ### Windows (recommended)
 

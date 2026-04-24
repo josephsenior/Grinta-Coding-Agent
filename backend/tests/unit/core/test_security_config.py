@@ -39,6 +39,10 @@ class TestSecurityConfigValidation:
         cfg = SecurityConfig(validation_mode='strict')
         assert cfg.validation_mode == 'strict'
 
+    def test_valid_sandboxed_local_profile(self):
+        cfg = SecurityConfig(execution_profile='sandboxed_local')
+        assert cfg.execution_profile == 'sandboxed_local'
+
     def test_custom_values(self):
         cfg = SecurityConfig(
             confirmation_mode=True,
@@ -46,7 +50,7 @@ class TestSecurityConfigValidation:
             enforce_security=False,
             block_high_risk=True,
             validation_mode='strict',
-            execution_profile='hardened_local',
+            execution_profile='sandboxed_local',
             allow_network_commands=True,
             allow_package_installs=True,
             allow_background_processes=True,
@@ -59,7 +63,7 @@ class TestSecurityConfigValidation:
         assert cfg.security_analyzer == 'custom_analyzer'
         assert cfg.enforce_security is False
         assert cfg.block_high_risk is True
-        assert cfg.execution_profile == 'hardened_local'
+        assert cfg.execution_profile == 'sandboxed_local'
         assert cfg.allow_network_commands is True
         assert cfg.allow_package_installs is True
         assert cfg.allow_background_processes is True

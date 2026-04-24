@@ -29,6 +29,7 @@ class SessionManager:
         tool_registry: Optional[ShellToolRegistryLike] = None,
         max_memory_gb: Optional[int] = None,
         cancellation_service: Optional[TaskCancellationService] = None,
+        security_config: object | None = None,
     ) -> None:
         """Initialize the session manager.
 
@@ -43,6 +44,7 @@ class SessionManager:
         self.username = username
         self.tool_registry = tool_registry
         self.max_memory_gb = max_memory_gb
+        self.security_config = security_config
         self.cancellation_service = cancellation_service or TaskCancellationService(
             label=f'sessions:{work_dir}'
         )
@@ -99,6 +101,8 @@ class SessionManager:
                 max_memory_mb=self.max_memory_gb * 1024 if self.max_memory_gb else None,
                 cancellation_service=self.cancellation_service,
                 interactive=interactive,
+                security_config=self.security_config,
+                workspace_root=self.work_dir,
             )
             session.initialize()
             self.sessions[session_id] = session

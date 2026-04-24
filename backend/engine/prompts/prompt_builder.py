@@ -30,6 +30,46 @@ _DIR = Path(__file__).parent
 
 
 # ---------------------------------------------------------------------------
+# Per-model capability classification (capability adaptation, not provider tuning)
+# ---------------------------------------------------------------------------
+
+# Models with strong inherent reasoning — they don't need a `think` scaffold and
+# the XML thinking sections waste tokens / occasionally suppress their own CoT.
+_INHERENT_REASONING_PATTERNS = (
+    'o1', 'o3', 'o4',
+    'deepseek-reasoner', 'deepseek-r1',
+    'gemini-2.0-flash-thinking', 'gemini-2.5-pro',
+    'grok-4',
+)
+
+# Small / weak models where the full prompt + 45 tools overwhelms behaviour.
+# They get the "short mode" rendering (no examples partial, terse rules).
+_SMALL_MODEL_PATTERNS = (
+    'llama3.2', 'llama-3.2', 'llama3-8b', 'llama-3-8b',
+    'mistral-7b', 'qwen2.5-7b', 'qwen-7b', 'phi-3', 'phi3',
+    'gemma-7b', 'gemma2-9b', 'codellama-7b',
+    'gpt-4o-mini', 'gemini-2.5-flash-lite', 'haiku',
+)
+
+
+def _model_has_inherent_reasoning(model_id: str) -> bool:
+    mid = (model_id or '').strip().lower()
+    if not mid:
+        return False
+    # Strip provider prefix for matching (e.g. "openai/o1" → "o1").
+    bare = mid.split('/')[-1]
+    return any(bare.startswith(p) or p in bare for p in _INHERENT_REASONING_PATTERNS)
+
+
+def _model_is_small(model_id: str) -> bool:
+    mid = (model_id or '').strip().lower()
+    if not mid:
+        return False
+    bare = mid.split('/')[-1]
+    return any(p in bare for p in _SMALL_MODEL_PATTERNS)
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -394,6 +434,11 @@ def _render_critical(
     )
 
 
+def _render_examples() -> str:
+    """Render the worked-examples partial (illustrative tool routing)."""
+    return _load("system_partial_05_examples.md")
+
+
 # ---------------------------------------------------------------------------
 # system_partial_03_mcp_permissions_tail  (most complex)
 # ---------------------------------------------------------------------------
@@ -597,9 +642,20 @@ def _collect_system_prompt_sections(
     terminal_tool_name: str | None = None,
     function_calling_mode: str | None = None,
     agent_identity: str = "",
+    render_mcp_inline: bool = True,
 ) -> list[tuple[str, str]]:
-    """Ordered (name, body) sections before joining with blank lines."""
+    """Ordered (name, body) sections before joining with blank lines.
+
+    When ``render_mcp_inline=False`` the MCP tool block is omitted from the
+    system prompt so it can be delivered as a per-turn user-role addendum
+    (see :func:`build_mcp_user_addendum`). This preserves provider prefix
+    caches because the system prompt no longer mutates when MCP servers
+    connect or disconnect mid-session.
+    """
     model_id = active_llm_model or "unknown"
+    is_small_model = _model_is_small(model_id)
+    has_inherent_reasoning = _model_has_inherent_reasoning(model_id)
+
     resolved_terminal_tool = _resolve_terminal_command_tool(
         is_windows=is_windows,
         terminal_tool_name=terminal_tool_name,
@@ -675,27 +731,79 @@ def _collect_system_prompt_sections(
             "system_partial_02_tools",
             _render_tool_reference(shell_is_powershell, config),
         ),
-        (
-            "mcp_permissions_partial_03_tail",
-            _render_mcp_and_permissions(
-                mcp_tool_names or [],
-                mcp_tool_descriptions or {},
-                mcp_server_hints or [],
-                config,
-            ),
-        ),
+    ]
+
+    # MCP block — only inline by default. When ``render_mcp_inline=False`` the
+    # caller is expected to deliver the MCP catalogue as a per-turn user-role
+    # addendum (see ``build_mcp_user_addendum``) so the system prompt stays
+    # stable for prefix caching.
+    if render_mcp_inline:
+        sections.append(
+            (
+                "mcp_permissions_partial_03_tail",
+                _render_mcp_and_permissions(
+                    mcp_tool_names or [],
+                    mcp_tool_descriptions or {},
+                    mcp_server_hints or [],
+                    config,
+                ),
+            )
+        )
+    else:
+        # Still render permissions (they are stable per-session).
+        if getattr(config, "enable_permissions", False):
+            perm = getattr(config, "permissions", None)
+            if perm is not None:
+                sections.append(("permissions_partial", _render_permissions(config, perm)))
+
+    # Worked-examples partial — capability-adapted: omit on small/local models
+    # where prompt budget is tight, and where examples can crowd out tool docs.
+    if not is_small_model:
+        sections.append(("system_partial_05_examples", _render_examples()))
+
+    # ``think`` is opt-in via config, but if the model has inherent reasoning
+    # (o1/o3/r1/grok-4/gemini-thinking) we suppress the scaffolding regardless.
+    effective_enable_think = bool(getattr(config, "enable_think", False)) and not has_inherent_reasoning
+
+    sections.append(
         (
             "system_partial_04_critical",
             _render_critical(
                 resolved_terminal_tool,
-                enable_think=bool(getattr(config, "enable_think", False)),
+                enable_think=effective_enable_think,
                 terminal_manager_available=bool(
                     getattr(config, "enable_terminal", True)
                 ),
             ),
         ),
-    ]
+    )
     return sections
+
+
+def build_mcp_user_addendum(
+    mcp_tool_names: list[str] | None = None,
+    mcp_tool_descriptions: dict[str, str] | None = None,
+    mcp_server_hints: list[dict[str, str]] | None = None,
+    config: Any = None,
+) -> str:
+    """Render the MCP catalogue as a *per-turn* addendum.
+
+    Emit this as a system-role message *appended* to the conversation each
+    turn (after history compaction) so the static system prompt remains stable
+    across MCP connect/disconnect events. This restores Claude / Gemini prefix
+    caching that was previously broken by inlining the MCP tool list into the
+    system prompt.
+
+    Returns an empty string when no MCP tools are connected.
+    """
+    if not mcp_tool_names:
+        return ""
+    return _render_mcp_and_permissions(
+        mcp_tool_names,
+        mcp_tool_descriptions or {},
+        mcp_server_hints or [],
+        config,
+    )
 
 
 def measure_system_prompt_sections(
@@ -756,11 +864,16 @@ def build_system_prompt(
     terminal_tool_name: str | None = None,
     function_calling_mode: str | None = None,
     agent_identity: str = "",
+    render_mcp_inline: bool = True,
     **_extra: object,
 ) -> str:
     """Assemble the full system prompt from partials.
 
     Drop-in replacement for the old ``system_prompt`` rendering.
+
+    Pass ``render_mcp_inline=False`` to omit the MCP catalogue from the system
+    prompt; deliver it separately via :func:`build_mcp_user_addendum` so the
+    system prompt stays stable across MCP connect/disconnect events.
     """
     sections = _collect_system_prompt_sections(
         active_llm_model=active_llm_model,
@@ -774,6 +887,7 @@ def build_system_prompt(
         terminal_tool_name=terminal_tool_name,
         function_calling_mode=function_calling_mode,
         agent_identity=agent_identity,
+        render_mcp_inline=render_mcp_inline,
     )
     return "\n\n".join(body for _, body in sections)
 

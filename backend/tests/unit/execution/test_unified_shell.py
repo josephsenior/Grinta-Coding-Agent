@@ -208,6 +208,34 @@ class TestCreateShellSession:
         )
         assert isinstance(session, _DummySession)
 
+    def test_sandboxed_local_avoids_tmux_session(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'posix')
+        monkeypatch.setitem(
+            sys.modules,
+            'backend.execution.utils.simple_bash',
+            types.SimpleNamespace(SimpleBashSession=_DummySession),
+        )
+
+        tools = _DummyTools(has_bash=True, has_tmux=True)
+        session = create_shell_session(
+            work_dir=str(tmp_path),
+            tools=tools,
+            cancellation_service=MagicMock(),
+            security_config=types.SimpleNamespace(execution_profile='sandboxed_local'),
+        )
+        assert isinstance(session, _DummySession)
+
+    def test_sandboxed_local_blocks_interactive_sessions(self, tmp_path):
+        tools = _DummyTools(has_bash=True, has_tmux=False)
+        with pytest.raises(RuntimeError, match='disabled under sandboxed_local'):
+            create_shell_session(
+                work_dir=str(tmp_path),
+                tools=tools,
+                cancellation_service=MagicMock(),
+                security_config=types.SimpleNamespace(execution_profile='sandboxed_local'),
+                interactive=True,
+            )
+
     def test_unix_falls_back_to_simple_bash_without_tmux(self, tmp_path, monkeypatch):
         monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'posix')
         monkeypatch.setitem(

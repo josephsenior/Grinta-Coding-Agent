@@ -95,6 +95,10 @@ class PromptManager:
         system_message = build_system_prompt(**context).strip()
         return system_message
 
+    def get_mcp_user_addendum(self, **context: object) -> str:
+        """Return any per-turn MCP addendum that should accompany the system prompt."""
+        return ''
+
     def set_prompt_tier(self, tier: str) -> None:
         """Set a coarse prompt tier for subsequent system prompt rendering.
 
@@ -277,12 +281,31 @@ class OrchestratorPromptManager(PromptManager):
         context.setdefault(
             'function_calling_mode', self._resolve_function_calling_mode()
         )
+        context.setdefault('render_mcp_inline', False)
         content = super().get_system_message(**context)
         content = self._inject_scratchpad(content)
         tier = getattr(self, '_prompt_tier', 'base')
         if tier == 'debug':
             content = self._inject_lessons_learned(content)
         return content
+
+    def get_mcp_user_addendum(self, **context: object) -> str:
+        """Render the MCP catalogue as a per-turn user-role addendum."""
+        from backend.engine.prompts.prompt_builder import build_mcp_user_addendum
+
+        if self._config is not None:
+            context.setdefault('config', self._config)
+            context.setdefault('cli_mode', True)
+
+        context.setdefault('mcp_tool_names', self.mcp_tool_names)
+        context.setdefault('mcp_tool_descriptions', self.mcp_tool_descriptions)
+        context.setdefault('mcp_server_hints', self.mcp_server_hints)
+        return build_mcp_user_addendum(
+            mcp_tool_names=context.get('mcp_tool_names'),
+            mcp_tool_descriptions=context.get('mcp_tool_descriptions'),
+            mcp_server_hints=context.get('mcp_server_hints'),
+            config=context.get('config'),
+        ).strip()
 
     def _inject_lessons_learned(self, content: str) -> str:
         """Inject lessons learned from .app/lessons.md into the system prompt."""

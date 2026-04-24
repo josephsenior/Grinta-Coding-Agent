@@ -185,6 +185,8 @@ class WindowsPowershellSession(BaseShellSession):
         no_change_timeout_seconds: int = 30,
         max_memory_mb: int | None = None,
         cancellation_service: TaskCancellationService | None = None,
+        security_config: object | None = None,
+        workspace_root: str | None = None,
         powershell_exe: str | None = None,
     ) -> None:
         """Initializes the PowerShell session."""
@@ -194,6 +196,8 @@ class WindowsPowershellSession(BaseShellSession):
             no_change_timeout_seconds=no_change_timeout_seconds,
             max_memory_mb=max_memory_mb,
             cancellation_service=cancellation_service,
+            security_config=security_config,
+            workspace_root=workspace_root,
         )
         self._job_lock = RLock()
 
@@ -267,6 +271,7 @@ class WindowsPowershellSession(BaseShellSession):
             '-Command',
             effective_command,
         ]
+        ps_command = self._wrap_subprocess_argv(ps_command, cwd=work_dir)
 
         process = None
         try:

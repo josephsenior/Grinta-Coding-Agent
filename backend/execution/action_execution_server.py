@@ -48,6 +48,10 @@ from backend.execution.security_enforcement import (
     path_is_within_workspace,
     tokenize_command,
 )
+from backend.execution.sandboxing import (
+    is_sandboxed_local_profile,
+    is_workspace_restricted_profile,
+)
 from backend.execution.server_routes import (
     register_exception_handlers,
     register_routes,
@@ -151,6 +155,7 @@ class RuntimeExecutor:
             tool_registry=tool_registry,
             max_memory_gb=None,  # Will be updated in ainit
         )
+        self.session_manager.security_config = security_config
 
         if self.session_manager.tool_registry is not None:
             from backend.engine.tools.prompt import set_active_tool_registry
@@ -366,16 +371,16 @@ class RuntimeExecutor:
     def _workspace_root(self) -> Path:
         return Path(self._initial_cwd).resolve()
 
-    def _is_hardened_local(self) -> bool:
-        return (
-            getattr(self.security_config, "execution_profile", "standard")
-            == "hardened_local"
-        )
+    def _is_workspace_restricted_profile(self) -> bool:
+        return is_workspace_restricted_profile(self.security_config)
+
+    def _is_sandboxed_local(self) -> bool:
+        return is_sandboxed_local_profile(self.security_config)
 
     def _validate_interactive_session_scope(
         self, session_id: str, session: Any
     ) -> ErrorObservation | None:
-        if not self._is_hardened_local():
+        if not self._is_workspace_restricted_profile():
             return None
 
         current_cwd = Path(getattr(session, "cwd", self._initial_cwd)).resolve()
@@ -431,7 +436,7 @@ class RuntimeExecutor:
     def _evaluate_interactive_terminal_command(
         self, command: str, current_cwd: Path
     ) -> tuple[Path | None, ErrorObservation | None]:
-        if not self._is_hardened_local():
+        if not self._is_workspace_restricted_profile():
             return (None, None)
 
         stripped = command.strip()
@@ -485,7 +490,7 @@ class RuntimeExecutor:
         requested_cwd: str | None,
         base_cwd: str | None = None,
     ) -> ErrorObservation | None:
-        if not self._is_hardened_local():
+        if not self._is_workspace_restricted_profile():
             return None
 
         workspace_root = self._workspace_root()
@@ -1104,6 +1109,13 @@ class RuntimeExecutor:
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         """Start a new interactive terminal session."""
         try:
+            if self._is_sandboxed_local():
+                return ErrorObservation(
+                    'Interactive terminal sessions are disabled under sandboxed_local. '
+                    'Use cmd_run for sandboxed commands or switch to hardened_local/standard '
+                    'if you need a live terminal session.'
+                )
+
             guard_err = self._terminal_open_guardrail_error(action.command or "")
             if guard_err is not None:
                 return guard_err

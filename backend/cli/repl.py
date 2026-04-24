@@ -114,6 +114,30 @@ _SLASH_COMMANDS = (
         '/status', 'Show the current HUD snapshot', '/status', help_section='control'
     ),
     SlashCommandSpec(
+        '/cost',
+        'Show running token & USD cost for this session',
+        '/cost',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/diff',
+        'Show cumulative file changes made this session',
+        '/diff',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/think',
+        'Toggle the optional `think` reasoning tool',
+        '/think [on|off]',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/checkpoint',
+        'Save a manual checkpoint of the workspace',
+        '/checkpoint [label]',
+        help_section='control',
+    ),
+    SlashCommandSpec(
         '/copy',
         'Copy last assistant message to system clipboard',
         '/copy',
@@ -1891,6 +1915,87 @@ class Repl:
             if self._renderer is not None:
                 self._renderer.add_system_message(
                     self._hud.plain_text(), title='status'
+                )
+            return True
+
+        if cmd == '/cost':
+            hud = self._hud.state
+            tokens = (
+                f'{hud.context_tokens:,} ctx · {hud.llm_calls} LLM calls'
+                if hud.llm_calls
+                else 'no LLM calls yet'
+            )
+            msg = (
+                f'Session cost: ${hud.cost_usd:.4f}  ·  {tokens}\n'
+                f'Model: {hud.model}'
+            )
+            if self._renderer is not None:
+                self._renderer.add_system_message(msg, title='cost')
+            return True
+
+        if cmd == '/diff':
+            try:
+                completed = subprocess.run(
+                    ['git', 'diff', '--stat'],
+                    capture_output=True,
+                    text=True,
+                    cwd=Path.cwd(),
+                    check=False,
+                )
+                body = (completed.stdout or '').strip() or '(no changes)'
+                if completed.stderr and completed.returncode != 0:
+                    body = f'{body}\n\n[stderr]\n{completed.stderr.strip()}'
+                if self._renderer is not None:
+                    self._renderer.add_system_message(body, title='diff')
+            except FileNotFoundError:
+                if self._renderer is not None:
+                    self._renderer.add_system_message(
+                        '`git` not found on PATH; cannot show diff.',
+                        title='warning',
+                    )
+            return True
+
+        if cmd == '/think':
+            parts = text.strip().split()
+            cur = bool(getattr(self._config, 'enable_think', False))
+            if len(parts) >= 2:
+                target = parts[1].lower()
+                if target in ('on', 'true', '1', 'yes'):
+                    new_val = True
+                elif target in ('off', 'false', '0', 'no'):
+                    new_val = False
+                else:
+                    if self._renderer is not None:
+                        self._renderer.add_system_message(
+                            'Usage: /think [on|off]', title='warning'
+                        )
+                    return True
+            else:
+                new_val = not cur
+            try:
+                self._config.enable_think = new_val  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    f'`think` tool now {"ON" if new_val else "OFF"} (applies to next system-prompt build).',
+                    title='think',
+                )
+            return True
+
+        if cmd == '/checkpoint':
+            parts = text.strip().split(maxsplit=1)
+            label = parts[1] if len(parts) > 1 else ''
+            instruction = (
+                'Use the `checkpoint` tool now to snapshot the current workspace state.'
+            )
+            if label:
+                instruction += f' Use this label: {label}'
+            self._next_action = MessageAction(content=instruction)
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    f'Checkpoint queued{(" (" + label + ")") if label else ""}.',
+                    title='checkpoint',
                 )
             return True
 

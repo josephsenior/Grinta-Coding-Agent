@@ -378,6 +378,19 @@ async def test_hardened_local_blocks_command_when_default_session_cwd_outside_wo
 
 
 @pytest.mark.asyncio
+async def test_sandboxed_local_blocks_interactive_terminal_run(mock_executor, tmp_path):
+    workspace = tmp_path / 'workspace'
+    workspace.mkdir()
+    mock_executor._initial_cwd = str(workspace)
+    mock_executor.security_config = SimpleNamespace(execution_profile='sandboxed_local')
+
+    obs = await mock_executor.terminal_run(TerminalRunAction(command='python -m http.server'))
+
+    assert isinstance(obs, ErrorObservation)
+    assert 'disabled under sandboxed_local' in obs.content
+
+
+@pytest.mark.asyncio
 async def test_read_blocks_when_session_cwd_drifts_outside_workspace(
     mock_executor, tmp_path
 ):

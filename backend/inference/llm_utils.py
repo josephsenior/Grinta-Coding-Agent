@@ -57,16 +57,30 @@ def _clean_tools_for_gemini(
 def _clean_tool_properties(properties: dict) -> None:
     """Clean tool properties for Gemini compatibility.
 
+    Defaults and unsupported string formats are not accepted by the Gemini
+    function-calling schema. We strip them, but to compensate we *append* the
+    removed information to the parameter's ``description`` so the model still
+    sees it. This closes a stealth correctness gap where the system prompt
+    promised behaviour the schema no longer encoded.
+
     Args:
         properties: Tool properties dict (modified in place)
 
     """
     for prop_name, prop in properties.items():
-        # Remove default values
-        if 'default' in prop:
-            del prop['default']
+        compensations: list[str] = []
 
-        # Remove unsupported string formats
+        # Remove default values, but surface them in the description.
+        if 'default' in prop:
+            default_value = prop['default']
+            del prop['default']
+            try:
+                rendered = repr(default_value)
+            except Exception:
+                rendered = str(default_value)
+            compensations.append(f'default: {rendered}')
+
+        # Remove unsupported string formats, but surface them in the description.
         if prop.get('type') == 'string' and 'format' in prop:
             if prop['format'] not in ['enum', 'date-time']:
                 logger.info(
@@ -74,7 +88,15 @@ def _clean_tool_properties(properties: dict) -> None:
                     prop['format'],
                     prop_name,
                 )
+                compensations.append(f'expected format: {prop["format"]}')
                 del prop['format']
+
+        if compensations:
+            extra = ' (' + '; '.join(compensations) + ')'
+            existing = prop.get('description') or ''
+            # Only append if the compensation text is not already there.
+            if extra.strip() not in existing:
+                prop['description'] = (existing + extra).strip()
 
 
 def get_token_count(

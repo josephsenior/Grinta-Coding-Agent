@@ -206,6 +206,22 @@ class TestEnforceSecurity:
         assert result.__class__.__name__ == 'ErrorObservation'
         assert 'background processes are disabled' in result.content
 
+    def test_sandboxed_local_reuses_hardened_local_command_policy(self):
+        from backend.ledger.action import CmdRunAction
+
+        rt = _FakeRuntime(
+            analyzer=None,
+            enforce=True,
+            execution_profile='sandboxed_local',
+        )
+        action = CmdRunAction(command='curl https://example.com')
+
+        result = rt._enforce_security(action)
+
+        assert result is not None
+        assert result.__class__.__name__ == 'ErrorObservation'
+        assert 'workspace-scoped allowlist' in result.content
+
     def test_hardened_local_blocks_network_commands(self):
         from backend.ledger.action import CmdRunAction
 

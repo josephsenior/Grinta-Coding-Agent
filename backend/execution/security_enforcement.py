@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
 from backend.execution.editor_only_shell_policy import evaluate_editor_only_shell_block
+from backend.execution.sandboxing import is_workspace_restricted_profile
 from backend.security.command_analyzer import CommandAnalyzer
 
 if TYPE_CHECKING:
@@ -175,7 +176,7 @@ def evaluate_hardened_local_command_policy(
     base_cwd: str | Path | None = None,
     is_background: bool = False,
 ) -> str | None:
-    if getattr(security_config, 'execution_profile', 'standard') != 'hardened_local':
+    if not is_workspace_restricted_profile(security_config):
         return None
 
     if is_background and not getattr(
@@ -246,7 +247,7 @@ def evaluate_hardened_local_command_policy(
 def evaluate_hardened_local_file_policy(
     *, path: str, security_config: Any
 ) -> str | None:
-    if getattr(security_config, 'execution_profile', 'standard') != 'hardened_local':
+    if not is_workspace_restricted_profile(security_config):
         return None
     if is_sensitive_path(path) and not getattr(
         security_config, 'allow_sensitive_path_access', False
@@ -445,7 +446,7 @@ class SecurityEnforcementMixin:
         from backend.ledger.observation import ErrorObservation
 
         sec_cfg = self.config.security  # type: ignore[attr-defined]
-        if getattr(sec_cfg, 'execution_profile', 'standard') != 'hardened_local':
+        if not is_workspace_restricted_profile(sec_cfg):
             return None
 
         if isinstance(action, CmdRunAction):

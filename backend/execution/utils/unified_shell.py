@@ -12,6 +12,10 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from backend.core.logger import app_logger as logger
+from backend.execution.sandboxing import (
+    is_sandboxed_local_profile,
+    resolve_execution_sandbox_policy,
+)
 from backend.execution.utils.tool_registry import resolve_windows_powershell_preference
 
 if TYPE_CHECKING:
@@ -79,6 +83,8 @@ class BaseShellSession(UnifiedShellSession, ABC):
         no_change_timeout_seconds: int = 30,
         max_memory_mb: int | None = None,
         cancellation_service: TaskCancellationService | None = None,
+        security_config: object | None = None,
+        workspace_root: str | None = None,
     ) -> None:
         """Initialize base shell session.
 
@@ -92,15 +98,27 @@ class BaseShellSession(UnifiedShellSession, ABC):
         self._closed = False
         self._initialized = False
         self.work_dir = os.path.abspath(work_dir)
+        self.workspace_root = os.path.abspath(workspace_root or work_dir)
         self.username = username
         self._cwd: str = self.work_dir
         self.NO_CHANGE_TIMEOUT_SECONDS = no_change_timeout_seconds
         self.max_memory_mb = max_memory_mb
+        self.security_config = security_config
         from backend.execution.utils.process_registry import TaskCancellationService
 
         self._cancellation = cancellation_service or TaskCancellationService(
             label='runtime'
         )
+        self._sandbox_policy = resolve_execution_sandbox_policy(
+            security_config=security_config,
+            workspace_root=self.workspace_root,
+        )
+
+    def _wrap_subprocess_argv(self, argv: list[str], *, cwd: str) -> list[str]:
+        """Prefix child argv with the active sandbox launcher when configured."""
+        if self._sandbox_policy is None:
+            return argv
+        return self._sandbox_policy.wrap_argv(argv, cwd=cwd)
 
     @property
     def cwd(self) -> str:
@@ -225,6 +243,8 @@ def create_shell_session(
     no_change_timeout_seconds: int = 30,
     max_memory_mb: int | None = None,
     cancellation_service: TaskCancellationService | None = None,
+    security_config: object | None = None,
+    workspace_root: str | None = None,
     *,
     interactive: bool = False,
 ) -> UnifiedShellSession:
@@ -273,7 +293,17 @@ def create_shell_session(
         'no_change_timeout_seconds': no_change_timeout_seconds,
         'max_memory_mb': max_memory_mb,
         'cancellation_service': cancellation_service,
+        'security_config': security_config,
+        'workspace_root': workspace_root or work_dir,
     }
+
+    sandboxed_local = is_sandboxed_local_profile(security_config)
+
+    if sandboxed_local and interactive:
+        raise RuntimeError(
+            'Interactive terminal sessions are disabled under sandboxed_local. '
+            'Use cmd_run for sandboxed execution or switch profiles.'
+        )
 
     if interactive:
         try:
@@ -344,7 +374,7 @@ def create_shell_session(
         )
 
     # Unix with tmux: Use full BashSession
-    if resolved_tools.has_tmux and resolved_tools.has_bash:
+    if not sandboxed_local and resolved_tools.has_tmux and resolved_tools.has_bash:
         from backend.execution.utils.bash import BashSession
 
         logger.info('Using BashSession with tmux')

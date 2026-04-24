@@ -590,6 +590,42 @@ class ContextMemory:
                 content.text += f'\n\n{summary}'
                 break
 
+    def _ensure_mcp_user_addendum(self, messages: list[Message]) -> None:
+        """Insert the MCP catalogue as a leading user message when configured."""
+        if not messages or messages[0].role != 'system':
+            return
+
+        builder = getattr(self.prompt_manager, 'get_mcp_user_addendum', None)
+        if not callable(builder):
+            return
+
+        try:
+            addendum = str(
+                builder(
+                    cli_mode=True,
+                    config=self.agent_config,
+                )
+                or ''
+            ).strip()
+        except Exception:
+            logger.debug('Failed to build MCP user addendum', exc_info=True)
+            return
+
+        if not addendum:
+            return
+
+        existing = messages[1] if len(messages) > 1 else None
+        if existing is not None and existing.role == 'user':
+            text_parts = [
+                content.text
+                for content in existing.content
+                if is_text_content(content)
+            ]
+            if text_parts and text_parts[0].strip() == addendum:
+                return
+
+        messages.insert(1, message_with_text('user', addendum))
+
     def _dedupe_system_messages(self, messages: list[Message]) -> list[Message]:
         """Return list with leading message plus non-system messages only."""
         if not messages:
@@ -602,6 +638,7 @@ class ContextMemory:
             return messages
         self._ensure_leading_system_message(messages)
         self._inject_context_summary_into_system(messages)
+        self._ensure_mcp_user_addendum(messages)
         return self._dedupe_system_messages(messages)
 
     def _process_action(
