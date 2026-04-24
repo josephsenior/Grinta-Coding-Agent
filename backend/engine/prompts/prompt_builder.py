@@ -35,24 +35,40 @@ _DIR = Path(__file__).parent
 
 
 def _count_section_tokens(text: str, model_id: str) -> tuple[int, str]:
-    """Best-effort token count for budgeting. Returns (tokens, encoding_label)."""
+    """Best-effort token count for budgeting. Returns (tokens, encoding_label).
+
+    Model-family awareness:
+    - Known tiktoken models: resolved directly via ``encoding_for_model``.
+    - Claude (claude-*): uses o200k_base + 1.05x correction factor (Claude's
+      tokenizer encodes ~5% more tokens than GPT-4o on typical code/text).
+    - Gemini (gemini-*): uses o200k_base (similar vocabulary to GPT-4o).
+    - All others: falls back to o200k_base (safer than cl100k_base for modern models).
+    """
     try:
         import tiktoken  # type: ignore
 
-        enc = None
-        label = "cl100k_base"
-        mid = (model_id or "").strip()
+        mid = (model_id or "").strip().lower()
+
+        # Try exact match first (covers all GPT / o1 / o3 variants)
         if mid:
             try:
                 enc = tiktoken.encoding_for_model(mid)
-                label = f"model:{mid}"
+                tokens = len(enc.encode(text))
+                return tokens, f"model:{mid}"
             except Exception:
-                enc = None
-        if enc is None:
-            enc = tiktoken.get_encoding("cl100k_base")
-            if not mid:
-                label = "cl100k_base"
-        return len(enc.encode(text)), label
+                pass
+
+        # Model-family fallback
+        enc = tiktoken.get_encoding("o200k_base")
+        tokens = len(enc.encode(text))
+
+        if mid.startswith("claude-"):
+            # Claude tokenizer produces ~5% more tokens on average
+            tokens = int(tokens * 1.05)
+            return tokens, "o200k_base+claude_correction"
+
+        label = "o200k_base" if mid else "o200k_base_default"
+        return tokens, label
     except Exception:
         est = max(0, len(text) // 4)
         return est, "chars_div_4_fallback"
@@ -98,6 +114,10 @@ def _render_routing(
     function_calling_mode: str | None = None,
 ) -> str:
     explore = _explore_hint(config)
+    meta_cognition_on = getattr(config, "enable_meta_cognition", False)
+    working_memory_on = getattr(config, "enable_working_memory", True)
+    condensation_on = getattr(config, "enable_condensation_request", False)
+    tracker_on = getattr(config, "enable_internal_task_tracker", False)
     batch_cmds = _choose(
         is_windows,
         f"Use **PowerShell** only for environment actions (install, build, test, git, processes). "
@@ -129,10 +149,70 @@ def _render_routing(
             "Mode is unknown. Use conservative single tool-call turns unless runtime capability "
             "signals explicitly confirm native multi-call support."
         )
+    ambiguous_intent_instruction = (
+        "Use `communicate_with_user` to offer options rather than guessing."
+        if meta_cognition_on
+        else "Ask the user a short clarifying question in natural language rather than guessing."
+    )
+    if working_memory_on:
+        memory_and_context_section = (
+            "<MEMORY_AND_CONTEXT_TOOLS>\n"
+            "Two separate memory systems — pick by lifetime, not by feel:\n\n"
+            "- **Cross-session, flat key-value** (survives session restart, stored on disk):\n"
+            "  - **`note(key, value)`** — write a stable fact (e.g. `key=\"db_url\"`, `key=\"auth_decision\"`).\n"
+            "  - **`recall(key)`** — read a stored key, or `key=\"all\"` to dump everything.\n"
+            "- **Within-session, structured** (dies on session restart, survives condensation):\n"
+            "  - **`memory_manager(action=\"working_memory\", ...)`** — sections: hypothesis, findings, blockers, file_context, decisions, plan.\n"
+            "  - **`memory_manager(action=\"semantic_recall\", key=...)`** — fuzzy search over this session's history when the visible window is thin.\n\n"
+            "Decision rule: \"must still be true next week\" → `note`. \"only true for this task\" → `memory_manager`.\n"
+            "</MEMORY_AND_CONTEXT_TOOLS>"
+        )
+        post_condensation_retrieval = (
+            "Retrieve working context immediately: call `memory_manager(action=\"working_memory\")` to restore hypothesis/findings/plan before taking any new action."
+        )
+        surviving_state_facts = (
+            "Only `note` (disk) and `memory_manager` (session) facts survive condensation — everything else is gone."
+        )
+    else:
+        memory_and_context_section = (
+            "<MEMORY_AND_CONTEXT_TOOLS>\n"
+            "Cross-session facts still use `note(key, value)` and `recall(key)`. No structured within-session working-memory tool is available in this run, so keep active hypotheses compact and rely on verified observations.\n"
+            "</MEMORY_AND_CONTEXT_TOOLS>"
+        )
+        post_condensation_retrieval = (
+            "Resume from the summary and your most recent verified observations; no structured working-memory tool is available in this run."
+        )
+        surviving_state_facts = (
+            "Only `note` (disk) facts are guaranteed to survive condensation — everything else may be compacted away."
+        )
+    context_budget_sync_clause = ", sync `task_tracker`" if tracker_on else ""
+    context_budget_next_step = (
+        "call `finish` or `summarize_context`"
+        if condensation_on
+        else "call `finish` or close the current sub-task before doing any broader exploration"
+    )
+    repetition_recovery_options = (
+        "switch tools, escalate with `communicate_with_user`, or call `finish` with a partial result."
+        if meta_cognition_on
+        else "switch tools, ask the user a short clarifying question, or call `finish` with a partial result."
+    )
+    remaining_work_source_of_truth = (
+        "Trust your `task_tracker` plan as the source of truth for what remains."
+        if tracker_on
+        else "Use your restored working memory and most recent verified observations as the source of truth for what remains."
+    )
     return _load("system_partial_00_routing.md").format(
+        ambiguous_intent_instruction=ambiguous_intent_instruction,
         batch_commands=batch_cmds,
         code_intelligence_routing=code_intelligence_routing,
+        context_budget_sync_clause=context_budget_sync_clause,
+        context_budget_next_step=context_budget_next_step,
         explore_layout_hint=explore,
+        memory_and_context_section=memory_and_context_section,
+        post_condensation_retrieval=post_condensation_retrieval,
+        remaining_work_source_of_truth=remaining_work_source_of_truth,
+        repetition_recovery_options=repetition_recovery_options,
+        surviving_state_facts=surviving_state_facts,
         tool_call_batching_mode=tool_call_batching_mode,
     )
 
@@ -228,12 +308,19 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
             + "\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update "
             "the plan when your beliefs about progress changed."
         )
+        task_sync_instruction = (
+            "**Task synchronization:** Update `task_tracker` to `done`, `skipped`, or `blocked` before attempting to finish."
+        )
     else:
         problem_solving_workflow_body = base_workflow
+        task_sync_instruction = (
+            "**Plan synchronization:** Keep your working memory and finish summary aligned with what was actually completed before attempting to finish."
+        )
 
     return _load("system_partial_01_autonomy.md").format(
         autonomy_block=autonomy,
         task_tracker_discipline_block=task_tracker_discipline_block,
+        task_sync_instruction=task_sync_instruction,
         path_discovery_hint=path_hint,
         code_intelligence_fallback=code_intelligence_fallback,
         problem_solving_workflow_body=problem_solving_workflow_body,
@@ -395,7 +482,22 @@ def _render_mcp_and_permissions(
     parts.append(
         _load("system_partial_03_tail.md").format(
             communicate_tool_section=communicate_tool_section,
+            interaction_guidance=(
+                "If a request is vague, inspect nearby docs/config first; use `communicate_with_user` if a true blocker remains or if the scope is ambiguous."
+                if meta_cognition
+                else "If a request is vague, inspect nearby docs/config first; ask the user directly in natural language if a true blocker remains or if the scope is ambiguous."
+            ),
             uncertainty_state_1_discover_line=uncertainty_state_1_discover_line,
+            uncertainty_state_2_ambiguous_line=(
+                "**Genuinely ambiguous intent** (multiple valid implementations, destructive action, scope not obvious) → `communicate_with_user` with `options`. Do NOT guess."
+                if meta_cognition
+                else "**Genuinely ambiguous intent** (multiple valid implementations, destructive action, scope not obvious) → ask the user a short clarifying question in natural language. Do NOT guess."
+            ),
+            uncertainty_state_3_unknowable_line=(
+                "**Unknowable from the code alone** (user's preference, external credential, business policy) → `communicate_with_user` with `intent='clarification'`."
+                if meta_cognition
+                else "**Unknowable from the code alone** (user's preference, external credential, business policy) → ask the user directly in natural language."
+            ),
             thinking_tool_section=thinking_tool_section,
         )
     )
@@ -479,6 +581,7 @@ def _collect_system_prompt_sections(
     mcp_server_hints: list[dict[str, str]] | None = None,
     terminal_tool_name: str | None = None,
     function_calling_mode: str | None = None,
+    agent_identity: str = "",
 ) -> list[tuple[str, str]]:
     """Ordered (name, body) sections before joining with blank lines."""
     model_id = active_llm_model or "unknown"
@@ -488,10 +591,15 @@ def _collect_system_prompt_sections(
     )
     shell_is_powershell = resolved_terminal_tool == "execute_powershell"
 
+    identity_line = (
+        agent_identity.strip()
+        if agent_identity.strip()
+        else "You are Grinta, an expert AI coding agent built by Youssef Mejdi."
+    )
     sections: list[tuple[str, str]] = [
         (
             "identity_header",
-            "You are Grinta, an expert AI coding agent built by Youssef Mejdi. "
+            f"{identity_line} "
             "You solve complex technical tasks through methodical reasoning and tool execution.\n\n"
             "**Model identity:** The deployment calls you through an API using the configured "
             "model id below.\n"
@@ -584,6 +692,7 @@ def measure_system_prompt_sections(
     mcp_server_hints: list[dict[str, str]] | None = None,
     terminal_tool_name: str | None = None,
     function_calling_mode: str | None = None,
+    agent_identity: str = "",
 ) -> dict[str, Any]:
     """Token/char budget per section (tiktoken when available). Sections sorted by tokens descending."""
     mid = active_llm_model or "unknown"
@@ -598,6 +707,7 @@ def measure_system_prompt_sections(
         mcp_server_hints=mcp_server_hints,
         terminal_tool_name=terminal_tool_name,
         function_calling_mode=function_calling_mode,
+        agent_identity=agent_identity,
     )
     per: list[dict[str, Any]] = []
     for name, body in sections:
@@ -627,6 +737,7 @@ def build_system_prompt(
     mcp_server_hints: list[dict[str, str]] | None = None,
     terminal_tool_name: str | None = None,
     function_calling_mode: str | None = None,
+    agent_identity: str = "",
     **_extra: object,
 ) -> str:
     """Assemble the full system prompt from partials.
@@ -644,6 +755,7 @@ def build_system_prompt(
         mcp_server_hints=mcp_server_hints,
         terminal_tool_name=terminal_tool_name,
         function_calling_mode=function_calling_mode,
+        agent_identity=agent_identity,
     )
     return "\n\n".join(body for _, body in sections)
 
@@ -748,16 +860,18 @@ def build_playbook_info(triggered_agents: list[Any]) -> str:
     """Render playbook info blocks for triggered agents."""
     blocks: list[str] = []
     for agent_info in triggered_agents:
-        trigger = getattr(agent_info, "trigger", "")
         name = getattr(agent_info, "name", "")
+        trigger = getattr(agent_info, "trigger", "")
         content = getattr(agent_info, "content", "")
+        intro = (
+            f'The following information has been included from playbook "{name}" based on a keyword match for "{trigger}".\n'
+            if name
+            else f'The following information has been included based on a keyword match for "{trigger}".\n'
+        )
         blocks.append(
             f"<EXTRA_INFO>\n"
-            f'The following information has been included based on a keyword match for "{trigger}".\n'
+            f"{intro}"
             f"It may or may not be relevant to the user's request.\n\n"
-            f'CRITICAL INSTRUCTION: Because this playbook ("{name}") was triggered, you MUST begin your next '
-            f"response to the user with the EXACT phrase:\n"
-            f'"App is treating this as a [{name}] based on your prompt. Generating plan..."\n\n'
             f"{content}\n"
             f"</EXTRA_INFO>"
         )

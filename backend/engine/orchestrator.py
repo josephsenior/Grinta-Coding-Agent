@@ -237,15 +237,14 @@ class Orchestrator(Agent):
                 getattr(self, '_consecutive_context_errors', 0) + 1
             )
             logger.warning(
-                'ContextLimitError encountered (%d/6). Attempting condensation + retry.',
+                'ContextLimitError encountered (%d/4). Attempting condensation + retry.',
                 self._consecutive_context_errors,
             )
 
-            # Circuit breaker: fail hard if we hit >6 consecutive ContextLimitErrors.
-            # Previous threshold of 3 was too aggressive — transient tokenizer
-            # errors or single-message overflows can cause short bursts that
-            # resolve after condensation.
-            if self._consecutive_context_errors > 6:
+            # Circuit breaker: fail hard if we hit >4 consecutive ContextLimitErrors.
+            # Threshold of 3 was too aggressive for transient single-message overflows;
+            # >6 burned too much token budget before giving up. 4 is the balance point.
+            if self._consecutive_context_errors > 4:
                 raise AgentRuntimeError(
                     'Circuit breaker: continuous ContextLimitErrors'
                 ) from None

@@ -25,13 +25,9 @@ Editor `path` arguments are relative to the project root (see runtime working di
 </EDITOR_AND_FILE_OPERATIONS>
 
 <CODE_QUALITY>
-Minimal comments; High quality modular code;Low cyclomatic complexity; Minimal diff unless asked; explore before large edits; imports at top unless circular logic requires otherwise.
+Minimal diff unless asked; explore before large edits; imports at top unless circular logic requires otherwise.
 </CODE_QUALITY>
 
-<ENVIRONMENT_SETUP>
-Prefer requirements.txt / package.json / pyproject.toml — install in one go when present.
-</ENVIRONMENT_SETUP>
-
 <PROCESS_MANAGEMENT>
-{process_management} Prefer app shutdown or pidfiles when available.
+{process_management} Prefer requirements.txt / package.json / pyproject.toml for installs — run in one go when present. Prefer app shutdown or pidfiles when available.
 </PROCESS_MANAGEMENT>

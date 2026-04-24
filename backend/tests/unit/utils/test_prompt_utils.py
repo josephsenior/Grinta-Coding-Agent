@@ -165,6 +165,102 @@ class TestOrchestratorPromptManager:
         result = pm.build_playbook_info([mock_agent])
         assert 'test_playbook' in result
 
+    def test_get_system_message_omits_task_tracker_when_disabled(self, tmp_path):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        mock_config = SimpleNamespace(
+            autonomy_level='balanced',
+            enable_checkpoints=False,
+            enable_lsp_query=False,
+            enable_internal_task_tracker=False,
+            enable_signal_progress=False,
+            enable_permissions=False,
+            enable_meta_cognition=False,
+            enable_think=False,
+            enable_working_memory=True,
+            enable_condensation_request=False,
+        )
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=mock_config)
+        result = opm.get_system_message()
+
+        assert 'sync `task_tracker`' not in result
+        assert 'Update `task_tracker` to `done`, `skipped`, or `blocked`' not in result
+        assert 'Trust your `task_tracker` plan as the source of truth' not in result
+
+    def test_get_system_message_omits_communicate_tool_when_meta_cognition_disabled(
+        self, tmp_path
+    ):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        config = SimpleNamespace(
+            autonomy_level='balanced',
+            enable_checkpoints=False,
+            enable_lsp_query=False,
+            enable_internal_task_tracker=False,
+            enable_signal_progress=False,
+            enable_permissions=False,
+            enable_meta_cognition=False,
+            enable_think=False,
+            enable_working_memory=True,
+            enable_condensation_request=False,
+        )
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
+        result = opm.get_system_message()
+
+        assert '`communicate_with_user`' not in result
+        assert 'ask the user a short clarifying question in natural language' in result
+
+    def test_get_system_message_omits_summarize_context_when_disabled(
+        self, tmp_path
+    ):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        config = SimpleNamespace(
+            autonomy_level='balanced',
+            enable_checkpoints=False,
+            enable_lsp_query=False,
+            enable_internal_task_tracker=False,
+            enable_signal_progress=False,
+            enable_permissions=False,
+            enable_meta_cognition=False,
+            enable_think=False,
+            enable_working_memory=True,
+            enable_condensation_request=False,
+        )
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
+        result = opm.get_system_message()
+
+        assert '`summarize_context`' not in result
+        assert 'close the current sub-task before doing any broader exploration' in result
+
+    def test_get_system_message_omits_working_memory_tool_when_disabled(
+        self, tmp_path
+    ):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        config = SimpleNamespace(
+            autonomy_level='balanced',
+            enable_checkpoints=False,
+            enable_lsp_query=False,
+            enable_internal_task_tracker=False,
+            enable_signal_progress=False,
+            enable_permissions=False,
+            enable_meta_cognition=False,
+            enable_think=False,
+            enable_working_memory=False,
+            enable_condensation_request=False,
+        )
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
+        result = opm.get_system_message()
+
+        assert '`memory_manager(action="working_memory")`' not in result
+        assert '`memory_manager(action="semantic_recall", key=...)`' not in result
+        assert 'No structured within-session working-memory tool is available in this run' in result
+
     def test_build_knowledge_base_info(self, tmp_path):
         from backend.utils.prompt import PromptManager
 
