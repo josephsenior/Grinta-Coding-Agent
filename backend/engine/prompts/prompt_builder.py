@@ -94,12 +94,23 @@ def _resolve_terminal_command_tool(
     return "execute_powershell" if is_windows else "execute_bash"
 
 
+def _code_intelligence_available(config: Any = None) -> bool:
+    """Return whether the code_intelligence tool should be considered available."""
+    if not getattr(config, "enable_lsp_query", False):
+        return False
+    try:
+        from backend.utils.lsp_client import _detect_pylsp
+
+        return bool(_detect_pylsp())
+    except Exception:
+        return False
+
+
 def _explore_hint(_config: Any = None) -> str:
     """Return the canonical layout-discovery tool hint."""
     return (
-        "`search_code` (preferred) and `explore_tree_structure`; "
-        "use `analyze_project_structure` only when needed and avoid repeating "
-        "the same call with unchanged arguments"
+        "`search_code` first, then `explore_tree_structure`; "
+        "use `analyze_project_structure` only when needed"
     )
 
 
@@ -114,6 +125,7 @@ def _render_routing(
     function_calling_mode: str | None = None,
 ) -> str:
     explore = _explore_hint(config)
+    code_intelligence_available = _code_intelligence_available(config)
     meta_cognition_on = getattr(config, "enable_meta_cognition", False)
     working_memory_on = getattr(config, "enable_working_memory", True)
     condensation_on = getattr(config, "enable_condensation_request", False)
@@ -127,10 +139,9 @@ def _render_routing(
         f"For repo layout and file content, use **{explore}** "
         "and **`str_replace_editor` (`view_file`)**—not `ls && cat && grep` chains for project files.",
     )
-    lsp_enabled = getattr(config, "enable_lsp_query", False)
     code_intelligence_routing = (
         "- **Known file + symbol position, precise definition/references/hover** → `code_intelligence`"
-        if lsp_enabled
+        if code_intelligence_available
         else ""
     )
     mode = (function_calling_mode or "unknown").strip().lower()
@@ -157,33 +168,29 @@ def _render_routing(
     if working_memory_on:
         memory_and_context_section = (
             "<MEMORY_AND_CONTEXT_TOOLS>\n"
-            "Two separate memory systems — pick by lifetime, not by feel:\n\n"
-            "- **Cross-session, flat key-value** (survives session restart, stored on disk):\n"
-            "  - **`note(key, value)`** — write a stable fact (e.g. `key=\"db_url\"`, `key=\"auth_decision\"`).\n"
-            "  - **`recall(key)`** — read a stored key, or `key=\"all\"` to dump everything.\n"
-            "- **Within-session, structured** (dies on session restart, survives condensation):\n"
-            "  - **`memory_manager(action=\"working_memory\", ...)`** — sections: hypothesis, findings, blockers, file_context, decisions, plan.\n"
-            "  - **`memory_manager(action=\"semantic_recall\", key=...)`** — fuzzy search over this session's history when the visible window is thin.\n\n"
-            "Decision rule: \"must still be true next week\" → `note`. \"only true for this task\" → `memory_manager`.\n"
+            "- Disk facts: `note(key, value)` / `recall(key)`.\n"
+            "- Session state: `memory_manager(action=\"working_memory\", ...)` and `memory_manager(action=\"semantic_recall\", key=...)`.\n"
+            "Rule: long-lived facts → `note`; task-local state → `memory_manager`.\n"
             "</MEMORY_AND_CONTEXT_TOOLS>"
         )
         post_condensation_retrieval = (
-            "Retrieve working context immediately: call `memory_manager(action=\"working_memory\")` to restore hypothesis/findings/plan before taking any new action."
+            "Call `memory_manager(action=\"working_memory\")` after condensation to restore plan/findings before acting."
         )
         surviving_state_facts = (
-            "Only `note` (disk) and `memory_manager` (session) facts survive condensation — everything else is gone."
+            "Only `note` (disk) and `memory_manager` (session) facts reliably survive condensation."
         )
     else:
         memory_and_context_section = (
             "<MEMORY_AND_CONTEXT_TOOLS>\n"
-            "Cross-session facts still use `note(key, value)` and `recall(key)`. No structured within-session working-memory tool is available in this run, so keep active hypotheses compact and rely on verified observations.\n"
+            "- Disk facts still use `note(key, value)` / `recall(key)`.\n"
+            "- No structured within-session working-memory tool is available in this run; keep active hypotheses compact and rely on verified observations.\n"
             "</MEMORY_AND_CONTEXT_TOOLS>"
         )
         post_condensation_retrieval = (
             "Resume from the summary and your most recent verified observations; no structured working-memory tool is available in this run."
         )
         surviving_state_facts = (
-            "Only `note` (disk) facts are guaranteed to survive condensation — everything else may be compacted away."
+            "Only `note` (disk) facts are guaranteed to survive condensation."
         )
     context_budget_sync_clause = ", sync `task_tracker`" if tracker_on else ""
     context_budget_next_step = (
@@ -199,7 +206,7 @@ def _render_routing(
     remaining_work_source_of_truth = (
         "Trust your `task_tracker` plan as the source of truth for what remains."
         if tracker_on
-        else "Use your restored working memory and most recent verified observations as the source of truth for what remains."
+        else "Use restored working memory and recent verified observations as the source of truth for what remains."
     )
     return _load("system_partial_00_routing.md").format(
         ambiguous_intent_instruction=ambiguous_intent_instruction,
@@ -249,6 +256,7 @@ def _render_security(cli_mode: bool = True) -> str:
 def _render_autonomy(config: Any, is_windows: bool) -> str:
     level = getattr(config, "autonomy_level", "balanced")
     checkpoints = getattr(config, "enable_checkpoints", False)
+    code_intelligence_available = _code_intelligence_available(config)
     cp_line = (
         " Auto-save occurs before large writes; use 'checkpoint' tool to manually save logically safe states."
         if checkpoints
@@ -271,10 +279,9 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
         f"run {_explore_hint(config)}, or list with `Get-ChildItem` only if no tool fits",
         f"run {_explore_hint(config)}—avoid blind `cat` of guessed paths",
     )
-    lsp_enabled = getattr(config, "enable_lsp_query", False)
     code_intelligence_fallback = (
-        "- `search_code` returns nothing → try `lsp_query`"
-        if lsp_enabled
+        "- `search_code` returns nothing → try `code_intelligence`"
+        if code_intelligence_available
         else "- `search_code` returns nothing → try alternate search terms, do not fall back to shell."
     )
     tracker_on = getattr(config, "enable_internal_task_tracker", False)
@@ -357,15 +364,34 @@ def _render_tool_reference(is_windows: bool, config: Any = None) -> str:
     )
 
 
-def _render_critical(terminal_command_tool: str, *, enable_think: bool) -> str:
+def _render_critical(
+    terminal_command_tool: str,
+    *,
+    enable_think: bool,
+    terminal_manager_available: bool,
+) -> str:
     """Render last-mile critical execution rules with dynamic terminal tool naming."""
     think_execution_rule = (
         "**`think` does not execute** — after reasoning, you must still call tools."
         if enable_think
         else "**Reasoning alone does not execute** — after reasoning, you must still call tools."
     )
+    if terminal_manager_available:
+        terminal_manager_rule = (
+            "**Interactive terminal discipline**:\n"
+            "   - For `terminal_manager action=open`, reuse only the returned `session_id`; never invent one. The `open` command already runs; later commands use `action=input`.\n"
+            "   - Prefer `action=read` with `mode=delta`; reuse `next_offset` or omit `offset`.\n"
+            "   - If output stalls, stop repeating the same `read` / `input` / `control`; send a different command or pivot tools.\n"
+            "   - Read an opened session before opening another similar one.\n"
+            "   - If the latest user message is about your behavior rather than more terminal work, answer in natural language first."
+        )
+    else:
+        terminal_manager_rule = (
+            f"**Interactive terminal sessions are unavailable in this run** — do not refer to `terminal_manager`; use `{terminal_command_tool}` for non-interactive command execution only."
+        )
     return _load("system_partial_04_critical.md").format(
         terminal_command_tool=terminal_command_tool,
+        terminal_manager_rule=terminal_manager_rule,
         think_execution_rule=think_execution_rule,
     )
 
@@ -448,33 +474,24 @@ def _render_mcp_and_permissions(
     enable_think = bool(getattr(config, "enable_think", False))
     communicate_tool_section = (
         "<COMMUNICATE_TOOL>\n"
-        "Use `communicate_with_user` to ask for clarification, flag uncertainty, propose options "
-        "before risky actions, or escalate after 3 failed attempts on a sub-task. On escalation, include a "
-        "**brief post-mortem**: what you tried, what failed, what you ruled out—then a specific question. "
-        "Do not generate free-form questions as plain text mid-task — always go through this tool so the turn "
-        "ends cleanly and waits for user input.\n"
+        "Use `communicate_with_user` for clarification, uncertainty, risky-action options, or escalation after 3 failed attempts on a sub-task. On escalation, include a brief post-mortem and one specific question. Do not ask mid-task questions in plain text; use this tool so the turn ends cleanly and waits for user input.\n"
         "</COMMUNICATE_TOOL>"
         if meta_cognition
         else ""
     )
-    lsp_enabled = getattr(config, "enable_lsp_query", False)
-    if lsp_enabled:
+    code_intelligence_available = _code_intelligence_available(config)
+    if code_intelligence_available:
         uncertainty_state_1_discover_line = (
-            "1. **Can be discovered** (unknown file path, unknown API, unknown config shape) → follow "
-            "**TOOL_ROUTING_LADDER** (e.g. `search_code`, editor `view_*`, `lsp_query`). "
-            "Do NOT ask the user first."
+            "**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**; use tools like `search_code`, editor `view_*`, or `code_intelligence`. Do NOT ask first."
         )
     else:
         uncertainty_state_1_discover_line = (
-            "1. **Can be discovered** (unknown file path, unknown API, unknown config shape) → follow "
-            "**TOOL_ROUTING_LADDER** (e.g. `search_code`, editor `view_*`, structure/symbol tools)—"
-            "not shell search/read of repo files. Do NOT ask the user first."
+            "**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**, not shell repo search/read. Do NOT ask first."
         )
     parts.append("")
     thinking_tool_section = (
         "<THINKING_TOOL>\n"
-        "Use the `think` tool for multi-step planning, complex debugging, or architecture trade-off analysis. "
-        "`think` records reasoning only; it does not execute actions.\n"
+        "Use `think` for multi-step planning, complex debugging, or architecture trade-offs. It records reasoning only; it does not execute actions.\n"
         "</THINKING_TOOL>"
         if enable_think
         else ""
@@ -483,20 +500,20 @@ def _render_mcp_and_permissions(
         _load("system_partial_03_tail.md").format(
             communicate_tool_section=communicate_tool_section,
             interaction_guidance=(
-                "If a request is vague, inspect nearby docs/config first; use `communicate_with_user` if a true blocker remains or if the scope is ambiguous."
+                "If a request is vague, inspect nearby docs/config first; use `communicate_with_user` only if you are still blocked or the scope is still ambiguous."
                 if meta_cognition
-                else "If a request is vague, inspect nearby docs/config first; ask the user directly in natural language if a true blocker remains or if the scope is ambiguous."
+                else "If a request is vague, inspect nearby docs/config first; ask the user directly in natural language only if you are still blocked or the scope is still ambiguous."
             ),
             uncertainty_state_1_discover_line=uncertainty_state_1_discover_line,
             uncertainty_state_2_ambiguous_line=(
-                "**Genuinely ambiguous intent** (multiple valid implementations, destructive action, scope not obvious) → `communicate_with_user` with `options`. Do NOT guess."
+                "**Ambiguous intent** (multiple valid implementations, destructive action, unclear scope) → `communicate_with_user` with `options`. Do NOT guess."
                 if meta_cognition
-                else "**Genuinely ambiguous intent** (multiple valid implementations, destructive action, scope not obvious) → ask the user a short clarifying question in natural language. Do NOT guess."
+                else "**Ambiguous intent** (multiple valid implementations, destructive action, unclear scope) → ask the user a short clarifying question in natural language. Do NOT guess."
             ),
             uncertainty_state_3_unknowable_line=(
-                "**Unknowable from the code alone** (user's preference, external credential, business policy) → `communicate_with_user` with `intent='clarification'`."
+                "**Needs user input** (user preference, external credential, business policy) → `communicate_with_user` with `intent='clarification'`."
                 if meta_cognition
-                else "**Unknowable from the code alone** (user's preference, external credential, business policy) → ask the user directly in natural language."
+                else "**Needs user input** (user preference, external credential, business policy) → ask the user directly in natural language."
             ),
             thinking_tool_section=thinking_tool_section,
         )
@@ -674,6 +691,9 @@ def _collect_system_prompt_sections(
             _render_critical(
                 resolved_terminal_tool,
                 enable_think=bool(getattr(config, "enable_think", False)),
+                terminal_manager_available=bool(
+                    getattr(config, "enable_terminal", True)
+                ),
             ),
         ),
     ]

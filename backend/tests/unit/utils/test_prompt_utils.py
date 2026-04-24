@@ -261,6 +261,83 @@ class TestOrchestratorPromptManager:
         assert '`memory_manager(action="semantic_recall", key=...)`' not in result
         assert 'No structured within-session working-memory tool is available in this run' in result
 
+    def test_get_system_message_uses_code_intelligence_when_lsp_is_available(
+        self, tmp_path
+    ):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        config = SimpleNamespace(
+            autonomy_level='balanced',
+            enable_checkpoints=False,
+            enable_lsp_query=True,
+            enable_internal_task_tracker=False,
+            enable_signal_progress=False,
+            enable_permissions=False,
+            enable_meta_cognition=False,
+            enable_think=False,
+            enable_working_memory=True,
+            enable_condensation_request=False,
+            enable_terminal=True,
+        )
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
+        with patch('backend.utils.lsp_client._detect_pylsp', return_value=True):
+            result = opm.get_system_message()
+
+        assert '`code_intelligence`' in result
+        assert '`lsp_query`' not in result
+
+    def test_get_system_message_omits_code_intelligence_when_lsp_unavailable(
+        self, tmp_path
+    ):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        config = SimpleNamespace(
+            autonomy_level='balanced',
+            enable_checkpoints=False,
+            enable_lsp_query=True,
+            enable_internal_task_tracker=False,
+            enable_signal_progress=False,
+            enable_permissions=False,
+            enable_meta_cognition=False,
+            enable_think=False,
+            enable_working_memory=True,
+            enable_condensation_request=False,
+            enable_terminal=True,
+        )
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
+        with patch('backend.utils.lsp_client._detect_pylsp', return_value=False):
+            result = opm.get_system_message()
+
+        assert '`code_intelligence`' not in result
+        assert '`lsp_query`' not in result
+
+    def test_get_system_message_omits_terminal_manager_when_terminal_disabled(
+        self, tmp_path
+    ):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        config = SimpleNamespace(
+            autonomy_level='balanced',
+            enable_checkpoints=False,
+            enable_lsp_query=False,
+            enable_internal_task_tracker=False,
+            enable_signal_progress=False,
+            enable_permissions=False,
+            enable_meta_cognition=False,
+            enable_think=False,
+            enable_working_memory=True,
+            enable_condensation_request=False,
+            enable_terminal=False,
+        )
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
+        result = opm.get_system_message()
+
+        assert '`terminal_manager action=open`' not in result
+        assert 'do not refer to `terminal_manager`' in result
+
     def test_build_knowledge_base_info(self, tmp_path):
         from backend.utils.prompt import PromptManager
 
