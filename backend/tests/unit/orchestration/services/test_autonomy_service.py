@@ -134,10 +134,15 @@ class TestAutonomyService(unittest.TestCase):
         self.assertIsNone(self.mock_controller.safety_validator)
 
     @patch('backend.validation.task_validator.CompositeValidator')
+    @patch('backend.validation.task_validator.FileExistsValidator')
     @patch('backend.validation.task_validator.DiffValidator')
     @patch('backend.validation.task_validator.TestPassingValidator')
     def test_initialize_task_validator_enabled(
-        self, mock_test_validator, mock_diff_validator, mock_composite_validator
+        self,
+        mock_test_validator,
+        mock_diff_validator,
+        mock_file_validator,
+        mock_composite_validator,
     ):
         """Test _initialize_task_validator enables TaskValidator when configured."""
         mock_agent = MagicMock()
@@ -146,10 +151,12 @@ class TestAutonomyService(unittest.TestCase):
 
         mock_test_val = MagicMock()
         mock_diff_val = MagicMock()
+        mock_file_val = MagicMock()
         mock_composite_val = MagicMock()
 
         mock_test_validator.return_value = mock_test_val
         mock_diff_validator.return_value = mock_diff_val
+        mock_file_validator.return_value = mock_file_val
         mock_composite_validator.return_value = mock_composite_val
 
         self.service._initialize_task_validator(mock_agent)
@@ -157,10 +164,11 @@ class TestAutonomyService(unittest.TestCase):
         # Should create validators
         mock_test_validator.assert_called_once()
         mock_diff_validator.assert_called_once()
+        mock_file_validator.assert_called_once()
 
         # Should create CompositeValidator
         mock_composite_validator.assert_called_once_with(
-            validators=[mock_test_val, mock_diff_val],
+            validators=[mock_test_val, mock_diff_val, mock_file_val],
             min_confidence=0.7,
             require_all_pass=False,
             fail_open_on_empty=False,

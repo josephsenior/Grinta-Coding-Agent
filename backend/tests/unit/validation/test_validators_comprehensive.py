@@ -78,7 +78,15 @@ class TestValidationResultDataclass(unittest.TestCase):
 class TestTestPassingValidatorExt(unittest.IsolatedAsyncioTestCase):
     async def test_no_test_executions(self):
         v = TestPassingValidator()
-        result = await v.validate_completion(Task('fix'), _make_state([]))
+        result = await v.validate_completion(Task('analyze the issue'), _make_state([]))
+        self.assertTrue(result.passed)
+        self.assertFalse(result.applicable)
+
+    async def test_no_test_executions_when_tests_required(self):
+        v = TestPassingValidator()
+        result = await v.validate_completion(
+            Task('fix', requirements=['run tests']), _make_state([])
+        )
         self.assertFalse(result.passed)
 
     async def test_passing_tests(self):
@@ -118,7 +126,7 @@ class TestTestPassingValidatorExt(unittest.IsolatedAsyncioTestCase):
 class TestDiffValidatorExt(unittest.IsolatedAsyncioTestCase):
     async def test_no_diff(self):
         v = DiffValidator()
-        result = await v.validate_completion(Task('change'), _make_state([]))
+        result = await v.validate_completion(Task('change login behavior'), _make_state([]))
         self.assertFalse(result.passed)
 
     async def test_substantial_diff(self):
@@ -139,10 +147,15 @@ class TestDiffValidatorExt(unittest.IsolatedAsyncioTestCase):
         diff = 'diff --git a/f b/f\n--- a/f\n+++ b/f\n+x\n-y'
         action = _cmd_action('git diff')
         result = await v.validate_completion(
-            Task('change'),
+            Task('change login behavior'),
             _make_state([action, _cmd_obs(diff, cause=1, command=action.command)]),
         )
-        self.assertFalse(result.passed)
+        self.assertTrue(result.passed)
+
+    async def test_read_only_task_without_diff(self):
+        v = DiffValidator()
+        result = await v.validate_completion(Task('review the architecture'), _make_state([]))
+        self.assertTrue(result.passed)
 
     def test_meaningful_change_detection(self):
         v = DiffValidator()
@@ -298,6 +311,29 @@ class TestCompositeValidatorExt(unittest.IsolatedAsyncioTestCase):
         cv = CompositeValidator(validators=[v1, v2], min_confidence=0.5)
         result = await cv.validate_completion(Task('x'), _make_state())
         self.assertTrue(result.passed)
+
+    async def test_non_applicable_results_do_not_drag_confidence(self):
+        skipped = MagicMock(spec=TaskValidator)
+        skipped.validate_completion = AsyncMock(
+            return_value=ValidationResult(
+                passed=True,
+                reason='skip',
+                confidence=0.1,
+                applicable=False,
+            )
+        )
+        changed = MagicMock(spec=TaskValidator)
+        changed.validate_completion = AsyncMock(
+            return_value=ValidationResult(
+                passed=True,
+                reason='changed',
+                confidence=0.8,
+            )
+        )
+        cv = CompositeValidator(validators=[skipped, changed], min_confidence=0.7)
+        result = await cv.validate_completion(Task('fix'), _make_state())
+        self.assertTrue(result.passed)
+        self.assertAlmostEqual(result.confidence, 0.8)
 
 
 if __name__ == '__main__':

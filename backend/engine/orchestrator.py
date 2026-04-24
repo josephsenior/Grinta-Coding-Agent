@@ -148,9 +148,6 @@ class Orchestrator(Agent):
     # ------------------------------------------------------------------ #
     def _create_prompt_manager(self) -> PromptManager:
         prompt_dir = os.path.join(os.path.dirname(__file__), 'prompts')
-        system_prompt = self.config.resolved_system_prompt_filename
-        if not os.path.exists(os.path.join(prompt_dir, system_prompt)):
-            system_prompt = 'system_prompt'
 
         resolved_model = ''
         with contextlib.suppress(Exception):
@@ -164,7 +161,6 @@ class Orchestrator(Agent):
                     resolved_model = str(llm_cfg.model).strip()
         return OrchestratorPromptManager(
             prompt_dir=prompt_dir,
-            system_prompt_filename=system_prompt,
             config=self.config,
             resolved_llm_model_id=resolved_model or None,
             app_config=self.llm_registry.config if self.llm_registry else None,

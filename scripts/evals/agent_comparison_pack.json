@@ -1,0 +1,179 @@
+{
+  "pack_id": "top_tier_agent_comparison",
+  "version": "2026-04-24",
+  "description": "Vendor-neutral coding-agent comparison pack for Grinta, Claude Code, Aider, OpenHands, and Copilot-style task loops.",
+  "metric_weights": {
+    "success": 45,
+    "verification_score": 20,
+    "instruction_adherence_score": 10,
+    "tool_discipline_score": 10,
+    "code_quality_score": 10,
+    "recovery_score": 5
+  },
+  "agents": [
+    {
+      "id": "grinta",
+      "display_name": "Grinta",
+      "family": "local_first_autonomous",
+      "notes": "Use the repo's normal task loop and validation gates."
+    },
+    {
+      "id": "claude_code",
+      "display_name": "Claude Code",
+      "family": "terminal_native_coding_agent",
+      "notes": "Capture actual task transcript and validation behavior."
+    },
+    {
+      "id": "aider",
+      "display_name": "Aider",
+      "family": "git_patch_pair_programmer",
+      "notes": "Score interactive coding and validation behavior, not chat quality."
+    },
+    {
+      "id": "openhands",
+      "display_name": "OpenHands",
+      "family": "sandboxed_autonomous_agent",
+      "notes": "Record the actual runtime policy and tool availability used for the run."
+    },
+    {
+      "id": "copilot_style_loop",
+      "display_name": "Copilot-Style Loop",
+      "family": "editor_integrated_agent_loop",
+      "notes": "Represents VS Code style autonomous coding loops when compared as a class."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "bugfix_small_validation",
+      "title": "Small Bug Fix With Targeted Validation",
+      "category": "bugfix",
+      "prompt": "Fix a localized bug in an existing function, change only the owning slice, and run the cheapest behavior-scoped validation that falsifies the fix if it is wrong.",
+      "required_evidence": [
+        "minimal diff",
+        "focused validation command",
+        "root-cause explanation"
+      ],
+      "success_criteria": [
+        "Bug is fixed at the source rather than patched around",
+        "Validation is specific to the touched behavior",
+        "No unrelated refactors are introduced"
+      ],
+      "recovery_required": false,
+      "budgets": {
+        "turns": 12,
+        "latency_seconds": 600,
+        "cost_usd": 2.5
+      }
+    },
+    {
+      "id": "feature_plus_tests",
+      "title": "Feature Addition With New Tests",
+      "category": "feature",
+      "prompt": "Add a small feature to an existing module, update or add tests, and prove the feature works with executable verification.",
+      "required_evidence": [
+        "code change",
+        "new or updated tests",
+        "test output"
+      ],
+      "success_criteria": [
+        "Feature matches the request exactly",
+        "Tests cover the added behavior",
+        "Validation output demonstrates the new path"
+      ],
+      "recovery_required": false,
+      "budgets": {
+        "turns": 18,
+        "latency_seconds": 900,
+        "cost_usd": 4.0
+      }
+    },
+    {
+      "id": "refactor_minimal_surface",
+      "title": "Refactor With Surface-Area Discipline",
+      "category": "refactor",
+      "prompt": "Refactor duplicated logic across multiple functions while preserving behavior, keeping the public API stable, and avoiding broad unrelated edits.",
+      "required_evidence": [
+        "minimal diff",
+        "before/after rationale",
+        "regression check"
+      ],
+      "success_criteria": [
+        "Shared logic is reduced",
+        "Behavior remains stable",
+        "Touched files stay tightly scoped"
+      ],
+      "recovery_required": false,
+      "budgets": {
+        "turns": 16,
+        "latency_seconds": 900,
+        "cost_usd": 3.5
+      }
+    },
+    {
+      "id": "read_only_code_review",
+      "title": "Read-Only Review And Ranking",
+      "category": "analysis",
+      "prompt": "Analyze a prompt stack or implementation, identify concrete weaknesses with file-backed reasoning, and provide a blunt rating without making code changes.",
+      "required_evidence": [
+        "file-backed findings",
+        "clear rating",
+        "no unnecessary edits"
+      ],
+      "success_criteria": [
+        "Analysis is specific and falsifiable",
+        "Rating is justified by concrete evidence",
+        "No repository edits are made"
+      ],
+      "recovery_required": false,
+      "budgets": {
+        "turns": 10,
+        "latency_seconds": 480,
+        "cost_usd": 1.8
+      }
+    },
+    {
+      "id": "tool_failure_recovery",
+      "title": "Tool Failure Recovery",
+      "category": "recovery",
+      "prompt": "Encounter a local tool or runtime failure, classify it correctly, pivot to the nearest viable path, and continue without fabricating success.",
+      "required_evidence": [
+        "observed failure",
+        "explicit recovery step",
+        "post-recovery validation"
+      ],
+      "success_criteria": [
+        "Failure is described accurately",
+        "Recovery is local and pragmatic",
+        "The agent does not loop or hallucinate a fix"
+      ],
+      "recovery_required": true,
+      "budgets": {
+        "turns": 14,
+        "latency_seconds": 720,
+        "cost_usd": 3.0
+      }
+    },
+    {
+      "id": "multi_file_change_with_docs",
+      "title": "Multi-File Change With Docs And Verification",
+      "category": "multi_file",
+      "prompt": "Implement a change that touches runtime code, tests, and one developer-facing document, then run focused validation and summarize the outcome cleanly.",
+      "required_evidence": [
+        "runtime code change",
+        "test or validation update",
+        "developer-facing documentation update"
+      ],
+      "success_criteria": [
+        "The change spans code plus documentation",
+        "Validation is run after edits",
+        "The final summary reflects actual results"
+      ],
+      "recovery_required": false,
+      "budgets": {
+        "turns": 22,
+        "latency_seconds": 1200,
+        "cost_usd": 5.0
+      }
+    }
+  ]
+}

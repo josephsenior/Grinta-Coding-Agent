@@ -49,8 +49,102 @@ class ValidationResult:
     passed: bool
     reason: str
     confidence: float = 1.0  # 0.0 to 1.0
+    applicable: bool = True
     missing_items: list[str] = field(default_factory=list)
     suggestions: list[str] = field(default_factory=list)
+
+
+_TASK_CHANGE_HINTS = (
+    'fix',
+    'implement',
+    'add',
+    'update',
+    'create',
+    'edit',
+    'change',
+    'modify',
+    'refactor',
+    'delete',
+    'remove',
+    'write',
+    'generate',
+    'patch',
+    'rename',
+    'move',
+)
+_TASK_READ_ONLY_HINTS = (
+    'analyze',
+    'analysis',
+    'review',
+    'explain',
+    'summarize',
+    'summary',
+    'compare',
+    'assessment',
+    'assess',
+    'audit',
+    'inspect',
+    'investigate',
+    'critique',
+    'rate',
+    'rating',
+    'walkthrough',
+    'understand',
+    'describe',
+)
+_TASK_TEST_HINTS = (
+    'test',
+    'tests',
+    'pytest',
+    'unit test',
+    'integration test',
+    'regression',
+    'smoke test',
+)
+
+
+def _task_text(task: Task) -> str:
+    """Return a normalized free-text representation of task expectations."""
+    parts = [task.description, *task.requirements, *task.acceptance_criteria]
+    return '\n'.join(part for part in parts if part).lower()
+
+
+def _contains_hint(text: str, hints: tuple[str, ...]) -> bool:
+    """Return True when any whole-word hint appears in task text."""
+    return any(
+        re.search(rf'(?<!\w){re.escape(hint)}(?!\w)', text) is not None
+        for hint in hints
+    )
+
+
+def _looks_like_question(description: str) -> bool:
+    """Return True for obviously read-only question-style tasks."""
+    normalized = (description or '').strip().lower()
+    if '?' in normalized:
+        return True
+    return bool(
+        re.match(
+            r'^(what|why|how|which|where|when|can|could|would|should|is|are|do|does|did)\b',
+            normalized,
+        )
+    )
+
+
+def _task_requires_repository_changes(task: Task) -> bool:
+    """Infer whether the task expects repository mutations."""
+    text = _task_text(task)
+    if task.expected_output_files:
+        return True
+    if _contains_hint(text, _TASK_CHANGE_HINTS):
+        return True
+    if _looks_like_question(task.description):
+        return False
+    return not _contains_hint(text, _TASK_READ_ONLY_HINTS)
+
+
+def _task_requires_test_validation(task: Task) -> bool:
+    """Infer whether explicit test execution is part of the task contract."""
+    return _contains_hint(_task_text(task), _TASK_TEST_HINTS)
 
 
 class TaskValidator(ABC):
@@ -71,7 +165,7 @@ class TaskValidator(ABC):
 
 
 class TestPassingValidator(TaskValidator):
-    """Validates that tests are passing before task completion."""
+    """Validates that tests are passing when the task explicitly requires them."""
 
     async def validate_completion(self, task: Task, state: State) -> ValidationResult:
         """Check if tests are passing.
@@ -86,13 +180,22 @@ class TestPassingValidator(TaskValidator):
             ValidationResult for test status
 
         """
-        # Look for test execution in recent history
         test_executions = self._find_test_executions(state)
+        if not test_executions and not _task_requires_test_validation(task):
+            logger.debug(
+                'Test validation skipped: task does not explicitly require tests'
+            )
+            return ValidationResult(
+                passed=True,
+                reason='Task does not explicitly require test validation',
+                confidence=0.8,
+                applicable=False,
+            )
 
         if not test_executions:
             return ValidationResult(
                 passed=False,
-                reason='No test execution found in recent history',
+                reason='No test execution found for a task that explicitly requires tests',
                 confidence=0.8,
                 missing_items=['Run test suite to verify changes'],
                 suggestions=['Run pytest, npm test, or appropriate test command'],
@@ -145,7 +248,7 @@ class TestPassingValidator(TaskValidator):
 
 
 class DiffValidator(TaskValidator):
-    """Validates that meaningful changes were made."""
+    """Validates that meaningful repository changes were made when needed."""
 
     async def validate_completion(self, task: Task, state: State) -> ValidationResult:
         """Check if meaningful git changes exist.
@@ -158,37 +261,72 @@ class DiffValidator(TaskValidator):
             ValidationResult for git diff
 
         """
-        # Look for git diff in recent history
-        git_diff = self._get_diff_output(state)
+        if not _task_requires_repository_changes(task):
+            logger.info('Diff validation skipped: task is read-only by intent')
+            return ValidationResult(
+                passed=True,
+                reason='Task does not require repository changes',
+                confidence=0.9,
+            )
 
-        if not git_diff:
+        git_diff = self._get_diff_output(state)
+        changed_paths = self._changed_paths_in_history(state)
+
+        if not git_diff and not changed_paths:
             return ValidationResult(
                 passed=False,
-                reason='No git changes detected',
+                reason='No repository changes detected',
                 confidence=0.9,
                 missing_items=['Make code changes to complete the task'],
                 suggestions=['Implement the required functionality'],
             )
 
-        # Check if diff is substantial (not just whitespace/comments)
-        meaningful_changes = self._count_meaningful_changes(git_diff)
+        if git_diff:
+            meaningful_changes = self._count_meaningful_changes(git_diff)
+            if meaningful_changes > 0:
+                confidence = 0.75 if meaningful_changes < 3 else 0.85
+                reason = (
+                    f'Small but meaningful changes detected ({meaningful_changes} lines)'
+                    if meaningful_changes < 3
+                    else f'Meaningful changes detected ({meaningful_changes} lines)'
+                )
+                logger.info('Git diff validation passed: %s', reason)
+                return ValidationResult(
+                    passed=True,
+                    reason=reason,
+                    confidence=confidence,
+                )
 
-        if meaningful_changes < 5:
+        if changed_paths:
+            logger.info(
+                'Diff validation passed from typed file events: %s file(s)',
+                len(changed_paths),
+            )
             return ValidationResult(
-                passed=False,
-                reason=f'Only {meaningful_changes} meaningful changes detected (expected at least 5)',
-                confidence=0.7,
-                missing_items=['Add more substantial changes'],
-                suggestions=['Ensure all requirements are implemented'],
+                passed=True,
+                reason=f'Typed file changes detected ({len(changed_paths)} file(s))',
+                confidence=0.8,
             )
 
-        logger.info(
-            'Git diff validation passed: %s meaningful changes', meaningful_changes
-        )
+        if git_diff:
+            meaningful_changes = self._count_meaningful_changes(git_diff)
+            return ValidationResult(
+                passed=False,
+                reason=(
+                    f'Git diff contained {meaningful_changes} meaningful changes but no '
+                    'typed file edits were recorded'
+                ),
+                confidence=0.7,
+                missing_items=['Make a meaningful repository change'],
+                suggestions=['Ensure the task results in an actual file edit or write'],
+            )
+
         return ValidationResult(
-            passed=True,
-            reason=f'Meaningful changes detected ({meaningful_changes} lines)',
-            confidence=0.8,
+            passed=False,
+            reason='No repository changes detected',
+            confidence=0.9,
+            missing_items=['Make code changes to complete the task'],
+            suggestions=['Implement the required functionality'],
         )
 
     def _get_diff_output(self, state: State) -> str | None:
@@ -210,6 +348,26 @@ class DiffValidator(TaskValidator):
                     return paired.content
 
         return None
+
+    def _changed_paths_in_history(self, state: State) -> set[str]:
+        """Return paths touched by typed edit/write events in recent history."""
+        changed_paths: set[str] = set()
+        recent_history = state.history[-100:]
+        for event in recent_history:
+            if not isinstance(
+                event,
+                (
+                    FileEditAction,
+                    FileWriteAction,
+                    FileEditObservation,
+                    FileWriteObservation,
+                ),
+            ):
+                continue
+            event_path = getattr(event, 'path', None)
+            if isinstance(event_path, str) and event_path:
+                changed_paths.add(event_path)
+        return changed_paths
 
     def _count_meaningful_changes(self, diff: str) -> int:
         """Count meaningful lines in diff (not whitespace/comments).
@@ -314,6 +472,7 @@ class FileExistsValidator(TaskValidator):
                 passed=True,
                 reason='No expected files specified',
                 confidence=0.9 if task.expected_output_files is not None else 0.5,
+                applicable=task.expected_output_files is not None,
             )
 
         missing_files = []
@@ -590,13 +749,14 @@ class CompositeValidator(TaskValidator):
             Combined ValidationResult
 
         """
-        results = await self._run_all_validators(task, state)
+        all_results = await self._run_all_validators(task, state)
+        results = [result for result in all_results if result.applicable]
 
         if not results:
             if not self.fail_open_on_empty:
                 return ValidationResult(
                     passed=False,
-                    reason='No validators ran successfully',
+                    reason='No applicable validators ran successfully',
                     confidence=0.0,
                     missing_items=['Run validation checks before finishing'],
                     suggestions=[
@@ -604,7 +764,9 @@ class CompositeValidator(TaskValidator):
                     ],
                 )
             return ValidationResult(
-                passed=True, reason='No validators ran successfully', confidence=0.0
+                passed=True,
+                reason='No applicable validators ran successfully',
+                confidence=0.0,
             )
 
         if self.require_all_pass:
@@ -653,7 +815,7 @@ class CompositeValidator(TaskValidator):
 
         return ValidationResult(
             passed=True,
-            reason=f'All validators passed: {len(results)} validators',
+            reason=f'All applicable validators passed: {len(results)} validators',
             confidence=combined_confidence,
         )
 
@@ -697,7 +859,7 @@ class CompositeValidator(TaskValidator):
         if self._vote_passes(passed_count, len(results), avg_confidence):
             return ValidationResult(
                 passed=True,
-                reason=f'All validators passed: {len(results)} validators',
+                reason=f'Applicable validators passed: {passed_count}/{len(results)}',
                 confidence=avg_confidence,
             )
 
@@ -758,9 +920,10 @@ class CompositeValidator(TaskValidator):
 
         return ValidationResult(
             passed=False,
-            reason=f'Task validation insufficient: {passed_count}/{
-                len(results)
-            } passed, avg confidence: {avg_confidence:.2f}',
+            reason=(
+                f'Task validation insufficient: {passed_count}/{len(results)} passed, '
+                f'avg confidence: {avg_confidence:.2f}'
+            ),
             confidence=avg_confidence,
             missing_items=[item for r in failed_validators for item in r.missing_items],
             suggestions=[sug for r in failed_validators for sug in r.suggestions],

@@ -33,7 +33,7 @@ class TestAgentConfigDefaults:
 
     def test_default_lsp_query_enabled(self):
         cfg = AgentConfig()
-        assert cfg.enable_lsp_query is True
+        assert cfg.enable_lsp_query is False
 
     def test_default_swarming_enabled(self):
         cfg = AgentConfig()
@@ -61,10 +61,6 @@ class TestAgentConfigValidation:
         with pytest.raises(ValidationError):
             AgentConfig(autonomy_level='')
 
-    def test_empty_system_prompt_rejected(self):
-        with pytest.raises(ValidationError):
-            AgentConfig(system_prompt_filename='')
-
     def test_memory_max_threads_min(self):
         with pytest.raises(ValidationError):
             AgentConfig(memory_max_threads=0)
@@ -80,6 +76,10 @@ class TestAgentConfigValidation:
     def test_legacy_enable_prompt_caching_in_model_validate_dropped(self):
         cfg = AgentConfig.model_validate({'enable_prompt_caching': True})
         assert not hasattr(cfg, 'enable_prompt_caching')
+
+    def test_legacy_system_prompt_filename_input_dropped(self):
+        cfg = AgentConfig.model_validate({'system_prompt_filename': 'custom.j2'})
+        assert not hasattr(cfg, 'system_prompt_filename')
 
     def test_legacy_condenser_config_kwarg_rejected(self):
         with pytest.raises(ValidationError):
@@ -119,30 +119,6 @@ class TestGetLlmConfig:
         llm = LLMConfig()
         cfg = AgentConfig(llm_config=llm)
         assert cfg.get_llm_config() is llm
-
-
-class TestResolvedSystemPromptFilename:
-    def test_default(self):
-        cfg = AgentConfig()
-        assert cfg.resolved_system_prompt_filename == 'system_prompt'
-
-    def test_custom(self):
-        cfg = AgentConfig(system_prompt_filename='custom.j2')
-        assert cfg.resolved_system_prompt_filename == 'custom.j2'
-
-    def test_none_filename_uses_default(self):
-        """Test that None filename falls back to default."""
-        cfg = AgentConfig()
-        # Bypass validation by setting directly
-        object.__setattr__(cfg, 'system_prompt_filename', None)
-        assert cfg.resolved_system_prompt_filename == 'system_prompt'
-
-    def test_non_string_filename_uses_default(self):
-        """Test that non-string filename falls back to default."""
-        cfg = AgentConfig()
-        # Bypass validation by setting directly
-        object.__setattr__(cfg, 'system_prompt_filename', 123)
-        assert cfg.resolved_system_prompt_filename == 'system_prompt'
 
 
 class TestSeparateBaseAndCustomSections:

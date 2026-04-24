@@ -1,6 +1,6 @@
 """Tests for backend.validation.task_validator — task completion validation framework."""
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -76,6 +76,7 @@ class TestValidationResult:
         assert result.passed is True
         assert result.reason == 'All good'
         assert result.confidence == 1.0
+        assert result.applicable is True
         assert result.missing_items == []
         assert result.suggestions == []
 
@@ -84,6 +85,15 @@ class TestValidationResult:
         result = ValidationResult(passed=False, reason='Tests failed')
         assert result.passed is False
         assert result.reason == 'Tests failed'
+
+    def test_create_non_applicable_result(self):
+        """Test creating ValidationResult with explicit applicability."""
+        result = ValidationResult(
+            passed=True,
+            reason='Skipped',
+            applicable=False,
+        )
+        assert result.applicable is False
 
     def test_create_with_custom_confidence(self):
         """Test creating ValidationResult with custom confidence."""
@@ -361,6 +371,31 @@ class TestCompositeValidator:
         """Test _vote_passes returns False without sufficient confidence."""
         composite = CompositeValidator(validators=[], min_confidence=0.8)
         assert composite._vote_passes(2, 3, 0.6) is False
+
+    @pytest.mark.asyncio
+    async def test_non_applicable_results_are_filtered(self):
+        """Test CompositeValidator ignores non-applicable validator results."""
+        skipped = MagicMock(spec=TaskValidator)
+        skipped.validate_completion = AsyncMock(
+            return_value=ValidationResult(
+                passed=True,
+                reason='Skipped',
+                confidence=0.1,
+                applicable=False,
+            )
+        )
+        passed = MagicMock(spec=TaskValidator)
+        passed.validate_completion = AsyncMock(
+            return_value=ValidationResult(
+                passed=True,
+                reason='Changed files',
+                confidence=0.8,
+            )
+        )
+        composite = CompositeValidator(validators=[skipped, passed])
+        result = await composite.validate_completion(Task(description='Fix the bug'), MagicMock())
+        assert result.passed is True
+        assert result.confidence == pytest.approx(0.8)
 
 
 class TestValidatorIntegration:

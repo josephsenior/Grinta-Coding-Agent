@@ -113,7 +113,8 @@ class TestOrchestratorPromptManager:
     def test_get_system_message_injects_identity(self, prompt_dir):
         opm = OrchestratorPromptManager(prompt_dir)
         msg = opm.get_system_message(name='Test')
-        assert 'You are App' in msg
+        assert 'You are Grinta' in msg
+        assert 'You are App' not in msg
 
     def test_inject_lessons_learned_missing_file(self, prompt_dir, tmp_path):
         # Line 255: return content if file doesn't exist

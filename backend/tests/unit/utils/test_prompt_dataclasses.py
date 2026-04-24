@@ -110,12 +110,6 @@ class TestPromptManagerInit:
             pm = PromptManager(prompt_dir=tmpdir)
             assert pm.prompt_dir == tmpdir
 
-    def test_custom_system_prompt(self):
-        """PromptManager accepts system_prompt_filename param (ignored in new builder)."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            pm = PromptManager(prompt_dir=tmpdir, system_prompt_filename='custom.j2')
-            assert pm.prompt_dir == tmpdir
-
 
 # ── PromptManager template rendering ─────────────────────────────────
 
@@ -196,7 +190,8 @@ class TestOrchestratorPromptManager:
             side_effect=lambda x: x,
         ):
             result = pm.get_system_message()
-            assert 'You are App' in result
+            assert 'You are Grinta' in result
+            assert 'You are App' not in result
 
     def test_get_system_message_with_config(self, pm):
         """Test system message with config injects context."""
@@ -211,7 +206,8 @@ class TestOrchestratorPromptManager:
             side_effect=lambda x: x,
         ):
             result = pm.get_system_message()
-            assert 'You are App' in result
+            assert 'You are Grinta' in result
+            assert 'You are App' not in result
 
     def test_inject_scratchpad_success(self, pm):
         """Test scratchpad injection when notes exist."""

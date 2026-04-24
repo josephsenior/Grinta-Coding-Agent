@@ -910,7 +910,7 @@ async def call_tool_mcp(
                     'only the tools listed in your active tool schema are available.'
                 ),
                 code='MCP_NO_CLIENTS',
-                retryable=False,
+                retryable=True,
             ),
         )
 

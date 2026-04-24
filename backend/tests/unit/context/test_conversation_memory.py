@@ -20,6 +20,7 @@ from backend.context.message_formatting import (
     remove_duplicate_system_prompt_user,
 )
 from backend.core.message import Message, TextContent
+from backend.inference.tool_result_format import decode_tool_result_payload
 from backend.integrations.mcp.mcp_utils import call_tool_mcp
 from backend.ledger.action import MessageAction
 from backend.ledger.action.browser_tool import BrowserToolAction
@@ -49,7 +50,7 @@ def _make_config(**overrides):
 
 def _make_prompt_manager():
     pm = MagicMock()
-    pm.get_system_message.return_value = 'You are App agent.'
+    pm.get_system_message.return_value = 'You are Grinta, an expert AI coding agent.'
     return pm
 
 
@@ -216,7 +217,11 @@ class TestToolResultPropagation:
         )
 
         assert not out
-        assert json.loads(tool_messages['call_5'].content[0].text) == obs.tool_result  # type: ignore
+        payload = decode_tool_result_payload(tool_messages['call_5'].content[0].text)  # type: ignore[arg-type]
+        assert payload is not None
+        assert payload[0] == 'checkpoint'
+        assert payload[1]['tool_result'] == obs.tool_result
+        assert json.loads(payload[1]['message']) == obs.tool_result
 
 
 class TestToolPairingMessageShape:

@@ -131,23 +131,13 @@ class TestPromptManager:
 
 
 class TestOrchestratorPromptManager:
-    def test_identity_prefix_added(self, tmp_path):
+    def test_identity_uses_grinta_once(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
         result = opm.get_system_message()
-        # prompt_builder always starts with "You are App" so OrchestratorPromptManager
-        # should not duplicate the prefix but the result should contain it.
-        assert 'You are App' in result
-
-    def test_identity_prefix_not_duplicated(self, tmp_path):
-        from backend.utils.prompt import OrchestratorPromptManager
-
-        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path))
-        result = opm.get_system_message()
-        # prompt_builder starts with "You are App" so the OrchestratorPromptManager
-        # should skip its own prefix. Only one occurrence of "You are App" expected.
-        assert result.count('You are App') == 1
+        assert result.count('You are Grinta') == 1
+        assert 'You are App' not in result
 
     def test_config_injected(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -328,6 +318,29 @@ class TestOrchestratorPromptManager:
 
         assert 'Your terminal is **PowerShell** on Windows.' in result
         assert 'Your terminal is **Git Bash** running on Windows.' not in result
+
+    def test_mcp_tools_and_server_hints_are_rendered(self, tmp_path):
+        from backend.utils.prompt import OrchestratorPromptManager
+
+        mock_config = MagicMock()
+        mock_config.autonomy_level = 'balanced'
+        mock_config.enable_checkpoints = False
+        mock_config.enable_permissions = False
+
+        opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=mock_config)
+        opm.mcp_tool_names = ['github_search']
+        opm.mcp_tool_descriptions = {'github_search': 'Search GitHub code'}
+        opm.mcp_server_hints = [
+            {'server': 'github', 'hint': 'Use for repository metadata and code search'}
+        ]
+
+        result = opm.get_system_message()
+
+        assert 'call_mcp_tool(tool_name="...", arguments={...})' in result
+        assert '`github_search`' in result
+        assert 'Search GitHub code' in result
+        assert 'Configured MCP servers' in result
+        assert '**`github`:** Use for repository metadata and code search' in result
 
 
 class TestPromptBuilderSectionTokens:

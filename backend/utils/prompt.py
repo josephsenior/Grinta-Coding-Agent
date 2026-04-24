@@ -60,12 +60,6 @@ UNINITIALIZED_PROMPT_MANAGER = _UninitializedPromptManager()
 """Module-level sentinel instance — import this instead of duplicating the class."""
 
 
-def _content_has_app_identity(content: str) -> bool:
-    """True when the rendered system prompt already identifies as App (skip duplicate prefix)."""
-    head = content.lstrip()[:80].lower()
-    return head.startswith('you are app')
-
-
 class PromptManager:
     """Manages prompt assembly using Python-based prompt builder (no Jinja2).
 
@@ -77,7 +71,6 @@ class PromptManager:
     def __init__(
         self,
         prompt_dir: str | None,
-        system_prompt_filename: str = 'system_prompt',
     ) -> None:
         """Initialize prompt manager with the given prompt directory."""
         if prompt_dir is None:
@@ -183,18 +176,15 @@ class OrchestratorPromptManager(PromptManager):
     with a proper override, preserving type-safety and IDE navigability.
     """
 
-    _IDENTITY_PREFIX = 'You are App agent.\n'
-
     def __init__(
         self,
         prompt_dir: str | None,
-        system_prompt_filename: str = 'system_prompt',
         *,
         config: object | None = None,
         resolved_llm_model_id: str | None = None,
         app_config: object | None = None,
     ) -> None:
-        super().__init__(prompt_dir, system_prompt_filename)
+        super().__init__(prompt_dir)
         self._config = config
         # Runtime-resolved model id (AppConfig + user settings live on LLMRegistry; AgentConfig often only references "llm").
         self._resolved_llm_model_id = (resolved_llm_model_id or '').strip()
@@ -260,7 +250,7 @@ class OrchestratorPromptManager(PromptManager):
             return 'unknown'
 
     def get_system_message(self, **context: object) -> str:
-        """Render with orchestrator defaults (config, cli_mode, identity prefix)."""
+        """Render with orchestrator defaults (config, cli_mode, runtime hints)."""
         if self._config is not None:
             context.setdefault('config', self._config)
             context.setdefault('cli_mode', True)
@@ -288,9 +278,6 @@ class OrchestratorPromptManager(PromptManager):
             'function_calling_mode', self._resolve_function_calling_mode()
         )
         content = super().get_system_message(**context)
-        # Avoid duplicating identity: system_prompt already opens with the app identity.
-        if not _content_has_app_identity(content):
-            content = self._IDENTITY_PREFIX + content
         content = self._inject_scratchpad(content)
         tier = getattr(self, '_prompt_tier', 'base')
         if tier == 'debug':

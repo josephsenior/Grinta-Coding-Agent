@@ -66,10 +66,15 @@ class AutonomyService:
             from backend.validation.task_validator import (
                 CompositeValidator,
                 DiffValidator,
+                FileExistsValidator,
                 TestPassingValidator,
             )
 
-            validators = [TestPassingValidator(), DiffValidator()]
+            validators = [
+                TestPassingValidator(),
+                DiffValidator(),
+                FileExistsValidator(),
+            ]
             controller.task_validator = CompositeValidator(
                 validators=validators,
                 min_confidence=0.7,

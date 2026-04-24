@@ -60,7 +60,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED,
     DEFAULT_AGENT_STUCK_DETECTION_ENABLED,
     DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS,
-    DEFAULT_AGENT_SYSTEM_PROMPT_FILENAME,
     DEFAULT_AGENT_THINK_ENABLED,
     DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
     DEFAULT_AGENT_WARNING_FIRST_TRIP_ENABLED,
@@ -257,12 +256,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         description='Enable SOM (Self-Organizing Map) visual browsing',
     )
 
-    # Prompt management
-    system_prompt_filename: str = Field(
-        default=DEFAULT_AGENT_SYSTEM_PROMPT_FILENAME,
-        min_length=1,
-        description='Filename for the system prompt template',
-    )
     enable_circuit_breaker: bool = Field(
         default=True,
         description=(
@@ -344,9 +337,10 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             data = dict(data)
             data.pop('enable_prompt_caching', None)
             data.pop('enable_web_search', None)
+            data.pop('system_prompt_filename', None)
         return data
 
-    @field_validator('name', 'autonomy_level', 'system_prompt_filename')
+    @field_validator('name', 'autonomy_level')
     @classmethod
     def validate_required_strings(cls, v: str) -> str:
         """Validate required string fields are non-empty."""
@@ -366,14 +360,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             return self.llm_config
         # Otherwise fall back to the default llm key
         return None
-
-    @property
-    def resolved_system_prompt_filename(self) -> str:
-        """Return a safe system prompt filename for PromptManager."""
-        filename = getattr(self, 'system_prompt_filename', None)
-        if not filename or not isinstance(filename, str):
-            return 'system_prompt'
-        return filename
 
     @classmethod
     def from_toml_section(cls, data: dict) -> dict[str, AgentConfig]:
