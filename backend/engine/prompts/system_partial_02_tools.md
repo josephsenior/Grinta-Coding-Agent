@@ -5,12 +5,14 @@ Editor `path` arguments are relative to the project root (see runtime working di
 {confirm_paths} Edit the path the user gave; no shadow copies (file_v2.py); remove temp files when done.
 
 **Edit vs write vs patch (reliability):**
+
 - **Surgical edits** = small steps: `str_replace_editor` **`insert_text`** (after a line you viewed), **`edit_mode`** (`section` / `range` / `format` / `patch`), or **`ast_code_editor`** (`edit_symbol_body` / `edit_symbols`, `replace_range`, etc.). Prefer structure-aware commands for code when they apply.
 - **Greenfield / new files** = start with a **minimal, parsing-valid stub** (imports, one function/class shell, closing delimiters) that passes the language parser, then grow with small follow-up edits. Do **not** paste an entire large file in one `create_file` / one-shot write — it fails syntax validation and burns context.
 - **Full file** = `create_file` when you are replacing or creating an entire file body — do not stuff a whole file into one undersized `insert_text` or fragmentary step.
 - **Unified diff / `patch` mode** = strict context apply or human-readable diff review — not the default way to mutate code; use it when you need exact hunk context or after previewing a diff.
 
 **Editors — capabilities (see ladder for when):**
+
 - **ast_code_editor**: structure-aware ops (`edit_symbol_body`, `edit_symbols`, `rename_symbol`, `replace_range`, `normalize_indent`, …), symbol/file views, `create_file`, `insert_text`; 40+ languages.
 - **str_replace_editor**: prose/config/line work; prefer explicit `edit_mode`:
   - `format` for JSON/YAML/TOML/Markdown/HTML/XML mutations

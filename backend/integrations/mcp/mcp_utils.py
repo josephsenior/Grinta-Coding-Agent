@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from backend.ledger.action.mcp import MCPAction
     from backend.ledger.observation.observation import Observation
     from backend.orchestration.agent import Agent
+
 from mcp import McpError
 
 from backend.core.config.mcp_config import (
@@ -26,6 +27,7 @@ from backend.core.config.mcp_config import (
 )
 from backend.core.logger import app_logger as logger
 from backend.core.pydantic_compat import model_dump_with_options
+from backend.execution import LocalRuntimeInProcess
 from backend.integrations.mcp.cache import get_cached, set_cache
 from backend.integrations.mcp.client import MCPClient
 from backend.integrations.mcp.error_collector import mcp_error_collector
@@ -38,7 +40,6 @@ from backend.integrations.mcp.wrappers import (
     WRAPPER_TOOL_REGISTRY,
     wrapper_tool_params,
 )
-from backend.execution import LocalRuntimeInProcess
 from backend.ledger.observation.mcp import MCPObservation
 
 # Populated by ``convert_mcps_to_tools`` for the current fetch cycle (cleared in ``fetch_mcp_tools_from_config``).
@@ -51,7 +52,7 @@ def _get_mcp_connect_timeout_sec() -> float:
     Default is generous for cold ``npx``/``uvx`` first installs; override with
     ``APP_MCP_CONNECT_TIMEOUT_SEC``.
     """
-    raw = os.getenv('APP_MCP_CONNECT_TIMEOUT_SEC', '60')
+    raw = os.getenv("APP_MCP_CONNECT_TIMEOUT_SEC", "60")
     try:
         timeout = float(raw)
         return timeout if timeout > 0 else 60.0
@@ -59,7 +60,7 @@ def _get_mcp_connect_timeout_sec() -> float:
         return 60.0
 
 
-_ENV_VAR_PATTERN = re.compile(r'^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$')
+_ENV_VAR_PATTERN = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$")
 
 
 def _resolve_server_env(raw_env: dict[str, Any] | None) -> dict[str, str] | None:
@@ -96,7 +97,7 @@ def _resolve_server_env(raw_env: dict[str, Any] | None) -> dict[str, str] | None
             resolved[key] = str(value)
             continue
 
-        if value == '':
+        if value == "":
             from_env = os.environ.get(key)
             if from_env:
                 resolved[key] = from_env
@@ -112,7 +113,7 @@ def _resolve_server_env(raw_env: dict[str, Any] | None) -> dict[str, str] | None
         if from_env:
             resolved[key] = from_env
             continue
-        if var_name == 'PROJECT_ROOT':
+        if var_name == "PROJECT_ROOT":
             from backend.core.workspace_resolution import (
                 get_effective_workspace_root,
             )
@@ -138,20 +139,20 @@ def _apply_exa_mcp_url_auth(server: MCPServerConfig) -> MCPServerConfig:
     expects the query form, so we fold ``api_key`` / ``EXA_API_KEY`` into the
     URL and clear ``api_key`` to avoid conflicting headers.
     """
-    if server.type not in ('sse', 'shttp') or not server.url:
+    if server.type not in ("sse", "shttp") or not server.url:
         return server
-    if 'mcp.exa.ai' not in server.url:
+    if "mcp.exa.ai" not in server.url:
         return server
-    if 'exaApiKey=' in server.url:
+    if "exaApiKey=" in server.url:
         return server
-    key = (server.api_key or '').strip()
+    key = (server.api_key or "").strip()
     if not key:
-        key = (os.environ.get('EXA_API_KEY') or '').strip()
+        key = (os.environ.get("EXA_API_KEY") or "").strip()
     if not key:
         return server
-    sep = '&' if '?' in server.url else '?'
+    sep = "&" if "?" in server.url else "?"
     new_url = f'{server.url}{sep}exaApiKey={quote(key, safe="")}'
-    return server.model_copy(update={'url': new_url, 'api_key': None})
+    return server.model_copy(update={"url": new_url, "api_key": None})
 
 
 def convert_mcps_to_tools(mcps: list[MCPClient] | None) -> list[dict]:
@@ -167,7 +168,7 @@ def convert_mcps_to_tools(mcps: list[MCPClient] | None) -> list[dict]:
 
     """
     if mcps is None:
-        logger.warning('mcps is None, returning empty list')
+        logger.warning("mcps is None, returning empty list")
         return []
     global _last_mcp_conversion_errors
     _last_mcp_conversion_errors = []
@@ -177,15 +178,15 @@ def convert_mcps_to_tools(mcps: list[MCPClient] | None) -> list[dict]:
 
     for client in mcps:
         try:
-            tools_iter = getattr(client, 'tools', None) or []
+            tools_iter = getattr(client, "tools", None) or []
             tools_list = list(tools_iter)
         except Exception as e:
-            err = f'list client tools: {e}'
+            err = f"list client tools: {e}"
             conversion_errors.append(err)
-            logger.error('convert_mcps_to_tools: %s', err, exc_info=True)
+            logger.error("convert_mcps_to_tools: %s", err, exc_info=True)
             mcp_error_collector.add_error(
-                server_name='general',
-                server_type='conversion',
+                server_name="general",
+                server_type="conversion",
                 error_message=err,
                 exception_details=str(e),
             )
@@ -197,13 +198,13 @@ def convert_mcps_to_tools(mcps: list[MCPClient] | None) -> list[dict]:
                 all_mcp_tools.append(mcp_tools)
                 server_tool_names.append(tool.name)
             except Exception as e:
-                tname = getattr(tool, 'name', '<unknown>')
-                err = f'tool {tname!r} to_param: {e}'
+                tname = getattr(tool, "name", "<unknown>")
+                err = f"tool {tname!r} to_param: {e}"
                 conversion_errors.append(err)
-                logger.error('convert_mcps_to_tools: %s', err, exc_info=True)
+                logger.error("convert_mcps_to_tools: %s", err, exc_info=True)
                 mcp_error_collector.add_error(
-                    server_name='general',
-                    server_type='conversion',
+                    server_name="general",
+                    server_type="conversion",
                     error_message=err,
                     exception_details=str(e),
                 )
@@ -211,12 +212,12 @@ def convert_mcps_to_tools(mcps: list[MCPClient] | None) -> list[dict]:
     try:
         all_mcp_tools.extend(wrapper_tool_params(server_tool_names))
     except Exception as e:
-        err = f'wrapper_tool_params: {e}'
+        err = f"wrapper_tool_params: {e}"
         conversion_errors.append(err)
-        logger.error('convert_mcps_to_tools: %s', err, exc_info=True)
+        logger.error("convert_mcps_to_tools: %s", err, exc_info=True)
         mcp_error_collector.add_error(
-            server_name='general',
-            server_type='conversion',
+            server_name="general",
+            server_type="conversion",
             error_message=err,
             exception_details=str(e),
         )
@@ -256,11 +257,11 @@ async def _connect_to_server(
 
     Returns the connected client or None if connection failed.
     """
-    if server.type == 'stdio':
+    if server.type == "stdio":
         return await _connect_stdio_server(server)
-    if server.type in ('sse', 'shttp'):
+    if server.type in ("sse", "shttp"):
         return await _connect_http_server(server, conversation_id)
-    logger.error('Unknown MCP server type: %s', server.type)
+    logger.error("Unknown MCP server type: %s", server.type)
     return None
 
 
@@ -270,14 +271,14 @@ async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
     if not server.command or not shutil.which(server.command):
         logger.error(
             'Skipping MCP stdio server "%s": command "%s" not found. '
-            'Please install %s or remove this server from your configuration.',
+            "Please install %s or remove this server from your configuration.",
             server.name,
             server.command,
             server.command,
         )
         return None
 
-    logger.info('Initializing MCP agent for %s with stdio connection...', server.name)
+    logger.info("Initializing MCP agent for %s with stdio connection...", server.name)
     client = MCPClient()
     timeout_sec = _get_mcp_connect_timeout_sec()
 
@@ -286,9 +287,9 @@ async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
     # actually reach the MCP child process.
     resolved_env = _resolve_server_env(server.env)
     if resolved_env is not server.env:
-        server = server.model_copy(update={'env': resolved_env})
+        server = server.model_copy(update={"env": resolved_env})
 
-    if server.name == 'rigour':
+    if server.name == "rigour":
         from backend.integrations.mcp.rigour_bootstrap import (
             ensure_minimal_rigour_yml_for_mcp,
         )
@@ -297,7 +298,7 @@ async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
 
     try:
         await asyncio.wait_for(client.connect_stdio(server), timeout=timeout_sec)
-        _log_successful_connection(client, server.name, 'STDIO')
+        _log_successful_connection(client, server.name, "STDIO")
         return client
     except TimeoutError:
         logger.warning(
@@ -307,7 +308,7 @@ async def _connect_stdio_server(server: MCPServerConfig) -> MCPClient | None:
         )
         return None
     except Exception as e:
-        logger.error('Failed to connect to %s: %s', server.name, str(e), exc_info=True)
+        logger.error("Failed to connect to %s: %s", server.name, str(e), exc_info=True)
         return None
 
 
@@ -319,7 +320,7 @@ async def _connect_http_server(
     connection_type = server.type.upper()
 
     logger.info(
-        'Initializing MCP agent for %s with %s connection...',
+        "Initializing MCP agent for %s with %s connection...",
         server.name,
         connection_type,
     )
@@ -332,7 +333,7 @@ async def _connect_http_server(
             client.connect_http(server, conversation_id=conversation_id),
             timeout=timeout_sec,
         )
-        _log_successful_connection(client, server.url or '', connection_type)
+        _log_successful_connection(client, server.url or "", connection_type)
         return client
     except TimeoutError:
         logger.warning(
@@ -343,7 +344,7 @@ async def _connect_http_server(
         )
         return None
     except Exception as e:
-        logger.error('Failed to connect to %s: %s', server.url, str(e), exc_info=True)
+        logger.error("Failed to connect to %s: %s", server.url, str(e), exc_info=True)
         return None
 
 
@@ -353,7 +354,7 @@ def _log_successful_connection(
     """Log successful MCP server connection with tool details."""
     tool_names = [tool.name for tool in client.tools]
     logger.debug(
-        'Successfully connected to MCP %s server %s - provides %s tools: %s',
+        "Successfully connected to MCP %s server %s - provides %s tools: %s",
         connection_type,
         server_identifier,
         len(tool_names),
@@ -382,10 +383,10 @@ async def fetch_mcp_tools_from_config(
     global _last_mcp_conversion_errors
     _last_mcp_conversion_errors = []
 
-    if not getattr(mcp_config, 'enabled', False):
+    if not getattr(mcp_config, "enabled", False):
         set_mcp_bootstrap_status(
             MCPBootstrapStatus(
-                state='mcp_disabled',
+                state="mcp_disabled",
                 mcp_enabled=False,
                 configured_server_count=len(mcp_config.servers or []),
             )
@@ -396,7 +397,7 @@ async def fetch_mcp_tools_from_config(
     servers_to_connect = (
         mcp_config.servers
         if use_stdio
-        else [s for s in mcp_config.servers if s.type != 'stdio']
+        else [s for s in mcp_config.servers if s.type != "stdio"]
     )
     configured_n = len(mcp_config.servers or [])
     attempted_n = len(servers_to_connect)
@@ -404,7 +405,7 @@ async def fetch_mcp_tools_from_config(
     if configured_n == 0:
         set_mcp_bootstrap_status(
             MCPBootstrapStatus(
-                state='no_servers_configured',
+                state="no_servers_configured",
                 mcp_enabled=True,
                 configured_server_count=0,
                 attempted_server_count=0,
@@ -415,16 +416,16 @@ async def fetch_mcp_tools_from_config(
     mcps: list[MCPClient] = []
     mcp_tools: list[dict] = []
     try:
-        logger.debug('Creating MCP clients with config: %s', mcp_config)
+        logger.debug("Creating MCP clients with config: %s", mcp_config)
 
         mcps = await create_mcps(servers_to_connect, conversation_id)
         if not mcps:
             logger.warning(
-                'No MCP clients were successfully connected; exposing degraded capability status tool only'
+                "No MCP clients were successfully connected; exposing degraded capability status tool only"
             )
             set_mcp_bootstrap_status(
                 MCPBootstrapStatus(
-                    state='no_clients_connected',
+                    state="no_clients_connected",
                     mcp_enabled=True,
                     configured_server_count=configured_n,
                     attempted_server_count=attempted_n,
@@ -442,19 +443,19 @@ async def fetch_mcp_tools_from_config(
         )
 
         reserved = set(reserved_tool_names or ()) | set(
-            getattr(mcp_config, 'mcp_exposed_name_reserved', frozenset()) or frozenset()
+            getattr(mcp_config, "mcp_exposed_name_reserved", frozenset()) or frozenset()
         )
         prepare_mcp_tool_exposed_names(mcps, reserved)
         mcp_tools = convert_mcps_to_tools(mcps)
-        remote_tool_count = sum(len(getattr(c, 'tools', ()) or ()) for c in mcps)
+        remote_tool_count = sum(len(getattr(c, "tools", ()) or ()) for c in mcps)
         conv_errs = list(_last_mcp_conversion_errors)
         boot_state: MCPBootstrapState
         if remote_tool_count == 0:
-            boot_state = 'connected_no_remote_tools'
+            boot_state = "connected_no_remote_tools"
         elif conv_errs:
-            boot_state = 'partial_tool_conversion'
+            boot_state = "partial_tool_conversion"
         else:
-            boot_state = 'healthy'
+            boot_state = "healthy"
         set_mcp_bootstrap_status(
             MCPBootstrapStatus(
                 state=boot_state,
@@ -468,17 +469,17 @@ async def fetch_mcp_tools_from_config(
             )
         )
     except Exception as e:
-        error_msg = f'Error fetching MCP tools: {e!s}'
+        error_msg = f"Error fetching MCP tools: {e!s}"
         logger.error(error_msg)
         mcp_error_collector.add_error(
-            server_name='general',
-            server_type='fetch',
+            server_name="general",
+            server_type="fetch",
             error_message=error_msg,
             exception_details=str(e),
         )
         set_mcp_bootstrap_status(
             MCPBootstrapStatus(
-                state='fetch_failed',
+                state="fetch_failed",
                 mcp_enabled=True,
                 configured_server_count=configured_n,
                 attempted_server_count=attempted_n,
@@ -500,13 +501,15 @@ async def fetch_mcp_tools_from_config(
                     await c.disconnect()
                 except asyncio.CancelledError:
                     raise
-                except BaseExceptionGroup as eg:  # noqa: F821  # pylint: disable=undefined-variable
-                    logger.debug('MCP probe disconnect (exception group): %s', eg)
+                except (
+                    BaseExceptionGroup
+                ) as eg:  # noqa: F821  # pylint: disable=undefined-variable
+                    logger.debug("MCP probe disconnect (exception group): %s", eg)
                 except Exception as e:
-                    logger.debug('MCP probe disconnect: %s', e, exc_info=True)
+                    logger.debug("MCP probe disconnect: %s", e, exc_info=True)
                 await asyncio.sleep(0)
             await asyncio.sleep(0.05)
-    logger.debug('MCP tools: %s', mcp_tools)
+    logger.debug("MCP tools: %s", mcp_tools)
     return mcp_tools
 
 
@@ -524,10 +527,10 @@ def _serialize_result_to_json(result_dict: dict) -> str:
 def _normalize_mcp_success_payload(result_dict: dict) -> dict:
     """Attach stable success metadata without discarding existing payload fields."""
     payload = dict(result_dict)
-    is_error = bool(payload.get('isError')) or payload.get('ok') is False
-    payload['ok'] = not is_error
-    payload['isError'] = is_error
-    payload.setdefault('retryable', False)
+    is_error = bool(payload.get("isError")) or payload.get("ok") is False
+    payload["ok"] = not is_error
+    payload["isError"] = is_error
+    payload.setdefault("retryable", False)
     return payload
 
 
@@ -540,50 +543,50 @@ def _build_mcp_error_payload(
 ) -> dict:
     """Build a stable MCP error envelope."""
     return {
-        'ok': False,
-        'isError': True,
-        'error': message,
-        'error_code': code,
-        'retryable': retryable,
-        'tool': action_name,
-        'content': [],
+        "ok": False,
+        "isError": True,
+        "error": message,
+        "error_code": code,
+        "retryable": retryable,
+        "tool": action_name,
+        "content": [],
     }
 
 
 def _looks_like_mcp_validation_error(message: str) -> bool:
     """Return True when MCP error text indicates argument/schema mismatch."""
-    text = (message or '').lower()
+    text = (message or "").lower()
     return any(
         marker in text
         for marker in (
-            '-32602',
-            'input validation error',
-            'invalid arguments',
-            'invalid_type',
-            'validation error',
+            "-32602",
+            "input validation error",
+            "invalid arguments",
+            "invalid_type",
+            "validation error",
         )
     )
 
 
 def _coerce_value_to_schema(value: Any, schema: dict[str, Any]) -> tuple[Any, bool]:
     """Best-effort coercion for common JSON schema field types."""
-    expected = schema.get('type')
+    expected = schema.get("type")
 
-    if expected == 'string':
+    if expected == "string":
         if isinstance(value, str):
             return value, False
         if isinstance(value, (dict, list)):
             return json.dumps(value, ensure_ascii=False), True
         return str(value), True
 
-    if expected == 'array':
+    if expected == "array":
         if isinstance(value, list):
             return value, False
         if isinstance(value, (tuple, set)):
             return list(value), True
         return [value], True
 
-    if expected == 'object':
+    if expected == "object":
         if isinstance(value, dict):
             return value, False
         if isinstance(value, str):
@@ -595,7 +598,7 @@ def _coerce_value_to_schema(value: Any, schema: dict[str, Any]) -> tuple[Any, bo
                 pass
         return value, False
 
-    if expected == 'integer':
+    if expected == "integer":
         if isinstance(value, bool):
             return int(value), True
         if isinstance(value, int):
@@ -609,7 +612,7 @@ def _coerce_value_to_schema(value: Any, schema: dict[str, Any]) -> tuple[Any, bo
                 return value, False
         return value, False
 
-    if expected == 'number':
+    if expected == "number":
         if isinstance(value, bool):
             return float(int(value)), True
         if isinstance(value, float):
@@ -623,14 +626,14 @@ def _coerce_value_to_schema(value: Any, schema: dict[str, Any]) -> tuple[Any, bo
                 return value, False
         return value, False
 
-    if expected == 'boolean':
+    if expected == "boolean":
         if isinstance(value, bool):
             return value, False
         if isinstance(value, str):
             s = value.strip().lower()
-            if s in {'true', '1', 'yes', 'y', 'on'}:
+            if s in {"true", "1", "yes", "y", "on"}:
                 return True, True
-            if s in {'false', '0', 'no', 'n', 'off'}:
+            if s in {"false", "0", "no", "n", "off"}:
                 return False, True
             return value, False
         if isinstance(value, (int, float)):
@@ -647,7 +650,7 @@ def _repair_args_with_schema(
     if input_schema is None or not isinstance(input_schema, dict):
         return args, False
 
-    properties = input_schema.get('properties')
+    properties = input_schema.get("properties")
     if not isinstance(properties, dict) or len(properties) == 0:
         return args, False
 
@@ -665,7 +668,7 @@ def _repair_args_with_schema(
 
 def _extract_mcp_jsonrpc_error_code(message: str) -> str | None:
     """Extract JSON-RPC style negative error code from freeform error text."""
-    match = re.search(r'(-\d{4,5})', message or '')
+    match = re.search(r"(-\d{4,5})", message or "")
     return match.group(1) if match else None
 
 
@@ -677,11 +680,11 @@ def _make_mcp_observation(action: MCPAction, payload: dict) -> MCPObservation:
         arguments=action.arguments,
     )
     obs.tool_result = {
-        'ok': bool(payload.get('ok', not payload.get('isError', False))),
-        'retryable': bool(payload.get('retryable', False)),
-        'error_code': payload.get('error_code'),
-        'action': getattr(action, 'action', None),
-        'observation': obs.observation,
+        "ok": bool(payload.get("ok", not payload.get("isError", False))),
+        "retryable": bool(payload.get("retryable", False)),
+        "error_code": payload.get("error_code"),
+        "action": getattr(action, "action", None),
+        "observation": obs.observation,
     }
     return obs
 
@@ -705,13 +708,13 @@ async def _execute_wrapper_tool(
             action, _normalize_mcp_success_payload(result_dict)
         )
     except Exception as e:
-        logger.error('Wrapper tool %s failed: %s', action.name, e, exc_info=True)
+        logger.error("Wrapper tool %s failed: %s", action.name, e, exc_info=True)
         return _make_mcp_observation(
             action,
             _build_mcp_error_payload(
                 action_name=action.name,
                 message=str(e),
-                code='WRAPPER_EXECUTION_FAILED',
+                code="WRAPPER_EXECUTION_FAILED",
                 retryable=False,
             ),
         )
@@ -719,26 +722,26 @@ async def _execute_wrapper_tool(
 
 def _find_matching_mcp(mcps: list[MCPClient], action_name: str) -> MCPClient:
     """Find MCP client that supports the requested tool."""
-    logger.debug('MCP clients: %s', mcps)
-    logger.debug('MCP action name: %s', action_name)
+    logger.debug("MCP clients: %s", mcps)
+    logger.debug("MCP action name: %s", action_name)
 
     for client in mcps:
-        logger.debug('MCP client tools: %s', client.tools)
+        logger.debug("MCP client tools: %s", client.tools)
         if _resolve_exposed_tool_name(client, action_name) is not None:
-            logger.debug('Matching client: %s', client)
+            logger.debug("Matching client: %s", client)
             return client
 
-    msg = f'No matching MCP agent found for tool name: {action_name}'
+    msg = f"No matching MCP agent found for tool name: {action_name}"
     raise ValueError(msg)
 
 
 def _resolve_exposed_tool_name(client: MCPClient, action_name: str) -> str | None:
     """Resolve either an exposed or protocol tool name to the exposed name."""
-    tool_names = {tool.name for tool in getattr(client, 'tools', [])}
+    tool_names = {tool.name for tool in getattr(client, "tools", [])}
     if action_name in tool_names:
         return action_name
 
-    exposed_to_protocol = getattr(client, 'exposed_to_protocol', {}) or {}
+    exposed_to_protocol = getattr(client, "exposed_to_protocol", {}) or {}
     for exposed_name, protocol_name in exposed_to_protocol.items():
         if protocol_name == action_name and exposed_name in tool_names:
             return exposed_name
@@ -753,19 +756,19 @@ async def _execute_direct_tool(
 
     try:
         if cached := get_cached(action.name, action.arguments):
-            logger.debug('Cache hit for MCP tool %s', action.name)
+            logger.debug("Cache hit for MCP tool %s", action.name)
             return _make_mcp_observation(action, _normalize_mcp_success_payload(cached))
 
         # Call tool
         response = await matching_client.call_tool(action.name, action.arguments)
-        logger.debug('MCP response: %s', response)
-        result_dict = model_dump_with_options(response, mode='json')
+        logger.debug("MCP response: %s", response)
+        result_dict = model_dump_with_options(response, mode="json")
 
         # Cache result
         try:
             set_cache(action.name, action.arguments, result_dict)
         except Exception as cache_exc:
-            logger.debug('Cache set skipped for %s: %s', action.name, cache_exc)
+            logger.debug("Cache set skipped for %s: %s", action.name, cache_exc)
 
         # Serialize and return
         return _make_mcp_observation(
@@ -773,50 +776,50 @@ async def _execute_direct_tool(
         )
     except McpError as e:
         err_text = str(e)
-        logger.error('MCP error when calling tool %s: %s', action.name, err_text)
+        logger.error("MCP error when calling tool %s: %s", action.name, err_text)
 
         if _looks_like_mcp_validation_error(err_text):
             resolved_name = (
                 _resolve_exposed_tool_name(matching_client, action.name) or action.name
             )
-            tool_obj = getattr(matching_client, 'tool_map', {}).get(resolved_name)
+            tool_obj = getattr(matching_client, "tool_map", {}).get(resolved_name)
             schema = (
-                getattr(tool_obj, 'inputSchema', None) if tool_obj is not None else None
+                getattr(tool_obj, "inputSchema", None) if tool_obj is not None else None
             )
             repaired_args, changed = _repair_args_with_schema(action.arguments, schema)
 
             if changed:
                 logger.warning(
-                    'MCP validation failed for %s; retrying once with schema-repaired args',
+                    "MCP validation failed for %s; retrying once with schema-repaired args",
                     action.name,
                 )
                 try:
                     response = await matching_client.call_tool(
                         action.name, repaired_args
                     )
-                    result_dict = model_dump_with_options(response, mode='json')
+                    result_dict = model_dump_with_options(response, mode="json")
                     payload = _normalize_mcp_success_payload(result_dict)
-                    payload['mcp_arg_repair_applied'] = True
-                    payload['repaired_arguments'] = repaired_args
+                    payload["mcp_arg_repair_applied"] = True
+                    payload["repaired_arguments"] = repaired_args
                     return _make_mcp_observation(action, payload)
                 except Exception as retry_exc:
                     logger.error(
-                        'MCP validation retry failed for %s: %s',
+                        "MCP validation retry failed for %s: %s",
                         action.name,
                         retry_exc,
                     )
 
-            code = _extract_mcp_jsonrpc_error_code(err_text) or '-32602'
+            code = _extract_mcp_jsonrpc_error_code(err_text) or "-32602"
             return _make_mcp_observation(
                 action,
                 _build_mcp_error_payload(
                     action_name=action.name,
                     message=(
                         f"MCP tool '{action.name}' rejected arguments with validation error ({code}).\n"
-                        'Attempted schema-aware repair and single retry where possible.\n'
-                        'Next step: call the same tool with arguments matching its input schema exactly.'
+                        "Attempted schema-aware repair and single retry where possible.\n"
+                        "Next step: call the same tool with arguments matching its input schema exactly."
                     ),
-                    code='MCP_TOOL_VALIDATION_ERROR',
+                    code="MCP_TOOL_VALIDATION_ERROR",
                     retryable=True,
                 ),
             )
@@ -827,27 +830,27 @@ async def _execute_direct_tool(
                 action_name=action.name,
                 message=(
                     f"MCP tool '{action.name}' returned an error: {e}\n"
-                    'You can try:\n'
-                    '  1. Re-call the tool with corrected arguments\n'
-                    f'  2. Use {_terminal_tool()} as a fallback to accomplish the same task'
+                    "You can try:\n"
+                    "  1. Re-call the tool with corrected arguments\n"
+                    f"  2. Use {_terminal_tool()} as a fallback to accomplish the same task"
                 ),
-                code='MCP_TOOL_ERROR',
+                code="MCP_TOOL_ERROR",
                 retryable=False,
             ),
         )
     except asyncio.TimeoutError as e:
-        logger.error('MCP tool %s timed out: %s', action.name, e)
+        logger.error("MCP tool %s timed out: %s", action.name, e)
         return _make_mcp_observation(
             action,
             _build_mcp_error_payload(
                 action_name=action.name,
                 message=(
                     f"MCP tool '{action.name}' timed out (server did not respond in time).\n"
-                    'The tool may be waiting on a slow network call or the MCP server may be stuck.\n'
-                    'Try: a narrower query, or fall back to a non-MCP tool.\n'
-                    'Tune limits: APP_MCP_CALL_TOTAL_BUDGET_SEC, APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC.'
+                    "The tool may be waiting on a slow network call or the MCP server may be stuck.\n"
+                    "Try: a narrower query, or fall back to a non-MCP tool.\n"
+                    "Tune limits: APP_MCP_CALL_TOTAL_BUDGET_SEC, APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC."
                 ),
-                code='MCP_TOOL_TIMEOUT',
+                code="MCP_TOOL_TIMEOUT",
                 retryable=True,
             ),
         )
@@ -862,13 +865,13 @@ async def _execute_direct_tool(
                 action_name=action.name,
                 message=(
                     f"MCP server for tool '{action.name}' is unavailable (reason: "
-                    f'{type(e).__name__}: {e}).\n'
-                    'The MCP server may be disconnected or experiencing issues.\n'
-                    'Fallback options:\n'
-                    f'  1. Use {_terminal_tool()} to accomplish the same task\n'
-                    '  2. Continue with non-MCP tools'
+                    f"{type(e).__name__}: {e}).\n"
+                    "The MCP server may be disconnected or experiencing issues.\n"
+                    "Fallback options:\n"
+                    f"  1. Use {_terminal_tool()} to accomplish the same task\n"
+                    "  2. Continue with non-MCP tools"
                 ),
-                code='MCP_SERVER_UNAVAILABLE',
+                code="MCP_SERVER_UNAVAILABLE",
                 retryable=True,
             ),
         )
@@ -891,7 +894,7 @@ async def call_tool_mcp(
         The observation from the MCP server
 
     """
-    logger.debug('MCP action received: %s', action)
+    logger.debug("MCP action received: %s", action)
 
     # Handle wrapper tools
     if action.name in WRAPPER_TOOL_REGISTRY:
@@ -905,11 +908,11 @@ async def call_tool_mcp(
             _build_mcp_error_payload(
                 action_name=action.name,
                 message=(
-                    'No MCP clients are currently connected for this session. '
-                    f'Use {_terminal_tool()} or another non-MCP tool instead; '
-                    'only the tools listed in your active tool schema are available.'
+                    "No MCP clients are currently connected for this session. "
+                    f"Use {_terminal_tool()} or another non-MCP tool instead; "
+                    "only the tools listed in your active tool schema are available."
                 ),
-                code='MCP_NO_CLIENTS',
+                code="MCP_NO_CLIENTS",
                 retryable=True,
             ),
         )
@@ -924,12 +927,12 @@ async def call_tool_mcp(
                 action_name=action.name,
                 message=(
                     f"MCP tool '{action.name}' is not available in this session.\n"
-                    'Only the tool names listed in your active tool schema are valid — '
-                    'pass them verbatim to `call_mcp_tool(tool_name=...)` with no '
-                    '`server:` / `server/` / `server__` prefix.\n'
-                    f'If none fit, use {_terminal_tool()} or another non-MCP tool.'
+                    "Only the tool names listed in your active tool schema are valid — "
+                    "pass them verbatim to `call_mcp_tool(tool_name=...)` with no "
+                    "`server:` / `server/` / `server__` prefix.\n"
+                    f"If none fit, use {_terminal_tool()} or another non-MCP tool."
                 ),
-                code='MCP_TOOL_UNAVAILABLE',
+                code="MCP_TOOL_UNAVAILABLE",
                 retryable=False,
             ),
         )
@@ -946,12 +949,12 @@ async def _call_mcp_raw(mcps: list[MCPClient], action) -> dict:
             resolved_exposed_name = resolved
             break
     if not matching_client or resolved_exposed_name is None:
-        msg = f'Underlying tool {action.name} not found for wrapper'
+        msg = f"Underlying tool {action.name} not found for wrapper"
         raise ValueError(msg)
     if cached := get_cached(action.name, action.arguments):
         return cached
     response = await matching_client.call_tool(resolved_exposed_name, action.arguments)
-    result_dict = model_dump_with_options(response, mode='json')
+    result_dict = model_dump_with_options(response, mode="json")
     set_cache(action.name, action.arguments, result_dict)
     return result_dict
 
@@ -960,9 +963,9 @@ async def add_mcp_tools_to_agent(
     agent: Agent, runtime: Runtime, memory: Memory
 ) -> MCPConfig | None:
     """Add MCP tools to an agent."""
-    assert runtime.runtime_initialized, (
-        'Runtime must be initialized before adding MCP tools'
-    )
+    assert (
+        runtime.runtime_initialized
+    ), "Runtime must be initialized before adding MCP tools"
     extra_servers = []
     playbook_mcp_configs = memory.get_playbook_mcp_tools()
     for mcp_config in playbook_mcp_configs:
@@ -971,7 +974,7 @@ async def add_mcp_tools_to_agent(
             if server not in extra_servers:
                 extra_servers.append(server)
                 logger.warning(
-                    'Added playbook MCP server: %s (%s)', server.name, server.type
+                    "Added playbook MCP server: %s (%s)", server.name, server.type
                 )
 
     updated_mcp_config = runtime.get_mcp_config(extra_servers)
@@ -986,8 +989,8 @@ async def add_mcp_tools_to_agent(
         use_stdio=isinstance(runtime, LocalRuntimeInProcess),
         reserved_tool_names=reserved,
     )
-    tool_names = [tool['function']['name'] for tool in mcp_tools]
-    logger.info('Loaded %s MCP tools: %s', len(mcp_tools), tool_names)
+    tool_names = [tool["function"]["name"] for tool in mcp_tools]
+    logger.info("Loaded %s MCP tools: %s", len(mcp_tools), tool_names)
     agent.set_mcp_tools(mcp_tools)
     agent.mcp_capability_status = get_mcp_bootstrap_status()
     return updated_mcp_config

@@ -173,10 +173,18 @@ async def test_middleware_blocks_mutating_edit_on_stale_file(
     f.write_text('v1\n', encoding='utf-8')
 
     mw = FileStateMiddleware()
-    # Simulate: file was read, snapshot taken, then disk changed.
+    # Simulate: file was read, snapshot taken.
     mw.tracker.record(str(f), 'read')
     mw.tracker.record_read_snapshot_from_disk(str(f))
-    f.write_text('v2\n', encoding='utf-8')  # disk change after read
+
+    # Advance mtime so the staleness check sees a newer mtime.
+    key = _normalize_path_key(str(f))
+    snap = mw.tracker._read_snapshots[key]
+    future_mtime = snap.mtime + 10
+    os.utime(f, (future_mtime, future_mtime))
+    # Overwrite content so hash also changes.
+    f.write_text('v2\n', encoding='utf-8')
+    os.utime(f, (future_mtime, future_mtime))
 
     action = _file_edit_action(str(f), 'write')
     ctx = _make_ctx(action)
