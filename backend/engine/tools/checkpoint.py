@@ -60,17 +60,20 @@ def create_checkpoint_tool() -> dict:
         'function': {
             'name': CHECKPOINT_TOOL_NAME,
             'description': (
-                "Save or view progress checkpoints. Use 'save' after completing "
-                "a logical phase of work (e.g., 'auth module complete'). Use "
-                "'view' to see all saved checkpoints. Use 'clear' to reset."
+                "Manage workspace checkpoints. Use 'save' after completing a logical "
+                "phase of work (e.g., 'auth module complete'). Use 'view' to list all "
+                "saved checkpoints with their IDs. Use 'revert' to roll back the "
+                "workspace to a previously saved state — use immediately after a bad "
+                "edit or failed command to undo changes without wasting turns. "
+                "Use 'clear' to reset all checkpoints."
             ),
             'parameters': {
                 'type': 'object',
                 'properties': {
                     'command': {
-                        'description': 'One of: save | view | clear',
+                        'description': 'One of: save | view | revert | clear',
                         'type': 'string',
-                        'enum': ['save', 'view', 'clear'],
+                        'enum': ['save', 'view', 'revert', 'clear'],
                     },
                     'label': {
                         'description': "For 'save': short description of what was completed.",
@@ -78,6 +81,13 @@ def create_checkpoint_tool() -> dict:
                     },
                     'files_modified': {
                         'description': "For 'save': comma-separated list of files that were changed.",
+                        'type': 'string',
+                    },
+                    'checkpoint_id': {
+                        'description': (
+                            "For 'revert': the checkpoint ID to roll back to (integer from 'view'). "
+                            "If omitted, reverts to the most recent checkpoint."
+                        ),
                         'type': 'string',
                     },
                 },
@@ -96,6 +106,8 @@ def build_checkpoint_action(arguments: dict) -> AgentThinkAction:
             arguments.get('label', ''),
             arguments.get('files_modified', ''),
         )
+    elif command == 'revert':
+        return _revert_checkpoint(arguments.get('checkpoint_id', ''))
     elif command == 'clear':
         return _clear_checkpoints()
     else:
@@ -211,6 +223,110 @@ def _save_checkpoint(label: str, files_modified: str) -> AgentThinkAction:
         next_best_action='Continue with the next planned step.',
         human_message=f'[CHECKPOINT] Saved #{entry["id"]}: {label}',
     )
+
+
+def _revert_checkpoint(checkpoint_id: str) -> AgentThinkAction:
+    checkpoint_id = (checkpoint_id or '').strip()
+
+    from backend.core.rollback.rollback_manager import RollbackManager
+    from backend.core.workspace_resolution import require_effective_workspace_root
+
+    manager = RollbackManager(
+        workspace_path=str(require_effective_workspace_root()),
+        max_checkpoints=30,
+        auto_cleanup=True,
+    )
+
+    if not checkpoint_id:
+        latest = manager.get_latest_checkpoint()
+        if not latest:
+            return _checkpoint_result(
+                command='revert',
+                ok=False,
+                status='failed',
+                reason_code='NO_CHECKPOINTS',
+                reason='No checkpoints found. Cannot revert to a safe state.',
+                retryable=True,
+                changed_state=False,
+                next_best_action="Save a checkpoint after a safe milestone with checkpoint(save), then retry checkpoint(revert).",
+                human_message='[ROLLBACK] Failure: No checkpoints found.',
+            )
+        resolved_id = latest.id
+        target_label = 'latest checkpoint'
+    else:
+        resolved_id = _resolve_rollback_id(checkpoint_id, manager)
+        if resolved_id is None:
+            return _checkpoint_result(
+                command='revert',
+                ok=False,
+                status='failed',
+                reason_code='CHECKPOINT_NOT_FOUND',
+                reason=(
+                    f"Checkpoint ID '{checkpoint_id}' was not found. "
+                    "Use checkpoint(view) to list available checkpoints."
+                ),
+                retryable=True,
+                changed_state=False,
+                data={'requested_checkpoint_id': checkpoint_id},
+                next_best_action="Call checkpoint(view) to inspect valid checkpoints, then retry.",
+                human_message=(
+                    f"[ROLLBACK] Failure: Checkpoint ID '{checkpoint_id}' not found."
+                ),
+            )
+        target_label = f'checkpoint {checkpoint_id}'
+
+    success = manager.rollback_to(resolved_id)
+    if success:
+        return _checkpoint_result(
+            command='revert',
+            ok=True,
+            status='reverted',
+            reason_code='ROLLBACK_COMPLETED',
+            reason='Workspace rollback completed successfully.',
+            retryable=False,
+            changed_state=True,
+            data={
+                'requested_checkpoint_id': checkpoint_id or None,
+                'resolved_checkpoint_id': resolved_id,
+            },
+            next_best_action='Re-run the next safe step from the restored state.',
+            human_message=f'[ROLLBACK] Success: Workspace reverted to {target_label}.',
+        )
+    else:
+        return _checkpoint_result(
+            command='revert',
+            ok=False,
+            status='failed',
+            reason_code='ROLLBACK_FAILED',
+            reason='Rollback failed. See logs for details.',
+            retryable=True,
+            changed_state=False,
+            data={
+                'requested_checkpoint_id': checkpoint_id or None,
+                'resolved_checkpoint_id': resolved_id,
+            },
+            next_best_action='Inspect the rollback logs, then retry or recover manually.',
+            human_message=f'[ROLLBACK] Failure: Revert to {target_label} failed.',
+        )
+
+
+def _resolve_rollback_id(checkpoint_id: str, manager: Any) -> str | None:
+    """Map an integer checkpoint tool ID to a RollbackManager internal ID."""
+    if checkpoint_id.isdigit():
+        path = _checkpoints_path()
+        if path.exists():
+            try:
+                entries = json.loads(path.read_text(encoding='utf-8'))
+                if isinstance(entries, list):
+                    for cp in entries:
+                        if str(cp.get('id', '')) == checkpoint_id:
+                            rid = cp.get('rollback_id')
+                            return str(rid) if rid else None
+            except Exception:
+                pass
+        return None
+    # Native RollbackManager ID — verify it exists.
+    return checkpoint_id if manager.get_checkpoint(checkpoint_id) else None
 
 
 def _view_checkpoints() -> AgentThinkAction:

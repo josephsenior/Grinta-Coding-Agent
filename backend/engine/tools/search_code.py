@@ -76,9 +76,8 @@ def create_search_code_tool() -> dict:
                 'description': 'Lines of context to show before and after each match (default: 2).',
             },
             'case_sensitive': {
-                'type': 'string',
-                'enum': ['true', 'false'],
-                'description': "Whether the search is case-sensitive (default: 'false').",
+                'type': 'boolean',
+                'description': 'Whether the search is case-sensitive (default: false).',
             },
             'max_results': {
                 'type': 'integer',
@@ -94,7 +93,7 @@ def build_search_code_action(
     path: str = '.',
     file_pattern: str = '',
     context_lines: int = 2,
-    case_sensitive: str = 'false',
+    case_sensitive: bool | str = False,
     max_results: int = 50,
 ) -> AgentThinkAction:
     """Perform the code search directly in pure Python (with ripgrep fast-path).
@@ -107,7 +106,7 @@ def build_search_code_action(
     path = path or '.'
     context_lines = max(0, min(int(context_lines), 10))
     max_results = max(1, min(int(max_results), 500))
-    is_case_sensitive = str(case_sensitive).lower() == 'true'
+    is_case_sensitive = case_sensitive is True or str(case_sensitive).lower() == 'true'
 
     # Auto-fix common LLM mistake where they provide `.ext` instead of `*.ext`
     if (

@@ -52,7 +52,8 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             "'hardened_local' adds stricter local policy gates for commands and file access. "
             "'sandboxed_local' adds those same policy gates plus OS-native process isolation "
             '(bubblewrap on Linux, sandbox-exec on macOS, AppContainer on Windows) '
-            'for non-interactive command execution.'
+            'for non-interactive command execution. Interactive terminals remain enabled '
+            'and bypass process isolation to preserve capability and latency.'
         ),
     )
     allow_network_commands: bool = Field(

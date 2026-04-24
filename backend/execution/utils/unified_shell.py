@@ -299,12 +299,6 @@ def create_shell_session(
 
     sandboxed_local = is_sandboxed_local_profile(security_config)
 
-    if sandboxed_local and interactive:
-        raise RuntimeError(
-            'Interactive terminal sessions are disabled under sandboxed_local. '
-            'Use cmd_run for sandboxed execution or switch profiles.'
-        )
-
     if interactive:
         try:
             from backend.execution.utils.pty_session import PtyUnavailableError
@@ -373,8 +367,13 @@ def create_shell_session(
             ),
         )
 
-    # Unix with tmux: Use full BashSession
-    if not sandboxed_local and resolved_tools.has_tmux and resolved_tools.has_bash:
+    # Non-interactive sandboxed_local sessions must avoid tmux because command
+    # isolation is applied by wrapping each subprocess. Interactive sessions are
+    # intentionally unsandboxed, so tmux remains a valid fallback when the PTY
+    # backend is unavailable.
+    if resolved_tools.has_tmux and resolved_tools.has_bash and (
+        interactive or not sandboxed_local
+    ):
         from backend.execution.utils.bash import BashSession
 
         logger.info('Using BashSession with tmux')

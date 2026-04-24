@@ -180,9 +180,6 @@ class OrchestratorPlanner:
             create_delegate_task_tool,
         )
         from backend.engine.tools.lsp_query import create_lsp_query_tool
-        from backend.engine.tools.signal_progress import (
-            create_signal_progress_tool,
-        )
 
         tools.append(create_analyze_project_structure_tool())
 
@@ -191,8 +188,6 @@ class OrchestratorPlanner:
 
             if _detect_pylsp():
                 tools.append(create_lsp_query_tool())
-        if getattr(self._config, 'enable_signal_progress', False):
-            tools.append(create_signal_progress_tool())
         if getattr(self._config, 'enable_swarming', False):
             tools.append(create_delegate_task_tool())
 
@@ -203,29 +198,8 @@ class OrchestratorPlanner:
 
         if getattr(self._config, 'enable_checkpoints', False):
             from backend.engine.tools.checkpoint import create_checkpoint_tool
-            from backend.engine.tools.revert_to_checkpoint import (
-                create_revert_to_checkpoint_tool,
-            )
 
             tools.append(create_checkpoint_tool())
-            tools.append(create_revert_to_checkpoint_tool())
-
-        if getattr(self._config, 'enable_session_diff', False):
-            from backend.engine.tools.session_diff import create_session_diff_tool
-
-            tools.append(create_session_diff_tool())
-
-        self._add_lazy_import_tools(
-            tools,
-            [
-                (
-                    'enable_verify_file_lines',
-                    False,
-                    'verify_file_lines',
-                    'create_verify_file_lines_tool',
-                ),
-            ],
-        )
 
     def _add_lazy_import_tools(
         self, tools: list, specs: list[tuple[str, bool, str, str]]

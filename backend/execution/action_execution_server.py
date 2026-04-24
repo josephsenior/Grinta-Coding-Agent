@@ -1109,13 +1109,6 @@ class RuntimeExecutor:
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         """Start a new interactive terminal session."""
         try:
-            if self._is_sandboxed_local():
-                return ErrorObservation(
-                    'Interactive terminal sessions are disabled under sandboxed_local. '
-                    'Use cmd_run for sandboxed commands or switch to hardened_local/standard '
-                    'if you need a live terminal session.'
-                )
-
             guard_err = self._terminal_open_guardrail_error(action.command or "")
             if guard_err is not None:
                 return guard_err

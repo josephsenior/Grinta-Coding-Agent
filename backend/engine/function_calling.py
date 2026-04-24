@@ -21,7 +21,6 @@ from backend.engine.common import (
 from backend.engine.tools import (
     create_cmd_run_tool,
     create_finish_tool,
-    create_llm_based_edit_tool,
     create_str_replace_editor_tool,
     create_structure_editor_tool,
     create_summarize_context_tool,
@@ -61,31 +60,15 @@ from backend.engine.tools.memory_manager import (
 )
 from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.note import build_note_action, build_recall_action
-from backend.engine.tools.revert_to_checkpoint import (
-    REVERT_TO_CHECKPOINT_TOOL_NAME,
-    build_revert_to_checkpoint_action,
-)
 from backend.engine.tools.search_code import (
     SEARCH_CODE_TOOL_NAME,
     build_search_code_action,
 )
 from backend.engine.tools.security_utils import RISK_LEVELS
-from backend.engine.tools.session_diff import (
-    SESSION_DIFF_TOOL_NAME,
-    build_session_diff_action,
-)
-from backend.engine.tools.signal_progress import (
-    SIGNAL_PROGRESS_TOOL_NAME,
-    build_signal_progress_action,
-)
 from backend.engine.tools.task_tracker import TaskTracker
 from backend.engine.tools.terminal_manager import (
     TERMINAL_MANAGER_TOOL_NAME,
     handle_terminal_manager_tool,
-)
-from backend.engine.tools.verify_file_lines import (
-    VERIFY_FILE_LINES_TOOL_NAME,
-    build_verify_file_lines_action,
 )
 from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
 from backend.ledger.action import (
@@ -301,13 +284,13 @@ def _handle_search_code_tool(arguments: dict) -> AgentThinkAction:
         path=arguments.get('path', '.'),
         file_pattern=arguments.get('file_pattern', ''),
         context_lines=arguments.get('context_lines', 2),
-        case_sensitive=arguments.get('case_sensitive', 'false'),
+        case_sensitive=arguments.get('case_sensitive', False),
         max_results=arguments.get('max_results', 50),
     )
 
 
 def _handle_checkpoint_tool(arguments: dict) -> AgentThinkAction:
-    """Handle checkpoint tool: save/view progress checkpoints."""
+    """Handle checkpoint tool: save/view/revert/clear progress checkpoints."""
     return build_checkpoint_action(arguments)
 
 
@@ -316,40 +299,6 @@ def _handle_analyze_project_structure_tool(
 ) -> AgentThinkAction:
     """Handle analyze_project_structure tool: structural overview of the workspace."""
     return build_analyze_project_structure_action(arguments)
-
-
-def _handle_session_diff_tool(arguments: dict) -> CmdRunAction:
-    """Handle session_diff tool: show cumulative changes in the session."""
-    return build_session_diff_action(arguments)
-
-
-def _handle_verify_file_lines_tool(arguments: dict) -> AgentThinkAction:
-    """Handle verify_file_lines tool: validate file assertions before editing."""
-    return build_verify_file_lines_action(arguments)
-
-
-def _handle_llm_based_file_edit_tool(arguments: dict) -> FileEditAction:
-    """Handle LLMBasedFileEditTool tool call."""
-    tool_name = create_llm_based_edit_tool()['function']['name']
-    if 'path' not in arguments:
-        msg = f'Missing required argument "path" in tool call {tool_name}'
-        raise FunctionCallValidationError(
-            msg,
-        )
-    if 'content' not in arguments:
-        msg = f'Missing required argument "content" in tool call {tool_name}'
-        raise FunctionCallValidationError(
-            msg,
-        )
-    action = FileEditAction(
-        path=arguments['path'],
-        content=arguments['content'],
-        start=arguments.get('start', 1),
-        end=arguments.get('end', -1),
-        impl_source=arguments.get('impl_source', FileEditSource.LLM_BASED_EDIT),
-    )
-    set_security_risk(action, arguments)
-    return action
 
 
 def _validate_str_replace_editor_args(arguments: dict) -> tuple[str, str]:
@@ -1122,9 +1071,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     return {
         create_cmd_run_tool()['function']['name']: _handle_cmd_run_tool,
         create_finish_tool()['function']['name']: _handle_finish_tool,
-        create_llm_based_edit_tool()['function'][
-            'name'
-        ]: _handle_llm_based_file_edit_tool,
         create_str_replace_editor_tool()['function'][
             'name'
         ]: _handle_str_replace_editor_tool,
@@ -1141,10 +1087,8 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         RECALL_TOOL_NAME: lambda args: build_recall_action(args['key']),
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
-        VERIFY_FILE_LINES_TOOL_NAME: _handle_verify_file_lines_tool,
         DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
         CODE_INTELLIGENCE_TOOL_NAME: build_lsp_query_action,
-        SIGNAL_PROGRESS_TOOL_NAME: build_signal_progress_action,
         BLACKBOARD_TOOL_NAME: build_blackboard_action,
         TERMINAL_MANAGER_TOOL_NAME: handle_terminal_manager_tool,
         'explore_tree_structure': build_explore_tree_structure_action,
@@ -1152,8 +1096,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
         EXECUTE_MCP_TOOL_TOOL_NAME: _handle_execute_mcp_tool_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
-        REVERT_TO_CHECKPOINT_TOOL_NAME: build_revert_to_checkpoint_action,
-        SESSION_DIFF_TOOL_NAME: _handle_session_diff_tool,
         BROWSER_TOOL_NAME: _handle_browser_tool,
     }
 

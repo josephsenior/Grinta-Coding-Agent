@@ -122,9 +122,8 @@ def create_cmd_run_tool(use_short_description: bool = False):
                 f'If True, the command is an input to the running process. If False, the command is a {shell} command to be executed in the terminal. Default is False.'
             ),
             'is_background': {
-                'type': 'string',
-                'enum': ['true', 'false'],
-                'description': 'If True, run the command in a background shell session. Returns immediately with a session ID. Use for long-running processes like servers or build watchers.',
+                'type': 'boolean',
+                'description': 'If true, run the command in a background shell session. Returns immediately with a session ID. Use for long-running processes like servers or build watchers.',
             },
             'grep_pattern': {
                 'type': 'string',

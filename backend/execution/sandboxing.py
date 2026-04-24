@@ -8,9 +8,9 @@ subprocess-backed shells:
 - Windows: AppContainer helper launched via ``python -m``
 
 The goal is honest isolation for non-interactive command execution. Interactive
-terminal sessions are handled separately by the shell factory and are currently
-disabled under ``sandboxed_local`` to avoid pretending they are isolated when
-they are not.
+terminal sessions are handled separately by the shell factory and intentionally
+remain unsandboxed so capability and latency stay aligned with the standard /
+hardened profiles.
 """
 
 from __future__ import annotations

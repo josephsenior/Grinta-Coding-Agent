@@ -22,7 +22,8 @@ from pathlib import Path
 HRESULT = ctypes.c_long
 
 
-PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES = 0x00020005
+# SECURITY_CAPABILITIES is ProcThreadAttributeValue(9, False, True, False).
+PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES = 0x00020009
 EXTENDED_STARTUPINFO_PRESENT = 0x00080000
 STARTF_USESTDHANDLES = 0x00000100
 ERROR_ALREADY_EXISTS = 183
@@ -274,9 +275,12 @@ def _launch(argv: list[str], *, cwd: str, workspace: Path, allow_network: bool) 
     stdin_file = open('NUL', 'rb')
 
     try:
-        os.set_handle_inheritable(stdout_file.fileno(), True)
-        os.set_handle_inheritable(stderr_file.fileno(), True)
-        os.set_handle_inheritable(stdin_file.fileno(), True)
+        stdout_handle = msvcrt.get_osfhandle(stdout_file.fileno())
+        stderr_handle = msvcrt.get_osfhandle(stderr_file.fileno())
+        stdin_handle = msvcrt.get_osfhandle(stdin_file.fileno())
+        os.set_handle_inheritable(stdout_handle, True)
+        os.set_handle_inheritable(stderr_handle, True)
+        os.set_handle_inheritable(stdin_handle, True)
         _grant_workspace_access(workspace, sid_string)
 
         caps_array, capability_ptrs = _make_capabilities(allow_network)
@@ -314,9 +318,9 @@ def _launch(argv: list[str], *, cwd: str, workspace: Path, allow_network: bool) 
         startup = STARTUPINFOEXW()
         startup.StartupInfo.cb = ctypes.sizeof(startup)
         startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES
-        startup.StartupInfo.hStdInput = wintypes.HANDLE(msvcrt.get_osfhandle(stdin_file.fileno()))
-        startup.StartupInfo.hStdOutput = wintypes.HANDLE(msvcrt.get_osfhandle(stdout_file.fileno()))
-        startup.StartupInfo.hStdError = wintypes.HANDLE(msvcrt.get_osfhandle(stderr_file.fileno()))
+        startup.StartupInfo.hStdInput = wintypes.HANDLE(stdin_handle)
+        startup.StartupInfo.hStdOutput = wintypes.HANDLE(stdout_handle)
+        startup.StartupInfo.hStdError = wintypes.HANDLE(stderr_handle)
         startup.lpAttributeList = attr_list
 
         proc_info = PROCESS_INFORMATION()
