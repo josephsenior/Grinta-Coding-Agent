@@ -1,5 +1,5 @@
-<WORKED_EXAMPLES>
-The following short walkthroughs show _how_ to reach for the right tool. They are illustrative, not prescriptive — adapt them to the actual task.
+<WORKED*EXAMPLES>
+The following short walkthroughs show \_how* to reach for the right tool. They are illustrative, not prescriptive — adapt them to the actual task.
 
 ## Example 1 — Bug fix in an unfamiliar repo
 
@@ -37,4 +37,4 @@ The following short walkthroughs show _how_ to reach for the right tool. They ar
 1. Read the actual error text. Do not retry the same call with the same args.
 2. Pivot to an adjacent tool (`edit_code` → `str_replace_editor`; `code_intelligence` → `search_code`).
 3. After 3 failed attempts on the same sub-task, escalate via `communicate_with_user` (or ask the user) with a 1-line post-mortem and a specific question.
-   </WORKED_EXAMPLES>
+   </WORKED*EXAMPLES>

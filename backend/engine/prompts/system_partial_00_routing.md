@@ -9,10 +9,11 @@
   </DECISION_FRAMEWORK>
 
 <TOOL_ROUTING_LADDER>
+
 - **Search & Explore:** Prefer `search_code`, `read_symbol_definition`, or `analyze_project_structure`.
 - **Read & Edit:** Use `edit_code` or `str_replace_editor`; read before editing.
 - **Shell & Execution:** Use the terminal for build/test/git/processes; shell text tools are fallback only.
-</TOOL_ROUTING_LADDER>
+  </TOOL_ROUTING_LADDER>
 
 <CROSS_SESSION_LEARNING>
 On workspace-modifying tasks, call `recall(key="lessons")` once. Skip for pure Q&A. The `finish` tool appends `lessons_learned` automatically.
@@ -50,8 +51,9 @@ When encountering secrets: STOP → Refuse → explain risk → offer safe alter
 
 <SELF_REGULATION>
 After context condensation:
+
 - Resume from the summary. Do not restart broad exploration.
 - {post_condensation_retrieval}
 - {remaining_work_source_of_truth}
 - {surviving_state_facts}
-</SELF_REGULATION>
+  </SELF_REGULATION>

@@ -1,5 +1,6 @@
 """Tests for backend/engine/tools/health_check.py."""
 
+from typing import TypedDict, cast
 from unittest.mock import patch
 
 import pytest
@@ -9,6 +10,25 @@ from backend.engine.tools.health_check import (
     check_structure_editor_dependencies,
     run_production_health_check,
 )
+
+
+class HealthCheckComponent(TypedDict):
+    status: str
+    message: str
+    critical: bool
+
+
+class HealthCheckResult(TypedDict):
+    edit_code: HealthCheckComponent
+    atomic_refactor: HealthCheckComponent
+    overall_status: str
+
+
+def _run_health_check() -> HealthCheckResult:
+    return cast(
+        HealthCheckResult,
+        run_production_health_check(raise_on_failure=False),
+    )
 
 
 class TestCheckStructureEditorDependencies:
@@ -75,7 +95,7 @@ class TestRunProductionHealthCheck:
                 'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
                 return_value=(True, 'AR OK'),
             ):
-                result = run_production_health_check(raise_on_failure=False)
+                result: HealthCheckResult = _run_health_check()
 
         assert result['overall_status'] == 'HEALTHY'
         assert result['edit_code']['status'] == 'PASS'
@@ -95,7 +115,7 @@ class TestRunProductionHealthCheck:
                 'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
                 return_value=(False, 'AR failed'),
             ):
-                result = run_production_health_check(raise_on_failure=False)
+                result: HealthCheckResult = _run_health_check()
 
         # Should still be healthy since atomic refactor is not critical
         assert result['overall_status'] == 'HEALTHY'
@@ -113,7 +133,7 @@ class TestRunProductionHealthCheck:
                 'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
                 return_value=(True, 'AR OK'),
             ):
-                result = run_production_health_check(raise_on_failure=False)
+                result: HealthCheckResult = _run_health_check()
 
         assert result['overall_status'] == 'CRITICAL_FAILURE'
         assert result['edit_code']['status'] == 'FAIL'
@@ -142,7 +162,7 @@ class TestRunProductionHealthCheck:
                 'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
                 return_value=(True, 'AR OK'),
             ):
-                result = run_production_health_check(raise_on_failure=False)
+                result: HealthCheckResult = _run_health_check()
 
         # Should return result without raising
         assert result['overall_status'] == 'CRITICAL_FAILURE'
@@ -157,7 +177,7 @@ class TestRunProductionHealthCheck:
                 'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
                 return_value=(False, 'AR failed'),
             ):
-                result = run_production_health_check(raise_on_failure=False)
+                result: HealthCheckResult = _run_health_check()
 
         assert result['overall_status'] == 'CRITICAL_FAILURE'
         assert result['edit_code']['status'] == 'FAIL'
@@ -173,7 +193,7 @@ class TestRunProductionHealthCheck:
                 'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
                 return_value=(True, 'OK'),
             ):
-                result = run_production_health_check(raise_on_failure=False)
+                result: HealthCheckResult = _run_health_check()
 
         # Check all required keys exist
         assert 'overall_status' in result
@@ -181,14 +201,21 @@ class TestRunProductionHealthCheck:
         assert 'atomic_refactor' in result
 
         # Check component structure
-        for component_key in ['edit_code', 'atomic_refactor']:
-            component = result[component_key]
-            assert isinstance(component, dict)
-            assert 'status' in component
-            assert 'message' in component
-            assert 'critical' in component
-            assert component['status'] in ['PASS', 'FAIL']
-            assert isinstance(component['critical'], bool)
+        component: HealthCheckComponent = result['edit_code']
+        assert isinstance(component, dict)
+        assert 'status' in component
+        assert 'message' in component
+        assert 'critical' in component
+        assert component['status'] in ['PASS', 'FAIL']
+        assert isinstance(component['critical'], bool)
+
+        component = result['atomic_refactor']
+        assert isinstance(component, dict)
+        assert 'status' in component
+        assert 'message' in component
+        assert 'critical' in component
+        assert component['status'] in ['PASS', 'FAIL']
+        assert isinstance(component['critical'], bool)
 
     def test_overall_status_values(self):
         """Test that overall_status has expected values."""
@@ -201,7 +228,7 @@ class TestRunProductionHealthCheck:
                 'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
                 return_value=(True, 'OK'),
             ):
-                result = run_production_health_check(raise_on_failure=False)
+                result: HealthCheckResult = _run_health_check()
                 assert result['overall_status'] == 'HEALTHY'
 
         # Test CRITICAL_FAILURE
@@ -213,5 +240,5 @@ class TestRunProductionHealthCheck:
                 'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
                 return_value=(True, 'OK'),
             ):
-                result = run_production_health_check(raise_on_failure=False)
+                result: HealthCheckResult = _run_health_check()
                 assert result['overall_status'] == 'CRITICAL_FAILURE'
