@@ -257,7 +257,7 @@ class RetryService:
                     controller.id,
                     exc,
                 )
-                raise asyncio.CancelledError
+                raise asyncio.CancelledError from exc
             raise
 
         if not tasks:
