@@ -171,7 +171,7 @@ _BLOCK_MSG = (
     'Shell file creation/overwrites are disabled for project work. '
     'Use the editor tools instead: '
     '`str_replace_editor` (create_file, insert_text, edit_mode) or '
-    '`ast_code_editor` (create_file, replace_range, …). '
+    '`edit_code` (create_file, replace_range, …). '
     'Do not use Set-Content, Out-File, tee, or `>` / `>>` to write source or '
     'document files. Redirection to `.log` / `.tmp` or a temp path is still allowed. '
     'If you really need shell writes (e.g. scaffolding scripts), set the '

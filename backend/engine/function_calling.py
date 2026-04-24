@@ -911,7 +911,7 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
     repair_changes = repair_arguments_in_place(normalized_args, path)
     if repair_changes:
         logger.warning(
-            '[escape_repair] %s (ast_code_editor): corrected literal escapes in %s',
+            '[escape_repair] %s (edit_code): corrected literal escapes in %s',
             path,
             ', '.join(f'{name}(x{count})' for name, count in repair_changes),
         )
@@ -1001,7 +1001,7 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
         else:
             all_cmds = list(editor_command_handlers) + list(simple_command_handlers)
             raise FunctionCallValidationError(
-                f"Unknown command '{command}' for ast_code_editor tool. "
+                f"Unknown command '{command}' for edit_code tool. "
                 f'Valid commands: {all_cmds}'
             )
 

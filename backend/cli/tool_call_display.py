@@ -12,7 +12,7 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'execute_powershell': ('', 'Shell'),
     'str_replace_editor': ('', 'Files'),
     'edit_file': ('', 'Edit file'),
-    'ast_code_editor': ('', 'AST edit'),
+    'edit_code': ('', 'Code edit'),
     'agent_think': ('', 'Think'),
     'think': ('', 'Think'),
     'finish': ('', 'Finish'),
@@ -25,17 +25,13 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'read_symbol_definition': ('', 'Symbol'),
     'analyze_project_structure': ('', 'Analyze project'),
     'apply_patch': ('', 'Apply patch'),
-    'verify_file_lines': ('', 'Verify lines'),
     'browser': ('', 'Browser'),
     'delegate_task': ('', 'Delegate'),
-    'signal_progress': ('', 'Progress'),
     'shared_task_board': ('', 'Board'),
     'terminal_manager': ('', 'Terminal'),
     'communicate_with_user': ('', 'Message you'),
     'call_mcp_tool': ('', 'MCP'),
     'checkpoint': ('', 'Checkpoint'),
-    'revert_to_checkpoint': ('', 'Revert'),
-    'session_diff': ('', 'Session diff'),
 }
 
 
@@ -82,7 +78,7 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
             return 'Read'
     mapping = {
         'edit_file': 'Edited',
-        'ast_code_editor': 'Refactored',
+        'edit_code': 'Refactored',
         'agent_think': 'Thinking',
         'think': 'Thinking',
         'finish': 'Finished',
@@ -94,15 +90,12 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
         'explore_tree_structure': 'Explored',
         'read_symbol_definition': 'Analyzed',
         'analyze_project_structure': 'Explored',
-        'verify_file_lines': 'Verified',
         'browser': 'Browser',
         'delegate_task': 'Delegated',
-        'signal_progress': 'Noted',
         'shared_task_board': 'Checked',
         'communicate_with_user': 'Messaged',
         'call_mcp_tool': 'Invoked',
         'checkpoint': 'Saved',
-        'revert_to_checkpoint': 'Reverted',
         'session_diff': 'Compared',
     }
     if tn in mapping:
@@ -430,7 +423,7 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
             return ef_path
         return 'edit…'
 
-    if tn == 'ast_code_editor':
+    if tn == 'edit_code':
         ast_path = args.get('path')
         ast_cmd = args.get('command')
         if ast_cmd == 'edit_symbols':
@@ -442,9 +435,9 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
                 f'{n} symbols' if n else '',
             ]
             joined = ' · '.join(b for b in bits_sym if b)
-            return _trunc(joined, 120) if joined else 'AST batch…'
+            return _trunc(joined, 120) if joined else 'Code batch…'
         bits_ast = [str(x) for x in (ast_cmd, ast_path) if x]
-        return _trunc(' · '.join(bits_ast), 120) if bits_ast else 'AST edit…'
+        return _trunc(' · '.join(bits_ast), 120) if bits_ast else 'Code edit…'
 
     if tn == 'terminal_manager':
         return _summarize_terminal_manager_args(args)

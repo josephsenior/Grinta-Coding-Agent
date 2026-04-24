@@ -308,7 +308,7 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
         autonomy = (
             f"<AUTONOMY>\nFULL AUTONOMOUS MODE: Execute all planned steps end-to-end without "
             f"confirmation. On tool failure, pivot to an alternative tool in the same turn "
-            f"(e.g. ast_code_editor → str_replace_editor). Auto-retry recoverable errors. "
+            f"(e.g. edit_code → str_replace_editor). Auto-retry recoverable errors. "
             f"Report back only after completing the plan or exhausting tool alternatives on a "
             f"blocking sub-task. "
             f"{cp_line}\n</AUTONOMY>"
@@ -325,20 +325,13 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
         else "- `search_code` returns nothing → try alternate search terms, do not fall back to shell."
     )
     tracker_on = getattr(config, "enable_internal_task_tracker", False)
-    signal_on = getattr(config, "enable_signal_progress", False)
     if tracker_on:
-        signal_blurb = ""
-        if signal_on:
-            signal_blurb = (
-                "\n\n**signal_progress** is enabled: use it for deferral or heartbeat-style notes when appropriate. It does not replace accurate `task_tracker` state."
-            )
         task_tracker_discipline_block = (
             "<TASK_TRACKING>\n"
             "**task_tracker**: For multi-step tasks, use `view` to inspect the plan and `update` to replace the full `task_list`.\n"
             "Allowed statuses: `todo`, `doing`, `done`, `skipped`, `blocked`.\n"
             "**Syncing**: Update the tracker as statuses change; piggyback updates when possible.\n"
             "**Completion (CRITICAL)**: Do NOT call `finish` if any steps are still in `todo` or `doing`."
-            f"{signal_blurb}\n"
             "</TASK_TRACKING>"
         )
     else:
@@ -1062,7 +1055,6 @@ def _cli_measure_default() -> None:
         enable_checkpoints=False,
         enable_lsp_query=False,
         enable_internal_task_tracker=False,
-        enable_signal_progress=False,
         enable_permissions=False,
         enable_meta_cognition=False,
     )

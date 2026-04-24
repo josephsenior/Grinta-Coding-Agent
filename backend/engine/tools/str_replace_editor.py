@@ -20,7 +20,7 @@ _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editin
   - `range`: line-range replacement with optional `expected_hash` (slice) or `expected_file_hash` (whole file as read).
   - `patch`: unified diff hunk apply with strict context — for strict apply or review, not the default editing style.
 
-Default mental model: **`edit_mode`** / **`ast_code_editor`** for structured code edits; **minimal valid `file_text` on create**, then **`insert_text`** or line/range tools. Multi-file work: sequential **`ast_code_editor`** calls or checkpoints — there is no atomic batch string API.
+Default mental model: **`edit_mode`** / **`edit_code`** for structured code edits; **minimal valid `file_text` on create**, then **`insert_text`** or line/range tools. Multi-file work: sequential **`edit_code`** calls or checkpoints — there is no atomic batch string API.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
 

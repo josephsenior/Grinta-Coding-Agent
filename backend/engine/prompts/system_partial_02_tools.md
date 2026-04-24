@@ -5,20 +5,22 @@ Editor `path` values may be project-relative or absolute. Editors create parent 
 
 **Edit shapes:**
 
-- **Surgical edits:** `insert_text`, `edit_mode`, or structure-aware `ast_code_editor` ops.
+- **Surgical edits:** `insert_text`, `edit_mode`, or structure-aware `edit_code` ops.
 - **New files:** create a minimal parsing-valid stub, then grow it.
 - **Full-file create/replace:** use `create_file`.
 - **`patch` mode:** use for strict-context apply or diff review, not as the default edit path.
 
 **Editors:**
 
-- **ast_code_editor**: symbol/range edits, renames, file views, `create_file`, `insert_text`.
+- **edit_code**: symbol/range edits, renames, file views, `create_file`, `insert_text`.
 - **str_replace_editor**: prose/config/line edits. Prefer:
   - `format` for structured formats
   - `section` for anchor-bounded edits
   - `range` for line-bounded edits
   - `patch` for strict unified diff apply
   Use `preview: true` when confidence is low.
+
+**Editor choice:** Use `edit_code` for code files when targeting a named symbol, function, class, or line range. Use `str_replace_editor` for prose, config files (YAML/TOML/JSON/Markdown), or when you have exact literal text to locate and replace.
 
 </EDITOR_AND_FILE_OPERATIONS>
 
