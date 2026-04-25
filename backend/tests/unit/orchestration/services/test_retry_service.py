@@ -344,6 +344,9 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         mock_task.metadata = {'retry_reason': 'APIConnectionError'}
 
         self.mock_controller.state.agent_state = AgentState.ERROR
+        # No budget/iteration limits configured in this scenario
+        self.mock_controller.state.budget_flag = None
+        self.mock_controller.state.iteration_flag = None
 
         await self.service._resume_agent_after_retry(mock_task)
 
@@ -380,6 +383,9 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         mock_task.metadata = {'retry_reason': 'Timeout'}
 
         self.mock_controller.state.agent_state = AgentState.RUNNING
+        # No budget/iteration limits configured in this scenario
+        self.mock_controller.state.budget_flag = None
+        self.mock_controller.state.iteration_flag = None
 
         await self.service._resume_agent_after_retry(mock_task)
 

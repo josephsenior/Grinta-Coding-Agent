@@ -446,6 +446,31 @@ class RetryService:
         if not retry_reason:
             retry_reason = str(getattr(task, "reason", "") or "transient failure")
         attempt = max(1, int(getattr(task, "attempts", 0) or 0))
+
+        # Guard: if budget or iteration limit is already exceeded, resuming the
+        # agent would immediately raise the same RuntimeError in _run_control_flags
+        # and loop forever.  Abort the retry and return control to the user.
+        state = getattr(controller, "state", None)
+        if state is not None:
+            budget_flag = getattr(state, "budget_flag", None)
+            iteration_flag = getattr(state, "iteration_flag", None)
+            limit_exceeded = (
+                budget_flag is not None and budget_flag.reached_limit()
+            ) or (
+                iteration_flag is not None and iteration_flag.reached_limit()
+            )
+            if limit_exceeded:
+                logger.warning(
+                    "Budget/iteration limit already reached on controller %s; "
+                    "aborting retry task %s and returning to AWAITING_USER_INPUT.",
+                    controller.id,
+                    task.id,
+                )
+                self._retry_pending = False
+                self._retry_count = 0
+                await self._transition_to_awaiting_user()
+                return
+
         message = (
             f"Autonomous recovery attempt {attempt}/{task.max_attempts} "
             f"starting after {retry_reason}."

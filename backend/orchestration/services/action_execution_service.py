@@ -560,9 +560,13 @@ class ActionExecutionService:
             content=self._format_verification_required_content(requirement),
             error_id='VERIFICATION_REQUIRED',
         )
+        # The blocked action has not been added to the event stream yet (id=-1),
+        # so pass None to leave cause unset rather than triggering a warning.
+        from backend.ledger.event import Event as _Event
+        _cause = action if getattr(action, 'id', _Event.INVALID_ID) != _Event.INVALID_ID else None
         attach_observation_cause(
             observation,
-            action,
+            _cause,
             context='ActionExecutionService.verification_gate',
         )
         self._context.event_stream.add_event(observation, EventSource.ENVIRONMENT)

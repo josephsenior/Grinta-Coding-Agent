@@ -34,7 +34,7 @@ def _mcp_call_total_budget_sec() -> float:
 
     Override with ``APP_MCP_CALL_TOTAL_BUDGET_SEC``.
     """
-    raw = os.getenv('APP_MCP_CALL_TOTAL_BUDGET_SEC', '180')
+    raw = os.getenv("APP_MCP_CALL_TOTAL_BUDGET_SEC", "180")
     try:
         v = float(raw)
         return v if v > 0 else 180.0
@@ -47,7 +47,7 @@ def _mcp_reconnect_session_timeout_sec() -> float:
 
     Override with ``APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC``.
     """
-    raw = os.getenv('APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC', '90')
+    raw = os.getenv("APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC", "90")
     try:
         v = float(raw)
         return v if v > 0 else 90.0
@@ -66,7 +66,7 @@ class MCPClient(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
     client: Client | None = None
-    description: str = 'MCP client tools for server interaction'
+    description: str = "MCP client tools for server interaction"
     tools: list[MCPClientTool] = Field(default_factory=list)
     tool_map: dict[str, MCPClientTool] = Field(default_factory=dict)
     exposed_to_protocol: dict[str, str] = Field(default_factory=dict)
@@ -101,7 +101,7 @@ class MCPClient(BaseModel):
     async def _open_session(self) -> None:
         """Open the persistent session on the current ``self.client``."""
         if self.client is None:
-            raise RuntimeError('Client not configured.')
+            raise RuntimeError("Client not configured.")
         # Intentional: session lifecycle is open/close across multiple calls, not a single async with
         await self.client.__aenter__()  # pylint: disable=unnecessary-dunder-call
         self._session_active = True
@@ -118,24 +118,24 @@ class MCPClient(BaseModel):
                 raise
             except BaseExceptionGroup as eg:
                 # stdio MCP often ends with ExceptionGroup(BrokenResourceError); not an app bug.
-                logger.debug('MCP session __aexit__ teardown: %s', eg)
+                logger.debug("MCP session __aexit__ teardown: %s", eg)
             except Exception as exc:
-                logger.warning('MCP session close failed: %s', exc, exc_info=True)
+                logger.warning("MCP session close failed: %s", exc, exc_info=True)
             try:
                 await cli.close()
             except asyncio.CancelledError:
                 raise
             except BaseExceptionGroup as eg:
-                logger.debug('MCP client.close() teardown: %s', eg)
+                logger.debug("MCP client.close() teardown: %s", eg)
             except Exception as exc:
-                logger.debug('MCP client.close(): %s', exc, exc_info=True)
+                logger.debug("MCP client.close(): %s", exc, exc_info=True)
         finally:
             self._session_active = False
 
     async def _populate_tools(self) -> None:
         """Fetch available tools from the connected server."""
         if not self.client:
-            raise RuntimeError('Session not initialized.')
+            raise RuntimeError("Session not initialized.")
         tools = await self.client.list_tools()
         self.tools = []
         self.tool_map = {}
@@ -148,7 +148,7 @@ class MCPClient(BaseModel):
             self.tool_map[tool.name] = server_tool
             self.tools.append(server_tool)
         logger.info(
-            'Connected to MCP server with %d tools: %s',
+            "Connected to MCP server with %d tools: %s",
             len(tools),
             [t.name for t in tools],
         )
@@ -163,7 +163,7 @@ class MCPClient(BaseModel):
         """
         cfg = self._server_config
         if cfg is None or cfg.command is None:
-            raise RuntimeError('No stdio server config available for reconnect.')
+            raise RuntimeError("No stdio server config available for reconnect.")
         cwd_path = get_effective_workspace_root()
         cwd: str | None
         if cwd_path is not None:
@@ -188,7 +188,7 @@ class MCPClient(BaseModel):
         # tool-enumeration (keep_alive=False).  Re-entering __aenter__ on the
         # dead transport will always raise BrokenResourceError.  Rebuild the
         # transport (i.e. re-launch the subprocess) first.
-        if self._server_config is not None and self._server_config.type == 'stdio':
+        if self._server_config is not None and self._server_config.type == "stdio":
             await self._rebuild_stdio_client()
         await self._open_session()
         await self._populate_tools()
@@ -201,7 +201,7 @@ class MCPClient(BaseModel):
         for attempt in range(1, _MAX_RECONNECT_ATTEMPTS + 1):
             delay = _BASE_BACKOFF_S * (2 ** (attempt - 1))
             logger.warning(
-                'MCP reconnect attempt %d/%d in %.1fs ...',
+                "MCP reconnect attempt %d/%d in %.1fs ...",
                 attempt,
                 _MAX_RECONNECT_ATTEMPTS,
                 delay,
@@ -212,18 +212,18 @@ class MCPClient(BaseModel):
                     self._resync_session_after_disconnect(),
                     timeout=session_timeout,
                 )
-                logger.info('MCP reconnected on attempt %d', attempt)
+                logger.info("MCP reconnected on attempt %d", attempt)
                 return
             except asyncio.TimeoutError:
                 logger.warning(
-                    'MCP reconnect attempt %d: session sync timed out after %.1fs',
+                    "MCP reconnect attempt %d: session sync timed out after %.1fs",
                     attempt,
                     session_timeout,
                 )
             except Exception as exc:
-                logger.warning('MCP reconnect attempt %d failed: %s', attempt, exc)
+                logger.warning("MCP reconnect attempt %d failed: %s", attempt, exc)
         raise RuntimeError(
-            f'MCP server unreachable after {_MAX_RECONNECT_ATTEMPTS} reconnect attempts.'
+            f"MCP server unreachable after {_MAX_RECONNECT_ATTEMPTS} reconnect attempts."
         )
 
     # ------------------------------------------------------------------
@@ -251,7 +251,7 @@ class MCPClient(BaseModel):
         """
         server_url = server.url
         if not server_url:
-            msg = 'Server URL is required.'
+            msg = "Server URL is required."
             raise ValueError(msg)
 
         try:
@@ -276,19 +276,19 @@ class MCPClient(BaseModel):
         if api_key:
             headers.update(
                 {
-                    'Authorization': f'Bearer {api_key}',
-                    's': api_key,
+                    "Authorization": f"Bearer {api_key}",
+                    "s": api_key,
                 },
             )
         if conversation_id:
-            headers['X-App-ServerConversation-ID'] = conversation_id
+            headers["X-App-ServerConversation-ID"] = conversation_id
         return headers
 
     def _create_http_transport(
         self, server: MCPServerConfig, server_url: str, headers: dict
     ):
         """Create appropriate HTTP transport."""
-        if server.transport == 'shttp':
+        if server.transport == "shttp":
             return StreamableHttpTransport(url=server_url, headers=headers or None)
         return SSETransport(url=server_url, headers=headers or None)
 
@@ -300,8 +300,8 @@ class MCPClient(BaseModel):
         is_mcp_error: bool = False,
     ) -> None:
         """Handle and record connection errors."""
-        error_prefix = 'McpError' if is_mcp_error else 'Error'
-        error_msg = f'{error_prefix} connecting to {server_url}: {error}'
+        error_prefix = "McpError" if is_mcp_error else "Error"
+        error_msg = f"{error_prefix} connecting to {server_url}: {error}"
         logger.error(error_msg)
 
         mcp_error_collector.add_error(
@@ -342,13 +342,13 @@ class MCPClient(BaseModel):
             await self._populate_tools()
         except Exception as e:
             server_name = getattr(
-                server, 'name', f'{server.command} {" ".join(server.args or [])}'
+                server, "name", f'{server.command} {" ".join(server.args or [])}'
             )
-            error_msg = f'Failed to connect to stdio server {server_name}: {e}'
+            error_msg = f"Failed to connect to stdio server {server_name}: {e}"
             logger.error(error_msg)
             mcp_error_collector.add_error(
                 server_name=server_name,
-                server_type='stdio',
+                server_type="stdio",
                 error_message=error_msg,
                 exception_details=str(e),
             )
@@ -370,10 +370,10 @@ class MCPClient(BaseModel):
         ``APP_MCP_CALL_TOTAL_BUDGET_SEC`` so a dead server cannot stall the agent.
         """
         if tool_name not in self.tool_map:
-            msg = f'Tool {tool_name} not found.'
+            msg = f"Tool {tool_name} not found."
             raise ValueError(msg)
         if not self.client:
-            msg = 'Client session is not available.'
+            msg = "Client session is not available."
             raise RuntimeError(msg)
 
         wire_name = self.exposed_to_protocol.get(tool_name, tool_name)
@@ -390,7 +390,7 @@ class MCPClient(BaseModel):
                 return await _call_once()
             except asyncio.TimeoutError:
                 logger.warning(
-                    'MCP call_tool(%s) timed out after %.1fs — reconnect + single retry',
+                    "MCP call_tool(%s) timed out after %.1fs — reconnect + single retry",
                     tool_name,
                     self.CALL_TIMEOUT,
                 )
@@ -398,7 +398,7 @@ class MCPClient(BaseModel):
                 # Transport-level drops only; do not retry arbitrary exceptions (risk of
                 # duplicate side effects on mutating tools if the server already applied the call).
                 logger.warning(
-                    'MCP call_tool(%s) transport error (%s): %s — reconnect + single retry',
+                    "MCP call_tool(%s) transport error (%s): %s — reconnect + single retry",
                     tool_name,
                     type(exc).__name__,
                     exc,
@@ -407,10 +407,10 @@ class MCPClient(BaseModel):
                 # On Windows with ProactorEventLoop, a broken stdio subprocess pipe raises
                 # RuntimeError("Event loop is closed") — misleading name, it's the IOCP
                 # transport handle becoming invalid. Treat it like a transport drop.
-                if 'closed' not in str(exc).lower():
+                if "closed" not in str(exc).lower():
                     raise
                 logger.warning(
-                    'MCP call_tool(%s) RuntimeError (Windows transport): %s — reconnect + single retry',
+                    "MCP call_tool(%s) RuntimeError (Windows transport): %s — reconnect + single retry",
                     tool_name,
                     exc,
                 )
@@ -423,8 +423,8 @@ class MCPClient(BaseModel):
             return await asyncio.wait_for(_invoke_with_retry(), timeout=budget)
         except asyncio.TimeoutError:
             logger.error(
-                'MCP call_tool(%s) exceeded total budget %.1fs '
-                '(per-attempt timeout %.1fs; includes reconnect/retry)',
+                "MCP call_tool(%s) exceeded total budget %.1fs "
+                "(per-attempt timeout %.1fs; includes reconnect/retry)",
                 tool_name,
                 budget,
                 self.CALL_TIMEOUT,
@@ -445,4 +445,4 @@ class MCPClient(BaseModel):
         self.exposed_to_protocol = {}
         self._mcp_alias_peers = None
         self._mcp_alias_reserved = None
-        logger.info('MCP client disconnected.')
+        logger.info("MCP client disconnected.")

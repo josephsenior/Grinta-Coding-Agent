@@ -51,7 +51,7 @@ from backend.ledger.observation.observation import Observation
 from backend.ledger.observation.reject import UserRejectObservation
 from backend.utils.prompt import PromptManager
 
-_MAX_SYSTEM_CONTEXT_SUMMARY_CHARS = 1200
+_MAX_SYSTEM_CONTEXT_SUMMARY_CHARS = 2000
 
 
 def _tool_ok_for_observation(obs: Observation) -> bool | None:

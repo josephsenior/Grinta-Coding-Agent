@@ -52,6 +52,19 @@ _RATE_LIMITED_EXCEPTIONS = (
 _QUEUED_RETRY_EXCEPTIONS = _RATE_LIMITED_EXCEPTIONS + (Timeout,)
 
 
+def _is_limit_exceeded_error(exc: Exception) -> bool:
+    """Return True if this RuntimeError signals an agent budget or iteration hard limit.
+
+    These are terminal conditions the agent cannot self-recover from; they
+    must be treated as hard stops that return control to the user rather than
+    re-triggering the step loop.
+    """
+    if not isinstance(exc, RuntimeError):
+        return False
+    msg = str(exc).lower()
+    return 'maximum budget' in msg or 'maximum iteration' in msg
+
+
 def _recovery_may_set_state(controller, new_state: AgentState) -> bool:
     """True only when the formal state graph allows ``current → new_state``.
 
@@ -124,6 +137,10 @@ class RecoveryService:
         # Hard-stop errors (auth failure, context window, model not found):
         #   → AWAITING_USER_INPUT — user must fix config/credentials first.
         #
+        # Budget / iteration hard limits:
+        #   → AWAITING_USER_INPUT — agent cannot self-recover; re-stepping
+        #     would immediately raise the same error again in an infinite loop.
+        #
         # Rate-limited errors (429, 503) and provider/network timeouts:
         #   → AWAITING_USER_INPUT + retry queue — the queue handles the
         #     back-off delay and transitions back to RUNNING automatically.
@@ -136,6 +153,18 @@ class RecoveryService:
         #     against infinite failure loops.
         # ------------------------------------------------------------------ #
         if isinstance(exc, _HARD_STOP_EXCEPTIONS):
+            if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
+                await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
+            return
+
+        # Budget or iteration limit exceeded: the agent cannot recover on its
+        # own.  Re-stepping immediately re-raises the same RuntimeError, which
+        # without this guard would create an infinite loop.
+        if _is_limit_exceeded_error(exc):
+            logger.warning(
+                'Agent limit exceeded (%s): stopping agent loop and returning to user',
+                exc,
+            )
             if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
                 await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
             return
