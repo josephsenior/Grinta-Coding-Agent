@@ -66,6 +66,7 @@ from backend.cli.theme import (
     CLR_META,
     CLR_MUTED_TEXT,
     CLR_SEP,
+    CLR_STATE_RUNNING,
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
@@ -1937,7 +1938,7 @@ class CLIEventRenderer:
         else:
             subline = f'{state_l} · ctrl+c if you need to interrupt'
             spin_style = f'dim {CLR_META}'
-            text_style = 'italic #64748b'
+            text_style = f'italic {CLR_META}'
         input_row.add_row(
             Spinner('dots', style=spin_style),
             Text(subline, style=text_style),
@@ -1992,7 +1993,7 @@ class CLIEventRenderer:
         row1.append('GRINTA', style=CLR_BRAND)
         row1.append('  ', style='')
         _BADGE_STYLES = {
-            'Running': CLR_STATUS_OK + ' bold',
+            'Running': CLR_STATE_RUNNING,
             'Ready': CLR_STATUS_OK + ' bold',
             'Done': CLR_STATUS_OK + ' bold',
             'Finished': CLR_STATUS_OK + ' bold',
