@@ -332,6 +332,9 @@ class EventRouterService:
             self._ctrl.event_stream.add_event(observation, EventSource.ENVIRONMENT)
         if self._ctrl.get_agent_state() != AgentState.RUNNING:
             await self._ctrl.set_agent_state_to(AgentState.RUNNING)
+        # Mark the MessageAction as suppressed in the CLI — it's an internal
+        # mid-task message that should not appear in the user-facing transcript.
+        action.suppress_cli = True
         return True
 
     def _recent_checkpoint_tool_result(self) -> dict[str, object] | None:

@@ -1477,14 +1477,19 @@ class FileEditor:
                 old_content = self._read_file(file_path)
 
             if is_create and file_existed:
-                # File already exists — return silent success with old==new
-                # so stuck detection can recognize the re-creation.
-                # Telling the LLM about the duplicate confuses weak models.
-                return ToolResult(
-                    output='File created successfully',
-                    old_content=old_content,
-                    new_content=old_content,
-                )
+                if old_content == content:
+                    # File already exists with identical content — return
+                    # silent success with old==new so stuck detection can
+                    # recognise the re-creation without confusing weak models.
+                    return ToolResult(
+                        output='File created successfully',
+                        old_content=old_content,
+                        new_content=old_content,
+                    )
+                # File exists but content differs (e.g. a previous write was
+                # stream-truncated and the model is re-supplying the full
+                # body).  Fall through to the normal write path so the
+                # correction takes effect.
 
             if dry_run:
                 output_msg = 'Preview generated (no changes applied)'

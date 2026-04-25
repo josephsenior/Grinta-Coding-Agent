@@ -7,7 +7,16 @@ from typing import TYPE_CHECKING, Any
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
-from backend.ledger.action import FileEditAction, FileWriteAction
+from backend.ledger.action import (
+    CmdRunAction,
+    FileEditAction,
+    FileReadAction,
+    FileWriteAction,
+    LspQueryAction,
+    RecallAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation
 from backend.ledger.observation.files import FileEditObservation, FileWriteObservation
 from backend.ledger.observation_cause import attach_observation_cause
@@ -451,6 +460,7 @@ class StepGuardService:
             return None
 
         failing_feedback: list[str] = []
+        last_failure_index = -1
         ignored_error_ids = {
             'CIRCUIT_BREAKER_TRIPPED',
             'CIRCUIT_BREAKER_WARNING',
@@ -459,7 +469,8 @@ class StepGuardService:
             'VERIFICATION_REQUIRED',
         }
 
-        for event in recent_history[last_mutation_index + 1 :]:
+        for rel_idx, event in enumerate(recent_history[last_mutation_index + 1 :]):
+            abs_idx = last_mutation_index + 1 + rel_idx
             if isinstance(event, ErrorObservation):
                 error_id = str(getattr(event, 'error_id', '') or '').strip().upper()
                 if error_id in ignored_error_ids:
@@ -467,6 +478,7 @@ class StepGuardService:
                 first_line = (getattr(event, 'content', '') or '').splitlines()[0].strip()
                 if first_line:
                     failing_feedback.append(first_line)
+                    last_failure_index = abs_idx
                 continue
             if isinstance(event, CmdOutputObservation):
                 exit_code = getattr(event, 'exit_code', None)
@@ -477,9 +489,27 @@ class StepGuardService:
                     command = str(getattr(event, 'command', '') or '').strip()
                     first_line = f'{command or "Command"} failed with exit code {exit_code}'
                 failing_feedback.append(first_line)
+                last_failure_index = abs_idx
 
         if not mutated_paths or not failing_feedback:
             return None
+
+        # If the agent already responded to the failure with a grounding action
+        # (file read, command run, view_file) that appears AFTER the last failure
+        # in history, the evidence has been investigated — don't re-block the
+        # same stale failure indefinitely.
+        if last_failure_index >= 0:
+            for event in recent_history[last_failure_index + 1 :]:
+                if isinstance(
+                    event,
+                    (FileReadAction, CmdRunAction, LspQueryAction, RecallAction,
+                     TerminalReadAction, TerminalRunAction),
+                ):
+                    return None
+                if isinstance(event, FileEditAction):
+                    command = str(getattr(event, 'command', '') or '').strip().lower()
+                    if command == 'view_file':
+                        return None
 
         latest_failure = failing_feedback[-1]
         if len(latest_failure) > 180:

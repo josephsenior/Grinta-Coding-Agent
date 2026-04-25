@@ -2178,6 +2178,15 @@ class CLIEventRenderer:
 
         if isinstance(action, MessageAction):
             self._flush_pending_tool_cards()
+            # Suppress mid-task internal messages that were intercepted by the
+            # event router (e.g. verbose model text between checkpoint and next
+            # tool call). Still clear the streaming preview and stop reasoning
+            # so Live panel doesn't linger.
+            if getattr(action, "suppress_cli", False):
+                self._stop_reasoning()
+                self._clear_streaming_preview()
+                self.refresh()
+                return
             cot = (getattr(action, "thought", None) or "").strip()
             if cot and _show_reasoning_text():
                 cleaned_cot = _sanitize_visible_transcript_text(cot)

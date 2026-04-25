@@ -990,6 +990,7 @@ class OrchestratorExecutor:
         from backend.core.errors import (
             FunctionCallValidationError as CoreFunctionCallValidationError,
         )
+        from backend.core.tool_arguments_json import TruncatedToolArgumentsError
         from backend.engine.common import (
             FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
         )
@@ -1006,13 +1007,29 @@ class OrchestratorExecutor:
                 LLMMalformedActionError,
                 CommonFunctionCallValidationError,
                 CommonFunctionCallNotExistsError,
+                TruncatedToolArgumentsError,
             ),
         )
 
     @staticmethod
     def _build_recoverable_tool_call_error_action(exc: Exception) -> Action:
         """Create a recovery action that feeds precise correction guidance back to the LLM."""
+        from backend.core.tool_arguments_json import TruncatedToolArgumentsError
         from backend.ledger.action import AgentThinkAction
+
+        if isinstance(exc, TruncatedToolArgumentsError):
+            return AgentThinkAction(
+                thought=(
+                    '[TOOL_CALL_TRUNCATED] The previous tool call arguments were '
+                    'stream-truncated — the JSON object was never closed, meaning '
+                    'the model stopped generating before finishing the payload. '
+                    'This commonly happens with very large file bodies. '
+                    'Please re-issue the same tool call with the complete, valid '
+                    'JSON arguments. If the file body is very large, consider '
+                    'splitting it: create a minimal stub first, then extend with '
+                    'insert_text or edit_mode calls.'
+                )
+            )
 
         detail = str(exc).strip() or exc.__class__.__name__
         if len(detail) > 1200:
