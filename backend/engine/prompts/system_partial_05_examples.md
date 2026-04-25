@@ -1,4 +1,4 @@
-<WORKED*EXAMPLES>
+<WORKED>
 The following short walkthroughs show \_how* to reach for the right tool. They are illustrative, not prescriptive — adapt them to the actual task.
 
 ## Example 1 — Bug fix in an unfamiliar repo
@@ -37,4 +37,4 @@ The following short walkthroughs show \_how* to reach for the right tool. They a
 1. Read the actual error text. Do not retry the same call with the same args.
 2. Pivot to an adjacent tool ({adjacent_tool_fallback}).
 3. {failure_escalation_step}
-   </WORKED*EXAMPLES>
+   </WORKED\*EXAMPLES>

@@ -14,6 +14,7 @@
 
 > Local-first autonomous coding agent. Plan → execute → validate → finish.
 
+<!-- trunk-ignore(markdownlint/MD033) -->
 <p align="center">
   <img alt="Grinta in action" src="docs/grinta-demo.gif" width="720">
 </p>
@@ -39,16 +40,16 @@ That is the whole setup. The `grinta init` wizard auto-detects local Ollama and 
 
 ## Common slash commands
 
-| Command       | What it does                                              |
-| ------------- | --------------------------------------------------------- |
-| `/help`       | Full slash-command reference                              |
-| `/cost`       | Tokens, calls, USD spent this session                     |
+| Command       | What it does                                               |
+| ------------- | ---------------------------------------------------------- |
+| `/help`       | Full slash-command reference                               |
+| `/cost`       | Tokens, calls, USD spent this session                      |
 | `/diff`       | Workspace git changes (`--stat`, `--name-only`, `--patch`) |
 | `/sessions`   | Recent sessions, with optional limit (`/sessions list 10`) |
-| `/think`      | Toggle the optional reasoning scratchpad                  |
-| `/checkpoint` | Snapshot the workspace (revertable)                       |
-| `/status`     | Full HUD snapshot                                         |
-| `/compact`    | Force context compaction now                              |
+| `/think`      | Toggle the optional reasoning scratchpad                   |
+| `/checkpoint` | Snapshot the workspace (revertable)                        |
+| `/status`     | Full HUD snapshot                                          |
+| `/compact`    | Force context compaction now                               |
 
 ## Security boundary
 

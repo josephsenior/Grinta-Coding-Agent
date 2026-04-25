@@ -2422,7 +2422,6 @@ class CLIEventRenderer:
         # -- Task tracking ----------------------------------------------------
         if isinstance(action, TaskTrackingAction):
             self._clear_streaming_preview()
-            self._flush_pending_tool_cards()
             command = str(getattr(action, 'command', '') or '').strip().lower()
             task_list = getattr(action, 'task_list', None)
             if command == 'update' and isinstance(task_list, list):
@@ -2918,8 +2917,8 @@ class CLIEventRenderer:
             return
 
         if isinstance(obs, StatusObservation):
-            self._flush_pending_tool_cards()
-            if getattr(obs, 'status_type', '') == 'delegate_progress':
+            status_type = str(getattr(obs, 'status_type', '') or '')
+            if status_type == 'delegate_progress':
                 extras = getattr(obs, 'extras', None) or {}
                 batch_id = extras.get('batch_id')
                 if (
@@ -2952,7 +2951,10 @@ class CLIEventRenderer:
                     or 'retrying without streaming' in lower_c
                 ):
                     self._append_history(_build_llm_stream_fallback_panel())
+                elif self._pending_activity_card is not None:
+                    return
                 else:
+                    self._flush_pending_tool_cards()
                     self._append_history(
                         format_activity_result_secondary(
                             f'status · {content}', kind='neutral'
@@ -3013,8 +3015,6 @@ class CLIEventRenderer:
 
         # -- Terminal output --------------------------------------------------
         if isinstance(obs, TerminalObservation):
-            self._stop_reasoning()
-            self._flush_pending_tool_cards()
             raw = getattr(obs, 'content', '') or ''
             display = strip_tool_result_validation_annotations(raw)
             content = display.strip()
@@ -3025,6 +3025,8 @@ class CLIEventRenderer:
             if has_new is False and not content:
                 self._last_terminal_input_sent = ''
                 return
+            self._stop_reasoning()
+            self._flush_pending_tool_cards()
             # Strip PTY character-echo lines produced when the agent injects input.
             if content and self._last_terminal_input_sent:
                 content = _strip_pty_echo(content, self._last_terminal_input_sent)
@@ -3181,8 +3183,6 @@ class CLIEventRenderer:
 
         # -- Task tracking result ---------------------------------------------
         if isinstance(obs, TaskTrackingObservation):
-            self._stop_reasoning()
-            self._flush_pending_tool_cards()
             task_list = getattr(obs, 'task_list', None)
             cmd = getattr(obs, 'command', '')
             if task_list is not None and cmd == 'update':

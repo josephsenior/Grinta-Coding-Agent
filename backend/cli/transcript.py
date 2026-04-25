@@ -65,23 +65,23 @@ def format_activity_primary(verb: str, detail: str) -> Text:
 
 
 def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
-    """Dim continuation row (exit status, stats, previews)."""
+    """Continuation row for inline stats and previews inside activity cards."""
     line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
     styles = {
-        'ok': 'dim green',
-        'err': 'dim red',
-        'neutral': 'dim',
+        'ok': '#86efac',
+        'err': '#fca5a5',
+        'neutral': '#93c5fd',
     }
     line.append(message, style=styles.get(kind, styles['neutral']))
     return line
 
 
 def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> Text:
-    """Continuation row for user-visible results — consistent with shell result style."""
+    """Continuation row for user-visible results within an activity card."""
     styles: dict[str, tuple[str, str, str]] = {
-        'ok': ('✓', 'dim', 'dim'),
-        'err': ('✗', 'dim red', 'dim red'),
-        'neutral': ('•', 'dim', 'dim'),
+        'ok': ('✓', 'bold #10b981', '#86efac'),
+        'err': ('✗', 'bold #ef4444', '#fca5a5'),
+        'neutral': ('•', 'bold #38bdf8', '#93c5fd'),
     }
     icon, icon_style, text_style = styles.get(kind, styles['neutral'])
     line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
