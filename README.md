@@ -43,7 +43,8 @@ That is the whole setup. The `grinta init` wizard auto-detects local Ollama and 
 | ------------- | --------------------------------------------------------- |
 | `/help`       | Full slash-command reference                              |
 | `/cost`       | Tokens, calls, USD spent this session                     |
-| `/diff`       | `git diff --stat` of the workspace                        |
+| `/diff`       | Workspace git changes (`--stat`, `--name-only`, `--patch`) |
+| `/sessions`   | Recent sessions, with optional limit (`/sessions list 10`) |
 | `/think`      | Toggle the optional reasoning scratchpad                  |
 | `/checkpoint` | Snapshot the workspace (revertable)                       |
 | `/status`     | Full HUD snapshot                                         |

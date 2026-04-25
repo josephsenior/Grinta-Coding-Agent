@@ -8,12 +8,18 @@ truth for what counts as "a session".
 from __future__ import annotations
 
 import shutil
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from rich.console import Console
 from rich.table import Table
+
+
+@dataclass(frozen=True)
+class _SessionResolveFailure:
+    message: str
 
 
 def _root() -> Path | None:
@@ -37,6 +43,9 @@ def _entries() -> list[tuple[str, dict[str, Any], int, Path]]:
 
 
 def cmd_list(console: Console, limit: int = 50) -> int:
+    if limit < 1:
+        console.print('[red]--limit must be 1 or greater.[/red]')
+        return 2
     rows = _entries()[:limit]
     if not rows:
         console.print('[dim]No sessions found.[/dim]')
@@ -60,26 +69,48 @@ def cmd_list(console: Console, limit: int = 50) -> int:
     return 0
 
 
-def _resolve(target: str) -> tuple[str, dict[str, Any], int, Path] | None:
+def _resolve(
+    target: str,
+) -> tuple[str, dict[str, Any], int, Path] | _SessionResolveFailure | None:
     rows = _entries()
     if not rows:
         return None
-    if target.isdigit():
-        i = int(target)
-        if 1 <= i <= len(rows):
-            return rows[i - 1]
+    cleaned = (target or '').strip()
+    if cleaned.isdigit():
+        index = int(cleaned)
+        if 1 <= index <= len(rows):
+            return rows[index - 1]
         return None
-    for row in rows:
-        if row[0].startswith(target):
-            return row
+
+    exact = [row for row in rows if row[0] == cleaned]
+    if exact:
+        return exact[0]
+
+    matches = [row for row in rows if row[0].startswith(cleaned)]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        preview = ', '.join(row[0][:12] for row in matches[:4])
+        if len(matches) > 4:
+            preview += ', ...'
+        return _SessionResolveFailure(
+            f"Session prefix '{cleaned}' is ambiguous ({len(matches)} matches: {preview}). Use a longer id."
+        )
     return None
+
+
+def _report_resolve_failure(console: Console, target: str) -> int:
+    console.print(f'[red]No session matches:[/red] {target}')
+    return 2
 
 
 def cmd_show(console: Console, target: str) -> int:
     row = _resolve(target)
-    if row is None:
-        console.print(f'[red]No session matches:[/red] {target}')
+    if isinstance(row, _SessionResolveFailure):
+        console.print(f'[red]{row.message}[/red]')
         return 2
+    if row is None:
+        return _report_resolve_failure(console, target)
     sid, meta, count, path = row
     console.print(f'[bold]Session[/bold] {sid}')
     console.print(f'  path:   {path}')
@@ -93,9 +124,11 @@ def cmd_show(console: Console, target: str) -> int:
 
 def cmd_export(console: Console, target: str, out_path: str) -> int:
     row = _resolve(target)
-    if row is None:
-        console.print(f'[red]No session matches:[/red] {target}')
+    if isinstance(row, _SessionResolveFailure):
+        console.print(f'[red]{row.message}[/red]')
         return 2
+    if row is None:
+        return _report_resolve_failure(console, target)
     sid, _meta, _count, path = row
     out = Path(out_path).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -111,9 +144,11 @@ def cmd_export(console: Console, target: str, out_path: str) -> int:
 
 def cmd_delete(console: Console, target: str, *, yes: bool = False) -> int:
     row = _resolve(target)
-    if row is None:
-        console.print(f'[red]No session matches:[/red] {target}')
+    if isinstance(row, _SessionResolveFailure):
+        console.print(f'[red]{row.message}[/red]')
         return 2
+    if row is None:
+        return _report_resolve_failure(console, target)
     sid, _meta, _count, path = row
     if not yes:
         from rich.prompt import Confirm
@@ -128,6 +163,9 @@ def cmd_delete(console: Console, target: str, *, yes: bool = False) -> int:
 
 def cmd_prune(console: Console, *, days: int = 30, yes: bool = False) -> int:
     """Delete sessions older than ``days``."""
+    if days < 0:
+        console.print('[red]--days must be 0 or greater.[/red]')
+        return 2
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     rows = _entries()
     to_delete: list[tuple[str, Path]] = []

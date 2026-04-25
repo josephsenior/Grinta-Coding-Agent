@@ -4,6 +4,7 @@ import asyncio
 import io
 import json
 import os
+import subprocess
 import sys
 from contextlib import suppress
 from pathlib import Path
@@ -27,6 +28,7 @@ from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.repl import (
     Repl,
     _build_command_completer,
+    _parse_slash_command,
     _prompt_toolkit_available,
     _supports_prompt_session,
 )
@@ -526,6 +528,27 @@ def test_command_completer_suggests_resume_targets() -> None:
     assert [completion.text for completion in completions] == ['session-123']
 
 
+def test_slash_command_parser_preserves_quoted_args_and_windows_paths() -> None:
+    parsed = _parse_slash_command(r'/checkpoint "pre refactor" C:\Users\me\repo')
+
+    assert parsed.name == '/checkpoint'
+    assert parsed.args == ('pre refactor', r'C:\Users\me\repo')
+
+
+def test_command_completer_suggests_diff_modes() -> None:
+    from prompt_toolkit.document import Document
+
+    completer = _build_command_completer()
+    completions = list(
+        completer.get_completions(
+            Document('/diff --n', cursor_position=len('/diff --n')),
+            None,
+        )
+    )
+
+    assert [completion.text for completion in completions] == ['--name-only']
+
+
 def test_prompt_message_uses_clean_follow_up_prompt() -> None:
     repl = Repl(_make_config(), _make_console())
     renderer = MagicMock()
@@ -837,6 +860,71 @@ def test_unknown_command_suggests_closest_match() -> None:
     assert 'autocomplete' in message
 
 
+def test_help_command_can_show_single_command_topic() -> None:
+    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    mock_renderer = MagicMock()
+    repl.set_renderer(mock_renderer)
+
+    result = repl.handle_command('/help diff')
+
+    assert result is True
+    mock_renderer.add_markdown_block.assert_called_once()
+    markdown = mock_renderer.add_markdown_block.call_args[0][1]
+    assert '/diff [--stat|--name-only|--patch] [path]' in markdown
+
+
+def test_model_command_rejects_unqualified_model() -> None:
+    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    mock_renderer = MagicMock()
+    repl.set_renderer(mock_renderer)
+
+    with patch('backend.cli.config_manager.update_model') as update_model:
+        result = repl.handle_command('/model gpt-4.1')
+
+    assert result is True
+    update_model.assert_not_called()
+    message = mock_renderer.add_system_message.call_args[0][0]
+    assert 'provider-qualified' in message
+
+
+def test_diff_command_uses_configured_project_root(tmp_path: Path) -> None:
+    config = _make_config()
+    config.project_root = str(tmp_path)
+    repl = Repl(config, Console(file=io.StringIO(), force_terminal=False))
+    mock_renderer = MagicMock()
+    repl.set_renderer(mock_renderer)
+    completed = subprocess.CompletedProcess(
+        args=['git', 'diff'], returncode=0, stdout='src/app.py\n', stderr=''
+    )
+
+    with patch('backend.cli.repl.subprocess.run', return_value=completed) as run_git:
+        result = repl.handle_command('/diff --name-only "src/app file.py"')
+
+    assert result is True
+    run_git.assert_called_once()
+    assert run_git.call_args.args[0] == [
+        'git',
+        'diff',
+        '--name-only',
+        '--',
+        'src/app file.py',
+    ]
+    assert run_git.call_args.kwargs['cwd'] == tmp_path.resolve()
+
+
+def test_sessions_command_accepts_optional_limit() -> None:
+    repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
+    mock_renderer = MagicMock()
+    repl.set_renderer(mock_renderer)
+
+    with patch('backend.cli.session_manager.list_sessions') as list_sessions:
+        result = repl.handle_command('/sessions list 5')
+
+    assert result is True
+    list_sessions.assert_called_once()
+    assert list_sessions.call_args.kwargs['limit'] == 5
+
+
 def test_autonomy_command_sets_level() -> None:
     """_handle_autonomy_command with a valid level should update the controller."""
     repl = Repl(_make_config(), Console(file=io.StringIO(), force_terminal=False))
@@ -883,22 +971,24 @@ def test_entry_point_parses_model_flag() -> None:
                 model='openai/gpt-4.1',
                 project=None,
                 cleanup_storage=False,
+                no_splash=False,
             )
 
 
-def test_entry_point_parses_project_flag() -> None:
+def test_entry_point_parses_project_flag(tmp_path: Path) -> None:
     """--project flag should be forwarded to repl main."""
     import sys
 
-    with patch.object(sys, 'argv', ['app', '--project', '/tmp/myrepo']):
+    with patch.object(sys, 'argv', ['app', '--project', str(tmp_path)]):
         with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
 
             main()
             mock_repl.assert_called_once_with(
                 model=None,
-                project='/tmp/myrepo',
+                project=str(tmp_path.resolve()),
                 cleanup_storage=False,
+                no_splash=False,
             )
 
 
@@ -915,17 +1005,18 @@ def test_entry_point_parses_cleanup_storage_flag() -> None:
                 model=None,
                 project=None,
                 cleanup_storage=True,
+                no_splash=False,
             )
 
 
-def test_entry_point_parses_both_flags() -> None:
+def test_entry_point_parses_both_flags(tmp_path: Path) -> None:
     """Both --model and --project should be forwarded."""
     import sys
 
     with patch.object(
         sys,
         'argv',
-        ['app', '-m', 'anthropic/claude-sonnet-4-20250514', '-p', '/tmp/proj'],
+        ['app', '-m', 'anthropic/claude-sonnet-4-20250514', '-p', str(tmp_path)],
     ):
         with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
@@ -933,17 +1024,18 @@ def test_entry_point_parses_both_flags() -> None:
             main()
             mock_repl.assert_called_once_with(
                 model='anthropic/claude-sonnet-4-20250514',
-                project='/tmp/proj',
+                project=str(tmp_path.resolve()),
                 cleanup_storage=False,
+                no_splash=False,
             )
 
 
-def test_entry_point_parses_cleanup_and_project_flags() -> None:
+def test_entry_point_parses_cleanup_and_project_flags(tmp_path: Path) -> None:
     """Cleanup flag should preserve the selected project override."""
     import sys
 
     with patch.object(
-        sys, 'argv', ['app', '--cleanup-storage', '--project', '/tmp/proj']
+        sys, 'argv', ['app', '--cleanup-storage', '--project', str(tmp_path)]
     ):
         with patch('backend.cli.main.main') as mock_repl:
             from backend.cli.entry import main
@@ -951,16 +1043,34 @@ def test_entry_point_parses_cleanup_and_project_flags() -> None:
             main()
             mock_repl.assert_called_once_with(
                 model=None,
-                project='/tmp/proj',
+                project=str(tmp_path.resolve()),
                 cleanup_storage=True,
+                no_splash=False,
             )
 
 
-def test_grinta_main_parses_project_flag() -> None:
+def test_entry_point_parses_no_splash_flag() -> None:
+    """--no-splash should be forwarded to repl main."""
+    import sys
+
+    with patch.object(sys, 'argv', ['app', '--no-splash']):
+        with patch('backend.cli.main.main') as mock_repl:
+            from backend.cli.entry import main
+
+            main()
+            mock_repl.assert_called_once_with(
+                model=None,
+                project=None,
+                cleanup_storage=False,
+                no_splash=True,
+            )
+
+
+def test_grinta_main_parses_project_flag(tmp_path: Path) -> None:
     """Grinta should parse --project even when invoked via backend.cli.main."""
     import sys
 
-    with patch.object(sys, 'argv', ['grinta', '--project', '/tmp/myrepo']):
+    with patch.object(sys, 'argv', ['grinta', '--project', str(tmp_path)]):
         with patch(
             'backend.cli.main._async_main', new_callable=MagicMock
         ) as mock_async_main:
@@ -969,7 +1079,28 @@ def test_grinta_main_parses_project_flag() -> None:
 
                 main()
 
-    mock_async_main.assert_called_once_with(model=None, project='/tmp/myrepo')
+    mock_async_main.assert_called_once_with(
+        model=None, project=str(tmp_path.resolve()), show_splash=True
+    )
+    mock_asyncio_run.assert_called_once()
+
+
+def test_grinta_main_parses_no_splash_flag() -> None:
+    """Direct backend.cli.main invocation should honor --no-splash."""
+    import sys
+
+    with patch.object(sys, 'argv', ['grinta', '--no-splash']):
+        with patch(
+            'backend.cli.main._async_main', new_callable=MagicMock
+        ) as mock_async_main:
+            with patch('backend.cli.main.asyncio.run') as mock_asyncio_run:
+                from backend.cli.main import main
+
+                main()
+
+    mock_async_main.assert_called_once_with(
+        model=None, project=None, show_splash=False
+    )
     mock_asyncio_run.assert_called_once()
 
 
@@ -1434,12 +1565,14 @@ def test_start_live_passes_vertical_overflow_crop() -> None:
     clamp themselves via ``options.max_height`` inside their renderables.
     """
     console = _make_console()
+    loop = asyncio.new_event_loop()
     with patch('backend.cli.event_renderer.Live') as live_cls:
-        live_cls.return_value = MagicMock()
-        r = CLIEventRenderer(
-            console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_event_loop()
-        )
-        r.start_live()
+        try:
+            live_cls.return_value = MagicMock()
+            r = CLIEventRenderer(console, HUDBar(), ReasoningDisplay(), loop=loop)
+            r.start_live()
+        finally:
+            loop.close()
     assert live_cls.call_args is not None
     assert live_cls.call_args.kwargs.get('vertical_overflow') == 'crop'
 
@@ -1705,7 +1838,7 @@ async def test_streaming_preview_renders_streaming_panel() -> None:
 
     await renderer.handle_event(chunk)
 
-    console.print(renderer._render_streaming_preview())
+    console.print(renderer._render_streaming_preview(max_width=None, max_lines=None))
     output = _console_output(console)
 
     # _render_streaming_preview uses a titled panel so live draft text is visually separated.
@@ -1793,7 +1926,6 @@ async def test_renderer_browser_cmd_output_does_not_print_ghost_terminal_card() 
     output = _console_output(console)
     # The specific corruption pattern we saw in the bug report must not appear.
     assert '$ (command)' not in output
-    assert 'Ran' not in output.split('\n', 1)[0] if False else True  # readability
     # No Terminal-card header for these observations.
     assert 'Terminal' not in output, (
         'Browser CmdOutputObservations should not render as Terminal cards; got:\n'
@@ -2494,6 +2626,36 @@ async def test_renderer_shows_noop_task_tracker_message_for_update() -> None:
 
 
 @pytest.mark.asyncio
+async def test_renderer_hides_task_tracker_update_chatter_when_panel_updates() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    renderer.start_live()
+
+    await renderer.handle_event(
+        TaskTrackingObservation(
+            content='[TASK_TRACKER] Updated step 1 to done.',
+            command='update',
+            task_list=[
+                {
+                    'id': '1',
+                    'description': 'Analyze manifest structure',
+                    'status': 'done',
+                }
+            ],
+        )
+    )
+
+    renderer.stop_live()
+    output = _console_output(console)
+    assert 'Updated step 1 to done' not in output
+    assert 'Tasks (1)' in output
+    assert '[DONE]' in output
+
+
+@pytest.mark.asyncio
 async def test_renderer_displays_done_task_state() -> None:
     console = _make_console()
     hud = HUDBar()
@@ -2539,6 +2701,154 @@ async def test_renderer_hides_internal_tool_thought_payloads() -> None:
     assert reasoning.active
     assert 'symbol' in reasoning._current_action.lower()
     assert reasoning._thought_lines == []
+
+
+@pytest.mark.asyncio
+async def test_renderer_hides_working_memory_thought_payloads() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    reasoning = ReasoningDisplay()
+    renderer = CLIEventRenderer(
+        console, hud, reasoning, loop=asyncio.get_running_loop()
+    )
+
+    await renderer.handle_event(
+        AgentThinkObservation(
+            content="[WORKING_MEMORY] Updated 'findings' section (fallback from section='all')."
+        )
+    )
+
+    assert reasoning.active
+    assert 'working memory' in reasoning._current_action.lower()
+    assert reasoning._thought_lines == []
+    assert _console_output(console) == ''
+
+
+@pytest.mark.asyncio
+async def test_renderer_sanitizes_internal_working_memory_markup_in_messages() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    action = MessageAction(
+        content=(
+            '<WORKING_MEMORY>\n'
+            '[PLAN] tighten transcript sanitization\n'
+            '[FINDINGS] raw task tracker text leaks into chat\n'
+            '</WORKING_MEMORY>'
+        )
+    )
+    action.source = EventSource.AGENT
+
+    await renderer.handle_event(action)
+
+    output = _console_output(console)
+    assert '<WORKING_MEMORY>' not in output
+    assert '[PLAN]' not in output
+    assert '[FINDINGS]' not in output
+    assert 'Plan: tighten transcript sanitization' in output
+    assert 'Findings: raw task tracker text leaks into chat' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_sanitizes_internal_working_memory_markup_in_stream_preview() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    chunk = StreamingChunkAction(
+        chunk='x',
+        accumulated=(
+            '<WORKING_MEMORY>\n'
+            '[PLAN] tighten transcript sanitization\n'
+            '</WORKING_MEMORY>'
+        ),
+        is_final=False,
+    )
+    chunk.source = EventSource.AGENT
+
+    await renderer.handle_event(chunk)
+
+    assert '<WORKING_MEMORY>' not in renderer._streaming_accumulated
+    assert '[PLAN]' not in renderer._streaming_accumulated
+    assert 'Plan: tighten transcript sanitization' in renderer._streaming_accumulated
+
+
+@pytest.mark.asyncio
+async def test_renderer_sanitizes_task_tracking_prompt_markup_in_messages() -> None:
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    action = MessageAction(
+        content=(
+            '<TASK_TRACKING>\n'
+            'task_tracker: update\n'
+            'Allowed statuses: todo, doing, done\n'
+            '</TASK_TRACKING>\n'
+            'Applied the patch and reran the test.'
+        )
+    )
+    action.source = EventSource.AGENT
+
+    await renderer.handle_event(action)
+
+    output = _console_output(console)
+    assert '<TASK_TRACKING>' not in output
+    assert 'task_tracker: update' not in output
+    assert 'Allowed statuses' not in output
+    assert 'Applied the patch and reran the test.' in output
+
+
+def test_mcp_result_user_preview_compacts_large_raw_text_payload() -> None:
+    from backend.cli.tool_call_display import mcp_result_user_preview
+
+    preview = mcp_result_user_preview(
+        '\n'.join(
+            [
+                'The Pragmatic Stack',
+                'https://example.com/articles/pragmatic-stack',
+                'A long excerpt that should not be dumped verbatim into the transcript.',
+                'Another detail line that would otherwise clutter the terminal.',
+                'https://example.com/articles/pragmatic-stack/source',
+            ]
+        ),
+        max_len=120,
+    )
+
+    assert preview.startswith('The Pragmatic Stack')
+    assert '5 lines' in preview
+    assert '2 links' in preview
+    assert 'Another detail line' not in preview
+
+
+def test_mcp_result_user_preview_summarizes_result_lists() -> None:
+    from backend.cli.tool_call_display import mcp_result_user_preview
+
+    preview = mcp_result_user_preview(
+        json.dumps(
+            {
+                'results': [
+                    {
+                        'title': 'The Pragmatic Stack',
+                        'url': 'https://example.com/articles/pragmatic-stack',
+                    },
+                    {
+                        'title': 'Verification Tax',
+                        'url': 'https://example.com/articles/verification-tax',
+                    },
+                ]
+            }
+        )
+    )
+
+    assert preview == '2 results · The Pragmatic Stack'
 
 
 @pytest.mark.asyncio

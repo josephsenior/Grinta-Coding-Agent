@@ -38,8 +38,8 @@ from backend.cli.layout_tokens import (
     ACTIVITY_CARD_TITLE_CODE,
     ACTIVITY_CARD_TITLE_DELEGATION,
     ACTIVITY_CARD_TITLE_FILES,
-    ACTIVITY_CARD_TITLE_MEMORY,
     ACTIVITY_CARD_TITLE_MCP,
+    ACTIVITY_CARD_TITLE_MEMORY,
     ACTIVITY_CARD_TITLE_SEARCH,
     ACTIVITY_CARD_TITLE_SHELL,
     ACTIVITY_CARD_TITLE_TERMINAL,
@@ -179,6 +179,21 @@ _INTERNAL_THINK_LABELS = {
     'VIEW_AND_REPLACE': 'Preparing edit…',
     'WORKING_MEMORY': 'Updating working memory…',
 }
+_VISIBLE_INTERNAL_BLOCK_TAG_RE = re.compile(
+    r'</?(?:WORKING_MEMORY|TASK_TRACKING)>',
+    re.IGNORECASE,
+)
+_VISIBLE_INTERNAL_SECTION_RE = re.compile(
+    r'^\[(HYPOTHESIS|FINDINGS|DECISIONS|PLAN)\](?:\s*(.*))?$',
+    re.IGNORECASE,
+)
+_VISIBLE_SUPPRESSED_LINE_RE = re.compile(
+    r'^\[(?:ANALYZE_PROJECT_STRUCTURE|CHECKPOINT|CHECKPOINT_RESULT|'
+    r'EXPLORE_TREE_STRUCTURE|PREVIEW|READ_SYMBOL_DEFINITION|'
+    r'REVERT_RESULT|ROLLBACK|SCRATCHPAD|SEMANTIC_RECALL_RESULT|'
+    r'TASK_TRACKER|VERIFY_FILE_LINES|WORKING_MEMORY)\]\b',
+    re.IGNORECASE,
+)
 # Strip structured JSON payloads embedded in think-action thoughts.
 _THINK_RESULT_JSON_RE = re.compile(
     r'\n?\[(?:CHECKPOINT_RESULT|REVERT_RESULT|ROLLBACK|TASK_TRACKER)\]\s*\{.*',
@@ -279,16 +294,56 @@ def _normalize_reasoning_text(text: str) -> tuple[str | None, str | None]:
         tag,
         tag.replace('_', ' ').capitalize() + '…',
     )
-    if not payload:
-        return label, None
-    if payload.startswith('{') or payload.startswith('['):
-        return label, None
+    del payload
+    # Internal tagged thoughts are machine-state updates, not user-facing prose.
+    # Keep the live action label but suppress the payload from transcript snapshots.
+    return label, None
 
-    payload_lines = [line.strip() for line in payload.splitlines() if line.strip()]
-    if payload_lines and all(line[:1] in '{["' for line in payload_lines[:2]):
-        return label, None
 
-    return label, payload
+def _sanitize_visible_transcript_text(text: str) -> str:
+    """Remove internal prompt scaffolding and protocol chatter from visible text."""
+    stripped = redact_internal_result_markers(
+        redact_task_list_json_blobs(redact_streamed_tool_call_markers((text or '').strip()))
+    )
+    if not stripped:
+        return ''
+
+    had_task_tracking_block = '<TASK_TRACKING>' in stripped.upper()
+    stripped = _VISIBLE_INTERNAL_BLOCK_TAG_RE.sub('', stripped)
+    lines_out: list[str] = []
+    previous_blank = False
+    for raw_line in stripped.splitlines():
+        line = raw_line.rstrip()
+        compact = line.strip()
+        if not compact:
+            if lines_out and not previous_blank:
+                lines_out.append('')
+            previous_blank = True
+            continue
+
+        if _VISIBLE_SUPPRESSED_LINE_RE.match(compact):
+            continue
+
+        lower_compact = compact.lower()
+        if had_task_tracking_block and (
+            lower_compact.startswith('task_tracker:')
+            or lower_compact.startswith('**task_tracker**:')
+            or lower_compact.startswith('allowed statuses:')
+            or lower_compact.startswith('**syncing**:')
+            or lower_compact.startswith('**completion (critical)**:')
+        ):
+            continue
+
+        section_match = _VISIBLE_INTERNAL_SECTION_RE.match(compact)
+        if section_match:
+            section_name = section_match.group(1).strip().capitalize()
+            remainder = (section_match.group(2) or '').strip()
+            compact = f'{section_name}: {remainder}' if remainder else f'{section_name}:'
+
+        lines_out.append(compact)
+        previous_blank = False
+
+    return '\n'.join(lines_out).strip()
 
 
 def _task_panel_signature(
@@ -2030,13 +2085,13 @@ class CLIEventRenderer:
             self._flush_pending_tool_cards()
             cot = (getattr(action, 'thought', None) or '').strip()
             if cot and _show_reasoning_text():
-                self._ensure_reasoning()
-                self._reasoning.update_thought(cot)
+                cleaned_cot = _sanitize_visible_transcript_text(cot)
+                if cleaned_cot:
+                    self._ensure_reasoning()
+                    self._reasoning.update_thought(cleaned_cot)
             self._stop_reasoning()
             self._clear_streaming_preview()
-            display_content = redact_internal_result_markers(
-                redact_streamed_tool_call_markers((action.content or '').strip())
-            ).strip()
+            display_content = _sanitize_visible_transcript_text(action.content or '')
             if display_content:
                 file_urls = getattr(action, 'file_urls', None) or []
                 image_urls = getattr(action, 'image_urls', None) or []
@@ -2458,9 +2513,7 @@ class CLIEventRenderer:
             self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
-            finish_text = redact_internal_result_markers(
-                (action.message or '').strip()
-            ).strip()
+            finish_text = _sanitize_visible_transcript_text(action.message or '')
             if finish_text:
                 self._append_assistant_message(finish_text)
             self.refresh()
@@ -2505,10 +2558,10 @@ class CLIEventRenderer:
             if question:
                 clarify_parts.append(Text(question, style='yellow'))
             for i, opt in enumerate(options, 1):
-                line = Text()
-                line.append(f'{i}. ', style='bold #f1bf63')
-                line.append(str(opt), style='#e2e8f0')
-                clarify_parts.append(line)
+                option_line = Text()
+                option_line.append(f'{i}. ', style='bold #f1bf63')
+                option_line.append(str(opt), style='#e2e8f0')
+                clarify_parts.append(option_line)
             if clarify_parts:
                 self._append_history(
                     format_callout_panel(
@@ -2527,10 +2580,10 @@ class CLIEventRenderer:
             info_needed = getattr(action, 'requested_information', '')
             uncertainty_parts: list[Any] = []
             for concern in concerns[:5]:
-                line = Text()
-                line.append('• ', style='dim')
-                line.append(str(concern), style='dim')
-                uncertainty_parts.append(line)
+                concern_line = Text()
+                concern_line.append('• ', style='dim')
+                concern_line.append(str(concern), style='dim')
+                uncertainty_parts.append(concern_line)
             if info_needed:
                 uncertainty_parts.append(Text(f'Need: {info_needed}', style='yellow'))
             if uncertainty_parts:
@@ -2559,13 +2612,13 @@ class CLIEventRenderer:
                 label = opt.get('name', opt.get('title', f'Option {i + 1}'))
                 desc = opt.get('description', '')
                 marker = ' (recommended)' if i == recommended else ''
-                line = Text()
-                line.append(f'{i + 1}. ', style='bold #a78bfa')
-                line.append(
+                proposal_line = Text()
+                proposal_line.append(f'{i + 1}. ', style='bold #a78bfa')
+                proposal_line.append(
                     f'{label}{marker}',
                     style='bold #f1bf63' if i == recommended else 'bold #e2e8f0',
                 )
-                proposal_parts.append(line)
+                proposal_parts.append(proposal_line)
                 if desc:
                     proposal_parts.append(Text(f'   {desc}', style='dim'))
             if proposal_parts:
@@ -2612,28 +2665,28 @@ class CLIEventRenderer:
         # First-class thinking field: if the provider streamed reasoning tokens
         # via the dedicated thinking channel, display them immediately.
         if action.thinking_accumulated and _show_reasoning_text():
-            self._ensure_reasoning()
-            self._reasoning.set_streaming_thought(action.thinking_accumulated)
+            cleaned_thinking = _sanitize_visible_transcript_text(
+                action.thinking_accumulated
+            )
+            if cleaned_thinking:
+                self._ensure_reasoning()
+                self._reasoning.set_streaming_thought(cleaned_thinking)
 
         # Fallback: extract <redacted_thinking> tags embedded in content text
         # (backward compat for models that embed thinking in the main stream).
         think_match = _THINK_EXTRACT_RE.search(raw)
         if think_match:
-            thinking_text = think_match.group(1)
-            if thinking_text.strip() and _show_reasoning_text():
+            thinking_text = _sanitize_visible_transcript_text(think_match.group(1))
+            if thinking_text and _show_reasoning_text():
                 self._ensure_reasoning()
                 self._reasoning.set_streaming_thought(thinking_text)
             # Strip thinking from the streaming preview.
             display_text = _THINK_STRIP_RE.sub('', raw).strip()
-            self._streaming_accumulated = redact_internal_result_markers(
-                redact_task_list_json_blobs(
-                    redact_streamed_tool_call_markers(display_text)
-                )
+            self._streaming_accumulated = _sanitize_visible_transcript_text(
+                display_text
             )
         else:
-            self._streaming_accumulated = redact_internal_result_markers(
-                redact_task_list_json_blobs(redact_streamed_tool_call_markers(raw))
-            )
+            self._streaming_accumulated = _sanitize_visible_transcript_text(raw)
 
         self._streaming_final = action.is_final
         if action.is_final:
@@ -3106,16 +3159,14 @@ class CLIEventRenderer:
             cmd = getattr(obs, 'command', '')
             if task_list is not None and cmd == 'update':
                 self._set_task_panel(task_list)
-            content = strip_tool_result_validation_annotations(
-                (getattr(obs, 'content', None) or '').strip()
+            content = _sanitize_visible_transcript_text(
+                strip_tool_result_validation_annotations(
+                    (getattr(obs, 'content', None) or '').strip()
+                )
             )
             body = ''
             if task_list is None or cmd != 'update':
                 body = content
-            elif content.startswith('[TASK_TRACKER]'):
-                # Suppress noop "plan unchanged" messages — they add noise.
-                if 'Update skipped' not in content:
-                    body = content
             if body:
                 for line in body.splitlines():  # type: ignore
                     self._append_history(
@@ -3324,6 +3375,7 @@ class CLIEventRenderer:
         self, display_content: str, *, attachments: list[Any] | None = None
     ) -> None:
         """Render a committed assistant message block in the transcript."""
+        display_content = _sanitize_visible_transcript_text(display_content)
         if not display_content:
             return
         self._last_assistant_message_text = display_content

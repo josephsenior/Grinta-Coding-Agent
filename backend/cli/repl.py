@@ -61,6 +61,19 @@ class SlashCommandSpec:
     help_section: str = 'system'
 
 
+@dataclass(frozen=True)
+class ParsedSlashCommand:
+    """A slash command tokenized without breaking Windows paths."""
+
+    raw_name: str
+    name: str
+    args: tuple[str, ...]
+
+
+class SlashCommandParseError(ValueError):
+    """Raised when the user entered a malformed slash command."""
+
+
 _AUTONOMY_LEVEL_HINTS = {
     'supervised': 'Always ask before actions',
     'balanced': 'Ask only for high-risk actions',
@@ -70,7 +83,7 @@ _SLASH_COMMANDS = (
     SlashCommandSpec(
         '/help',
         'Show commands and shortcuts',
-        '/help',
+        '/help [command]',
         aliases=('/?',),
         help_section='system',
     ),
@@ -121,8 +134,8 @@ _SLASH_COMMANDS = (
     ),
     SlashCommandSpec(
         '/diff',
-        'Show cumulative file changes made this session',
-        '/diff',
+        'Show workspace git changes',
+        '/diff [--stat|--name-only|--patch] [path]',
         help_section='control',
     ),
     SlashCommandSpec(
@@ -188,6 +201,52 @@ def _canonical_command_name(command: str) -> str:
     return _COMMAND_ALIASES.get(lowered, lowered)
 
 
+def _split_command_words(text: str) -> tuple[str, ...]:
+    """Split a REPL command line with quotes while preserving backslashes."""
+    words: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    in_word = False
+
+    for char in text.strip():
+        if char in {'"', "'"}:
+            if quote == char:
+                quote = None
+                in_word = True
+                continue
+            if quote is None:
+                quote = char
+                in_word = True
+                continue
+        if char.isspace() and quote is None:
+            if in_word:
+                words.append(''.join(current))
+                current = []
+                in_word = False
+            continue
+        current.append(char)
+        in_word = True
+
+    if quote is not None:
+        raise SlashCommandParseError(f'Unclosed {quote} quote in command.')
+    if in_word:
+        words.append(''.join(current))
+    return tuple(words)
+
+
+def _parse_slash_command(text: str) -> ParsedSlashCommand:
+    """Parse and canonicalize a slash command line."""
+    words = _split_command_words(text)
+    if not words or not words[0].startswith('/'):
+        raise SlashCommandParseError('Expected a slash command.')
+    raw_name = words[0].lower()
+    return ParsedSlashCommand(
+        raw_name=raw_name,
+        name=_canonical_command_name(raw_name),
+        args=words[1:],
+    )
+
+
 def _iter_command_completion_entries() -> list[tuple[str, str]]:
     """Return slash commands plus aliases for prompt-toolkit completion."""
     entries: list[tuple[str, str]] = []
@@ -205,9 +264,39 @@ _HELP_SECTIONS_ORDER: tuple[tuple[str, str], ...] = (
 )
 
 
-def _build_help_markdown() -> str:
+def _find_command_spec(command_name: str) -> SlashCommandSpec | None:
+    normalized = command_name.strip().lower()
+    if normalized and not normalized.startswith('/'):
+        normalized = f'/{normalized}'
+    canonical = _canonical_command_name(normalized)
+    for spec in _SLASH_COMMANDS:
+        if spec.name == canonical:
+            return spec
+    return None
+
+
+def _build_help_markdown(command_name: str | None = None) -> str:
     """Build the slash-command help block from the shared command registry."""
     from collections import defaultdict
+
+    if command_name:
+        spec = _find_command_spec(command_name)
+        if spec is None:
+            suggestions = _closest_command_names(command_name)
+            suffix = ''
+            if suggestions:
+                suffix = '\n\nTry ' + ' or '.join(f'`{item}`' for item in suggestions) + '.'
+            return f'No help topic for `{command_name}`.{suffix}'
+        detail_lines = [
+            f'`{spec.usage}`',
+            '',
+            spec.description,
+        ]
+        if spec.aliases:
+            detail_lines.extend(
+                ['', 'Aliases: ' + ', '.join(f'`{alias}`' for alias in spec.aliases)]
+            )
+        return '\n'.join(detail_lines)
 
     by_section: dict[str, list[SlashCommandSpec]] = defaultdict(list)
     for spec in _SLASH_COMMANDS:
@@ -433,6 +522,32 @@ def _build_command_completer(
                         start_position=-len(argument_prefix),
                         display_meta=provider,
                     )
+                return
+
+            if canonical_command == '/help':
+                lowered_prefix = argument_prefix.lower()
+                for name, description in _iter_command_completion_entries():
+                    if name.startswith(lowered_prefix):
+                        yield Completion(
+                            name,
+                            start_position=-len(argument_prefix),
+                            display_meta=description,
+                        )
+                return
+
+            if canonical_command == '/diff':
+                lowered_prefix = argument_prefix.lower()
+                for option, description in (
+                    ('--stat', 'Summary by file'),
+                    ('--name-only', 'Changed file names'),
+                    ('--patch', 'Full patch'),
+                ):
+                    if option.startswith(lowered_prefix):
+                        yield Completion(
+                            option,
+                            start_position=-len(argument_prefix),
+                            display_meta=description,
+                        )
                 return
 
             if canonical_command == '/resume':
@@ -1014,10 +1129,36 @@ class Repl:
         )
 
     def handle_autonomy_command(self, text: str) -> None:
-        self._handle_autonomy_command(text)
+        try:
+            parsed = _parse_slash_command(text)
+        except SlashCommandParseError as exc:
+            self._warn(str(exc))
+            return
+        self._handle_autonomy_command(parsed)
 
     def handle_command(self, text: str) -> bool:
         return self._handle_command(text)
+
+    def _warn(self, message: str, *, title: str = 'warning') -> None:
+        if self._renderer is not None:
+            self._renderer.add_system_message(message, title=title)
+
+    def _usage(self, command_name: str) -> str:
+        spec = _find_command_spec(command_name)
+        return spec.usage if spec is not None else command_name
+
+    def _reject_extra_args(self, parsed: ParsedSlashCommand) -> bool:
+        if not parsed.args:
+            return False
+        self._warn(f'Usage: {self._usage(parsed.name)}')
+        return True
+
+    def _command_project_root(self) -> Path:
+        raw_project = getattr(self._config, 'project_root', None)
+        if isinstance(raw_project, str) and raw_project.strip():
+            with contextlib.suppress(OSError):
+                return Path(raw_project).expanduser().resolve()
+        return Path.cwd().resolve()
 
     async def _read_non_interactive_input(self) -> str:
         if self._queued_input:
@@ -1285,14 +1426,16 @@ class Repl:
                     continue
 
                 if text.startswith('/'):
-                    parts_sl = text.strip().split()
-                    if parts_sl:
-                        sc = _canonical_command_name(parts_sl[0].lower())
-                        if sc in ('/resume', '/compact', '/retry'):
-                            await engine_init_done.wait()
-                            if engine_init_exc[0] is not None:
-                                continue
-                    should_continue = self._handle_command(text)
+                    try:
+                        parsed_command = _parse_slash_command(text)
+                    except SlashCommandParseError as exc:
+                        self._warn(str(exc))
+                        continue
+                    if parsed_command.name in ('/resume', '/compact', '/retry'):
+                        await engine_init_done.wait()
+                        if engine_init_exc[0] is not None:
+                            continue
+                    should_continue = self._handle_parsed_command(parsed_command)
                     if not should_continue:
                         break
                     if self._pending_resume is not None:
@@ -1660,7 +1803,7 @@ class Repl:
 
         Returns (controller, agent_task) on success, or None on failure.
         """
-        from backend.cli.session_manager import get_session_id_by_index
+        from backend.cli.session_manager import resolve_session_id
         from backend.core.bootstrap.main import (
             _setup_memory_and_mcp,
             _setup_runtime_for_controller,
@@ -1677,17 +1820,13 @@ class Repl:
                 )
             return None
 
-        # Resolve target to a session ID.
-        if target.isdigit():
-            resolved_id = get_session_id_by_index(int(target), config)
-            if resolved_id is None:
-                if self._renderer is not None:
-                    self._renderer.add_system_message(
-                        f'No session at index {target}.', title='warning'
-                    )
-                return None
-        else:
-            resolved_id = target
+        resolved_id, resolve_error = resolve_session_id(target, config)
+        if resolve_error or resolved_id is None:
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    resolve_error or f'No session matches: {target}', title='warning'
+                )
+            return None
 
         if self._renderer is not None:
             self._renderer.add_system_message(
@@ -1760,7 +1899,8 @@ class Repl:
             config,
             conversation_stats,
         )
-        runtime.controller = controller
+        runtime_for_controller = cast(Any, runtime)
+        runtime_for_controller.controller = controller
         self._controller = controller
 
         early_cb = create_status_callback(controller)
@@ -1821,12 +1961,11 @@ class Repl:
 
     # -- autonomy control --------------------------------------------------
 
-    def _handle_autonomy_command(self, text: str) -> None:
+    def _handle_autonomy_command(self, parsed: ParsedSlashCommand) -> None:
         """View or change the autonomy level."""
-        parts = text.strip().split()
         valid_levels = tuple(_AUTONOMY_LEVEL_HINTS)
 
-        if len(parts) < 2:
+        if not parsed.args:
             # Show current level
             level = self._get_current_autonomy()
             if self._renderer is not None:
@@ -1842,7 +1981,11 @@ class Repl:
                 )
             return
 
-        new_level = parts[1].lower()
+        if len(parsed.args) > 1:
+            self._warn(f'Usage: {self._usage(parsed.name)}')
+            return
+
+        new_level = parsed.args[0].lower()
         if new_level not in valid_levels:
             if self._renderer is not None:
                 self._renderer.add_system_message(
@@ -1880,8 +2023,17 @@ class Repl:
 
     def _handle_command(self, text: str) -> bool:
         """Handle a /command. Returns True to continue REPL, False to exit."""
-        raw_cmd = text.lower().split()[0]
-        cmd = _canonical_command_name(raw_cmd)
+        try:
+            parsed = _parse_slash_command(text)
+        except SlashCommandParseError as exc:
+            self._warn(str(exc))
+            return True
+        return self._handle_parsed_command(parsed)
+
+    def _handle_parsed_command(self, parsed: ParsedSlashCommand) -> bool:
+        """Handle a parsed /command. Returns True to continue, False to exit."""
+        raw_cmd = parsed.raw_name
+        cmd = parsed.name
 
         if cmd in ('/exit', '/quit'):
             if self._renderer is not None:
@@ -1903,6 +2055,8 @@ class Repl:
             return True
 
         if cmd == '/clear':
+            if self._reject_extra_args(parsed):
+                return True
             if self._renderer is not None:
                 self._renderer.clear_history()
                 self._renderer.add_system_message(
@@ -1912,6 +2066,8 @@ class Repl:
             return True
 
         if cmd == '/status':
+            if self._reject_extra_args(parsed):
+                return True
             if self._renderer is not None:
                 self._renderer.add_system_message(
                     self._hud.plain_text(), title='status'
@@ -1919,6 +2075,8 @@ class Repl:
             return True
 
         if cmd == '/cost':
+            if self._reject_extra_args(parsed):
+                return True
             hud = self._hud.state
             tokens = (
                 f'{hud.context_tokens:,} ctx · {hud.llm_calls} LLM calls'
@@ -1934,17 +2092,39 @@ class Repl:
             return True
 
         if cmd == '/diff':
+            mode = '--stat'
+            paths: list[str] = []
+            for arg in parsed.args:
+                if arg in {'--stat', '--name-only', '--patch'}:
+                    mode = arg
+                    continue
+                if arg.startswith('-'):
+                    self._warn(f'Usage: {self._usage(cmd)}')
+                    return True
+                paths.append(arg)
+            if len(paths) > 1:
+                self._warn(f'Usage: {self._usage(cmd)}')
+                return True
+            cwd = self._command_project_root()
+            git_args = ['git', 'diff']
+            if mode != '--patch':
+                git_args.append(mode)
+            if paths:
+                git_args.extend(['--', paths[0]])
             try:
                 completed = subprocess.run(
-                    ['git', 'diff', '--stat'],
+                    git_args,
                     capture_output=True,
                     text=True,
-                    cwd=Path.cwd(),
+                    cwd=cwd,
                     check=False,
                 )
                 body = (completed.stdout or '').strip() or '(no changes)'
                 if completed.stderr and completed.returncode != 0:
-                    body = f'{body}\n\n[stderr]\n{completed.stderr.strip()}'
+                    body = (
+                        f'git diff failed in {cwd}\n\n'
+                        f'{completed.stderr.strip() or body}'
+                    )
                 if self._renderer is not None:
                     self._renderer.add_system_message(body, title='diff')
             except FileNotFoundError:
@@ -1956,10 +2136,12 @@ class Repl:
             return True
 
         if cmd == '/think':
-            parts = text.strip().split()
             cur = bool(getattr(self._config, 'enable_think', False))
-            if len(parts) >= 2:
-                target = parts[1].lower()
+            if len(parsed.args) > 1:
+                self._warn(f'Usage: {self._usage(cmd)}')
+                return True
+            if parsed.args:
+                target = parsed.args[0].lower()
                 if target in ('on', 'true', '1', 'yes'):
                     new_val = True
                 elif target in ('off', 'false', '0', 'no'):
@@ -1984,8 +2166,7 @@ class Repl:
             return True
 
         if cmd == '/checkpoint':
-            parts = text.strip().split(maxsplit=1)
-            label = parts[1] if len(parts) > 1 else ''
+            label = ' '.join(parsed.args).strip()
             instruction = (
                 'Use the `checkpoint` tool now to snapshot the current workspace state.'
             )
@@ -2000,6 +2181,8 @@ class Repl:
             return True
 
         if cmd == '/copy':
+            if self._reject_extra_args(parsed):
+                return True
             last_reply = (
                 self._renderer.last_assistant_message_text
                 if self._renderer is not None
@@ -2015,42 +2198,59 @@ class Repl:
         if cmd == '/sessions':
             from backend.cli.session_manager import list_sessions
 
+            args = list(parsed.args)
+            if args and args[0].lower() == 'list':
+                args.pop(0)
+            if len(args) > 1:
+                self._warn('Usage: /sessions [list] [limit]')
+                return True
+            limit = 20
+            if args:
+                try:
+                    limit = int(args[0])
+                except ValueError:
+                    self._warn('Usage: /sessions [list] [limit]')
+                    return True
+                if limit < 1:
+                    self._warn('Session limit must be 1 or greater.')
+                    return True
             if self._renderer is not None:
                 with self._renderer.suspend_live():
-                    list_sessions(self._console, config=self._config)
+                    list_sessions(self._console, limit=limit, config=self._config)
             else:
-                list_sessions(self._console, config=self._config)
+                list_sessions(self._console, limit=limit, config=self._config)
             return True
 
         if cmd == '/resume':
-            parts = text.strip().split()
-            if len(parts) < 2:
+            if len(parsed.args) != 1:
                 if self._renderer is not None:
                     self._renderer.add_system_message(
                         'Usage: /resume <N> or /resume <session_id>. Press Tab to autocomplete recent sessions.',
                         title='warning',
                     )
                 return True
-            self._pending_resume = parts[1]
+            self._pending_resume = parsed.args[0]
             return True
 
         if cmd == '/autonomy':
-            self._handle_autonomy_command(text)
+            self._handle_autonomy_command(parsed)
             return True
 
         if cmd == '/help':
+            if len(parsed.args) > 1:
+                self._warn(f'Usage: {self._usage(cmd)}')
+                return True
             if self._renderer is not None:
                 self._renderer.add_markdown_block(
                     'Help',
-                    _build_help_markdown(),
+                    _build_help_markdown(parsed.args[0] if parsed.args else None),
                 )
             return True
 
         if cmd == '/model':
             from backend.cli.config_manager import update_model
 
-            parts = text.strip().split(maxsplit=1)
-            if len(parts) < 2:
+            if not parsed.args:
                 current = get_current_model(self._config)
                 provider, model = HUDBar.describe_model(current)
                 if self._renderer is not None:
@@ -2059,7 +2259,13 @@ class Repl:
                         title='model',
                     )
             else:
-                new_model = parts[1].strip()
+                if len(parsed.args) != 1:
+                    self._warn(f'Usage: {self._usage(cmd)}')
+                    return True
+                new_model = parsed.args[0].strip()
+                if '/' not in new_model or new_model.startswith('/') or new_model.endswith('/'):
+                    self._warn('Use a provider-qualified model, for example `openai/gpt-4.1`.')
+                    return True
                 update_model(new_model)
                 self._config = load_app_config()
                 self._hud.update_model(get_current_model(self._config))
@@ -2072,12 +2278,16 @@ class Repl:
             return True
 
         if cmd == '/compact':
+            if self._reject_extra_args(parsed):
+                return True
             from backend.ledger.action.agent import CondensationRequestAction
 
             self._next_action = CondensationRequestAction()
             return True
 
         if cmd == '/retry':
+            if self._reject_extra_args(parsed):
+                return True
             if self._last_user_message:
                 self._next_action = MessageAction(content=self._last_user_message)
             else:

@@ -19,13 +19,14 @@ import time
 import warnings
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 # Suppress third-party DeprecationWarnings (same default as entry.py / backend pkg).
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 # google-genai subclasses aiohttp.ClientSession (emits noise on import in some envs).
 warnings.filterwarnings(
-    "ignore",
-    message=r"Inheritance class AiohttpClientSession from ClientSession is discouraged",
+    'ignore',
+    message=r'Inheritance class AiohttpClientSession from ClientSession is discouraged',
     category=DeprecationWarning,
 )
 
@@ -39,20 +40,34 @@ def _create_console(*args: Any, **kwargs: Any) -> Any:
 Console = _create_console
 
 
+def _normalize_project_arg_early(value: str) -> str:
+    """Normalize a project arg before backend modules are safe to import."""
+    normalized = value.strip()
+    if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {'"', "'"}:
+        normalized = normalized[1:-1].strip()
+    if normalized.lower().startswith('file:'):
+        parsed = urlparse(normalized)
+        path = unquote(parsed.path or '')
+        if sys.platform == 'win32' and len(path) >= 3 and path[0] == '/' and path[2] == ':':
+            path = path[1:]
+        normalized = path
+    return normalized
+
+
 def _parse_project_dir_from_argv() -> Path | None:
     """Return ``-p`` / ``--project`` directory from ``sys.argv`` if present."""
     argv = sys.argv[1:]
     i = 0
     while i < len(argv):
         a = argv[i]
-        if a in ("-p", "--project") and i + 1 < len(argv):
+        if a in ('-p', '--project') and i + 1 < len(argv):
             try:
-                return Path(argv[i + 1]).expanduser().resolve()
+                return Path(_normalize_project_arg_early(argv[i + 1])).expanduser().resolve()
             except OSError:
                 return None
-        if a.startswith("--project="):
+        if a.startswith('--project='):
             try:
-                return Path(a.split("=", 1)[1]).expanduser().resolve()
+                return Path(_normalize_project_arg_early(a.split('=', 1)[1])).expanduser().resolve()
             except OSError:
                 return None
         i += 1
@@ -82,7 +97,7 @@ def _load_dotenv_early(*, explicit_project: str | None = None) -> None:
     except ImportError:
         return
     try:
-        load_dotenv(_grinta_install_tree_for_dotenv() / ".env", override=False)
+        load_dotenv(_grinta_install_tree_for_dotenv() / '.env', override=False)
     except OSError:
         pass
     for base in (
@@ -92,16 +107,16 @@ def _load_dotenv_early(*, explicit_project: str | None = None) -> None:
         if base is None:
             continue
         try:
-            load_dotenv(base / ".env", override=True)
+            load_dotenv(base / '.env', override=True)
         except OSError:
             pass
 
 
 def _log_to_file_effective() -> bool:
     """Mirror ``LOG_TO_FILE`` default in ``backend.core.constants`` without importing backend."""
-    raw = os.getenv("LOG_TO_FILE")
-    if raw is not None and raw.strip() != "":
-        return raw.strip().lower() in ("true", "1", "yes")
+    raw = os.getenv('LOG_TO_FILE')
+    if raw is not None and raw.strip() != '':
+        return raw.strip().lower() in ('true', '1', 'yes')
     return True
 
 
@@ -113,9 +128,9 @@ def _app_logger_level_after_silence() -> int:
     """
     if not _log_to_file_effective():
         return logging.ERROR
-    name = os.getenv("LOG_LEVEL", "INFO").upper()
+    name = os.getenv('LOG_LEVEL', 'INFO').upper()
     # Python 3.11+ provides getLevelNamesMapping(). Fallback for older versions.
-    if hasattr(logging, "getLevelNamesMapping"):
+    if hasattr(logging, 'getLevelNamesMapping'):
         mapping = logging.getLevelNamesMapping()
     else:
         mapping = logging._levelToName  # type: ignore
@@ -137,7 +152,7 @@ def _silence_all_loggers() -> None:
     root.setLevel(logging.WARNING)
 
     app_level = _app_logger_level_after_silence()
-    for name in ("app", "app.access"):
+    for name in ('app', 'app.access'):
         lg = logging.getLogger(name)
         for h in lg.handlers[:]:
             if isinstance(h, logging.StreamHandler) and not isinstance(
@@ -149,14 +164,14 @@ def _silence_all_loggers() -> None:
         lg.propagate = False
 
     for name in (
-        "uvicorn",
-        "httpcore",
-        "httpx",
-        "asyncio",
-        "filelock",
-        "openai",
-        "httpx._client",
-        "charset_normalizer",
+        'uvicorn',
+        'httpcore',
+        'httpx',
+        'asyncio',
+        'filelock',
+        'openai',
+        'httpx._client',
+        'charset_normalizer',
     ):
         logging.getLogger(name).setLevel(logging.CRITICAL)
 
@@ -172,12 +187,12 @@ def _configure_redirected_streams(*streams: object | None) -> None:
     for stream in streams:
         if stream is None:
             continue
-        if bool(getattr(stream, "isatty", lambda: True)()):
+        if bool(getattr(stream, 'isatty', lambda: True)()):
             continue
-        reconfigure = getattr(stream, "reconfigure", None)
+        reconfigure = getattr(stream, 'reconfigure', None)
         if callable(reconfigure):
             try:
-                reconfigure(encoding="utf-8", errors="replace")
+                reconfigure(encoding='utf-8', errors='replace')
             except Exception:
                 # Log or handle reconfiguration failure if necessary, rather than silent continue
                 pass
@@ -193,26 +208,26 @@ def show_grinta_splash(console: Any | None = None) -> None:
 
     console = console or Console()
 
-    _R = "bold red"
-    _D = "dim"
+    _R = 'bold red'
+    _D = 'dim'
 
     _logo = [
-        r"  [red]▄▄████████████████████████████████▄▄[/red]  ",
-        r"[red]▄██████████████████████████████████████▄[/red]",
-        r"[red]▀▀▀▀▀▀▀██████████████████████████▀▀▀▀▀▀▀[/red]",
-        r"       [red]███[/red][black]▄▄▄▄▄[/black][red]████████████[/red][black]▄▄▄▄▄[/black][red]███[/red]       ",
-        r"       [red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red][black]▄[/black][red]████[/red][black]▄[/black][red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red]       ",
-        r"       [red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red][black]▀▄▄▄▄▀[/black][red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red]       ",
-        r"       [red]███[/red][black]▀▀▀▀▀[/black][red]████████████[/red][black]▀▀▀▀▀[/black][red]███[/red]       ",
-        r"     [red]▄████████████████████████████▄[/red]     ",
-        r"   [red]▄████████████████████████████████▄[/red]   ",
-        r"                                        ",
+        r'  [red]▄▄████████████████████████████████▄▄[/red]  ',
+        r'[red]▄██████████████████████████████████████▄[/red]',
+        r'[red]▀▀▀▀▀▀▀██████████████████████████▀▀▀▀▀▀▀[/red]',
+        r'       [red]███[/red][black]▄▄▄▄▄[/black][red]████████████[/red][black]▄▄▄▄▄[/black][red]███[/red]       ',
+        r'       [red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red][black]▄[/black][red]████[/red][black]▄[/black][red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red]       ',
+        r'       [red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red][black]▀▄▄▄▄▀[/black][red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red]       ',
+        r'       [red]███[/red][black]▀▀▀▀▀[/black][red]████████████[/red][black]▀▀▀▀▀[/black][red]███[/red]       ',
+        r'     [red]▄████████████████████████████▄[/red]     ',
+        r'   [red]▄████████████████████████████████▄[/red]   ',
+        r'                                        ',
     ]
 
     try:
         import pyfiglet as _pyfiglet
 
-        _raw = _pyfiglet.figlet_format("GRINTA", font="slant").splitlines()
+        _raw = _pyfiglet.figlet_format('GRINTA', font='slant').splitlines()
         while _raw and not _raw[-1].strip():
             _raw.pop()
 
@@ -226,22 +241,22 @@ def show_grinta_splash(console: Any | None = None) -> None:
             t = Text.from_markup(ln.strip())
             pad = max(0, width - len(t))
             _figlet_lines.append(
-                Text(" " * (pad // 2)) + t + Text(" " * (pad - pad // 2))
+                Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2))
             )
         for ln in _raw:
             t = Text(ln, style=_R)
             pad = max(0, width - len(t))
             _figlet_lines.append(
-                Text(" " * (pad // 2)) + t + Text(" " * (pad - pad // 2))
+                Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2))
             )
 
     except Exception:
         _raw = [
-            "  ____ ____  ___ _   _ _____  _",
-            " / ___|  _ \\|_ _| \\ | |_   _|/ \\",
-            "| |  _| |_) || ||  \\| | | | / _ \\",
-            "| |_| |  _ < | || |\\  | | |/ ___ \\",
-            " \\____|_| \\_\\___|_| \\_| |_/_/   \\_\\",
+            '  ____ ____  ___ _   _ _____  _',
+            ' / ___|  _ \\|_ _| \\ | |_   _|/ \\',
+            '| |  _| |_) || ||  \\| | | | / _ \\',
+            '| |_| |  _ < | || |\\  | | |/ ___ \\',
+            ' \\____|_| \\_\\___|_| \\_| |_/_/   \\_\\',
         ]
 
         logo_width = 40
@@ -253,48 +268,48 @@ def show_grinta_splash(console: Any | None = None) -> None:
             t = Text.from_markup(ln.strip())
             pad = max(0, width - len(t))
             _figlet_lines.append(
-                Text(" " * (pad // 2)) + t + Text(" " * (pad - pad // 2))
+                Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2))
             )
         for ln in _raw:
             t = Text(ln, style=_R)
             pad = max(0, width - len(t))
             _figlet_lines.append(
-                Text(" " * (pad // 2)) + t + Text(" " * (pad - pad // 2))
+                Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2))
             )
 
-    _TAGLINE = "AI agent. Pure grit."
+    _TAGLINE = 'AI agent. Pure grit.'
     _HINT = (
-        "Type /help for commands · Ctrl+C interrupts the agent · /quit or exit to leave"
+        'Type /help for commands · Ctrl+C interrupts the agent · /quit or exit to leave'
     )
 
     def _body(visible: int, *, tagline: bool = False) -> Group:
         figlet = Text()
         for i, text_obj in enumerate(_figlet_lines):
             if i > 0:
-                figlet.append("\n")
+                figlet.append('\n')
             if i < visible:
                 figlet.append(text_obj)
             else:
-                figlet.append(" " * len(text_obj))
-        parts: list = [Align.center(figlet), Text("")]
+                figlet.append(' ' * len(text_obj))
+        parts: list = [Align.center(figlet), Text('')]
         if tagline:
-            parts.append(Text(_TAGLINE, style="italic dim", justify="center"))
+            parts.append(Text(_TAGLINE, style='italic dim', justify='center'))
         else:
-            parts.append(Text(""))
+            parts.append(Text(''))
         return Group(*parts)
 
     def _frame(visible: int, *, tagline: bool = False, hint: bool = False) -> Any:
         panel = Panel(
             _body(visible, tagline=tagline),
-            title="[bold dim] >_ [/]",
+            title='[bold dim] >_ [/]',
             border_style=_D,
             box=ROUNDED,
             padding=(1, 4),
         )
-        rows: list = [Text(""), Align.center(panel), Text("")]
+        rows: list = [Text(''), Align.center(panel), Text('')]
         if hint:
-            rows.append(Align.center(Text(_HINT, style="dim")))
-            rows.append(Text(""))
+            rows.append(Align.center(Text(_HINT, style='dim')))
+            rows.append(Text(''))
         return Group(*rows)
 
     if not console.is_terminal:
@@ -322,65 +337,104 @@ def _setup_logging() -> None:
 
 def _read_piped_stdin() -> str | None:
     """Capture a one-shot piped task before startup work can consume stdin."""
-    if bool(getattr(sys.stdin, "isatty", lambda: True)()):
+    if bool(getattr(sys.stdin, 'isatty', lambda: True)()):
         return None
     try:
         data = sys.stdin.read()
     except Exception:
         return None
-    if data == "":
+    if data == '':
         return None
     return data
+
+
+def _version_string() -> str:
+    try:
+        from backend import get_version
+
+        return get_version()
+    except Exception:
+        return 'unknown'
+
+
+def _project_dir_arg(value: str) -> str:
+    from backend.core.workspace_resolution import resolve_existing_directory
+
+    try:
+        return str(resolve_existing_directory(value))
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
+
+
+def _env_truthy(name: str) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return False
+    return raw.strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
 def _resolve_invocation(
     *,
     model: str | None,
     project: str | None,
-) -> tuple[str | None, str | None, bool]:
+    no_splash: bool,
+) -> tuple[str | None, str | None, bool, bool]:
     """Resolve CLI flags when grinta is invoked as the console script."""
-    if model is not None or project is not None:
-        return model, project, False
+    if model is not None or project is not None or no_splash:
+        return model, project, False, no_splash
 
     argv = sys.argv[1:]
     if not argv:
-        return None, None, False
+        return None, None, False, False
 
     parser = argparse.ArgumentParser(
-        prog="grinta",
-        description="Grinta — AI coding agent for the terminal",
+        prog='grinta',
+        description='Grinta — AI coding agent for the terminal',
     )
     parser.add_argument(
-        "--model",
-        "-m",
-        help="Override LLM model (e.g. anthropic/claude-sonnet-4-20250514)",
+        '--model',
+        '-m',
+        help='Override LLM model (e.g. anthropic/claude-sonnet-4-20250514)',
     )
     parser.add_argument(
-        "--project",
-        "-p",
-        help="Set project root directory",
+        '--project',
+        '-p',
+        type=_project_dir_arg,
+        help='Set project root directory',
     )
     parser.add_argument(
-        "--cleanup-storage",
-        action="store_true",
+        '--no-splash',
+        action='store_true',
         default=False,
-        help="Consolidate legacy project data into .grinta/storage and exit",
+        help='Start without the animated splash screen',
+    )
+    parser.add_argument(
+        '--cleanup-storage',
+        action='store_true',
+        default=False,
+        help='Consolidate legacy project data into .grinta/storage and exit',
+    )
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'%(prog)s {_version_string()}',
     )
     args = parser.parse_args(argv)
     if args.cleanup_storage:
-        return args.model, args.project, True
-    return args.model, args.project, False
+        return args.model, args.project, True, args.no_splash
+    return args.model, args.project, False, args.no_splash
 
 
 async def _async_main(
     *,
     model: str | None = None,
     project: str | None = None,
+    show_splash: bool = True,
 ) -> None:
     resolved_project = (
         str(Path(project).resolve()) if project else str(Path.cwd().resolve())
     )
-    os.environ["PROJECT_ROOT"] = resolved_project
+    os.environ['PROJECT_ROOT'] = resolved_project
 
     from backend.cli.config_manager import (
         auto_detect_api_keys,
@@ -402,7 +456,8 @@ async def _async_main(
     except OSError:
         term_cols = 120
     console = Console(width=term_cols - 2)
-    show_grinta_splash(console)
+    if show_splash and not _env_truthy('GRINTA_NO_SPLASH'):
+        show_grinta_splash(console)
     initial_input = _read_piped_stdin()
 
     # -- load config -------------------------------------------------------
@@ -421,13 +476,13 @@ async def _async_main(
         detected_provider = auto_detect_api_keys(config)
         if detected_provider and not needs_onboarding(config):
             console.print(
-                f"  [green]✓[/green] Auto-detected API key from environment "
-                f"([cyan]{detected_provider}[/cyan])",
+                f'  [green]✓[/green] Auto-detected API key from environment '
+                f'([cyan]{detected_provider}[/cyan])',
             )
             console.print(
-                "  [dim][bold]Next:[/bold] type [bold]/help[/bold] for commands, "
-                "[bold]/settings[/bold] for model and MCP, "
-                "[bold]grinta --help[/bold] for CLI flags.[/dim]",
+                '  [dim][bold]Next:[/bold] type [bold]/help[/bold] for commands, '
+                '[bold]/settings[/bold] for model and MCP, '
+                '[bold]grinta --help[/bold] for CLI flags.[/dim]',
             )
             ensure_default_model(config)
         else:
@@ -440,7 +495,7 @@ async def _async_main(
             config.local_data_root = get_project_local_data_root(resolved_project)
             # Re-check after onboarding.
             if needs_onboarding(config):
-                console.print("[red]No API key configured. Exiting.[/red]")
+                console.print('[red]No API key configured. Exiting.[/red]')
                 return
     else:
         ensure_default_model(config)
@@ -457,6 +512,7 @@ def main(
     model: str | None = None,
     project: str | None = None,
     cleanup_storage: bool = False,
+    no_splash: bool = False,
 ) -> None:
     """Synchronous entry point for the ``grinta`` console_script."""
     # Grinta repo ``.env`` first (and optional explicit project), before backend
@@ -472,18 +528,22 @@ def main(
 
         run_storage_cleanup_command(project)
         return
-    model, project, handled = _resolve_invocation(model=model, project=project)
+    model, project, handled, no_splash = _resolve_invocation(
+        model=model,
+        project=project,
+        no_splash=no_splash,
+    )
     if handled:
         from backend.cli.storage_cleanup import run_storage_cleanup_command
 
         run_storage_cleanup_command(project)
         return
     try:
-        asyncio.run(_async_main(model=model, project=project))
+        asyncio.run(_async_main(model=model, project=project, show_splash=not no_splash))
     except KeyboardInterrupt:
         # Top-level Ctrl+C — exit cleanly without traceback.
         print()  # newline after ^C
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

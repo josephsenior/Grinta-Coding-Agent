@@ -143,6 +143,51 @@ def get_session_id_by_index(index: int, config: AppConfig | None = None) -> str 
     return None
 
 
+def resolve_session_id(
+    target: str,
+    config: AppConfig | None = None,
+) -> tuple[str | None, str | None]:
+    """Resolve a 1-based index, exact session id, or unique id prefix.
+
+    Returns ``(session_id, None)`` on success or ``(None, user_message)`` on
+    failure. The message is ready for CLI display.
+    """
+    cleaned = (target or '').strip()
+    if not cleaned:
+        return None, 'Usage: /resume <N> or /resume <session_id>.'
+
+    root = _find_sessions_root(config)
+    if root is None:
+        return None, 'No session storage found for this project.'
+
+    sessions = _list_session_entries(root)
+    if not sessions:
+        return None, 'No past sessions found for this project.'
+
+    if cleaned.isdigit():
+        index = int(cleaned)
+        if 1 <= index <= len(sessions):
+            return sessions[index - 1][0], None
+        return None, f'No session at index {cleaned}.'
+
+    exact = [sid for sid, _meta, _event_count in sessions if sid == cleaned]
+    if exact:
+        return exact[0], None
+
+    matches = [sid for sid, _meta, _event_count in sessions if sid.startswith(cleaned)]
+    if len(matches) == 1:
+        return matches[0], None
+    if len(matches) > 1:
+        preview = ', '.join(sid[:12] for sid in matches[:4])
+        if len(matches) > 4:
+            preview += ', ...'
+        return (
+            None,
+            f"Session prefix '{cleaned}' is ambiguous ({len(matches)} matches: {preview}). Use a longer id.",
+        )
+    return None, f'No session matches: {cleaned}'
+
+
 def get_session_suggestions(
     config: AppConfig | None = None, limit: int = 8
 ) -> list[tuple[str, str]]:

@@ -6,6 +6,9 @@ import json
 import re
 from typing import Any
 
+_RAW_URL_RE = re.compile(r'https?://\S+', re.IGNORECASE)
+_LOW_SIGNAL_MCP_LINES = frozenset({'search results', 'results', 'content', 'text'})
+
 # (icon, short verb phrase for the activity line)
 _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'execute_bash': ('', 'Shell'),
@@ -205,6 +208,68 @@ def _trunc(s: str, max_len: int = 100) -> str:
     if len(s) <= max_len:
         return s
     return s[: max_len - 1] + '…'
+
+
+def _pluralize_result_label(label: str, count: int) -> str:
+    singular = label[:-1] if label.endswith('s') and len(label) > 1 else label
+    return singular if count == 1 else (label if label.endswith('s') else f'{label}s')
+
+
+def _preview_result_item(item: Any, *, max_len: int) -> str:
+    if isinstance(item, str) and item.strip():
+        return _trunc(item, max_len)
+    if isinstance(item, dict):
+        for key in ('title', 'name', 'path', 'file', 'url', 'id'):
+            value = item.get(key)
+            if isinstance(value, str) and value.strip():
+                return _trunc(value, max_len)
+    return ''
+
+
+def _summarize_result_collection(
+    items: list[Any], *, label: str = 'results', max_len: int
+) -> str:
+    count = len(items)
+    noun = _pluralize_result_label(label, count)
+    summary = f'{count} {noun}'
+    preview = _preview_result_item(items[0], max_len=max(20, max_len // 2)) if items else ''
+    if preview:
+        return _trunc(f'{summary} · {preview}', max_len)
+    return summary
+
+
+def _summarize_raw_mcp_text(text: str, *, max_len: int) -> str:
+    lines = [
+        raw.strip(' \t-*•')
+        for raw in (text or '').splitlines()
+        if raw.strip()
+    ]
+    if not lines:
+        return ''
+
+    preview = next(
+        (
+            line
+            for line in lines
+            if line.lower() not in _LOW_SIGNAL_MCP_LINES
+            and not _RAW_URL_RE.fullmatch(line)
+        ),
+        lines[0],
+    )
+
+    suffix_parts: list[str] = []
+    if len(lines) > 1:
+        suffix_parts.append(f'{len(lines)} lines')
+    url_count = len(_RAW_URL_RE.findall(text))
+    if url_count > 1:
+        suffix_parts.append(f'{url_count} links')
+
+    if not suffix_parts:
+        return _trunc(preview, max_len)
+
+    suffix = ' · ' + ' · '.join(suffix_parts)
+    budget = max(20, max_len - len(suffix))
+    return f'{_trunc(preview, budget)}{suffix}'
 
 
 def _summarize_terminal_manager_args(args: dict[str, Any]) -> str:
@@ -770,12 +835,12 @@ def mcp_result_user_preview(content: str, *, max_len: int = 400) -> str:
     if not s:
         return ''
     if not s.startswith('{') and not s.startswith('['):
-        return _trunc(s, max_len)
+        return _summarize_raw_mcp_text(s, max_len=max_len)
 
     try:
         data = json.loads(s)
     except (json.JSONDecodeError, TypeError, ValueError):
-        return _trunc(s, max_len)
+        return _summarize_raw_mcp_text(s, max_len=max_len)
 
     if isinstance(data, dict):
         # Search / navigation result fields (search_code, lsp, etc.)
@@ -794,11 +859,22 @@ def mcp_result_user_preview(content: str, *, max_len: int = 400) -> str:
             )
             return f'{count} matches found'
 
+        for list_key in ('results', 'items', 'entries', 'documents', 'matches'):
+            value = data.get(list_key)
+            if isinstance(value, list):
+                return _summarize_result_collection(
+                    value,
+                    label=list_key,
+                    max_len=max_len,
+                )
+
         for key in ('text', 'message', 'content', 'summary', 'result', 'output'):
             v = data.get(key)
             if isinstance(v, str) and v.strip():
-                return _trunc(v, max_len)
+                return _summarize_raw_mcp_text(v, max_len=max_len)
             if isinstance(v, (list, dict)) and v:
+                if isinstance(v, list):
+                    return _summarize_result_collection(v, max_len=max_len)
                 try:
                     nested = json.dumps(v, ensure_ascii=False)
                 except (TypeError, ValueError):
@@ -812,14 +888,12 @@ def mcp_result_user_preview(content: str, *, max_len: int = 400) -> str:
             if isinstance(msg, str):
                 return _trunc(msg, max_len)
     elif isinstance(data, list) and data:
-        # List of file matches (e.g. from search_code)
-        n = len(data)
-        return f'{n} matches found'
+        return _summarize_result_collection(data, max_len=max_len)
 
     try:
         return _trunc(json.dumps(data, ensure_ascii=False), max_len)
     except (TypeError, ValueError):
-        return _trunc(s, max_len)
+        return _summarize_raw_mcp_text(s, max_len=max_len)
 
 
 def try_format_message_as_tool_json(
