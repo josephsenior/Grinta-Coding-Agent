@@ -417,6 +417,13 @@ class StepGuardService:
         self, history: list
     ) -> dict[str, Any] | None:
         """Detect stale-state churn after a recent file mutation plus failing feedback."""
+        return StepGuardService._build_verification_requirement_from_history(history)
+
+    @staticmethod
+    def _build_verification_requirement_from_history(
+        history: list,
+    ) -> dict[str, Any] | None:
+        """Static entry point so ActionExecutionService can call it without an instance."""
         recent_history = list(history[-18:])
         last_mutation_index = -1
         mutated_paths: list[str] = []
@@ -428,7 +435,7 @@ class StepGuardService:
                     continue
                 path = getattr(event, 'path', '') or ''
                 if path:
-                    mutated_paths.append(self._normalize_path(path))
+                    mutated_paths.append(StepGuardService._normalize_path(path))
                 last_mutation_index = idx
                 continue
             if isinstance(
@@ -437,7 +444,7 @@ class StepGuardService:
             ):
                 path = getattr(event, 'path', '') or ''
                 if path:
-                    mutated_paths.append(self._normalize_path(path))
+                    mutated_paths.append(StepGuardService._normalize_path(path))
                 last_mutation_index = idx
 
         if last_mutation_index < 0:

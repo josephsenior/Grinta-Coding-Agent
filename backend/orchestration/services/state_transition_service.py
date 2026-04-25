@@ -49,6 +49,11 @@ VALID_TRANSITIONS: dict[AgentState, frozenset[AgentState]] = {
         {
             AgentState.LOADING,
             AgentState.RUNNING,
+            # The agent may complete a long LLM call while the controller was
+            # stopped (e.g. a timing race after a user-stop or step timeout).
+            # Allow it to surface its reply rather than crashing on the
+            # transition and silently losing the message.
+            AgentState.AWAITING_USER_INPUT,
         }
     ),
     AgentState.FINISHED: frozenset(

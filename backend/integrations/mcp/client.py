@@ -153,8 +153,43 @@ class MCPClient(BaseModel):
             [t.name for t in tools],
         )
 
+    async def _rebuild_stdio_client(self) -> None:
+        """Re-create the stdio transport and FastMCP client from the stored config.
+
+        Called during reconnect when the child process has already exited
+        (``keep_alive=False`` causes the subprocess to die after the initial
+        tool-enumeration session).  Simply re-entering ``__aenter__`` on a dead
+        transport will always fail; we have to spawn a fresh subprocess.
+        """
+        cfg = self._server_config
+        if cfg is None or cfg.command is None:
+            raise RuntimeError('No stdio server config available for reconnect.')
+        cwd_path = get_effective_workspace_root()
+        cwd: str | None
+        if cwd_path is not None:
+            cwd = str(cwd_path.resolve())
+        else:
+            try:
+                cwd = str(Path.cwd().resolve())
+            except OSError:
+                cwd = None
+        transport = StdioTransport(
+            command=cfg.command,
+            args=cfg.args or [],
+            env=cfg.env,
+            cwd=cwd,
+            keep_alive=False,
+        )
+        self.client = Client(transport, timeout=_mcp_reconnect_session_timeout_sec())
+
     async def _resync_session_after_disconnect(self) -> None:
         """Re-enter session and refresh tool list (used after transport drop)."""
+        # For stdio servers the child subprocess exits after the initial
+        # tool-enumeration (keep_alive=False).  Re-entering __aenter__ on the
+        # dead transport will always raise BrokenResourceError.  Rebuild the
+        # transport (i.e. re-launch the subprocess) first.
+        if self._server_config is not None and self._server_config.type == 'stdio':
+            await self._rebuild_stdio_client()
         await self._open_session()
         await self._populate_tools()
         self._reapply_mcp_tool_aliases()

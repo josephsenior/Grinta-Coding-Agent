@@ -52,11 +52,11 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         cb.circuit_breaker.stuck_detection_count = 1
         self.controller.circuit_breaker_service = cb
 
-        # Run first attempt
+        # Run first attempt: sets replan latch and returns False
         result = await self.service._handle_stuck_detection(self.controller)
 
-        # Verify
-        self.assertTrue(result)
+        # First call: latch set, directive injected, returns False
+        self.assertFalse(result)
         cb.record_stuck_detection.assert_called_once()
 
         # Check event emitted
@@ -80,11 +80,11 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
 
         self.controller.event_stream = MagicMock()
 
-        # Run
+        # Run: first stuck call returns False (latch set)
         result = await self.service._handle_stuck_detection(self.controller)
 
         # Verify
-        self.assertTrue(result)
+        self.assertFalse(result)
         cb.record_stuck_detection.assert_called_once()
         self.controller.event_stream.add_event.assert_called_once()
 
@@ -103,10 +103,12 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         first = await self.service._handle_stuck_detection(self.controller)
         second = await self.service._handle_stuck_detection(self.controller)
 
-        self.assertTrue(first)
+        # First call: is_stuck() True → sets latch → records cb → injects directive → returns False
+        # Second call: latch is set → clears latch → returns True (skips is_stuck entirely)
+        self.assertFalse(first)
         self.assertTrue(second)
-        self.assertEqual(cb.record_stuck_detection.call_count, 2)
-        self.assertEqual(self.controller.event_stream.add_event.call_count, 2)
+        self.assertEqual(cb.record_stuck_detection.call_count, 1)
+        self.assertEqual(self.controller.event_stream.add_event.call_count, 1)
 
     async def test_handle_stuck_detection_clears_agent_queued_actions(self):
         stuck_svc = MagicMock()
@@ -125,7 +127,8 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
 
         result = await self.service._handle_stuck_detection(self.controller)
 
-        self.assertTrue(result)
+        # First stuck call: sets replan latch and returns False (will yield True on next call)
+        self.assertFalse(result)
         self.controller.agent.clear_queued_actions.assert_called_once()
 
     async def test_handle_stuck_detection_requires_fresh_verification_after_edit_failure(

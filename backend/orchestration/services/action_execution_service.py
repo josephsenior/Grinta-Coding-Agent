@@ -428,6 +428,22 @@ class ActionExecutionService:
                 source='ActionExecutionService',
             )
 
+    def _set_verification_requirement(self, requirement: dict[str, object]) -> None:
+        state = getattr(self._context, 'state', None)
+        if state is None:
+            return
+        extra = getattr(state, 'extra_data', None)
+        if not isinstance(extra, dict):
+            state.extra_data = {}
+            extra = state.extra_data
+        extra[_VERIFICATION_REQUIRED_KEY] = requirement
+        if hasattr(state, 'set_extra'):
+            state.set_extra(
+                _VERIFICATION_REQUIRED_KEY,
+                requirement,
+                source='ActionExecutionService',
+            )
+
     @staticmethod
     def _normalize_mcp_tool_name(action: MCPAction) -> str:
         name = str(getattr(action, 'name', '') or '').strip().lower()
@@ -498,8 +514,38 @@ class ActionExecutionService:
         )
         return '\n'.join(lines)
 
+    def _proactive_churn_check(self, action: Action) -> dict[str, object] | None:
+        """Proactively scan history for edit+failure churn even before stuck detection fires.
+
+        Returns a verification requirement dict if the pattern is detected,
+        otherwise None.  Only called when no gate is already set.
+        """
+        if not self._action_blocked_by_verification_requirement(action):
+            return None
+        state = getattr(self._context, 'state', None)
+        if state is None:
+            return None
+        history = getattr(state, 'history', [])
+        if not history:
+            return None
+        try:
+            from backend.orchestration.services.step_guard_service import (
+                StepGuardService,
+            )
+
+            return StepGuardService._build_verification_requirement_from_history(history)
+        except Exception:
+            return None
+
     def _enforce_verification_requirement(self, action: Action) -> bool:
         requirement = self._get_verification_requirement()
+        if requirement is None:
+            # Proactive path: check history even when stuck detection hasn't fired yet.
+            requirement = self._proactive_churn_check(action)
+            if requirement is not None:
+                # Persist so the gate stays set until a grounding action clears it.
+                self._set_verification_requirement(requirement)
+
         if requirement is None:
             return False
 
