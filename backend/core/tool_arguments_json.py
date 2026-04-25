@@ -55,11 +55,12 @@ def parse_tool_arguments_object(raw: object) -> dict[str, Any]:
     except (json.JSONDecodeError, ValueError):
         pass
 
-    # The text is not valid JSON.  If it doesn't end with '}' the stream was
-    # most likely truncated mid-value — raise a dedicated error so callers can
-    # retry rather than silently accepting a partial payload (e.g. a file with
-    # only the first few lines of a large create_file body).
-    if not text.endswith('}'):
+    # The text is not valid JSON.  If it looks like a JSON object that started
+    # but was never closed (starts with '{', does NOT end with '}'), the stream
+    # was most likely cut off mid-value — raise a dedicated error so callers can
+    # retry rather than silently accepting a partial payload (e.g. a file that
+    # contains only the first few lines of a large create_file body).
+    if text.startswith('{') and not text.endswith('}'):
         raise TruncatedToolArgumentsError(
             f'Tool call arguments appear truncated (stream ended before JSON object '
             f'was closed). Last 60 chars: ...{text[-60:]!r}'
