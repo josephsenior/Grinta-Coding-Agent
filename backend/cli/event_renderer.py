@@ -2423,6 +2423,10 @@ class CLIEventRenderer:
         if isinstance(action, TaskTrackingAction):
             self._clear_streaming_preview()
             self._flush_pending_tool_cards()
+            command = str(getattr(action, 'command', '') or '').strip().lower()
+            task_list = getattr(action, 'task_list', None)
+            if command == 'update' and isinstance(task_list, list):
+                self._set_task_panel(task_list)
             self.refresh()
             return
 

@@ -53,10 +53,15 @@ class TaskValidationService:
         """Block finish when the visible active plan still has tasks in progress."""
         controller = self._context.get_controller()
         plan = getattr(controller.state, 'plan', None)
-        if plan is None:
+        used_task_tracker = self._session_used_task_tracker()
+        if plan is None and not used_task_tracker:
             return True
 
         active_steps = self._collect_non_terminal_steps(getattr(plan, 'steps', []))
+        if plan is not None or used_task_tracker:
+            active_steps = self._dedupe_active_steps(
+                active_steps + self._load_persisted_non_terminal_steps()
+            )
         if not active_steps:
             return True
 
@@ -70,12 +75,58 @@ class TaskValidationService:
 
         return await self._emit_finish_block(
             '⚠️ FINISH BLOCKED: The task plan still has active steps. '
-            'You must ensure all tasks are in a terminal state (`done`, `skipped`, or `blocked`) '
+            'You must ensure all tasks are marked `done` or another terminal state (`skipped` or `blocked`) '
             'before calling the finish tool.\n\n'
             f'Active steps:\n{bullets}{more}',
             error_id='TASK_TRACKER_INCOMPLETE',
             cause_action=action,
         )
+
+    def _session_used_task_tracker(self) -> bool:
+        """True when the current session has used task tracking at least once."""
+        history = getattr(self._context.get_controller().state, 'history', None)
+        if not isinstance(history, list):
+            return False
+
+        from backend.ledger.action import TaskTrackingAction
+        from backend.ledger.observation import TaskTrackingObservation
+
+        return any(
+            isinstance(event, (TaskTrackingAction, TaskTrackingObservation))
+            for event in history
+        )
+
+    def _load_persisted_non_terminal_steps(self) -> list[tuple[str, str, str]]:
+        """Load active steps from the persisted workspace plan when available."""
+        controller = self._context.get_controller()
+        config = getattr(controller, 'config', None)
+        project_root = getattr(config, 'project_root', None)
+        if not isinstance(project_root, str) or not project_root.strip():
+            return []
+
+        try:
+            from backend.engine.tools.task_tracker import TaskTracker
+
+            persisted_steps = TaskTracker(project_root.strip()).load_from_file()
+        except Exception as exc:
+            logger.debug('Could not load persisted active plan for finish validation: %s', exc)
+            return []
+
+        return self._collect_non_terminal_steps(persisted_steps)
+
+    @staticmethod
+    def _dedupe_active_steps(
+        steps: list[tuple[str, str, str]]
+    ) -> list[tuple[str, str, str]]:
+        """Return stable unique active-step tuples preserving first-seen order."""
+        unique: list[tuple[str, str, str]] = []
+        seen: set[tuple[str, str, str]] = set()
+        for step in steps:
+            if step in seen:
+                continue
+            seen.add(step)
+            unique.append(step)
+        return unique
 
     def _collect_non_terminal_steps(
         self, steps: list[Any]
@@ -83,19 +134,28 @@ class TaskValidationService:
         """Return visible plan steps that are still todo or doing."""
         active_steps: list[tuple[str, str, str]] = []
         for step in steps or []:
-            status = str(getattr(step, 'status', '') or '').strip().lower()
+            if isinstance(step, dict):
+                status = str(step.get('status', '') or '').strip().lower()
+                step_id = str(step.get('id', '?') or '?')
+                description = str(
+                    step.get('description', 'Untitled step') or 'Untitled step'
+                )
+                subtasks = step.get('subtasks', None) or []
+            else:
+                status = str(getattr(step, 'status', '') or '').strip().lower()
+                step_id = str(getattr(step, 'id', '?') or '?')
+                description = str(
+                    getattr(step, 'description', 'Untitled step') or 'Untitled step'
+                )
+                subtasks = getattr(step, 'subtasks', None) or []
             if status in ACTIVE_TASK_STATUSES:
                 active_steps.append(
                     (
-                        str(getattr(step, 'id', '?') or '?'),
-                        str(
-                            getattr(step, 'description', 'Untitled step')
-                            or 'Untitled step'
-                        ),
+                        step_id,
+                        description,
                         status,
                     )
                 )
-            subtasks = getattr(step, 'subtasks', None) or []
             active_steps.extend(self._collect_non_terminal_steps(subtasks))
         return active_steps
 

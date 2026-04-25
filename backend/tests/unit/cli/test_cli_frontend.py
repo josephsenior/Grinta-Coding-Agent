@@ -2546,6 +2546,50 @@ async def test_renderer_handles_task_tracking_action() -> None:
 
 
 @pytest.mark.asyncio
+async def test_renderer_syncs_task_panel_from_update_action_before_observation() -> None:
+    from backend.ledger.action import TaskTrackingAction
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    renderer.start_live()
+
+    await renderer.handle_event(
+        TaskTrackingObservation(
+            content="created",
+            command="update",
+            task_list=[
+                {
+                    "id": "1",
+                    "description": "Analyze manifest structure",
+                    "status": "doing",
+                }
+            ],
+        )
+    )
+    action = TaskTrackingAction(
+        command="update",
+        task_list=[
+            {
+                "id": "1",
+                "description": "Analyze manifest structure",
+                "status": "done",
+            }
+        ],
+    )
+    action.source = EventSource.AGENT
+    await renderer.handle_event(action)
+
+    renderer.stop_live()
+    output = _console_output(console)
+    assert "Tasks (1)" in output
+    assert "[DONE]" in output
+    assert "[DOING]" not in output
+
+
+@pytest.mark.asyncio
 async def test_renderer_task_tracking_observation_replaces_previous_panel() -> None:
     console = _make_console()
     hud = HUDBar()

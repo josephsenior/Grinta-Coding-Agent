@@ -1,10 +1,12 @@
 """Tests for TaskValidationService."""
 
 import unittest
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.core.schemas import AgentState
+from backend.engine.tools.task_tracker import TaskTracker
 from backend.ledger.action.agent import PlaybookFinishAction
 from backend.orchestration.services.task_validation_service import TaskValidationService
 
@@ -19,9 +21,11 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.state = MagicMock()
         self.mock_controller.state.agent_state = AgentState.RUNNING
         self.mock_controller.state.plan = None
+        self.mock_controller.state.history = []
         self.mock_controller.event_stream = MagicMock()
         self.mock_controller.set_agent_state_to = AsyncMock()
         self.mock_controller._get_initial_task = MagicMock()
+        self.mock_controller.config = SimpleNamespace(project_root=None)
         self.mock_context.get_controller.return_value = self.mock_controller
 
         self.service = TaskValidationService(self.mock_context)
@@ -256,6 +260,40 @@ class TestTaskValidationService(unittest.IsolatedAsyncioTestCase):
         result = await self.service.handle_finish(action)
 
         self.assertTrue(result)
+
+    async def test_handle_finish_blocks_when_persisted_plan_has_active_steps(self):
+        action = PlaybookFinishAction(outputs={})
+        self.mock_controller.task_validator = None
+        self.mock_controller.state.plan = SimpleNamespace(
+            steps=[
+                SimpleNamespace(
+                    id='1',
+                    description='Implement CLI interface',
+                    status='done',
+                    subtasks=[],
+                )
+            ]
+        )
+
+        with TemporaryDirectory() as tmpdir:
+            self.mock_controller.config.project_root = tmpdir
+            TaskTracker(tmpdir).save_to_file(
+                [
+                    {
+                        'id': '1',
+                        'description': 'Implement CLI interface',
+                        'status': 'doing',
+                    }
+                ]
+            )
+
+            result = await self.service.handle_finish(action)
+
+        self.assertFalse(result)
+        self.mock_controller.event_stream.add_event.assert_called_once()
+        observation = self.mock_controller.event_stream.add_event.call_args[0][0]
+        self.assertEqual(observation.error_id, 'TASK_TRACKER_INCOMPLETE')
+        self.assertIn('Implement CLI interface', observation.content)
 
     async def test_build_feedback_complete(self):
         """Test _build_feedback includes all validation details."""
