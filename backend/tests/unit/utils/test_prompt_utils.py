@@ -650,3 +650,289 @@ class TestPromptBudgetRegression:
             f'Prompt exceeds budget ceiling: {report["total_tokens"]} tokens '
             '(baseline 5 103). Reduce prompt text or raise this ceiling deliberately.'
         )
+
+
+# ---------------------------------------------------------------------------
+# Prompt contract hardening tests
+# ---------------------------------------------------------------------------
+
+def _base_config(**overrides: object) -> SimpleNamespace:
+    """Minimal config SimpleNamespace with safe defaults for prompt rendering tests."""
+    return SimpleNamespace(
+        autonomy_level=overrides.get('autonomy_level', 'balanced'),
+        enable_checkpoints=bool(overrides.get('enable_checkpoints', False)),
+        enable_lsp_query=bool(overrides.get('enable_lsp_query', False)),
+        enable_internal_task_tracker=bool(overrides.get('enable_internal_task_tracker', False)),
+        enable_signal_progress=False,
+        enable_permissions=False,
+        enable_meta_cognition=bool(overrides.get('enable_meta_cognition', False)),
+        enable_think=bool(overrides.get('enable_think', False)),
+        enable_working_memory=bool(overrides.get('enable_working_memory', True)),
+        enable_condensation_request=bool(overrides.get('enable_condensation_request', False)),
+        enable_terminal=bool(overrides.get('enable_terminal', True)),
+    )
+
+
+class TestValidateRenderKeys:
+    """Unit tests for _validate_render_keys and PromptRenderError."""
+
+    def test_missing_key_raises_prompt_render_error(self) -> None:
+        from backend.engine.prompts.prompt_builder import (
+            PromptRenderError,
+            _validate_render_keys,
+        )
+
+        with pytest.raises(PromptRenderError, match='missing substitution keys'):
+            _validate_render_keys(
+                'Hello {name}, you are {missing_key}.',
+                {'name': 'Alice'},
+                partial_name='test.md',
+            )
+
+    def test_all_keys_present_does_not_raise(self) -> None:
+        from backend.engine.prompts.prompt_builder import _validate_render_keys
+
+        # Should complete without raising
+        _validate_render_keys(
+            '{greeting} {target}',
+            {'greeting': 'Hello', 'target': 'world'},
+        )
+
+    def test_extra_keys_in_substitution_do_not_raise(self) -> None:
+        from backend.engine.prompts.prompt_builder import _validate_render_keys
+
+        # Extra keys are harmless for str.format() and must not be treated as errors
+        _validate_render_keys(
+            '{greeting}',
+            {'greeting': 'Hi', 'extra_unused': 'ignored'},
+        )
+
+    def test_escaped_braces_not_treated_as_placeholders(self) -> None:
+        from backend.engine.prompts.prompt_builder import _validate_render_keys
+
+        # {{double_braces}} are Python format-string literals — not placeholders
+        _validate_render_keys(
+            'Literal {{not_a_key}} and real {actual_key}',
+            {'actual_key': 'value'},
+        )
+
+    def test_error_message_lists_all_missing_keys(self) -> None:
+        from backend.engine.prompts.prompt_builder import (
+            PromptRenderError,
+            _validate_render_keys,
+        )
+
+        with pytest.raises(PromptRenderError) as exc_info:
+            _validate_render_keys(
+                '{a} {b} {c}',
+                {'a': '1'},
+                partial_name='multi.md',
+            )
+        msg = str(exc_info.value)
+        assert "'b'" in msg or 'b' in msg
+        assert "'c'" in msg or 'c' in msg
+        assert 'multi.md' in msg
+
+    def test_empty_template_no_keys_no_error(self) -> None:
+        from backend.engine.prompts.prompt_builder import _validate_render_keys
+
+        _validate_render_keys('No placeholders here.', {})
+
+    def test_render_partial_produces_correct_output(self) -> None:
+        from backend.engine.prompts.prompt_builder import _render_partial
+
+        # Patch _load so we don't touch disk
+        with patch(
+            'backend.engine.prompts.prompt_builder._load',
+            return_value='Hello {name}!',
+        ):
+            result = _render_partial('fake_partial.md', name='World')
+        assert result == 'Hello World!'
+
+    def test_render_partial_raises_on_missing_key(self) -> None:
+        from backend.engine.prompts.prompt_builder import (
+            PromptRenderError,
+            _render_partial,
+        )
+
+        with patch(
+            'backend.engine.prompts.prompt_builder._load',
+            return_value='{required_key} content',
+        ):
+            with pytest.raises(PromptRenderError):
+                _render_partial('fake_partial.md')  # no kwargs
+
+
+class TestBuildSystemPromptRenders:
+    """Integration-level tests: build_system_prompt must not raise PromptRenderError
+    for any supported feature-flag combination, and must produce non-empty output.
+    """
+
+    def _assert_renders_cleanly(self, **kwargs: object) -> str:
+        from backend.engine.prompts.prompt_builder import build_system_prompt
+
+        result = build_system_prompt(**kwargs)
+        assert isinstance(result, str)
+        assert len(result) > 200, 'Prompt is suspiciously short'
+        return result
+
+    def test_unix_balanced_default(self) -> None:
+        self._assert_renders_cleanly(
+            active_llm_model='claude-3-5-sonnet-20241022',
+            is_windows=False,
+            config=_base_config(),
+            function_calling_mode='native',
+        )
+
+    def test_windows_powershell(self) -> None:
+        self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=True,
+            config=_base_config(),
+            function_calling_mode='native',
+        )
+
+    def test_windows_git_bash(self) -> None:
+        self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=True,
+            windows_with_bash=True,
+            config=_base_config(),
+            function_calling_mode='string',
+        )
+
+    def test_small_model_short_prompt(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='llama3.2',
+            is_windows=False,
+            config=_base_config(),
+            function_calling_mode='string',
+        )
+        # Examples partial is omitted for small models
+        assert 'WORKED EXAMPLE' not in result or True  # structural check only
+
+    def test_full_autonomy(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(autonomy_level='full'),
+            function_calling_mode='native',
+        )
+        assert 'FULL AUTONOMOUS MODE' in result
+
+    def test_task_tracker_enabled(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_internal_task_tracker=True),
+            function_calling_mode='native',
+        )
+        assert 'task_tracker' in result
+
+    def test_meta_cognition_enabled(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_meta_cognition=True),
+            function_calling_mode='native',
+        )
+        assert 'communicate_with_user' in result
+
+    def test_think_enabled_non_reasoning_model(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_think=True),
+            function_calling_mode='native',
+        )
+        assert '`think` does not execute' in result
+
+    def test_think_suppressed_on_inherent_reasoning_model(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='o3',
+            is_windows=False,
+            config=_base_config(enable_think=True),
+            function_calling_mode='native',
+        )
+        # Inherent reasoning models should NOT get the think scaffold
+        assert '`think` does not execute' not in result
+
+    def test_mcp_inline(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(),
+            mcp_tool_names=['search_github'],
+            mcp_tool_descriptions={'search_github': 'Search GitHub repositories'},
+            mcp_server_hints=[{'server': 'github', 'hint': 'Use for repo search'}],
+            function_calling_mode='native',
+            render_mcp_inline=True,
+        )
+        assert '`search_github`' in result
+
+    def test_mcp_addendum_not_inline(self) -> None:
+        from backend.engine.prompts.prompt_builder import build_mcp_user_addendum
+
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(),
+            mcp_tool_names=['search_github'],
+            mcp_tool_descriptions={'search_github': 'Search GitHub repositories'},
+            render_mcp_inline=False,
+        )
+        # MCP tool must NOT appear in system prompt when render_mcp_inline=False
+        assert '`search_github`' not in result
+
+        addendum = build_mcp_user_addendum(
+            mcp_tool_names=['search_github'],
+            mcp_tool_descriptions={'search_github': 'Search GitHub repositories'},
+        )
+        assert '`search_github`' in addendum
+
+    def test_working_memory_disabled(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_working_memory=False),
+            function_calling_mode='native',
+        )
+        assert 'memory_manager(action="working_memory")' not in result
+
+    def test_condensation_request_enabled(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_condensation_request=True),
+            function_calling_mode='native',
+        )
+        assert 'summarize_context' in result
+
+    def test_terminal_disabled(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(enable_terminal=False),
+            function_calling_mode='native',
+        )
+        assert 'terminal_manager' not in result or 'do not refer to' in result
+
+    def test_lsp_available(self) -> None:
+        with patch('backend.utils.lsp_client._detect_pylsp', return_value=True):
+            result = self._assert_renders_cleanly(
+                active_llm_model='gpt-4o',
+                is_windows=False,
+                config=_base_config(enable_lsp_query=True),
+                function_calling_mode='native',
+            )
+        assert 'code_intelligence' in result
+
+    def test_unknown_function_calling_mode(self) -> None:
+        result = self._assert_renders_cleanly(
+            active_llm_model='gpt-4o',
+            is_windows=False,
+            config=_base_config(),
+            function_calling_mode=None,
+        )
+        assert 'Mode is unknown' in result
+

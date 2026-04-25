@@ -15,6 +15,8 @@ build_knowledge_base_info(.) → knowledge-base block
 
 from __future__ import annotations
 
+import logging
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -27,6 +29,52 @@ if TYPE_CHECKING:
     )
 
 _DIR = Path(__file__).parent
+_log = logging.getLogger(__name__)
+
+# Matches {key} placeholders — but NOT {{ or }} (Python format-string escapes).
+_PLACEHOLDER_RE = re.compile(r'(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})')
+
+
+class PromptRenderError(ValueError):
+    """Raised when a prompt template is missing required substitution keys."""
+
+
+def _validate_render_keys(
+    template: str,
+    substitution: dict[str, Any],
+    *,
+    partial_name: str = "",
+) -> None:
+    """Verify that every ``{key}`` placeholder in *template* has a matching entry in *substitution*.
+
+    Raises :class:`PromptRenderError` on the first missing key so callers fail
+    fast instead of propagating a ``KeyError`` deep inside `str.format`.
+
+    Extra keys in *substitution* that are not referenced by the template are
+    silently ignored by `str.format` and are logged at DEBUG level only.
+    """
+    required = set(_PLACEHOLDER_RE.findall(template))
+    provided = set(substitution)
+    missing = required - provided
+    if missing:
+        loc = f" in {partial_name!r}" if partial_name else ""
+        raise PromptRenderError(
+            f"Prompt template{loc} is missing substitution keys: {sorted(missing)}"
+        )
+    extra = provided - required
+    if extra:
+        _log.debug(
+            "Prompt partial %r received unused substitution keys: %s",
+            partial_name,
+            sorted(extra),
+        )
+
+
+def _render_partial(partial_name: str, **kwargs: Any) -> str:
+    """Load a prompt partial, validate all placeholders are satisfied, and render."""
+    template = _load(partial_name)
+    _validate_render_keys(template, kwargs, partial_name=partial_name)
+    return template.format(**kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -248,7 +296,8 @@ def _render_routing(
         if tracker_on
         else "Use restored working memory and recent verified observations as the source of truth for what remains."
     )
-    return _load("system_partial_00_routing.md").format(
+    return _render_partial(
+        "system_partial_00_routing.md",
         ambiguous_intent_instruction=ambiguous_intent_instruction,
         batch_commands=batch_cmds,
         code_intelligence_routing=code_intelligence_routing,
@@ -355,7 +404,8 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
             "**Plan synchronization:** Keep your working memory and finish summary aligned with what was actually completed before attempting to finish."
         )
 
-    return _load("system_partial_01_autonomy.md").format(
+    return _render_partial(
+        "system_partial_01_autonomy.md",
         autonomy_block=autonomy,
         task_tracker_discipline_block=task_tracker_discipline_block,
         task_sync_instruction=task_sync_instruction,
@@ -388,7 +438,8 @@ def _render_tool_reference(is_windows: bool, config: Any = None) -> str:
         if checkpoints
         else ""
     )
-    return _load("system_partial_02_tools.md").format(
+    return _render_partial(
+        "system_partial_02_tools.md",
         confirm_paths=confirm_cmd,
         process_management=proc_find,
         checkpoint_rollback_hint=checkpoint_rollback_hint,
@@ -420,7 +471,8 @@ def _render_critical(
         terminal_manager_rule = (
             f"**Interactive terminal sessions are unavailable in this run** — do not refer to `terminal_manager`; use `{terminal_command_tool}` for non-interactive command execution only."
         )
-    return _load("system_partial_04_critical.md").format(
+    return _render_partial(
+        "system_partial_04_critical.md",
         terminal_command_tool=terminal_command_tool,
         terminal_manager_rule=terminal_manager_rule,
         think_execution_rule=think_execution_rule,
@@ -533,7 +585,8 @@ def _render_mcp_and_permissions(
         else ""
     )
     parts.append(
-        _load("system_partial_03_tail.md").format(
+        _render_partial(
+            "system_partial_03_tail.md",
             communicate_tool_section=communicate_tool_section,
             interaction_guidance=(
                 "If a request is vague, inspect nearby docs/config first; use `communicate_with_user` only if you are still blocked or the scope is still ambiguous."
