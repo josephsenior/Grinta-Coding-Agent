@@ -215,9 +215,15 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.assertIn('task_tracker update', directive)
         self.assertIn('finish', directive)
 
-    async def test_handle_action_message_from_agent_allows_checkpoint_completion_handoff(
+    async def test_handle_action_message_from_agent_always_intercepts_after_checkpoint(
         self,
     ):
+        """After any checkpoint tool call, MessageAction(wait_for_response=True) is
+        always intercepted regardless of content — no content sniffing.
+
+        If the agent thinks the task is done it must call PlaybookFinish, not hand
+        back via a MessageAction.  The guidance injected here tells it exactly that.
+        """
         checkpoint_obs = AgentThinkObservation(content='Your thought has been logged.')
         checkpoint_obs.tool_result = {
             'tool': 'checkpoint',
@@ -240,10 +246,11 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
 
         await self.service._handle_action(action)
 
-        self.mock_controller.set_agent_state_to.assert_called_once_with(
-            AgentState.AWAITING_USER_INPUT
-        )
-        self.mock_controller.event_stream.add_event.assert_not_called()
+        # Always intercepted — agent stays RUNNING, guided to continue or call finish
+        self.mock_controller.set_agent_state_to.assert_not_called()
+        self.mock_controller.state.set_planning_directive.assert_called_once()
+        directive = self.mock_controller.state.set_planning_directive.call_args[0][0]
+        self.assertIn('checkpoint is an intermediate control tool', directive)
 
     async def test_handle_action_message_from_agent_blocks_incomplete_revert_handoff(
         self,

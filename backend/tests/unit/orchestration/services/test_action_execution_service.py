@@ -170,12 +170,25 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
             await self.service.get_next_action()
 
     async def test_get_next_action_pauses_after_repeated_null_actions(self):
-        """Repeated live-agent NullAction results should trip a bounded pause."""
+        """Repeated live-agent NullAction results should trip a bounded pause.
+
+        On the 3rd consecutive NullAction the service must:
+        - emit a NULL_ACTION_LOOP ErrorObservation
+        - transition the controller to AWAITING_USER_INPUT directly
+        - return None (no MessageAction — avoids the race between runtime
+          NullObservation and the event-router state transition)
+        """
+        from backend.core.schemas import AgentState
+
         self.mock_context.agent.astep = AsyncMock(side_effect=[
             NullAction(),
             NullAction(),
             NullAction(),
         ])
+        mock_controller = MagicMock()
+        mock_controller.get_agent_state.return_value = AgentState.RUNNING
+        mock_controller.set_agent_state_to = AsyncMock()
+        self.mock_context.get_controller.return_value = mock_controller
 
         first = await self.service.get_next_action()
         second = await self.service.get_next_action()
@@ -183,12 +196,13 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(first, NullAction)
         self.assertIsInstance(second, NullAction)
-        self.assertIsInstance(third, MessageAction)
-        self.assertTrue(third.wait_for_response)
-        self.assertIn('no executable action 3 times in a row', third.content)
+        self.assertIsNone(third)
         self.mock_context.event_stream.add_event.assert_called_once()
         error_obs = self.mock_context.event_stream.add_event.call_args[0][0]
         self.assertEqual(error_obs.error_id, 'NULL_ACTION_LOOP')
+        mock_controller.set_agent_state_to.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
 
     async def test_get_next_action_resets_null_streak_after_real_action(self):
         """A real action should clear the null-action streak."""

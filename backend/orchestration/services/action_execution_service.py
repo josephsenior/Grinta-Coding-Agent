@@ -35,7 +35,6 @@ from backend.ledger.action import (
     FileWriteAction,
     LspQueryAction,
     MCPAction,
-    MessageAction,
     NullAction,
     PlaybookFinishAction,
     RecallAction,
@@ -253,7 +252,7 @@ class ActionExecutionService:
                 if use_confirmation_replay:
                     return action
                 if isinstance(action, NullAction):
-                    return self._handle_consecutive_null_action(action)
+                    return await self._handle_consecutive_null_action(action)
                 self._reset_consecutive_null_actions()
                 return action
 
@@ -357,7 +356,7 @@ class ActionExecutionService:
 
         return None
 
-    def _handle_consecutive_null_action(self, action: Action) -> Action:
+    async def _handle_consecutive_null_action(self, action: Action) -> Action | None:
         self._consecutive_null_actions += 1
         logger.warning(
             'ActionExecutionService.get_next_action: consecutive NullAction %d/%d '
@@ -386,16 +385,16 @@ class ActionExecutionService:
         )
         self._reset_consecutive_null_actions()
 
-        pause = MessageAction(
-            content=(
-                'I am pausing because the model returned no executable action 3 times '
-                'in a row after the last step. This stops a no-progress retry loop '
-                'instead of silently consuming more model calls.'
-            ),
-            wait_for_response=True,
-        )
-        pause.source = EventSource.AGENT
-        return pause
+        # Set AWAITING_USER_INPUT directly on the controller instead of returning a
+        # MessageAction. Returning a MessageAction caused a race: the runtime would
+        # process the action, emit a NullObservation, and trigger_post_resolution_step
+        # would resume the loop before the event router could set AWAITING_USER_INPUT.
+        from backend.core.schemas import AgentState as _AgentState
+
+        controller = self._context.get_controller()
+        if controller.get_agent_state() == _AgentState.RUNNING:
+            await controller.set_agent_state_to(_AgentState.AWAITING_USER_INPUT)
+        return None
 
     def _reset_consecutive_null_actions(self) -> None:
         self._consecutive_null_actions = 0

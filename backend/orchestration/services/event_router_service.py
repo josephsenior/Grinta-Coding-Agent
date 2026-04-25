@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import os as _os
-import re
 from typing import TYPE_CHECKING
 
 from backend.core.schemas import AgentState
@@ -53,20 +52,6 @@ if TYPE_CHECKING:
 
 
 _CHECKPOINT_INTERMEDIATE_TOOLS = frozenset({'checkpoint', 'revert_to_checkpoint'})
-_USER_INPUT_HINTS = (
-    re.compile(r'\?\s*$'),
-    re.compile(r'\b(?:can|could|would|should|do)\s+you\b'),
-    re.compile(
-        r'\b(?:please confirm|clarify|let me know|which option|what would you like)\b'
-    ),
-)
-_COMPLETION_HANDOFF_MARKERS = (
-    'next step',
-    'next steps',
-    "if you'd like",
-    'if you want',
-    'let me know if',
-)
 _DELEGATE_PROGRESS_STATUS = 'delegate_progress'
 
 
@@ -313,12 +298,6 @@ class EventRouterService:
         if recent_tool_result is None:
             return False
 
-        content = (action.content or '').strip()
-        if self._message_requests_user_input(content):
-            return False
-        if self._message_provides_completion_handoff(content):
-            return False
-
         tool_name = str(recent_tool_result.get('tool') or 'checkpoint')
         next_best_action = str(recent_tool_result.get('next_best_action') or '').strip()
         guidance_lines = [
@@ -371,18 +350,6 @@ class EventRouterService:
             if tool_name in _CHECKPOINT_INTERMEDIATE_TOOLS:
                 return tool_result
         return None
-
-    @staticmethod
-    def _message_requests_user_input(content: str) -> bool:
-        lowered = content.strip().lower()
-        if not lowered:
-            return False
-        return any(pattern.search(lowered) for pattern in _USER_INPUT_HINTS)
-
-    @staticmethod
-    def _message_provides_completion_handoff(content: str) -> bool:
-        lowered = content.strip().lower()
-        return any(marker in lowered for marker in _COMPLETION_HANDOFF_MARKERS)
 
     async def _handle_user_message(self, action: MessageAction) -> None:
         """Handle user message: log, create recall, set pending, start agent."""
