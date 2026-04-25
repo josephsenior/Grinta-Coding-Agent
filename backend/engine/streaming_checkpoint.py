@@ -25,6 +25,10 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from backend.core.constants import (
+    DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
+    DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
+)
 from backend.core.logger import app_logger as logger
 
 
@@ -58,13 +62,22 @@ class StreamingCheckpoint:
     """
 
     _FILENAME = 'streaming_wal.json'
-    _MAX_CHECKPOINT_AGE_SEC: float = 300.0  # 5 minutes
 
-    def __init__(self, checkpoint_dir: str) -> None:
+    def __init__(
+        self,
+        checkpoint_dir: str,
+        *,
+        max_checkpoint_age_sec: float = DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
+        discard_stale_on_recovery: bool = DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
+    ) -> None:
+        if max_checkpoint_age_sec <= 0:
+            raise ValueError('max_checkpoint_age_sec must be positive')
         self._dir = Path(checkpoint_dir)
         self._dir.mkdir(parents=True, exist_ok=True)
         self._wal_path = self._dir / self._FILENAME
         self._active: CheckpointRecord | None = None
+        self._max_checkpoint_age_sec = float(max_checkpoint_age_sec)
+        self._discard_stale_on_recovery = bool(discard_stale_on_recovery)
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -119,7 +132,7 @@ class StreamingCheckpoint:
         or ``None`` if the last call completed cleanly.
         """
         inspection = self.inspect_recovery()
-        if inspection.status == 'blocked_uncommitted':
+        if inspection.status in {'blocked_uncommitted', 'blocked_stale'}:
             return inspection.record
         return None
 
@@ -136,18 +149,36 @@ class StreamingCheckpoint:
             record = self._read_record()
             age = time.time() - record.created_at
 
-            if age > self._MAX_CHECKPOINT_AGE_SEC:
-                logger.warning(
-                    'Discarding stale streaming checkpoint %s (age=%.1fs > %.0fs limit)',
-                    record.token,
-                    age,
-                    self._MAX_CHECKPOINT_AGE_SEC,
+            if age > self._max_checkpoint_age_sec:
+                if self._discard_stale_on_recovery:
+                    reason = (
+                        f'checkpoint age {age:.1f}s exceeded '
+                        f'{self._max_checkpoint_age_sec:.1f}s max age; '
+                        'auto-discard enabled'
+                    )
+                    logger.warning(
+                        'Discarding stale streaming checkpoint %s (%s)',
+                        record.token,
+                        reason,
+                    )
+                    self._remove_wal()
+                    return RecoveryInspection(
+                        status='stale_discarded',
+                        record=record,
+                        reason=reason,
+                    )
+
+                reason = (
+                    f'stale uncommitted checkpoint token={record.token} '
+                    f'age={age:.1f}s attempt={record.attempt} '
+                    f'exceeded {self._max_checkpoint_age_sec:.1f}s max age '
+                    'with auto-discard disabled'
                 )
-                self._remove_wal()
+                logger.warning('Streaming checkpoint requires manual recovery: %s', reason)
                 return RecoveryInspection(
-                    status='stale_discarded',
+                    status='blocked_stale',
                     record=record,
-                    reason='checkpoint exceeded max age',
+                    reason=reason,
                 )
 
             reason = (

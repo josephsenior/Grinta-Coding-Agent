@@ -58,6 +58,8 @@ from backend.core.constants import (
     DEFAULT_AGENT_REFLECTION_MIDDLEWARE_ENABLED,
     DEFAULT_AGENT_SIGNAL_PROGRESS_ENABLED,
     DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED,
+    DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
+    DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
     DEFAULT_AGENT_STUCK_DETECTION_ENABLED,
     DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS,
     DEFAULT_AGENT_THINK_ENABLED,
@@ -71,6 +73,9 @@ if TYPE_CHECKING:
     from backend.core.config.llm_config import LLMConfig
 else:
     LLMConfig = Any  # For runtime when TYPE_CHECKING is False
+
+
+_VALID_AUTONOMY_LEVELS = {'supervised', 'balanced', 'full'}
 
 
 class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
@@ -223,15 +228,32 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     min_iterations: int = Field(
         default=DEFAULT_AGENT_MIN_ITERATIONS,
+        ge=1,
         description='Minimum iterations for simple tasks',
     )
     max_iterations_override: int | None = Field(
         default=None,
+        ge=1,
         description='Override max_iterations from AppConfig (None = use AppConfig value)',
     )
     complexity_iteration_multiplier: float = Field(
         default=DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
         description='Iterations = complexity_score * multiplier (capped at max_iterations)',
+    )
+    streaming_checkpoint_max_age_seconds: float = Field(
+        default=DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
+        gt=0.0,
+        description=(
+            'Maximum age in seconds before an uncommitted streaming checkpoint is '
+            'treated as stale during recovery.'
+        ),
+    )
+    streaming_checkpoint_discard_stale_on_recovery: bool = Field(
+        default=DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
+        description=(
+            'Whether stale streaming checkpoints should be auto-discarded during '
+            'recovery instead of blocking the next LLM call for manual review.'
+        ),
     )
     max_autonomous_iterations: int = Field(
         default=DEFAULT_AGENT_MAX_AUTONOMOUS_ITERATIONS,
@@ -347,6 +369,68 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         from backend.core.type_safety.type_safety import validate_non_empty_string
 
         return validate_non_empty_string(v, name='field')
+
+    @field_validator('autonomy_level')
+    @classmethod
+    def validate_autonomy_level_choice(cls, value: str) -> str:
+        """Normalize and validate autonomy levels against the supported set."""
+        normalized = value.strip().lower()
+        if normalized not in _VALID_AUTONOMY_LEVELS:
+            allowed = ', '.join(sorted(_VALID_AUTONOMY_LEVELS))
+            raise ValueError(f'autonomy_level must be one of: {allowed}')
+        return normalized
+
+    @model_validator(mode='after')
+    def warn_on_finish_disable(self) -> AgentConfig:
+        """Surface dangerous lifecycle toggles loudly without breaking legacy configs."""
+        if not self.enable_finish:
+            logger.warning(
+                'Agent config has enable_finish=False; the finish tool is disabled, which removes the normal task-completion signal and may prevent clean termination.'
+            )
+        if (
+            self.max_iterations_override is not None
+            and self.max_iterations_override < self.min_iterations
+        ):
+            raise ValueError(
+                'max_iterations_override must be greater than or equal to min_iterations'
+            )
+        if not self.streaming_checkpoint_discard_stale_on_recovery:
+            logger.warning(
+                'Agent config sets streaming_checkpoint_discard_stale_on_recovery=False; stale streaming WAL recovery will block the next LLM call until the checkpoint is inspected or discarded.'
+            )
+        if self.autonomy_level != 'full':
+            if self.max_autonomous_iterations > 0:
+                logger.warning(
+                    'Agent config sets max_autonomous_iterations=%s while autonomy_level=%s; this limit only applies in full autonomy.',
+                    self.max_autonomous_iterations,
+                    self.autonomy_level,
+                )
+            if self.stuck_threshold_iterations > 0:
+                logger.warning(
+                    'Agent config sets stuck_threshold_iterations=%s while autonomy_level=%s; stuck-threshold tuning only applies in full autonomy.',
+                    self.stuck_threshold_iterations,
+                    self.autonomy_level,
+                )
+        if not self.enable_dynamic_iterations:
+            if self.max_iterations_override is not None:
+                logger.warning(
+                    'Agent config sets max_iterations_override=%s while enable_dynamic_iterations=False; the override is ignored until dynamic iterations are enabled.',
+                    self.max_iterations_override,
+                )
+            if self.min_iterations != DEFAULT_AGENT_MIN_ITERATIONS:
+                logger.warning(
+                    'Agent config sets min_iterations=%s while enable_dynamic_iterations=False; this value is only used by dynamic iteration adjustment.',
+                    self.min_iterations,
+                )
+            if (
+                self.complexity_iteration_multiplier
+                != DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER
+            ):
+                logger.warning(
+                    'Agent config sets complexity_iteration_multiplier=%s while enable_dynamic_iterations=False; this value is only used by dynamic iteration adjustment.',
+                    self.complexity_iteration_multiplier,
+                )
+        return self
 
     def get_llm_config(self) -> LLMConfig | None:
         """Get the default LLM configuration for this agent.

@@ -451,6 +451,7 @@ def _render_critical(
     *,
     enable_think: bool,
     terminal_manager_available: bool,
+    meta_cognition_on: bool,
 ) -> str:
     """Render last-mile critical execution rules with dynamic terminal tool naming."""
     think_execution_rule = (
@@ -471,17 +472,66 @@ def _render_critical(
         terminal_manager_rule = (
             f"**Interactive terminal sessions are unavailable in this run** — do not refer to `terminal_manager`; use `{terminal_command_tool}` for non-interactive command execution only."
         )
+    user_question_antipattern = (
+        '**Asking the user a question in plain prose mid-turn** when `communicate_with_user` is available. The turn must end so the user can answer.'
+        if meta_cognition_on
+        else '**Asking the user a question in plain prose mid-turn** when a blocking clarification is needed. If you must ask, ask the user a short clarifying question in natural language and wait for the answer instead of continuing with guesses.'
+    )
     return _render_partial(
         "system_partial_04_critical.md",
         terminal_command_tool=terminal_command_tool,
         terminal_manager_rule=terminal_manager_rule,
         think_execution_rule=think_execution_rule,
+        user_question_antipattern=user_question_antipattern,
     )
 
 
-def _render_examples() -> str:
-    """Render the worked-examples partial (illustrative tool routing)."""
-    return _load("system_partial_05_examples.md")
+def _render_examples(
+    *,
+    tracker_on: bool,
+    enable_think: bool,
+    meta_cognition_on: bool,
+    code_intelligence_available: bool,
+    checkpoints_on: bool,
+) -> str:
+    """Render the worked-examples partial with capability-aware tool references."""
+    if tracker_on and enable_think:
+        planning_hint = 'draft the plan with `task_tracker` (or `think`)'
+    elif tracker_on:
+        planning_hint = 'draft the plan with `task_tracker`'
+    elif enable_think:
+        planning_hint = 'draft the plan with `think`'
+    else:
+        planning_hint = 'draft a short plan in your working notes before editing'
+
+    destructive_confirmation_step = (
+        'Use `communicate_with_user` to confirm scope and target.'
+        if meta_cognition_on
+        else 'ask the user a short clarifying question in natural language to confirm scope and target.'
+    )
+    checkpoint_step = (
+        'If approved and supported, take a `checkpoint` first.'
+        if checkpoints_on
+        else 'If approved, keep the change surface small and verify immediately after the action.'
+    )
+    adjacent_tool_fallback = (
+        '`edit_code` → `str_replace_editor`; `code_intelligence` → `search_code`'
+        if code_intelligence_available
+        else '`edit_code` → `str_replace_editor`; refine the `search_code` query and read nearby files'
+    )
+    failure_escalation_step = (
+        'After 3 failed attempts on the same sub-task, escalate via `communicate_with_user` with a 1-line post-mortem and a specific question.'
+        if meta_cognition_on
+        else 'After 3 failed attempts on the same sub-task, ask the user with a 1-line post-mortem and a specific question.'
+    )
+    return _render_partial(
+        'system_partial_05_examples.md',
+        planning_hint=planning_hint,
+        destructive_confirmation_step=destructive_confirmation_step,
+        checkpoint_step=checkpoint_step,
+        adjacent_tool_fallback=adjacent_tool_fallback,
+        failure_escalation_step=failure_escalation_step,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -707,6 +757,7 @@ def _collect_system_prompt_sections(
         terminal_tool_name=terminal_tool_name,
     )
     shell_is_powershell = resolved_terminal_tool == "execute_powershell"
+    code_intelligence_available = _code_intelligence_available(config)
 
     identity_line = (
         agent_identity.strip()
@@ -802,14 +853,25 @@ def _collect_system_prompt_sections(
             if perm is not None:
                 sections.append(("permissions_partial", _render_permissions(config, perm)))
 
-    # Worked-examples partial — capability-adapted: omit on small/local models
-    # where prompt budget is tight, and where examples can crowd out tool docs.
-    if not is_small_model:
-        sections.append(("system_partial_05_examples", _render_examples()))
-
     # ``think`` is opt-in via config, but if the model has inherent reasoning
     # (o1/o3/r1/grok-4/gemini-thinking) we suppress the scaffolding regardless.
     effective_enable_think = bool(getattr(config, "enable_think", False)) and not has_inherent_reasoning
+
+    # Worked-examples partial — capability-adapted: omit on small/local models
+    # where prompt budget is tight, and where examples can crowd out tool docs.
+    if not is_small_model:
+        sections.append(
+            (
+                'system_partial_05_examples',
+                _render_examples(
+                    tracker_on=bool(getattr(config, 'enable_internal_task_tracker', False)),
+                    enable_think=effective_enable_think,
+                    meta_cognition_on=bool(getattr(config, 'enable_meta_cognition', False)),
+                    code_intelligence_available=code_intelligence_available,
+                    checkpoints_on=bool(getattr(config, 'enable_checkpoints', False)),
+                ),
+            )
+        )
 
     sections.append(
         (
@@ -820,6 +882,7 @@ def _collect_system_prompt_sections(
                 terminal_manager_available=bool(
                     getattr(config, "enable_terminal", True)
                 ),
+                meta_cognition_on=bool(getattr(config, 'enable_meta_cognition', False)),
             ),
         ),
     )

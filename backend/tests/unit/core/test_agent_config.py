@@ -7,7 +7,11 @@ from pydantic import ValidationError
 
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.compactor_config import AutoCompactorConfig
-from backend.core.constants import DEFAULT_AGENT_NAME
+from backend.core.constants import (
+    DEFAULT_AGENT_NAME,
+    DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
+    DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
+)
 
 
 class TestAgentConfigDefaults:
@@ -51,6 +55,17 @@ class TestAgentConfigDefaults:
         cfg = AgentConfig()
         assert cfg.enable_graceful_shutdown is True
 
+    def test_default_streaming_checkpoint_policy(self):
+        cfg = AgentConfig()
+        assert (
+            cfg.streaming_checkpoint_max_age_seconds
+            == DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS
+        )
+        assert (
+            cfg.streaming_checkpoint_discard_stale_on_recovery
+            is DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY
+        )
+
 
 class TestAgentConfigValidation:
     def test_empty_name_rejected(self):
@@ -61,9 +76,36 @@ class TestAgentConfigValidation:
         with pytest.raises(ValidationError):
             AgentConfig(autonomy_level='')
 
+    def test_invalid_autonomy_value_rejected(self):
+        with pytest.raises(ValidationError, match='autonomy_level must be one of'):
+            AgentConfig(autonomy_level='aggressive')
+
+    def test_autonomy_value_normalized_to_lowercase(self):
+        cfg = AgentConfig(autonomy_level=' FULL ')
+        assert cfg.autonomy_level == 'full'
+
     def test_memory_max_threads_min(self):
         with pytest.raises(ValidationError):
             AgentConfig(memory_max_threads=0)
+
+    def test_min_iterations_must_be_positive(self):
+        with pytest.raises(ValidationError):
+            AgentConfig(min_iterations=0)
+
+    def test_max_iterations_override_must_be_positive_when_set(self):
+        with pytest.raises(ValidationError):
+            AgentConfig(max_iterations_override=0)
+
+    def test_max_iterations_override_cannot_be_below_min_iterations(self):
+        with pytest.raises(
+            ValidationError,
+            match='max_iterations_override must be greater than or equal to min_iterations',
+        ):
+            AgentConfig(min_iterations=50, max_iterations_override=10)
+
+    def test_streaming_checkpoint_max_age_must_be_positive(self):
+        with pytest.raises(ValidationError):
+            AgentConfig(streaming_checkpoint_max_age_seconds=0)
 
     def test_extra_fields_rejected(self):
         with pytest.raises(ValidationError):
@@ -106,6 +148,68 @@ class TestAgentConfigCustom:
     def test_max_iterations_default_none(self):
         cfg = AgentConfig()
         assert cfg.max_iterations_override is None
+
+    def test_max_iterations_override_equal_to_min_iterations_allowed(self):
+        cfg = AgentConfig(min_iterations=25, max_iterations_override=25)
+        assert cfg.min_iterations == 25
+        assert cfg.max_iterations_override == 25
+
+    def test_disable_finish_warning_is_not_silent(self):
+        from unittest.mock import patch
+
+        with patch('backend.core.config.agent_config.logger.warning') as mock_warning:
+            cfg = AgentConfig(enable_finish=False)
+
+        assert cfg.enable_finish is False
+        mock_warning.assert_called_once()
+        warning_message = mock_warning.call_args.args[0]
+        assert 'enable_finish=False' in warning_message
+        assert 'normal task-completion signal' in warning_message
+
+    def test_non_full_autonomy_warns_on_full_autonomy_only_knobs(self):
+        from unittest.mock import patch
+
+        with patch('backend.core.config.agent_config.logger.warning') as mock_warning:
+            cfg = AgentConfig(
+                autonomy_level='balanced',
+                max_autonomous_iterations=10,
+                stuck_threshold_iterations=5,
+            )
+
+        assert cfg.autonomy_level == 'balanced'
+        messages = [call.args[0] for call in mock_warning.call_args_list]
+        assert any('max_autonomous_iterations=%s' in msg for msg in messages)
+        assert any('stuck_threshold_iterations=%s' in msg for msg in messages)
+
+    def test_dynamic_iteration_specific_knobs_warn_when_feature_disabled(self):
+        from unittest.mock import patch
+
+        with patch('backend.core.config.agent_config.logger.warning') as mock_warning:
+            cfg = AgentConfig(
+                enable_dynamic_iterations=False,
+                min_iterations=60,
+                max_iterations_override=80,
+                complexity_iteration_multiplier=75.0,
+            )
+
+        assert cfg.enable_dynamic_iterations is False
+        messages = [call.args[0] for call in mock_warning.call_args_list]
+        assert any('max_iterations_override=%s' in msg for msg in messages)
+        assert any('min_iterations=%s' in msg for msg in messages)
+        assert any('complexity_iteration_multiplier=%s' in msg for msg in messages)
+
+    def test_disabling_stale_checkpoint_auto_discard_warns(self):
+        from unittest.mock import patch
+
+        with patch('backend.core.config.agent_config.logger.warning') as mock_warning:
+            cfg = AgentConfig(streaming_checkpoint_discard_stale_on_recovery=False)
+
+        assert cfg.streaming_checkpoint_discard_stale_on_recovery is False
+        messages = [call.args[0] for call in mock_warning.call_args_list]
+        assert any(
+            'streaming_checkpoint_discard_stale_on_recovery=False' in msg
+            for msg in messages
+        )
 
 
 class TestGetLlmConfig:

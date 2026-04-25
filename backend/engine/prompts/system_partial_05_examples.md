@@ -5,7 +5,7 @@ The following short walkthroughs show \_how* to reach for the right tool. They a
 
 1. `search_code` for the user-visible symptom (error string, function name).
 2. `str_replace_editor` `view_file` on the matching file(s); read the relevant range.
-3. Form a hypothesis. If multi-step, draft the plan with `task_tracker` (or `think`).
+3. Form a hypothesis. If multi-step, {planning_hint}.
 4. Reproduce via the project's test runner / repro script using the terminal tool.
 5. Apply the fix with `str_replace_editor` (or `edit_code` for symbol-level edits).
 6. Re-run the same reproducer; only call `finish` when the failing case now passes.
@@ -28,13 +28,13 @@ The following short walkthroughs show \_how* to reach for the right tool. They a
 ## Example 4 — Destructive or repo-wide operation
 
 1. STOP. Do not just run it.
-2. Use `communicate_with_user` (or natural-language clarification) to confirm scope and target.
-3. If approved and supported, take a `checkpoint` first.
+2. {destructive_confirmation_step}
+3. {checkpoint_step}
 4. Execute. Verify. Report.
 
 ## Example 5 — Tool failed unexpectedly
 
 1. Read the actual error text. Do not retry the same call with the same args.
-2. Pivot to an adjacent tool (`edit_code` → `str_replace_editor`; `code_intelligence` → `search_code`).
-3. After 3 failed attempts on the same sub-task, escalate via `communicate_with_user` (or ask the user) with a 1-line post-mortem and a specific question.
+2. Pivot to an adjacent tool ({adjacent_tool_fallback}).
+3. {failure_escalation_step}
    </WORKED*EXAMPLES>

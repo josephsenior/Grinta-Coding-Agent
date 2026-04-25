@@ -60,6 +60,10 @@ class TestInit:
         ckpt = StreamingCheckpoint(str(tmp_path))
         assert ckpt._wal_path.name == 'streaming_wal.json'
 
+    def test_rejects_non_positive_max_age(self, tmp_path):
+        with pytest.raises(ValueError, match='max_checkpoint_age_sec must be positive'):
+            StreamingCheckpoint(str(tmp_path), max_checkpoint_age_sec=0)
+
 
 # ---------------------------------------------------------------------------
 # begin
@@ -240,7 +244,45 @@ class TestRecoveryInspection:
         assert inspection.status == 'stale_discarded'
         assert inspection.record is not None
         assert inspection.record.token == token
+        assert 'auto-discard enabled' in inspection.reason
         assert not ckpt._wal_path.exists()
+
+    def test_inspect_recovery_blocks_stale_wal_when_auto_discard_disabled(
+        self, tmp_path
+    ):
+        ckpt = StreamingCheckpoint(
+            str(tmp_path),
+            max_checkpoint_age_sec=1.0,
+            discard_stale_on_recovery=False,
+        )
+        token = ckpt.begin({'model': 'gpt-4'})
+        raw = json.loads(ckpt._wal_path.read_text(encoding='utf-8'))
+        raw['created_at'] = 0.0
+        ckpt._wal_path.write_text(json.dumps(raw), encoding='utf-8')
+
+        inspection = ckpt.inspect_recovery()
+
+        assert inspection.status == 'blocked_stale'
+        assert inspection.record is not None
+        assert inspection.record.token == token
+        assert 'auto-discard disabled' in inspection.reason
+        assert ckpt._wal_path.exists()
+
+    def test_recover_returns_stale_record_when_auto_discard_disabled(self, tmp_path):
+        ckpt = StreamingCheckpoint(
+            str(tmp_path),
+            max_checkpoint_age_sec=1.0,
+            discard_stale_on_recovery=False,
+        )
+        token = ckpt.begin({'model': 'gpt-4'})
+        raw = json.loads(ckpt._wal_path.read_text(encoding='utf-8'))
+        raw['created_at'] = 0.0
+        ckpt._wal_path.write_text(json.dumps(raw), encoding='utf-8')
+
+        record = ckpt.recover()
+
+        assert record is not None
+        assert record.token == token
 
     def test_inspect_recovery_discards_corrupt_wal(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
@@ -329,8 +371,6 @@ class TestExecutorRecoveryBlock:
         executor.execute({}, event_stream=session_b_stream)
 
         assert llm.completion.call_count == 1
-
-
 # ---------------------------------------------------------------------------
 # _summarise_params
 # ---------------------------------------------------------------------------

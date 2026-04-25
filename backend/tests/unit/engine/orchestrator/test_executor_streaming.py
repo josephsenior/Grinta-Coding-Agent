@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 from types import SimpleNamespace
 from typing import Any, cast
@@ -12,6 +13,25 @@ from backend.engine.safety import OrchestratorSafetyManager
 class _Safety:
     def apply(self, response_text, actions):
         return True, actions
+
+
+def _planner_with_checkpoint_policy(
+    *,
+    max_age: float = 300.0,
+    discard_stale_on_recovery: bool = True,
+):
+    planner = MagicMock()
+    planner._config = SimpleNamespace(
+        streaming_checkpoint_max_age_seconds=max_age,
+        streaming_checkpoint_discard_stale_on_recovery=discard_stale_on_recovery,
+    )
+    return planner
+
+
+def _mark_checkpoint_stale(checkpoint) -> None:
+    raw = json.loads(checkpoint._wal_path.read_text(encoding='utf-8'))
+    raw['created_at'] = 0.0
+    checkpoint._wal_path.write_text(json.dumps(raw), encoding='utf-8')
 
 
 def test_executor_emits_streaming_chunk_actions(monkeypatch):
@@ -525,6 +545,168 @@ def test_get_checkpoint_blocks_when_no_persisted_control_event_supersedes_wal(
     executor._get_checkpoint(event_stream)
 
     assert 'sid-2' in executor._recovery_blocked_reasons
+
+
+def test_get_checkpoint_blocks_stale_wal_when_auto_discard_disabled(
+    monkeypatch, tmp_path
+):
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.streaming_checkpoint import StreamingCheckpoint
+
+    monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
+
+    event_stream = MagicMock()
+    event_stream.sid = 'sid-stale'
+    event_stream.search_events.return_value = []
+
+    executor = OrchestratorExecutor(
+        llm=MagicMock(),
+        safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+        planner=_planner_with_checkpoint_policy(
+            max_age=1.0,
+            discard_stale_on_recovery=False,
+        ),
+        mcp_tools_provider=lambda: {},
+    )
+
+    checkpoint_path = tmp_path / 'streaming_checkpoints' / 'sid-stale'
+    checkpoint = StreamingCheckpoint(
+        str(checkpoint_path),
+        max_checkpoint_age_sec=1.0,
+        discard_stale_on_recovery=False,
+    )
+    checkpoint.begin({'messages': []}, anchor_event_id=5)
+    _mark_checkpoint_stale(checkpoint)
+
+    executor._get_checkpoint(event_stream)
+
+    assert 'sid-stale' in executor._recovery_blocked_reasons
+    assert not checkpoint._wal_path.exists()
+
+
+def test_get_checkpoint_clears_stale_wal_for_resumed_session_with_persisted_control_event(
+    monkeypatch, tmp_path
+):
+    from backend.core.enums import AgentState
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.streaming_checkpoint import StreamingCheckpoint
+    from backend.ledger import EventSource
+    from backend.ledger.observation import (
+        AgentStateChangedObservation,
+        NullObservation,
+    )
+    from backend.ledger.stream import EventStream
+    from backend.persistence.local_file_store import LocalFileStore
+
+    monkeypatch.setenv('APP_DATA_DIR', str(tmp_path / 'appdata'))
+    monkeypatch.setenv('APP_SQLITE_EVENTS', '0')
+
+    file_store = LocalFileStore(str(tmp_path / 'events'))
+    initial_stream = EventStream(
+        'sid-resume-progress',
+        file_store,
+        worker_count=0,
+        async_write=False,
+    )
+    try:
+        initial_stream.add_event(NullObservation('before'), EventSource.AGENT)
+        initial_stream.add_event(
+            AgentStateChangedObservation('', agent_state=AgentState.FINISHED),
+            EventSource.AGENT,
+        )
+    finally:
+        initial_stream.close()
+
+    checkpoint = StreamingCheckpoint(
+        str(tmp_path / 'appdata' / 'streaming_checkpoints' / 'sid-resume-progress'),
+        max_checkpoint_age_sec=1.0,
+        discard_stale_on_recovery=False,
+    )
+    checkpoint.begin({'messages': []}, anchor_event_id=0)
+    _mark_checkpoint_stale(checkpoint)
+
+    resumed_stream = EventStream(
+        'sid-resume-progress',
+        file_store,
+        worker_count=0,
+        async_write=False,
+    )
+    try:
+        executor = OrchestratorExecutor(
+            llm=MagicMock(),
+            safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+            planner=_planner_with_checkpoint_policy(
+                max_age=1.0,
+                discard_stale_on_recovery=False,
+            ),
+            mcp_tools_provider=lambda: {},
+        )
+
+        resolved = executor._get_checkpoint(resumed_stream)
+
+        assert resolved.inspect_recovery().status == 'clean'
+        assert not executor._recovery_blocked_reasons
+    finally:
+        resumed_stream.close()
+
+
+def test_get_checkpoint_blocks_resumed_session_without_superseding_control_event(
+    monkeypatch, tmp_path
+):
+    from backend.engine.executor import OrchestratorExecutor
+    from backend.engine.streaming_checkpoint import StreamingCheckpoint
+    from backend.ledger import EventSource
+    from backend.ledger.observation import NullObservation
+    from backend.ledger.stream import EventStream
+    from backend.persistence.local_file_store import LocalFileStore
+
+    monkeypatch.setenv('APP_DATA_DIR', str(tmp_path / 'appdata'))
+    monkeypatch.setenv('APP_SQLITE_EVENTS', '0')
+
+    file_store = LocalFileStore(str(tmp_path / 'events'))
+    initial_stream = EventStream(
+        'sid-resume-blocked',
+        file_store,
+        worker_count=0,
+        async_write=False,
+    )
+    try:
+        initial_stream.add_event(NullObservation('before'), EventSource.AGENT)
+    finally:
+        initial_stream.close()
+
+    checkpoint = StreamingCheckpoint(
+        str(tmp_path / 'appdata' / 'streaming_checkpoints' / 'sid-resume-blocked'),
+        max_checkpoint_age_sec=1.0,
+        discard_stale_on_recovery=False,
+    )
+    checkpoint.begin({'messages': []}, anchor_event_id=0)
+    _mark_checkpoint_stale(checkpoint)
+
+    resumed_stream = EventStream(
+        'sid-resume-blocked',
+        file_store,
+        worker_count=0,
+        async_write=False,
+    )
+    try:
+        executor = OrchestratorExecutor(
+            llm=MagicMock(),
+            safety_manager=cast(OrchestratorSafetyManager, _Safety()),
+            planner=_planner_with_checkpoint_policy(
+                max_age=1.0,
+                discard_stale_on_recovery=False,
+            ),
+            mcp_tools_provider=lambda: {},
+        )
+
+        resolved = executor._get_checkpoint(resumed_stream)
+
+        assert resolved.inspect_recovery().status == 'clean'
+        assert 'sid-resume-blocked' in executor._recovery_blocked_reasons
+        assert not checkpoint._wal_path.exists()
+    finally:
+        resumed_stream.close()
 
 
 def test_response_to_actions_passes_through_plain_message_after_guard_disabled(

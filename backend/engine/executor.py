@@ -17,8 +17,14 @@ from typing import (
 from backend.core.errors import ModelProviderError
 from backend.core.logger import app_logger as logger
 from backend.engine import function_calling as _function_calling_module  # noqa: F401
-from backend.engine.streaming_checkpoint import StreamingCheckpoint
+from backend.engine.streaming_checkpoint import (
+    StreamingCheckpoint,
+)
 from backend.ledger.persistence import EventPersistence
+from backend.core.constants import (
+    DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
+    DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
+)
 
 if TYPE_CHECKING:
     from backend.inference.llm import LLM
@@ -734,9 +740,17 @@ class OrchestratorExecutor:
                 self._sanitize_checkpoint_key(session_key),
             )
 
-        checkpoint = StreamingCheckpoint(checkpoint_dir)
+        max_checkpoint_age_sec, discard_stale_on_recovery = (
+            self._checkpoint_recovery_policy()
+        )
+
+        checkpoint = StreamingCheckpoint(
+            checkpoint_dir,
+            max_checkpoint_age_sec=max_checkpoint_age_sec,
+            discard_stale_on_recovery=discard_stale_on_recovery,
+        )
         inspection = checkpoint.inspect_recovery()
-        if inspection.status == 'blocked_uncommitted':
+        if inspection.status in {'blocked_uncommitted', 'blocked_stale'}:
             if self._checkpoint_is_superseded_by_persisted_control_event(
                 event_stream,
                 inspection.record,
@@ -756,6 +770,35 @@ class OrchestratorExecutor:
                 )
         self._checkpoint_cache[session_key] = checkpoint
         return checkpoint
+
+    def _checkpoint_recovery_policy(self) -> tuple[float, bool]:
+        config = getattr(self._planner, '_config', None)
+
+        max_checkpoint_age_sec = DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS
+        configured_max_age = getattr(
+            config,
+            'streaming_checkpoint_max_age_seconds',
+            max_checkpoint_age_sec,
+        )
+        if (
+            isinstance(configured_max_age, int | float)
+            and not isinstance(configured_max_age, bool)
+            and configured_max_age > 0
+        ):
+            max_checkpoint_age_sec = float(configured_max_age)
+
+        discard_stale_on_recovery = (
+            DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY
+        )
+        configured_discard_stale = getattr(
+            config,
+            'streaming_checkpoint_discard_stale_on_recovery',
+            discard_stale_on_recovery,
+        )
+        if isinstance(configured_discard_stale, bool):
+            discard_stale_on_recovery = configured_discard_stale
+
+        return max_checkpoint_age_sec, discard_stale_on_recovery
 
     @staticmethod
     def _checkpoint_anchor_event_id(event_stream: EventStream | None) -> int | None:
