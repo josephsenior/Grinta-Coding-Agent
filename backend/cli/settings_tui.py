@@ -22,6 +22,7 @@ from backend.cli.config_manager import (
     update_model,
 )
 from backend.cli.hud import HUDBar
+from backend.cli.theme import CLR_BRAND, CLR_CARD_BORDER, CLR_CARD_TITLE, CLR_META
 from backend.core.config import load_app_config
 
 
@@ -124,9 +125,9 @@ def _render_mcp_tab(console: Console) -> None:
     config = load_app_config()
     servers = get_mcp_servers(config)
 
-    table = Table(border_style='dim', padding=(0, 2))
-    table.add_column('#', style='dim')
-    table.add_column('Name', style='dim')
+    table = Table(border_style=CLR_CARD_BORDER, padding=(0, 2))
+    table.add_column('#', style=CLR_META)
+    table.add_column('Name', style=CLR_CARD_TITLE)
     table.add_column('Type')
     table.add_column('Endpoint')
 
@@ -137,16 +138,22 @@ def _render_mcp_tab(console: Console) -> None:
             endpoint = s.get('url') or s.get('command') or '—'
             table.add_row(str(i), s['name'], s.get('type', '?'), str(endpoint))
 
-    console.print(Panel(table, title='[bold]MCP Servers[/bold]', border_style='cyan'))
+    console.print(
+        Panel(
+            table,
+            title=f'[{CLR_BRAND}]MCP Servers[/]',
+            border_style=CLR_CARD_BORDER,
+        )
+    )
     console.print()
     settings_path = _settings_path()
     console.print(
-        f'[dim]Servers are stored as [bold]mcp_config[/bold] in [bold]{settings_path}[/bold] '
-        '(you can also edit that file directly).[/dim]'
+        f'[{CLR_META}]Servers are stored as [bold]mcp_config[/bold] in [bold]{settings_path}[/bold] '
+        '(you can also edit that file directly).[/]'
     )
     console.print()
     console.print(
-        '[dim]Commands:  [bold]a[/bold] add server  │  [bold]q[/bold] back[/dim]'
+        f'[{CLR_META}]Commands:  [bold]a[/bold] add server  │  [bold]q[/bold] back[/]'
     )
 
 

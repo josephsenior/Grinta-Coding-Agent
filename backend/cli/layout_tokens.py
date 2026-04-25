@@ -11,6 +11,14 @@ from typing import Any
 from rich.padding import Padding
 from rich.text import Text
 
+from backend.cli.theme import (
+    CLR_CARD_BORDER,
+    CLR_CARD_TITLE,
+    CLR_DECISION_BORDER,
+    CLR_DRAFT_BORDER,
+    CLR_THINKING_BORDER,
+)
+
 # Symmetric horizontal inset so transcript and footer align cleanly.
 TRANSCRIPT_LEFT_INSET = 5
 TRANSCRIPT_RIGHT_INSET = 5
@@ -25,15 +33,24 @@ ACTIVITY_PANEL_PADDING = (0, 1)
 # to provide a small visual gap between adjacent activity cards.
 ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 2, 0)
 
+# Shared palette for the transcript chrome. Centralizing these keeps live panels,
+# activity cards, and decision callouts visually consistent during long sessions.
+ACTIVITY_SECTION_TITLE = 'Activity'
+ACTIVITY_CARD_BORDER_STYLE = CLR_CARD_BORDER
+ACTIVITY_CARD_TITLE_STYLE = CLR_CARD_TITLE
+LIVE_PANEL_ACCENT_STYLE = CLR_THINKING_BORDER
+DRAFT_PANEL_ACCENT_STYLE = CLR_DRAFT_BORDER
+DECISION_PANEL_ACCENT_STYLE = CLR_DECISION_BORDER
+
 # User-facing activity card titles (rounded panels under "Tools & commands").
 # Keep these short Title Case nouns so the transcript scans consistently.
 ACTIVITY_CARD_TITLE_FILES = 'Files'
 ACTIVITY_CARD_TITLE_TERMINAL = 'Terminal'
 ACTIVITY_CARD_TITLE_BROWSER = 'Browser'
-ACTIVITY_CARD_TITLE_MCP = 'MCP'
+ACTIVITY_CARD_TITLE_MCP = 'Connected Tool'
 ACTIVITY_CARD_TITLE_MEMORY = 'Memory'
 ACTIVITY_CARD_TITLE_CODE = 'Code'
-ACTIVITY_CARD_TITLE_DELEGATION = 'Delegation'
+ACTIVITY_CARD_TITLE_DELEGATION = 'Workers'
 ACTIVITY_CARD_TITLE_CHECKPOINT = 'Checkpoint'
 ACTIVITY_CARD_TITLE_SEARCH = 'Search'
 ACTIVITY_CARD_TITLE_TOOL = 'Tool'

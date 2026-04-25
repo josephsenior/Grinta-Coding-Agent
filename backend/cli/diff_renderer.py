@@ -9,6 +9,12 @@ from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.panel import Panel
 from rich.text import Text
 
+from backend.cli.theme import (
+    CLR_CARD_BORDER,
+    CLR_CARD_TITLE,
+    CLR_DIFF_ADD,
+    CLR_DIFF_REM,
+)
 from backend.cli.transcript import (
     format_activity_delta_secondary,
     format_activity_primary,
@@ -59,9 +65,9 @@ class DiffPanel:
                 parts.append(delta)
             yield Panel(
                 Group(*parts),
-                title=Text('File', style='bold #9ca3af'),
+                title=Text('File', style=CLR_CARD_TITLE),
                 title_align='left',
-                border_style='dim',
+                border_style=CLR_CARD_BORDER,
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
@@ -95,9 +101,9 @@ class DiffPanel:
             parts.append(diff_text)
             yield Panel(
                 Group(*parts),
-                title=Text('File', style='bold #9ca3af'),
+                title=Text('File', style=CLR_CARD_TITLE),
                 title_align='left',
-                border_style='dim',
+                border_style=CLR_CARD_BORDER,
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
@@ -115,9 +121,9 @@ class DiffPanel:
             parts.append(Text(diff_str[:3000]))
             yield Panel(
                 Group(*parts),
-                title=Text('File', style='bold #9ca3af'),
+                title=Text('File', style=CLR_CARD_TITLE),
                 title_align='left',
-                border_style='dim',
+                border_style=CLR_CARD_BORDER,
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
@@ -133,9 +139,9 @@ class DiffPanel:
 
             yield Panel(
                 Group(*filtered_parts),
-                title=Text('File', style='bold #9ca3af'),
+                title=Text('File', style=CLR_CARD_TITLE),
                 title_align='left',
-                border_style='dim',
+                border_style=CLR_CARD_BORDER,
                 box=box.ROUNDED,
                 padding=(0, 1),
             )
@@ -148,9 +154,9 @@ class DiffPanel:
             if i > 0:
                 result.append('  ···\n', style='dim')
             for line in group.get('before_edits', []):
-                result.append(line + '\n', style='red')
+                result.append(line + '\n', style=CLR_DIFF_REM)
             for line in group.get('after_edits', []):
-                result.append(line + '\n', style='green')
+                result.append(line + '\n', style=CLR_DIFF_ADD)
         # Truncate if too long
         if len(result.plain) > 3000:
             result.truncate(3000)

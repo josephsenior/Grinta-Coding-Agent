@@ -46,12 +46,30 @@ from backend.cli.layout_tokens import (
     ACTIVITY_CARD_TITLE_TOOL,
     ACTIVITY_PANEL_PADDING,
     CALLOUT_PANEL_PADDING,
+    DECISION_PANEL_ACCENT_STYLE,
+    DRAFT_PANEL_ACCENT_STYLE,
+    LIVE_PANEL_ACCENT_STYLE,
     TRANSCRIPT_LEFT_INSET,
     TRANSCRIPT_RIGHT_INSET,
     frame_live_body,
     frame_transcript_body,
     gap_below_live_section,
     spacer_live_section,
+)
+from backend.cli.theme import (
+    CLR_AUTONOMY_BALANCED,
+    CLR_AUTONOMY_FULL,
+    CLR_AUTONOMY_SUPERVISED,
+    CLR_BRAND,
+    CLR_HUD_DETAIL,
+    CLR_HUD_MODEL,
+    CLR_META,
+    CLR_MUTED_TEXT,
+    CLR_SEP,
+    CLR_STATUS_ERR,
+    CLR_STATUS_OK,
+    CLR_STATUS_WARN,
+    CLR_USER_BORDER,
 )
 from backend.cli.tool_call_display import (
     format_tool_activity_rows,
@@ -647,7 +665,7 @@ def _build_task_panel(task_list: list[dict[str, Any]]) -> Any:
     return format_callout_panel(
         f'Tasks ({len(task_list)})',
         empty_state,
-        accent_style='#4a6b82',
+        accent_style=LIVE_PANEL_ACCENT_STYLE,
         padding=ACTIVITY_PANEL_PADDING,
     )
 
@@ -688,7 +706,7 @@ def _build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
     return format_callout_panel(
         f'Workers ({len(workers)})',
         empty_state,
-        accent_style='#4a6b82',
+        accent_style=LIVE_PANEL_ACCENT_STYLE,
         padding=ACTIVITY_PANEL_PADDING,
     )
 
@@ -1243,18 +1261,18 @@ def _build_llm_stream_fallback_panel() -> Panel:
         Text(
             'The first streamed tokens took longer than expected, so Grinta is '
             'retrying the same completion in one shot (non-streaming).',
-            style='cyan',
+            style=LIVE_PANEL_ACCENT_STYLE,
         ),
         Text(
             'You do not need to do anything—this is common on busy endpoints.',
-            style='dim #64748b',
+            style=f'dim {CLR_META}',
         ),
     )
     return Panel(
         body,
-        title=Text('ℹ  Still working', style='bold cyan'),
+        title=Text('ℹ  Still Working', style=f'bold {LIVE_PANEL_ACCENT_STYLE}'),
         title_align='left',
-        border_style='#5dade2',
+        border_style=LIVE_PANEL_ACCENT_STYLE,
         box=box.ROUNDED,
         padding=(0, 1),
     )
@@ -1281,10 +1299,12 @@ def _build_error_panel(
         if force_notice is not None
         else _use_recoverable_notice_style(error_text)
     )
-    accent = 'cyan' if use_notice else accent_style
-    border = '#5dade2' if use_notice else accent_style
-    headline_style = 'bold cyan' if use_notice else f'{accent_style} bold'
-    detail_style = 'dim cyan' if use_notice else f'{accent_style} dim'
+    accent = LIVE_PANEL_ACCENT_STYLE if use_notice else accent_style
+    border = LIVE_PANEL_ACCENT_STYLE if use_notice else accent_style
+    headline_style = (
+        f'bold {LIVE_PANEL_ACCENT_STYLE}' if use_notice else f'{accent_style} bold'
+    )
+    detail_style = f'dim {CLR_META}' if use_notice else f'{accent_style} dim'
 
     if guidance is not None and 'syntax validation failed' in error_text.lower():
         headline = guidance.summary
@@ -1669,7 +1689,7 @@ class CLIEventRenderer:
             title=Text('You', style='bold dim'),
             title_align='left',
             box=box.ROUNDED,
-            border_style='dim cyan',
+            border_style=CLR_USER_BORDER,
             padding=(0, 0),
             style='default',
         )
@@ -1912,11 +1932,11 @@ class CLIEventRenderer:
         state_l = (hud.agent_state_label or 'Running').strip()
         if state_l.lower() == 'running':
             subline = 'Agent working · ctrl+c to interrupt'
-            spin_style = 'bold #7dd3fc'
-            text_style = 'italic #5d7286'
+            spin_style = CLR_BRAND
+            text_style = f'italic {CLR_META}'
         else:
             subline = f'{state_l} · ctrl+c if you need to interrupt'
-            spin_style = 'dim #5d7286'
+            spin_style = f'dim {CLR_META}'
             text_style = 'italic #64748b'
         input_row.add_row(
             Spinner('dots', style=spin_style),
@@ -1925,7 +1945,7 @@ class CLIEventRenderer:
         items.append(input_row)
 
         # -- separator (mirrors _prompt_bottom_toolbar) ---------------------
-        items.append(Text('─' * width, style='#3a5368'))
+        items.append(Text('─' * width, style=CLR_SEP))
 
         state_label = hud.agent_state_label or 'Running'
         autonomy = hud.autonomy_level or 'balanced'
@@ -1933,7 +1953,7 @@ class CLIEventRenderer:
         # Tight bullet separator — the old "  •  " (5 chars) made the row
         # feel crowded; " · " keeps the visual rhythm while reclaiming
         # ~2 chars per delimiter for denser information without clutter.
-        SEP = (' · ', '#3a5368')
+        SEP = (' · ', CLR_SEP)
 
         if width < 72:
             # Compact single-line mode for very narrow terminals.
@@ -1952,7 +1972,7 @@ class CLIEventRenderer:
             if ws_compact:
                 line.append(
                     HUDBar.ellipsize_path(ws_compact, 22),
-                    style='dim #94a3b8',
+                    style=f'dim {CLR_MUTED_TEXT}',
                 )
                 line.append(SEP[0], style=SEP[1])
             line.append(state_label, style='dim')
@@ -1969,37 +1989,37 @@ class CLIEventRenderer:
 
         # -- row 1: brand + state badge + autonomy -------------------------
         row1 = Text()
-        row1.append('GRINTA', style='bold #7dd3fc')
+        row1.append('GRINTA', style=CLR_BRAND)
         row1.append('  ', style='')
         _BADGE_STYLES = {
-            'Running': '#93c5fd bold',
-            'Ready': '#86efac bold',
-            'Done': '#86efac bold',
-            'Finished': '#86efac bold',
-            'Needs approval': '#fcd34d bold',
-            'Needs attention': '#fca5a5 bold',
-            'Stopped': '#fca5a5 bold',
+            'Running': CLR_STATUS_OK + ' bold',
+            'Ready': CLR_STATUS_OK + ' bold',
+            'Done': CLR_STATUS_OK + ' bold',
+            'Finished': CLR_STATUS_OK + ' bold',
+            'Needs approval': CLR_STATUS_WARN + ' bold',
+            'Needs attention': CLR_STATUS_ERR + ' bold',
+            'Stopped': CLR_STATUS_ERR + ' bold',
         }
         row1.append(
             f' {state_label.upper()} ',
-            style=_BADGE_STYLES.get(state_label, '#93c5fd bold'),
+            style=_BADGE_STYLES.get(state_label, CLR_STATUS_OK + ' bold'),
         )
         row1.append('  ', style='')
-        auto_style = '#8bd8ff'
+        auto_style = CLR_AUTONOMY_BALANCED
         if 'full' in autonomy:
-            auto_style = '#f1bf63 bold'
+            auto_style = CLR_AUTONOMY_FULL
         elif 'supervised' in autonomy:
-            auto_style = '#f0a3ff bold'
+            auto_style = CLR_AUTONOMY_SUPERVISED
         row1.append(f'autonomy:{autonomy}', style=auto_style)
         items.append(row1)
 
         ws_full = (hud.workspace_path or '').strip()
         if ws_full:
             row_ws = Text()
-            row_ws.append('workspace ', style='dim #64748b')
+            row_ws.append('workspace ', style=f'dim {CLR_META}')
             row_ws.append(
                 HUDBar.ellipsize_path(ws_full, max(28, width - 14)),
-                style='#94a3b8',
+                style=CLR_MUTED_TEXT,
             )
             items.append(row_ws)
 
@@ -2018,11 +2038,11 @@ class CLIEventRenderer:
         mcp_label = HUDBar._format_mcp_servers_label(hud.mcp_servers)
         skills_label = HUDBar._format_skills_label(self._hud.bundled_skill_count)
 
-        ledger_style = '#8fdfb1 bold'
+        ledger_style = CLR_STATUS_OK + ' bold'
         if hud.ledger_status in {'Review', 'Paused'}:
-            ledger_style = '#f1bf63 bold'
+            ledger_style = CLR_STATUS_WARN + ' bold'
         elif hud.ledger_status not in {'Healthy', 'Ready', 'Idle', 'Starting'}:
-            ledger_style = '#ff9ea8 bold'
+            ledger_style = CLR_STATUS_ERR + ' bold'
 
         # "provider/model" combined — the explicit "provider:" and "model:"
         # labels were redundant visual weight. Provider is already implied
@@ -2033,18 +2053,18 @@ class CLIEventRenderer:
             model_display = f'{provider}/{model}'
 
         primary_parts: list[tuple[str, str]] = [
-            (model_display, 'bold #dbe7f3'),
+            (model_display, CLR_HUD_MODEL),
             SEP,
-            (token_display, '#b4c4d5'),
+            (token_display, CLR_HUD_DETAIL),
             SEP,
-            (f'${hud.cost_usd:.4f}', '#b4c4d5'),
+            (f'${hud.cost_usd:.4f}', CLR_HUD_DETAIL),
             SEP,
             (hud.ledger_status, ledger_style),
         ]
         optional_parts: list[tuple[str, str]] = [
-            (f'{hud.llm_calls} calls', '#b4c4d5'),
-            (mcp_label, '#b4c4d5'),
-            (skills_label, '#b4c4d5'),
+            (f'{hud.llm_calls} calls', CLR_HUD_DETAIL),
+            (mcp_label, CLR_HUD_DETAIL),
+            (skills_label, CLR_HUD_DETAIL),
         ]
         parts: list[tuple[str, str]] = list(primary_parts)
         for content, style in optional_parts:
@@ -2539,9 +2559,9 @@ class CLIEventRenderer:
                 )
             self._append_history(
                 format_callout_panel(
-                    'Need your input',
+                    'Need Your Input',
                     Group(*escalate_parts),
-                    accent_style='yellow',
+                    accent_style=DECISION_PANEL_ACCENT_STYLE,
                 )
             )
             self.refresh()
@@ -2567,7 +2587,7 @@ class CLIEventRenderer:
                     format_callout_panel(
                         'Question',
                         Group(*clarify_parts),
-                        accent_style='yellow',
+                        accent_style=DECISION_PANEL_ACCENT_STYLE,
                     )
                 )
             self.refresh()
@@ -2589,9 +2609,9 @@ class CLIEventRenderer:
             if uncertainty_parts:
                 self._append_history(
                     format_callout_panel(
-                        'Needs context',
+                        'Needs Context',
                         Group(*uncertainty_parts),
-                        accent_style='yellow',
+                        accent_style=DECISION_PANEL_ACCENT_STYLE,
                     )
                 )
             self.refresh()
@@ -2613,7 +2633,10 @@ class CLIEventRenderer:
                 desc = opt.get('description', '')
                 marker = ' (recommended)' if i == recommended else ''
                 proposal_line = Text()
-                proposal_line.append(f'{i + 1}. ', style='bold #a78bfa')
+                proposal_line.append(
+                    f'{i + 1}. ',
+                    style=f'bold {DECISION_PANEL_ACCENT_STYLE}',
+                )
                 proposal_line.append(
                     f'{label}{marker}',
                     style='bold #f1bf63' if i == recommended else 'bold #e2e8f0',
@@ -2626,7 +2649,7 @@ class CLIEventRenderer:
                     format_callout_panel(
                         'Options',
                         Group(*proposal_parts),
-                        accent_style='#7c3aed',
+                        accent_style=DECISION_PANEL_ACCENT_STYLE,
                     )
                 )
             self.refresh()
@@ -3389,7 +3412,7 @@ class CLIEventRenderer:
         if tool_lines is not None:
             _icon, friendly = tool_lines
             for line in friendly.split('\n'):
-                self._append_history(Text(line, style='cyan'))
+                self._append_history(Text(line, style=LIVE_PANEL_ACCENT_STYLE))
         else:
             # Condense embedded search tool output or ripgrep-style match lines
             s = display_content.strip()
@@ -3418,7 +3441,7 @@ class CLIEventRenderer:
                     summary = (
                         f'Found {match_count} match{"es" if match_count != 1 else ""}.'
                     )
-                self._append_history(Text(summary, style='cyan'))
+                self._append_history(Text(summary, style=LIVE_PANEL_ACCENT_STYLE))
             else:
                 # Also detect plain ripgrep-like output without XML tags and condense it
                 plain_lines = [ln for ln in s.splitlines() if ln.strip()]
@@ -3431,7 +3454,7 @@ class CLIEventRenderer:
                     summary = (
                         f'Found {match_count} match{"es" if match_count != 1 else ""}.'
                     )
-                    self._append_history(Text(summary, style='cyan'))
+                    self._append_history(Text(summary, style=LIVE_PANEL_ACCENT_STYLE))
                 else:
                     self._append_history(
                         Padding(Markdown(display_content), (0, 0, 1, 0))
@@ -3699,9 +3722,9 @@ class CLIEventRenderer:
         if not self._streaming_final:
             body.append(Text('Still streaming…', style='dim'))
         return format_callout_panel(
-            'Draft reply',
+            'Draft Reply',
             Group(*body),
-            accent_style='#5d8aa8',
+            accent_style=DRAFT_PANEL_ACCENT_STYLE,
             padding=ACTIVITY_PANEL_PADDING,
         )
 

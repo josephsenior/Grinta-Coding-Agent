@@ -23,6 +23,8 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
+from backend.cli.layout_tokens import LIVE_PANEL_ACCENT_STYLE
+from backend.cli.theme import CLR_ACTION, CLR_META, CLR_SPINNER, CLR_THOUGHT_BODY
 from backend.cli.transcript import format_callout_panel
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
@@ -246,9 +248,9 @@ class ReasoningDisplay:
         header.add_column(ratio=1)
         header.add_column(justify='right', no_wrap=True)
         header.add_row(
-            Spinner('dots', style='#7dd3fc'),
-            Text(action_label, style='bold #dbe7f3'),
-            Text(meta_right, style='#5d7286') if meta_right else Text(''),
+            Spinner('dots', style=CLR_SPINNER),
+            Text(action_label, style=CLR_ACTION),
+            Text(meta_right, style=CLR_META) if meta_right else Text(''),
         )
         rows.append(header)
 
@@ -275,14 +277,14 @@ class ReasoningDisplay:
                 wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
 
             for row in wrapped_rows:
-                rows.append(Text(row, style='#8b9eb5 dim'))
+                rows.append(Text(row, style=CLR_THOUGHT_BODY))
 
             if clipped:
-                rows.append(Text('… showing latest thoughts', style='#5d7286 italic'))
+                rows.append(Text('… showing latest thoughts', style=f'{CLR_META} italic'))
 
         return format_callout_panel(
             'Thinking',
             Group(*rows),
-            accent_style='#4a6b82',
+            accent_style=LIVE_PANEL_ACCENT_STYLE,
             padding=(0, 0),
         )

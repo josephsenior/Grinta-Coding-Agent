@@ -18,7 +18,7 @@ Editor `path` values may be project-relative or absolute. Editors create parent 
   - `section` for anchor-bounded edits
   - `range` for line-bounded edits
   - `patch` for strict unified diff apply
-  Use `preview: true` when confidence is low.
+    Use `preview: true` when confidence is low.
 
 **Editor choice:** Use `edit_code` for code files when targeting a named symbol, function, class, or line range. Use `str_replace_editor` for prose, config files (YAML/TOML/JSON/Markdown), or when you have exact literal text to locate and replace.
 

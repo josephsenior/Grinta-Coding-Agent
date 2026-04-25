@@ -19,6 +19,14 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
+from backend.cli.theme import (
+    CLR_BRAND,
+    CLR_CARD_BORDER,
+    CLR_CARD_TITLE,
+    CLR_META,
+    CLR_STATUS_OK,
+)
+
 _PROVIDER_PRESETS: dict[str, dict[str, str]] = {
     'openai': {
         'env': 'OPENAI_API_KEY',
@@ -112,8 +120,8 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         Panel.fit(
             '[bold]Welcome to Grinta.[/bold]\n'
             'This wizard configures your LLM provider and writes [bold]settings.json[/bold].\n'
-            'Re-run any time with [bold cyan]grinta init[/bold cyan].',
-            border_style='cyan',
+            f'Re-run any time with [{CLR_BRAND}]grinta init[/].',
+            border_style=CLR_CARD_BORDER,
         )
     )
 
@@ -131,14 +139,18 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     detected = _detect_local()
     if detected:
         console.print(
-            f'[green]Detected local provider(s):[/green] {", ".join(detected)}'
+            f'[{CLR_STATUS_OK}]Detected local provider(s):[/] {", ".join(detected)}'
         )
 
     # Render provider menu.
-    table = Table(title='Pick a provider', border_style='dim')
-    table.add_column('Key', style='bold cyan')
+    table = Table(
+        title='Pick a provider',
+        title_style=CLR_CARD_TITLE,
+        border_style=CLR_CARD_BORDER,
+    )
+    table.add_column('Key', style=CLR_BRAND)
     table.add_column('Description')
-    table.add_column('Detected', style='green')
+    table.add_column('Detected', style=CLR_STATUS_OK)
     for key, preset in _PROVIDER_PRESETS.items():
         detected_marker = '✓' if key in detected else ''
         table.add_row(key, preset['help'], detected_marker)
@@ -195,10 +207,10 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
             f'Wrote [bold]{settings_file}[/bold]\n'
             f'Provider: [bold]{provider}[/bold]\n'
             f'Model: [bold]{model}[/bold]\n\n'
-            'Start the agent with: [bold cyan]grinta[/bold cyan]\n'
-            'Slash commands inside the REPL: [bold cyan]/help[/bold cyan]',
+            f'Start the agent with: [{CLR_BRAND}]grinta[/]\n'
+            f'Slash commands inside the REPL: [{CLR_BRAND}]/help[/]',
             title='Setup complete',
-            border_style='green',
+            border_style=CLR_STATUS_OK,
         )
     )
 
@@ -206,8 +218,8 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     checklist = project_root / 'docs' / 'SECURITY_CHECKLIST.md'
     if checklist.exists():
         console.print(
-            '[dim]Tip: read [bold]docs/SECURITY_CHECKLIST.md[/bold] '
-            'before pointing Grinta at untrusted code.[/dim]'
+            f'[{CLR_META}]Tip: read [bold]docs/SECURITY_CHECKLIST.md[/bold] '
+            'before pointing Grinta at untrusted code.[/]'
         )
 
     return 0

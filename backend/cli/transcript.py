@@ -18,8 +18,11 @@ from rich.rule import Rule
 from rich.text import Text
 
 from backend.cli.layout_tokens import (
+    ACTIVITY_CARD_BORDER_STYLE,
+    ACTIVITY_CARD_TITLE_STYLE,
     ACTIVITY_CARD_TITLE_TERMINAL,
     ACTIVITY_PANEL_PADDING,
+    ACTIVITY_SECTION_TITLE,
     CALLOUT_PANEL_PADDING,
 )
 
@@ -131,12 +134,12 @@ def format_activity_block(
         parts.extend(extra_lines)
     content = Group(*parts)
     if title is not None:
-        panel_title = Text(title, style='bold #9ca3af')
+        panel_title = Text(title, style=ACTIVITY_CARD_TITLE_STYLE)
         return Panel(
             content,
             title=panel_title,
             title_align='left',
-            border_style='#3a5368',
+            border_style=ACTIVITY_CARD_BORDER_STYLE,
             box=box.ROUNDED,
             padding=ACTIVITY_PANEL_PADDING,
         )
@@ -145,7 +148,7 @@ def format_activity_block(
 
 def format_activity_turn_header() -> Rule:
     """Section divider before the first tool/shell row each agent turn."""
-    return Rule(title='Tools & commands', style='dim cyan', align='left')
+    return Rule(title=ACTIVITY_SECTION_TITLE, style='dim #6d8596', align='left')
 
 
 _REASONING_SENTENCE_ENDERS = ('.', '!', '?', ':', ';', '"', "'", ')', ']', '…')

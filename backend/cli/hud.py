@@ -10,6 +10,15 @@ from rich.console import Console, ConsoleOptions, RenderResult
 from rich.text import Text
 
 import backend
+from backend.cli.theme import (
+    CLR_HUD_DETAIL,
+    CLR_HUD_MODEL,
+    CLR_SEP,
+    CLR_STATUS_ERR,
+    CLR_STATUS_OK,
+    CLR_STATUS_WARN,
+    HUD_BG,
+)
 
 
 @dataclass
@@ -121,7 +130,7 @@ class HUDBar:
     # Shared tight bullet separator. Matches the live branded row so the
     # committed footer and the in-progress footer feel like the same bar.
     _SEP_TEXT = ' · '
-    _SEP_STYLE = '#3a5368'
+    _SEP_STYLE = CLR_SEP
 
     def _full_bar_length(self) -> int:
         """Approximate character length of the full-format HUD bar."""
@@ -181,17 +190,17 @@ class HUDBar:
         SEP = (self._SEP_TEXT, self._SEP_STYLE)
         parts = [
             (' ', ''),
-            (model_display, 'bold #dbe7f3'),
+            (model_display, CLR_HUD_MODEL),
             SEP,
-            (token_display, '#b4c4d5'),
+            (token_display, CLR_HUD_DETAIL),
             SEP,
-            (f'${self.state.cost_usd:.4f}', '#b4c4d5'),
+            (f'${self.state.cost_usd:.4f}', CLR_HUD_DETAIL),
             SEP,
-            (f'{self.state.llm_calls} calls', '#b4c4d5'),
+            (f'{self.state.llm_calls} calls', CLR_HUD_DETAIL),
             SEP,
-            (mcp_label, '#b4c4d5'),
+            (mcp_label, CLR_HUD_DETAIL),
             SEP,
-            (skills_label, '#b4c4d5'),
+            (skills_label, CLR_HUD_DETAIL),
             SEP,
             (self.state.ledger_status, self._ledger_style()),
         ]
@@ -259,12 +268,12 @@ class HUDBar:
 
     def _ledger_style(self) -> str:
         if self.state.ledger_status in {'Healthy', 'Ready', 'Idle', 'Starting'}:
-            return '#8fdfb1 bold'
+            return f'{CLR_STATUS_OK} bold'
         if self.state.ledger_status == 'Review':
-            return '#fcd34d bold'
+            return f'{CLR_STATUS_WARN} bold'
         if self.state.ledger_status == 'Paused':
-            return '#fcd34d'
-        return '#fca5a5 bold'
+            return CLR_STATUS_WARN
+        return f'{CLR_STATUS_ERR} bold'
 
     @staticmethod
     def _format_tokens(n: int) -> str:
@@ -463,7 +472,7 @@ class HUDBar:
         pad = max(0, width - len(bar.plain) - 2)
         console.print(
             Text('  ') + bar + Text(' ' * pad),
-            style='on grey15',
+            style=f'on {HUD_BG}',
             highlight=False,
             end='',
         )

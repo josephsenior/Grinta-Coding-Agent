@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console
 from rich.table import Table
 
+from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE
+
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -96,7 +98,12 @@ def list_sessions(
 
     sessions = sessions[:limit]
 
-    table = Table(title='Past Sessions', border_style='dim', show_lines=False)
+    table = Table(
+        title='Past Sessions',
+        title_style=CLR_CARD_TITLE,
+        border_style=CLR_CARD_BORDER,
+        show_lines=False,
+    )
     table.add_column('#', style='dim')
     table.add_column('Session ID', style='dim')
     table.add_column('Title')

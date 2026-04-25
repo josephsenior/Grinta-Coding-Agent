@@ -9,6 +9,14 @@ from rich.prompt import Confirm
 from rich.table import Table
 from rich.text import Text
 
+from backend.cli.theme import (
+    CLR_CARD_BORDER,
+    CLR_DECISION_BORDER,
+    CLR_RISK_ASK,
+    CLR_RISK_HIGH,
+    CLR_RISK_LOW,
+    CLR_RISK_MEDIUM,
+)
 from backend.core.enums import ActionSecurityRisk, AgentState
 from backend.ledger.action import (
     Action,
@@ -29,12 +37,12 @@ def _risk_label(action: Action) -> tuple[str, str]:
         risk = ActionSecurityRisk.UNKNOWN
 
     if risk == ActionSecurityRisk.HIGH:
-        return ('HIGH', 'bold red')
+        return ('HIGH', CLR_RISK_HIGH)
     if risk == ActionSecurityRisk.MEDIUM:
-        return ('MEDIUM', 'yellow')
+        return ('MEDIUM', CLR_RISK_MEDIUM)
     if risk == ActionSecurityRisk.LOW:
-        return ('LOW', 'green')
-    return ('ASK', 'yellow')
+        return ('LOW', CLR_RISK_LOW)
+    return ('ASK', CLR_RISK_ASK)
 
 
 def _action_label(action: Action) -> str:
@@ -60,12 +68,12 @@ def _file_label(action: Action) -> str:
 
 def _confirmation_frame_style(risk_text: str) -> str:
     if risk_text == 'HIGH':
-        return 'red'
+        return CLR_RISK_HIGH.replace('bold ', '')
     if risk_text in {'MEDIUM', 'ASK'}:
-        return 'yellow'
+        return CLR_DECISION_BORDER
     if risk_text == 'LOW':
-        return 'green'
-    return 'dim'
+        return CLR_RISK_LOW
+    return CLR_CARD_BORDER
 
 
 def render_confirmation(
@@ -114,7 +122,7 @@ def render_confirmation(
                 thought,
                 title='[dim]Why the agent wants this[/dim]',
                 title_align='left',
-                border_style='dim',
+                border_style=CLR_CARD_BORDER,
                 box=box.ROUNDED,
                 padding=(0, 2),
             ),

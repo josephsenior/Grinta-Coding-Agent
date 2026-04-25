@@ -13,6 +13,15 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.text import Text
 
+from backend.cli.theme import (
+    CLR_BRAND,
+    CLR_CARD_BORDER,
+    CLR_META,
+    CLR_SPINNER,
+    CLR_STATUS_ERR,
+    CLR_STATUS_OK,
+    CLR_STATUS_WARN,
+)
 from backend.core.app_paths import get_app_settings_root
 from backend.core.config import AppConfig, load_app_config
 from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
@@ -217,7 +226,7 @@ def run_onboarding() -> AppConfig:
     """Interactive first-run setup. Clean, minimal, validates before saving."""
     if not os.isatty(0):
         _console.print(
-            '[red]No API key configured and stdin is not interactive.[/red]\n'
+            f'[{CLR_STATUS_ERR}]No API key configured and stdin is not interactive.[/]\n'
             'Run [bold]grinta[/bold] in a terminal to complete setup,\n'
             'or create [bold]settings.json[/bold] in the Grinta repo root.'
         )
@@ -227,11 +236,11 @@ def run_onboarding() -> AppConfig:
     _console.print(
         Panel(
             Text.from_markup(
-                '[bold cyan]Welcome to Grinta[/bold cyan]\n\n'
+                f'[{CLR_BRAND}]Welcome to Grinta[/]\n\n'
                 "Let's get you connected to an LLM.\n"
-                '[dim]Settings saved locally — never sent anywhere.[/dim]'
+                f'[{CLR_META}]Settings saved locally — never sent anywhere.[/]'
             ),
-            border_style='dim',
+            border_style=CLR_CARD_BORDER,
             padding=(1, 3),
         ),
     )
@@ -266,7 +275,7 @@ def run_onboarding() -> AppConfig:
     _console.print(
         Panel(
             Text.from_markup(
-                '[green bold]✓ Ready to go![/green bold]\n\n'
+                f'[bold {CLR_STATUS_OK}]✓ Ready to go![/]\n\n'
                 f'  Provider  [bold]{custom_provider_name or provider_key}[/bold]\n'
                 f'  Model     [bold]{full_model}[/bold]\n\n'
                 '[bold]Next steps[/bold]\n'
@@ -275,9 +284,9 @@ def run_onboarding() -> AppConfig:
                 '  • [bold]/autonomy[/bold] — choose supervised, balanced, or full autonomy\n'
                 '  • [bold]/sessions[/bold] — list past sessions; [bold]/resume[/bold] to continue one\n'
                 '  • [bold]/settings[/bold] — change model, API key, or MCP servers anytime\n\n'
-                '[dim]Tip: run [bold]grinta --help[/bold] for CLI flags.[/dim]'
+                f'[{CLR_META}]Tip: run [bold]grinta --help[/bold] for CLI flags.[/]'
             ),
-            border_style='green',
+            border_style=CLR_STATUS_OK,
             padding=(1, 3),
         ),
     )
@@ -300,24 +309,24 @@ def _select_provider() -> tuple[str, str | None, str | None]:
 
     for key, label in cloud:
         marker = ' [dim](recommended)[/dim]' if key in ('openai', 'anthropic') else ''
-        _console.print(f'  [cyan]{idx:>2}[/cyan]  {label}{marker}')
+        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {label}{marker}')
         provider_map[idx] = (key, label)
         idx += 1
 
     _console.print()
     for key, label in aggregator:
-        _console.print(f'  [cyan]{idx:>2}[/cyan]  [dim]{label}[/dim]')
+        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  [dim]{label}[/dim]')
         provider_map[idx] = (key, label)
         idx += 1
 
     _console.print()
     for key, label in local:
-        _console.print(f'  [cyan]{idx:>2}[/cyan]  {label} [dim](local)[/dim]')
+        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {label} [dim](local)[/dim]')
         provider_map[idx] = (key, label)
         idx += 1
 
     custom_idx = idx
-    _console.print(f'\n  [cyan]{custom_idx:>2}[/cyan]  [dim]Custom endpoint[/dim]')
+    _console.print(f'\n  [{CLR_BRAND}]{custom_idx:>2}[/]  [dim]Custom endpoint[/dim]')
     _console.print()
 
     while True:
@@ -325,7 +334,7 @@ def _select_provider() -> tuple[str, str | None, str | None]:
         try:
             num = int(choice)
         except ValueError:
-            _console.print('[red]  Enter a number from the list.[/red]')
+            _console.print(f'[{CLR_STATUS_ERR}]  Enter a number from the list.[/]')
             continue
 
         if num in provider_map:
@@ -334,7 +343,7 @@ def _select_provider() -> tuple[str, str | None, str | None]:
         elif num == custom_idx:
             return _collect_custom_provider()
         else:
-            _console.print('[red]  Enter a number from the list.[/red]')
+            _console.print(f'[{CLR_STATUS_ERR}]  Enter a number from the list.[/]')
 
 
 def _collect_custom_provider() -> tuple[str, str | None, str | None]:
@@ -351,7 +360,7 @@ def _collect_custom_provider() -> tuple[str, str | None, str | None]:
         console=_console,
     ).strip()
     if not base_url:
-        _console.print('[red]  Base URL is required.[/red]')
+        _console.print(f'[{CLR_STATUS_ERR}]  Base URL is required.[/]')
         raise SystemExit(1)
 
     return 'custom', base_url, name or 'custom'
@@ -380,7 +389,7 @@ def _select_model(provider_key: str, custom_name: str | None = None) -> str:
         if default:
             model_input = default
         else:
-            _console.print('[red]  Model name is required.[/red]')
+            _console.print(f'[{CLR_STATUS_ERR}]  Model name is required.[/]')
             raise SystemExit(1)
 
     # Ensure provider prefix
@@ -410,7 +419,7 @@ def _collect_api_key(provider_key: str) -> str:
         key = Prompt.ask('  Key', console=_console, password=True).strip()
         if key:
             return key
-        _console.print('[red]  API key is required for this provider.[/red]')
+        _console.print(f'[{CLR_STATUS_ERR}]  API key is required for this provider.[/]')
 
 
 def _validate_connection(model: str, api_key: str, base_url: str | None) -> None:
@@ -421,7 +430,7 @@ def _validate_connection(model: str, api_key: str, base_url: str | None) -> None
     from rich.live import Live
     from rich.spinner import Spinner
 
-    spinner = Spinner('dots', text='  Validating connection…', style='cyan')
+    spinner = Spinner('dots', text='  Validating connection…', style=CLR_SPINNER)
     try:
         with Live(spinner, console=_console, transient=True):
             import asyncio
@@ -429,11 +438,11 @@ def _validate_connection(model: str, api_key: str, base_url: str | None) -> None
             result = asyncio.run(_test_llm_call(model, api_key, base_url))
 
         if result is True:
-            _console.print('  [green]✓[/green] Connection verified')
+            _console.print(f'  [{CLR_STATUS_OK}]✓[/] Connection verified')
         elif isinstance(result, str):
-            _console.print(f'  [yellow]⚠[/yellow] [dim]{result}[/dim]')
+            _console.print(f'  [{CLR_STATUS_WARN}]⚠[/] [{CLR_META}]{result}[/]')
             _console.print(
-                '  [dim]Settings saved anyway — you can fix this in /settings[/dim]'
+                f'  [{CLR_META}]Settings saved anyway — you can fix this in /settings[/]'
             )
     except Exception:
         _console.print(
