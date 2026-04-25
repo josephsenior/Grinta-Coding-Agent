@@ -35,6 +35,7 @@ def mock_executor():
         )
         # Session manager is mocked by patch, but we can refine it
         executor.session_manager = MagicMock()
+        executor.plugins = {}
         return executor
 
 
@@ -215,6 +216,46 @@ async def test_windows_powershell_rewrites_python3(mock_executor):
         await mock_executor.run(action)
 
     assert action.command == 'python --version'
+
+
+def test_init_shell_commands_uses_powershell_helpers_on_windows(mock_executor):
+    mock_session = MagicMock()
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_executor.session_manager.tool_registry = MagicMock(
+        has_bash=True,
+        has_powershell=True,
+    )
+
+    with patch('backend.execution.action_execution_server.sys.platform', 'win32'):
+        mock_executor._init_shell_commands()
+
+    first_command = mock_session.execute.call_args_list[0][0][0].command
+    second_command = mock_session.execute.call_args_list[1][0][0].command
+
+    assert '; git config --global user.email ' in first_command
+    assert '&&' not in first_command
+    assert 'function global:env_check' in second_command
+    assert 'Get-PSDrive -PSProvider FileSystem' in second_command
+    assert 'alias env_check=' not in second_command
+
+
+def test_init_shell_commands_keeps_bash_helpers_when_not_powershell(mock_executor):
+    mock_session = MagicMock()
+    mock_executor.session_manager.get_session.return_value = mock_session
+    mock_executor.session_manager.tool_registry = MagicMock(
+        has_bash=True,
+        has_powershell=False,
+    )
+
+    with patch('backend.execution.action_execution_server.sys.platform', 'win32'):
+        mock_executor._init_shell_commands()
+
+    first_command = mock_session.execute.call_args_list[0][0][0].command
+    second_command = mock_session.execute.call_args_list[1][0][0].command
+
+    assert '&& git config --global user.email ' in first_command
+    assert "alias env_check='" in second_command
+    assert 'python3 --version 2>/dev/null' in second_command
 
 
 @pytest.mark.asyncio

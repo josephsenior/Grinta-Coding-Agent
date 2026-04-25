@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
 from backend.ledger.action import FileEditAction, FileWriteAction
-from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation import CmdOutputObservation, ErrorObservation
+from backend.ledger.observation.files import FileEditObservation, FileWriteObservation
 from backend.ledger.observation_cause import attach_observation_cause
 
 if TYPE_CHECKING:
@@ -41,6 +42,7 @@ class StepGuardService:
 
     _WARNING_TRIP_COUNTS_KEY = '__step_guard_warning_trip_counts'
     _REPLAN_REQUIRED_KEY = '__step_guard_replan_required'
+    _VERIFICATION_REQUIRED_KEY = '__step_guard_verification_required'
 
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
@@ -155,6 +157,22 @@ class StepGuardService:
         if hasattr(state, 'set_extra'):
             state.set_extra(
                 self._REPLAN_REQUIRED_KEY, bool(value), source='StepGuardService'
+            )
+
+    def _set_verification_requirement(
+        self, controller, requirement: dict[str, Any] | None
+    ) -> None:
+        state = getattr(controller, 'state', None)
+        if state is None:
+            return
+        if not hasattr(state, 'extra_data') or not isinstance(state.extra_data, dict):
+            state.extra_data = {}
+        state.extra_data[self._VERIFICATION_REQUIRED_KEY] = requirement
+        if hasattr(state, 'set_extra'):
+            state.set_extra(
+                self._VERIFICATION_REQUIRED_KEY,
+                requirement,
+                source='StepGuardService',
             )
 
     async def _check_circuit_breaker(self, controller) -> bool | None:
@@ -288,7 +306,12 @@ class StepGuardService:
         _clear_agent_queued_actions(controller, reason='stuck_loop_recovery')
 
         created_files = self._collect_created_files(history)
-        msg, planning = self._build_stuck_recovery_message(created_files, history)
+        msg, planning, verification_requirement = self._build_stuck_recovery_message(
+            created_files, history
+        )
+
+        if verification_requirement is not None:
+            self._set_verification_requirement(controller, verification_requirement)
 
         error_obs = ErrorObservation(content=msg, error_id='STUCK_LOOP_RECOVERY')
         attach_observation_cause(
@@ -315,8 +338,9 @@ class StepGuardService:
         self,
         created_files: set[str],
         history: list,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, dict[str, Any] | None]:
         """Build a generic stuck recovery message without task-text heuristics."""
+        verification_requirement = self._build_verification_requirement(history)
         recent_errors = [
             (getattr(e, 'content', '') or '')
             for e in history[-12:]
@@ -339,6 +363,32 @@ class StepGuardService:
                 '3. If it fails again, switch to a different edit strategy instead of retrying str_replace_editor.\n'
                 'Do NOT emit another near-identical str_replace_editor call without new file evidence.',
                 'STUCK RECOVERY: read_file refresh, then one str_replace_editor retry max, then switch strategy.',
+                verification_requirement,
+            )
+
+        if verification_requirement is not None:
+            path_list = verification_requirement.get('paths') or []
+            if isinstance(path_list, list):
+                files_text = ', '.join(str(path) for path in path_list if str(path).strip())
+            else:
+                files_text = ''
+            failure_text = str(
+                verification_requirement.get('observed_failure')
+                or 'Recent failing feedback still contradicts the last edit attempt.'
+            ).strip()
+            if not files_text:
+                files_text = 'recently touched files'
+            return (
+                'STUCK LOOP DETECTED — recent file changes were followed by failing feedback.\n'
+                f'Files to reconcile: {files_text}.\n'
+                f'Latest failing feedback: {failure_text}\n'
+                'MANDATORY NEXT ACTIONS:\n'
+                '1. Read the actual file contents or rerun the focused failing check.\n'
+                '2. Compare the fresh output to your last assumption.\n'
+                '3. Only then emit another edit or finish action.\n'
+                'Do NOT emit another write/edit or finish action until you have one fresh grounding result.',
+                'STUCK RECOVERY: reconcile actual file/check state before any more edits or finish.',
+                verification_requirement,
             )
 
         created_str = ', '.join(sorted(created_files))
@@ -350,6 +400,7 @@ class StepGuardService:
                 'YOUR VERY NEXT ACTION MUST BE: perform one concrete unfinished task step, '
                 'or verify the current state before changing course.',
                 'STUCK RECOVERY: stop repeating, verify current state, then do the next unfinished step.',
+                None,
             )
         return (
             'STUCK LOOP DETECTED — You are repeating actions without progress.\n'
@@ -359,4 +410,76 @@ class StepGuardService:
             '3. Execute one specific unfinished step.\n'
             'YOUR VERY NEXT ACTION MUST BE a real progress-making action.',
             'STUCK RECOVERY: verify state, then make one concrete next-step action.',
+            None,
         )
+
+    def _build_verification_requirement(
+        self, history: list
+    ) -> dict[str, Any] | None:
+        """Detect stale-state churn after a recent file mutation plus failing feedback."""
+        recent_history = list(history[-18:])
+        last_mutation_index = -1
+        mutated_paths: list[str] = []
+
+        for idx, event in enumerate(recent_history):
+            if isinstance(event, FileEditAction):
+                command = str(getattr(event, 'command', '') or '').strip().lower()
+                if command == 'view_file':
+                    continue
+                path = getattr(event, 'path', '') or ''
+                if path:
+                    mutated_paths.append(self._normalize_path(path))
+                last_mutation_index = idx
+                continue
+            if isinstance(
+                event,
+                (FileWriteAction, FileEditObservation, FileWriteObservation),
+            ):
+                path = getattr(event, 'path', '') or ''
+                if path:
+                    mutated_paths.append(self._normalize_path(path))
+                last_mutation_index = idx
+
+        if last_mutation_index < 0:
+            return None
+
+        failing_feedback: list[str] = []
+        ignored_error_ids = {
+            'CIRCUIT_BREAKER_TRIPPED',
+            'CIRCUIT_BREAKER_WARNING',
+            'NULL_ACTION_LOOP',
+            'STUCK_LOOP_RECOVERY',
+            'VERIFICATION_REQUIRED',
+        }
+
+        for event in recent_history[last_mutation_index + 1 :]:
+            if isinstance(event, ErrorObservation):
+                error_id = str(getattr(event, 'error_id', '') or '').strip().upper()
+                if error_id in ignored_error_ids:
+                    continue
+                first_line = (getattr(event, 'content', '') or '').splitlines()[0].strip()
+                if first_line:
+                    failing_feedback.append(first_line)
+                continue
+            if isinstance(event, CmdOutputObservation):
+                exit_code = getattr(event, 'exit_code', None)
+                if exit_code in (None, 0, -1):
+                    continue
+                first_line = (getattr(event, 'content', '') or '').splitlines()[0].strip()
+                if not first_line:
+                    command = str(getattr(event, 'command', '') or '').strip()
+                    first_line = f'{command or "Command"} failed with exit code {exit_code}'
+                failing_feedback.append(first_line)
+
+        if not mutated_paths or not failing_feedback:
+            return None
+
+        latest_failure = failing_feedback[-1]
+        if len(latest_failure) > 180:
+            latest_failure = latest_failure[:179].rstrip() + '…'
+
+        return {
+            'reason': 'recent_file_mutation_plus_failure',
+            'paths': sorted({path for path in mutated_paths if path})[:6],
+            'observed_failure': latest_failure,
+        }

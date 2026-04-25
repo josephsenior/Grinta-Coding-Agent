@@ -17,7 +17,7 @@ from backend.ledger.action import (
     SignalProgressAction,
     TaskTrackingAction,
 )
-from backend.ledger.observation import ErrorObservation, Observation
+from backend.ledger.observation import Observation
 from backend.ledger.observation.agent import AgentThinkObservation
 from backend.ledger.tool import ToolCallMetadata
 from backend.orchestration.services.event_router_service import (
@@ -209,12 +209,11 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         await self.service._handle_action(action)
 
         self.mock_controller.set_agent_state_to.assert_not_called()
-        self.mock_controller.event_stream.add_event.assert_called_once()
-        emitted = self.mock_controller.event_stream.add_event.call_args[0][0]
-        self.assertIsInstance(emitted, ErrorObservation)
-        self.assertEqual(emitted.error_id, 'CHECKPOINT_FLOW_INCOMPLETE')
-        self.assertIn('task_tracker update', emitted.content)
-        self.assertIn('finish', emitted.content)
+        self.mock_controller.event_stream.add_event.assert_not_called()
+        self.mock_controller.state.set_planning_directive.assert_called_once()
+        directive = self.mock_controller.state.set_planning_directive.call_args[0][0]
+        self.assertIn('task_tracker update', directive)
+        self.assertIn('finish', directive)
 
     async def test_handle_action_message_from_agent_allows_checkpoint_completion_handoff(
         self,
@@ -270,12 +269,11 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         await self.service._handle_action(action)
 
         self.mock_controller.set_agent_state_to.assert_not_called()
-        self.mock_controller.event_stream.add_event.assert_called_once()
-        emitted = self.mock_controller.event_stream.add_event.call_args[0][0]
-        self.assertIsInstance(emitted, ErrorObservation)
-        self.assertEqual(emitted.error_id, 'CHECKPOINT_FLOW_INCOMPLETE')
+        self.mock_controller.event_stream.add_event.assert_not_called()
+        self.mock_controller.state.set_planning_directive.assert_called_once()
+        directive = self.mock_controller.state.set_planning_directive.call_args[0][0]
         self.assertIn(
-            'revert_to_checkpoint is an intermediate control tool', emitted.content
+            'revert_to_checkpoint is an intermediate control tool', directive
         )
 
     @patch.dict('os.environ', {'LOG_ALL_EVENTS': 'true'})

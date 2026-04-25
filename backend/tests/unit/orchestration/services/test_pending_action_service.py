@@ -144,7 +144,29 @@ class TestPendingActionService(unittest.TestCase):
         self.assertEqual(action, mock_action)
         # Should have logged both set and periodic update
         log_calls = [call[0][1] for call in self.mock_controller.log.call_args_list]
-        self.assertTrue(any('Pending action active' in msg for msg in log_calls))
+        self.assertTrue(any('Pending action still running' in msg for msg in log_calls))
+
+    @patch('time.time')
+    def test_get_logs_progress_update_once_per_bucket(self, mock_time):
+        """Repeated polling in the same 30s bucket should not spam progress logs."""
+        mock_action = MagicMock()
+        mock_action.__class__.__name__ = 'TestAction'
+        mock_action.id = 'action-123'
+
+        mock_time.return_value = 100.0
+        self.service.set(mock_action)
+
+        mock_time.return_value = 190.0
+        self.assertEqual(self.service.get(), mock_action)
+
+        mock_time.return_value = 190.8
+        self.assertEqual(self.service.get(), mock_action)
+
+        progress_logs = [
+            call for call in self.mock_controller.log.call_args_list
+            if 'Pending action still running' in call[0][1]
+        ]
+        self.assertEqual(len(progress_logs), 1)
 
     def test_info_returns_pending_tuple(self):
         """Test info() returns (action, timestamp) tuple."""
@@ -355,6 +377,29 @@ class TestPendingActionService(unittest.TestCase):
         mock_time.return_value = 705.0
         self.assertIsNone(service.get())
         self.mock_controller.event_stream.add_event.assert_called_once()
+
+    @patch('time.time')
+    def test_cmd_run_action_progress_log_uses_effective_timeout(self, mock_time):
+        """Long-running command progress logs should not be labeled as timeouts."""
+        service = PendingActionService(self.mock_context, timeout=120.0)
+        action = CmdRunAction(command='python -m venv .venv && pip install fastapi')
+
+        mock_time.return_value = 100.0
+        service.set(action)
+
+        mock_time.return_value = 320.0
+        self.assertEqual(service.get(), action)
+
+        progress_logs = [
+            call for call in self.mock_controller.log.call_args_list
+            if 'Pending action still running' in call[0][1]
+        ]
+        self.assertEqual(len(progress_logs), 1)
+        self.assertIn('timeout 600.0s', progress_logs[0][0][1])
+        self.assertEqual(
+            progress_logs[0][1]['extra']['msg_type'],
+            'PENDING_ACTION_STILL_RUNNING',
+        )
 
     @patch('time.time')
     def test_browser_tool_action_uses_long_timeout_floor(self, mock_time):

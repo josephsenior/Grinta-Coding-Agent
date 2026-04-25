@@ -6,6 +6,8 @@ import unittest
 from unittest.mock import MagicMock
 
 from backend.ledger import EventSource
+from backend.ledger.action import FileEditAction
+from backend.ledger.observation import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
 from backend.orchestration.services.step_guard_service import StepGuardService
 
@@ -125,3 +127,43 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(result)
         self.controller.agent.clear_queued_actions.assert_called_once()
+
+    async def test_handle_stuck_detection_requires_fresh_verification_after_edit_failure(
+        self,
+    ):
+        stuck_svc = MagicMock()
+        stuck_svc.compute_repetition_score.return_value = 1.0
+        stuck_svc.is_stuck.return_value = True
+        self.controller.stuck_service = stuck_svc
+
+        state = MagicMock()
+        state.extra_data = {}
+        state.set_extra = MagicMock()
+        state.set_planning_directive = MagicMock()
+        state.history = [
+            FileEditAction(
+                path='backend/context/schemas.py',
+                command='replace_text',
+                old_str='old',
+                new_str='new',
+            ),
+            CmdOutputObservation(
+                content='FAILED: backend/context/schemas.py is out of sync',
+                command='uv run pytest -q',
+                exit_code=1,
+            ),
+        ]
+        self.controller.state = state
+        self.controller.event_stream = MagicMock()
+        self.controller.agent = MagicMock()
+        self.controller.agent.clear_queued_actions = MagicMock(return_value=1)
+
+        result = await self.service._handle_stuck_detection(self.controller)
+
+        self.assertFalse(result)
+        requirement = state.extra_data['__step_guard_verification_required']
+        self.assertEqual(requirement['reason'], 'recent_file_mutation_plus_failure')
+        self.assertEqual(requirement['paths'], ['backend/context/schemas.py'])
+        emitted = self.controller.event_stream.add_event.call_args.args[0]
+        self.assertIsInstance(emitted, ErrorObservation)
+        self.assertIn('Do NOT emit another write/edit or finish action', emitted.content)

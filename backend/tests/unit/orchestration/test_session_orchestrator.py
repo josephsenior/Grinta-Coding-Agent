@@ -964,6 +964,53 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
             self.ctrl.services.action_execution.execute_action.call_count, 2
         )
 
+    async def test_step_does_not_auto_schedule_after_agent_pause_state_change(self):
+        """Background event-router state changes must suppress the tail self.step() requeue."""
+        from backend.core.schemas import AgentState
+
+        self.ctrl.services.step_prerequisites.can_step.return_value = True
+        self.ctrl.services.step_guard.ensure_can_step = AsyncMock(return_value=True)
+        self.ctrl._sync_budget_flag_with_metrics = MagicMock()
+        self.ctrl.services.retry.retry_count = 0
+
+        state = {'value': AgentState.RUNNING}
+        self.ctrl.get_agent_state = MagicMock(side_effect=lambda: state['value'])
+        self.ctrl.services.action_execution.get_next_action = AsyncMock(
+            return_value=MagicMock()
+        )
+
+        async def _execute_action(_action):
+            async def _flip_state():
+                state['value'] = AgentState.AWAITING_USER_INPUT
+
+            asyncio.create_task(_flip_state())
+
+        self.ctrl.services.action_execution.execute_action = AsyncMock(
+            side_effect=_execute_action
+        )
+        self.ctrl.step = MagicMock()
+
+        with (
+            patch.object(self.ctrl, '_run_control_flags_safely', return_value=True),
+            patch.object(
+                type(self.ctrl),
+                '_pending_action',
+                new_callable=PropertyMock,
+                return_value=None,
+            ),
+            patch.object(
+                self.ctrl,
+                '_try_parallel_read_batch',
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch.object(self.ctrl, '_can_drain_pending', return_value=False),
+            patch.object(self.ctrl, '_handle_post_execution', new_callable=AsyncMock),
+        ):
+            await self.ctrl._step()
+
+        self.ctrl.step.assert_not_called()
+
     def test_cleanup_action_context_no_action(self):
         """Line 213-228 coverage for action=None path."""
         self.ctrl._action_contexts_by_object = {}

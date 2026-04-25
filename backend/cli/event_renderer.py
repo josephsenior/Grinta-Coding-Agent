@@ -730,10 +730,17 @@ _IDLE_STATES = {
 
 # Provider / network / quota issues: calm “notice” styling (cyan) instead of red.
 _RECOVERABLE_NOTICE_FRAGMENTS = (
+    'verification required',
+    'blind retries are blocked',
+    'fresh grounding action',
     'stuck loop detected',
+    'no executable action',
+    'no-progress loop',
+    'intermediate control tool',
     'timeout',
     'timed out',
     'did not answer before',
+    'automatic backoff and retry',
     'retrying without streaming',
     'stream timed out',
     'fallback completion timed out',
@@ -1053,6 +1060,38 @@ def _error_guidance(error_text: str) -> ErrorGuidance | None:
                 'non-streaming cap (many setups use 60s by default).',
             ),
         )
+    if _contains_any(
+        lower,
+        (
+            'automatic backoff and retry will run',
+            'waiting before retrying — no action needed',
+            'waiting before retrying - no action needed',
+        ),
+    ):
+        return ErrorGuidance(
+            summary='Autonomous recovery is in progress.',
+            steps=(
+                'No action needed. Grinta already scheduled a retry.',
+                'Watch the Backoff / Auto Retry status in the footer for attempt progress.',
+                'If automatic retries exhaust, the prompt will return automatically.',
+            ),
+        )
+    if 'intermediate control tool' in lower:
+        return ErrorGuidance(
+            summary='This was an internal control step, not a user-facing reply.',
+            steps=(
+                'No action is required from you.',
+                'Grinta should continue the same turn and either execute the next step or finish normally.',
+            ),
+        )
+    if _contains_any(lower, ('no executable action', 'no-progress loop')):
+        return ErrorGuidance(
+            summary='Grinta paused to avoid a no-progress loop.',
+            steps=(
+                'No action is required unless you want the task to continue immediately.',
+                'Reply with a clearer next step or ask the agent to retry if you want it to resume.',
+            ),
+        )
     if _contains_any(lower, ('timeout', 'timed out')):
         return ErrorGuidance(
             summary="The model didn't finish within Grinta's wait window.",
@@ -1185,6 +1224,21 @@ def _error_guidance(error_text: str) -> ErrorGuidance | None:
     if _contains_any(
         lower,
         (
+            'verification required',
+            'blind retries are blocked',
+            'fresh grounding action',
+        ),
+    ):
+        return ErrorGuidance(
+            summary='Grinta blocked another blind write because recent edits were followed by failing feedback.',
+            steps=(
+                'Read the affected file or rerun the focused failing check to get fresh evidence.',
+                'After one grounding step, the agent can edit or finish again.',
+            ),
+        )
+    if _contains_any(
+        lower,
+        (
             'stuck loop detected',
             'stuck recovery:',
             'mandatory recovery:',
@@ -1237,6 +1291,22 @@ def _build_recovery_text(
 def _notice_panel_title(error_text: str) -> str:
     """Short cyan banner title for recoverable (notice-style) issues."""
     lower = error_text.lower()
+    if 'verification required' in lower:
+        return 'Need fresh evidence'
+    if _contains_any(
+        lower,
+        (
+            'automatic backoff and retry',
+            'waiting before retrying — no action needed',
+            'waiting before retrying - no action needed',
+            'autonomous recovery',
+        ),
+    ):
+        return 'Autonomous recovery'
+    if _contains_any(lower, ('no executable action', 'no-progress loop')):
+        return 'Paused safely'
+    if 'intermediate control tool' in lower:
+        return 'Continuing work'
     if 'fallback completion timed out' in lower:
         return 'Still no reply'
     if _contains_any(
@@ -2918,6 +2988,7 @@ class CLIEventRenderer:
 
         if isinstance(obs, StatusObservation):
             status_type = str(getattr(obs, 'status_type', '') or '')
+            force_visible_status = False
             if status_type == 'delegate_progress':
                 extras = getattr(obs, 'extras', None) or {}
                 batch_id = extras.get('batch_id')
@@ -2943,6 +3014,32 @@ class CLIEventRenderer:
                     }
                     self._set_delegate_panel()
                     return
+            elif status_type == 'retry_pending':
+                extras = getattr(obs, 'extras', None) or {}
+                try:
+                    attempt = max(1, int(extras.get('attempt') or 1))
+                except (TypeError, ValueError):
+                    attempt = 1
+                try:
+                    max_attempts = max(attempt, int(extras.get('max_attempts') or attempt))
+                except (TypeError, ValueError):
+                    max_attempts = attempt
+                self._hud.update_ledger('Backoff')
+                self._hud.update_agent_state(f'Auto Retry {attempt}/{max_attempts}')
+                force_visible_status = True
+            elif status_type == 'retry_resuming':
+                extras = getattr(obs, 'extras', None) or {}
+                try:
+                    attempt = max(1, int(extras.get('attempt') or 1))
+                except (TypeError, ValueError):
+                    attempt = 1
+                try:
+                    max_attempts = max(attempt, int(extras.get('max_attempts') or attempt))
+                except (TypeError, ValueError):
+                    max_attempts = attempt
+                self._hud.update_ledger('Backoff')
+                self._hud.update_agent_state(f'Retrying {attempt}/{max_attempts}')
+                force_visible_status = True
             content = getattr(obs, 'content', '')
             if content:
                 lower_c = content.lower()
@@ -2951,7 +3048,7 @@ class CLIEventRenderer:
                     or 'retrying without streaming' in lower_c
                 ):
                     self._append_history(_build_llm_stream_fallback_panel())
-                elif self._pending_activity_card is not None:
+                elif self._pending_activity_card is not None and not force_visible_status:
                     return
                 else:
                     self._flush_pending_tool_cards()
@@ -3247,7 +3344,9 @@ class CLIEventRenderer:
             self._hud.update_agent_state('Ready')
         elif state == AgentState.RATE_LIMITED:
             self._hud.update_ledger('Backoff')
-            self._hud.update_agent_state('Rate Limited')
+            current_label = (self._hud.state.agent_state_label or '').strip()
+            if not current_label.startswith(('Auto Retry', 'Retrying')):
+                self._hud.update_agent_state('Waiting on recovery')
         elif state == AgentState.PAUSED:
             # PAUSED is treated as STOPPED in CLI — collapse to same UX
             state = AgentState.STOPPED

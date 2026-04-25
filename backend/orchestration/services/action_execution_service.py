@@ -28,8 +28,23 @@ from backend.inference.exceptions import (
     is_context_window_error,
 )
 from backend.ledger import EventSource
+from backend.ledger.action import (
+    CmdRunAction,
+    FileEditAction,
+    FileReadAction,
+    FileWriteAction,
+    LspQueryAction,
+    MCPAction,
+    MessageAction,
+    NullAction,
+    PlaybookFinishAction,
+    RecallAction,
+    TerminalReadAction,
+    TerminalRunAction,
+)
 from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation_cause import attach_observation_cause
 from backend.orchestration.agent_circuit_breaker import (
     classify_str_replace_editor_error_bucket,
 )
@@ -56,6 +71,45 @@ _MALFORMED_JSON_MARKERS: tuple[str, ...] = (
     'control character',
     'json parse error',
     'invalid json',
+)
+
+_VERIFICATION_REQUIRED_KEY = '__step_guard_verification_required'
+_GROUNDING_MCP_TOOL_NAMES = frozenset(
+    {
+        'copilot_getnotebooksummary',
+        'execution_subagent',
+        'fetch_webpage',
+        'file_search',
+        'get_changed_files',
+        'get_errors',
+        'get_terminal_output',
+        'github_repo',
+        'github_text_search',
+        'grep_search',
+        'read_file',
+        'read_notebook_cell_output',
+        'run_in_terminal',
+        'run_task',
+        'semantic_search',
+        'view_image',
+        'vscode_listcodeusages',
+    }
+)
+_MUTATING_MCP_TOOL_NAMES = frozenset(
+    {
+        'apply_patch',
+        'create_directory',
+        'create_file',
+        'create_new_jupyter_notebook',
+        'create_new_workspace',
+        'edit_notebook_file',
+        'memory.create',
+        'memory.delete',
+        'memory.insert',
+        'memory.rename',
+        'memory.str_replace',
+        'vscode_renamesymbol',
+    }
 )
 
 
@@ -101,8 +155,11 @@ def _resolve_llm_step_timeout_seconds(agent) -> float | None:
 class ActionExecutionService:
     """Encapsulates action acquisition, planning, and execution orchestration."""
 
+    _MAX_CONSECUTIVE_NULL_ACTIONS = 3
+
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
+        self._consecutive_null_actions = 0
 
     async def get_next_action(self) -> Action | None:
         """Get the next action from the agent, with automatic repair for validation errors."""
@@ -193,6 +250,11 @@ class ActionExecutionService:
                         self._context.agent.__class__.__name__,
                     ),
                 )
+                if use_confirmation_replay:
+                    return action
+                if isinstance(action, NullAction):
+                    return self._handle_consecutive_null_action(action)
+                self._reset_consecutive_null_actions()
                 return action
 
             except (
@@ -204,6 +266,7 @@ class ActionExecutionService:
                 CommonFunctionCallValidationError,
                 CommonFunctionCallNotExistsError,
             ) as exc:
+                self._reset_consecutive_null_actions()
                 error_signature = f'{type(exc).__name__}:{str(exc).strip()}'
                 if error_signature == last_error_signature:
                     identical_error_count += 1
@@ -287,11 +350,184 @@ class ActionExecutionService:
                 return None
 
             except (ContextWindowExceededError, BadRequestError, OpenAIError) as exc:
+                self._reset_consecutive_null_actions()
                 return await self._handle_context_window_error(exc)
             # APIConnectionError, AuthenticationError, RateLimitError, ServiceUnavailableError,
             # APIError, InternalServerError, Timeout: let propagate to caller
 
         return None
+
+    def _handle_consecutive_null_action(self, action: Action) -> Action:
+        self._consecutive_null_actions += 1
+        logger.warning(
+            'ActionExecutionService.get_next_action: consecutive NullAction %d/%d '
+            'from agent=%s',
+            self._consecutive_null_actions,
+            self._MAX_CONSECUTIVE_NULL_ACTIONS,
+            getattr(
+                self._context.agent,
+                'name',
+                self._context.agent.__class__.__name__,
+            ),
+        )
+
+        if self._consecutive_null_actions < self._MAX_CONSECUTIVE_NULL_ACTIONS:
+            return action
+
+        self._context.event_stream.add_event(
+            ErrorObservation(
+                content=(
+                    'The model returned no executable action for multiple consecutive '
+                    'steps. Pausing to avoid a no-progress loop that burns model calls.'
+                ),
+                error_id='NULL_ACTION_LOOP',
+            ),
+            EventSource.AGENT,
+        )
+        self._reset_consecutive_null_actions()
+
+        pause = MessageAction(
+            content=(
+                'I am pausing because the model returned no executable action 3 times '
+                'in a row after the last step. This stops a no-progress retry loop '
+                'instead of silently consuming more model calls.'
+            ),
+            wait_for_response=True,
+        )
+        pause.source = EventSource.AGENT
+        return pause
+
+    def _reset_consecutive_null_actions(self) -> None:
+        self._consecutive_null_actions = 0
+
+    def _get_verification_requirement(self) -> dict[str, object] | None:
+        state = getattr(self._context, 'state', None)
+        if state is None:
+            return None
+        extra = getattr(state, 'extra_data', None)
+        if not isinstance(extra, dict):
+            return None
+        requirement = extra.get(_VERIFICATION_REQUIRED_KEY)
+        if isinstance(requirement, dict) and requirement:
+            return requirement
+        return None
+
+    def _clear_verification_requirement(self) -> None:
+        state = getattr(self._context, 'state', None)
+        if state is None:
+            return
+        extra = getattr(state, 'extra_data', None)
+        if not isinstance(extra, dict):
+            state.extra_data = {}
+            extra = state.extra_data
+        extra[_VERIFICATION_REQUIRED_KEY] = None
+        if hasattr(state, 'set_extra'):
+            state.set_extra(
+                _VERIFICATION_REQUIRED_KEY,
+                None,
+                source='ActionExecutionService',
+            )
+
+    @staticmethod
+    def _normalize_mcp_tool_name(action: MCPAction) -> str:
+        name = str(getattr(action, 'name', '') or '').strip().lower()
+        arguments = getattr(action, 'arguments', None)
+        if not isinstance(arguments, dict):
+            arguments = {}
+
+        if name in {'call_mcp_tool', 'execute_mcp_tool'}:
+            inner = arguments.get('tool_name') or arguments.get('name')
+            if isinstance(inner, str) and inner.strip():
+                name = inner.strip().lower()
+
+        if name == 'memory':
+            command = arguments.get('command')
+            if isinstance(command, str) and command.strip():
+                return f'memory.{command.strip().lower()}'
+
+        return name
+
+    def _action_satisfies_verification_requirement(self, action: Action) -> bool:
+        if isinstance(action, (CmdRunAction, FileReadAction, LspQueryAction)):
+            return True
+        if isinstance(action, (RecallAction, TerminalReadAction, TerminalRunAction)):
+            return True
+        if isinstance(action, FileEditAction):
+            command = str(getattr(action, 'command', '') or '').strip().lower()
+            return command == 'view_file'
+        if isinstance(action, MCPAction):
+            return self._normalize_mcp_tool_name(action) in _GROUNDING_MCP_TOOL_NAMES
+        return False
+
+    def _action_blocked_by_verification_requirement(self, action: Action) -> bool:
+        if isinstance(action, (FileWriteAction, PlaybookFinishAction)):
+            return True
+        if isinstance(action, FileEditAction):
+            command = str(getattr(action, 'command', '') or '').strip().lower()
+            return command != 'view_file'
+        if isinstance(action, MCPAction):
+            return self._normalize_mcp_tool_name(action) in _MUTATING_MCP_TOOL_NAMES
+        return False
+
+    def _format_verification_required_content(
+        self, requirement: dict[str, object]
+    ) -> str:
+        raw_paths = requirement.get('paths') or []
+        if isinstance(raw_paths, list):
+            paths = ', '.join(str(path) for path in raw_paths if str(path).strip())
+        else:
+            paths = ''
+        failure = str(
+            requirement.get('observed_failure')
+            or 'Recent failing feedback still contradicts the last edit attempt.'
+        ).strip()
+        lines = [
+            'VERIFICATION REQUIRED BEFORE CONTINUING',
+            '',
+            'Recent edits were followed by failing feedback, so blind retries are blocked for one grounding step.',
+        ]
+        if paths:
+            lines.append(f'Files to reconcile: {paths}')
+        if failure:
+            lines.append(f'Latest failing feedback: {failure}')
+        lines.extend(
+            [
+                'Allowed next moves: read the affected file, inspect terminal output, or rerun a focused check.',
+                'After one fresh grounding action, edits and finish are allowed again.',
+            ]
+        )
+        return '\n'.join(lines)
+
+    def _enforce_verification_requirement(self, action: Action) -> bool:
+        requirement = self._get_verification_requirement()
+        if requirement is None:
+            return False
+
+        if self._action_satisfies_verification_requirement(action):
+            self._clear_verification_requirement()
+            return False
+
+        if not self._action_blocked_by_verification_requirement(action):
+            return False
+
+        observation = ErrorObservation(
+            content=self._format_verification_required_content(requirement),
+            error_id='VERIFICATION_REQUIRED',
+        )
+        attach_observation_cause(
+            observation,
+            action,
+            context='ActionExecutionService.verification_gate',
+        )
+        self._context.event_stream.add_event(observation, EventSource.ENVIRONMENT)
+
+        state = getattr(self._context, 'state', None)
+        if state is not None and hasattr(state, 'set_planning_directive'):
+            state.set_planning_directive(
+                'VERIFICATION REQUIRED: before more edits or finish, get one fresh file read, terminal read, or focused command result from the actual workspace state.',
+                source='ActionExecutionService',
+            )
+        return True
 
     async def execute_action(self, action: Action) -> None:
         # Plugin hook: action_pre
@@ -306,6 +542,9 @@ class ActionExecutionService:
                 exc,
                 exc_info=True,
             )
+
+        if self._enforce_verification_requirement(action):
+            return
 
         ctx: ToolInvocationContext | None = None
         pipeline = _resolve_operation_pipeline(self._context)

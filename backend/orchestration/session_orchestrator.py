@@ -723,8 +723,14 @@ class SessionOrchestrator:
         # pending action is set and the runtime may never produce an observation
         # that would re-trigger the step loop.  Schedule the next step so the
         # agent can proceed to the LLM call instead of stalling indefinitely.
-        if not self._pending_action and self.get_agent_state() == AgentState.RUNNING:
-            self.step()
+        if not self._pending_action:
+            # Give background _on_event tasks one turn to flip state after
+            # agent messages such as wait_for_response handoffs. Without this,
+            # _step_inner can queue the next LLM call before the event router
+            # moves the agent to AWAITING_USER_INPUT.
+            await asyncio.sleep(0)
+            if not self._pending_action and self.get_agent_state() == AgentState.RUNNING:
+                self.step()
 
     async def _try_parallel_read_batch(self) -> bool:
         """Attempt to drain pending actions in parallel when scheduler allows.

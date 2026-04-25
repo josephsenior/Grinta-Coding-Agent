@@ -334,16 +334,23 @@ class EventRouterService:
             ]
         )
 
-        observation = ErrorObservation(
-            content='\n'.join(guidance_lines),
-            error_id='CHECKPOINT_FLOW_INCOMPLETE',
-        )
-        attach_observation_cause(
-            observation,
-            action,
-            context='EventRouterService._intercept_incomplete_checkpoint_handoff',
-        )
-        self._ctrl.event_stream.add_event(observation, EventSource.ENVIRONMENT)
+        state = getattr(self._ctrl, 'state', None)
+        if state is not None and hasattr(state, 'set_planning_directive'):
+            state.set_planning_directive(
+                '\n'.join(guidance_lines),
+                source='EventRouterService._intercept_incomplete_checkpoint_handoff',
+            )
+        else:
+            observation = ErrorObservation(
+                content='\n'.join(guidance_lines),
+                error_id='CHECKPOINT_FLOW_INCOMPLETE',
+            )
+            attach_observation_cause(
+                observation,
+                action,
+                context='EventRouterService._intercept_incomplete_checkpoint_handoff',
+            )
+            self._ctrl.event_stream.add_event(observation, EventSource.ENVIRONMENT)
         if self._ctrl.get_agent_state() != AgentState.RUNNING:
             await self._ctrl.set_agent_state_to(AgentState.RUNNING)
         return True

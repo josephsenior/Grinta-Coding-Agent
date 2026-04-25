@@ -46,6 +46,11 @@ _RATE_LIMITED_EXCEPTIONS = (
     ServiceUnavailableError,
 )
 
+# Transient provider failures that should use the retry queue instead of
+# dropping straight back to the user. Timeouts are included here on purpose:
+# they indicate provider/network stall, not a task-level dead end.
+_QUEUED_RETRY_EXCEPTIONS = _RATE_LIMITED_EXCEPTIONS + (Timeout,)
+
 
 def _recovery_may_set_state(controller, new_state: AgentState) -> bool:
     """True only when the formal state graph allows ``current → new_state``.
@@ -119,7 +124,7 @@ class RecoveryService:
         # Hard-stop errors (auth failure, context window, model not found):
         #   → AWAITING_USER_INPUT — user must fix config/credentials first.
         #
-        # Rate-limited errors (429, 503):
+        # Rate-limited errors (429, 503) and provider/network timeouts:
         #   → AWAITING_USER_INPUT + retry queue — the queue handles the
         #     back-off delay and transitions back to RUNNING automatically.
         #
@@ -135,10 +140,10 @@ class RecoveryService:
                 await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
             return
 
-        if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
+        if isinstance(exc, _QUEUED_RETRY_EXCEPTIONS):
             if not _recovery_may_set_state(controller, AgentState.RATE_LIMITED):
                 logger.info(
-                    'Skipping rate-limit recovery transition (state=%s); '
+                    'Skipping queued-retry recovery transition (state=%s); '
                     'error was still recorded.',
                     controller.get_agent_state(),
                 )
@@ -146,30 +151,28 @@ class RecoveryService:
             try:
                 from backend.ledger.observation import AgentThinkObservation
 
-                controller.event_stream.add_event(
-                    AgentThinkObservation(
-                        content='⚠️ API Rate Limit hit. Pausing execution for exponential backoff...'
-                    ),
-                    EventSource.ENVIRONMENT,
-                )
+                if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
+                    controller.event_stream.add_event(
+                        AgentThinkObservation(
+                            content='⚠️ API Rate Limit hit. Pausing execution for exponential backoff...'
+                        ),
+                        EventSource.ENVIRONMENT,
+                    )
 
-                await controller.retry_service.schedule_retry_after_failure(exc)
+                scheduled = await controller.retry_service.schedule_retry_after_failure(
+                    exc
+                )
             except Exception:
                 logger.debug('schedule_retry_after_failure failed', exc_info=True)
-            await self._context.set_agent_state(AgentState.RATE_LIMITED)
-            return
+                scheduled = False
 
-        # Provider wall-clock timeouts (streaming stall, first-chunk wait, step
-        # wait_for, etc.): return to user input instead of auto-calling
-        # controller.step() again.  Auto-retry blocked the CLI in
-        # _wait_for_agent_idle while recoverable error panels set the HUD to
-        # "Ready", so the user could not type.  The model already receives the
-        # ErrorObservation; the user can send a follow-up or /retry.
-        if isinstance(exc, Timeout):
-            logger.warning(
-                'Timeout: returning to AWAITING_USER_INPUT so the CLI prompt is usable again'
-            )
-            if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
+            if scheduled:
+                await self._context.set_agent_state(AgentState.RATE_LIMITED)
+            elif _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
+                logger.warning(
+                    'Queued retry unavailable for %s; returning to AWAITING_USER_INPUT',
+                    type(exc).__name__,
+                )
                 await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
             return
 
@@ -316,6 +319,12 @@ class RecoveryService:
             )
         elif isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
             guidance = 'Rate limit reached. Waiting before retrying — no action needed.'
+        elif isinstance(exc, Timeout):
+            guidance = (
+                'The provider timed out on this step. Automatic backoff and retry '
+                'will run if the retry queue is available; otherwise the agent will '
+                'return to the prompt.'
+            )
         else:
             guidance = (
                 'A transient error occurred on this step. The error has been recorded. '

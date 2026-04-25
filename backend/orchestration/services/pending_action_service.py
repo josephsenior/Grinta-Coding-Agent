@@ -40,6 +40,7 @@ class PendingActionService:
         self._timeout = timeout
         self._outstanding: dict[int, tuple[Action, float]] = {}
         self._legacy_pending: tuple[Action, float] | None = None
+        self._progress_log_buckets: dict[int | str, int] = {}
         self._watchdog_handle: asyncio.TimerHandle | threading.Timer | None = None
         self._watchdog_delay_s: float = timeout + 2
 
@@ -102,6 +103,7 @@ class PendingActionService:
                 act, ts = self._legacy_pending
                 self._log_clear(controller, act, ts)
                 self._legacy_pending = None
+            self._progress_log_buckets.clear()
             return
 
         action_id = getattr(action, 'id', 'unknown')
@@ -115,8 +117,10 @@ class PendingActionService:
         aid = self._int_action_id(action)
         if aid is not None:
             self._outstanding[aid] = (action, now)
+            self._progress_log_buckets.pop(aid, None)
         else:
             self._legacy_pending = (action, now)
+            self._progress_log_buckets.pop('legacy', None)
 
         self._schedule_watchdog_if_needed()
 
@@ -156,6 +160,7 @@ class PendingActionService:
         if entry is None:
             return None
         action, ts = entry
+        self._progress_log_buckets.pop(cid, None)
         self._log_clear(self._context.get_controller(), action, ts)
         self._schedule_watchdog_if_needed()
         return action
@@ -179,6 +184,7 @@ class PendingActionService:
                 dead.append(aid)
         for aid in dead:
             self._outstanding.pop(aid, None)
+            self._progress_log_buckets.pop(aid, None)
 
         if self._legacy_pending is not None:
             action, ts = self._legacy_pending
@@ -187,6 +193,7 @@ class PendingActionService:
             if math.isfinite(limit) and elapsed > limit:
                 self._handle_timeout(controller, action, elapsed)
                 self._legacy_pending = None
+                self._progress_log_buckets.pop('legacy', None)
 
     def get(self) -> Action | None:
         self._purge_timeouts()
@@ -198,13 +205,7 @@ class PendingActionService:
         elapsed = time.time() - timestamp
         limit = self._effective_timeout_seconds(self._timeout, action)
 
-        if math.isfinite(limit) and elapsed > 60.0 and int(elapsed) % 30 == 0:
-            controller.log(
-                'info',
-                f'Pending action active for {elapsed:.1f}s: {type(action).__name__} '
-                f'(id={getattr(action, "id", "unknown")})',
-                extra={'msg_type': 'PENDING_ACTION_TIMEOUT'},
-            )
+        self._log_progress_update(controller, action, elapsed, limit)
         return action
 
     def info(self) -> tuple[Action, float] | None:
@@ -216,6 +217,32 @@ class PendingActionService:
         self._cancel_watchdog()
         self._outstanding.clear()
         self._legacy_pending = None
+        self._progress_log_buckets.clear()
+
+    def _log_progress_update(
+        self, controller, action: Action, elapsed: float, limit: float
+    ) -> None:
+        """Emit at most one progress log per 30s bucket for long-running actions."""
+        if not math.isfinite(limit) or elapsed < 60.0:
+            return
+
+        bucket = int(elapsed // 30)
+        if bucket < 2:
+            return
+
+        action_id = self._int_action_id(action)
+        progress_key: int | str = action_id if action_id is not None else 'legacy'
+        if self._progress_log_buckets.get(progress_key) == bucket:
+            return
+
+        self._progress_log_buckets[progress_key] = bucket
+        controller.log(
+            'info',
+            f'Pending action still running for {elapsed:.1f}s '
+            f'(timeout {limit:.1f}s): {type(action).__name__} '
+            f'(id={getattr(action, "id", "unknown")})',
+            extra={'msg_type': 'PENDING_ACTION_STILL_RUNNING'},
+        )
 
     def _log_clear(self, controller, prev_action: Action, timestamp: float) -> None:
         action_id = getattr(prev_action, 'id', 'unknown')

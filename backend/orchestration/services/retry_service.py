@@ -118,10 +118,30 @@ class RetryService:
             delay = min(queue.max_delay, delay * consecutive)
         return delay
 
+    @staticmethod
+    def _format_retry_delay(delay_seconds: float) -> str:
+        rounded = round(float(delay_seconds), 1)
+        if rounded.is_integer():
+            return f"{int(rounded)}s"
+        return f"{rounded:.1f}s"
+
+    def _emit_retry_status(
+        self,
+        *,
+        status_type: str,
+        content: str,
+        extras: dict[str, Any],
+    ) -> None:
+        from backend.ledger import EventSource
+        from backend.ledger.observation import StatusObservation
+
+        self.controller.event_stream.add_event(
+            StatusObservation(content=content, status_type=status_type, extras=extras),
+            EventSource.ENVIRONMENT,
+        )
+
     async def schedule_retry_after_failure(self, exc: Exception) -> bool:
         """Schedule an automatic retry for transient failures."""
-        from backend.ledger import EventSource
-        from backend.ledger.observation import AgentThinkObservation
         from backend.orchestration.tool_telemetry import ToolTelemetry
 
         queue = self._retry_queue or get_retry_queue()
@@ -137,7 +157,10 @@ class RetryService:
             self._retry_queue = queue
             self.initialize()
 
-        metadata: dict[str, Any] = {"error": str(exc)}
+        metadata: dict[str, Any] = {
+            "error": str(exc),
+            "retry_reason": type(exc).__name__,
+        }
         if controller._pending_action is not None:
             metadata["pending_action"] = ToolTelemetry.action_to_dict(
                 controller._pending_action
@@ -158,16 +181,24 @@ class RetryService:
         # budget so recovery overhead doesn't burn into the task runway.
         self._compensate_iterations_for_connection_error(exc)
 
+        next_attempt = max(1, int(getattr(task, "attempts", 0) or 0) + 1)
         human_message = (
-            f"⚠️ Encountered {type(exc).__name__}. Automatic retry scheduled in "
-            f"{int(initial_delay)}s (max {task.max_attempts} attempts)."
+            "Waiting on autonomous recovery: retry "
+            f"{next_attempt}/{task.max_attempts} in "
+            f"{self._format_retry_delay(initial_delay)} after {type(exc).__name__}."
         )
         controller.state.set_last_error(
             f"{type(exc).__name__}: retry scheduled", source="RetryService"
         )
-        controller.event_stream.add_event(
-            AgentThinkObservation(content=human_message),
-            EventSource.ENVIRONMENT,
+        self._emit_retry_status(
+            status_type="retry_pending",
+            content=human_message,
+            extras={
+                "attempt": next_attempt,
+                "max_attempts": task.max_attempts,
+                "delay_seconds": initial_delay,
+                "reason": type(exc).__name__,
+            },
         )
         logger.warning(
             "Scheduled retry task %s for controller %s due to %s (delay=%.1fs)",
@@ -405,15 +436,28 @@ class RetryService:
 
     async def _resume_agent_after_retry(self, task: RetryTask) -> None:
         """Resume the agent after a retry task completes."""
-        from backend.ledger import EventSource
-        from backend.ledger.observation import AgentThinkObservation
         from backend.orchestration.state.state import AgentState
 
         controller = self.controller
-        message = f"🔁 Retrying after {task.reason}. Attempt {task.attempts}/{task.max_attempts}."
-        controller.event_stream.add_event(
-            AgentThinkObservation(content=message),
-            EventSource.ENVIRONMENT,
+        metadata = getattr(task, "metadata", None)
+        retry_reason = ""
+        if isinstance(metadata, dict):
+            retry_reason = str(metadata.get("retry_reason") or "").strip()
+        if not retry_reason:
+            retry_reason = str(getattr(task, "reason", "") or "transient failure")
+        attempt = max(1, int(getattr(task, "attempts", 0) or 0))
+        message = (
+            f"Autonomous recovery attempt {attempt}/{task.max_attempts} "
+            f"starting after {retry_reason}."
+        )
+        self._emit_retry_status(
+            status_type="retry_resuming",
+            content=message,
+            extras={
+                "attempt": attempt,
+                "max_attempts": task.max_attempts,
+                "reason": retry_reason,
+            },
         )
 
         controller.circuit_breaker_service.record_success()

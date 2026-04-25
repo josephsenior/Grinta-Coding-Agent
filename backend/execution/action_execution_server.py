@@ -237,9 +237,9 @@ class RuntimeExecutor:
             logger.info("Step 2/4: Initializing plugins...")
             self.plugins = await init_plugins(self.plugins_to_load, self.username)
 
-            # Step 3: Initialize bash commands/aliases
-            logger.info("Step 3/4: Setting up bash commands...")
-            self._init_bash_commands()
+            # Step 3: Initialize shell commands/aliases
+            logger.info("Step 3/4: Setting up shell commands...")
+            self._init_shell_commands()
 
             # Step 4: Start memory monitoring
             logger.info("Step 4/4: Starting memory monitor...")
@@ -261,40 +261,103 @@ class RuntimeExecutor:
         """Check if action execution server has completed initialization."""
         return self._initialized
 
-    def _init_bash_commands(self):
-        # We need to set up some aliases and functions in bash for better UX
-        bash_session = self.session_manager.get_session("default")
-        assert bash_session is not None
+    def _init_shell_commands(self):
+        # We need to set up shell-native aliases and functions for better UX.
+        shell_session = self.session_manager.get_session("default")
+        assert shell_session is not None
 
-        # Init git configuration
-        bash_session.execute(
+        use_powershell = self._uses_powershell_shell_contract()
+
+        shell_session.execute(
             CmdRunAction(
-                command=f'git config --global user.name "{self.username}" && git config --global user.email "{self.username}@example.com"',
+                command=self._build_shell_git_config_command(use_powershell),
             )
         )
 
-        # Set up env_check alias for diagnosing environment issues after
-        # cascading failures.  Shows Python version, key packages, disk
+        # Set up env_check helper for diagnosing environment issues after
+        # cascading failures. Shows Python version, key packages, disk
         # usage, and memory stats in one command.
-        bash_session.execute(
-            CmdRunAction(
-                command=(
-                    "alias env_check='"
-                    'echo "=== PYTHON ===" && python3 --version 2>/dev/null || python --version 2>/dev/null && '
-                    'echo "=== KEY PACKAGES ===" && pip list --format=freeze 2>/dev/null | head -30 && '
-                    'echo "=== DISK ===" && df -h . 2>/dev/null && '
-                    'echo "=== MEMORY ===" && free -h 2>/dev/null || vm_stat 2>/dev/null; '
-                    "true'"
-                ),
-            )
+        shell_session.execute(
+            CmdRunAction(command=self._build_env_check_command(use_powershell))
         )
 
-        # Initialize plugins commands
+        # Initialize plugin commands.
         for plugin in self.plugins.values():
             init_cmds = plugin.get_init_bash_commands()
             if init_cmds:
                 for cmd in init_cmds:
-                    bash_session.execute(CmdRunAction(command=cmd))
+                    shell_session.execute(CmdRunAction(command=cmd))
+
+    def _build_shell_git_config_command(self, use_powershell: bool) -> str:
+        separator = ";" if use_powershell else "&&"
+        return (
+            f'git config --global user.name "{self.username}" '
+            f'{separator} git config --global user.email "{self.username}@example.com"'
+        )
+
+    @staticmethod
+    def _build_env_check_command(use_powershell: bool) -> str:
+        if use_powershell:
+            return (
+                "function global:env_check { "
+                "Write-Output '=== PYTHON ==='; "
+                "if (Get-Command python -ErrorAction SilentlyContinue) { python --version } "
+                "elseif (Get-Command python3 -ErrorAction SilentlyContinue) { python3 --version } "
+                "else { Write-Output 'python not found' }; "
+                "Write-Output '=== KEY PACKAGES ==='; "
+                "if (Get-Command pip -ErrorAction SilentlyContinue) { "
+                "pip list --format=freeze | Select-Object -First 30 "
+                "}; "
+                "Write-Output '=== DISK ==='; "
+                "Get-PSDrive -PSProvider FileSystem; "
+                "Write-Output '=== MEMORY ==='; "
+                "if (Get-Command Get-CimInstance -ErrorAction SilentlyContinue) { "
+                "Get-CimInstance Win32_OperatingSystem | Select-Object "
+                "@{Name='FreeMemoryMB';Expression={[math]::Round($_.FreePhysicalMemory / 1024, 1)}}, "
+                "@{Name='TotalMemoryMB';Expression={[math]::Round($_.TotalVisibleMemorySize / 1024, 1)}} "
+                "} "
+                "}"
+            )
+
+        return (
+            "alias env_check='"
+            'echo "=== PYTHON ===" && python3 --version 2>/dev/null || python --version 2>/dev/null && '
+            'echo "=== KEY PACKAGES ===" && pip list --format=freeze 2>/dev/null | head -30 && '
+            'echo "=== DISK ===" && df -h . 2>/dev/null && '
+            'echo "=== MEMORY ===" && free -h 2>/dev/null || vm_stat 2>/dev/null; '
+            "true'"
+        )
+
+    def _uses_powershell_shell_contract(self) -> bool:
+        """Return True only when the active Windows terminal contract is PowerShell."""
+        if sys.platform != "win32":
+            return False
+
+        tool_registry = getattr(self.session_manager, "tool_registry", None)
+        if tool_registry is not None:
+            from backend.execution.utils.tool_registry import (
+                resolve_windows_powershell_preference,
+            )
+
+            has_bash_raw = getattr(tool_registry, "has_bash", False)
+            has_powershell_raw = getattr(tool_registry, "has_powershell", False)
+            has_bash = has_bash_raw if isinstance(has_bash_raw, bool) else False
+            has_powershell = (
+                has_powershell_raw if isinstance(has_powershell_raw, bool) else False
+            )
+
+            if has_bash or has_powershell:
+                return resolve_windows_powershell_preference(
+                    has_bash=has_bash,
+                    has_powershell=has_powershell,
+                )
+
+        # Fallback when tool registry details are unavailable in tests/mocks.
+        default_session = self.session_manager.get_session("default")
+        session_name = (
+            default_session.__class__.__name__.lower() if default_session else ""
+        )
+        return "powershell" in session_name
 
     async def run_action(self, action) -> Observation:
         """Execute any action through action execution server."""
@@ -327,34 +390,7 @@ class RuntimeExecutor:
         On Windows in bash mode, commands should remain bash-native and python3
         should not be rewritten.
         """
-        if sys.platform != "win32":
-            return False
-
-        tool_registry = getattr(self.session_manager, "tool_registry", None)
-        if tool_registry is not None:
-            from backend.execution.utils.tool_registry import (
-                resolve_windows_powershell_preference,
-            )
-
-            has_bash_raw = getattr(tool_registry, "has_bash", False)
-            has_powershell_raw = getattr(tool_registry, "has_powershell", False)
-            has_bash = has_bash_raw if isinstance(has_bash_raw, bool) else False
-            has_powershell = (
-                has_powershell_raw if isinstance(has_powershell_raw, bool) else False
-            )
-
-            if has_bash or has_powershell:
-                return resolve_windows_powershell_preference(
-                    has_bash=has_bash,
-                    has_powershell=has_powershell,
-                )
-
-        # Fallback when tool registry details are unavailable in tests/mocks.
-        default_session = self.session_manager.get_session("default")
-        session_name = (
-            default_session.__class__.__name__.lower() if default_session else ""
-        )
-        return "powershell" in session_name
+        return self._uses_powershell_shell_contract()
 
     @staticmethod
     def _extract_failure_signature(content: str) -> str:

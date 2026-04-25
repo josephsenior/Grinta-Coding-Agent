@@ -19,8 +19,8 @@ from backend.inference.exceptions import (
     RateLimitError,
 )
 from backend.ledger import EventSource
-from backend.ledger.action import Action
-from backend.ledger.action.agent import CondensationRequestAction
+from backend.ledger.action import Action, FileEditAction, MCPAction, MessageAction, NullAction
+from backend.ledger.action.agent import CondensationRequestAction, PlaybookFinishAction
 from backend.orchestration.services.action_execution_service import (
     ActionExecutionService,
 )
@@ -169,6 +169,48 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RateLimitError):
             await self.service.get_next_action()
 
+    async def test_get_next_action_pauses_after_repeated_null_actions(self):
+        """Repeated live-agent NullAction results should trip a bounded pause."""
+        self.mock_context.agent.astep = AsyncMock(side_effect=[
+            NullAction(),
+            NullAction(),
+            NullAction(),
+        ])
+
+        first = await self.service.get_next_action()
+        second = await self.service.get_next_action()
+        third = await self.service.get_next_action()
+
+        self.assertIsInstance(first, NullAction)
+        self.assertIsInstance(second, NullAction)
+        self.assertIsInstance(third, MessageAction)
+        self.assertTrue(third.wait_for_response)
+        self.assertIn('no executable action 3 times in a row', third.content)
+        self.mock_context.event_stream.add_event.assert_called_once()
+        error_obs = self.mock_context.event_stream.add_event.call_args[0][0]
+        self.assertEqual(error_obs.error_id, 'NULL_ACTION_LOOP')
+
+    async def test_get_next_action_resets_null_streak_after_real_action(self):
+        """A real action should clear the null-action streak."""
+        real_action = MagicMock(spec=Action)
+        self.mock_context.agent.astep = AsyncMock(side_effect=[
+            NullAction(),
+            real_action,
+            NullAction(),
+            NullAction(),
+        ])
+
+        first = await self.service.get_next_action()
+        second = await self.service.get_next_action()
+        third = await self.service.get_next_action()
+        fourth = await self.service.get_next_action()
+
+        self.assertIsInstance(first, NullAction)
+        self.assertEqual(second, real_action)
+        self.assertIsInstance(third, NullAction)
+        self.assertIsInstance(fourth, NullAction)
+        self.mock_context.event_stream.add_event.assert_not_called()
+
     async def test_execute_action_runnable_with_pipeline(self):
         """Test execute_action processes runnable action through pipeline."""
         mock_action = MagicMock(spec=Action)
@@ -256,6 +298,112 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
         # Should still run action
         self.mock_context.run_action.assert_called_once()
+
+    @patch('backend.core.plugin.get_plugin_registry')
+    async def test_execute_action_blocks_write_until_fresh_verification(
+        self, mock_get_registry
+    ):
+        state = MagicMock()
+        state.extra_data = {
+            '__step_guard_verification_required': {
+                'paths': ['backend/context/schemas.py'],
+                'observed_failure': 'FAILED: backend/context/schemas.py is out of sync',
+            }
+        }
+        state.set_planning_directive = MagicMock()
+        self.mock_context.state = state
+
+        action = FileEditAction(
+            path='backend/context/schemas.py',
+            command='replace_text',
+            old_str='old',
+            new_str='new',
+        )
+        mock_registry = MagicMock()
+        mock_registry.dispatch_action_pre = AsyncMock(return_value=action)
+        mock_get_registry.return_value = mock_registry
+
+        await self.service.execute_action(action)
+
+        self.mock_context.run_action.assert_not_called()
+        self.mock_context.event_stream.add_event.assert_called_once()
+        blocked_obs = self.mock_context.event_stream.add_event.call_args.args[0]
+        self.assertEqual(blocked_obs.error_id, 'VERIFICATION_REQUIRED')
+        state.set_planning_directive.assert_called_once()
+
+    @patch('backend.core.plugin.get_plugin_registry')
+    async def test_execute_action_allows_grounding_view_to_clear_requirement(
+        self, mock_get_registry
+    ):
+        state = MagicMock()
+        state.extra_data = {
+            '__step_guard_verification_required': {
+                'paths': ['backend/context/schemas.py'],
+                'observed_failure': 'FAILED: backend/context/schemas.py is out of sync',
+            }
+        }
+        state.set_extra = MagicMock()
+        self.mock_context.state = state
+
+        view_action = FileEditAction(path='backend/context/schemas.py', command='view_file')
+        mock_registry = MagicMock()
+        mock_registry.dispatch_action_pre = AsyncMock(return_value=view_action)
+        mock_get_registry.return_value = mock_registry
+
+        await self.service.execute_action(view_action)
+
+        state.set_extra.assert_called_once_with(
+            '__step_guard_verification_required',
+            None,
+            source='ActionExecutionService',
+        )
+        self.mock_context.run_action.assert_called_once_with(view_action, None)
+
+    @patch('backend.core.plugin.get_plugin_registry')
+    async def test_execute_action_blocks_mutating_mcp_tool_until_grounded(
+        self, mock_get_registry
+    ):
+        state = MagicMock()
+        state.extra_data = {
+            '__step_guard_verification_required': {
+                'paths': ['backend/context/schemas.py'],
+                'observed_failure': 'FAILED: backend/context/schemas.py is out of sync',
+            }
+        }
+        self.mock_context.state = state
+
+        action = MCPAction(name='apply_patch', arguments={'input': '*** Begin Patch'})
+        mock_registry = MagicMock()
+        mock_registry.dispatch_action_pre = AsyncMock(return_value=action)
+        mock_get_registry.return_value = mock_registry
+
+        await self.service.execute_action(action)
+
+        self.mock_context.run_action.assert_not_called()
+        blocked_obs = self.mock_context.event_stream.add_event.call_args.args[0]
+        self.assertEqual(blocked_obs.error_id, 'VERIFICATION_REQUIRED')
+
+    @patch('backend.core.plugin.get_plugin_registry')
+    async def test_execute_action_blocks_finish_until_grounded(self, mock_get_registry):
+        state = MagicMock()
+        state.extra_data = {
+            '__step_guard_verification_required': {
+                'paths': ['backend/context/schemas.py'],
+                'observed_failure': 'FAILED: backend/context/schemas.py is out of sync',
+            }
+        }
+        self.mock_context.state = state
+
+        action = PlaybookFinishAction(final_thought='done')
+        mock_registry = MagicMock()
+        mock_registry.dispatch_action_pre = AsyncMock(return_value=action)
+        mock_get_registry.return_value = mock_registry
+
+        await self.service.execute_action(action)
+
+        self.mock_context.run_action.assert_not_called()
+        blocked_obs = self.mock_context.event_stream.add_event.call_args.args[0]
+        self.assertEqual(blocked_obs.error_id, 'VERIFICATION_REQUIRED')
 
     @patch(
         'backend.orchestration.services.action_execution_service.is_context_window_error'

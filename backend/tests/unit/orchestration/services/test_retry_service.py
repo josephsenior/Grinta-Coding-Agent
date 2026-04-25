@@ -2,7 +2,6 @@
 
 import asyncio
 import unittest
-from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.orchestration.services.retry_service import RetryService
@@ -168,10 +167,12 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
     async def test_schedule_retry_api_connection_error(self, mock_get_queue):
         """Test schedule_retry_after_failure schedules for APIConnectionError."""
         from backend.inference.exceptions import APIConnectionError
+        from backend.ledger.observation import StatusObservation
 
         mock_task = MagicMock()
         mock_task.id = 'retry-123'
         mock_task.max_attempts = 3
+        mock_task.attempts = 0
 
         mock_queue = MagicMock()
         mock_queue.base_delay = 5.0
@@ -188,8 +189,14 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.service._retry_pending)
         mock_queue.schedule.assert_called_once()
 
-        # Should emit observation
+        # Should emit retry telemetry observation
         self.mock_controller.event_stream.add_event.assert_called_once()
+        event = self.mock_controller.event_stream.add_event.call_args[0][0]
+        self.assertIsInstance(event, StatusObservation)
+        self.assertEqual(event.status_type, 'retry_pending')
+        self.assertEqual(event.extras['attempt'], 1)
+        self.assertEqual(event.extras['max_attempts'], 3)
+        self.assertIn('autonomous recovery', event.content.lower())
 
     @patch('backend.orchestration.services.retry_service.get_retry_queue')
     async def test_schedule_retry_rate_limit_error_longer_delay(self, mock_get_queue):
@@ -327,12 +334,14 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
 
     async def test_resume_agent_after_retry(self):
         """Test _resume_agent_after_retry resumes agent."""
+        from backend.ledger.observation import StatusObservation
         from backend.orchestration.state.state import AgentState
 
         mock_task = MagicMock()
         mock_task.reason = 'APIConnectionError'
         mock_task.attempts = 2
         mock_task.max_attempts = 5
+        mock_task.metadata = {'retry_reason': 'APIConnectionError'}
 
         self.mock_controller.state.agent_state = AgentState.ERROR
 
@@ -341,8 +350,14 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         # Should record success
         self.mock_controller.circuit_breaker_service.record_success.assert_called_once()
 
-        # Should emit think observation
+        # Should emit retry telemetry observation
         self.mock_controller.event_stream.add_event.assert_called_once()
+        event = self.mock_controller.event_stream.add_event.call_args[0][0]
+        self.assertIsInstance(event, StatusObservation)
+        self.assertEqual(event.status_type, 'retry_resuming')
+        self.assertEqual(event.extras['attempt'], 2)
+        self.assertEqual(event.extras['max_attempts'], 5)
+        self.assertIn('2/5', event.content)
 
         # Should set state to running
         self.mock_controller.set_agent_state_to.assert_called_once()
@@ -362,6 +377,7 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         mock_task.reason = 'Timeout'
         mock_task.attempts = 1
         mock_task.max_attempts = 3
+        mock_task.metadata = {'retry_reason': 'Timeout'}
 
         self.mock_controller.state.agent_state = AgentState.RUNNING
 

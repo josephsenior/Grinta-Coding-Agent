@@ -38,7 +38,9 @@ def ctrl(mock_context):
 
 class TestRecoveryService:
     @pytest.mark.asyncio
-    async def test_emits_error_and_returns_to_user_on_timeout(self, mock_context, ctrl):
+    async def test_emits_error_and_schedules_retry_on_timeout(self, mock_context, ctrl):
+        ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
+
         svc = RecoveryService(mock_context)
         await svc.react_to_exception(Timeout('slow'))
 
@@ -48,9 +50,21 @@ class TestRecoveryService:
         assert isinstance(err_obs, ErrorObservation)
         assert err_obs.error_id == 'LLM_TIMEOUT'
         assert 'Timeout' in err_obs.content
-        ctrl.retry_service.schedule_retry_after_failure.assert_not_awaited()
-        # Timeout returns to user input so the CLI is not blocked in
-        # _wait_for_agent_idle while the HUD incorrectly showed "Ready".
+        ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
+        mock_context.set_agent_state.assert_awaited_once_with(
+            AgentState.RATE_LIMITED
+        )
+
+    @pytest.mark.asyncio
+    async def test_timeout_without_retry_queue_returns_to_user_input(
+        self, mock_context, ctrl
+    ):
+        ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=False)
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(Timeout('slow'))
+
+        ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
         mock_context.set_agent_state.assert_awaited_once_with(
             AgentState.AWAITING_USER_INPUT
         )

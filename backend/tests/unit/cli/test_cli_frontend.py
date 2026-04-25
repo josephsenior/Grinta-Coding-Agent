@@ -704,6 +704,77 @@ async def test_renderer_notice_panel_does_not_repeat_summary_under_next_steps() 
 
 
 @pytest.mark.asyncio
+async def test_renderer_timeout_error_with_autonomous_retry_uses_recovery_copy() -> None:
+    from backend.ledger.observation import ErrorObservation
+
+    console = _make_console()
+    renderer = CLIEventRenderer(
+        console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    await renderer.handle_event(
+        ErrorObservation(
+            content=(
+                'Timeout: slow\n\nThe provider timed out on this step. Automatic '
+                'backoff and retry will run if the retry queue is available; '
+                'otherwise the agent will return to the prompt.'
+            )
+        )
+    )
+    output = _console_output(console)
+    assert 'Autonomous recovery' in output
+    assert 'No action needed. Grinta already scheduled a retry.' in output
+    assert 'Confirm your network' not in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_null_action_loop_uses_notice_panel_copy() -> None:
+    from backend.ledger.observation import ErrorObservation
+
+    console = _make_console()
+    renderer = CLIEventRenderer(
+        console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    await renderer.handle_event(
+        ErrorObservation(
+            content=(
+                'The model returned no executable action for multiple consecutive '
+                'steps. Pausing to avoid a no-progress loop that burns model calls.'
+            )
+        )
+    )
+    output = _console_output(console)
+    assert 'Paused safely' in output
+    assert 'Grinta paused to avoid a no-progress loop.' in output
+    assert 'No action is required unless you want the task to continue immediately.' in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_verification_required_uses_notice_panel_copy() -> None:
+    from backend.ledger.observation import ErrorObservation
+
+    console = _make_console()
+    renderer = CLIEventRenderer(
+        console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    await renderer.handle_event(
+        ErrorObservation(
+            content=(
+                'VERIFICATION REQUIRED BEFORE CONTINUING\n\n'
+                'Recent edits were followed by failing feedback, so blind retries are blocked for one grounding step.\n'
+                'Files to reconcile: backend/context/schemas.py\n'
+                'Latest failing feedback: FAILED: backend/context/schemas.py is out of sync\n'
+                'Allowed next moves: read the affected file, inspect terminal output, or rerun a focused check.\n'
+                'After one fresh grounding action, edits and finish are allowed again.'
+            )
+        )
+    )
+    output = _console_output(console)
+    assert 'Need fresh evidence' in output
+    assert 'Grinta blocked another blind write because recent edits were followed by failing feedback.' in output
+    assert 'Read the affected file or rerun the focused failing check to get fresh evidence.' in output
+
+
+@pytest.mark.asyncio
 async def test_reasoning_transcript_skips_duplicate_prefix_between_tool_steps() -> None:
     """CoT segments often restate the same opening; only new lines print after each flush."""
     console = _make_console()
@@ -2480,6 +2551,64 @@ async def test_renderer_updates_worker_panel_from_delegate_progress_status() -> 
     assert "Write unit tests for the converter" in output
     assert "Completed converter tests" in output
     assert "[DONE]" in output
+
+
+@pytest.mark.asyncio
+async def test_renderer_shows_retry_pending_status_in_hud() -> None:
+    from backend.ledger.observation import StatusObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    await renderer.handle_event(
+        StatusObservation(
+            content=(
+                'Waiting on autonomous recovery: retry 1/3 in 5s after Timeout.'
+            ),
+            status_type='retry_pending',
+            extras={
+                'attempt': 1,
+                'max_attempts': 3,
+                'delay_seconds': 5.0,
+                'reason': 'Timeout',
+            },
+        )
+    )
+
+    output = _console_output(console)
+    assert 'autonomous recovery' in output.lower()
+    assert hud.state.ledger_status == 'Backoff'
+    assert hud.state.agent_state_label == 'Auto Retry 1/3'
+
+
+@pytest.mark.asyncio
+async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> None:
+    from backend.ledger.observation import AgentStateChangedObservation, StatusObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+
+    await renderer.handle_event(
+        StatusObservation(
+            content=(
+                'Waiting on autonomous recovery: retry 1/3 in 5s after Timeout.'
+            ),
+            status_type='retry_pending',
+            extras={'attempt': 1, 'max_attempts': 3, 'reason': 'Timeout'},
+        )
+    )
+    await renderer.handle_event(
+        AgentStateChangedObservation('', AgentState.RATE_LIMITED)
+    )
+
+    assert hud.state.ledger_status == 'Backoff'
+    assert hud.state.agent_state_label == 'Auto Retry 1/3'
 
 
 @pytest.mark.asyncio
