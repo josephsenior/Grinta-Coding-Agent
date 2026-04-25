@@ -3,9 +3,21 @@
 Ensures all App competitive advantages are available at startup.
 """
 
-from typing import Any
+from typing import TypedDict
 
 from backend.core.logger import app_logger as logger
+
+
+class HealthCheckComponent(TypedDict):
+    status: str
+    message: str
+    critical: bool
+
+
+class HealthCheckResult(TypedDict):
+    edit_code: HealthCheckComponent
+    atomic_refactor: HealthCheckComponent
+    overall_status: str
 
 
 def check_structure_editor_dependencies() -> tuple[bool, str]:
@@ -84,7 +96,7 @@ def check_atomic_refactor_dependencies() -> tuple[bool, str]:
         return False, f'Atomic refactoring initialization failed: {e}'
 
 
-def run_production_health_check(raise_on_failure: bool = True) -> dict[str, Any]:
+def run_production_health_check(raise_on_failure: bool = True) -> HealthCheckResult:
     """Run complete health check for production deployment.
 
     Args:
@@ -101,30 +113,27 @@ def run_production_health_check(raise_on_failure: bool = True) -> dict[str, Any]
     logger.info('🏥 APP PRODUCTION HEALTH CHECK')
     logger.info('=' * 60)
 
-    results: dict[str, Any] = {
-        'edit_code': None,
-        'atomic_refactor': None,
+    # Check Structure Editor (CRITICAL)
+    ue_success, ue_msg = check_structure_editor_dependencies()
+    ar_success, ar_msg = check_atomic_refactor_dependencies()
+
+    results: HealthCheckResult = {
+        'edit_code': {
+            'status': 'PASS' if ue_success else 'FAIL',
+            'message': ue_msg,
+            'critical': True,
+        },
+        'atomic_refactor': {
+            'status': 'PASS' if ar_success else 'FAIL',
+            'message': ar_msg,
+            'critical': False,
+        },
         'overall_status': 'UNKNOWN',
     }
 
-    # Check Structure Editor (CRITICAL)
-    ue_success, ue_msg = check_structure_editor_dependencies()
-    results['edit_code'] = {
-        'status': 'PASS' if ue_success else 'FAIL',
-        'message': ue_msg,
-        'critical': True,
-    }
-
-    # Check Atomic Refactor
-    ar_success, ar_msg = check_atomic_refactor_dependencies()
-    results['atomic_refactor'] = {
-        'status': 'PASS' if ar_success else 'FAIL',
-        'message': ar_msg,
-        'critical': False,  # Less critical, can work without it
-    }
-
-    health_components = {
-        name: data for name, data in results.items() if isinstance(data, dict)
+    health_components: dict[str, HealthCheckComponent] = {
+        'edit_code': results['edit_code'],
+        'atomic_refactor': results['atomic_refactor'],
     }
 
     # Determine overall status
@@ -160,10 +169,9 @@ if __name__ == '__main__':
     check_results = run_production_health_check(raise_on_failure=False)
 
     print('\n📊 HEALTH CHECK RESULTS:')
-    component_results = {
-        component: data
-        for component, data in check_results.items()
-        if isinstance(data, dict)
+    component_results: dict[str, HealthCheckComponent] = {
+        'edit_code': check_results['edit_code'],
+        'atomic_refactor': check_results['atomic_refactor'],
     }
     for component, data in component_results.items():
         status_emoji = '✅' if data['status'] == 'PASS' else '❌'

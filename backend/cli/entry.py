@@ -136,12 +136,12 @@ def main() -> None:
     args = parser.parse_args(sys.argv[1:])
 
     # Subcommand dispatch.
-    if getattr(args, "subcommand", None) is not None:
-        func = getattr(args, "func", None)
-        if func is None or not callable(func):
-            parser.print_help()
-            sys.exit(2)
-        rc = func(args) or 0
+    if args.subcommand == "init":
+        rc = _run_init(args) or 0
+        sys.exit(int(rc))
+
+    if args.subcommand == "sessions":
+        rc = _run_sessions(args) or 0
         sys.exit(int(rc))
 
     repl_main = importlib.import_module("backend.cli.main").main
