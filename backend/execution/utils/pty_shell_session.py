@@ -19,6 +19,7 @@ primitive's API.
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import shutil
 import time
@@ -55,6 +56,11 @@ _POST_WRITE_SETTLE_SECONDS = 0.1
 # Bounds for waiting for a new PS1 JSON block after ``execute`` sends a line.
 _PTY_PS1_WAIT_FLOOR = 60.0
 _PTY_PS1_WAIT_CEIL = 3600.0
+
+# PowerShell default prompt pattern: "PS C:\some\path>"
+# Used to parse the current working directory from PTY delta output on Windows
+# where PS1 JSON metadata tracking is not available.
+_PS_PROMPT_RE = re.compile(r"^PS\s+(.+?)>\s*$")
 
 
 def _remove_command_prefix(command_output: str, command: str) -> str:
@@ -355,13 +361,26 @@ class PtyInteractiveShellSession(BaseShellSession):
             return self._execute_with_ps1_after_send(pty, command, n_before)
 
         if command:
+            # Snapshot the current buffer position so we can return only the
+            # delta produced by this command rather than the entire accumulated
+            # PTY history.  read_output_since(very_large) returns ('', current)
+            # without allocating the full buffer text.
+            _, offset_before, _ = self.read_output_since(10**18)
             try:
                 pty.send_line(command)
             except InteractiveSessionError as exc:
                 return ErrorObservation(content=f"Failed to send command: {exc}")
             time.sleep(_POST_WRITE_SETTLE_SECONDS)
+            # Return only the output produced since before the command was sent.
+            content, _, _ = self.read_output_since(offset_before)
+            # On Windows the shell is PowerShell/cmd — no PS1 JSON tracking.
+            # Parse the embedded prompt to keep self._cwd current so every
+            # observation carries the correct [Current working directory:] tag.
+            if IS_WINDOWS:
+                self._try_update_cwd_from_ps_prompt(content)
+        else:
+            content = pty.read(consume=False)
 
-        content = pty.read(consume=False)
         metadata = CmdOutputMetadata(exit_code=0, working_dir=self.cwd)
         return CmdOutputObservation(
             content=content,
@@ -374,6 +393,26 @@ class PtyInteractiveShellSession(BaseShellSession):
         if self._pty is None:
             return ""
         return self._pty.read(consume=False)
+
+    def _try_update_cwd_from_ps_prompt(self, content: str) -> None:
+        """Parse the PowerShell prompt from PTY delta output and update self._cwd.
+
+        The default PS prompt is ``PS <path>> ``.  We normalise CRLF first,
+        then scan lines in reverse so we pick the last (most recent) prompt.
+        We only accept the candidate if it resolves to an existing directory to
+        guard against false positives from command output that happens to look
+        like a prompt.
+        """
+        normalised = _norm_tty_text(content)
+        for line in reversed(normalised.splitlines()):
+            stripped = line.rstrip()
+            # Match "PS C:\some\path>" with optional trailing spaces/ANSI
+            m = _PS_PROMPT_RE.match(stripped)
+            if m:
+                candidate = m.group(1).strip()
+                if candidate and os.path.isdir(candidate):
+                    self._cwd = candidate
+                return
 
     def read_output_since(self, offset: int) -> tuple[str, int, int]:
         """Return non-consuming output delta since ``offset``.

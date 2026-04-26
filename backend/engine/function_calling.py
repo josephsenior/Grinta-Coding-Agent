@@ -5,7 +5,7 @@ This is similar to the functionality of `OrchestratorResponseParser`.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
@@ -119,21 +119,18 @@ def combine_thought(action: Action, thought: str) -> Action:
         Action: The action with the combined thought.
 
     """
-    if not hasattr(action, "thought"):
-        return action
     if thought:
         action.thought = f"{thought}\n{action.thought}" if action.thought else thought
     return action
 
 
-def set_security_risk(action: Action, arguments: dict) -> None:
+def set_security_risk(action: Action, arguments: Mapping[str, Any]) -> None:
     """Set the security risk level for the action."""
     if "security_risk" in arguments:
         if arguments["security_risk"] in RISK_LEVELS:
-            if hasattr(action, "security_risk"):
-                action.security_risk = getattr(
-                    ActionSecurityRisk, arguments["security_risk"]
-                )
+            action.security_risk = getattr(
+                ActionSecurityRisk, str(arguments["security_risk"])
+            )
         else:
             logger.warning(
                 "Invalid security_risk value: %s", arguments["security_risk"]
@@ -156,21 +153,21 @@ def _require_tool_argument(
     return arguments[key]
 
 
-def _handle_browser_tool(arguments: dict) -> BrowserToolAction:
+def _handle_browser_tool(arguments: Mapping[str, Any]) -> BrowserToolAction:
     """Handle native browser-use tool calls."""
-    action = build_browser_tool_action(arguments)
+    action = build_browser_tool_action(dict(arguments))
     set_security_risk(action, arguments)
     return action
 
 
-def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
+def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
     """Handle CmdRunTool (Bash) tool call."""
     from backend.engine.tools.bash import (
         windows_drive_glued_hint,
         windows_drive_glued_in_command,
     )
 
-    tool_name = create_cmd_run_tool()["function"]["name"]
+    tool_name = cast(str, create_cmd_run_tool().get("function", {}).get("name", ""))
     command = _require_tool_argument(arguments, "command", tool_name)
     raw_is_input = arguments.get("is_input", False)
     is_input = _parse_bool_argument(raw_is_input)
@@ -186,7 +183,7 @@ def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
         is_input=is_input,
         is_background=is_background,
         grep_pattern=grep_pattern,
-        truncation_strategy=arguments.get("truncation_strategy"),
+        truncation_strategy=cast(Any, arguments.get("truncation_strategy")),
         thought=glue_hint,
     )
     if "timeout" in arguments:
@@ -201,11 +198,11 @@ def _handle_cmd_run_tool(arguments: dict) -> CmdRunAction:
     return action
 
 
-def _handle_finish_tool(arguments: dict) -> PlaybookFinishAction:
+def _handle_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
     """Handle FinishTool tool call."""
-    tool_name = create_finish_tool()["function"]["name"]
+    tool_name = cast(str, create_finish_tool().get("function", {}).get("name", ""))
     message = _require_tool_argument(arguments, "message", tool_name)
-    outputs: dict = {}
+    outputs: dict[str, Any] = {}
     if "completed" in arguments:
         outputs["completed"] = arguments["completed"]
     if "blocked_by" in arguments:
@@ -228,14 +225,14 @@ def _handle_finish_tool(arguments: dict) -> PlaybookFinishAction:
     return PlaybookFinishAction(final_thought=message, outputs=outputs)
 
 
-def _handle_memory_manager_tool(arguments: dict) -> AgentThinkAction:
+def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     """Handle unified memory ops: note, recall, semantic_recall, working_memory."""
     action = arguments.get("action")
     if not action:
         raise FunctionCallValidationError("Missing 'action' in memory_manager tool.")
 
     if action == "semantic_recall":
-        query = arguments.get("key", "")
+        query = cast(str, arguments.get("key", ""))
         if not query:
             raise FunctionCallValidationError(
                 'Missing search phrase "key" in memory_manager (semantic_recall)'
@@ -267,9 +264,9 @@ def _handle_memory_manager_tool(arguments: dict) -> AgentThinkAction:
 
         # Map arguments back to what build_working_memory_action expects
         wm_args = {
-            "command": arguments.get("update_type", "get"),
-            "section": arguments.get("section", "all"),
-            "content": arguments.get("content", ""),
+            "command": cast(str, arguments.get("update_type", "get")),
+            "section": cast(str, arguments.get("section", "all")),
+            "content": cast(str, arguments.get("content", "")),
         }
         return build_working_memory_action(wm_args)
 
@@ -277,33 +274,35 @@ def _handle_memory_manager_tool(arguments: dict) -> AgentThinkAction:
         raise FunctionCallValidationError(f"Unknown memory_manager action: {action}")
 
 
-def _handle_search_code_tool(arguments: dict) -> AgentThinkAction:
+def _handle_search_code_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     """Handle SEARCH_CODE_TOOL: fast code search via ripgrep/grep."""
     return build_search_code_action(
-        pattern=arguments.get("pattern", ""),
-        path=arguments.get("path", "."),
-        file_pattern=arguments.get("file_pattern", ""),
-        context_lines=arguments.get("context_lines", 2),
-        case_sensitive=arguments.get("case_sensitive", False),
-        max_results=arguments.get("max_results", 50),
+        pattern=cast(str, arguments.get("pattern", "")),
+        path=cast(str, arguments.get("path", ".")),
+        file_pattern=cast(str, arguments.get("file_pattern", "")),
+        context_lines=cast(int, arguments.get("context_lines", 2)),
+        case_sensitive=cast(bool, arguments.get("case_sensitive", False)),
+        max_results=cast(int, arguments.get("max_results", 50)),
     )
 
 
-def _handle_checkpoint_tool(arguments: dict) -> AgentThinkAction:
+def _handle_checkpoint_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     """Handle checkpoint tool: save/view/revert/clear progress checkpoints."""
-    return build_checkpoint_action(arguments)
+    return build_checkpoint_action(dict(arguments))
 
 
 def _handle_analyze_project_structure_tool(
-    arguments: dict,
+    arguments: Mapping[str, Any],
 ) -> AgentThinkAction:
     """Handle analyze_project_structure tool: structural overview of the workspace."""
-    return build_analyze_project_structure_action(arguments)
+    return build_analyze_project_structure_action(dict(arguments))
 
 
-def _validate_str_replace_editor_args(arguments: dict) -> tuple[str, str]:
+def _validate_str_replace_editor_args(
+    arguments: Mapping[str, Any]
+) -> tuple[str, str]:
     """Validate required arguments for str_replace_editor tool."""
-    tool_name = create_str_replace_editor_tool()["function"]["name"]
+    tool_name = cast(str, create_str_replace_editor_tool().get("function", {}).get("name", ""))
     command = _require_tool_argument(arguments, "command", tool_name)
     path = arguments.get("path")
     if not path:
@@ -314,25 +313,27 @@ def _validate_str_replace_editor_args(arguments: dict) -> tuple[str, str]:
 
 def _normalize_file_editor_command_and_args(
     command: str,
-    arguments: dict[str, Any],
+    arguments: Mapping[str, Any],
 ) -> tuple[str, dict[str, Any]]:
     """Normalize canonical file editor arguments.
 
-    Canonical-only mode: no legacy command or field aliases are accepted.
+    No aliases — the command value must match what the schema declares.
     """
     normalized_command = str(command or "").strip().lower()
     normalized_args: dict[str, Any] = dict(arguments)
     return normalized_command, normalized_args
 
 
-def _filter_valid_editor_kwargs(other_kwargs: dict) -> dict:
+def _filter_valid_editor_kwargs(
+    other_kwargs: Mapping[str, Any]
+) -> dict[str, Any]:
     """Filter and validate kwargs for file editor."""
     str_replace_editor_tool = create_str_replace_editor_tool()
     valid_params = set(
-        str_replace_editor_tool["function"]["parameters"]["properties"].keys()
+        cast(dict[str, Any], str_replace_editor_tool.get("function", {}).get("parameters", {})).get("properties", {}).keys()
     )
-    valid_kwargs_for_editor = {}
-    tool_name = str_replace_editor_tool["function"]["name"]
+    valid_kwargs_for_editor: dict[str, Any] = {}
+    tool_name = cast(str, str_replace_editor_tool.get("function", {}).get("name", ""))
 
     for key, value in other_kwargs.items():
         if key not in valid_params:
@@ -346,7 +347,7 @@ def _filter_valid_editor_kwargs(other_kwargs: dict) -> dict:
 
 
 def _preview_str_replace_edit(
-    path: str, command: str, kwargs: dict
+    path: str, command: str, kwargs: Mapping[str, Any]
 ) -> AgentThinkAction:
     """Generate a unified diff preview of what an insert_text edit would produce."""
     import difflib
@@ -365,7 +366,7 @@ def _preview_str_replace_edit(
 
     if command == "insert_text":
         insert_line = int(kwargs.get("insert_line", 0))
-        new_str = kwargs.get("new_str", "")
+        new_str = cast(str, kwargs.get("new_str", ""))
         insert_text = new_str if new_str.endswith("\n") else new_str + "\n"
         new_lines[insert_line:insert_line] = [insert_text]
 
@@ -388,7 +389,9 @@ def _preview_str_replace_edit(
     )
 
 
-def _apply_confidence_preview_override(kwargs: dict, path: str) -> None:
+def _apply_confidence_preview_override(
+    kwargs: dict[str, Any], path: str
+) -> None:
     """If confidence < 0.7, force preview mode. Mutates kwargs."""
     confidence = kwargs.pop("confidence", None)
     if confidence is None or not isinstance(confidence, (int, float)):
@@ -408,9 +411,9 @@ def _is_preview_enabled(raw: Any) -> bool:
     return _parse_bool_argument(raw)
 
 
-def _handle_str_replace_editor_tool(arguments: dict) -> Action:
+def _handle_str_replace_editor_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle str_replace_editor tool call."""
-    command = arguments.get("command", "")
+    command = cast(str, arguments.get("command", ""))
 
     path, command = _validate_str_replace_editor_args(arguments)
     command, normalized_args = _normalize_file_editor_command_and_args(
@@ -433,6 +436,7 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     valid_commands = {
         "read_file",
         "create_file",
+        "replace_text",
         "insert_text",
         "undo_last_edit",
     }
@@ -456,7 +460,7 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
         return FileReadAction(
             path=path,
             impl_source=FileReadSource.FILE_EDITOR,
-            view_range=other_kwargs.get("view_range"),
+            view_range=cast(Any, other_kwargs.get("view_range")),
         )
 
     other_kwargs.pop("view_range", None)
@@ -472,19 +476,21 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     return action
 
 
-def _handle_think_tool(arguments: dict) -> AgentThinkAction:
+def _handle_think_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     """Handle ThinkTool tool call."""
-    tool_name = create_think_tool()["function"]["name"]
+    tool_name = cast(str, create_think_tool().get("function", {}).get("name", ""))
     thought = _require_tool_argument(arguments, "thought", tool_name)
     return AgentThinkAction(thought=thought)
 
 
-def _handle_summarize_context_tool(arguments: dict) -> CondensationRequestAction:
+def _handle_summarize_context_tool(
+    arguments: Mapping[str, Any]
+) -> CondensationRequestAction:
     """Handle Summarize Context tool call."""
     return CondensationRequestAction()
 
 
-def _normalize_task_tracker_step(s: dict, idx: int) -> dict:
+def _normalize_task_tracker_step(s: Mapping[str, Any], idx: int) -> dict[str, Any]:
     """Normalize a single task step dict. Raises FunctionCallValidationError on invalid input."""
     from backend.orchestration.state.state import normalize_plan_step_payload
 
@@ -498,7 +504,9 @@ def _normalize_task_tracker_step(s: dict, idx: int) -> dict:
         raise FunctionCallValidationError(str(e)) from e
 
 
-def _normalize_task_tracker_list(raw_list: list) -> list[dict]:
+def _normalize_task_tracker_list(
+    raw_list: list[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
     """Normalize task list. Raises FunctionCallValidationError on invalid structure."""
     try:
         return [
@@ -511,7 +519,7 @@ def _normalize_task_tracker_list(raw_list: list) -> list[dict]:
         raise FunctionCallValidationError(f"Invalid task list structure: {e}") from e
 
 
-def _handle_task_tracker_tool(arguments: dict) -> Action:
+def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle TASK_TRACKER_TOOL tool call."""
     command = _require_tool_argument(arguments, "command", TASK_TRACKER_TOOL_NAME)
     if command not in {"view", "update"}:
@@ -526,28 +534,28 @@ def _handle_task_tracker_tool(arguments: dict) -> Action:
 
     tracker = TaskTracker()
 
-    existing_normalized_task_list: list[dict] = []
+    existing_normalized_task_list: list[dict[str, Any]] = []
     if command == "view":
         raw_task_list = tracker.load_from_file()
     else:
         # Capture the current persisted plan so we can detect no-op updates
         # that otherwise create tool-call loops without advancing execution.
         existing_raw = tracker.load_from_file()
-        if isinstance(existing_raw, list):
+        if isinstance(existing_raw, Sequence):
             try:
                 existing_normalized_task_list = _normalize_task_tracker_list(
-                    existing_raw
+                    cast(list[Mapping[str, Any]], existing_raw)
                 )
             except FunctionCallValidationError:
                 existing_normalized_task_list = []
         raw_task_list = arguments.get("task_list", [])
 
-    if not isinstance(raw_task_list, list):
+    if not isinstance(raw_task_list, Sequence):
         raise FunctionCallValidationError(
             f'Invalid format for "task_list". Expected a list but got {type(raw_task_list)}.'
         )
 
-    normalized_task_list = _normalize_task_tracker_list(raw_task_list)
+    normalized_task_list = _normalize_task_tracker_list(cast(list[Mapping[str, Any]], raw_task_list))
 
     if (
         command == "update"
@@ -598,7 +606,7 @@ def _merge_mcp_gateway_inner_arguments(arguments: Mapping[str, Any]) -> dict[str
     """
     raw_inner = arguments.get("arguments")
     if isinstance(raw_inner, Mapping):
-        inner: dict[str, Any] = dict(raw_inner)
+        inner: dict[str, Any] = dict(cast(Mapping[str, Any], raw_inner))
     else:
         inner = {}
 
@@ -635,7 +643,9 @@ def _handle_execute_mcp_tool_tool(arguments: dict[str, Any]) -> MCPAction:
     return MCPAction(name=tool_name, arguments=inner_args)
 
 
-def _validate_ast_code_editor_args(arguments: dict, tool_name: str) -> tuple[str, str]:
+def _validate_ast_code_editor_args(
+    arguments: Mapping[str, Any], tool_name: str
+) -> tuple[str, str]:
     """Validate required arguments for structure editor.
 
     Args:
@@ -656,7 +666,7 @@ def _validate_ast_code_editor_args(arguments: dict, tool_name: str) -> tuple[str
 
 def _normalize_ast_code_editor_alias(
     command: str,
-    arguments: dict,
+    arguments: Mapping[str, Any],
 ) -> tuple[str, dict[str, Any]]:
     """Normalize ast_code_editor command casing.
 
@@ -670,10 +680,12 @@ def _normalize_ast_code_editor_alias(
 _MAX_EDIT_SYMBOLS_PER_BATCH = 25
 
 
-def _handle_edit_symbol_body_command(editor, path: str, arguments: dict) -> Action:
+def _handle_edit_symbol_body_command(
+    editor: Any, path: str, arguments: Mapping[str, Any]
+) -> Action:
     """Handle edit_symbol_body command."""
-    function_name = arguments.get("function_name")
-    new_body = arguments.get("new_body")
+    function_name = cast(str | None, arguments.get("function_name"))
+    new_body = cast(str | None, arguments.get("new_body"))
 
     if not function_name or not new_body:
         raise FunctionCallValidationError(
@@ -689,7 +701,9 @@ def _handle_edit_symbol_body_command(editor, path: str, arguments: dict) -> Acti
     return MessageAction(content=f"❌ Edit failed: {result.message}")
 
 
-def _handle_edit_symbols_command(editor, path: str, arguments: dict) -> Action:
+def _handle_edit_symbols_command(
+    editor: Any, path: str, arguments: Mapping[str, Any]
+) -> Action:
     """Apply multiple ``edit_symbol_body``-style replacements in one call.
 
     On any failure after the file was modified, restores the file from a
@@ -697,10 +711,8 @@ def _handle_edit_symbols_command(editor, path: str, arguments: dict) -> Action:
     """
     import os
 
-    raw_edits = arguments.get("edits")
-    if raw_edits is None and arguments.get("symbol_edits") is not None:
-        raw_edits = arguments["symbol_edits"]
-    if not isinstance(raw_edits, list) or len(raw_edits) == 0:
+    raw_edits = cast(Any, arguments.get("edits") or arguments.get("symbol_edits"))
+    if not isinstance(raw_edits, Sequence) or len(raw_edits) == 0:
         raise FunctionCallValidationError(
             "edit_symbols requires a non-empty 'edits' array "
             "(objects with function_name or symbol, and new_body)"
@@ -712,16 +724,17 @@ def _handle_edit_symbols_command(editor, path: str, arguments: dict) -> Action:
 
     normalized: list[tuple[str, str]] = []
     seen: set[str] = set()
-    for i, item in enumerate(raw_edits):
-        if not isinstance(item, dict):
+    for i, item_any in enumerate(raw_edits):
+        if not isinstance(item_any, Mapping):
             raise FunctionCallValidationError(
                 f"edit_symbols edits[{i}] must be an object"
             )
-        fn = item.get("function_name") or item.get("symbol")
-        nb = item.get("new_body")
-        if not fn or not isinstance(fn, str):
+        item: Mapping[str, Any] = cast(Mapping[str, Any], item_any)
+        fn = cast(str | None, item.get("function_name") or item.get("symbol"))
+        nb = cast(str | None, item.get("new_body"))
+        if not fn:
             raise FunctionCallValidationError(
-                f"edit_symbols edits[{i}] requires function_name or symbol (non-empty string)"
+                f"edit_symbols edits[{i}] requires function_name or symbol"
             )
         if not isinstance(nb, str):
             raise FunctionCallValidationError(
@@ -779,10 +792,12 @@ def _handle_edit_symbols_command(editor, path: str, arguments: dict) -> Action:
     )
 
 
-def _handle_rename_symbol_command(editor, path: str, arguments: dict) -> Action:
+def _handle_rename_symbol_command(
+    editor: Any, path: str, arguments: Mapping[str, Any]
+) -> Action:
     """Handle rename_symbol command."""
-    old_name = arguments.get("old_name")
-    new_name = arguments.get("new_name")
+    old_name = cast(str | None, arguments.get("old_name"))
+    new_name = cast(str | None, arguments.get("new_name"))
 
     if not old_name or not new_name:
         raise FunctionCallValidationError(
@@ -798,13 +813,15 @@ def _handle_rename_symbol_command(editor, path: str, arguments: dict) -> Action:
     return MessageAction(content=f"❌ Rename failed: {result.message}")
 
 
-def _handle_find_symbol_command(editor, path: str, arguments: dict) -> Action:
+def _handle_find_symbol_command(
+    editor: Any, path: str, arguments: Mapping[str, Any]
+) -> Action:
     """Handle find_symbol command."""
-    symbol_name = arguments.get("symbol_name")
+    symbol_name = cast(str | None, arguments.get("symbol_name"))
     if not symbol_name:
         raise FunctionCallValidationError("find_symbol requires 'symbol_name' argument")
 
-    symbol_type = arguments.get("symbol_type")
+    symbol_type = cast(str | None, arguments.get("symbol_type"))
     result = editor.find_symbol(path, symbol_name, symbol_type)
 
     if result:
@@ -819,7 +836,9 @@ def _handle_find_symbol_command(editor, path: str, arguments: dict) -> Action:
     return MessageAction(content=f"❌ Symbol '{symbol_name}' not found in {path}")
 
 
-def _handle_replace_range_command(editor, path: str, arguments: dict) -> Action:
+def _handle_replace_range_command(
+    editor: Any, path: str, arguments: Mapping[str, Any]
+) -> Action:
     """Handle replace_range command."""
     start_line = arguments.get("start_line")
     end_line = arguments.get("end_line")
@@ -839,7 +858,9 @@ def _handle_replace_range_command(editor, path: str, arguments: dict) -> Action:
     return MessageAction(content=f"❌ Replace failed: {result.message}")
 
 
-def _handle_normalize_indent_command(editor, path: str, arguments: dict) -> Action:
+def _handle_normalize_indent_command(
+    editor: Any, path: str, arguments: Mapping[str, Any]
+) -> Action:
     """Handle normalize_indent command."""
     style = arguments.get("style")
     size = arguments.get("size")
@@ -852,9 +873,9 @@ def _handle_normalize_indent_command(editor, path: str, arguments: dict) -> Acti
     return MessageAction(content=f"❌ Normalization failed: {result.message}")
 
 
-def _handle_create_file_command(path: str, arguments: dict) -> Action:
+def _handle_create_file_command(path: str, arguments: Mapping[str, Any]) -> Action:
     """Handle create_file command — delegates to str_replace_editor create_file."""
-    file_text = arguments.get("file_text", "")
+    file_text = cast(str, arguments.get("file_text", ""))
     return FileEditAction(
         path=path,
         command="create_file",
@@ -863,14 +884,16 @@ def _handle_create_file_command(path: str, arguments: dict) -> Action:
     )
 
 
-def _handle_read_file_command(path: str, _arguments: dict | None = None) -> Action:
+def _handle_read_file_command(
+    path: str, _arguments: Mapping[str, Any] | None = None
+) -> Action:
     """Handle read_file command — reads file contents."""
     return FileReadAction(path=path, impl_source=FileReadSource.FILE_EDITOR)
 
 
-def _handle_insert_text_command(path: str, arguments: dict) -> Action:
+def _handle_insert_text_command(path: str, arguments: Mapping[str, Any]) -> Action:
     """Handle insert_text command — inserts text after a line number."""
-    new_str = arguments.get("new_str")
+    new_str = cast(str | None, arguments.get("new_str"))
     insert_line = arguments.get("insert_line")
     if new_str is None or insert_line is None:
         raise FunctionCallValidationError(
@@ -885,7 +908,9 @@ def _handle_insert_text_command(path: str, arguments: dict) -> Action:
     )
 
 
-def _handle_undo_last_edit_command(path: str, _arguments: dict | None = None) -> Action:
+def _handle_undo_last_edit_command(
+    path: str, _arguments: Mapping[str, Any] | None = None
+) -> Action:
     """Handle undo_last_edit — restores last snapshot for *path* in runtime FileEditor."""
     return FileEditAction(
         path=path,
@@ -894,13 +919,15 @@ def _handle_undo_last_edit_command(path: str, _arguments: dict | None = None) ->
     )
 
 
-def _handle_ast_code_editor_tool(arguments: dict) -> Action:
+def _handle_ast_code_editor_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle StructureEditor tool call."""
-    tool_name = create_structure_editor_tool()["function"]["name"]
+    tool_name = cast(
+        str, create_structure_editor_tool().get("function", {}).get("name", "")
+    )
 
     # Validate arguments
-    command, path = _validate_ast_code_editor_args(arguments, tool_name)
-    command, normalized_args = _normalize_ast_code_editor_alias(command, arguments)
+    command, path = _validate_ast_code_editor_args(dict(arguments), tool_name)
+    command, normalized_args = _normalize_ast_code_editor_alias(command, dict(arguments))
 
     # Repair double-escaped content (``\n`` / ``\"``) before it reaches the
     # StructureEditor. Structure-aware commands (replace_range, etc.) build
@@ -980,7 +1007,8 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
         "normalize_indent": _handle_normalize_indent_command,
     }
     # File I/O commands delegate directly to runtime actions (no StructureEditor needed)
-    simple_command_handlers = {
+    # Simple command handlers for standard file operations
+    simple_command_handlers: dict[str, Callable[[str, Mapping[str, Any]], Action]] = {
         "create_file": _handle_create_file_command,
         "read_file": _handle_read_file_command,
         "insert_text": _handle_insert_text_command,
@@ -993,13 +1021,12 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
             handler = editor_command_handlers[command]
             return handler(editor, path, normalized_args)
         elif command in simple_command_handlers:
-            simple_handler = cast(
-                Callable[[str, dict[str, Any]], Action],
-                simple_command_handlers[command],
-            )
+            simple_handler = simple_command_handlers[command]
             return simple_handler(path, normalized_args)
         else:
-            all_cmds = list(editor_command_handlers) + list(simple_command_handlers)
+            all_cmds = list(editor_command_handlers.keys()) + list(
+                simple_command_handlers.keys()
+            )
             raise FunctionCallValidationError(
                 f"Unknown command '{command}' for edit_code tool. "
                 f"Valid commands: {all_cmds}"
@@ -1011,13 +1038,13 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
         return MessageAction(content=f"❌ Structure Editor error: {str(e)}")
 
 
-def _handle_communicate_tool(arguments: dict) -> Action:
+def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:
     """Route the unified communicate tool to the specific Action class based on intent."""
-    intent = arguments.get("intent", "clarification")
-    message = arguments.get("message", "")
-    options = arguments.get("options", [])
-    context = arguments.get("context", "")
-    thought = arguments.get("thought", "")
+    intent = cast(str, arguments.get("intent", "clarification"))
+    message = cast(str, arguments.get("message", ""))
+    options = cast(Sequence[str], arguments.get("options", []))
+    context = cast(str, arguments.get("context", ""))
+    thought = cast(str, arguments.get("thought", ""))
 
     if intent == "uncertainty":
         from backend.ledger.action.agent import UncertaintyAction
@@ -1033,7 +1060,7 @@ def _handle_communicate_tool(arguments: dict) -> Action:
         from backend.ledger.action.agent import ProposalAction
 
         # Format the options cleanly for the existing UI
-        formatted_options = (
+        formatted_options: list[dict[str, Any]] = (
             [{"approach": opt, "pros": [], "cons": []} for opt in options]
             if options
             else [{"approach": message}]
@@ -1060,7 +1087,7 @@ def _handle_communicate_tool(arguments: dict) -> Action:
 
         return ClarificationRequestAction(
             question=message,
-            options=options,
+            options=list(options),
             context=context,
             thought=thought,
         )
@@ -1069,30 +1096,24 @@ def _handle_communicate_tool(arguments: dict) -> Action:
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     """Create dispatch map for tool handlers."""
     return {
-        create_cmd_run_tool()["function"]["name"]: _handle_cmd_run_tool,
-        create_finish_tool()["function"]["name"]: _handle_finish_tool,
-        create_str_replace_editor_tool()["function"][
-            "name"
-        ]: _handle_str_replace_editor_tool,
-        create_structure_editor_tool()["function"][
-            "name"
-        ]: _handle_ast_code_editor_tool,
-        create_think_tool()["function"]["name"]: _handle_think_tool,
-        create_summarize_context_tool()["function"][
-            "name"
-        ]: _handle_summarize_context_tool,
+        cast(str, create_cmd_run_tool().get("function", {}).get("name", "")): _handle_cmd_run_tool,
+        cast(str, create_finish_tool().get("function", {}).get("name", "")): _handle_finish_tool,
+        cast(str, create_str_replace_editor_tool().get("function", {}).get("name", "")): _handle_str_replace_editor_tool,
+        cast(str, create_structure_editor_tool().get("function", {}).get("name", "")): _handle_ast_code_editor_tool,
+        cast(str, create_think_tool().get("function", {}).get("name", "")): _handle_think_tool,
+        cast(str, create_summarize_context_tool().get("function", {}).get("name", "")): _handle_summarize_context_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
         MEMORY_MANAGER_TOOL_NAME: _handle_memory_manager_tool,
-        NOTE_TOOL_NAME: lambda args: build_note_action(args["key"], args["value"]),
-        RECALL_TOOL_NAME: lambda args: build_recall_action(args["key"]),
+        NOTE_TOOL_NAME: lambda args: build_note_action(cast(str, args["key"]), cast(str, args["value"])),
+        RECALL_TOOL_NAME: lambda args: build_recall_action(cast(str, args["key"])),
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
-        DELEGATE_TASK_TOOL_NAME: build_delegate_task_action,
-        CODE_INTELLIGENCE_TOOL_NAME: build_lsp_query_action,
-        BLACKBOARD_TOOL_NAME: build_blackboard_action,
-        TERMINAL_MANAGER_TOOL_NAME: handle_terminal_manager_tool,
-        "explore_tree_structure": build_explore_tree_structure_action,
-        "read_symbol_definition": build_read_symbol_definition_action,
+        DELEGATE_TASK_TOOL_NAME: lambda args: build_delegate_task_action(dict(args)),
+        CODE_INTELLIGENCE_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
+        BLACKBOARD_TOOL_NAME: lambda args: build_blackboard_action(dict(args)),
+        TERMINAL_MANAGER_TOOL_NAME: lambda args: cast(Action, handle_terminal_manager_tool(dict(args))),
+        "explore_tree_structure": lambda args: build_explore_tree_structure_action(dict(args)),
+        "read_symbol_definition": lambda args: build_read_symbol_definition_action(dict(args)),
         COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
         EXECUTE_MCP_TOOL_TOOL_NAME: _handle_execute_mcp_tool_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,
@@ -1107,7 +1128,7 @@ def response_to_actions(
 ) -> list[Action]:
     """Convert LLM response to agent actions."""
 
-    def process_with_mcp_tools(tc, args):
+    def process_with_mcp_tools(tc: Any, args: dict[str, Any]) -> Action:
         return _process_single_tool_call(tc, args)
 
     return common_response_to_actions(
@@ -1120,23 +1141,23 @@ def response_to_actions(
 
 # Lazily-initialized dispatch map — built once per process to avoid
 # re-creating tool definition dicts on every tool call.
-_TOOL_DISPATCH_MAP: dict[str, ToolHandler] | None = None
+_tool_dispatch_map: dict[str, ToolHandler] | None = None
 
 
 def _get_tool_dispatch_map() -> dict[str, ToolHandler]:
-    global _TOOL_DISPATCH_MAP
-    if _TOOL_DISPATCH_MAP is None:
-        _TOOL_DISPATCH_MAP = _create_tool_dispatch_map()
-    return _TOOL_DISPATCH_MAP
+    global _tool_dispatch_map
+    if _tool_dispatch_map is None:
+        _tool_dispatch_map = _create_tool_dispatch_map()
+    return _tool_dispatch_map
 
 
-def _process_single_tool_call(tool_call, arguments: dict[str, Any]) -> Action:
+def _process_single_tool_call(tool_call: Any, arguments: dict[str, Any]) -> Action:
     """Process a single tool call and return the corresponding action."""
     logger.debug("Tool call in function_calling.py: %s", tool_call)
     tool_dispatch = _get_tool_dispatch_map()
 
-    tool_name = tool_call.function.name
-    mcp_tool_names = getattr(tool_call, "_mcp_tool_names", None)
+    tool_name = cast(str, tool_call.function.name)
+    mcp_tool_names = cast(list[str] | None, getattr(tool_call, "_mcp_tool_names", None))
 
     if tool_name in tool_dispatch:
         return tool_dispatch[tool_name](arguments)
@@ -1149,7 +1170,7 @@ def _process_single_tool_call(tool_call, arguments: dict[str, Any]) -> Action:
 
 
 def _set_tool_call_metadata(
-    action: Action, tool_call, response: ModelResponse, total_calls: int
+    action: Action, tool_call: Any, response: ModelResponse, total_calls: int
 ) -> None:
     """Set tool call metadata for the action.
 
@@ -1158,14 +1179,14 @@ def _set_tool_call_metadata(
     the class).
     """
     action.tool_call_metadata = build_tool_call_metadata(
-        function_name=tool_call.function.name,
-        tool_call_id=tool_call.id,
+        function_name=cast(str, tool_call.function.name),
+        tool_call_id=cast(str, tool_call.id),
         response_obj=response,
         total_calls_in_response=total_calls,
     )
 
 
-def _create_message_action_from_content(content) -> list[Action]:
+def _create_message_action_from_content(content: Any) -> list[Action]:
     """Create message action from content when no tool calls are present."""
     from backend.engine.common import (
         extract_redacted_thinking_inner,

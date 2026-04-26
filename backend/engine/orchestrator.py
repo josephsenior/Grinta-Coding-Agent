@@ -525,16 +525,53 @@ class Orchestrator(Agent):
             with contextlib.suppress(Exception):
                 self.executor._llm = self.llm  # type: ignore[attr-defined]  # pylint: disable=protected-access
 
+    # Lowercase phrases that indicate the model is genuinely directing a
+    # question at the user.  Only these trigger AWAITING_USER_INPUT; all other
+    # text-only responses continue the loop so leaked reasoning/planning blobs
+    # don't silently drop the agent back to the input prompt.
+    _QUESTION_SIGNALS = (
+        '?',
+        'please let me know',
+        'please tell me',
+        'can you tell',
+        'could you tell',
+        'which would you',
+        'which do you',
+        'what would you',
+        'would you like',
+        'should i ',
+        'do you want',
+        'do you prefer',
+        'let me know',
+    )
+
+    def _text_is_user_question(self, text: str) -> bool:
+        """Return True when the text looks like a genuine question to the user.
+
+        We use a small set of lexical signals rather than an LLM call to keep
+        this fast and model-agnostic.  False negatives (a question we miss)
+        mean the loop continues for one extra step then naturally stops when
+        the model repeats the question.  False positives (treating reasoning as
+        a question) would drop the user back to the prompt — that is the worse
+        outcome, so we err on the side of continuing.
+        """
+        lower = text.lower().rstrip()
+        return any(signal in lower for signal in self._QUESTION_SIGNALS)
+
     def _build_fallback_action(self, result) -> Action:
         """Create a message action when the LLM returns no tool calls.
 
-        This typically means the LLM returned pure-text (e.g. a final answer
-        or a refusal). We surface it as a ``MessageAction`` so the controller
-        can decide whether to continue or stop.
+        When the model returns a genuine question or final answer (text ending
+        with a question mark, or containing user-directed question phrases),
+        we pause and wait for the user (``wait_for_response=True``).
+
+        When the text looks like leaked reasoning or a planning blob (no
+        question signals), we surface it as ``wait_for_response=False`` so the
+        loop continues without interrupting the user.  A warning is logged so
+        the prompt can be improved.
 
         When the model truly emitted no visible text, return ``NullAction`` so
-        the session does not hard-fail and the CLI shows nothing (same as an
-        empty assistant message).
+        the session does not hard-fail and the CLI shows nothing.
         """
         from backend.ledger.action import NullAction
 
@@ -551,7 +588,15 @@ class Orchestrator(Agent):
             silent.source = EventSource.AGENT
             return silent
 
-        fallback = MessageAction(content=message_text, wait_for_response=True)
+        wait = self._text_is_user_question(message_text)
+        if not wait:
+            logger.warning(
+                'LLM returned text-only response with no tool calls and no '
+                'question signal — surfacing as non-blocking message. '
+                'This usually means the model emitted planning text instead of '
+                'using tools. Check system prompt ANTI_PATTERNS.'
+            )
+        fallback = MessageAction(content=message_text, wait_for_response=wait)
         fallback.source = EventSource.AGENT
         return fallback
 

@@ -1477,19 +1477,16 @@ class FileEditor:
                 old_content = self._read_file(file_path)
 
             if is_create and file_existed:
-                if old_content == content:
-                    # File already exists with identical content — return
-                    # silent success with old==new so stuck detection can
-                    # recognise the re-creation without confusing weak models.
-                    return ToolResult(
-                        output='File created successfully',
-                        old_content=old_content,
-                        new_content=old_content,
-                    )
-                # File exists but content differs (e.g. a previous write was
-                # stream-truncated and the model is re-supplying the full
-                # body).  Fall through to the normal write path so the
-                # correction takes effect.
+                # ``create_file`` on an already-existing file always returns
+                # silent success WITHOUT overwriting.  Agents should use
+                # ``str_replace`` to edit existing files.  Returning
+                # old==new lets the stuck-detector recognise repeated
+                # no-change create attempts and nudge the model forward.
+                return ToolResult(
+                    output='File created successfully',
+                    old_content=old_content,
+                    new_content=old_content,
+                )
 
             if dry_run:
                 output_msg = 'Preview generated (no changes applied)'

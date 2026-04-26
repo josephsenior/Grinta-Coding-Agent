@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from typing import ClassVar
 
 from backend._canonical import CanonicalMeta
+from backend.core.enums import ActionSecurityRisk
 from backend.core.schemas import (
     ActionConfirmationStatus,
 )
@@ -31,6 +32,10 @@ class Action(Event, metaclass=CanonicalMeta):
     # Declared as a proper field so subclass __post_init__ chains are safe.
     confirmation_state: ActionConfirmationStatus = field(
         default=ActionConfirmationStatus.CONFIRMED, init=False
+    )
+    thought: str = field(default='', init=False)
+    security_risk: ActionSecurityRisk = field(
+        default=ActionSecurityRisk.LOW, init=False
     )
 
     def __post_init__(self) -> None:

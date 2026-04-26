@@ -205,6 +205,49 @@ class TestExecuteErrorPaths:
         fake_pty.write.assert_called()
 
 
+class TestNonPs1Execute:
+    def test_execute_reads_delta_and_updates_windows_cwd(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        session = PtyInteractiveShellSession(work_dir=str(tmp_path))
+        session._initialized = True
+        fake_pty = MagicMock()
+        fake_pty.is_alive.return_value = True
+        session._pty = fake_pty
+
+        next_dir = tmp_path / 'app'
+        next_dir.mkdir()
+        delta = f'cd app\r\nPS {next_dir}> '
+        read_output_since = MagicMock(
+            side_effect=[('', 41, 0), (delta, 59, 0)]
+        )
+        monkeypatch.setattr(session, 'read_output_since', read_output_since)
+        monkeypatch.setattr(
+            'backend.execution.utils.pty_shell_session.IS_WINDOWS',
+            True,
+        )
+        monkeypatch.setattr(
+            'backend.execution.utils.pty_shell_session.time.sleep',
+            lambda _: None,
+        )
+
+        obs = session.execute(CmdRunAction(command='cd app'))
+
+        assert isinstance(obs, CmdOutputObservation)
+        fake_pty.send_line.assert_called_once_with('cd app')
+        assert read_output_since.call_args_list == [((10**18,),), ((41,),)]
+        assert obs.content == delta
+        assert obs.metadata.working_dir == str(next_dir)
+        assert session.cwd == str(next_dir)
+
+    def test_prompt_parser_ignores_non_directory_candidate(self, tmp_path) -> None:
+        session = PtyInteractiveShellSession(work_dir=str(tmp_path))
+
+        session._try_update_cwd_from_ps_prompt('PS C:\\does-not-exist> ')
+
+        assert session.cwd == str(tmp_path)
+
+
 # ---------------------------------------------------------------------------
 # Factory wiring
 # ---------------------------------------------------------------------------

@@ -907,6 +907,8 @@ def _pty_output_transcript_caption(
         parts.append(f'{n_lines} line{"s" if n_lines != 1 else ""}')
     if truncated:
         parts.append("truncated")
+    if has_new_output is False:
+        parts.append("no new bytes since last read")
     return " · ".join(parts)
 
 

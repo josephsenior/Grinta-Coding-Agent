@@ -12,6 +12,7 @@ from backend.inference.tool_names import STR_REPLACE_EDITOR_TOOL_NAME
 _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `read_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
 * `create_file`: create or fully overwrite a file with the given content. Requires `file_text` — full-file body. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call.
+* `replace_text`: **the primary way to edit an existing file**. Requires `old_str` (exact substring to find — must be unique in the file) and `new_str` (replacement text). Uses tolerant whitespace + quote normalization so small formatting differences do not block the match. To delete a block set `new_str` to an empty string.
 * `insert_text`: insert `new_str` after `insert_line`.
 * `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
 * `edit_mode`: safer non-code editing primitives — prefer these over giant free-form replaces for documents:
@@ -20,7 +21,7 @@ _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editin
   - `range`: line-range replacement with optional `expected_hash` (slice) or `expected_file_hash` (whole file as read).
   - `patch`: unified diff hunk apply with strict context — for strict apply or review, not the default editing style.
 
-Default mental model: **`edit_mode`** / **`edit_code`** for structured code edits; **minimal valid `file_text` on create**, then **`insert_text`** or line/range tools. Multi-file work: sequential **`edit_code`** calls or checkpoints — there is no atomic batch string API.
+Default mental model: **`replace_text`** for code edits on existing files; **minimal valid `file_text` on create**, then **`replace_text`** or **`insert_text`** to extend. Multi-file work: sequential **`replace_text`** calls or checkpoints — there is no atomic batch API.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
 
@@ -36,8 +37,10 @@ Paths are project-relative or absolute under the project root. Do not use a ``/w
 If the tool reports `Syntax validation failed` with a hint about literal escape residue, retry using the rules above.
 """
 _SHORT_STR_REPLACE_EDITOR_DESCRIPTION = (
-    'File reading, creation, and editing tool. Commands: read_file, create_file, '
-    'insert_text, undo_last_edit. Supports edit_mode=format|section|range|patch. '
+    'File reading, creation, and editing tool. '
+    'Commands: read_file, create_file, replace_text, insert_text, undo_last_edit. '
+    'replace_text: edit existing file using old_str→new_str (unique substring). '
+    'Supports edit_mode=format|section|range|patch. '
     'Use project-relative paths.\n'
 )
 
@@ -64,14 +67,25 @@ def create_str_replace_editor_tool(
         description=description,
         properties={
             'command': get_command_param(
-                'The commands to run: `read_file`, `create_file`, `insert_text`, `undo_last_edit`.',
+                'The commands to run: `read_file`, `create_file`, `replace_text`, `insert_text`, `undo_last_edit`. '
+                'Use `replace_text` to edit existing files (requires `old_str` and `new_str`).',
                 [
                     'read_file',
                     'create_file',
+                    'replace_text',
                     'insert_text',
                     'undo_last_edit',
                 ],
             ),
+            'old_str': {
+                'description': (
+                    'Required for `replace_text`. The exact substring to find and replace. '
+                    'Must be unique within the file. Whitespace and quote normalization is '
+                    'applied automatically so minor formatting differences are tolerated. '
+                    'JSON string — escape newlines as \\n, embedded double quotes as \\".'
+                ),
+                'type': 'string',
+            },
             'path': get_path_param(
                 'Path to file or directory, relative to the project root (e.g. `README.md`, '
                 '`src/main.py`) or an absolute path under that root.'
@@ -86,7 +100,8 @@ def create_str_replace_editor_tool(
             },
             'new_str': {
                 'description': (
-                    'Text to insert for `insert_text` (required there). JSON string — '
+                    'Required for `replace_text` (the replacement text; use empty string to delete). '
+                    'Required for `insert_text` (text to insert). JSON string — '
                     'escape newlines as \\n, embedded quotes as \\".'
                 ),
                 'type': 'string',
