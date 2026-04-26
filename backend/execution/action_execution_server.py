@@ -612,7 +612,8 @@ class RuntimeExecutor:
         (
             r"ModuleNotFoundError:\s*No module named ['\"]?(\S+?)['\"]?",
             "[MISSING_MODULE]",
-            "Install with: pip install {match}",
+            "Install the missing dependency, then re-run the command. "
+            "NEXT ACTION: install the module now.",
         ),
         (
             r"ImportError:\s*cannot import name",

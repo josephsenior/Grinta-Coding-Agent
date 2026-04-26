@@ -612,6 +612,10 @@ _PROTOCOL_ECHO_PREFIXES = (
 )
 
 
+# Partial prefix that can appear mid-stream before the closing ']' arrives.
+_TOOL_CALL_PREFIX_PARTIAL = '[Tool call'
+
+
 def strip_tool_call_marker_lines(text: str) -> str:
     """Drop whole lines that are only a friendly ``[Tool call] …`` summary.
 
@@ -621,15 +625,22 @@ def strip_tool_call_marker_lines(text: str) -> str:
 
     Lines matching ``[Tool call] identifier({...})`` are left intact so the JSON
     redaction pass below can remove them.
+
+    Partial streaming fragments (``[Tool call`` without ``]``) are also dropped —
+    these appear when the model emits the history-echo prefix character by character
+    and the closing bracket hasn't arrived yet.
     """
-    if _TOOL_CALL_PREFIX not in text:
+    if _TOOL_CALL_PREFIX_PARTIAL not in text:
         return text
     lines = text.splitlines(keepends=True)
     kept: list[str] = []
     for line in lines:
         rest = line.lstrip()
-        if not rest.startswith(_TOOL_CALL_PREFIX):
+        if not rest.startswith(_TOOL_CALL_PREFIX_PARTIAL):
             kept.append(line)
+            continue
+        # Partial fragment (no closing ']') — always drop during streaming.
+        if not rest.startswith(_TOOL_CALL_PREFIX):
             continue
         after = rest[len(_TOOL_CALL_PREFIX) :].lstrip()
         if re.match(r'^[A-Za-z0-9_]+\s*\(', after):
@@ -732,9 +743,10 @@ def redact_streamed_tool_call_markers(text: str) -> str:
         json_shift = len(text[args_begin:]) - len(tail)
         json_start = args_begin + json_shift
         if json_start >= n or text[json_start] != '{':
-            out.append(text[j])
-            i = j + 1
-            continue
+            # The JSON arguments haven't arrived yet — the stream is still
+            # emitting the tool-call prefix.  Return what we have so far
+            # rather than leaking a stray '[' into the Draft Reply panel.
+            return ''.join(out).rstrip()
         end_json = _balanced_json_object_end(text, json_start)
         if end_json is None:
             return ''.join(out).rstrip()

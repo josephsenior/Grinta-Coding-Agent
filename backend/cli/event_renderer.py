@@ -2760,6 +2760,11 @@ class CLIEventRenderer:
                 self._reasoning.update_action(f"{headline}: {hint}")
             else:
                 self._reasoning.update_action(f"{headline}…")
+            # Clear any text content that arrived before the tool call started
+            # (e.g. a preamble "[" or task-list header). Keeping it would leave
+            # a stale "Draft Reply … Still streaming…" panel alongside the
+            # Thinking spinner for the entire duration of the tool call stream.
+            self._streaming_accumulated = ""
             self.refresh()
             return
 

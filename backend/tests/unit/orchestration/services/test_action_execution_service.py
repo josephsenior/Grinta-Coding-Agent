@@ -172,7 +172,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
     async def test_get_next_action_pauses_after_repeated_null_actions(self):
         """Repeated live-agent NullAction results should trip a bounded pause.
 
-        On the 3rd consecutive NullAction the service must:
+        On the 5th consecutive NullAction the service must:
         - emit a NULL_ACTION_LOOP ErrorObservation
         - transition the controller to AWAITING_USER_INPUT directly
         - return None (no MessageAction — avoids the race between runtime
@@ -181,6 +181,8 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         from backend.core.schemas import AgentState
 
         self.mock_context.agent.astep = AsyncMock(side_effect=[
+            NullAction(),
+            NullAction(),
             NullAction(),
             NullAction(),
             NullAction(),
@@ -193,10 +195,14 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         first = await self.service.get_next_action()
         second = await self.service.get_next_action()
         third = await self.service.get_next_action()
+        fourth = await self.service.get_next_action()
+        fifth = await self.service.get_next_action()
 
         self.assertIsInstance(first, NullAction)
         self.assertIsInstance(second, NullAction)
-        self.assertIsNone(third)
+        self.assertIsInstance(third, NullAction)
+        self.assertIsInstance(fourth, NullAction)
+        self.assertIsNone(fifth)
         self.mock_context.event_stream.add_event.assert_called_once()
         error_obs = self.mock_context.event_stream.add_event.call_args[0][0]
         self.assertEqual(error_obs.error_id, 'NULL_ACTION_LOOP')

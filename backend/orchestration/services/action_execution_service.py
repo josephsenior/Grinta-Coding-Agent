@@ -154,7 +154,7 @@ def _resolve_llm_step_timeout_seconds(agent) -> float | None:
 class ActionExecutionService:
     """Encapsulates action acquisition, planning, and execution orchestration."""
 
-    _MAX_CONSECUTIVE_NULL_ACTIONS = 3
+    _MAX_CONSECUTIVE_NULL_ACTIONS = 5
 
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
