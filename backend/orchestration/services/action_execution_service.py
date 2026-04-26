@@ -43,7 +43,6 @@ from backend.ledger.action import (
 )
 from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.observation import ErrorObservation
-from backend.ledger.observation_cause import attach_observation_cause
 from backend.orchestration.agent_circuit_breaker import (
     classify_str_replace_editor_error_bucket,
 )
@@ -155,10 +154,15 @@ class ActionExecutionService:
     """Encapsulates action acquisition, planning, and execution orchestration."""
 
     _MAX_CONSECUTIVE_NULL_ACTIONS = 5
+    # How many full rounds of null-action recovery to attempt before pausing.
+    # Round 1: inject a directive and keep going.
+    # Round 2+: pause for user input (model is truly stuck).
+    _MAX_NULL_RECOVERY_ROUNDS = 2
 
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
         self._consecutive_null_actions = 0
+        self._null_recovery_rounds = 0
 
     async def get_next_action(self) -> Action | None:
         """Get the next action from the agent, with automatic repair for validation errors."""
@@ -254,6 +258,7 @@ class ActionExecutionService:
                 if isinstance(action, NullAction):
                     return await self._handle_consecutive_null_action(action)
                 self._reset_consecutive_null_actions()
+                self._reset_null_recovery_rounds()
                 return action
 
             except (
@@ -373,6 +378,38 @@ class ActionExecutionService:
         if self._consecutive_null_actions < self._MAX_CONSECUTIVE_NULL_ACTIONS:
             return action
 
+        self._reset_consecutive_null_actions()
+        self._null_recovery_rounds += 1
+
+        if self._null_recovery_rounds < self._MAX_NULL_RECOVERY_ROUNDS:
+            # Round 1: inject a strong directive and keep the loop running.
+            # The model is confused but not fatally stuck — give it one more
+            # turn with an explicit instruction rather than pausing immediately.
+            logger.warning(
+                'Null-action loop: recovery round %d/%d — injecting directive',
+                self._null_recovery_rounds,
+                self._MAX_NULL_RECOVERY_ROUNDS,
+            )
+            self._context.event_stream.add_event(
+                ErrorObservation(
+                    content=(
+                        'You have returned no executable action for several consecutive steps.\n\n'
+                        'You MUST emit a concrete tool call right now. Do not describe what you '
+                        'would do — actually do it. Pick the single most important next step '
+                        '(e.g. run a command, read a file, write code) and execute it immediately.'
+                    ),
+                    error_id='NULL_ACTION_LOOP_RECOVERY',
+                ),
+                EventSource.AGENT,
+            )
+            return action  # let the loop continue
+
+        # All recovery rounds exhausted — pause for user input.
+        logger.error(
+            'Null-action loop: all %d recovery rounds exhausted, pausing',
+            self._MAX_NULL_RECOVERY_ROUNDS,
+        )
+        self._null_recovery_rounds = 0
         self._context.event_stream.add_event(
             ErrorObservation(
                 content=(
@@ -383,7 +420,6 @@ class ActionExecutionService:
             ),
             EventSource.AGENT,
         )
-        self._reset_consecutive_null_actions()
 
         # Set AWAITING_USER_INPUT directly on the controller instead of returning a
         # MessageAction. Returning a MessageAction caused a race: the runtime would
@@ -398,6 +434,9 @@ class ActionExecutionService:
 
     def _reset_consecutive_null_actions(self) -> None:
         self._consecutive_null_actions = 0
+
+    def _reset_null_recovery_rounds(self) -> None:
+        self._null_recovery_rounds = 0
 
     def _get_verification_requirement(self) -> dict[str, object] | None:
         state = getattr(self._context, 'state', None)
@@ -555,27 +594,18 @@ class ActionExecutionService:
         if not self._action_blocked_by_verification_requirement(action):
             return False
 
-        observation = ErrorObservation(
-            content=self._format_verification_required_content(requirement),
-            error_id='VERIFICATION_REQUIRED',
-        )
-        # The blocked action has not been added to the event stream yet (id=-1),
-        # so pass None to leave cause unset rather than triggering a warning.
         from backend.ledger.event import Event as _Event
         _cause = action if getattr(action, 'id', _Event.INVALID_ID) != _Event.INVALID_ID else None
-        attach_observation_cause(
-            observation,
-            _cause,
-            context='ActionExecutionService.verification_gate',
+        from backend.orchestration.services.guard_bus import VERIFICATION, GuardBus
+        GuardBus.emit(
+            self._context,
+            VERIFICATION,
+            'VERIFICATION_REQUIRED',
+            self._format_verification_required_content(requirement),
+            'VERIFICATION REQUIRED: before more edits or finish, get one fresh file read, terminal read, or focused command result from the actual workspace state.',
+            cause=_cause,
+            cause_context='ActionExecutionService.verification_gate',
         )
-        self._context.event_stream.add_event(observation, EventSource.ENVIRONMENT)
-
-        state = getattr(self._context, 'state', None)
-        if state is not None and hasattr(state, 'set_planning_directive'):
-            state.set_planning_directive(
-                'VERIFICATION REQUIRED: before more edits or finish, get one fresh file read, terminal read, or focused command result from the actual workspace state.',
-                source='ActionExecutionService',
-            )
         return True
 
     async def execute_action(self, action: Action) -> None:

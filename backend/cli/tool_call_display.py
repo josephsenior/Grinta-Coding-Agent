@@ -761,6 +761,82 @@ def redact_streamed_tool_call_markers(text: str) -> str:
     return ''.join(out)
 
 
+def extract_tool_calls_from_text_markers(
+    text: str,
+) -> list[dict[str, Any]]:
+    """Extract structured tool-call dicts from ``[Tool call] name({...})`` spans.
+
+    Some OpenAI-compatible Gemini proxies stream tool calls as text in
+    ``delta.content`` rather than populating ``delta.tool_calls``.  The executor
+    strips those markers from the visible accumulator via
+    :func:`redact_streamed_tool_call_markers`, which means ``tool_calls_dict``
+    stays empty and the entire response collapses to a ``NullAction``.
+
+    This function is the reverse pass: it walks the same marker format and
+    returns a list of standard tool-call dicts suitable for populating
+    ``tool_calls_dict`` so the normal action-building pipeline can execute them.
+
+    Only fully-formed ``[Tool call] name({...})`` markers are returned; partial
+    or malformed markers are silently skipped (the model hasn't finished
+    generating them yet or they are friendly-format history echoes without JSON).
+    """
+    if _TOOL_CALL_PREFIX not in text:
+        return []
+
+    results: list[dict[str, Any]] = []
+    i = 0
+    n = len(text)
+    call_index = 0
+
+    while i < n:
+        j = text.find(_TOOL_CALL_PREFIX, i)
+        if j < 0:
+            break
+        rest_start = j + len(_TOOL_CALL_PREFIX)
+        rest = text[rest_start:]
+        lstripped = rest.lstrip()
+        ws = len(rest) - len(lstripped)
+        m = re.match(r'^([A-Za-z0-9_]+)\(', lstripped)
+        if not m:
+            i = rest_start
+            continue
+        fn_name = m.group(1)
+        open_paren_in_rest = lstripped.find('(')
+        args_begin = rest_start + ws + open_paren_in_rest + 1
+        tail = text[args_begin:].lstrip()
+        json_shift = len(text[args_begin:]) - len(tail)
+        json_start = args_begin + json_shift
+        if json_start >= n or text[json_start] != '{':
+            # JSON not yet arrived or this is a friendly-format marker without args.
+            i = rest_start
+            continue
+        end_json = _balanced_json_object_end(text, json_start)
+        if end_json is None:
+            # Incomplete JSON — stream may still be arriving; skip.
+            i = rest_start
+            continue
+        k = end_json
+        while k < n and text[k] in ' \t\r':
+            k += 1
+        if k >= n or text[k] != ')':
+            i = rest_start
+            continue
+        arguments_str = text[json_start:end_json]
+        results.append(
+            {
+                'id': f'call_{call_index + 1:02d}',
+                'type': 'function',
+                'function': {'name': fn_name, 'arguments': arguments_str},
+            }
+        )
+        call_index += 1
+        i = k + 1
+        if i < n and text[i] == '\n':
+            i += 1
+
+    return results
+
+
 # Matches JSON objects that look like task-list items the model echoes back in text.
 # Pattern: {"description": ..., "id": ..., "status": ...} (any key order, no nesting)
 _TASK_JSON_OBJ_RE = re.compile(

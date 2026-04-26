@@ -118,6 +118,21 @@ def _module_attr(name: str):
     return getattr(sys.modules[__name__], name)
 
 
+# Feature flag: when set to a truthy value (1/true/yes/on), the runtime
+# appends prescriptive guidance suffixes to failed-command observations
+# (e.g. `[MISSING_MODULE] Install with: ...`, `[REPEATED_COMMAND_FAILURE]
+# Pivot now: ...`, `[OOM_KILLED] Reduce memory ...`). Default OFF — modern
+# LLMs read raw stderr fine and the suffixes add noise that fragments
+# attention. Structural tags the model cannot infer alone (`[SHELL_MISMATCH]`,
+# `[SCAFFOLD_SETUP_FAILED]`) are always emitted regardless of this flag.
+_VERBOSE_ENV_ANNOTATIONS_ENV = "APP_VERBOSE_ENV_ANNOTATIONS"
+
+
+def _verbose_env_annotations() -> bool:
+    val = os.environ.get(_VERBOSE_ENV_ANNOTATIONS_ENV, "").strip().lower()
+    return val in ("1", "true", "yes", "on")
+
+
 class ActionRequest(BaseModel):
     """Incoming action execution request envelope sent to runtime server."""
 
@@ -555,20 +570,25 @@ class RuntimeExecutor:
             self._same_cmd_failure_count = 0
             return
 
+        verbose = _module_attr("_verbose_env_annotations")()
+
         # Annotate fatal signals with actionable guidance so the LLM knows
-        # *why* the process died instead of blindly retrying.
-        if exit_code == 137:
-            observation.content += (
-                "\n\n[OOM_KILLED] The command was killed by the kernel (exit 137 — "
-                "out of memory or SIGKILL). Reduce memory usage, process data in "
-                "smaller chunks, or increase available memory before retrying."
-            )
-        elif exit_code == 139:
-            observation.content += (
-                "\n\n[SEGFAULT] The command crashed with a segmentation fault "
-                "(exit 139 — SIGSEGV). This indicates a bug in the program, not "
-                "a configuration issue. Inspect the code for memory errors."
-            )
+        # *why* the process died instead of blindly retrying. Only emit when
+        # verbose annotations are enabled — the raw exit code already tells
+        # modern LLMs what happened.
+        if verbose:
+            if exit_code == 137:
+                observation.content += (
+                    "\n\n[OOM_KILLED] The command was killed by the kernel (exit 137 — "
+                    "out of memory or SIGKILL). Reduce memory usage, process data in "
+                    "smaller chunks, or increase available memory before retrying."
+                )
+            elif exit_code == 139:
+                observation.content += (
+                    "\n\n[SEGFAULT] The command crashed with a segmentation fault "
+                    "(exit 139 — SIGSEGV). This indicates a bug in the program, not "
+                    "a configuration issue. Inspect the code for memory errors."
+                )
 
         signature = (
             action.command.strip(),
@@ -581,7 +601,7 @@ class RuntimeExecutor:
             self._last_cmd_failure_signature = signature
             self._same_cmd_failure_count = 1
 
-        if self._same_cmd_failure_count >= 2:
+        if self._same_cmd_failure_count >= 2 and verbose:
             scaffold_failure = self._detect_scaffold_setup_failure(
                 action.command,
                 observation.content,
@@ -667,6 +687,15 @@ class RuntimeExecutor:
         )
         if scaffold_failure:
             observation.content += f"\n\n[SCAFFOLD_SETUP_FAILED] {scaffold_failure}"
+            return
+
+        # Generic environment-error annotations (`[MISSING_MODULE]`,
+        # `[MISSING_TOOL]`, `[DISK_FULL]`, `[PERMISSION_ERROR]`,
+        # `[IMPORT_ERROR]`) are noise for modern LLMs — they read raw stderr
+        # fine and our prescriptive `Install with: ...` suggestions can be
+        # outright wrong (e.g. recommending pip when the project uses uv).
+        # Only emit these when the verbose-annotations feature flag is on.
+        if not _module_attr("_verbose_env_annotations")():
             return
 
         for pattern, tag, guidance_template in self._ENV_ERROR_PATTERNS:

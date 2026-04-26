@@ -193,6 +193,12 @@ DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED = True
 DEFAULT_AGENT_CLI_MODE = True
 DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT = False
 DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY = False
+# When False (the new default), the planner stops shipping per-turn
+# `<APP_CONTEXT_STATUS>`, repetition warnings, context-pressure warnings, and
+# `<ACTIVE_PLAN>` blocks on every LLM call. Only `<APP_DIRECTIVE>` is injected,
+# and only when a guard set `state.planning_directive`. The legacy verbose
+# behavior is preserved for users who explicitly opt in.
+DEFAULT_AGENT_VERBOSE_TURN_STATUS = False
 DEFAULT_APP_MCP_CONFIG_CLS = "backend.core.config.mcp_config.AppMCPConfig"
 DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS = 5
 DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS = 10

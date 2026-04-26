@@ -31,7 +31,7 @@ class TestNormalizePath(unittest.TestCase):
 
 class TestRecoveryMessage(unittest.TestCase):
     def test_build_message_with_created_files_is_generic(self):
-        msg, planning = StepGuardService(MagicMock())._build_stuck_recovery_message(
+        msg, planning, _vr = StepGuardService(MagicMock())._build_stuck_recovery_message(
             {'src/app/page.tsx', 'src/app/layout.tsx'}, []
         )
         self.assertIn('Files already touched in this session', msg)
@@ -39,7 +39,7 @@ class TestRecoveryMessage(unittest.TestCase):
         self.assertIn('verify current state', planning)
 
     def test_build_message_without_created_files_is_generic(self):
-        msg, planning = StepGuardService(MagicMock())._build_stuck_recovery_message(
+        msg, planning, _vr = StepGuardService(MagicMock())._build_stuck_recovery_message(
             set(), []
         )
         self.assertIn('Stop repeating', msg)
@@ -68,8 +68,13 @@ class TestInjectReplanDirective(unittest.TestCase):
         self.assertIn('Files already touched', obs.content)
 
     def test_inject_replan_directive_sets_planning_directive(self):
+        # GuardBus XOR rule: when budget is available, observation is emitted
+        # and planning_directive is NOT set (they are mutually exclusive).
+        # Directive-only path fires only when the observation budget is already spent.
         self.service._inject_replan_directive(self.controller)
-        self.controller.state.set_planning_directive.assert_called_once()
+        # The observation was emitted (covered by the sibling test).
+        # Confirm set_planning_directive is NOT called on the happy path.
+        self.controller.state.set_planning_directive.assert_not_called()
 
 
 class TestEnsureCanStep(unittest.IsolatedAsyncioTestCase):

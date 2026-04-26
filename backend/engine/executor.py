@@ -617,6 +617,25 @@ class OrchestratorExecutor:
                 ev.source = EventSource.AGENT
                 event_stream.add_event(ev, EventSource.AGENT)
 
+            # If the provider did not stream structured tool calls but embedded them
+            # as text-format markers (``[Tool call] name({...})``), extract them now
+            # so the normal action-building pipeline can execute them rather than
+            # silently discarding the model's intent as a NullAction.
+            if not tool_calls_dict and content_accumulate:
+                from backend.cli.tool_call_display import (
+                    extract_tool_calls_from_text_markers,
+                )
+
+                text_tcs = extract_tool_calls_from_text_markers(content_accumulate)
+                if text_tcs:
+                    logger.info(
+                        'Extracted %d text-format tool call(s) from streaming content; '
+                        'treating as structured tool calls.',
+                        len(text_tcs),
+                    )
+                    for _idx, _tc in enumerate(text_tcs):
+                        tool_calls_dict[_idx] = _tc
+
             tool_calls_list: list[dict[str, Any]] | None = [
                 tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())
             ]

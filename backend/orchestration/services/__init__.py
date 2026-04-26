@@ -7,6 +7,7 @@ from .circuit_breaker_service import CircuitBreakerService
 from .confirmation_service import ConfirmationService
 from .event_router_service import EventRouterService
 from .exception_handler_service import ExceptionHandlerService
+from .guard_bus import CIRCUIT_WARNING, CHECKPOINT, HARD_STOP, STUCK, VERIFICATION, GuardBus
 from .iteration_guard_service import IterationGuardService
 from .iteration_service import IterationService
 from .lifecycle_service import LifecycleService
@@ -30,7 +31,11 @@ __all__ = [
     'ActionService',
     'ActionExecutionService',
     'AutonomyService',
+    'CIRCUIT_WARNING',
+    'CHECKPOINT',
     'CircuitBreakerService',
+    'GuardBus',
+    'HARD_STOP',
     'OrchestrationContext',
     'EventRouterService',
     'ExceptionHandlerService',
@@ -40,6 +45,7 @@ __all__ = [
     'StepDecisionService',
     'StepGuardService',
     'StepPrerequisiteService',
+    'STUCK',
     'ConfirmationService',
     'LifecycleService',
     'ObservationService',
@@ -50,4 +56,5 @@ __all__ = [
     'RetryService',
     'StuckDetectionService',
     'TaskValidationService',
+    'VERIFICATION',
 ]

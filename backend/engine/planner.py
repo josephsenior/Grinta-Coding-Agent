@@ -318,11 +318,29 @@ class OrchestratorPlanner:
     def _inject_turn_status(self, messages: list, state: State) -> list:
         """Inject a dedicated control/status message for the current turn.
 
-        High-quality behavior:
-        - Does not mutate user message content.
-        - Retry-safe: does not destructively consume signals while building prompts.
-        - Structured tags allow stable parsing/heuristics.
+        Default behavior (verbose_turn_status=False): emits NOTHING unless a
+        guard subsystem has set `state.planning_directive`. In that case a
+        single `<APP_DIRECTIVE>` block is inserted before the last user
+        message. This keeps each turn's payload free of turn counters,
+        repetition warnings, context-pressure warnings, and active-plan
+        echoes that fragment model attention without adding signal.
+
+        Legacy behavior (verbose_turn_status=True): emits the full
+        `<APP_CONTEXT_STATUS>` block plus warnings and `<ACTIVE_PLAN>`.
         """
+        verbose = bool(getattr(self._config, 'verbose_turn_status', False))
+        planning_directive, memory_pressure, rep_score = self._extract_turn_signals(
+            state
+        )
+
+        if not verbose:
+            # Minimal path: only inject when a guard explicitly demands it.
+            if not planning_directive:
+                return messages
+            status = f'<APP_DIRECTIVE>\n{planning_directive}\n</APP_DIRECTIVE>'
+            return self._apply_control_message(messages, status)
+
+        # Legacy verbose path (preserved for users who opt in).
         iter_flag = getattr(state, 'iteration_flag', None)
         if iter_flag is None:
             return messages
@@ -331,9 +349,6 @@ class OrchestratorPlanner:
             return messages
 
         parts = self._build_turn_context_parts(state)
-        planning_directive, memory_pressure, rep_score = self._extract_turn_signals(
-            state
-        )
         parts = self._append_signal_parts(parts, memory_pressure, rep_score)
 
         status = '<APP_CONTEXT_STATUS ' + ' | '.join(parts) + ' />'

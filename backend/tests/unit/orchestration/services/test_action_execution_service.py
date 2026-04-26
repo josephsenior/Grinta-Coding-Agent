@@ -169,15 +169,45 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(RateLimitError):
             await self.service.get_next_action()
 
-    async def test_get_next_action_pauses_after_repeated_null_actions(self):
-        """Repeated live-agent NullAction results should trip a bounded pause.
+    async def test_get_next_action_recovers_first_round_then_pauses(self):
+        """Null-action loop uses two-round recovery before pausing.
 
-        On the 5th consecutive NullAction the service must:
-        - emit a NULL_ACTION_LOOP ErrorObservation
-        - transition the controller to AWAITING_USER_INPUT directly
-        - return None (no MessageAction — avoids the race between runtime
-          NullObservation and the event-router state transition)
+        Round 1 (5 consecutive NullActions): emits NULL_ACTION_LOOP_RECOVERY and
+        keeps the loop running — no pause, no AWAITING_USER_INPUT.
+        Round 2 (another 5): emits NULL_ACTION_LOOP and pauses.
         """
+        from backend.core.schemas import AgentState
+
+        nulls = [NullAction() for _ in range(10)]
+        self.mock_context.agent.astep = AsyncMock(side_effect=nulls)
+        mock_controller = MagicMock()
+        mock_controller.get_agent_state.return_value = AgentState.RUNNING
+        mock_controller.set_agent_state_to = AsyncMock()
+        self.mock_context.get_controller.return_value = mock_controller
+
+        results = []
+        for _ in range(10):
+            results.append(await self.service.get_next_action())
+
+        # First 9 calls return NullAction (4 pass-through + 1 recovery at round-1
+        # threshold + 4 more pass-through), 10th returns None (round-2 pause).
+        self.assertEqual(results.count(None), 1)
+        self.assertIsNone(results[-1])
+
+        # Two observations total: first is recovery, second is the hard pause.
+        self.assertEqual(self.mock_context.event_stream.add_event.call_count, 2)
+        first_obs = self.mock_context.event_stream.add_event.call_args_list[0][0][0]
+        second_obs = self.mock_context.event_stream.add_event.call_args_list[1][0][0]
+        self.assertEqual(first_obs.error_id, 'NULL_ACTION_LOOP_RECOVERY')
+        self.assertEqual(second_obs.error_id, 'NULL_ACTION_LOOP')
+
+        # Only pauses after the second round is exhausted.
+        mock_controller.set_agent_state_to.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+
+    async def test_get_next_action_pauses_after_repeated_null_actions(self):
+        """Backward-compat alias: first recovery round emits recovery obs, not a pause."""
         from backend.core.schemas import AgentState
 
         self.mock_context.agent.astep = AsyncMock(side_effect=[
@@ -192,23 +222,15 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         mock_controller.set_agent_state_to = AsyncMock()
         self.mock_context.get_controller.return_value = mock_controller
 
-        first = await self.service.get_next_action()
-        second = await self.service.get_next_action()
-        third = await self.service.get_next_action()
-        fourth = await self.service.get_next_action()
-        fifth = await self.service.get_next_action()
+        for _ in range(5):
+            await self.service.get_next_action()
 
-        self.assertIsInstance(first, NullAction)
-        self.assertIsInstance(second, NullAction)
-        self.assertIsInstance(third, NullAction)
-        self.assertIsInstance(fourth, NullAction)
-        self.assertIsNone(fifth)
-        self.mock_context.event_stream.add_event.assert_called_once()
-        error_obs = self.mock_context.event_stream.add_event.call_args[0][0]
-        self.assertEqual(error_obs.error_id, 'NULL_ACTION_LOOP')
-        mock_controller.set_agent_state_to.assert_awaited_once_with(
-            AgentState.AWAITING_USER_INPUT
-        )
+        # After 5 nulls (round 1) a recovery observation is emitted but the agent
+        # is NOT paused — set_agent_state_to should NOT have been called.
+        self.assertEqual(self.mock_context.event_stream.add_event.call_count, 1)
+        obs = self.mock_context.event_stream.add_event.call_args[0][0]
+        self.assertEqual(obs.error_id, 'NULL_ACTION_LOOP_RECOVERY')
+        mock_controller.set_agent_state_to.assert_not_awaited()
 
     async def test_get_next_action_resets_null_streak_after_real_action(self):
         """A real action should clear the null-action streak."""
@@ -349,7 +371,8 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.mock_context.event_stream.add_event.assert_called_once()
         blocked_obs = self.mock_context.event_stream.add_event.call_args.args[0]
         self.assertEqual(blocked_obs.error_id, 'VERIFICATION_REQUIRED')
-        state.set_planning_directive.assert_called_once()
+        # GuardBus XOR rule: observation emitted → planning_directive NOT also set.
+        state.set_planning_directive.assert_not_called()
 
     @patch('backend.core.plugin.get_plugin_registry')
     async def test_execute_action_allows_grounding_view_to_clear_requirement(

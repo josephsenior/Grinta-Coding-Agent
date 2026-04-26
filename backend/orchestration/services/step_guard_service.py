@@ -7,6 +7,11 @@ from typing import TYPE_CHECKING, Any
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
+from backend.orchestration.services.guard_bus import (
+    CIRCUIT_WARNING,
+    STUCK,
+    GuardBus,
+)
 from backend.ledger.action import (
     CmdRunAction,
     FileEditAction,
@@ -117,23 +122,15 @@ class StepGuardService:
             'You must change strategy now.\n'
             f'Warning attempt: {warning_count}/{limit}'
         )
-        warning_obs = ErrorObservation(
-            content=content,
-            error_id='CIRCUIT_BREAKER_WARNING',
+        GuardBus.emit(
+            controller,
+            CIRCUIT_WARNING,
+            'CIRCUIT_BREAKER_WARNING',
+            content,
+            'CIRCUIT WARNING: change strategy immediately; avoid repeating failed pattern; produce one concrete progress action next.',
+            cause=_pending_action_for_observation_cause(controller),
+            cause_context='step_guard.circuit_warning',
         )
-        attach_observation_cause(
-            warning_obs,
-            _pending_action_for_observation_cause(controller),
-            context='step_guard.circuit_warning',
-        )
-        controller.event_stream.add_event(warning_obs, EventSource.ENVIRONMENT)
-
-        state = getattr(controller, 'state', None)
-        if state and hasattr(state, 'set_planning_directive'):
-            state.set_planning_directive(
-                'CIRCUIT WARNING: change strategy immediately; avoid repeating failed pattern; produce one concrete progress action next.',
-                source='StepGuardService',
-            )
 
     async def ensure_can_step(self) -> bool:
         """Return False if circuit breaker/stuck detection block execution."""
@@ -221,20 +218,15 @@ class StepGuardService:
                 f'CIRCUIT BREAKER FORCED STRATEGY SWITCH: {result.reason}\n\n'
                 f'{result.recommendation}'
             )
-            obs = ErrorObservation(
-                content=content, error_id='CIRCUIT_BREAKER_FORCED_SWITCH'
+            GuardBus.emit(
+                controller,
+                CIRCUIT_WARNING,
+                'CIRCUIT_BREAKER_FORCED_SWITCH',
+                content,
+                'STRATEGY SWITCH REQUIRED: You must use a different tool or strategy now.',
+                cause=_pending_action_for_observation_cause(controller),
+                cause_context='step_guard.forced_switch',
             )
-            attach_observation_cause(
-                obs,
-                _pending_action_for_observation_cause(controller),
-                context='step_guard.forced_switch',
-            )
-            controller.event_stream.add_event(obs, EventSource.ENVIRONMENT)
-            if state and hasattr(state, 'set_planning_directive'):
-                state.set_planning_directive(
-                    'STRATEGY SWITCH REQUIRED: You must use a different tool or strategy now.',
-                    source='StepGuardService',
-                )
             _clear_agent_queued_actions(
                 controller, 'Forced strategy switch due to deterministic failures'
             )
@@ -322,16 +314,15 @@ class StepGuardService:
         if verification_requirement is not None:
             self._set_verification_requirement(controller, verification_requirement)
 
-        error_obs = ErrorObservation(content=msg, error_id='STUCK_LOOP_RECOVERY')
-        attach_observation_cause(
-            error_obs,
-            _pending_action_for_observation_cause(controller),
-            context='step_guard.stuck_recovery',
+        GuardBus.emit(
+            controller,
+            STUCK,
+            'STUCK_LOOP_RECOVERY',
+            msg,
+            planning,
+            cause=_pending_action_for_observation_cause(controller),
+            cause_context='step_guard.stuck_recovery',
         )
-        controller.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
-
-        if state and hasattr(state, 'set_planning_directive'):
-            state.set_planning_directive(planning, source='StepGuardService')
 
     def _collect_created_files(self, history: list) -> set[str]:
         """Collect normalized paths of files created via FileWrite/FileEdit."""

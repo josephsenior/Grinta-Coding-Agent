@@ -26,6 +26,10 @@ def _make_config(**kwargs):
     cfg.enable_editor = True
     cfg.enable_first_turn_orientation_prompt = False
     cfg.merge_control_system_into_primary = False
+    # Existing tests were written against the legacy verbose per-turn
+    # injection; opt them in so they continue to exercise that code path.
+    # New tests exercise the minimal default explicitly.
+    cfg.verbose_turn_status = True
     for k, v in kwargs.items():
         setattr(cfg, k, v)
     return cfg
@@ -504,6 +508,75 @@ class TestBuildLlmParams:
         )
         assert "<FIRST_TURN_ORIENTATION>" not in first_control
         assert "<FIRST_TURN_ORIENTATION>" not in second_control
+
+
+class TestMinimalTurnStatusDefault:
+    """Verify the new default (verbose_turn_status=False) emits nothing
+    unless a guard subsystem has set a planning_directive."""
+
+    def _state_with_directive(self, directive: str | None):
+        state = _make_state()
+        it = MagicMock()
+        it.current_value = 1
+        it.max_value = 3
+        state.iteration_flag = it
+        ts = MagicMock()
+        ts.planning_directive = directive
+        ts.memory_pressure = "WARNING"
+        ts.repetition_score = 0.8
+        state.turn_signals = ts
+        state.extra_data = {}
+        return state
+
+    def test_no_injection_when_directive_absent(self):
+        cfg = _make_config()
+        cfg.verbose_turn_status = False
+        p = _make_planner(config=cfg)
+        state = self._state_with_directive(None)
+
+        messages = [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "task"},
+        ]
+        with patch("backend.engine.planner.check_tools", return_value=[]):
+            params = p.build_llm_params(messages, state, [])
+
+        out = params["messages"]
+        # No control system message inserted; no APP_CONTEXT_STATUS, no
+        # repetition warning, no active plan, no directive.
+        assert len(out) == 2
+        joined = "\n".join(
+            m["content"] for m in out if isinstance(m.get("content"), str)
+        )
+        assert "<APP_CONTEXT_STATUS" not in joined
+        assert "<APP_DIRECTIVE>" not in joined
+        assert "<ACTIVE_PLAN>" not in joined
+        assert "REPETITION WARNING" not in joined
+        assert "CONTEXT PRESSURE" not in joined
+
+    def test_only_directive_injected_when_present(self):
+        cfg = _make_config()
+        cfg.verbose_turn_status = False
+        p = _make_planner(config=cfg)
+        state = self._state_with_directive("[GUARD] take next concrete step")
+
+        messages = [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "task"},
+        ]
+        with patch("backend.engine.planner.check_tools", return_value=[]):
+            params = p.build_llm_params(messages, state, [])
+
+        out = params["messages"]
+        assert out[-1] == {"role": "user", "content": "task"}
+        assert out[-2]["role"] == "system"
+        content = out[-2]["content"]
+        assert content.startswith("<APP_DIRECTIVE>")
+        assert "[GUARD] take next concrete step" in content
+        assert "<APP_CONTEXT_STATUS" not in content
+        assert "<ACTIVE_PLAN>" not in content
+        assert "REPETITION WARNING" not in content
+        assert "CONTEXT PRESSURE" not in content
 
 
 # ---------------------------------------------------------------------------
