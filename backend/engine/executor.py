@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import sys
 import time
 from collections.abc import Callable
@@ -45,6 +46,14 @@ class ModelResponse(Protocol):
     choices: list
     id: str
     tool_calls: list[Any] | None  # OpenAI-style function/tool calls (optional)
+
+
+# Compiled once at import time for inline <think>/<redacted_thinking> tag splitting
+# in the streaming delta handler.  DeepSeek R1, QwQ, Ollama reasoning models, and
+# early OpenAI o-series all embed chain-of-thought in delta.content using one of
+# these two tag conventions.
+_INLINE_OPEN_THINK_RE = re.compile(r'<(redacted_thinking|think)>', re.IGNORECASE)
+_INLINE_CLOSE_THINK_RE = re.compile(r'</(redacted_thinking|think)>', re.IGNORECASE)
 
 
 @dataclass(slots=True)
@@ -240,6 +249,9 @@ class OrchestratorExecutor:
             async def _consume_stream():
                 nonlocal content_accumulate, streamed_usage
                 thinking_accumulate = ''
+                # True while we are inside a <think> or <redacted_thinking> block
+                # that is still being streamed chunk by chunk.
+                _in_inline_think_block = False
 
                 def _merge_stream_fragment(existing: str, incoming: str) -> str:
                     r"""Merge streamed fragments with safe append-only defaults.
@@ -337,6 +349,7 @@ class OrchestratorExecutor:
                         await asyncio.sleep(0)
 
                 async def _process_delta(delta: dict[str, Any]) -> None:
+                    nonlocal _in_inline_think_block
                     text_chunk = ''
                     delta_content = delta.get('content')
                     if isinstance(delta_content, str):
@@ -358,6 +371,8 @@ class OrchestratorExecutor:
                     # alternate keys instead of delta.content.  Route these to
                     # the dedicated thinking channel so the UI can display them
                     # in the reasoning panel rather than as regular content.
+                    # Covered: OpenAI o1/o3/o4 (reasoning_content), DeepSeek/
+                    # Perplexity (reasoning), xAI Grok thinking, QwQ via compat.
                     reasoning_chunk = ''
                     for alt_key in ('reasoning_content', 'reasoning'):
                         alt_val = delta.get(alt_key)
@@ -369,7 +384,34 @@ class OrchestratorExecutor:
                         await _emit_thinking_piece(reasoning_chunk)
 
                     if text_chunk:
-                        await _emit_text_piece(text_chunk)
+                        # Split <think>…</think> / <redacted_thinking>…</redacted_thinking>
+                        # inline blocks out of regular content so they stream to
+                        # the reasoning panel in real time (DeepSeek R1, QwQ,
+                        # Ollama reasoning models, early OpenAI o-series).
+                        # We track _in_inline_think_block across chunk boundaries
+                        # because a single tag can arrive split across many deltas.
+                        remaining = text_chunk
+                        while remaining:
+                            if _in_inline_think_block:
+                                close_m = _INLINE_CLOSE_THINK_RE.search(remaining)
+                                if close_m:
+                                    await _emit_thinking_piece(remaining[:close_m.start()])
+                                    _in_inline_think_block = False
+                                    remaining = remaining[close_m.end():]
+                                else:
+                                    await _emit_thinking_piece(remaining)
+                                    remaining = ''
+                            else:
+                                open_m = _INLINE_OPEN_THINK_RE.search(remaining)
+                                if open_m:
+                                    before = remaining[:open_m.start()]
+                                    if before:
+                                        await _emit_text_piece(before)
+                                    _in_inline_think_block = True
+                                    remaining = remaining[open_m.end():]
+                                else:
+                                    await _emit_text_piece(remaining)
+                                    remaining = ''
 
                     if 'tool_calls' in delta and delta['tool_calls']:
                         for tc_chunk in delta['tool_calls']:

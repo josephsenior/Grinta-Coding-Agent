@@ -175,12 +175,16 @@ def _show_reasoning_text() -> bool:
     )
 
 
-# Patterns for extracting / stripping <redacted_thinking> blocks from reasoning models.
+# Patterns for extracting / stripping thinking blocks from reasoning models.
+# Matches both <redacted_thinking> (Anthropic/MiniMax) and <think> (DeepSeek R1,
+# QwQ, Ollama reasoning models, early OpenAI o-series) tags.
 _THINK_EXTRACT_RE = re.compile(
-    r"<redacted_thinking>(.*?)(?:</redacted_thinking>|$)", re.DOTALL | re.IGNORECASE
+    r"<(?:redacted_thinking|think)>(.*?)(?:</(?:redacted_thinking|think)>|$)",
+    re.DOTALL | re.IGNORECASE,
 )
 _THINK_STRIP_RE = re.compile(
-    r"<redacted_thinking>.*?(?:</redacted_thinking>|$)", re.DOTALL | re.IGNORECASE
+    r"<(?:redacted_thinking|think)>.*?(?:</(?:redacted_thinking|think)>|$)",
+    re.DOTALL | re.IGNORECASE,
 )
 _INTERNAL_THINK_TAG_RE = re.compile(
     r"^\[(?P<tag>[A-Z0-9_]+)\](?:\s*(?P<payload>.*))?$",

@@ -17,17 +17,18 @@ from backend.inference.tool_types import make_function_chunk, make_tool_param
 from backend.ledger.action import Action
 
 _THINK_TAG_RE = re.compile(
-    r'<redacted_thinking>.*?</redacted_thinking>', re.DOTALL | re.IGNORECASE
+    r'<(?:redacted_thinking|think)>.*?</(?:redacted_thinking|think)>',
+    re.DOTALL | re.IGNORECASE,
 )
 
 _THINK_INNER_RE = re.compile(
-    r'<redacted_thinking>\s*(.*?)\s*</redacted_thinking>',
+    r'<(?:redacted_thinking|think)>\s*(.*?)\s*</(?:redacted_thinking|think)>',
     re.DOTALL | re.IGNORECASE,
 )
 
 
 def extract_redacted_thinking_inner(text: str) -> str:
-    """Return inner text of all ``<redacted_thinking>...</redacted_thinking>`` blocks."""
+    """Return inner text of all ``<redacted_thinking>`` / ``<think>`` blocks."""
     parts = [
         m.group(1).strip()
         for m in _THINK_INNER_RE.finditer(text or '')
@@ -37,11 +38,11 @@ def extract_redacted_thinking_inner(text: str) -> str:
 
 
 def strip_thinking_tags(text: str) -> str:
-    """Remove <redacted_thinking>...</redacted_thinking> blocks emitted by reasoning models (e.g. MiniMax, DeepSeek R1).
+    """Remove ``<redacted_thinking>`` and ``<think>`` blocks from text.
 
-    These blocks contain chain-of-thought that should not appear in the final
-    user-facing response.  The surrounding whitespace is collapsed so the
-    result reads cleanly.
+    Covers Anthropic/MiniMax (``<redacted_thinking>``), DeepSeek R1, QwQ,
+    Ollama reasoning models, and early OpenAI o-series (``<think>``).
+    The surrounding whitespace is collapsed so the result reads cleanly.
     """
     stripped = _THINK_TAG_RE.sub('', text)
     return re.sub(r'\n{3,}', '\n\n', stripped).strip()
