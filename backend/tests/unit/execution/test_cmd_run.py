@@ -1,3 +1,4 @@
+# pyright: reportUnknownParameterType=false, reportMissingParameterType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -882,7 +883,8 @@ async def test_terminal_input_post_read_uses_stored_cursor(mock_executor, tmp_pa
 
     session = MagicMock()
     session.cwd = str(workspace)
-    session.read_output_since = read_since
+    read_output_since = MagicMock(side_effect=read_since)
+    session.read_output_since = read_output_since
     mock_executor.session_manager.get_session.return_value = session
     mock_executor._terminal_read_cursor["t-cursor"] = 250
 
@@ -896,6 +898,7 @@ async def test_terminal_input_post_read_uses_stored_cursor(mock_executor, tmp_pa
     assert obs.__class__.__name__ == "TerminalObservation"
     assert offsets_seen == [250]
     assert obs.has_new_output is False
+    read_output_since.assert_called_once_with(250)
     assert mock_executor._terminal_read_cursor["t-cursor"] == 300
 
 
@@ -907,7 +910,6 @@ def test_pty_output_transcript_caption_notes_no_new_bytes_when_flag_false() -> N
         n_lines=5,
         truncated=False,
         has_output=True,
-        raw="",
         has_new_output=False,
     )
     assert "no new bytes since last read" in cap

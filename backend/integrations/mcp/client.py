@@ -25,6 +25,11 @@ from backend.integrations.mcp.tool import MCPClientTool
 if TYPE_CHECKING:
     from mcp.types import CallToolResult
 
+try:
+    BaseExceptionGroupType = BaseExceptionGroup
+except NameError:  # pragma: no cover - Python < 3.11 compatibility for static analysis
+    BaseExceptionGroupType = Exception
+
 _MAX_RECONNECT_ATTEMPTS = 5
 _BASE_BACKOFF_S = 0.5
 
@@ -65,7 +70,7 @@ class MCPClient(BaseModel):
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    client: Client | None = None
+    client: Client[Any] | None = None
     description: str = "MCP client tools for server interaction"
     tools: list[MCPClientTool] = Field(default_factory=list)
     tool_map: dict[str, MCPClientTool] = Field(default_factory=dict)
@@ -73,7 +78,7 @@ class MCPClient(BaseModel):
     _session_active: bool = False
     _mcp_alias_peers: list[Any] | None = PrivateAttr(default=None)
     _mcp_alias_reserved: frozenset[str] | None = PrivateAttr(default=None)
-    _connect_kwargs: dict | None = None
+    _connect_kwargs: dict[str, Any] | None = None
     _server_config: MCPServerConfig | None = None
 
     # ------------------------------------------------------------------
@@ -116,7 +121,7 @@ class MCPClient(BaseModel):
                 await cli.__aexit__(None, None, None)
             except asyncio.CancelledError:
                 raise
-            except BaseExceptionGroup as eg:
+            except BaseExceptionGroupType as eg:
                 # stdio MCP often ends with ExceptionGroup(BrokenResourceError); not an app bug.
                 logger.debug("MCP session __aexit__ teardown: %s", eg)
             except Exception as exc:
@@ -125,7 +130,7 @@ class MCPClient(BaseModel):
                 await cli.close()
             except asyncio.CancelledError:
                 raise
-            except BaseExceptionGroup as eg:
+            except BaseExceptionGroupType as eg:
                 logger.debug("MCP client.close() teardown: %s", eg)
             except Exception as exc:
                 logger.debug("MCP client.close(): %s", exc, exc_info=True)
@@ -270,9 +275,9 @@ class MCPClient(BaseModel):
 
     def _build_http_headers(
         self, api_key: str | None, conversation_id: str | None
-    ) -> dict:
+    ) -> dict[str, str]:
         """Build HTTP headers for connection."""
-        headers = {}
+        headers: dict[str, str] = {}
         if api_key:
             headers.update(
                 {
@@ -285,8 +290,8 @@ class MCPClient(BaseModel):
         return headers
 
     def _create_http_transport(
-        self, server: MCPServerConfig, server_url: str, headers: dict
-    ):
+        self, server: MCPServerConfig, server_url: str, headers: dict[str, str]
+    ) -> StreamableHttpTransport | SSETransport:
         """Create appropriate HTTP transport."""
         if server.transport == "shttp":
             return StreamableHttpTransport(url=server_url, headers=headers or None)
@@ -361,7 +366,7 @@ class MCPClient(BaseModel):
     # Per-call timeout (seconds).  Override via subclass or instance attribute.
     CALL_TIMEOUT: float = 60.0
 
-    async def call_tool(self, tool_name: str, args: dict) -> CallToolResult:
+    async def call_tool(self, tool_name: str, args: dict[str, Any]) -> CallToolResult:
         """Call a tool on the MCP server, reconnecting if the session dropped.
 
         Each attempt uses ``asyncio.wait_for`` with ``CALL_TIMEOUT`` seconds.
