@@ -51,7 +51,6 @@ from backend.engine.tools.delegate_task import (
     DELEGATE_TASK_TOOL_NAME,
 )
 from backend.engine.tools.execute_mcp_tool import EXECUTE_MCP_TOOL_TOOL_NAME
-from backend.engine.tools.explore_code import ()
 from backend.engine.tools.lsp_query import (
     CODE_INTELLIGENCE_TOOL_NAME,
 )
@@ -86,24 +85,34 @@ from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.action.mcp import MCPAction
 
 ToolHandler = Callable[[dict[str, Any]], Action]
+AgentThinkToolHandler = Callable[[dict[str, Any]], AgentThinkAction]
 
 build_analyze_project_structure_action = cast(
-    ToolHandler, analyze_project_structure_tools.build_analyze_project_structure_action
+    AgentThinkToolHandler,
+    cast(Any, analyze_project_structure_tools).build_analyze_project_structure_action,
 )
-build_blackboard_action = cast(ToolHandler, blackboard_tools.build_blackboard_action)
-build_checkpoint_action = cast(ToolHandler, checkpoint_tools.build_checkpoint_action)
+build_blackboard_action = cast(
+    ToolHandler, cast(Any, blackboard_tools).build_blackboard_action
+)
+build_checkpoint_action = cast(
+    AgentThinkToolHandler, cast(Any, checkpoint_tools).build_checkpoint_action
+)
 build_delegate_task_action = cast(
-    ToolHandler, delegate_task_tools.build_delegate_task_action
+    ToolHandler, cast(Any, delegate_task_tools).build_delegate_task_action
 )
 build_explore_tree_structure_action = cast(
-    ToolHandler, explore_code_tools.build_explore_tree_structure_action
+    AgentThinkToolHandler,
+    cast(Any, explore_code_tools).build_explore_tree_structure_action,
 )
 build_read_symbol_definition_action = cast(
-    ToolHandler, explore_code_tools.build_read_symbol_definition_action
+    AgentThinkToolHandler,
+    cast(Any, explore_code_tools).build_read_symbol_definition_action,
 )
-build_lsp_query_action = cast(ToolHandler, lsp_query_tools.build_lsp_query_action)
+build_lsp_query_action = cast(
+    ToolHandler, cast(Any, lsp_query_tools).build_lsp_query_action
+)
 handle_terminal_manager_tool = cast(
-    ToolHandler, terminal_manager_tools.handle_terminal_manager_tool
+    ToolHandler, cast(Any, terminal_manager_tools).handle_terminal_manager_tool
 )
 
 # Callback for semantic recall — set by the orchestrator at init time.
@@ -277,9 +286,7 @@ def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkActio
         return AgentThinkAction(thought="\n".join(parts))
 
     elif action == "working_memory":
-        from backend.engine.tools.working_memory import (
-            build_working_memory_action as _build_working_memory_action,
-        )
+        import backend.engine.tools.working_memory as working_memory_tools
 
         # Map arguments back to what build_working_memory_action expects
         wm_args = {
@@ -288,7 +295,8 @@ def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkActio
             "content": cast(str, arguments.get("content", "")),
         }
         build_working_memory_action = cast(
-            ToolHandler, _build_working_memory_action
+            AgentThinkToolHandler,
+            cast(Any, working_memory_tools).build_working_memory_action,
         )
         return build_working_memory_action(wm_args)
 
@@ -555,10 +563,11 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
         )
 
     tracker = TaskTracker()
+    raw_task_list: Sequence[Mapping[str, Any]]
 
     existing_normalized_task_list: list[dict[str, Any]] = []
     if command == "view":
-        raw_task_list = tracker.load_from_file()
+        raw_task_list = cast(list[Mapping[str, Any]], tracker.load_from_file())
     else:
         # Capture the current persisted plan so we can detect no-op updates
         # that otherwise create tool-call loops without advancing execution.
@@ -569,14 +578,14 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
             )
         except FunctionCallValidationError:
             existing_normalized_task_list = []
-        raw_task_list = arguments.get("task_list", [])
+        raw_task_list_any = arguments.get("task_list", [])
+        if not isinstance(raw_task_list_any, Sequence):
+            raise FunctionCallValidationError(
+                f'Invalid format for "task_list". Expected a list but got {type(raw_task_list_any)}.'
+            )
+        raw_task_list = cast(Sequence[Mapping[str, Any]], raw_task_list_any)
 
-    if not isinstance(raw_task_list, Sequence):
-        raise FunctionCallValidationError(
-            f'Invalid format for "task_list". Expected a list but got {type(raw_task_list)}.'
-        )
-
-    normalized_task_list = _normalize_task_tracker_list(cast(list[Mapping[str, Any]], raw_task_list))
+    normalized_task_list = _normalize_task_tracker_list(list(raw_task_list))
 
     if (
         command == "update"
@@ -733,16 +742,17 @@ def _handle_edit_symbols_command(
     import os
 
     raw_edits_any = arguments.get("edits") or arguments.get("symbol_edits")
-    if (
-        not isinstance(raw_edits_any, Sequence)
-        or isinstance(raw_edits_any, str | bytes)
-        or len(raw_edits_any) == 0
-    ):
+    if not isinstance(raw_edits_any, Sequence) or isinstance(raw_edits_any, (str, bytes)):
         raise FunctionCallValidationError(
             "edit_symbols requires a non-empty 'edits' array "
             "(objects with function_name or symbol, and new_body)"
         )
-    raw_edits: Sequence[Any] = raw_edits_any
+    raw_edits: list[Any] = list(cast(Sequence[Any], raw_edits_any))
+    if not raw_edits:
+        raise FunctionCallValidationError(
+            "edit_symbols requires a non-empty 'edits' array "
+            "(objects with function_name or symbol, and new_body)"
+        )
     if len(raw_edits) > _MAX_EDIT_SYMBOLS_PER_BATCH:
         raise FunctionCallValidationError(
             f"edit_symbols supports at most {_MAX_EDIT_SYMBOLS_PER_BATCH} edits per call"
@@ -1137,7 +1147,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         DELEGATE_TASK_TOOL_NAME: lambda args: build_delegate_task_action(dict(args)),
         CODE_INTELLIGENCE_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
         BLACKBOARD_TOOL_NAME: lambda args: build_blackboard_action(dict(args)),
-        TERMINAL_MANAGER_TOOL_NAME: lambda args: cast(Action, handle_terminal_manager_tool(dict(args))),
+        TERMINAL_MANAGER_TOOL_NAME: lambda args: handle_terminal_manager_tool(dict(args)),
         "explore_tree_structure": lambda args: build_explore_tree_structure_action(dict(args)),
         "read_symbol_definition": lambda args: build_read_symbol_definition_action(dict(args)),
         COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
