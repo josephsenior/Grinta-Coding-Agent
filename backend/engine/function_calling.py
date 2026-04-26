@@ -28,11 +28,11 @@ from backend.engine.tools import (
 )
 from backend.engine.tools.analyze_project_structure import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
-    build_analyze_project_structure_action,
+    build_analyze_project_structure_action as _build_analyze_project_structure_action,
 )
 from backend.engine.tools.blackboard import (
     BLACKBOARD_TOOL_NAME,
-    build_blackboard_action,
+    build_blackboard_action as _build_blackboard_action,
 )
 from backend.engine.tools.browser_native import (
     BROWSER_TOOL_NAME,
@@ -40,20 +40,20 @@ from backend.engine.tools.browser_native import (
 )
 from backend.engine.tools.checkpoint import (
     CHECKPOINT_TOOL_NAME,
-    build_checkpoint_action,
+    build_checkpoint_action as _build_checkpoint_action,
 )
 from backend.engine.tools.delegate_task import (
     DELEGATE_TASK_TOOL_NAME,
-    build_delegate_task_action,
+    build_delegate_task_action as _build_delegate_task_action,
 )
 from backend.engine.tools.execute_mcp_tool import EXECUTE_MCP_TOOL_TOOL_NAME
 from backend.engine.tools.explore_code import (
-    build_explore_tree_structure_action,
-    build_read_symbol_definition_action,
+    build_explore_tree_structure_action as _build_explore_tree_structure_action,
+    build_read_symbol_definition_action as _build_read_symbol_definition_action,
 )
 from backend.engine.tools.lsp_query import (
     CODE_INTELLIGENCE_TOOL_NAME,
-    build_lsp_query_action,
+    build_lsp_query_action as _build_lsp_query_action,
 )
 from backend.engine.tools.memory_manager import (
     MEMORY_MANAGER_TOOL_NAME,
@@ -68,7 +68,7 @@ from backend.engine.tools.security_utils import RISK_LEVELS
 from backend.engine.tools.task_tracker import TaskTracker
 from backend.engine.tools.terminal_manager import (
     TERMINAL_MANAGER_TOOL_NAME,
-    handle_terminal_manager_tool,
+    handle_terminal_manager_tool as _handle_terminal_manager_tool,
 )
 from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
 from backend.ledger.action import (
@@ -88,6 +88,21 @@ from backend.ledger.action.mcp import MCPAction
 from backend.ledger.tool import build_tool_call_metadata
 
 ToolHandler = Callable[[dict[str, Any]], Action]
+
+build_analyze_project_structure_action = cast(
+    ToolHandler, _build_analyze_project_structure_action
+)
+build_blackboard_action = cast(ToolHandler, _build_blackboard_action)
+build_checkpoint_action = cast(ToolHandler, _build_checkpoint_action)
+build_delegate_task_action = cast(ToolHandler, _build_delegate_task_action)
+build_explore_tree_structure_action = cast(
+    ToolHandler, _build_explore_tree_structure_action
+)
+build_read_symbol_definition_action = cast(
+    ToolHandler, _build_read_symbol_definition_action
+)
+build_lsp_query_action = cast(ToolHandler, _build_lsp_query_action)
+handle_terminal_manager_tool = cast(ToolHandler, _handle_terminal_manager_tool)
 
 # Callback for semantic recall — set by the orchestrator at init time.
 # Signature: (query: str, k: int) -> list[dict[str, Any]]
@@ -219,9 +234,9 @@ def _handle_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
             from backend.engine.tools.note import append_to_note
 
             append_to_note("lessons", str(lessons))
-        except Exception:
+        except Exception as exc:
             # Persistence is best-effort; never block finish on scratchpad I/O.
-            pass
+            logger.debug("Failed to persist finish lessons: %s", exc, exc_info=True)
     return PlaybookFinishAction(final_thought=message, outputs=outputs)
 
 
@@ -260,7 +275,9 @@ def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkActio
         return AgentThinkAction(thought="\n".join(parts))
 
     elif action == "working_memory":
-        from backend.engine.tools.working_memory import build_working_memory_action
+        from backend.engine.tools.working_memory import (
+            build_working_memory_action as _build_working_memory_action,
+        )
 
         # Map arguments back to what build_working_memory_action expects
         wm_args = {
@@ -268,6 +285,9 @@ def _handle_memory_manager_tool(arguments: Mapping[str, Any]) -> AgentThinkActio
             "section": cast(str, arguments.get("section", "all")),
             "content": cast(str, arguments.get("content", "")),
         }
+        build_working_memory_action = cast(
+            ToolHandler, _build_working_memory_action
+        )
         return build_working_memory_action(wm_args)
 
     else:
@@ -541,13 +561,12 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
         # Capture the current persisted plan so we can detect no-op updates
         # that otherwise create tool-call loops without advancing execution.
         existing_raw = tracker.load_from_file()
-        if isinstance(existing_raw, Sequence):
-            try:
-                existing_normalized_task_list = _normalize_task_tracker_list(
-                    cast(list[Mapping[str, Any]], existing_raw)
-                )
-            except FunctionCallValidationError:
-                existing_normalized_task_list = []
+        try:
+            existing_normalized_task_list = _normalize_task_tracker_list(
+                cast(list[Mapping[str, Any]], existing_raw)
+            )
+        except FunctionCallValidationError:
+            existing_normalized_task_list = []
         raw_task_list = arguments.get("task_list", [])
 
     if not isinstance(raw_task_list, Sequence):
@@ -711,12 +730,17 @@ def _handle_edit_symbols_command(
     """
     import os
 
-    raw_edits = cast(Any, arguments.get("edits") or arguments.get("symbol_edits"))
-    if not isinstance(raw_edits, Sequence) or len(raw_edits) == 0:
+    raw_edits_any = arguments.get("edits") or arguments.get("symbol_edits")
+    if (
+        not isinstance(raw_edits_any, Sequence)
+        or isinstance(raw_edits_any, str | bytes)
+        or len(raw_edits_any) == 0
+    ):
         raise FunctionCallValidationError(
             "edit_symbols requires a non-empty 'edits' array "
             "(objects with function_name or symbol, and new_body)"
         )
+    raw_edits: Sequence[Any] = raw_edits_any
     if len(raw_edits) > _MAX_EDIT_SYMBOLS_PER_BATCH:
         raise FunctionCallValidationError(
             f"edit_symbols supports at most {_MAX_EDIT_SYMBOLS_PER_BATCH} edits per call"
@@ -1167,39 +1191,3 @@ def _process_single_tool_call(tool_call: Any, arguments: dict[str, Any]) -> Acti
     raise FunctionCallNotExistsError(
         msg,
     )
-
-
-def _set_tool_call_metadata(
-    action: Action, tool_call: Any, response: ModelResponse, total_calls: int
-) -> None:
-    """Set tool call metadata for the action.
-
-    Falls back to direct construction if the patched ToolCallMetadata lacks
-    the `from_sdk` classmethod (used in certain unit tests that monkeypatch
-    the class).
-    """
-    action.tool_call_metadata = build_tool_call_metadata(
-        function_name=cast(str, tool_call.function.name),
-        tool_call_id=cast(str, tool_call.id),
-        response_obj=response,
-        total_calls_in_response=total_calls,
-    )
-
-
-def _create_message_action_from_content(content: Any) -> list[Action]:
-    """Create message action from content when no tool calls are present."""
-    from backend.engine.common import (
-        extract_redacted_thinking_inner,
-        strip_thinking_tags,
-    )
-
-    raw = str(content) if content else ""
-    cot = extract_redacted_thinking_inner(raw).strip()
-    content_str = strip_thinking_tags(raw)
-    return [
-        MessageAction(
-            content=content_str,
-            thought=cot,
-            wait_for_response=bool(content_str.strip()),
-        )
-    ]
