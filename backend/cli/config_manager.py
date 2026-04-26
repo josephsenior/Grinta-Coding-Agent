@@ -32,12 +32,12 @@ logger = logging.getLogger(__name__)
 _console = Console()
 _DEFAULT_ONBOARDING_MODEL = 'openai/gpt-4.1'
 _DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
-    'anthropic': 'anthropic/claude-sonnet-4-20250514',
-    'google': 'google/gemini-2.5-flash',
+    'anthropic': 'anthropic/claude-sonnet-4.6',
+    'google': 'google/gemini-3-flash-preview',
     'groq': 'groq/meta-llama/llama-4-scout',
     'lightning': 'lightning/meta-llama/Meta-Llama-3.1-8B-Instruct',
     'openai': _DEFAULT_ONBOARDING_MODEL,
-    'openrouter': 'openrouter/anthropic/claude-3.5-sonnet',
+    'openrouter': 'openrouter/anthropic/claude-4.5-sonnet',
     'xai': 'xai/grok-4.1-fast',
     'deepseek': 'deepseek/deepseek-chat',
 }
