@@ -113,26 +113,6 @@ if sys.platform == "win32":
     pass
 
 
-def _module_attr(name: str):
-    """Return the latest attribute from this module for monkeypatched helpers."""
-    return getattr(sys.modules[__name__], name)
-
-
-# Feature flag: when set to a truthy value (1/true/yes/on), the runtime
-# appends prescriptive guidance suffixes to failed-command observations
-# (e.g. `[MISSING_MODULE] Install with: ...`, `[REPEATED_COMMAND_FAILURE]
-# Pivot now: ...`, `[OOM_KILLED] Reduce memory ...`). Default OFF — modern
-# LLMs read raw stderr fine and the suffixes add noise that fragments
-# attention. Structural tags the model cannot infer alone (`[SHELL_MISMATCH]`,
-# `[SCAFFOLD_SETUP_FAILED]`) are always emitted regardless of this flag.
-_VERBOSE_ENV_ANNOTATIONS_ENV = "APP_VERBOSE_ENV_ANNOTATIONS"
-
-
-def _verbose_env_annotations() -> bool:
-    val = os.environ.get(_VERBOSE_ENV_ANNOTATIONS_ENV, "").strip().lower()
-    return val in ("1", "true", "yes", "on")
-
-
 class ActionRequest(BaseModel):
     """Incoming action execution request envelope sent to runtime server."""
 
@@ -198,10 +178,6 @@ class RuntimeExecutor:
         self.downloaded_files: list[str] = []
         self.downloads_directory = get_workspace_downloads_dir(work_dir)
 
-        # Track repeated identical command failures to nudge strategy pivots
-        # before the circuit breaker is the only recovery mechanism.
-        self._last_cmd_failure_signature: tuple[str, int, str] | None = None
-        self._same_cmd_failure_count: int = 0
         self._terminal_session_seq: int = 0
         self._terminal_sessions_awaiting_interaction: list[str] = []
         self._terminal_open_commands_no_interaction: list[str] = []
@@ -560,111 +536,8 @@ class RuntimeExecutor:
     def _resolve_workspace_file_path(self, path: str, working_dir: str) -> str:
         return str(resolve_workspace_path(path, working_dir, self._initial_cwd))
 
-    def _maybe_mark_repeated_cmd_failure(
-        self, action: CmdRunAction, observation: CmdOutputObservation
-    ) -> None:
-        """Annotate repeated identical command failures to force a strategy pivot."""
-        exit_code = int(getattr(observation.metadata, "exit_code", 0) or 0)
-        if exit_code == 0:
-            self._last_cmd_failure_signature = None
-            self._same_cmd_failure_count = 0
-            return
-
-        verbose = _module_attr("_verbose_env_annotations")()
-
-        # Annotate fatal signals with actionable guidance so the LLM knows
-        # *why* the process died instead of blindly retrying. Only emit when
-        # verbose annotations are enabled — the raw exit code already tells
-        # modern LLMs what happened.
-        if verbose:
-            if exit_code == 137:
-                observation.content += (
-                    "\n\n[OOM_KILLED] The command was killed by the kernel (exit 137 — "
-                    "out of memory or SIGKILL). Reduce memory usage, process data in "
-                    "smaller chunks, or increase available memory before retrying."
-                )
-            elif exit_code == 139:
-                observation.content += (
-                    "\n\n[SEGFAULT] The command crashed with a segmentation fault "
-                    "(exit 139 — SIGSEGV). This indicates a bug in the program, not "
-                    "a configuration issue. Inspect the code for memory errors."
-                )
-
-        signature = (
-            action.command.strip(),
-            exit_code,
-            self._extract_failure_signature(observation.content),
-        )
-        if signature == self._last_cmd_failure_signature:
-            self._same_cmd_failure_count += 1
-        else:
-            self._last_cmd_failure_signature = signature
-            self._same_cmd_failure_count = 1
-
-        if self._same_cmd_failure_count >= 2 and verbose:
-            scaffold_failure = self._detect_scaffold_setup_failure(
-                action.command,
-                observation.content,
-            )
-            pivot_hint = (
-                "Pivot now: this is a PowerShell command running in Git Bash. "
-                "Rewrite it using bash syntax only (ls, cat, grep, find, echo, cd, mkdir, rm)."
-                if self._detect_powershell_in_bash_mismatch(
-                    action.command,
-                    observation.content,
-                )
-                else (
-                    "Pivot now: the scaffold step did not create a project. Run the generator alone, "
-                    'inspect its output, and prefer a fresh subdirectory instead of ".".'
-                    if scaffold_failure
-                    else "Pivot now: inspect available tools/interpreters, adjust environment, "
-                    "or choose a different command/tool."
-                )
-            )
-            observation.content += (
-                "\n\n[REPEATED_COMMAND_FAILURE] "
-                f"The same command failed {self._same_cmd_failure_count} times with the same error signature. "
-                f"Do NOT retry unchanged. {pivot_hint}"
-            )
-
-    # Patterns for common environment errors → (regex, tag, guidance).
-    _ENV_ERROR_PATTERNS: list[tuple[str, str, str]] = [
-        (
-            r"ModuleNotFoundError:\s*No module named ['\"]?(\S+?)['\"]?",
-            "[MISSING_MODULE]",
-            "Install the missing dependency, then re-run the command. "
-            "NEXT ACTION: install the module now.",
-        ),
-        (
-            r"ImportError:\s*cannot import name",
-            "[IMPORT_ERROR]",
-            "Check that the correct package version is installed and the name is spelled correctly.",
-        ),
-        (
-            r"(\S+):\s*command not found",
-            "[MISSING_TOOL]",
-            "{missing_tool_guidance}",
-        ),
-        (
-            r"No space left on device",
-            "[DISK_FULL]",
-            "{disk_full_guidance}",
-        ),
-        (
-            r"Permission denied",
-            "[PERMISSION_ERROR]",
-            "{permission_error_guidance}",
-        ),
-    ]
-
     def _annotate_environment_errors(self, observation: CmdOutputObservation) -> None:
-        """Detect environment-level errors and append actionable guidance.
-
-        Scans the observation content for common environment failures
-        (missing modules, missing tools, disk full, permission denied)
-        and appends a tagged annotation so the LLM gets explicit guidance
-        instead of having to infer the root cause.
-        """
+        """Append structural tags for errors the model cannot infer from raw output alone."""
         content = observation.content
         if not content:
             return
@@ -687,74 +560,6 @@ class RuntimeExecutor:
         )
         if scaffold_failure:
             observation.content += f"\n\n[SCAFFOLD_SETUP_FAILED] {scaffold_failure}"
-            return
-
-        # Generic environment-error annotations (`[MISSING_MODULE]`,
-        # `[MISSING_TOOL]`, `[DISK_FULL]`, `[PERMISSION_ERROR]`,
-        # `[IMPORT_ERROR]`) are noise for modern LLMs — they read raw stderr
-        # fine and our prescriptive `Install with: ...` suggestions can be
-        # outright wrong (e.g. recommending pip when the project uses uv).
-        # Only emit these when the verbose-annotations feature flag is on.
-        if not _module_attr("_verbose_env_annotations")():
-            return
-
-        for pattern, tag, guidance_template in self._ENV_ERROR_PATTERNS:
-            m = re.search(pattern, content)
-            if m:
-                # Use the first capture group as {match} if available.
-                match_text = m.group(1) if m.lastindex and m.lastindex >= 1 else ""
-                guidance = guidance_template.format(
-                    match=match_text,
-                    missing_tool_guidance=self._missing_tool_guidance(match_text),
-                    disk_full_guidance=self._disk_full_guidance(),
-                    permission_error_guidance=self._permission_error_guidance(),
-                )
-                observation.content += f"\n\n{tag} {guidance}"
-                # Only annotate the first matching pattern to avoid noise.
-                return
-
-    @staticmethod
-    def _missing_tool_guidance(tool_name: str) -> str:
-        """Return platform-aware guidance for missing shell tools."""
-        normalized = (tool_name or "the missing tool").strip()
-        if sys.platform == "win32":
-            return (
-                f"Install with: winget install {normalized} "
-                "(or use choco/scoop, or check PATH)"
-            )
-        if sys.platform == "darwin":  # type: ignore
-            return f"Install with: brew install {normalized} (or check PATH)"
-        return f"Install with: apt-get install {normalized} (or check PATH)"
-
-    @staticmethod
-    def _disk_full_guidance() -> str:
-        """Return platform-aware guidance for disk full errors."""
-        if sys.platform == "win32":
-            return (
-                "Free disk space before retrying. Check usage in File Explorer "
-                "or in PowerShell with: Get-PSDrive -PSProvider FileSystem"
-            )
-        if sys.platform == "darwin":  # type: ignore
-            return "Free disk space before retrying. Check usage with: df -h"
-        return "Free disk space before retrying. Check usage with: df -h"
-
-    @staticmethod
-    def _permission_error_guidance() -> str:
-        """Return platform-aware guidance for permission denied errors."""
-        if sys.platform == "win32":
-            return (
-                "Check file ACLs or read-only attributes, verify another process "
-                "is not locking the file, and only retry from an elevated shell if appropriate."
-            )
-        if sys.platform == "darwin":  # type: ignore
-            return (
-                "Check file ownership and permissions with: ls -l. "
-                "You may need chmod or to run as a different user."
-            )
-        return (
-            "Check file ownership and permissions with: ls -l. "
-            "You may need chmod or to run as a different user."
-        )
 
     @staticmethod
     def _detect_powershell_in_bash_mismatch(command: str, content: str) -> str | None:
@@ -865,8 +670,6 @@ class RuntimeExecutor:
             observation = await self._run_foreground_cmd(action)
             if isinstance(observation, ErrorObservation):
                 return observation
-
-            self._maybe_mark_repeated_cmd_failure(action, observation)
 
             if action.grep_pattern and isinstance(observation.content, str):
                 observation.content = self._apply_grep_filter(

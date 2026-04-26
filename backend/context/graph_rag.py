@@ -155,7 +155,7 @@ class GraphRAG:
                 'arrow_function',  # JS/TS
                 'function_item',  # Rust
             ):
-                name_node = editor._get_name_node(node)
+                name_node = editor.get_name_node(node)
                 if name_node:
                     sym = _node_text(name_node)
                     line_start = node.start_point[0] + 1
@@ -193,7 +193,7 @@ class GraphRAG:
                 'type_declaration',  # Go
                 'interface_declaration',  # Java, TS
             ):
-                name_node = editor._get_name_node(node)
+                name_node = editor.get_name_node(node)
                 if name_node:
                     cls_name = _node_text(name_node)
                     line_start = node.start_point[0] + 1

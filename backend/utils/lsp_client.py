@@ -495,7 +495,7 @@ def _ast_list_symbols(abs_path: str, source: str, symbol_filter: str) -> LspResu
             k in node.type
             for k in ['function', 'class', 'method', 'declaration', 'declarator']
         ):
-            name_node = editor._get_name_node(node)
+            name_node = editor.get_name_node(node)
             if name_node:
                 name = (
                     (name_node.text.decode('utf-8') if name_node.text else '')
@@ -551,7 +551,7 @@ def _ast_hover(abs_path: str, source: str, line: int) -> LspResult:
         # node.start_point is 0-indexed
         if node.start_point[0] + 1 <= line <= node.end_point[0] + 1:
             if any(k in node.type for k in ['function', 'class', 'method']):
-                name_node = editor._get_name_node(node)
+                name_node = editor.get_name_node(node)
                 if name_node:
                     kind = (
                         'Class'
@@ -598,7 +598,7 @@ def _ast_grep_symbol(abs_path: str, source: str, line: int) -> LspResult:
             k in node.type
             for k in ['function', 'class', 'method', 'declaration', 'declarator']
         ):
-            name_node = editor._get_name_node(node)
+            name_node = editor.get_name_node(node)
             if name_node:
                 name = (
                     (name_node.text.decode('utf-8') if name_node.text else '')

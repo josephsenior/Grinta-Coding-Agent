@@ -58,9 +58,11 @@ class FileWriteAction(Action):
 
     def __repr__(self) -> str:
         """Return a readable summary of the write parameters."""
-        return f'**FileWriteAction**\nPath: {self.path}\nRange: [L{self.start}:L{
-            self.end
-        }]\nThought: {self.thought}\nContent:\n```\n{self.content}\n```\n'
+        range_str = f'[L{self.start}:L{self.end}]'
+        return (
+            f'**FileWriteAction**\nPath: {self.path}\nRange: {range_str}'
+            f'\nThought: {self.thought}\nContent:\n```\n{self.content}\n```\n'
+        )
 
 
 @dataclass

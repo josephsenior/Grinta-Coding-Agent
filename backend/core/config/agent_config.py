@@ -45,7 +45,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_MEMORY_ENABLED,
     DEFAULT_AGENT_MEMORY_MAX_THREADS,
     DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY,
-    DEFAULT_AGENT_VERBOSE_TURN_STATUS,
     DEFAULT_AGENT_MIN_ITERATIONS,
     DEFAULT_AGENT_NAME,
     DEFAULT_AGENT_NATIVE_BROWSER_ENABLED,
@@ -323,14 +322,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             'Append APP control/status text to the first system message instead of '
             'inserting a second system message (some providers handle a single system '
             'message better)'
-        ),
-    )
-    verbose_turn_status: bool = Field(
-        default=DEFAULT_AGENT_VERBOSE_TURN_STATUS,
-        description=(
-            'Legacy: inject per-turn `<APP_CONTEXT_STATUS>`, repetition warnings, '
-            'context-pressure warnings, and `<ACTIVE_PLAN>` blocks into every LLM '
-            'request. Default False; modern LLMs perform better without this noise.'
         ),
     )
     max_consecutive_errors: int = Field(

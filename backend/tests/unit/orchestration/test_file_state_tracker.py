@@ -7,6 +7,8 @@ import pytest
 from backend.orchestration.file_state_tracker import (
     FileStateMiddleware,
     FileStateTracker,
+    _extract_removed_symbols,
+    _find_symbol_references,
     _normalize_path_key,
     file_manifest_path,
 )
@@ -193,3 +195,126 @@ async def test_middleware_blocks_mutating_edit_on_stale_file(
 
     assert ctx.blocked is True
     assert 'FILE_STATE_GUARD' in (ctx.block_reason or '')
+
+
+# ---------------------------------------------------------------------------
+# create_file gate tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_middleware_blocks_create_file_on_existing_without_read(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """create_file on an existing file must be blocked when not yet read."""
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / 'models.py'
+    f.write_text('class Foo: pass\n', encoding='utf-8')
+
+    mw = FileStateMiddleware()
+    action = _file_edit_action(str(f), 'create_file')
+    ctx = _make_ctx(action)
+
+    await mw.execute(ctx)
+
+    assert ctx.blocked is True
+    assert 'FILE_STATE_GUARD' in (ctx.block_reason or '')
+
+
+@pytest.mark.asyncio
+async def test_middleware_allows_create_file_on_existing_after_read(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """create_file on an existing file must be allowed when read first."""
+    monkeypatch.chdir(tmp_path)
+    f = tmp_path / 'models.py'
+    f.write_text('class Foo: pass\n', encoding='utf-8')
+
+    mw = FileStateMiddleware()
+    mw.tracker.record(str(f), 'read')
+    action = _file_edit_action(str(f), 'create_file')
+    ctx = _make_ctx(action)
+
+    await mw.execute(ctx)
+
+    assert ctx.blocked is False
+
+
+@pytest.mark.asyncio
+async def test_middleware_allows_create_file_on_new_file(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """create_file on a path that does not yet exist must never be blocked."""
+    monkeypatch.chdir(tmp_path)
+    new_path = str(tmp_path / 'new_module.py')  # file does not exist
+
+    mw = FileStateMiddleware()
+    action = _file_edit_action(new_path, 'create_file')
+    ctx = _make_ctx(action)
+
+    await mw.execute(ctx)
+
+    assert ctx.blocked is False
+
+
+# ---------------------------------------------------------------------------
+# Blast-radius helper tests
+# ---------------------------------------------------------------------------
+
+
+def test_extract_removed_symbols_finds_class_and_def() -> None:
+    diff = (
+        '--- a/models.py\n'
+        '+++ b/models.py\n'
+        '@@ -1,5 +1,3 @@\n'
+        '-class ExpenseParticipant:\n'
+        '-    pass\n'
+        '+class ExpenseSplit:\n'
+        '+    pass\n'
+        '-def calculate_balance():\n'
+        '+def compute_balance():\n'
+    )
+    symbols = _extract_removed_symbols(diff)
+    assert 'ExpenseParticipant' in symbols
+    assert 'calculate_balance' in symbols
+    # Added names must NOT appear (they start with '+')
+    assert 'ExpenseSplit' not in symbols
+    assert 'compute_balance' not in symbols
+
+
+def test_extract_removed_symbols_empty_on_additions_only() -> None:
+    diff = '+class NewThing:\n+    pass\n+def new_fn():\n+    pass\n'
+    assert _extract_removed_symbols(diff) == []
+
+
+def test_find_symbol_references_returns_matching_lines(tmp_path) -> None:
+    logic = tmp_path / 'logic.py'
+    logic.write_text(
+        'from models import ExpenseParticipant\n'
+        'def run():\n'
+        '    return ExpenseParticipant()\n',
+        encoding='utf-8',
+    )
+    models = tmp_path / 'models.py'
+    models.write_text('class ExpenseSplit:\n    pass\n', encoding='utf-8')
+
+    refs = _find_symbol_references(
+        ['ExpenseParticipant'],
+        [str(logic), str(models)],
+        exclude_path=str(models),
+    )
+    assert str(logic) in refs
+    assert 'ExpenseParticipant' in refs
+
+
+def test_find_symbol_references_excludes_mutated_file(tmp_path) -> None:
+    """The file being written must not appear in its own blast-radius report."""
+    f = tmp_path / 'models.py'
+    f.write_text('class ExpenseParticipant:\n    pass\n', encoding='utf-8')
+
+    refs = _find_symbol_references(
+        ['ExpenseParticipant'],
+        [str(f)],
+        exclude_path=str(f),
+    )
+    assert refs == ''

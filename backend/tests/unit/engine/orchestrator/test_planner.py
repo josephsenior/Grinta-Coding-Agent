@@ -26,10 +26,6 @@ def _make_config(**kwargs):
     cfg.enable_editor = True
     cfg.enable_first_turn_orientation_prompt = False
     cfg.merge_control_system_into_primary = False
-    # Existing tests were written against the legacy verbose per-turn
-    # injection; opt them in so they continue to exercise that code path.
-    # New tests exercise the minimal default explicitly.
-    cfg.verbose_turn_status = True
     for k, v in kwargs.items():
         setattr(cfg, k, v)
     return cfg
@@ -355,20 +351,14 @@ class TestBuildLlmParams:
         with patch("backend.engine.planner.check_tools", return_value=[]):
             params = p.build_llm_params(messages, state, [])
         assert isinstance(params["messages"], list)
-        # Planner injects a dedicated system control message.
-        assert params["messages"] != messages
+        # No planning_directive set → messages pass through unchanged.
+        assert params["messages"] == messages
         assert params["messages"][-1]["role"] == "user"
         assert params["messages"][-1]["content"] == "test"
 
     def test_injects_control_message_before_last_user(self):
         p = _make_planner()
         state = _make_state()
-        # Minimal iteration flag required for injection
-        it = MagicMock()
-        it.current_value = 1
-        it.max_value = 3
-        state.iteration_flag = it
-        # Provide typed turn signals
         ts = MagicMock()
         ts.planning_directive = "[AUTO-PLAN] do planning"
         ts.memory_pressure = "WARNING"
@@ -388,17 +378,13 @@ class TestBuildLlmParams:
         assert out[-1]["content"] == "task"
         # Control message is inserted immediately before the last user message.
         assert out[-2]["role"] == "system"
-        assert "<APP_CONTEXT_STATUS" in out[-2]["content"]
-        assert "memory_pressure=WARNING" in out[-2]["content"]
         assert "<APP_DIRECTIVE>" in out[-2]["content"]
+        assert "[AUTO-PLAN] do planning" in out[-2]["content"]
+        assert "<APP_CONTEXT_STATUS" not in out[-2]["content"]
 
     def test_merges_control_into_primary_system_when_configured(self):
         p = _make_planner(config=_make_config(merge_control_system_into_primary=True))
         state = _make_state()
-        it = MagicMock()
-        it.current_value = 1
-        it.max_value = 3
-        state.iteration_flag = it
         ts = MagicMock()
         ts.planning_directive = "[AUTO-PLAN] do planning"
         ts.memory_pressure = "WARNING"
@@ -416,9 +402,9 @@ class TestBuildLlmParams:
         assert len(out) == 2
         assert out[0]["role"] == "system"
         assert out[0]["content"].startswith("base sys")
-        assert "<APP_CONTEXT_STATUS" in out[0]["content"]
-        assert "memory_pressure=WARNING" in out[0]["content"]
         assert "<APP_DIRECTIVE>" in out[0]["content"]
+        assert "[AUTO-PLAN] do planning" in out[0]["content"]
+        assert "<APP_CONTEXT_STATUS" not in out[0]["content"]
         assert out[-1]["role"] == "user"
         assert out[-1]["content"] == "task"
 
@@ -459,12 +445,10 @@ class TestBuildLlmParams:
         with patch("backend.engine.planner.check_tools", return_value=[]):
             params = p.build_llm_params(messages, state, [])
 
-        control = next(
-            msg["content"]
-            for msg in params["messages"]
-            if msg["role"] == "system" and "<APP_CONTEXT_STATUS" in msg["content"]
+        joined = "\n".join(
+            m["content"] for m in params["messages"] if isinstance(m.get("content"), str)
         )
-        assert "<FIRST_TURN_ORIENTATION>" not in control
+        assert "<FIRST_TURN_ORIENTATION>" not in joined
 
     def test_first_turn_orientation_is_not_injected_even_when_opted_in(self):
         p = _make_planner(
@@ -477,12 +461,10 @@ class TestBuildLlmParams:
         with patch("backend.engine.planner.check_tools", return_value=[]):
             params = p.build_llm_params(messages, state, [])
 
-        control = next(
-            msg["content"]
-            for msg in params["messages"]
-            if msg["role"] == "system" and "<APP_CONTEXT_STATUS" in msg["content"]
+        joined = "\n".join(
+            m["content"] for m in params["messages"] if isinstance(m.get("content"), str)
         )
-        assert "<FIRST_TURN_ORIENTATION>" not in control
+        assert "<FIRST_TURN_ORIENTATION>" not in joined
 
     def test_first_turn_orientation_never_appears_across_retries(self):
         p = _make_planner(
@@ -496,23 +478,15 @@ class TestBuildLlmParams:
             first = p.build_llm_params(messages, state, [])
             second = p.build_llm_params(messages, state, [])
 
-        first_control = next(
-            msg["content"]
-            for msg in first["messages"]
-            if msg["role"] == "system" and "<APP_CONTEXT_STATUS" in msg["content"]
-        )
-        second_control = next(
-            msg["content"]
-            for msg in second["messages"]
-            if msg["role"] == "system" and "<APP_CONTEXT_STATUS" in msg["content"]
-        )
-        assert "<FIRST_TURN_ORIENTATION>" not in first_control
-        assert "<FIRST_TURN_ORIENTATION>" not in second_control
+        for params in (first, second):
+            joined = "\n".join(
+                m["content"] for m in params["messages"] if isinstance(m.get("content"), str)
+            )
+            assert "<FIRST_TURN_ORIENTATION>" not in joined
 
 
 class TestMinimalTurnStatusDefault:
-    """Verify the new default (verbose_turn_status=False) emits nothing
-    unless a guard subsystem has set a planning_directive."""
+    """Verify that nothing is injected unless a guard sets planning_directive."""
 
     def _state_with_directive(self, directive: str | None):
         state = _make_state()
@@ -529,9 +503,7 @@ class TestMinimalTurnStatusDefault:
         return state
 
     def test_no_injection_when_directive_absent(self):
-        cfg = _make_config()
-        cfg.verbose_turn_status = False
-        p = _make_planner(config=cfg)
+        p = _make_planner()
         state = self._state_with_directive(None)
 
         messages = [
@@ -555,9 +527,7 @@ class TestMinimalTurnStatusDefault:
         assert "CONTEXT PRESSURE" not in joined
 
     def test_only_directive_injected_when_present(self):
-        cfg = _make_config()
-        cfg.verbose_turn_status = False
-        p = _make_planner(config=cfg)
+        p = _make_planner()
         state = self._state_with_directive("[GUARD] take next concrete step")
 
         messages = [

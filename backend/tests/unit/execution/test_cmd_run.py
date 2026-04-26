@@ -39,20 +39,8 @@ def mock_executor():
         return executor
 
 
-@pytest.fixture
-def verbose_annotations(monkeypatch):
-    """Enable the prescriptive env-error / repeated-failure suffixes that are
-    OFF by default. Tests that assert on `[MISSING_TOOL]`,
-    `[REPEATED_COMMAND_FAILURE]`, `[DISK_FULL]`, `[PERMISSION_ERROR]`, etc.
-    opt in via this fixture.
-    """
-    monkeypatch.setenv("APP_VERBOSE_ENV_ANNOTATIONS", "1")
-    yield
-
-
 @pytest.mark.asyncio
 async def test_cmd_run_grep_pattern(mock_executor):
-    """Test that grep_pattern filters the output correctly."""
     # Setup
     mock_session = MagicMock()
     # Mock return value of execute to be an Observation
@@ -270,31 +258,6 @@ def test_init_shell_commands_keeps_bash_helpers_when_not_powershell(mock_executo
 
 
 @pytest.mark.asyncio
-async def test_repeated_identical_failures_add_pivot_hint(mock_executor, verbose_annotations):
-    """Second identical command failure should include repeated-failure guidance."""
-    mock_session = MagicMock()
-    mock_executor.session_manager.get_session.return_value = mock_session
-
-    def _mk_fail_obs() -> CmdOutputObservation:
-        return CmdOutputObservation(
-            content="[ERROR STREAM]\n/bin/bash: line 1: python: command not found",
-            command="python --version",
-            metadata={"exit_code": 127},
-        )
-
-    mock_session.execute.side_effect = [_mk_fail_obs(), _mk_fail_obs()]
-
-    action1 = CmdRunAction(command="python --version")
-    action2 = CmdRunAction(command="python --version")
-
-    first = await mock_executor.run(action1)
-    second = await mock_executor.run(action2)
-
-    assert "REPEATED_COMMAND_FAILURE" not in first.content
-    assert "REPEATED_COMMAND_FAILURE" in second.content
-
-
-@pytest.mark.asyncio
 async def test_powershell_syntax_in_bash_adds_shell_mismatch_guidance(mock_executor):
     mock_session = MagicMock()
     mock_executor.session_manager.get_session.return_value = mock_session
@@ -347,74 +310,14 @@ async def test_chained_scaffold_failure_adds_scaffold_guidance(mock_executor):
     assert "MISSING_TOOL" not in obs.content
 
 
-@pytest.mark.asyncio
-async def test_missing_tool_guidance_is_platform_aware_on_windows(mock_executor, verbose_annotations):
-    mock_session = MagicMock()
-    mock_executor.session_manager.get_session.return_value = mock_session
-    mock_session.cwd = "C:/tmp"
-    mock_session.execute.return_value = CmdOutputObservation(
-        content="[ERROR STREAM]\n/bin/bash: line 1: poetry: command not found",
-        command="poetry --version",
-        metadata={"exit_code": 127},
-    )
-
-    action = CmdRunAction(command="poetry --version")
-
-    with patch("backend.execution.action_execution_server.sys.platform", "win32"):
-        obs = await mock_executor.run(action)
-
-    assert "MISSING_TOOL" in obs.content
-    assert "winget install poetry" in obs.content
-    assert "apt-get install poetry" not in obs.content
-
-
-@pytest.mark.asyncio
-async def test_disk_full_guidance_is_platform_aware_on_windows(mock_executor, verbose_annotations):
-    mock_session = MagicMock()
-    mock_executor.session_manager.get_session.return_value = mock_session
-    mock_session.cwd = "C:/tmp"
-    mock_session.execute.return_value = CmdOutputObservation(
-        content="[ERROR STREAM]\nNo space left on device",
-        command="npm install",
-        metadata={"exit_code": 1},
-    )
-
-    with patch("backend.execution.action_execution_server.sys.platform", "win32"):
-        obs = await mock_executor.run(CmdRunAction(command="npm install"))
-
-    assert "DISK_FULL" in obs.content
-    assert "Get-PSDrive -PSProvider FileSystem" in obs.content
-    assert "df -h" not in obs.content
-
-
-@pytest.mark.asyncio
-async def test_permission_denied_guidance_is_platform_aware_on_windows(mock_executor, verbose_annotations):
-    mock_session = MagicMock()
-    mock_executor.session_manager.get_session.return_value = mock_session
-    mock_session.cwd = "C:/tmp"
-    mock_session.execute.return_value = CmdOutputObservation(
-        content="[ERROR STREAM]\nPermission denied",
-        command="python write_file.py",
-        metadata={"exit_code": 1},
-    )
-
-    with patch("backend.execution.action_execution_server.sys.platform", "win32"):
-        obs = await mock_executor.run(CmdRunAction(command="python write_file.py"))
-
-    assert "PERMISSION_ERROR" in obs.content
-    assert "ACLs" in obs.content
-    assert "chmod" not in obs.content
-
-
 # ---------------------------------------------------------------------------
-# Default-off behavior for prescriptive env-error annotations.
+# Annotation behaviour
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_missing_tool_no_annotation_by_default(mock_executor):
-    """Without the verbose flag, raw stderr is preserved; no [MISSING_TOOL]
-    suffix is appended. The model is trusted to read `command not found`."""
+async def test_missing_tool_no_annotation(mock_executor):
+    """Raw stderr is returned unchanged; no [MISSING_TOOL] tag is appended."""
     mock_session = MagicMock()
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_session.cwd = "C:/tmp"
@@ -428,16 +331,12 @@ async def test_missing_tool_no_annotation_by_default(mock_executor):
     obs = await mock_executor.run(CmdRunAction(command="poetry --version"))
 
     assert "MISSING_TOOL" not in obs.content
-    assert "winget install" not in obs.content
-    assert "apt-get install" not in obs.content
     assert "command not found" in obs.content
 
 
 @pytest.mark.asyncio
-async def test_repeated_failure_no_annotation_by_default(mock_executor):
-    """Without the verbose flag, repeated identical failures do NOT get a
-    `[REPEATED_COMMAND_FAILURE]` suffix. The model can see its own command
-    history."""
+async def test_repeated_failure_no_annotation(mock_executor):
+    """Repeated identical failures are passed through without annotation."""
     mock_session = MagicMock()
     mock_executor.session_manager.get_session.return_value = mock_session
 
@@ -459,8 +358,7 @@ async def test_repeated_failure_no_annotation_by_default(mock_executor):
 
 @pytest.mark.asyncio
 async def test_shell_mismatch_always_emitted(mock_executor):
-    """Structural tags the model cannot infer alone are always emitted,
-    regardless of the verbose flag."""
+    """Structural tags that the model cannot infer from raw output are always emitted."""
     mock_session = MagicMock()
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_executor.session_manager.tool_registry = MagicMock(
@@ -480,9 +378,8 @@ async def test_shell_mismatch_always_emitted(mock_executor):
 
 
 @pytest.mark.asyncio
-async def test_oom_no_extra_commentary_by_default(mock_executor):
-    """Exit 137 produces no `[OOM_KILLED] ...` suffix by default — the exit
-    code itself communicates the kill."""
+async def test_oom_no_extra_commentary(mock_executor):
+    """Exit 137 produces no `[OOM_KILLED] ...` suffix — the exit code itself communicates the kill."""
     mock_session = MagicMock()
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_session.execute.return_value = CmdOutputObservation(

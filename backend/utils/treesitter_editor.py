@@ -589,7 +589,7 @@ class TreeSitterEditor:
 
             # Validate if requested against normalized content
             if validate:
-                validation_result = self._validate_syntax(new_code, file_path, language)
+                validation_result = self.validate_syntax(new_code, file_path, language)
                 if not validation_result[0]:
                     return EditResult(
                         success=False,
@@ -662,7 +662,7 @@ class TreeSitterEditor:
         new_code = new_code.replace('\r\n', '\n').replace('\r', '\n')
 
         # Validate
-        validation_result = self._validate_syntax(new_code, file_path, language)
+        validation_result = self.validate_syntax(new_code, file_path, language)
         if not validation_result[0]:
             return EditResult(
                 success=False,
@@ -720,7 +720,7 @@ class TreeSitterEditor:
         # Check if current node matches
         if node.type in node_types:
             # Try to extract name from node
-            name_node = self._get_name_node(node)
+            name_node = self.get_name_node(node)
             if name_node:
                 name_text = file_bytes[
                     name_node.start_byte : name_node.end_byte
@@ -736,7 +736,7 @@ class TreeSitterEditor:
 
         return None
 
-    def _get_name_node(self, node: NodeType) -> NodeType | None:
+    def get_name_node(self, node: NodeType) -> NodeType | None:
         """Extract the name identifier node from a definition node."""
         # Common patterns across languages
         for child in node.children:
@@ -749,7 +749,7 @@ class TreeSitterEditor:
                 return child
             # For some languages, name is in a child node
             if child.type in ['function_declarator', 'class_name']:
-                return self._get_name_node(child)
+                return self.get_name_node(child)
 
         return None
 
@@ -910,7 +910,7 @@ class TreeSitterEditor:
         # Replace
         return original_code[:start_byte] + new_content + original_code[end_byte:]
 
-    def _validate_syntax(
+    def validate_syntax(
         self, code: str, file_path: str, language: str
     ) -> tuple[bool, str]:
         """Validate syntax by parsing with Tree-sitter.

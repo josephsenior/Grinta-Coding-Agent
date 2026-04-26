@@ -704,7 +704,7 @@ class FileEditor:
         if not language:
             return True, 'No parser mapping for file extension; skipping validation'
 
-        is_valid, msg = editor._validate_syntax(content, str(file_path), language)
+        is_valid, msg = editor.validate_syntax(content, str(file_path), language)
         if is_valid:
             return True, msg
 

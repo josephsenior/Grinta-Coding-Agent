@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -189,6 +190,9 @@ _READ_BEFORE_EDIT_COMMANDS: frozenset[str] = frozenset(
         'insert_text',
         'edit',
         'str_replace',
+        # create_file on an *existing* path must require a prior read.
+        # The gate already skips new files (path does not exist on disk).
+        'create_file',
     }
 )
 
@@ -200,8 +204,80 @@ _MUTATING_EDIT_COMMANDS: frozenset[str] = frozenset(
         'write',
         'str_replace',
         'apply_patch',
+        'create_file',
     }
 )
+
+# ---------------------------------------------------------------------------
+# Non-LSP blast-radius helpers
+# ---------------------------------------------------------------------------
+
+# Matches diff lines that remove a top-level (or inner) class/def name:
+# "-def foo(" or "-class Bar:" with optional leading whitespace.
+_REMOVED_SYMBOL_RE = re.compile(
+    r'^-[ \t]*(?:async[ \t]+)?(?:def|class)[ \t]+(\w+)',
+    re.MULTILINE,
+)
+
+
+def _extract_removed_symbols(diff: str) -> list[str]:
+    """Return deduplicated list of Python symbol names removed in *diff*."""
+    return list(dict.fromkeys(_REMOVED_SYMBOL_RE.findall(diff)))
+
+
+def _find_symbol_references(
+    symbols: list[str],
+    session_files: list[str],
+    exclude_path: str,
+    *,
+    max_lines_per_file: int = 3,
+    max_files: int = 6,
+) -> str:
+    """Plain-text search across *session_files* for references to *symbols*.
+
+    Returns a compact multi-line string suitable for appending to an
+    observation.  Bounded output: at most *max_files* files, at most
+    *max_lines_per_file* matching lines each.
+    """
+    if not symbols or not session_files:
+        return ''
+
+    try:
+        norm_exclude = str(Path(exclude_path).resolve())
+    except Exception:
+        norm_exclude = exclude_path
+
+    report: list[str] = []
+    files_reported = 0
+    for filepath in session_files:
+        if files_reported >= max_files:
+            break
+        try:
+            norm_fp = str(Path(filepath).resolve())
+        except Exception:
+            norm_fp = filepath
+        if norm_fp == norm_exclude:
+            continue
+        try:
+            text = Path(filepath).read_text(encoding='utf-8', errors='replace')
+        except OSError:
+            continue
+        file_lines: list[str] = []
+        for sym in symbols:
+            if sym not in text:
+                continue
+            for lineno, line in enumerate(text.splitlines(), 1):
+                stripped = line.strip()
+                if sym in line and stripped and not stripped.startswith('#'):
+                    file_lines.append(f'  {filepath}:{lineno}: {stripped[:100]}')
+                    if len(file_lines) >= max_lines_per_file:
+                        break
+            if len(file_lines) >= max_lines_per_file:
+                break
+        if file_lines:
+            report.extend(file_lines)
+            files_reported += 1
+    return '\n'.join(report)
 
 
 def _read_before_edit_enforced() -> bool:
@@ -283,6 +359,7 @@ class FileStateMiddleware(ToolInvocationMiddleware):
     ) -> None:
         action = ctx.action
         action_cls = type(action).__name__
+        mutated_path: str = ''
 
         try:
             if action_cls == 'FileEditAction':
@@ -290,12 +367,14 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                 command = getattr(action, 'command', '') or 'write'
                 if command == 'create_file':
                     self._tracker.record(path, 'created')
+                    mutated_path = path
                 elif command == 'read_file':
                     self._tracker.record(path, 'read')
                     self._tracker.record_read_snapshot_from_disk(path)
                 else:
                     self._tracker.record(path, 'modified')
                     self._tracker.invalidate_read_snapshot(path)
+                    mutated_path = path
             elif action_cls == 'FileReadAction':
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'read')
@@ -304,5 +383,41 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                 path = getattr(action, 'path', '')
                 self._tracker.record(path, 'created')
                 self._tracker.invalidate_read_snapshot(path)
+                mutated_path = path
         except Exception:
             logger.debug('FileStateMiddleware: failed to record action', exc_info=True)
+
+        # Blast radius: when symbols are removed/renamed, report session files
+        # that still reference them so the agent knows what else needs fixing.
+        if mutated_path and observation is not None:
+            try:
+                diff = (
+                    ctx.metadata.get('pre_exec_diff', '')
+                    if hasattr(ctx, 'metadata') and isinstance(ctx.metadata, dict)
+                    else ''
+                )
+                if diff:
+                    symbols = _extract_removed_symbols(diff)
+                    if symbols:
+                        session_files = [
+                            e.path for e in self._tracker._files.values()
+                        ]
+                        refs = _find_symbol_references(
+                            symbols, session_files, exclude_path=mutated_path
+                        )
+                        if refs:
+                            content = getattr(observation, 'content', None)
+                            if isinstance(content, str):
+                                observation.content = (
+                                    content
+                                    + '\n\n<BLAST_RADIUS>\n'
+                                    + 'Symbols removed/renamed: '
+                                    + ', '.join(symbols)
+                                    + '\nSession files that reference them:\n'
+                                    + refs + '\n'
+                                    + '</BLAST_RADIUS>'
+                                )
+            except Exception:
+                logger.debug(
+                    'FileStateMiddleware: blast radius check failed', exc_info=True
+                )

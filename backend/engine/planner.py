@@ -4,7 +4,6 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any
 
-from backend.core.task_status import TASK_STATUS_PLAN_ICONS
 from backend.inference.catalog_loader import supports_tool_choice
 from backend.inference.llm_utils import check_tools
 
@@ -318,215 +317,20 @@ class OrchestratorPlanner:
     def _inject_turn_status(self, messages: list, state: State) -> list:
         """Inject a dedicated control/status message for the current turn.
 
-        Default behavior (verbose_turn_status=False): emits NOTHING unless a
-        guard subsystem has set `state.planning_directive`. In that case a
-        single `<APP_DIRECTIVE>` block is inserted before the last user
-        message. This keeps each turn's payload free of turn counters,
-        repetition warnings, context-pressure warnings, and active-plan
-        echoes that fragment model attention without adding signal.
-
-        Legacy behavior (verbose_turn_status=True): emits the full
-        `<APP_CONTEXT_STATUS>` block plus warnings and `<ACTIVE_PLAN>`.
+        Emits nothing unless a guard subsystem has set `state.planning_directive`.
+        When set, a single `<APP_DIRECTIVE>` block is inserted before the last
+        user message.
         """
-        verbose = bool(getattr(self._config, 'verbose_turn_status', False))
-        planning_directive, memory_pressure, rep_score = self._extract_turn_signals(
-            state
-        )
-
-        if not verbose:
-            # Minimal path: only inject when a guard explicitly demands it.
-            if not planning_directive:
-                return messages
-            status = f'<APP_DIRECTIVE>\n{planning_directive}\n</APP_DIRECTIVE>'
-            return self._apply_control_message(messages, status)
-
-        # Legacy verbose path (preserved for users who opt in).
-        iter_flag = getattr(state, 'iteration_flag', None)
-        if iter_flag is None:
-            return messages
-        current = getattr(iter_flag, 'current_value', None)
-        if current is None:
-            return messages
-
-        parts = self._build_turn_context_parts(state)
-        parts = self._append_signal_parts(parts, memory_pressure, rep_score)
-
-        status = '<APP_CONTEXT_STATUS ' + ' | '.join(parts) + ' />'
-        status += self._build_context_pressure_warning(parts, memory_pressure)
-        status += self._build_repetition_warning(rep_score)
-        status += self._build_active_plan_section(state)
-        if planning_directive:
-            status += f'\n<APP_DIRECTIVE>\n{planning_directive}\n</APP_DIRECTIVE>'
-
-        return self._apply_control_message(messages, status)
-
-    def _build_turn_context_parts(self, state: State) -> list[str]:
-        """Build the core context status parts (turn, tokens, budget, history)."""
-        iter_flag = getattr(state, 'iteration_flag', None)
-        max_val = getattr(iter_flag, 'max_value', None) if iter_flag else None
-        current = getattr(iter_flag, 'current_value', None) if iter_flag else None
-        parts = [f'turn={current}' + (f'/{max_val}' if max_val else '')]
-
-        metrics = getattr(state, 'metrics', None)
-        if metrics:
-            self._append_token_usage_parts(metrics, parts)
-            self._append_budget_parts(metrics, parts)
-
-        history = getattr(state, 'history', [])
-        if history:
-            parts.append(f'history_events={len(history)}')
-        return parts
-
-    def _append_token_usage_parts(self, metrics: Any, parts: list[str]) -> None:
-        """Append token usage and context window to parts."""
-        atu = getattr(metrics, 'accumulated_token_usage', None)
-        if not atu:
-            return
-        prompt_tok = self._safe_int(getattr(atu, 'prompt_tokens', 0))
-        comp_tok = self._safe_int(getattr(atu, 'completion_tokens', 0))
-        ctx_window = self._safe_int(getattr(atu, 'context_window', 0))
-        if prompt_tok or comp_tok:
-            parts.append(f'tokens_used={prompt_tok + comp_tok}')
-        if ctx_window:
-            parts.append(f'context_window={ctx_window}')
-
-    def _append_budget_parts(self, metrics: Any, parts: list[str]) -> None:
-        """Append cost/budget info to parts."""
-        cost = self._safe_float(getattr(metrics, 'accumulated_cost', 0.0)) or 0.0
-        if cost <= 0:
-            return
-        budget = getattr(metrics, 'max_budget_per_task', None)
-        budget_val = self._safe_float(budget) if budget is not None else None
-        budget_str = f'cost=${cost:.4f}'
-        if budget_val is not None:
-            budget_str += f'/${budget_val:.2f}'
-        parts.append(budget_str)
-
-    @staticmethod
-    def _safe_int(val: Any) -> int:
-        try:
-            return int(val)
-        except Exception:
-            return 0
-
-    @staticmethod
-    def _safe_float(val: Any) -> float | None:
-        if val is None:
-            return None
-        try:
-            return float(val)
-        except Exception:
-            return None
-
-    def _extract_turn_signals(self, state: State) -> tuple[Any, Any, float]:
-        """Extract planning_directive, memory_pressure, and repetition_score."""
         ts = getattr(state, 'turn_signals', None)
         planning_directive = getattr(ts, 'planning_directive', None) if ts else None
-        memory_pressure = getattr(ts, 'memory_pressure', None) if ts else None
-
-        extra_data = getattr(state, 'extra_data', {}) or {}
         if planning_directive is None:
+            extra_data = getattr(state, 'extra_data', {}) or {}
             planning_directive = extra_data.get('planning_directive')
-        if memory_pressure is None:
-            memory_pressure = extra_data.get('memory_pressure')
 
-        rep_score = getattr(ts, 'repetition_score', 0.0) if ts else 0.0
-        return planning_directive, memory_pressure, rep_score
-
-    def _append_signal_parts(
-        self, parts: list[str], memory_pressure: Any, rep_score: float
-    ) -> list[str]:
-        """Append memory_pressure and repetition_score to parts."""
-        if memory_pressure:
-            parts.append(f'memory_pressure={memory_pressure}')
-        if rep_score and rep_score >= 0.45:
-            parts.append(f'repetition_score={rep_score:.1f}')
-        return parts
-
-    def _build_context_pressure_warning(
-        self, parts: list[str], memory_pressure: Any
-    ) -> str:
-        """Build context pressure warning at ~70% token usage."""
-        if memory_pressure:
-            return ''
-        prompt_tok, ctx_window = 0, 0
-        for p in parts:
-            if p.startswith('tokens_used='):
-                prompt_tok = self._safe_int(p.split('=', 1)[1])
-            elif p.startswith('context_window='):
-                ctx_window = self._safe_int(p.split('=', 1)[1])
-        if not ctx_window or not prompt_tok:
-            return ''
-        usage_pct = prompt_tok / ctx_window
-        if usage_pct >= 0.85:
-            return (
-                '\n🔴 CRITICAL: Consider calling summarize_context() NOW to control '
-                'what context survives before automatic condensation forces a reset.'
-            )
-        if usage_pct >= 0.70:
-            remaining_pct = round((1.0 - usage_pct) * 100)
-            return (
-                f'\n⚠️ CONTEXT PRESSURE: ~{remaining_pct}% of context window left; '
-                'condensation is coming. Persist essentials with memory_manager (note / '
-                'working_memory), avoid redundant file re-reads, and stay concise. '
-                'Follow **Execution discipline** (EFFICIENCY + TASK_MANAGEMENT) in the '
-                'system prompt for search/read patterns.'
-            )
-        return ''
-
-    def _build_repetition_warning(self, rep_score: float) -> str:
-        """Build repetition warning when approaching stuck threshold."""
-        if rep_score >= 0.7:
-            return (
-                f'\n⚠️ REPETITION WARNING (score={rep_score:.1f}/1.0): You are approaching the stuck detection threshold. '
-                'Your recent actions show a repeating pattern. You MUST change strategy:\n'
-                "1. STOP and use think() to analyze why your current approach isn't working\n"
-                '2. Try a fundamentally different approach\n'
-                '3. Do not repeat unchanged project scans or re-open the same file without a new reason\n'
-                '4. Execute one concrete unfinished step (edit, run test, or run the next command)\n'
-                '5. Optional: think() to step back and re-analyze the problem from scratch'
-            )
-        if rep_score >= 0.45:
-            return (
-                f'\n📊 Mild repetition detected (score={rep_score:.1f}/1.0). '
-                'Vary your approach and avoid repeating unchanged read-only scans.'
-            )
-        return ''
-
-    def _build_active_plan_section(self, state: State) -> str:
-        """Build active plan injection section."""
-        plan = getattr(state, 'plan', None)
-        if not plan or not hasattr(plan, 'steps') or not plan.steps:
-            return ''
-        title = getattr(plan, 'title', 'Current Plan')
-        lines = [f'Title: {title}\n']
-        for step in plan.steps:
-            lines.append(self._format_plan_step(step))
-        return f'\n<ACTIVE_PLAN>\n{"".join(lines)}</ACTIVE_PLAN>'
-
-    def _format_plan_step(self, step: Any) -> str:
-        """Format a single plan step for injection."""
-        icon = self._step_status_icon(step.status)
-        out = f'{step.id} [{icon}] {step.description} ({self._step_status_label(step.status)})\n'
-        if step.result:
-            out += f'   Result: {str(step.result)[:200]}...\n'
-        for sub in step.subtasks:
-            sub_icon = TASK_STATUS_PLAN_ICONS.get(sub.status, '-')
-            out += (
-                f'    {sub.id} [{sub_icon}] {sub.description} '
-                f'({self._step_status_label(sub.status)})\n'
-            )
-        return out
-
-    @staticmethod
-    def _step_status_icon(status: str) -> str:
-        """Map step status to display icon."""
-        return TASK_STATUS_PLAN_ICONS.get(status, '-')
-
-    @staticmethod
-    def _step_status_label(status: str) -> str:
-        """Return user-facing task status labels."""
-        return status
+        if not planning_directive:
+            return messages
+        status = f'<APP_DIRECTIVE>\n{planning_directive}\n</APP_DIRECTIVE>'
+        return self._apply_control_message(messages, status)
 
     def _apply_control_message(self, messages: list, status: str) -> list:
         """Attach turn control either as a second system message or merged into primary."""
