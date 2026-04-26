@@ -167,18 +167,63 @@ class StructuredSummaryCompactor(BaseLLMCompactor):
             raise ValueError(msg)
 
     def get_compaction(self, view: View) -> Compaction:
-        """Generate condensation from view by summarizing pruned events."""
+        """Generate condensation from view by summarizing pruned events.
+
+        If the LLM call fails (network, rate-limit, provider outage), fall
+        back to a non-LLM degraded summary so the agent can keep running
+        instead of hard-stalling on context pressure.
+        """
         # Prepare view sections
         _head, pruned_events, summary_event = self._prepare_view_sections(view)
 
         # Build prompt for LLM
         prompt = self._build_condensation_prompt(summary_event, pruned_events)
 
-        # Get summary from LLM
-        summary = self._get_llm_summary(prompt)
+        # Get summary from LLM, with degraded fallback
+        try:
+            summary = self._get_llm_summary(prompt)
+            summary_text = str(summary)
+        except Exception as e:
+            logger.warning(
+                'Condensation LLM call failed (%s: %s); falling back to '
+                'degraded summary so the agent can continue.',
+                type(e).__name__,
+                e,
+            )
+            summary_text = self._degraded_summary(summary_event, pruned_events, e)
 
         # Create compaction result
-        return self._create_compaction_result(pruned_events, str(summary))
+        return self._create_compaction_result(pruned_events, summary_text)
+
+    def _degraded_summary(
+        self,
+        summary_event: AgentCondensationObservation,
+        pruned_events: list[Event],
+        error: BaseException,
+    ) -> str:
+        """Build a non-LLM placeholder summary used when the summarizer fails.
+
+        Preserves the previous summary (if any) and lists the IDs and types of
+        the events being pruned so the agent retains a minimal audit trail.
+        """
+        prior = str(summary_event) if summary_event else ''
+        lines: list[str] = [
+            '# State Summary (degraded)',
+            f'NOTE: condensation summarizer unavailable ({type(error).__name__}). '
+            'Pruned events listed by id/type only; re-summarization will be '
+            'attempted on the next compaction cycle.',
+        ]
+        if prior and prior != 'No events summarized':
+            lines.append('## Previous Summary')
+            lines.append(prior)
+        if pruned_events:
+            lines.append('## Pruned Events')
+            for ev in pruned_events[:200]:  # hard cap to keep this small
+                ev_id = getattr(ev, 'id', '?')
+                lines.append(f'- {type(ev).__name__} id={ev_id}')
+            if len(pruned_events) > 200:
+                lines.append(f'- ... and {len(pruned_events) - 200} more')
+        return '\n'.join(lines)
 
     def _prepare_view_sections(
         self, view: View

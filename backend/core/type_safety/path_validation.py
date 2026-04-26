@@ -244,6 +244,73 @@ def _validate_path_string(path: str) -> str:
     return path
 
 
+def _is_windows_junction(p: Path) -> bool:
+    """Detect a Windows directory junction (created via ``mklink /J``).
+
+    ``Path.is_symlink()`` returns ``False`` for junctions on Windows even
+    though they redirect like symlinks. We probe the file attributes via
+    ``os.lstat`` and check the ``FILE_ATTRIBUTE_REPARSE_POINT`` bit.
+    """
+    import os
+
+    if os.name != 'nt':
+        return False
+    try:
+        st = os.lstat(p)
+    except (OSError, ValueError):
+        return False
+    # 0x400 = FILE_ATTRIBUTE_REPARSE_POINT
+    file_attrs = getattr(st, 'st_file_attributes', 0)
+    return bool(file_attrs & 0x400) and not p.is_symlink()
+
+
+def _reject_unsafe_links(path_str: str, full_path: Path, workspace: Path) -> None:
+    """Reject paths whose components include symlinks or junctions that
+    would let an edit/read escape the workspace once dereferenced.
+
+    A symlink that resolves *inside* the workspace is allowed (common in
+    ``node_modules/.bin``); one that resolves *outside* is rejected with a
+    clear error rather than a generic "outside boundary" message.
+    """
+    # Walk every parent of the supplied path that exists on disk and inspect
+    # the link status BEFORE resolution. ``Path.resolve()`` already followed
+    # links to compute ``full_path``; here we want the un-followed truth.
+    candidate = full_path
+    seen: set[Path] = set()
+    while True:
+        if candidate in seen:
+            break
+        seen.add(candidate)
+        try:
+            is_link = candidate.is_symlink() or _is_windows_junction(candidate)
+        except OSError:
+            is_link = False
+        if is_link:
+            try:
+                target = candidate.resolve()
+            except (OSError, RuntimeError) as e:  # RuntimeError: symlink loop
+                raise PathValidationError(
+                    f'Refusing to follow broken or cyclic link: {path_str}',
+                    path_str,
+                ) from e
+            try:
+                target.relative_to(workspace)
+            except ValueError:
+                raise PathValidationError(
+                    'Refusing to follow link that escapes the workspace: '
+                    f'{path_str} -> {target}',
+                    path_str,
+                ) from None
+        if candidate == candidate.parent:
+            break
+        candidate = candidate.parent
+        # Stop at the workspace root; nothing above it is in scope.
+        try:
+            candidate.relative_to(workspace)
+        except ValueError:
+            break
+
+
 def _resolve_path(
     path: str, workspace_root: str | Path | None, must_be_relative: bool
 ) -> Path:
@@ -290,6 +357,7 @@ def _resolve_path(
                 raise PathValidationError(
                     f'Path depth too great (max 100): {depth}', path
                 )
+            _reject_unsafe_links(path, full_path, workspace)
             return full_path
         return Path(path).resolve()
     except (OSError, ValueError) as e:

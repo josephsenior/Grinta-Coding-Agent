@@ -11,6 +11,7 @@ import subprocess
 from typing import TYPE_CHECKING
 
 from backend.core.logger import app_logger as logger
+from backend.execution.utils.bounded_io import bounded_communicate
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (
     CmdOutputMetadata,
@@ -110,19 +111,30 @@ class SimpleBashSession(BaseShellSession):
         command: str,
         timeout: int | None = None,
     ) -> tuple[str, str, int]:
-        """Run a Bash command via subprocess."""
+        """Run a Bash command via subprocess with bounded stdout/stderr.
+
+        Uses ``bounded_communicate`` instead of the stdlib ``communicate``
+        so a runaway child cannot exhaust agent memory before per-observation
+        truncation kicks in.
+        """
         if self._closed:
             raise RuntimeError('Bash session is closed')
 
+        process = None
         try:
             process = self._start_subprocess(command)
-            stdout, stderr = process.communicate(timeout=timeout)
-            return_code = process.returncode
+            result = bounded_communicate(process, timeout=timeout)
 
             if 'cd ' in command:
                 self._update_cwd_if_needed()
 
-            return (stdout, stderr, return_code)
+            if result.timed_out:
+                logger.warning(
+                    'Command timed out after %s seconds: %s', timeout, command
+                )
+                return ('', f'Command timed out after {timeout} seconds', 124)
+
+            return (result.stdout, result.stderr, result.returncode)
 
         except subprocess.TimeoutExpired:
             return self._handle_subprocess_timeout(command, timeout)
@@ -130,20 +142,22 @@ class SimpleBashSession(BaseShellSession):
             logger.error('Error running Bash command: %s', e)
             return ('', str(e), 1)
         finally:
-            if 'process' in locals() and process.pid:
+            if process is not None and process.pid:
                 self._cancellation.unregister_process(process.pid)
 
     def _start_subprocess(self, command: str) -> subprocess.Popen:
-        """Initialize and register the subprocess."""
+        """Initialize and register the subprocess.
+
+        Note: stdout/stderr are kept in **binary** mode here so that
+        ``bounded_communicate`` can enforce a precise byte cap. Decoding to
+        UTF-8 (with ``errors='replace'``) happens in the bounded reader.
+        """
         argv = self._wrap_subprocess_argv(['bash', '-c', command], cwd=self._cwd)
         process = subprocess.Popen(
             argv,
             cwd=self._cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
         )
         self._cancellation.register_process(process)
         return process
