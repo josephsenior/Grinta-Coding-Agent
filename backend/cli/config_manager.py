@@ -478,7 +478,7 @@ async def _test_llm_call(model: str, api_key: str, base_url: str | None) -> bool
         if parts[0] in ('openai', 'anthropic', 'google', 'groq', 'xai', 'deepseek'):
             api_model = parts[1]
 
-    body = {
+    body: dict[str, Any] = {
         'model': api_model,
         'messages': [{'role': 'user', 'content': 'Say "ok" and nothing else.'}],
         'max_tokens': 5,
