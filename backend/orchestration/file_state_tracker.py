@@ -190,9 +190,8 @@ _READ_BEFORE_EDIT_COMMANDS: frozenset[str] = frozenset(
         'insert_text',
         'edit',
         'str_replace',
-        # create_file on an *existing* path must require a prior read.
-        # The gate already skips new files (path does not exist on disk).
-        'create_file',
+        # `create_file` and `write` supply the entire file body — no anchor
+        # text can mismatch — so they do not require a prior read.
     }
 )
 
@@ -338,11 +337,11 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                 if not exists:
                     return
                 ctx.block(
-                    '[FILE_STATE_GUARD] File has not been read yet in this '
-                    f'session: {target_path}. Read it first (use read_file or '
-                    'grep to locate the exact text) before editing, otherwise '
-                    'your old_str / anchor context will likely not match.'
-                )
+                        '[FILE_STATE_GUARD] File has not been read yet in this '
+                        f'session: {target_path}. Read it first (use read_file or '
+                        'grep to locate the exact text) before editing, otherwise '
+                        'your old_str / anchor context will likely not match.'
+                    )
 
         if (
             not ctx.blocked

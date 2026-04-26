@@ -203,10 +203,11 @@ async def test_middleware_blocks_mutating_edit_on_stale_file(
 
 
 @pytest.mark.asyncio
-async def test_middleware_blocks_create_file_on_existing_without_read(
+async def test_middleware_allows_create_file_on_existing_without_read(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """create_file on an existing file must be blocked when not yet read."""
+    """create_file is a full overwrite — no anchor text to mismatch — so it
+    must NOT be blocked by the read-before-edit guard even on existing files."""
     monkeypatch.chdir(tmp_path)
     f = tmp_path / 'models.py'
     f.write_text('class Foo: pass\n', encoding='utf-8')
@@ -217,8 +218,7 @@ async def test_middleware_blocks_create_file_on_existing_without_read(
 
     await mw.execute(ctx)
 
-    assert ctx.blocked is True
-    assert 'FILE_STATE_GUARD' in (ctx.block_reason or '')
+    assert ctx.blocked is False
 
 
 @pytest.mark.asyncio
