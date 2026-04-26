@@ -146,7 +146,8 @@ def combine_thought(action: Action, thought: str) -> Action:
 
     """
     if thought:
-        action.thought = f"{thought}\n{action.thought}" if action.thought else thought
+        existing = getattr(action, 'thought', None)
+        action.thought = f"{thought}\n{existing}" if existing else thought
     return action
 
 
@@ -482,6 +483,7 @@ def _handle_str_replace_editor_tool(arguments: Mapping[str, Any]) -> Action:
     valid_commands = {
         "read_file",
         "create_file",
+        "replace_text",
         "insert_text",
         "undo_last_edit",
     }
@@ -997,6 +999,7 @@ def _handle_ast_code_editor_tool(arguments: Mapping[str, Any]) -> Action:
     file_editor_commands = {
         "create_file",
         "read_file",
+        "replace_text",
         "insert_text",
         "undo_last_edit",
     }

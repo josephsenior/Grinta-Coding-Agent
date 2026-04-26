@@ -477,18 +477,21 @@ class TestValidateStructureEditorArgs:
         assert isinstance(result, FileReadAction)
         assert result.path == "x.py"
 
-    def test_ast_replace_text_command_rejected(self):
+    def test_ast_replace_text_command_accepted(self):
+        """replace_text is now valid for edit_code — delegates to str_replace_editor."""
         from backend.engine.function_calling import _handle_ast_code_editor_tool
+        from backend.ledger.action import FileEditAction
 
-        with pytest.raises(FunctionCallValidationError, match="Unknown command"):
-            _handle_ast_code_editor_tool(
-                {
-                    "command": "replace_text",
-                    "path": "x.py",
-                    "old_str": "old",
-                    "new_str": "new",
-                }
-            )
+        result = _handle_ast_code_editor_tool(
+            {
+                "command": "replace_text",
+                "path": "x.py",
+                "old_str": "old",
+                "new_str": "new",
+            }
+        )
+        assert isinstance(result, FileEditAction)
+        assert result.command == "replace_text"
 
     def test_unknown_command_raises_validation_error(self):
         from backend.engine.function_calling import _handle_ast_code_editor_tool

@@ -223,17 +223,18 @@ class TestHandleStrReplaceEditorTool:
         assert isinstance(action, FileReadAction)
         assert action.view_range == [10, 20]
 
-    def test_replace_text_command_is_rejected(self):
-        with pytest.raises(FunctionCallValidationError, match='Unknown command'):
-            _handle_str_replace_editor_tool(
-                {
-                    'command': 'replace_text',
-                    'path': '/workspace/app.py',
-                    'old_str': 'x = 1',
-                    'new_str': 'x = 2',
-                    'security_risk': 'low',
-                }
-            )
+    def test_replace_text_command_is_accepted(self):
+        action = _handle_str_replace_editor_tool(
+            {
+                'command': 'replace_text',
+                'path': '/workspace/app.py',
+                'old_str': 'x = 1',
+                'new_str': 'x = 2',
+                'security_risk': 'low',
+            }
+        )
+        assert isinstance(action, FileEditAction)
+        assert action.command == 'replace_text'
 
     def test_create_returns_file_edit(self):
         action = _handle_str_replace_editor_tool(

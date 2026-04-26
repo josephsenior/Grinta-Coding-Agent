@@ -55,11 +55,15 @@ COMMANDS:
     Required: path
    Returns the file's full content
 
-8. `insert_text` - Insert code after a specific line
+8. `replace_text` - Edit an existing file using exact string matching
+    Required: path, old_str (exact substring to find), new_str (replacement text)
+    Use empty new_str to delete a block. Prefer this for targeted text edits.
+
+9. `insert_text` - Insert code after a specific line
     Required: path, new_str, insert_line
     insert_line=0 inserts at the beginning of the file
 
-9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `insert_text`, etc.). Symbol-level commands (`edit_symbol_body`, `edit_symbols`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
+10. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `insert_text`, etc.). Symbol-level commands (`edit_symbol_body`, `edit_symbols`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
 
 NOTE:
 - Prefer this tool for structure-aware code edits.
@@ -82,7 +86,7 @@ BEST PRACTICES:
 _SHORT_STRUCTURE_EDITOR_DESCRIPTION = """Structure-aware editor for 40+ languages (Python, JS, TS, Go, Rust, Java, C++, etc.)
 
 Commands: edit_symbol_body, edit_symbols, rename_symbol, find_symbol, replace_range, normalize_indent,
-          create_file, read_file, insert_text, undo_last_edit
+          create_file, read_file, replace_text, insert_text, undo_last_edit
 - Edits by symbol name (function/class), not line numbers
 - Auto-indents code to match file style
 - Validates syntax before saving
@@ -124,6 +128,7 @@ def create_structure_editor_tool(
                     'normalize_indent',
                     'create_file',
                     'read_file',
+                    'replace_text',
                     'insert_text',
                     'undo_last_edit',
                 ],
@@ -205,8 +210,12 @@ def create_structure_editor_tool(
                 'description': 'Content to write to the file (for create_file command)',
                 'type': 'string',
             },
+            'old_str': {
+                'description': 'Exact substring to find and replace (required for replace_text command)',
+                'type': 'string',
+            },
             'new_str': {
-                'description': 'Text to insert (for insert_text command)',
+                'description': 'Replacement text (for replace_text and insert_text commands; use empty string to delete a block)',
                 'type': 'string',
             },
             'view_range': {
