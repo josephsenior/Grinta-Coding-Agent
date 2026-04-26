@@ -1,4 +1,5 @@
 # pyright: reportUnknownParameterType=false, reportMissingParameterType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -20,7 +21,7 @@ from backend.utils.regex_limits import MAX_USER_REGEX_PATTERN_CHARS
 
 
 @pytest.fixture
-def mock_executor():
+def mock_executor(tmp_path: Path):
     """Create a minimal mocked RuntimeExecutor to avoid full initialization."""
     with (
         patch("os.makedirs"),
@@ -28,7 +29,7 @@ def mock_executor():
     ):
         executor = RuntimeExecutor(
             plugins_to_load=[],
-            work_dir="/tmp/test",
+            work_dir=str(tmp_path / "test"),
             username="testuser",
             user_id=1000,
             enable_browser=False,
@@ -151,7 +152,7 @@ async def test_cmd_run_background_spawns_session(mock_executor):
     mock_session.read_output.return_value = "Background process started"
     mock_executor.session_manager.create_session.return_value = mock_session
     mock_executor.session_manager.get_session.return_value = MagicMock(
-        cwd="/tmp"
+        cwd="/project/space"
     )  # Mock default session for cwd fallback
 
     action = CmdRunAction(command="long_running_task", is_background=True)
@@ -266,7 +267,7 @@ async def test_powershell_syntax_in_bash_adds_shell_mismatch_guidance(mock_execu
         has_bash=True,
         has_powershell=False,
     )
-    mock_session.cwd = "/tmp"
+    mock_session.cwd = "/project/space"
     mock_session.execute.return_value = CmdOutputObservation(
         content="[ERROR STREAM]\n/bin/bash: line 1: Get-Content: command not found",
         command='Write-Output "=== FILE: src/repomentor/index.py ===" ; Get-Content "src/repomentor/index.py" -Encoding UTF8',
@@ -289,12 +290,12 @@ async def test_powershell_syntax_in_bash_adds_shell_mismatch_guidance(mock_execu
 async def test_chained_scaffold_failure_adds_scaffold_guidance(mock_executor):
     mock_session = MagicMock()
     mock_executor.session_manager.get_session.return_value = mock_session
-    mock_session.cwd = "/tmp"
+    mock_session.cwd = "/project/space"
     mock_session.execute.return_value = CmdOutputObservation(
         content=(
             "npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, "
-            "open '/tmp/react-app/package.json'\n"
-            "npm error A complete log of this run can be found in: /tmp/npm-debug.log"
+            "open '/project/space/react-app/package.json'\n"
+            "npm error A complete log of this run can be found in: /project/space/npm-debug.log"
         ),
         command="npm create vite@latest . -- --template react && npm install",
         metadata={"exit_code": 38},
@@ -366,7 +367,7 @@ async def test_shell_mismatch_always_emitted(mock_executor):
         has_bash=True,
         has_powershell=False,
     )
-    mock_session.cwd = "/tmp"
+    mock_session.cwd = "/project/space"
     mock_session.execute.return_value = CmdOutputObservation(
         content="[ERROR STREAM]\n/bin/bash: line 1: Get-Content: command not found",
         command='Get-Content "x.py"',
