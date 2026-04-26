@@ -9,6 +9,7 @@ import pytest
 from backend.execution.utils.simple_bash import SimpleBashSession
 from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import ErrorObservation
+from backend.ledger.observation.commands import CmdOutputObservation
 
 if TYPE_CHECKING:
     from backend.execution.utils.process_registry import TaskCancellationService

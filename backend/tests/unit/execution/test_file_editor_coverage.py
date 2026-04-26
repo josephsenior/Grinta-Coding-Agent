@@ -1,3 +1,4 @@
+import pathlib
 from unittest.mock import patch
 
 import pytest
@@ -6,30 +7,34 @@ from backend.execution.utils.file_editor import FileEditor
 
 
 class TestFileEditorCoverageGaps:
+    test_dir: pathlib.Path
+    tmpdir: str
+    editor: FileEditor
+
     @pytest.fixture(autouse=True)
-    def setup(self, tmp_path):
+    def setup(self, tmp_path: pathlib.Path) -> None:
         """Setup for test class."""
         self.test_dir = tmp_path
         self.tmpdir = str(tmp_path)
         self.editor = FileEditor(workspace_root=self.tmpdir)
 
-    def _write(self, name, content):
+    def _write(self, name: str, content: str) -> pathlib.Path:
         p = self.test_dir / name
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(content, encoding='utf-8')
         return p
 
-    def _read(self, name):
+    def _read(self, name: str) -> str:
         p = self.test_dir / name
         return p.read_text(encoding='utf-8')
 
-    def test_path_validation_error(self):
+    def test_path_validation_error(self) -> None:
         """Covers line 126 (PathValidationError in __call__)."""
         result = self.editor(command='read_file', path='../outside.txt')
         assert result.error is not None
         assert 'Path validation error' in result.error
 
-    def test_handle_view_exception(self):
+    def test_handle_view_exception(self) -> None:
         """Covers line 193-194 (Exception in _handle_view)."""
         self._write('test.txt', 'content')
         with patch.object(
@@ -39,7 +44,7 @@ class TestFileEditorCoverageGaps:
             assert result.error is not None
             assert 'Error reading file: View error' in result.error
 
-    def test_handle_edit_exception(self):
+    def test_handle_edit_exception(self) -> None:
         """Covers line 293-294 (Exception in _handle_edit)."""
         self._write('test.txt', 'content')
         with patch.object(
@@ -51,15 +56,15 @@ class TestFileEditorCoverageGaps:
             assert result.error is not None
             assert 'Error editing file: Read fail' in result.error
 
-    def test_apply_edit_logic_no_content(self):
+    def test_apply_edit_logic_no_content(self) -> None:
         """Covers line 382 (ToolResult for no content provided)."""
         self._write('test.txt', 'content')
         result = self.editor(command='edit', path='test.txt')
         assert result.error is not None
         assert 'No content provided' in result.error
 
-    def test_apply_edit_logic_append_only(self):
-        """Covers line 343 (old_content_str + new_str_val).
+    def test_apply_edit_logic_append_only(self) -> None:
+        r"""Covers line 343 (old_content_str + new_str_val).
 
         Line-ending normalization note: Python's text-mode ``open`` on
         Windows reads the file back as ``line1\\r\\n`` even if we wrote a
@@ -76,19 +81,19 @@ class TestFileEditorCoverageGaps:
         normalized = result.new_content.replace('\r\n', '\n').replace('\r', '\n')
         assert 'line1\nline2\n' in normalized
 
-    def test_transaction_success(self):
+    def test_transaction_success(self) -> None:
         """Covers lines 546-547 (Transaction success pop)."""
         self._write('file1.txt', 'orig1')
         with self.editor.transaction() as trans:
             trans(command='write', path='file1.txt', file_text='new1')
-            assert self.editor._transaction_stack != []
+            assert self.editor._transaction_stack
         # Success pop
-        assert self.editor._transaction_stack == []
+        assert not self.editor._transaction_stack
         # Line 399: backup_file should be hit if write was inside transaction
         # Let's verify backup was created
         # But backup logic is internal. Let's trust line 399 was hit.
 
-    def test_transaction_failure(self):
+    def test_transaction_failure(self) -> None:
         """Covers lines 549-551 (Transaction failure cleanup)."""
         self._write('file1.txt', 'orig1')
         try:
@@ -98,10 +103,10 @@ class TestFileEditorCoverageGaps:
         except RuntimeError:
             pass
         # Failure pop
-        assert self.editor._transaction_stack == []
+        assert not self.editor._transaction_stack
         assert self._read('file1.txt') == 'orig1'
 
-    def test_insert_at_line_empty_file(self):
+    def test_insert_at_line_empty_file(self) -> None:
         """Covers line 497 (lines = [""] in _insert_at_line)."""
         with patch(
             'backend.execution.utils.file_editor.open',
@@ -111,12 +116,12 @@ class TestFileEditorCoverageGaps:
             res = self.editor._insert_at_line('', 'content', 1)
             assert res == 'content'
 
-    def test_insert_at_line_simple_new(self):
+    def test_insert_at_line_simple_new(self) -> None:
         """Covers line 505 (new_lines = [new_text])."""
         res = self.editor._insert_at_line('a\n', 'b', 2)
         assert res == 'a\nb\n'
 
-    def test_rollback_failure_logging_full(self):
+    def test_rollback_failure_logging_full(self) -> None:
         """Covers line 567-572 (rollback error handling)."""
         file_path = self.test_dir / 'failed_restore.txt'
         self._write('failed_restore.txt', 'content')
@@ -129,7 +134,7 @@ class TestFileEditorCoverageGaps:
             self.editor._rollback_transaction(backup)
             # No crash!
 
-    def test_fuzzy_match_error_high_ratio(self):
+    def test_fuzzy_match_error_high_ratio(self) -> None:
         """Covers exact-matching error with close-but-not-identical ``old_str``.
 
         When the edit can't be located verbatim the editor now emits a
@@ -153,7 +158,7 @@ class TestFileEditorCoverageGaps:
         assert 'No match found' in result.error, result.error
         assert 'Closest candidates' in result.error, result.error
 
-    def test_unicode_decode_fallback(self):
+    def test_unicode_decode_fallback(self) -> None:
         """Covers line 440-449 (UnicodeDecodeError fallback)."""
         p = self.test_dir / 'binary.dat'
         p.write_bytes(b'hello \xff world')  # 0xff invalid UTF-8
@@ -161,7 +166,7 @@ class TestFileEditorCoverageGaps:
         assert 'hello' in content
         assert 'ÿ' in content
 
-    def test_write_file_unlink_error(self):
+    def test_write_file_unlink_error(self) -> None:
         """Covers line 490 (temp_path.unlink() in error path)."""
         # We'll mock Path.replace which is after temp file creation.
         # But we need Path.replace to be mocked on the temp_path?
