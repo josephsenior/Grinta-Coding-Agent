@@ -2341,8 +2341,8 @@ class CLIEventRenderer:
             start = getattr(action, "start", 1)
             end = getattr(action, "end", -1)
             stats: str | None = None
-            if cmd == "view_file":
-                verb, detail = "Viewed", path
+            if cmd == "read_file":
+                verb, detail = "Read", path
             elif cmd == "create_file":
                 verb, detail = "Created", path
             elif cmd == "insert_text":

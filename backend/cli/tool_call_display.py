@@ -60,7 +60,7 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
     a = args or {}
     if tn == 'str_replace_editor':
         cmd = str(a.get('command', '') or '')
-        if cmd == 'view_file':
+        if cmd == 'read_file':
             return 'Viewed'
         if cmd == 'create_file':
             return 'Created'
@@ -127,7 +127,7 @@ def tool_activity_stats_hint(tool_name: str, args: dict[str, Any]) -> str | None
     if tn == 'str_replace_editor':
         c = str(args.get('command', '') or '')
         sr_path_hint = str(args.get('path', '') or '')
-        if c == 'view_file' and sr_path_hint:
+        if c == 'read_file' and sr_path_hint:
             start = args.get('view_range_start')
             end = args.get('view_range_end')
             if start is not None and end is not None:

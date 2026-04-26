@@ -59,7 +59,7 @@ def create_analyze_project_structure_tool() -> dict:
                             'imports: show what a file imports and what imports it. '
                             'symbols: list classes/functions/top-level names in a file. '
                             'file_outline: AST signatures only (Python) or line-based heads (fallback) — '
-                            'for large files before view_file. '
+                            'for large files before read_file. '
                             'recent: git log of recently modified files. '
                             'callers: find all files referencing a given symbol name. '
                             'test_coverage: find test files that likely test a given source file. '
@@ -494,7 +494,7 @@ def _file_outline_fallback_lines(path: str) -> list[str]:
     except OSError as e:
         return [f'(error reading file: {e})']
     if not lines_out:
-        lines_out.append('(no outline heads found — use symbols or view_file)')
+        lines_out.append('(no outline heads found — use symbols or read_file)')
     return lines_out
 
 

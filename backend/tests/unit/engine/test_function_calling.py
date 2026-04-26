@@ -203,7 +203,7 @@ class TestHandleStrReplaceEditorTool:
     def test_view_returns_file_read(self):
         action = _handle_str_replace_editor_tool(
             {
-                'command': 'view_file',
+                'command': 'read_file',
                 'path': '/workspace/app.py',
                 'security_risk': 'low',
             }
@@ -214,7 +214,7 @@ class TestHandleStrReplaceEditorTool:
     def test_view_with_range(self):
         action = _handle_str_replace_editor_tool(
             {
-                'command': 'view_file',
+                'command': 'read_file',
                 'path': '/workspace/app.py',
                 'view_range': [10, 20],
                 'security_risk': 'low',
@@ -252,7 +252,7 @@ class TestHandleStrReplaceEditorTool:
 
     def test_missing_path_raises(self):
         with pytest.raises(FunctionCallValidationError, match='path'):
-            _handle_str_replace_editor_tool({'command': 'view_file'})
+            _handle_str_replace_editor_tool({'command': 'read_file'})
 
     def test_invalid_argument_raises(self):
         with pytest.raises(FunctionCallValidationError, match='Unexpected'):

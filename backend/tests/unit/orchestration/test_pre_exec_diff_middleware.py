@@ -101,7 +101,7 @@ class TestSimulateEdit:
 
     def test_unknown_command_returns_none(self):
         action = MagicMock()
-        action.command = 'view_file'
+        action.command = 'read_file'
         result = self.mw._simulate_edit('content', action)
         assert result is None
 
@@ -146,7 +146,7 @@ class TestExecuteEdit:
         test_file.write_text('content', encoding='utf-8')
 
         action = MagicMock()
-        action.command = 'view_file'  # returns None from _simulate_edit
+        action.command = 'read_file'  # returns None from _simulate_edit
         action.path = str(test_file)
 
         ctx = _make_ctx(action=action)

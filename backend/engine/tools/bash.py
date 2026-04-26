@@ -43,7 +43,7 @@ def windows_drive_glued_hint() -> str:
 _DETAILED_BASH_DESCRIPTION = (
     "Execute a {shell} command in a persistent shell session.\n\n"
     "* **Discovery & reading project files:** use `search_code` or "
-    "`str_replace_editor` (`view_file`)—not `cat`/`grep`/`find` for source and config under the repo.\n"
+    "`str_replace_editor` (`read_file`)—not `cat`/`grep`/`find` for source and config under the repo.\n"
     "* One shell command payload per tool call. Chain subcommands with `&&` or `;` when needed.\n"
     "* This rule applies to shell syntax only; it does not define global tool-call batching policy.\n"
     "* Persistent: env vars, venvs, cwd persist between calls.\n"
@@ -58,7 +58,7 @@ _DETAILED_BASH_DESCRIPTION = (
     "not `dirC:/path`.\n"
 )
 _SHORT_BASH_DESCRIPTION = (
-    "Execute a {shell} command. Prefer `search_code` / `analyze_project_structure` / editor `view_file` "
+    "Execute a {shell} command. Prefer `search_code` / `analyze_project_structure` / editor `read_file` "
     "for repo reads—not cat/grep. Chain with `&&`/`;`. "
     "Background long-running commands with `cmd > out.log 2>&1 &`. "
     "Exit code -1 means still running — set is_input=true to interact. "

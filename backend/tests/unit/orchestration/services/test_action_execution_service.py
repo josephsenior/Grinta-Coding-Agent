@@ -388,7 +388,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         state.set_extra = MagicMock()
         self.mock_context.state = state
 
-        view_action = FileEditAction(path='backend/context/schemas.py', command='view_file')
+        view_action = FileEditAction(path='backend/context/schemas.py', command='read_file')
         mock_registry = MagicMock()
         mock_registry.dispatch_action_pre = AsyncMock(return_value=view_action)
         mock_get_registry.return_value = mock_registry

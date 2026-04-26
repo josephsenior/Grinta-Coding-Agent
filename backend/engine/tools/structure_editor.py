@@ -66,7 +66,7 @@ class StructureEditor:
 
     # Standard file operations
     editor.create_file("new_file.py", "print('hello')")
-    editor.view_file("new_file.py")
+    editor.read_file("new_file.py")
     editor.insert_code("new_file.py", 1, "import os")
     ```
     """
@@ -134,7 +134,7 @@ class StructureEditor:
         except Exception as e:
             return EditResult(success=False, message=f'Failed to create file: {e}')
 
-    def view_file(self, path: str, line_range: list[int] | None = None) -> EditResult:
+    def read_file(self, path: str, line_range: list[int] | None = None) -> EditResult:
         """View file content or directory listing.
 
         Args:

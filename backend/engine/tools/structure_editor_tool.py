@@ -51,7 +51,7 @@ COMMANDS:
     Required: path, file_text
    Creates parent directories if needed
 
-7. `view_file` - View a file's contents
+7. `read_file` - Read a file's contents
     Required: path
    Returns the file's full content
 
@@ -82,7 +82,7 @@ BEST PRACTICES:
 _SHORT_STRUCTURE_EDITOR_DESCRIPTION = """Structure-aware editor for 40+ languages (Python, JS, TS, Go, Rust, Java, C++, etc.)
 
 Commands: edit_symbol_body, edit_symbols, rename_symbol, find_symbol, replace_range, normalize_indent,
-          create_file, view_file, insert_text, undo_last_edit
+          create_file, read_file, insert_text, undo_last_edit
 - Edits by symbol name (function/class), not line numbers
 - Auto-indents code to match file style
 - Validates syntax before saving
@@ -123,7 +123,7 @@ def create_structure_editor_tool(
                     'replace_range',
                     'normalize_indent',
                     'create_file',
-                    'view_file',
+                    'read_file',
                     'insert_text',
                     'undo_last_edit',
                 ],
@@ -210,7 +210,7 @@ def create_structure_editor_tool(
                 'type': 'string',
             },
             'view_range': {
-                'description': 'Optional line range [start, end] (1-indexed) for view_file',
+                'description': 'Optional line range [start, end] (1-indexed) for read_file',
                 'items': {'type': 'integer'},
                 'type': 'array',
             },

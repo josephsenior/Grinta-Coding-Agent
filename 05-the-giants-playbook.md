@@ -181,7 +181,7 @@ It is not enough to say "the model has tools." The details of those tools matter
 That lesson shows up all over Grinta.
 The current tool layer is not accidental. It reflects a lot of attention to how the tool contract shapes model behavior.
 
-Consider the `str_replace_editor` tool as an example of this philosophy applied rigorously. It exposes `view_file`, `create_file`, `insert_text`, `undo_last_edit`, and structured `edit_mode` flows (`format`, `section`, `range`, `patch`) — each designed to be unambiguous enough that a probabilistic model can use it correctly without guessing. For code, `ast_code_editor` (`replace_range`, symbol edits) reduces brittle substring matching; multi-file changes use sequential calls and checkpoints instead of a batch string API.
+Consider the `str_replace_editor` tool as an example of this philosophy applied rigorously. It exposes `read_file`, `create_file`, `insert_text`, `undo_last_edit`, and structured `edit_mode` flows (`format`, `section`, `range`, `patch`) — each designed to be unambiguous enough that a probabilistic model can use it correctly without guessing. For code, `ast_code_editor` (`replace_range`, symbol edits) reduces brittle substring matching; multi-file changes use sequential calls and checkpoints instead of a batch string API.
 
 The tool also supports a `normalize_ws` flag that ignores whitespace differences during matching. That exists because models frequently get indentation wrong by one or two spaces, and a strict exact-match that fails on whitespace produces frustrating retry loops where the model is fundamentally doing the right thing but getting rejected on trivia. The normalize flag lets the system be lenient about whitespace while remaining strict about content.
 

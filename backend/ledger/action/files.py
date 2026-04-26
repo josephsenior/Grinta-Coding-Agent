@@ -74,7 +74,7 @@ class FileEditAction(Action):
     Attributes:
         path (str): The path to the file being edited. Works for both LLM-based and FILE_EDITOR editing.
         FILE_EDITOR only arguments:
-            command (str): The editing command to be performed (view_file, create_file, replace_text [internal substring replace], insert_text, undo_last_edit, write).
+            command (str): The editing command to be performed (read_file, create_file, replace_text [internal substring replace], insert_text, undo_last_edit, write).
             file_text (str): The content of the file to be created (used with 'create_file' command in FILE_EDITOR mode).
             old_str (str): The string to be replaced (substring replace in FILE_EDITOR mode).
             new_str (str): The replacement text (substring replace and insert_text in FILE_EDITOR mode).

@@ -179,7 +179,7 @@ class FileEditor:
         """Execute a file editor command.
 
         Args:
-            command: Command to execute ("view_file", "replace_text" [internal substring replace], "insert_text", "create_file", "undo_last_edit", "edit", "write").
+            command: Command to execute ("read_file", "replace_text" [internal substring replace], "insert_text", "create_file", "undo_last_edit", "edit", "write").
             path: File path (relative to workspace_root or absolute)
             file_text: Optional file content for write/edit operations (use MISSING if not provided)
             view_range: Optional [start_line, end_line] for view command (1-indexed)
@@ -218,7 +218,7 @@ class FileEditor:
             safe_path = self._resolve_path_safe(path)
             file_path = safe_path.path
 
-            if command == 'view_file':
+            if command == 'read_file':
                 return self._handle_view(file_path, view_range, path)
             if command in (
                 'edit',

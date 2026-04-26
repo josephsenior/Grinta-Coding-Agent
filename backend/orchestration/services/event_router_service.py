@@ -76,8 +76,8 @@ def _summarize_delegate_worker_event(
         command = getattr(event, 'command', '') or ''
         if command == 'create_file':
             return 'running', f'Created {event.path}'
-        if command == 'view_file':
-            return 'running', f'Viewed {event.path}'
+        if command == 'read_file':
+            return 'running', f'Read {event.path}'
         return 'running', f'Edited {event.path}'
 
     if isinstance(event, CmdRunAction):

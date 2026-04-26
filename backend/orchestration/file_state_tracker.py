@@ -263,7 +263,7 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                     return
                 ctx.block(
                     '[FILE_STATE_GUARD] File has not been read yet in this '
-                    f'session: {target_path}. Read it first (use view_file or '
+                    f'session: {target_path}. Read it first (use read_file or '
                     'grep to locate the exact text) before editing, otherwise '
                     'your old_str / anchor context will likely not match.'
                 )
@@ -290,7 +290,7 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                 command = getattr(action, 'command', '') or 'write'
                 if command == 'create_file':
                     self._tracker.record(path, 'created')
-                elif command == 'view_file':
+                elif command == 'read_file':
                     self._tracker.record(path, 'read')
                     self._tracker.record_read_snapshot_from_disk(path)
                 else:

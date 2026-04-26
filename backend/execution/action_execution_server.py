@@ -1476,7 +1476,7 @@ class RuntimeExecutor:
         """Handle file reading using the FILE_EDITOR implementation."""
         result_str, _ = execute_file_editor(
             self.file_editor,
-            command="view_file",
+            command="read_file",
             path=action.path,
             view_range=action.view_range,
         )
@@ -1551,7 +1551,7 @@ class RuntimeExecutor:
         """Return directory view observation if path is dir and viewable; else None."""
         try:
             if os.path.isdir(filepath) and (
-                action.command == "view_file" or not action.command
+                action.command == "read_file" or not action.command
             ):
                 return handle_directory_view(filepath, path_for_obs)
         except Exception:
@@ -1598,7 +1598,7 @@ class RuntimeExecutor:
         if (
             old_content is not None
             and new_content is not None
-            and command != "view_file"
+            and command != "read_file"
         ):
             try:
                 diff = get_diff(old_content, new_content, action.path)
@@ -1682,7 +1682,7 @@ class RuntimeExecutor:
         new_content: str | None,
     ) -> str:
         """Append blast-radius warning text when available, without interrupting edits."""
-        if command == "view_file" or new_content is None:
+        if command == "read_file" or new_content is None:
             return base_content
         try:
             from backend.utils.blast_radius import check_blast_radius_from_code

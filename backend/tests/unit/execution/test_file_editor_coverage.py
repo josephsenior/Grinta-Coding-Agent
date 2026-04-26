@@ -25,7 +25,7 @@ class TestFileEditorCoverageGaps:
 
     def test_path_validation_error(self):
         """Covers line 126 (PathValidationError in __call__)."""
-        result = self.editor(command='view_file', path='../outside.txt')
+        result = self.editor(command='read_file', path='../outside.txt')
         assert result.error is not None
         assert 'Path validation error' in result.error
 
@@ -35,7 +35,7 @@ class TestFileEditorCoverageGaps:
         with patch.object(
             self.editor, '_prepare_view_content', side_effect=Exception('View error')
         ):
-            result = self.editor(command='view_file', path='test.txt')
+            result = self.editor(command='read_file', path='test.txt')
             assert result.error is not None
             assert 'Error reading file: View error' in result.error
 

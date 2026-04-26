@@ -26,5 +26,5 @@ Never rerun the same failing command unchanged. After multiple failed approaches
 {task_sync_instruction}
 **Browser hygiene:** Call browser tool with `command="close"` immediately after gathering information.
 **Execution verification:** Verify terminal output matches expectations. Empty results are NOT success.
-**Silent output = logic error:** If a script returns no output, invoke `view_file` immediately. Do NOT overwrite before reading.
+**Silent output = logic error:** If a script returns no output, invoke `read_file` immediately. Do NOT overwrite before reading.
 </WORK_HABITS>

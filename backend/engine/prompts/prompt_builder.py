@@ -222,10 +222,10 @@ def _render_routing(
         is_windows,
         f"Use **PowerShell** only for environment actions (install, build, test, git, processes). "
         f"For repo layout and file content, use **{explore}** "
-        "and **`str_replace_editor` (`view_file`)**—not `Get-Content`/`Select-String` pipelines for source trees.",
+        "and **`str_replace_editor` (`read_file`)**—not `Get-Content`/`Select-String` pipelines for source trees.",
         f"Use **bash** only for environment actions (install, build, test, git, processes). "
         f"For repo layout and file content, use **{explore}** "
-        "and **`str_replace_editor` (`view_file`)**—not `ls && cat && grep` chains for project files.",
+        "and **`str_replace_editor` (`read_file`)**—not `ls && cat && grep` chains for project files.",
     )
     code_intelligence_routing = (
         "- **Known file + symbol position, precise definition/references/hover** → `code_intelligence`"

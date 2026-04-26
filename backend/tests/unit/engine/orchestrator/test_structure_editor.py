@@ -162,41 +162,41 @@ class TestCreateFile:
 
 
 # ---------------------------------------------------------------------------
-# view_file
+# read_file
 # ---------------------------------------------------------------------------
 
 
-class TestViewFile:
+class TestReadFile:
     def test_view_full_file(self, editor, py_file):
-        result = editor.view_file(py_file)
+        result = editor.read_file(py_file)
         assert result.success is True
         assert 'greet' in result.message
 
     def test_view_with_line_range(self, editor, py_file):
-        result = editor.view_file(py_file, line_range=[1, 2])
+        result = editor.read_file(py_file, line_range=[1, 2])
         assert result.success is True
         # First two lines are visible
         assert 'greet' in result.message
 
     def test_view_nonexistent_file(self, editor):
-        result = editor.view_file('/no/such/file.py')
+        result = editor.read_file('/no/such/file.py')
         assert result.success is False
         assert 'not found' in result.message.lower()
 
     def test_view_directory(self, editor, tmp_path):
         (tmp_path / 'sub').mkdir()
         (tmp_path / 'file.py').write_text('x = 1')
-        result = editor.view_file(str(tmp_path))
+        result = editor.read_file(str(tmp_path))
         assert result.success is True
 
     def test_view_with_inverted_range(self, editor, py_file):
         # start > end should fail gracefully
-        result = editor.view_file(py_file, line_range=[10, 1])
+        result = editor.read_file(py_file, line_range=[10, 1])
         # After clamping, start > end returns failure
         assert result.success is False
 
     def test_view_line_numbers_in_output(self, editor, py_file):
-        result = editor.view_file(py_file)
+        result = editor.read_file(py_file)
         assert result.success is True
         # Line numbers should be present as integers
         assert '1' in result.message
@@ -446,7 +446,7 @@ class TestNormalizeFileIndent:
 
 class TestClearCaches:
     def test_clears_without_error(self, editor, py_file):
-        editor.view_file(py_file)  # may populate caches
+        editor.read_file(py_file)  # may populate caches
         editor.clear_caches()  # should not raise
 
     def test_clear_empty_caches_safe(self, editor):

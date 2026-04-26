@@ -69,7 +69,7 @@ class TestToolCallDisplay(unittest.TestCase):
     def test_format_invocation_line(self) -> None:
         icon, line = format_tool_invocation_line(
             'str_replace_editor',
-            {'command': 'view_file', 'path': 'src/a.py'},
+            {'command': 'read_file', 'path': 'src/a.py'},
         )
         self.assertIsInstance(icon, str)
         self.assertIn('src/a.py', line)
@@ -97,7 +97,7 @@ class TestToolCallDisplay(unittest.TestCase):
     def test_redact_removes_friendly_tool_call_lines(self) -> None:
         friendly = flatten_tool_call_for_history(
             'str_replace_editor',
-            '{"command":"view_file","path":"axis-3/query_rag.py"}',
+            '{"command":"read_file","path":"axis-3/query_rag.py"}',
         )
         raw = f'Intro line.\n{friendly}\n\nHello.'
         out = redact_streamed_tool_call_markers(raw).strip()

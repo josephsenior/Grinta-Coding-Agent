@@ -153,7 +153,7 @@ In earlier versions, file editing alone had at least ten different tools. There 
 
 The model was constantly confused. Should it use `edit_file` or `str_replace`? What about `append_to_file`? What about `write_new_file`? The overlap was enormous, and the LLM would regularly pick the wrong one, then hallucinate the parameters for the tool it chose.
 
-I crushed all of those into a single `str_replace_editor` that exposes four commands behind one tool definition: `view_file`, `create_file`, `insert_text`, and `undo_last_edit`, plus structured `edit_mode` options. One tool. One schema. One mental model. The model learns a single interaction pattern and uses the `command` parameter to express intent.
+I crushed all of those into a single `str_replace_editor` that exposes four commands behind one tool definition: `read_file`, `create_file`, `insert_text`, and `undo_last_edit`, plus structured `edit_mode` options. One tool. One schema. One mental model. The model learns a single interaction pattern and uses the `command` parameter to express intent.
 
 The details inside that tool matter. For code, `ast_code_editor` line/symbol tools and `edit_mode=range|patch` avoid brittle substring matching. Multi-file edits are sequential tool calls; checkpoints cover rollback when atomicity matters. `undo_last_edit` gives the model a bounded session-scoped undo instead of requiring checkpoint rollbacks for small mistakes.
 

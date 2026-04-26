@@ -431,7 +431,7 @@ class StepGuardService:
         for idx, event in enumerate(recent_history):
             if isinstance(event, FileEditAction):
                 command = str(getattr(event, 'command', '') or '').strip().lower()
-                if command == 'view_file':
+                if command == 'read_file':
                     continue
                 path = getattr(event, 'path', '') or ''
                 if path:
@@ -486,7 +486,7 @@ class StepGuardService:
             return None
 
         # If the agent already responded to the failure with a grounding action
-        # (file read, command run, view_file) that appears AFTER the last failure
+        # (file read, command run, read_file) that appears AFTER the last failure
         # in history, the evidence has been investigated — don't re-block the
         # same stale failure indefinitely.
         if last_failure_index >= 0:
@@ -499,7 +499,7 @@ class StepGuardService:
                     return None
                 if isinstance(event, FileEditAction):
                     command = str(getattr(event, 'command', '') or '').strip().lower()
-                    if command == 'view_file':
+                    if command == 'read_file':
                         return None
 
         latest_failure = failing_feedback[-1]

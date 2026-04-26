@@ -508,7 +508,7 @@ class ActionExecutionService:
             return True
         if isinstance(action, FileEditAction):
             command = str(getattr(action, 'command', '') or '').strip().lower()
-            return command == 'view_file'
+            return command == 'read_file'
         if isinstance(action, MCPAction):
             return self._normalize_mcp_tool_name(action) in _GROUNDING_MCP_TOOL_NAMES
         return False
@@ -518,7 +518,7 @@ class ActionExecutionService:
             return True
         if isinstance(action, FileEditAction):
             command = str(getattr(action, 'command', '') or '').strip().lower()
-            return command != 'view_file'
+            return command != 'read_file'
         if isinstance(action, MCPAction):
             return self._normalize_mcp_tool_name(action) in _MUTATING_MCP_TOOL_NAMES
         return False

@@ -431,7 +431,7 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
             ", ".join(f"{name}(x{count})" for name, count in repair_changes),
         )
     valid_commands = {
-        "view_file",
+        "read_file",
         "create_file",
         "insert_text",
         "undo_last_edit",
@@ -452,7 +452,7 @@ def _handle_str_replace_editor_tool(arguments: dict) -> Action:
     if _is_preview_enabled(raw_preview) and command == "insert_text":
         return _preview_str_replace_edit(path, command, other_kwargs)
 
-    if command == "view_file":
+    if command == "read_file":
         return FileReadAction(
             path=path,
             impl_source=FileReadSource.FILE_EDITOR,
@@ -863,8 +863,8 @@ def _handle_create_file_command(path: str, arguments: dict) -> Action:
     )
 
 
-def _handle_view_file_command(path: str, _arguments: dict | None = None) -> Action:
-    """Handle view_file command — reads file contents."""
+def _handle_read_file_command(path: str, _arguments: dict | None = None) -> Action:
+    """Handle read_file command — reads file contents."""
     return FileReadAction(path=path, impl_source=FileReadSource.FILE_EDITOR)
 
 
@@ -918,7 +918,7 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
 
     file_editor_commands = {
         "create_file",
-        "view_file",
+        "read_file",
         "insert_text",
         "undo_last_edit",
     }
@@ -982,7 +982,7 @@ def _handle_ast_code_editor_tool(arguments: dict) -> Action:
     # File I/O commands delegate directly to runtime actions (no StructureEditor needed)
     simple_command_handlers = {
         "create_file": _handle_create_file_command,
-        "view_file": _handle_view_file_command,
+        "read_file": _handle_read_file_command,
         "insert_text": _handle_insert_text_command,
         "undo_last_edit": _handle_undo_last_edit_command,
     }

@@ -369,11 +369,11 @@ class TestSimulateEdit:
         assert new_content is not None
         assert 'appended line' in new_content
 
-    def test_simulate_edit_view_file_returns_none(self):
-        """Should return None for view_file command (no edit)."""
+    def test_simulate_edit_read_file_returns_none(self):
+        """Should return None for read_file command (no edit)."""
         middleware = PreExecDiffMiddleware()
         action = MagicMock()
-        action.command = 'view_file'
+        action.command = 'read_file'
 
         old_content = 'content'
         new_content = middleware._simulate_edit(old_content, action)

@@ -156,9 +156,9 @@ class TestHandleFinishTool:
 
 
 class TestHandleStrReplaceEditorTool:
-    def test_canonical_view_file_command_returns_file_read_action(self):
+    def test_canonical_read_file_command_returns_file_read_action(self):
         action = _handle_str_replace_editor_tool(
-            {"command": "view_file", "path": "f.py"}
+            {"command": "read_file", "path": "f.py"}
         )
         assert isinstance(action, FileReadAction)
         assert action.path == "f.py"
@@ -170,12 +170,12 @@ class TestHandleStrReplaceEditorTool:
     def test_file_path_alias_is_rejected(self):
         with pytest.raises(FunctionCallValidationError, match="path"):
             _handle_str_replace_editor_tool(
-                {"command": "view_file", "file_path": "f.py"}
+                {"command": "read_file", "file_path": "f.py"}
             )
 
     def test_view_with_range(self):
         action = _handle_str_replace_editor_tool(
-            {"command": "view_file", "path": "f.py", "view_range": [1, 10]}
+            {"command": "read_file", "path": "f.py", "view_range": [1, 10]}
         )
         assert isinstance(action, FileReadAction)
 
@@ -465,12 +465,12 @@ class TestValidateStructureEditorArgs:
         with pytest.raises(FunctionCallValidationError, match="path"):
             _handle_ast_code_editor_tool({"command": "edit_symbol_body"})
 
-    def test_canonical_path_with_view_file_command(self):
+    def test_canonical_path_with_read_file_command(self):
         from backend.engine.function_calling import _handle_ast_code_editor_tool
 
         result = _handle_ast_code_editor_tool(
             {
-                "command": "view_file",
+                "command": "read_file",
                 "path": "x.py",
             }
         )

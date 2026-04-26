@@ -10,7 +10,7 @@ from backend.engine.tools.common import (
 from backend.inference.tool_names import STR_REPLACE_EDITOR_TOOL_NAME
 
 _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
-* `view_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
+* `read_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
 * `create_file`: create new file (fails if exists). Requires `file_text` — full-file body for new files. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call.
 * `insert_text`: insert `new_str` after `insert_line`.
 * `undo_last_edit`: revert the last successful edit/write to this file in the current session (bounded history). Prefer checkpoint/rollback for large reversions.
@@ -36,7 +36,7 @@ Paths are project-relative or absolute under the project root. Do not use a ``/w
 If the tool reports `Syntax validation failed` with a hint about literal escape residue, retry using the rules above.
 """
 _SHORT_STR_REPLACE_EDITOR_DESCRIPTION = (
-    'File viewing, creation, and editing tool. Commands: view_file, create_file, '
+    'File reading, creation, and editing tool. Commands: read_file, create_file, '
     'insert_text, undo_last_edit. Supports edit_mode=format|section|range|patch. '
     'Use project-relative paths.\n'
 )
@@ -64,9 +64,9 @@ def create_str_replace_editor_tool(
         description=description,
         properties={
             'command': get_command_param(
-                'The commands to run: `view_file`, `create_file`, `insert_text`, `undo_last_edit`.',
+                'The commands to run: `read_file`, `create_file`, `insert_text`, `undo_last_edit`.',
                 [
-                    'view_file',
+                    'read_file',
                     'create_file',
                     'insert_text',
                     'undo_last_edit',
@@ -96,7 +96,7 @@ def create_str_replace_editor_tool(
                 'type': 'integer',
             },
             'view_range': {
-                'description': 'Optional for `view_file`. Line range [start, end] (1-indexed). Use [start, -1] for rest of file.',
+                'description': 'Optional for `read_file`. Line range [start, end] (1-indexed). Use [start, -1] for rest of file.',
                 'items': {'type': 'integer'},
                 'type': 'array',
             },
