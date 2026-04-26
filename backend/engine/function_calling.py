@@ -8,6 +8,14 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
+import backend.engine.tools.analyze_project_structure as analyze_project_structure_tools
+import backend.engine.tools.blackboard as blackboard_tools
+import backend.engine.tools.checkpoint as checkpoint_tools
+import backend.engine.tools.delegate_task as delegate_task_tools
+import backend.engine.tools.explore_code as explore_code_tools
+import backend.engine.tools.lsp_query as lsp_query_tools
+import backend.engine.tools.terminal_manager as terminal_manager_tools
+
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.errors import (
@@ -28,11 +36,9 @@ from backend.engine.tools import (
 )
 from backend.engine.tools.analyze_project_structure import (
     ANALYZE_PROJECT_STRUCTURE_TOOL_NAME,
-    build_analyze_project_structure_action as _build_analyze_project_structure_action,
 )
 from backend.engine.tools.blackboard import (
     BLACKBOARD_TOOL_NAME,
-    build_blackboard_action as _build_blackboard_action,
 )
 from backend.engine.tools.browser_native import (
     BROWSER_TOOL_NAME,
@@ -40,20 +46,14 @@ from backend.engine.tools.browser_native import (
 )
 from backend.engine.tools.checkpoint import (
     CHECKPOINT_TOOL_NAME,
-    build_checkpoint_action as _build_checkpoint_action,
 )
 from backend.engine.tools.delegate_task import (
     DELEGATE_TASK_TOOL_NAME,
-    build_delegate_task_action as _build_delegate_task_action,
 )
 from backend.engine.tools.execute_mcp_tool import EXECUTE_MCP_TOOL_TOOL_NAME
-from backend.engine.tools.explore_code import (
-    build_explore_tree_structure_action as _build_explore_tree_structure_action,
-    build_read_symbol_definition_action as _build_read_symbol_definition_action,
-)
+from backend.engine.tools.explore_code import ()
 from backend.engine.tools.lsp_query import (
     CODE_INTELLIGENCE_TOOL_NAME,
-    build_lsp_query_action as _build_lsp_query_action,
 )
 from backend.engine.tools.memory_manager import (
     MEMORY_MANAGER_TOOL_NAME,
@@ -68,7 +68,6 @@ from backend.engine.tools.security_utils import RISK_LEVELS
 from backend.engine.tools.task_tracker import TaskTracker
 from backend.engine.tools.terminal_manager import (
     TERMINAL_MANAGER_TOOL_NAME,
-    handle_terminal_manager_tool as _handle_terminal_manager_tool,
 )
 from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
 from backend.ledger.action import (
@@ -85,24 +84,27 @@ from backend.ledger.action import (
 )
 from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.action.mcp import MCPAction
-from backend.ledger.tool import build_tool_call_metadata
 
 ToolHandler = Callable[[dict[str, Any]], Action]
 
 build_analyze_project_structure_action = cast(
-    ToolHandler, _build_analyze_project_structure_action
+    ToolHandler, analyze_project_structure_tools.build_analyze_project_structure_action
 )
-build_blackboard_action = cast(ToolHandler, _build_blackboard_action)
-build_checkpoint_action = cast(ToolHandler, _build_checkpoint_action)
-build_delegate_task_action = cast(ToolHandler, _build_delegate_task_action)
+build_blackboard_action = cast(ToolHandler, blackboard_tools.build_blackboard_action)
+build_checkpoint_action = cast(ToolHandler, checkpoint_tools.build_checkpoint_action)
+build_delegate_task_action = cast(
+    ToolHandler, delegate_task_tools.build_delegate_task_action
+)
 build_explore_tree_structure_action = cast(
-    ToolHandler, _build_explore_tree_structure_action
+    ToolHandler, explore_code_tools.build_explore_tree_structure_action
 )
 build_read_symbol_definition_action = cast(
-    ToolHandler, _build_read_symbol_definition_action
+    ToolHandler, explore_code_tools.build_read_symbol_definition_action
 )
-build_lsp_query_action = cast(ToolHandler, _build_lsp_query_action)
-handle_terminal_manager_tool = cast(ToolHandler, _handle_terminal_manager_tool)
+build_lsp_query_action = cast(ToolHandler, lsp_query_tools.build_lsp_query_action)
+handle_terminal_manager_tool = cast(
+    ToolHandler, terminal_manager_tools.handle_terminal_manager_tool
+)
 
 # Callback for semantic recall — set by the orchestrator at init time.
 # Signature: (query: str, k: int) -> list[dict[str, Any]]
