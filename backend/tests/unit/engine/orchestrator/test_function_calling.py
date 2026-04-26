@@ -477,21 +477,19 @@ class TestValidateStructureEditorArgs:
         assert isinstance(result, FileReadAction)
         assert result.path == "x.py"
 
-    def test_ast_replace_text_command_accepted(self):
-        """replace_text is now valid for symbol_editor — delegates to text_editor."""
+    def test_replace_text_not_valid_for_symbol_editor(self):
+        """replace_text is NOT a symbol_editor command — use text_editor instead."""
         from backend.engine.function_calling import _handle_symbol_editor_tool
-        from backend.ledger.action import FileEditAction
 
-        result = _handle_symbol_editor_tool(
-            {
-                "command": "replace_text",
-                "path": "x.py",
-                "old_str": "old",
-                "new_str": "new",
-            }
-        )
-        assert isinstance(result, FileEditAction)
-        assert result.command == "replace_text"
+        with pytest.raises(FunctionCallValidationError, match="Unknown command"):
+            _handle_symbol_editor_tool(
+                {
+                    "command": "replace_text",
+                    "path": "x.py",
+                    "old_str": "old",
+                    "new_str": "new",
+                }
+            )
 
     def test_unknown_command_raises_validation_error(self):
         from backend.engine.function_calling import _handle_symbol_editor_tool
@@ -529,8 +527,8 @@ class TestEditSymbolsBatch:
                 "command": "edit_symbols",
                 "path": str(py),
                 "edits": [
-                    {"function_name": "a", "new_body": "    return 10"},
-                    {"symbol": "b", "new_body": "    return 20"},
+                    {"symbol_name": "a", "new_body": "    return 10"},
+                    {"symbol_name": "b", "new_body": "    return 20"},
                 ],
             }
         )
@@ -552,8 +550,8 @@ class TestEditSymbolsBatch:
                 "command": "edit_symbols",
                 "path": str(py),
                 "edits": [
-                    {"function_name": "a", "new_body": "    return 99"},
-                    {"function_name": "nope_not_a_symbol", "new_body": "    pass"},
+                    {"symbol_name": "a", "new_body": "    return 99"},
+                    {"symbol_name": "nope_not_a_symbol", "new_body": "    pass"},
                 ],
             }
         )
@@ -573,8 +571,8 @@ class TestEditSymbolsBatch:
                     "command": "edit_symbols",
                     "path": str(py),
                     "edits": [
-                        {"function_name": "a", "new_body": "    return 2"},
-                        {"symbol": "a", "new_body": "    return 3"},
+                        {"symbol_name": "a", "new_body": "    return 2"},
+                        {"symbol_name": "a", "new_body": "    return 3"},
                     ],
                 }
             )
@@ -597,20 +595,20 @@ class TestHandleEditFunctionCommand:
     def test_success_returns_file_read_action(self):
         editor = self._make_editor(success=True)
         result = _handle_edit_symbol_body_command(
-            editor, "foo.py", {"function_name": "my_fn", "new_body": "return 1"}
+            editor, "foo.py", {"symbol_name": "my_fn", "new_body": "return 1"}
         )
         assert isinstance(result, FileReadAction)
 
     def test_failure_returns_message_action(self):
         editor = self._make_editor(success=False, message="parse error")
         result = _handle_edit_symbol_body_command(
-            editor, "foo.py", {"function_name": "my_fn", "new_body": "return 1"}
+            editor, "foo.py", {"symbol_name": "my_fn", "new_body": "return 1"}
         )
         assert isinstance(result, MessageAction)
         assert "parse error" in result.content
 
-    def test_missing_function_name_raises(self):
-        with pytest.raises(FunctionCallValidationError, match="function_name"):
+    def test_missing_symbol_name_raises(self):
+        with pytest.raises(FunctionCallValidationError, match="symbol_name"):
             _handle_edit_symbol_body_command(
                 MagicMock(), "foo.py", {"new_body": "return 1"}
             )
@@ -618,7 +616,7 @@ class TestHandleEditFunctionCommand:
     def test_missing_new_body_raises(self):
         with pytest.raises(FunctionCallValidationError, match="new_body"):
             _handle_edit_symbol_body_command(
-                MagicMock(), "foo.py", {"function_name": "fn"}
+                MagicMock(), "foo.py", {"symbol_name": "fn"}
             )
 
 

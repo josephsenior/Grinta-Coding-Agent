@@ -731,15 +731,15 @@ def _handle_edit_symbol_body_command(
     editor: Any, path: str, arguments: Mapping[str, Any]
 ) -> Action:
     """Handle edit_symbol_body command."""
-    function_name = cast(str | None, arguments.get("function_name"))
+    symbol_name = cast(str | None, arguments.get("symbol_name"))
     new_body = cast(str | None, arguments.get("new_body"))
 
-    if not function_name or not new_body:
+    if not symbol_name or not new_body:
         raise FunctionCallValidationError(
-            "edit_symbol_body requires 'function_name' and 'new_body' arguments"
+            "edit_symbol_body requires 'symbol_name' and 'new_body' arguments"
         )
 
-    result = editor.edit_function(path, function_name, new_body)
+    result = editor.edit_function(path, symbol_name, new_body)
 
     if result.success:
         return FileReadAction(
@@ -783,11 +783,11 @@ def _handle_edit_symbols_command(
                 f"edit_symbols edits[{i}] must be an object"
             )
         item: Mapping[str, Any] = cast(Mapping[str, Any], item_any)
-        fn = cast(str | None, item.get("function_name") or item.get("symbol"))
+        fn = cast(str | None, item.get("symbol_name"))
         nb = cast(str | None, item.get("new_body"))
         if not fn:
             raise FunctionCallValidationError(
-                f"edit_symbols edits[{i}] requires function_name or symbol"
+                f"edit_symbols edits[{i}] requires symbol_name and new_body"
             )
         if not isinstance(nb, str):
             raise FunctionCallValidationError(
@@ -999,7 +999,6 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
     file_editor_commands = {
         "create_file",
         "read_file",
-        "replace_text",
         "insert_text",
         "undo_last_edit",
     }
@@ -1010,7 +1009,6 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
         }
         for key in (
             "file_text",
-            "old_str",
             "new_str",
             "insert_line",
             "start_line",

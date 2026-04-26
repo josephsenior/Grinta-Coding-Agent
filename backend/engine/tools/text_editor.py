@@ -149,16 +149,22 @@ def create_text_editor_tool(
                 'description': 'Value for format set/append operations. JSON-compatible value or string.',
             },
             'anchor_type': {
-                'description': 'Anchor selector type when edit_mode=section.',
+                'description': (
+                    'Anchor selector type when edit_mode=section. '
+                    'Together with anchor_value (and optionally anchor_occurrence) these three '
+                    'params form a single "anchor" that locates the section boundary: '
+                    'markdown_heading = match a ## Heading line; '
+                    'literal = exact substring match; regex = regular expression match.'
+                ),
                 'type': 'string',
                 'enum': ['markdown_heading', 'literal', 'regex'],
             },
             'anchor_value': {
-                'description': 'Anchor text/pattern when edit_mode=section.',
+                'description': 'The heading text, literal substring, or regex pattern to anchor on (edit_mode=section).',
                 'type': 'string',
             },
             'anchor_occurrence': {
-                'description': '1-indexed match occurrence for section anchor.',
+                'description': '1-indexed occurrence of the anchor match to use when multiple matches exist (edit_mode=section, default 1).',
                 'type': 'integer',
             },
             'section_action': {
