@@ -202,5 +202,5 @@ class TestSlowPendingLogging:
             mock_time.time.return_value = old_ts + 90.0
             svc.get()
         # controller.log should have been called for the slow warning
-        calls = [c for c in controller.log.call_args_list if 'active for' in str(c)]
+        calls = [c for c in controller.log.call_args_list if 'still running for' in str(c)]
         assert calls

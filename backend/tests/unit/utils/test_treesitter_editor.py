@@ -469,19 +469,19 @@ class TestRenameSymbol:
 
 
 # ---------------------------------------------------------------------------
-# _validate_syntax (internal)
+# validate_syntax (public)
 # ---------------------------------------------------------------------------
 
 
 class TestValidateSyntax:
     def test_valid_python(self, editor):
         code = 'def foo():\n    return 1\n'
-        is_valid, msg = editor._validate_syntax(code, 'f.py', 'python')
+        is_valid, msg = editor.validate_syntax(code, 'f.py', 'python')
         assert is_valid is True
 
     def test_invalid_python(self, editor):
         code = 'def foo(\n    return 1\n'  # syntax error
-        is_valid, msg = editor._validate_syntax(code, 'f.py', 'python')
+        is_valid, msg = editor.validate_syntax(code, 'f.py', 'python')
         assert is_valid is False
         assert 'Python syntax error' in msg
         assert 'Parser message:' in msg
@@ -489,7 +489,7 @@ class TestValidateSyntax:
 
     def test_no_parser_for_unknown_language(self, editor):
         code = 'some code'
-        is_valid, msg = editor._validate_syntax(code, 'f.zzz', 'unknown_xyz')
+        is_valid, msg = editor.validate_syntax(code, 'f.zzz', 'unknown_xyz')
         # no parser => validation skipped, returns True
         assert is_valid is True
 
@@ -592,7 +592,7 @@ class TestCoverageGaps:
                 raise Exception('test exception')
 
             mp.setattr(editor, 'get_parser', raise_exc)
-            is_valid, msg = editor._validate_syntax('const x =', 'f.js', 'javascript')
+            is_valid, msg = editor.validate_syntax('const x =', 'f.js', 'javascript')
             # Should skip validation and return True on exception
             assert is_valid is True
             assert 'Validation skipped' in msg

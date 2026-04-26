@@ -208,6 +208,7 @@ class TestAPIKeyHandling:
             'GEMINI_API_KEY',
             'DEEPSEEK_API_KEY',
             'OPENROUTER_API_KEY',
+            'LLM_API_KEY',
         ]:
             monkeypatch.delenv(key, raising=False)
 

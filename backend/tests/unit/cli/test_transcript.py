@@ -107,7 +107,7 @@ def test_format_activity_turn_header_plain() -> None:
     assert isinstance(r, Rule)
     buf = io.StringIO()
     Console(file=buf, width=80, force_terminal=False, color_system=None).print(r)
-    assert 'Tools & commands' in buf.getvalue()
+    assert 'Activity' in buf.getvalue()
 
 
 def test_format_callout_panel_uses_layout_padding() -> None:

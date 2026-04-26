@@ -18,7 +18,7 @@ from backend.core.constants import MAX_PATH_LENGTH
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
 
 # Security constants
-DANGEROUS_CHARS = ['<', '>', '|', '&', ';', '`', '$', '(', ')', '\n', '\r', '\x00']
+DANGEROUS_CHARS = ['<', '>', '|', '&', ';', '`', '$', '(', ')', '\n', '\r']
 PATH_TRAVERSAL_PATTERNS = ['../', '..\\', '..%2F', '..%5C']
 # Regex to match ".." as a standalone path segment (not inside brackets like [...nextauth])
 _DOTDOT_SEGMENT_RE = re.compile(r'(^|/)\.\.(/|$)')
@@ -218,6 +218,8 @@ def _validate_path_string(path: str) -> str:
         path = unquote(path)
     except Exception as e:
         raise PathValidationError(f'Invalid URL encoding: {e}', path) from e
+    if '\x00' in path:
+        raise PathValidationError('Path contains null bytes', path)
     if len(path) > MAX_PATH_LENGTH:
         raise PathValidationError(
             f'Path too long (max {MAX_PATH_LENGTH}): {len(path)}', path

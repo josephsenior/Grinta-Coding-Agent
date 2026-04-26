@@ -176,7 +176,9 @@ class TestGetApiKeyForModel:
 
     def test_no_key_found(self):
         mgr = APIKeyManager()
-        with patch.object(mgr, '_get_provider_key_from_env', return_value=None):
+        mgr.provider_api_keys.clear()
+        with patch.object(mgr, '_get_provider_key_from_env', return_value=None), \
+                patch.dict(os.environ, {'LLM_API_KEY': ''}):
             result = mgr.get_api_key_for_model('openai/gpt-4')
             assert result is None
 
@@ -189,9 +191,11 @@ class TestGetApiKeyForModel:
     def test_wrong_provider_key_too_short(self):
         """Test warning when provided key is wrong provider and too short."""
         mgr = APIKeyManager()
+        mgr.provider_api_keys.clear()
         # Key that doesn't match pattern and is too short (<= 10 chars)
         key = SecretStr('short-key')  # Only 9 chars
-        with patch.object(mgr, '_get_provider_key_from_env', return_value=None):
+        with patch.object(mgr, '_get_provider_key_from_env', return_value=None), \
+                patch.dict(os.environ, {'LLM_API_KEY': ''}):
             result = mgr.get_api_key_for_model('openai/gpt-4', provided_key=key)
             # Should not return the key, fall back to None
             assert result is None

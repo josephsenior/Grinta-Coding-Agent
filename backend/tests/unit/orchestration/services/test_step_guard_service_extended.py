@@ -27,6 +27,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.controller.stuck_service = stuck_svc
 
         state = MagicMock()
+        state.extra_data = {}
         state.turn_signals = MagicMock()
         self.controller.state = state
 
@@ -46,6 +47,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
 
         self.controller.event_stream = MagicMock()
         state = MagicMock()
+        state.extra_data = {}
         self.controller.state = state
 
         cb = MagicMock()
@@ -73,6 +75,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         stuck_svc.is_stuck.return_value = True
         self.controller.stuck_service = stuck_svc
         self.controller.state = MagicMock()
+        self.controller.state.extra_data = {}
 
         cb = MagicMock()
         cb.circuit_breaker.stuck_detection_count = 3
@@ -94,6 +97,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         stuck_svc.is_stuck.return_value = True
         self.controller.stuck_service = stuck_svc
         self.controller.state = MagicMock()
+        self.controller.state.extra_data = {}
         self.controller.event_stream = MagicMock()
 
         cb = MagicMock()
@@ -116,6 +120,7 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         stuck_svc.is_stuck.return_value = True
         self.controller.stuck_service = stuck_svc
         self.controller.state = MagicMock()
+        self.controller.state.extra_data = {}
         self.controller.event_stream = MagicMock()
 
         cb = MagicMock()

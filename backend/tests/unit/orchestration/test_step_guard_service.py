@@ -19,6 +19,7 @@ def _make_service():
     )
     controller = MagicMock()
     controller.event_stream = MagicMock()
+    controller.state.extra_data = {}
     controller.set_agent_state_to = AsyncMock()
     controller._react_to_exception = AsyncMock()
     ctx.get_controller.return_value = controller
@@ -60,7 +61,7 @@ class TestEnsureCanStep:
         ctrl.circuit_breaker_service.check.return_value = SimpleNamespace(tripped=False)
         ctrl.stuck_service.is_stuck.return_value = True
         ctrl.circuit_breaker_service.record_stuck_detection = MagicMock()
-        assert await svc.ensure_can_step() is True
+        assert await svc.ensure_can_step() is False
         ctrl.circuit_breaker_service.record_stuck_detection.assert_called_once()
         ctrl._react_to_exception.assert_not_awaited()
 
