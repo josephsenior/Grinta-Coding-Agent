@@ -12,7 +12,8 @@
       "supports_function_calling": true,
       "strip_temperature": true,
       "strip_top_p": true,
-      "strip_penalties": true
+      "strip_penalties": true,
+      "use_max_completion_tokens": true
     },
     "gpt-5.3-codex-spark": {
       "provider": "openai",

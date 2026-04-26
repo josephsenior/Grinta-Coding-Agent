@@ -25,13 +25,16 @@ from backend.integrations.mcp.tool import MCPClientTool
 if TYPE_CHECKING:
     from mcp.types import CallToolResult
 
-try:
-    BaseExceptionGroupType = BaseExceptionGroup
-except NameError:  # pragma: no cover - Python < 3.11 compatibility for static analysis
-    BaseExceptionGroupType = Exception
-
 _MAX_RECONNECT_ATTEMPTS = 5
 _BASE_BACKOFF_S = 0.5
+
+
+def _is_exception_group(exc: BaseException) -> bool:
+    """Return whether ``exc`` is a Python 3.11 ``BaseExceptionGroup``."""
+    try:
+        return isinstance(exc, BaseExceptionGroup)
+    except NameError:  # pragma: no cover - Python < 3.11 compatibility
+        return False
 
 
 def _mcp_call_total_budget_sec() -> float:
@@ -111,29 +114,39 @@ class MCPClient(BaseModel):
         await self.client.__aenter__()  # pylint: disable=unnecessary-dunder-call
         self._session_active = True
 
+    async def _close_client_context(self, cli: Client[Any]) -> None:
+        """Close the active async context manager for the MCP client."""
+        try:
+            await cli.__aexit__(None, None, None)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if _is_exception_group(exc):
+                # stdio MCP often ends with ExceptionGroup(BrokenResourceError); not an app bug.
+                logger.debug("MCP session __aexit__ teardown: %s", exc)
+            else:
+                logger.warning("MCP session close failed: %s", exc, exc_info=True)
+
+    async def _close_client_transport(self, cli: Client[Any]) -> None:
+        """Close the underlying MCP transport."""
+        try:
+            await cli.close()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            if _is_exception_group(exc):
+                logger.debug("MCP client.close() teardown: %s", exc)
+            else:
+                logger.debug("MCP client.close(): %s", exc, exc_info=True)
+
     async def _close_session(self) -> None:
         """Close the persistent session if active."""
         if self.client is None or not self._session_active:
             return
         cli = self.client
         try:
-            try:
-                await cli.__aexit__(None, None, None)
-            except asyncio.CancelledError:
-                raise
-            except BaseExceptionGroupType as eg:
-                # stdio MCP often ends with ExceptionGroup(BrokenResourceError); not an app bug.
-                logger.debug("MCP session __aexit__ teardown: %s", eg)
-            except Exception as exc:
-                logger.warning("MCP session close failed: %s", exc, exc_info=True)
-            try:
-                await cli.close()
-            except asyncio.CancelledError:
-                raise
-            except BaseExceptionGroupType as eg:
-                logger.debug("MCP client.close() teardown: %s", eg)
-            except Exception as exc:
-                logger.debug("MCP client.close(): %s", exc, exc_info=True)
+            await self._close_client_context(cli)
+            await self._close_client_transport(cli)
         finally:
             self._session_active = False
 

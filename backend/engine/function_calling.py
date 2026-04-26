@@ -482,7 +482,6 @@ def _handle_str_replace_editor_tool(arguments: Mapping[str, Any]) -> Action:
     valid_commands = {
         "read_file",
         "create_file",
-        "replace_text",
         "insert_text",
         "undo_last_edit",
     }

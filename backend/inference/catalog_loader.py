@@ -45,6 +45,7 @@ class ModelEntry:
     strip_temperature: bool = False  # Remove temperature when thinking is active
     strip_top_p: bool = False  # Remove top_p from kwargs
     strip_penalties: bool = False  # Remove presence_penalty and frequency_penalty
+    use_max_completion_tokens: bool = False  # Use max_completion_tokens instead of max_tokens
 
 
 @functools.lru_cache(maxsize=1)
@@ -82,6 +83,7 @@ def get_catalog() -> tuple[ModelEntry, ...]:
                 strip_temperature=info.get('strip_temperature', False),
                 strip_top_p=info.get('strip_top_p', False),
                 strip_penalties=info.get('strip_penalties', False),
+                use_max_completion_tokens=info.get('use_max_completion_tokens', False),
             )
         )
     return tuple(entries)
@@ -352,6 +354,9 @@ def apply_model_param_overrides(
     if entry.strip_penalties:
         call_kwargs.pop('presence_penalty', None)
         call_kwargs.pop('frequency_penalty', None)
+
+    if entry.use_max_completion_tokens and 'max_tokens' in call_kwargs:
+        call_kwargs['max_completion_tokens'] = call_kwargs.pop('max_tokens')
 
     return call_kwargs
 
