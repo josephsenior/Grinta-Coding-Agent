@@ -606,21 +606,10 @@ class OrchestratorExecutor:
             else:
                 await asyncio.wait_for(consume_task, timeout=timeout_seconds)
 
-            # finalize streams
-            visible_accum = redact_streamed_tool_call_markers(
-                content_accumulate
-            ).strip()
-            if event_stream and content_accumulate:
-                ev = StreamingChunkAction(
-                    chunk='', accumulated=visible_accum, is_final=True
-                )
-                ev.source = EventSource.AGENT
-                event_stream.add_event(ev, EventSource.AGENT)
-
             # If the provider did not stream structured tool calls but embedded them
             # as text-format markers (``[Tool call] name({...})``), extract them now
-            # so the normal action-building pipeline can execute them rather than
-            # silently discarding the model's intent as a NullAction.
+            # BEFORE emitting the final streaming event so the draft reply panel is
+            # cleared correctly (see below).
             if not tool_calls_dict and content_accumulate:
                 from backend.cli.tool_call_display import (
                     extract_tool_calls_from_text_markers,
@@ -635,6 +624,24 @@ class OrchestratorExecutor:
                     )
                     for _idx, _tc in enumerate(text_tcs):
                         tool_calls_dict[_idx] = _tc
+
+            # finalize streams
+            visible_accum = redact_streamed_tool_call_markers(
+                content_accumulate
+            ).strip()
+            # When the model is in "tool call mode" (structured delta.tool_calls OR
+            # text-format markers extracted above), suppress the preamble text from
+            # the Draft Reply panel.  Without this, any text the model emitted before
+            # the first tool call marker would flash in the panel and then disappear
+            # when the first tool action commits — confusing users into thinking a
+            # message was sent but silently discarded.
+            draft_reply_accum = '' if tool_calls_dict else visible_accum
+            if event_stream and content_accumulate:
+                ev = StreamingChunkAction(
+                    chunk='', accumulated=draft_reply_accum, is_final=True
+                )
+                ev.source = EventSource.AGENT
+                event_stream.add_event(ev, EventSource.AGENT)
 
             tool_calls_list: list[dict[str, Any]] | None = [
                 tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())
