@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -26,14 +27,14 @@ pytestmark = pytest.mark.skipif(
 
 
 @pytest.fixture
-def editor():
+def editor() -> TreeSitterEditor:
     return TreeSitterEditor()
 
 
 @pytest.fixture
-def py_file(tmp_path):
-    """Create a simple Python file for testing."""
-    content = textwrap.dedent("""\
+def py_file(tmp_path: Path) -> str:
+    \"\"\"Create a simple Python file for testing.\"\"\"
+    content = textwrap.dedent(\"\"\"\\
         def greet(name):
             return f"Hello, {name}!"
 
@@ -50,16 +51,16 @@ def py_file(tmp_path):
                 if y == 0:
                     raise ValueError("Division by zero")
                 return x / y
-    """)
+    \"\"\")
     f = tmp_path / 'sample.py'
     f.write_text(content, encoding='utf-8')
     return str(f)
 
 
 @pytest.fixture
-def js_file(tmp_path):
-    """Create a simple JavaScript file for testing."""
-    content = textwrap.dedent("""\
+def js_file(tmp_path: Path) -> str:
+    \"\"\"Create a simple JavaScript file for testing.\"\"\"
+    content = textwrap.dedent(\"\"\"\\
         function hello(name) {
             return `Hello, ${name}!`;
         }
@@ -67,7 +68,7 @@ def js_file(tmp_path):
         function add(a, b) {
             return a + b;
         }
-    """)
+    \"\"\")
     f = tmp_path / 'sample.js'
     f.write_text(content, encoding='utf-8')
     return str(f)
