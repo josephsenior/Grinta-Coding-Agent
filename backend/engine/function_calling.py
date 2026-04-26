@@ -441,6 +441,22 @@ def _is_preview_enabled(raw: Any) -> bool:
     return _parse_bool_argument(raw)
 
 
+def _handle_llm_based_file_edit_tool(arguments: Mapping[str, Any]) -> FileEditAction:
+    """Handle legacy direct content edits over an optional line range."""
+    path = _require_tool_argument(arguments, "path", "llm_based_file_edit")
+    content = _require_tool_argument(arguments, "content", "llm_based_file_edit")
+
+    action = FileEditAction(
+        path=str(path),
+        content=str(content),
+        start=cast(int, arguments.get("start", 1)),
+        end=cast(int, arguments.get("end", -1)),
+        impl_source=FileEditSource.LLM_BASED_EDIT,
+    )
+    set_security_risk(action, arguments)
+    return action
+
+
 def _handle_str_replace_editor_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle str_replace_editor tool call."""
     command = cast(str, arguments.get("command", ""))
