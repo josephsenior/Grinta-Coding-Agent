@@ -2036,7 +2036,7 @@ async def test_renderer_browser_screenshot_timeout_shows_browser_guidance() -> N
 async def test_renderer_directory_view_uses_entries_not_lines() -> None:
     """Regression: ``FileReadObservation`` on a directory previously rendered
     the result as ``N lines`` because the handler unconditionally split the
-    content on newlines. ``str_replace_editor view`` on a directory returns
+    content on newlines. ``text_editor view`` on a directory returns
     a ``Directory contents of <path>:`` header followed by one entry per
     line; users reading ``Viewed . • 2 lines`` for a dir listing (where one
     of the lines is the header) was confusing. Now we label as ``entries``

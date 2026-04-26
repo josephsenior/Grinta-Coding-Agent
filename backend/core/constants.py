@@ -288,7 +288,7 @@ LOG_COLORS = {
 DISABLE_COLOR_PRINTING = False
 
 # ── Tool Names ──────────────────────────────────────────────────────
-STR_REPLACE_EDITOR_TOOL_NAME = "str_replace_editor"
+TEXT_EDITOR_TOOL_NAME = "text_editor"
 FINISH_TOOL_NAME = "finish"
 LLM_BASED_EDIT_TOOL_NAME = "edit_file"
 TASK_TRACKER_TOOL_NAME = "task_tracker"

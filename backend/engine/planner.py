@@ -235,14 +235,14 @@ class OrchestratorPlanner:
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
             from backend.engine.tools import (
-                create_str_replace_editor_tool,
-                create_structure_editor_tool,
+                create_text_editor_tool,
+                create_symbol_editor_tool,
             )
 
-            # Primary editor: str_replace_editor for targeted line-level edits
-            tools.append(create_str_replace_editor_tool())
+            # Primary editor: text_editor for targeted line-level edits
+            tools.append(create_text_editor_tool())
             # Advanced editor: structure_editor (tree-sitter AST) for symbol-level refactoring
-            tools.append(create_structure_editor_tool())
+            tools.append(create_symbol_editor_tool())
 
     def _add_execute_mcp_tool_tool(self, tools: list) -> None:
         """Add the MCP gateway proxy tool when MCP is enabled.

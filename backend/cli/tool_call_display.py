@@ -13,9 +13,9 @@ _LOW_SIGNAL_MCP_LINES = frozenset({'search results', 'results', 'content', 'text
 _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'execute_bash': ('', 'Shell'),
     'execute_powershell': ('', 'Shell'),
-    'str_replace_editor': ('', 'Files'),
+    'text_editor': ('', 'Files'),
     'edit_file': ('', 'Edit file'),
-    'edit_code': ('', 'Code edit'),
+    'symbol_editor': ('', 'Code edit'),
     'agent_think': ('', 'Think'),
     'think': ('', 'Think'),
     'finish': ('', 'Finish'),
@@ -58,7 +58,7 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
     """Short English verb for the activity row (no emoji)."""
     tn = (tool_name or '').strip()
     a = args or {}
-    if tn == 'str_replace_editor':
+    if tn == 'text_editor':
         cmd = str(a.get('command', '') or '')
         if cmd == 'read_file':
             return 'Viewed'
@@ -81,7 +81,7 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
             return 'Read'
     mapping = {
         'edit_file': 'Edited',
-        'edit_code': 'Refactored',
+        'symbol_editor': 'Refactored',
         'agent_think': 'Thinking',
         'think': 'Thinking',
         'finish': 'Finished',
@@ -124,7 +124,7 @@ def tool_activity_stats_hint(tool_name: str, args: dict[str, Any]) -> str | None
         d = args.get('max_depth') or args.get('depth')
         if isinstance(d, int) and d > 0:
             return f'max depth {d}'
-    if tn == 'str_replace_editor':
+    if tn == 'text_editor':
         c = str(args.get('command', '') or '')
         sr_path_hint = str(args.get('path', '') or '')
         if c == 'read_file' and sr_path_hint:
@@ -355,7 +355,7 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
             return f'$ {_trunc(shell_cmd, 120)}'
         return 'command…'
 
-    if tn == 'str_replace_editor':
+    if tn == 'text_editor':
         sr_cmd = str(args.get('command', '') or '')
         sr_path = str(args.get('path', '') or '')
         if sr_cmd == 'create_file' and sr_path:
@@ -488,7 +488,7 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
             return ef_path
         return 'edit…'
 
-    if tn == 'edit_code':
+    if tn == 'symbol_editor':
         ast_path = args.get('path')
         ast_cmd = args.get('command')
         if ast_cmd == 'edit_symbols':
@@ -911,7 +911,7 @@ def looks_like_streaming_tool_arguments(text: str) -> bool:
         '"path"',
         '"tool_name"',
         '"arguments"',
-        '"str_replace_editor"',
+        '"text_editor"',
         '"function"',
     )
     return any(m in text for m in markers)

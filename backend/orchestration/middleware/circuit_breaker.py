@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from backend.orchestration.agent_circuit_breaker import (
-    STR_REPLACE_EDITOR_TOOL_NAME,
-    classify_str_replace_editor_error_bucket,
+    TEXT_EDITOR_TOOL_NAME,
+    classify_text_editor_error_bucket,
 )
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
@@ -31,10 +31,10 @@ _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
 # Tool fallback map — when a tool fails, suggest the next alternative so the
 # model can pivot in the same turn instead of stopping to explain.
 _TOOL_FALLBACK_MAP: dict[str, list[str]] = {
-    'ast_code_editor': [
-        'str_replace_editor',
+    'symbol_editor': [
+        'text_editor',
     ],
-    'str_replace_editor': [],
+    'text_editor': [],
     'search_code': ['lsp_query'],
     'lsp_query': ['search_code'],
 }
@@ -69,8 +69,8 @@ class CircuitBreakerMiddleware(ToolInvocationMiddleware):
         if isinstance(observation, ErrorObservation):
             base_content = observation.content or ''
             effective_tool = tool_name
-            if tool_name == STR_REPLACE_EDITOR_TOOL_NAME:
-                effective_tool = classify_str_replace_editor_error_bucket(base_content)
+            if tool_name == TEXT_EDITOR_TOOL_NAME:
+                effective_tool = classify_text_editor_error_bucket(base_content)
             # Inject fallback hint so the model knows which tool to try next
             if tool_name and tool_name in _TOOL_FALLBACK_MAP:
                 fallbacks = _TOOL_FALLBACK_MAP[tool_name]

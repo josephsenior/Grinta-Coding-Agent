@@ -7,9 +7,9 @@ from backend.engine.tools.common import (
     get_path_param,
     get_security_risk_param,
 )
-from backend.inference.tool_names import STR_REPLACE_EDITOR_TOOL_NAME
+from backend.inference.tool_names import TEXT_EDITOR_TOOL_NAME
 
-_DETAILED_STR_REPLACE_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
+_DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
 * `read_file`: show file contents (cat -n) or list directory (2 levels). Supports binary formats: .xlsx, .pptx, .wav, .mp3, .pdf, .docx (not images).
 * `create_file`: create or fully overwrite a file with the given content. Requires `file_text` — full-file body. Prefer a **small, parser-valid stub** first, then extend with further edits; avoid dumping very large bodies in one call.
 * `replace_text`: **the primary way to edit an existing file**. Requires `old_str` (exact substring to find — must be unique in the file) and `new_str` (replacement text). Uses tolerant whitespace + quote normalization so small formatting differences do not block the match. To delete a block set `new_str` to an empty string.
@@ -36,7 +36,7 @@ Paths are project-relative or absolute under the project root. Do not use a ``/w
 
 If the tool reports `Syntax validation failed` with a hint about literal escape residue, retry using the rules above.
 """
-_SHORT_STR_REPLACE_EDITOR_DESCRIPTION = (
+_SHORT_TEXT_EDITOR_DESCRIPTION = (
     'File reading, creation, and editing tool. '
     'Commands: read_file, create_file, replace_text, insert_text, undo_last_edit. '
     'replace_text: edit existing file using old_str→new_str (unique substring). '
@@ -45,7 +45,7 @@ _SHORT_STR_REPLACE_EDITOR_DESCRIPTION = (
 )
 
 
-def create_str_replace_editor_tool(
+def create_text_editor_tool(
     use_short_description: bool = False,
 ) -> ChatCompletionToolParam:
     """Create a string replacement editor tool for the agent.
@@ -58,12 +58,12 @@ def create_str_replace_editor_tool(
 
     """
     description = (
-        _SHORT_STR_REPLACE_EDITOR_DESCRIPTION
+        _SHORT_TEXT_EDITOR_DESCRIPTION
         if use_short_description
-        else _DETAILED_STR_REPLACE_EDITOR_DESCRIPTION
+        else _DETAILED_TEXT_EDITOR_DESCRIPTION
     )
     return create_tool_definition(
-        name=STR_REPLACE_EDITOR_TOOL_NAME,
+        name=TEXT_EDITOR_TOOL_NAME,
         description=description,
         properties={
             'command': get_command_param(

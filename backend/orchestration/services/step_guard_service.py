@@ -337,23 +337,23 @@ class StepGuardService:
             for e in history[-12:]
             if isinstance(e, ErrorObservation)
         ]
-        str_replace_editor_hits = sum(
+        text_editor_hits = sum(
             1
             for content in recent_errors
-            if "str_replace_editor" in content.lower()
+            if "text_editor" in content.lower()
             or "corrupt patch" in content.lower()
             or "patch failed to apply" in content.lower()
-            or "[str_replace_editor_guidance]" in content.lower()
+            or "[text_editor_guidance]" in content.lower()
         )
-        if str_replace_editor_hits >= 2:
+        if text_editor_hits >= 2:
             return (
-                "STUCK LOOP DETECTED — repeated str_replace_editor failures were detected.\n"
+                "STUCK LOOP DETECTED — repeated text_editor failures were detected.\n"
                 "MANDATORY NEXT ACTIONS:\n"
                 "1. Read the target file again with read_file to refresh exact context lines.\n"
-                "2. Retry str_replace_editor once with corrected unified diff context.\n"
-                "3. If it fails again, switch to a different edit strategy instead of retrying str_replace_editor.\n"
-                "Do NOT emit another near-identical str_replace_editor call without new file evidence.",
-                "STUCK RECOVERY: read_file refresh, then one str_replace_editor retry max, then switch strategy.",
+                "2. Retry text_editor once with corrected unified diff context.\n"
+                "3. If it fails again, switch to a different edit strategy instead of retrying text_editor.\n"
+                "Do NOT emit another near-identical text_editor call without new file evidence.",
+                "STUCK RECOVERY: read_file refresh, then one text_editor retry max, then switch strategy.",
                 verification_requirement,
             )
 

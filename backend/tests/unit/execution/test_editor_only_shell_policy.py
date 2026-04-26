@@ -33,7 +33,7 @@ def test_blocks_obvious_shell_writes(command: str) -> None:
         workspace_root='/workspace',
     )
     assert msg is not None
-    assert 'str_replace_editor' in msg
+    assert 'text_editor' in msg
 
 
 @pytest.mark.parametrize(

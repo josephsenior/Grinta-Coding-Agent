@@ -380,7 +380,7 @@ def _stream_chunks_to_tool_args(chunks: list[str]) -> str:
                                     "index": 0,
                                     "id": "call_x",
                                     "function": {
-                                        "name": "str_replace_editor",
+                                        "name": "text_editor",
                                         "arguments": piece,
                                     },
                                 }

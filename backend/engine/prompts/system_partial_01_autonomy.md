@@ -9,8 +9,8 @@ If path is uncertain: {path_discovery_hint}
 
 On tool failure:
 
-- `edit_code` → `str_replace_editor`
-- `str_replace_editor` → `edit_code`
+- `symbol_editor` → `text_editor`
+- `text_editor` → `symbol_editor`
   {code_intelligence_fallback}
 
 Never rerun the same failing command unchanged. After multiple failed approaches on the same sub-task, escalate with a **short post-mortem** before asking the user: (1) what you believed was wrong, (2) what you ran and the outcome, (3) hypotheses you ruled out and why. Then ask a concrete question or request direction—do not escalate with only “it didn’t work.”

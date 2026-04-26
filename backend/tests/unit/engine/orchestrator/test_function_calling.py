@@ -16,7 +16,7 @@ from backend.engine.function_calling import (
     _handle_edit_symbol_body_command,
     _handle_finish_tool,
     _handle_mcp_tool,
-    _handle_str_replace_editor_tool,
+    _handle_text_editor_tool,
     _handle_summarize_context_tool,
     _handle_task_tracker_tool,
     _handle_think_tool,
@@ -151,13 +151,13 @@ class TestHandleFinishTool:
 
 
 # ---------------------------------------------------------------------------
-# _handle_str_replace_editor_tool
+# _handle_text_editor_tool
 # ---------------------------------------------------------------------------
 
 
 class TestHandleStrReplaceEditorTool:
     def test_canonical_read_file_command_returns_file_read_action(self):
-        action = _handle_str_replace_editor_tool(
+        action = _handle_text_editor_tool(
             {"command": "read_file", "path": "f.py"}
         )
         assert isinstance(action, FileReadAction)
@@ -165,37 +165,37 @@ class TestHandleStrReplaceEditorTool:
 
     def test_legacy_view_alias_is_rejected(self):
         with pytest.raises(FunctionCallValidationError, match="Unknown command"):
-            _handle_str_replace_editor_tool({"command": "view", "path": "f.py"})
+            _handle_text_editor_tool({"command": "view", "path": "f.py"})
 
     def test_file_path_alias_is_rejected(self):
         with pytest.raises(FunctionCallValidationError, match="path"):
-            _handle_str_replace_editor_tool(
+            _handle_text_editor_tool(
                 {"command": "read_file", "file_path": "f.py"}
             )
 
     def test_view_with_range(self):
-        action = _handle_str_replace_editor_tool(
+        action = _handle_text_editor_tool(
             {"command": "read_file", "path": "f.py", "view_range": [1, 10]}
         )
         assert isinstance(action, FileReadAction)
 
     def test_missing_command_raises(self):
         with pytest.raises(FunctionCallValidationError, match="command"):
-            _handle_str_replace_editor_tool({"path": "f.py"})
+            _handle_text_editor_tool({"path": "f.py"})
 
     def test_missing_path_raises(self):
         with pytest.raises(FunctionCallValidationError, match="path"):
-            _handle_str_replace_editor_tool({"command": "create_file"})
+            _handle_text_editor_tool({"command": "create_file"})
 
     def test_create_file_command_returns_file_edit_action(self):
-        action = _handle_str_replace_editor_tool(
+        action = _handle_text_editor_tool(
             {"command": "create_file", "path": "new.py", "file_text": "content"}
         )
         assert isinstance(action, FileEditAction)
 
     def test_unexpected_arg_raises(self):
         with pytest.raises(FunctionCallValidationError):
-            _handle_str_replace_editor_tool(
+            _handle_text_editor_tool(
                 {
                     "command": "create_file",
                     "path": "x.py",
@@ -207,7 +207,7 @@ class TestHandleStrReplaceEditorTool:
         target = tmp_path / "sample.txt"
         target.write_text("hello world\n", encoding="utf-8")
         with pytest.raises(FunctionCallValidationError, match="Unknown command"):
-            _handle_str_replace_editor_tool(
+            _handle_text_editor_tool(
                 {
                     "command": "view_and_replace",
                     "path": str(target),
@@ -220,7 +220,7 @@ class TestHandleStrReplaceEditorTool:
         target = tmp_path / "a.py"
         target.write_text("x\n", encoding="utf-8")
         with pytest.raises(FunctionCallValidationError, match="Unknown command"):
-            _handle_str_replace_editor_tool(
+            _handle_text_editor_tool(
                 {
                     "command": "batch_replace",
                     "path": str(target),
@@ -231,7 +231,7 @@ class TestHandleStrReplaceEditorTool:
     def test_insert_text_preview_is_read_only_think_action(self, tmp_path):
         target = tmp_path / "sample.txt"
         target.write_text("alpha\nbeta\n", encoding="utf-8")
-        action = _handle_str_replace_editor_tool(
+        action = _handle_text_editor_tool(
             {
                 "command": "insert_text",
                 "path": str(target),
@@ -454,21 +454,21 @@ class TestValidateStructureEditorArgs:
     """Tests for missing command / path validation."""
 
     def test_missing_command_raises(self):
-        from backend.engine.function_calling import _handle_ast_code_editor_tool
+        from backend.engine.function_calling import _handle_symbol_editor_tool
 
         with pytest.raises(FunctionCallValidationError, match="command"):
-            _handle_ast_code_editor_tool({"file_path": "x.py"})
+            _handle_symbol_editor_tool({"file_path": "x.py"})
 
     def test_missing_path_raises(self):
-        from backend.engine.function_calling import _handle_ast_code_editor_tool
+        from backend.engine.function_calling import _handle_symbol_editor_tool
 
         with pytest.raises(FunctionCallValidationError, match="path"):
-            _handle_ast_code_editor_tool({"command": "edit_symbol_body"})
+            _handle_symbol_editor_tool({"command": "edit_symbol_body"})
 
     def test_canonical_path_with_read_file_command(self):
-        from backend.engine.function_calling import _handle_ast_code_editor_tool
+        from backend.engine.function_calling import _handle_symbol_editor_tool
 
-        result = _handle_ast_code_editor_tool(
+        result = _handle_symbol_editor_tool(
             {
                 "command": "read_file",
                 "path": "x.py",
@@ -478,11 +478,11 @@ class TestValidateStructureEditorArgs:
         assert result.path == "x.py"
 
     def test_ast_replace_text_command_accepted(self):
-        """replace_text is now valid for edit_code — delegates to str_replace_editor."""
-        from backend.engine.function_calling import _handle_ast_code_editor_tool
+        """replace_text is now valid for symbol_editor — delegates to text_editor."""
+        from backend.engine.function_calling import _handle_symbol_editor_tool
         from backend.ledger.action import FileEditAction
 
-        result = _handle_ast_code_editor_tool(
+        result = _handle_symbol_editor_tool(
             {
                 "command": "replace_text",
                 "path": "x.py",
@@ -494,18 +494,18 @@ class TestValidateStructureEditorArgs:
         assert result.command == "replace_text"
 
     def test_unknown_command_raises_validation_error(self):
-        from backend.engine.function_calling import _handle_ast_code_editor_tool
+        from backend.engine.function_calling import _handle_symbol_editor_tool
 
         with pytest.raises(FunctionCallValidationError, match="Unknown command"):
-            _handle_ast_code_editor_tool(
+            _handle_symbol_editor_tool(
                 {"command": "totally_unknown_cmd", "path": "x.py"}
             )
 
     def test_str_replace_alias_is_rejected(self):
-        from backend.engine.function_calling import _handle_ast_code_editor_tool
+        from backend.engine.function_calling import _handle_symbol_editor_tool
 
         with pytest.raises(FunctionCallValidationError, match="Unknown command"):
-            _handle_ast_code_editor_tool(
+            _handle_symbol_editor_tool(
                 {
                     "command": "str_replace",
                     "path": "x.py",
@@ -517,14 +517,14 @@ class TestValidateStructureEditorArgs:
 
 class TestEditSymbolsBatch:
     def test_edit_symbols_applies_multiple(self, tmp_path):
-        from backend.engine.function_calling import _handle_ast_code_editor_tool
+        from backend.engine.function_calling import _handle_symbol_editor_tool
 
         py = tmp_path / "m.py"
         py.write_text(
             "def a():\n    return 1\n\ndef b():\n    return 2\n",
             encoding="utf-8",
         )
-        result = _handle_ast_code_editor_tool(
+        result = _handle_symbol_editor_tool(
             {
                 "command": "edit_symbols",
                 "path": str(py),
@@ -542,12 +542,12 @@ class TestEditSymbolsBatch:
         assert "20" in py.read_text(encoding="utf-8")
 
     def test_edit_symbols_restores_on_failure(self, tmp_path):
-        from backend.engine.function_calling import _handle_ast_code_editor_tool
+        from backend.engine.function_calling import _handle_symbol_editor_tool
 
         original = "def a():\n    return 1\n\ndef b():\n    return 2\n"
         py = tmp_path / "m.py"
         py.write_text(original, encoding="utf-8")
-        result = _handle_ast_code_editor_tool(
+        result = _handle_symbol_editor_tool(
             {
                 "command": "edit_symbols",
                 "path": str(py),
@@ -563,12 +563,12 @@ class TestEditSymbolsBatch:
         assert py.read_text(encoding="utf-8") == original
 
     def test_edit_symbols_rejects_duplicate_symbols(self, tmp_path):
-        from backend.engine.function_calling import _handle_ast_code_editor_tool
+        from backend.engine.function_calling import _handle_symbol_editor_tool
 
         py = tmp_path / "m.py"
         py.write_text("def a():\n    return 1\n", encoding="utf-8")
         with pytest.raises(FunctionCallValidationError, match="duplicate"):
-            _handle_ast_code_editor_tool(
+            _handle_symbol_editor_tool(
                 {
                     "command": "edit_symbols",
                     "path": str(py),
@@ -814,7 +814,7 @@ class TestHealthCheck:
         from backend.engine.tools.health_check import run_production_health_check
 
         result = run_production_health_check(raise_on_failure=False)
-        assert "edit_code" in result
+        assert "symbol_editor" in result
 
     def test_atomic_refactor_check_present(self):
         from backend.engine.tools.health_check import run_production_health_check

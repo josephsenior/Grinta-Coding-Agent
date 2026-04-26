@@ -406,10 +406,10 @@ class TestExampleStepBuilder:
         result = builder.build_all_steps()
         assert 'finish' in result
 
-    def test_str_replace_editor(self):
-        builder = ExampleStepBuilder({'str_replace_editor'})
+    def test_text_editor(self):
+        builder = ExampleStepBuilder({'text_editor'})
         result = builder.build_all_steps()
-        assert 'str_replace_editor' in result
+        assert 'text_editor' in result
 
     def test_edit_file_fallback(self):
         builder = ExampleStepBuilder({'edit_file'})

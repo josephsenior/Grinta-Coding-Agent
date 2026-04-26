@@ -222,10 +222,10 @@ def _render_routing(
         is_windows,
         f"Use **PowerShell** only for environment actions (install, build, test, git, processes). "
         f"For repo layout and file content, use **{explore}** "
-        "and **`str_replace_editor` (`read_file`)**—not `Get-Content`/`Select-String` pipelines for source trees.",
+        "and **`text_editor` (`read_file`)**—not `Get-Content`/`Select-String` pipelines for source trees.",
         f"Use **bash** only for environment actions (install, build, test, git, processes). "
         f"For repo layout and file content, use **{explore}** "
-        "and **`str_replace_editor` (`read_file`)**—not `ls && cat && grep` chains for project files.",
+        "and **`text_editor` (`read_file`)**—not `ls && cat && grep` chains for project files.",
     )
     code_intelligence_routing = (
         "- **Known file + symbol position, precise definition/references/hover** → `code_intelligence`"
@@ -357,7 +357,7 @@ def _render_autonomy(config: Any, is_windows: bool) -> str:
         autonomy = (
             f"<AUTONOMY>\nFULL AUTONOMOUS MODE: Execute all planned steps end-to-end without "
             f"confirmation. On tool failure, pivot to an alternative tool in the same turn "
-            f"(e.g. edit_code → str_replace_editor). Auto-retry recoverable errors. "
+            f"(e.g. symbol_editor → text_editor). Auto-retry recoverable errors. "
             f"Report back only after completing the plan or exhausting tool alternatives on a "
             f"blocking sub-task. "
             f"{cp_line}\n</AUTONOMY>"
@@ -515,9 +515,9 @@ def _render_examples(
         else 'If approved, keep the change surface small and verify immediately after the action.'
     )
     adjacent_tool_fallback = (
-        '`edit_code` → `str_replace_editor`; `code_intelligence` → `search_code`'
+        '`symbol_editor` → `text_editor`; `code_intelligence` → `search_code`'
         if code_intelligence_available
-        else '`edit_code` → `str_replace_editor`; refine the `search_code` query and read nearby files'
+        else '`symbol_editor` → `text_editor`; refine the `search_code` query and read nearby files'
     )
     failure_escalation_step = (
         'After 3 failed attempts on the same sub-task, escalate via `communicate_with_user` with a 1-line post-mortem and a specific question.'

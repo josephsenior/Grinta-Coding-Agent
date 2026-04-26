@@ -117,7 +117,7 @@ class FileEditAction(Action):
     runnable: ClassVar[bool] = True
     security_risk: ActionSecurityRisk = ActionSecurityRisk.UNKNOWN
     impl_source: FileEditSource = FileEditSource.FILE_EDITOR
-    # str_replace_editor / FileEditor extended options (optional)
+    # text_editor / FileEditor extended options (optional)
     edit_mode: str | None = None
     format_kind: str | None = None
     format_op: str | None = None

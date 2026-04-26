@@ -67,7 +67,7 @@ COMMANDS:
 
 NOTE:
 - Prefer this tool for structure-aware code edits.
-- For non-code files or document-oriented edits (format/section/range/patch), prefer `str_replace_editor` with `edit_mode`.
+- For non-code files or document-oriented edits (format/section/range/patch), prefer `text_editor` with `edit_mode`.
 
 FEATURES:
 - Language-agnostic: Works with ALL languages via Tree-sitter
@@ -91,11 +91,11 @@ Commands: edit_symbol_body, edit_symbols, rename_symbol, find_symbol, replace_ra
 - Auto-indents code to match file style
 - Validates syntax before saving
 - Suggests fixes for typos/errors
-- Prefer str_replace_editor edit_mode for non-code document edits
+- Prefer text_editor edit_mode for non-code document edits
 """
 
 
-def create_structure_editor_tool(
+def create_symbol_editor_tool(
     use_short_description: bool = False,
 ) -> ChatCompletionToolParam:
     """Create the Structure Editor tool for the Orchestrator agent.
@@ -114,7 +114,7 @@ def create_structure_editor_tool(
     )
 
     return create_tool_definition(
-        name='edit_code',
+        name='symbol_editor',
         description=description,
         properties={
             'command': get_command_param(

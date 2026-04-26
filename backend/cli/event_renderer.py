@@ -3095,7 +3095,7 @@ class CLIEventRenderer:
             content = getattr(obs, "content", "") or ""
             n_lines = len(content.splitlines()) if content else 0
             pending = self._take_pending_activity_card("file_read")  # type: ignore
-            # ``str_replace_editor view`` on a directory returns a header line
+            # ``text_editor view`` on a directory returns a header line
             # (``Directory contents of <path>:``) followed by one entry per
             # line. Labelling that output as "N lines" is misleading — the
             # number the user cares about is *entries*. We subtract 1 for the

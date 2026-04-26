@@ -20,10 +20,10 @@ class TestToolNames(TestCase):
         self.assertTrue(hasattr(tool_names, 'LLM_BASED_EDIT_TOOL_NAME'))
         self.assertIsInstance(tool_names.LLM_BASED_EDIT_TOOL_NAME, str)
 
-    def test_str_replace_editor_tool_name_exported(self):
-        """Test that STR_REPLACE_EDITOR_TOOL_NAME is exported."""
-        self.assertTrue(hasattr(tool_names, 'STR_REPLACE_EDITOR_TOOL_NAME'))
-        self.assertIsInstance(tool_names.STR_REPLACE_EDITOR_TOOL_NAME, str)
+    def test_text_editor_tool_name_exported(self):
+        """Test that TEXT_EDITOR_TOOL_NAME is exported."""
+        self.assertTrue(hasattr(tool_names, 'TEXT_EDITOR_TOOL_NAME'))
+        self.assertIsInstance(tool_names.TEXT_EDITOR_TOOL_NAME, str)
 
     def test_task_tracker_tool_name_exported(self):
         """Test that TASK_TRACKER_TOOL_NAME is exported."""
@@ -35,7 +35,7 @@ class TestToolNames(TestCase):
         expected_exports = [
             'FINISH_TOOL_NAME',
             'LLM_BASED_EDIT_TOOL_NAME',
-            'STR_REPLACE_EDITOR_TOOL_NAME',
+            'TEXT_EDITOR_TOOL_NAME',
             'TASK_TRACKER_TOOL_NAME',
         ]
         self.assertEqual(set(tool_names.__all__), set(expected_exports))
@@ -52,12 +52,12 @@ class TestToolNames(TestCase):
 
         self.assertEqual(tool_names.LLM_BASED_EDIT_TOOL_NAME, LLM_BASED_EDIT_TOOL_NAME)
 
-    def test_str_replace_editor_tool_name_value(self):
-        """Test STR_REPLACE_EDITOR_TOOL_NAME has expected value from constants."""
-        from backend.core.constants import STR_REPLACE_EDITOR_TOOL_NAME
+    def test_text_editor_tool_name_value(self):
+        """Test TEXT_EDITOR_TOOL_NAME has expected value from constants."""
+        from backend.core.constants import TEXT_EDITOR_TOOL_NAME
 
         self.assertEqual(
-            tool_names.STR_REPLACE_EDITOR_TOOL_NAME, STR_REPLACE_EDITOR_TOOL_NAME
+            tool_names.TEXT_EDITOR_TOOL_NAME, TEXT_EDITOR_TOOL_NAME
         )
 
     def test_task_tracker_tool_name_value(self):
@@ -71,14 +71,14 @@ class TestToolNames(TestCase):
         from backend.inference.tool_names import (
             FINISH_TOOL_NAME,
             LLM_BASED_EDIT_TOOL_NAME,
-            STR_REPLACE_EDITOR_TOOL_NAME,
+            TEXT_EDITOR_TOOL_NAME,
             TASK_TRACKER_TOOL_NAME,
         )
 
         # Verify all imports succeeded
         self.assertIsNotNone(FINISH_TOOL_NAME)
         self.assertIsNotNone(LLM_BASED_EDIT_TOOL_NAME)
-        self.assertIsNotNone(STR_REPLACE_EDITOR_TOOL_NAME)
+        self.assertIsNotNone(TEXT_EDITOR_TOOL_NAME)
         self.assertIsNotNone(TASK_TRACKER_TOOL_NAME)
 
     def test_all_list_length(self):
@@ -102,7 +102,7 @@ class TestToolNames(TestCase):
         """Test that all tool names are non-empty strings."""
         self.assertTrue(tool_names.FINISH_TOOL_NAME)
         self.assertTrue(tool_names.LLM_BASED_EDIT_TOOL_NAME)
-        self.assertTrue(tool_names.STR_REPLACE_EDITOR_TOOL_NAME)
+        self.assertTrue(tool_names.TEXT_EDITOR_TOOL_NAME)
         self.assertTrue(tool_names.TASK_TRACKER_TOOL_NAME)
 
     def test_tool_names_consistency_with_core_constants(self):
@@ -115,8 +115,8 @@ class TestToolNames(TestCase):
             core_constants.LLM_BASED_EDIT_TOOL_NAME,
         )
         self.assertEqual(
-            tool_names.STR_REPLACE_EDITOR_TOOL_NAME,
-            core_constants.STR_REPLACE_EDITOR_TOOL_NAME,
+            tool_names.TEXT_EDITOR_TOOL_NAME,
+            core_constants.TEXT_EDITOR_TOOL_NAME,
         )
         self.assertEqual(
             tool_names.TASK_TRACKER_TOOL_NAME, core_constants.TASK_TRACKER_TOOL_NAME

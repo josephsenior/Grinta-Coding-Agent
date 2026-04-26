@@ -118,7 +118,7 @@ class SecurityConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         description=(
             'When True, shell commands cannot create or overwrite project files via '
             'redirection, tee/dd, or PowerShell file-writing cmdlets; agents must use '
-            'str_replace_editor / ast_code_editor. Set False only if you rely on shell '
+            'text_editor / symbol_editor. Set False only if you rely on shell '
             'scripts to generate files.'
         ),
     )

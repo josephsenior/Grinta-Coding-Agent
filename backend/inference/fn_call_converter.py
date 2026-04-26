@@ -53,7 +53,7 @@ from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_names import (
     FINISH_TOOL_NAME,
     LLM_BASED_EDIT_TOOL_NAME,
-    STR_REPLACE_EDITOR_TOOL_NAME,
+    TEXT_EDITOR_TOOL_NAME,
 )
 from backend.inference.tool_result_format import (
     TOOL_RESULT_BLOCK_PREFIX,
@@ -110,9 +110,9 @@ TOOL_EXAMPLES = {
         "kill_server": "\nUSER: Now kill the server, make it display the numbers in a table format.\n\nASSISTANT:\nSure! Let me stop the server first:\n<function=execute_bash>\n<parameter=command>\nkill 124\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\n[1]+  Terminated              python3 app.py > server.log 2>&1\n",
         "run_server_again": "\nASSISTANT:\nRunning the updated file:\n<function=execute_bash>\n<parameter=command>\npython3 app.py > server.log 2>&1 &\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [execute_bash]:\n[1] 126\n\nASSISTANT:\nThe server is running on port 5000 with PID 126. You can access the list of numbers in a table format by visiting http://127.0.0.1:5000.\n",
     },
-    "str_replace_editor": {
-        "create_file": "\nASSISTANT:\nThere is no `app.py` file in the current directory. Let me create a Python file `app.py`:\n<function=str_replace_editor>\n<parameter=command>create_file</parameter>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=file_text>\nfrom flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    numbers = list(range(1, 11))\n    return str(numbers)\n\nif __name__ == '__main__':\n    app.run(port=5000)\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [str_replace_editor]:\nFile created successfully at: /workspace/app.py\n",
-        "edit_file": "\nASSISTANT:\nNow let me display the numbers in a table format using a line-range edit:\n<function=edit_code>\n<parameter=command>replace_range</parameter>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=start_line>7</parameter>\n<parameter=end_line>7</parameter>\n<parameter=new_code>    return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [edit_code]:\nThe file /workspace/app.py has been edited. Here's the result of running `cat -n` on a snippet of /workspace/app.py:\n     3\n     4  @app.route('/')\n     5  def index():\n     6      numbers = list(range(1, 11))\n     7      return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'\n     8\n     9  if __name__ == '__main__':\n    10      app.run(port=5000)\n\n",
+    "text_editor": {
+        "create_file": "\nASSISTANT:\nThere is no `app.py` file in the current directory. Let me create a Python file `app.py`:\n<function=text_editor>\n<parameter=command>create_file</parameter>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=file_text>\nfrom flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    numbers = list(range(1, 11))\n    return str(numbers)\n\nif __name__ == '__main__':\n    app.run(port=5000)\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [text_editor]:\nFile created successfully at: /workspace/app.py\n",
+        "edit_file": "\nASSISTANT:\nNow let me display the numbers in a table format using a line-range edit:\n<function=symbol_editor>\n<parameter=command>replace_range</parameter>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=start_line>7</parameter>\n<parameter=end_line>7</parameter>\n<parameter=new_code>    return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [symbol_editor]:\nThe file /workspace/app.py has been edited. Here's the result of running `cat -n` on a snippet of /workspace/app.py:\n     3\n     4  @app.route('/')\n     5  def index():\n     6      numbers = list(range(1, 11))\n     7      return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'\n     8\n     9  if __name__ == '__main__':\n    10      app.run(port=5000)\n\n",
     },
     "browser": {
         "view_page": "\nASSISTANT:\nLet me check how the page looks in the browser:\n<function=browser>\n<parameter=code>\ngoto('http://127.0.0.1:5000')\nnoop(1000)  # Wait for page to load\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [browser]:\n[Browser shows the numbers in a table format]\n",
@@ -197,7 +197,7 @@ def _get_tool_name_mapping() -> dict[str, str]:
         get_terminal_tool_name(): TERMINAL_EXAMPLE_KEY,
         "execute_bash": TERMINAL_EXAMPLE_KEY,
         "execute_powershell": TERMINAL_EXAMPLE_KEY,
-        STR_REPLACE_EDITOR_TOOL_NAME: "str_replace_editor",
+        TEXT_EDITOR_TOOL_NAME: "text_editor",
         FINISH_TOOL_NAME: "finish",
         LLM_BASED_EDIT_TOOL_NAME: "edit_file",
     }
@@ -270,8 +270,8 @@ class ExampleStepBuilder:
 
     def _add_file_creation_step(self) -> None:
         """Add file creation step based on available editors."""
-        if "str_replace_editor" in self.available_tools:
-            self.example += TOOL_EXAMPLES["str_replace_editor"]["create_file"]
+        if "text_editor" in self.available_tools:
+            self.example += TOOL_EXAMPLES["text_editor"]["create_file"]
         elif "edit_file" in self.available_tools:
             self.example += TOOL_EXAMPLES["edit_file"]["create_file"]
 
@@ -292,8 +292,8 @@ class ExampleStepBuilder:
 
     def _add_file_edit_step(self) -> None:
         """Add file edit step based on available editors."""
-        if "str_replace_editor" in self.available_tools:
-            self.example += TOOL_EXAMPLES["str_replace_editor"]["edit_file"]
+        if "text_editor" in self.available_tools:
+            self.example += TOOL_EXAMPLES["text_editor"]["edit_file"]
         elif "edit_file" in self.available_tools:
             self.example += TOOL_EXAMPLES["edit_file"]["edit_file"]
 

@@ -15,12 +15,12 @@ from unittest.mock import MagicMock
 
 from backend.ledger.action import ActionSecurityRisk
 from backend.orchestration.agent_circuit_breaker import (
-    STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME,
-    STR_REPLACE_EDITOR_TOOL_NAME,
+    TEXT_EDITOR_SYNTAX_TOOL_NAME,
+    TEXT_EDITOR_TOOL_NAME,
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitBreakerResult,
-    classify_str_replace_editor_error_bucket,
+    classify_text_editor_error_bucket,
 )
 
 
@@ -525,17 +525,17 @@ class TestUpdateMetrics:
         assert breaker.consecutive_errors == 0
 
 
-class TestStrReplaceEditorTaxonomy:
-    """str_replace_editor vs syntax bucket thresholds and classification."""
+class TestTextEditorTaxonomy:
+    """text_editor vs syntax bucket thresholds and classification."""
 
     def test_classify_syntax_vs_hard(self):
         assert (
-            classify_str_replace_editor_error_bucket('Syntax validation failed: oops')
-            == STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+            classify_text_editor_error_bucket('Syntax validation failed: oops')
+            == TEXT_EDITOR_SYNTAX_TOOL_NAME
         )
         assert (
-            classify_str_replace_editor_error_bucket('old_str not found')
-            == STR_REPLACE_EDITOR_TOOL_NAME
+            classify_text_editor_error_bucket('old_str not found')
+            == TEXT_EDITOR_TOOL_NAME
         )
 
     def test_syntax_errors_skip_consecutive_counter(self):
@@ -545,7 +545,7 @@ class TestStrReplaceEditorTaxonomy:
         for _ in range(10):
             breaker.record_error(
                 RuntimeError('Syntax validation failed: x'),
-                tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME,
+                tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME,
             )
         assert breaker.consecutive_errors == 0
 
@@ -562,11 +562,11 @@ class TestStrReplaceEditorTaxonomy:
         breaker = CircuitBreaker(config)
         for _ in range(9):
             breaker.record_error(
-                RuntimeError('x'), tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+                RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME
             )
         assert breaker.check(MagicMock()).tripped is False
         breaker.record_error(
-            RuntimeError('x'), tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+            RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME
         )
         result = breaker.check(MagicMock())
         assert result.tripped is True
@@ -581,11 +581,11 @@ class TestStrReplaceEditorTaxonomy:
         breaker = CircuitBreaker(config)
         for _ in range(14):
             breaker.record_error(
-                RuntimeError('x'), tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+                RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME
             )
         assert breaker.check(MagicMock()).action == 'switch_context'
         breaker.record_error(
-            RuntimeError('x'), tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME
+            RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME
         )
         result = breaker.check(MagicMock())
         assert result.tripped is True
@@ -599,11 +599,11 @@ class TestStrReplaceEditorTaxonomy:
         )
         breaker = CircuitBreaker(config)
         breaker.record_error(
-            RuntimeError('no match'), tool_name=STR_REPLACE_EDITOR_TOOL_NAME
+            RuntimeError('no match'), tool_name=TEXT_EDITOR_TOOL_NAME
         )
         assert breaker.check(MagicMock()).tripped is False
         breaker.record_error(
-            RuntimeError('no match'), tool_name=STR_REPLACE_EDITOR_TOOL_NAME
+            RuntimeError('no match'), tool_name=TEXT_EDITOR_TOOL_NAME
         )
         result = breaker.check(MagicMock())
         assert result.tripped is True
@@ -612,13 +612,13 @@ class TestStrReplaceEditorTaxonomy:
     def test_record_success_clears_both_str_replace_buckets(self):
         config = CircuitBreakerConfig()
         breaker = CircuitBreaker(config)
-        breaker.record_error(RuntimeError('a'), tool_name=STR_REPLACE_EDITOR_TOOL_NAME)
+        breaker.record_error(RuntimeError('a'), tool_name=TEXT_EDITOR_TOOL_NAME)
         breaker.record_error(
             RuntimeError('Syntax validation failed:'),
-            tool_name=STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME,
+            tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME,
         )
-        assert breaker.get_tool_error_count(STR_REPLACE_EDITOR_TOOL_NAME) == 1
-        assert breaker.get_tool_error_count(STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME) == 1
-        breaker.record_success(tool_name=STR_REPLACE_EDITOR_TOOL_NAME)
-        assert breaker.get_tool_error_count(STR_REPLACE_EDITOR_TOOL_NAME) == 0
-        assert breaker.get_tool_error_count(STR_REPLACE_EDITOR_SYNTAX_TOOL_NAME) == 0
+        assert breaker.get_tool_error_count(TEXT_EDITOR_TOOL_NAME) == 1
+        assert breaker.get_tool_error_count(TEXT_EDITOR_SYNTAX_TOOL_NAME) == 1
+        breaker.record_success(tool_name=TEXT_EDITOR_TOOL_NAME)
+        assert breaker.get_tool_error_count(TEXT_EDITOR_TOOL_NAME) == 0
+        assert breaker.get_tool_error_count(TEXT_EDITOR_SYNTAX_TOOL_NAME) == 0

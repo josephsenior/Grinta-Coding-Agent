@@ -4,17 +4,17 @@ The following short walkthroughs show \_how* to reach for the right tool. They a
 ## Example 1 — Bug fix in an unfamiliar repo
 
 1. `search_code` for the user-visible symptom (error string, function name).
-2. `str_replace_editor` `read_file` on the matching file(s); read the relevant range.
+2. `text_editor` `read_file` on the matching file(s); read the relevant range.
 3. Form a hypothesis. If multi-step, {planning_hint}.
 4. Reproduce via the project's test runner / repro script using the terminal tool.
-5. Apply the fix with `str_replace_editor` (or `edit_code` for symbol-level edits).
+5. Apply the fix with `text_editor` (or `symbol_editor` for symbol-level edits).
 6. Re-run the same reproducer; only call `finish` when the failing case now passes.
 
 ## Example 2 — Add a small feature
 
 1. `explore_tree_structure` to see where the related module lives.
 2. Read the closest neighbour file to learn the project's conventions.
-3. Implement the change with the smallest editor surface possible (`str_replace_editor` for additions, `edit_code` for symbol replacement).
+3. Implement the change with the smallest editor surface possible (`text_editor` for additions, `symbol_editor` for symbol replacement).
 4. Run linters / tests for the touched files.
 5. `finish` with a concise summary of files changed and verification performed.
 

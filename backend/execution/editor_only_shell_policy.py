@@ -1,7 +1,7 @@
 """Block shell-level project file writes so agents use editor tools instead.
 
 This is deterministic policy (not prompt-only): execute_bash / execute_powershell
-cannot replace str_replace_editor / ast_code_editor for creating or overwriting
+cannot replace text_editor / symbol_editor for creating or overwriting
 source and document files.
 """
 
@@ -170,8 +170,8 @@ def evaluate_editor_only_shell_block(
 _BLOCK_MSG = (
     'Shell file creation/overwrites are disabled for project work. '
     'Use the editor tools instead: '
-    '`str_replace_editor` (create_file, insert_text, edit_mode) or '
-    '`edit_code` (create_file, replace_range, …). '
+    '`text_editor` (create_file, insert_text, edit_mode) or '
+    '`symbol_editor` (create_file, replace_range, …). '
     'Do not use Set-Content, Out-File, tee, or `>` / `>>` to write source or '
     'document files. Redirection to `.log` / `.tmp` or a temp path is still allowed. '
     'If you really need shell writes (e.g. scaffolding scripts), set the '

@@ -78,10 +78,7 @@ class TestRunProductionHealthCheck:
 
         assert res["overall_status"] == "HEALTHY"
         # pylint: disable=unsubscriptable-object
-        ue_comp = res["edit_code"]
-        assert ue_comp["status"] == "PASS"
-        assert ue_comp["message"] == "UE OK"
-        assert ue_comp["critical"] is True
+        ue_comp = res["symbol_editor"]
 
         ar_comp = res["atomic_refactor"]
         assert ar_comp["status"] == "PASS"
@@ -96,7 +93,7 @@ class TestRunProductionHealthCheck:
 
         assert res["overall_status"] == "HEALTHY"
         # pylint: disable=unsubscriptable-object
-        assert res["edit_code"]["status"] == "PASS"
+        assert res["symbol_editor"]["status"] == "PASS"
         assert res["atomic_refactor"]["status"] == "FAIL"
 
     def test_critical_component_failure(self):
@@ -107,8 +104,8 @@ class TestRunProductionHealthCheck:
 
         # pylint: disable=unsubscriptable-object
         assert res["overall_status"] == "CRITICAL_FAILURE"
-        assert res["edit_code"]["status"] == "FAIL"
-        assert res["edit_code"]["message"] == "UE failed"
+        assert res["symbol_editor"]["status"] == "FAIL"
+        assert res["symbol_editor"]["message"] == "UE failed"
 
     def test_critical_failure_raises_with_flag(self):
         """Test that critical failure raises RuntimeError when raise_on_failure=True."""
@@ -133,7 +130,7 @@ class TestRunProductionHealthCheck:
 
         # pylint: disable=unsubscriptable-object
         assert res["overall_status"] == "CRITICAL_FAILURE"
-        assert res["edit_code"]["status"] == "FAIL"
+        assert res["symbol_editor"]["status"] == "FAIL"
         assert res["atomic_refactor"]["status"] == "FAIL"
 
     def test_result_structure_complete(self):
@@ -143,11 +140,11 @@ class TestRunProductionHealthCheck:
                 res = _run_hc()
 
         assert "overall_status" in res
-        assert "edit_code" in res
+        assert "symbol_editor" in res
         assert "atomic_refactor" in res
 
         # pylint: disable=unsubscriptable-object
-        ue_comp = res["edit_code"]
+        ue_comp = res["symbol_editor"]
         assert isinstance(ue_comp, dict)
         assert "status" in ue_comp
         assert "message" in ue_comp

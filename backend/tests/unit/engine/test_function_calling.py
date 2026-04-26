@@ -11,7 +11,7 @@ from backend.engine.function_calling import (
     _handle_cmd_run_tool,
     _handle_finish_tool,
     _handle_llm_based_file_edit_tool,
-    _handle_str_replace_editor_tool,
+    _handle_text_editor_tool,
     combine_thought,
     set_security_risk,
 )
@@ -193,15 +193,15 @@ class TestHandleLlmBasedFileEditTool:
 
 
 # ---------------------------------------------------------------------------
-# _handle_str_replace_editor_tool
+# _handle_text_editor_tool
 # ---------------------------------------------------------------------------
 
 
-class TestHandleStrReplaceEditorTool:
-    """Tests for _handle_str_replace_editor_tool."""
+class TestHandleTextEditorTool:
+    """Tests for _handle_text_editor_tool."""
 
     def test_view_returns_file_read(self):
-        action = _handle_str_replace_editor_tool(
+        action = _handle_text_editor_tool(
             {
                 'command': 'read_file',
                 'path': '/workspace/app.py',
@@ -212,7 +212,7 @@ class TestHandleStrReplaceEditorTool:
         assert action.path == '/workspace/app.py'
 
     def test_view_with_range(self):
-        action = _handle_str_replace_editor_tool(
+        action = _handle_text_editor_tool(
             {
                 'command': 'read_file',
                 'path': '/workspace/app.py',
@@ -224,7 +224,7 @@ class TestHandleStrReplaceEditorTool:
         assert action.view_range == [10, 20]
 
     def test_replace_text_command_is_accepted(self):
-        action = _handle_str_replace_editor_tool(
+        action = _handle_text_editor_tool(
             {
                 'command': 'replace_text',
                 'path': '/workspace/app.py',
@@ -237,7 +237,7 @@ class TestHandleStrReplaceEditorTool:
         assert action.command == 'replace_text'
 
     def test_create_returns_file_edit(self):
-        action = _handle_str_replace_editor_tool(
+        action = _handle_text_editor_tool(
             {
                 'command': 'create_file',
                 'path': '/workspace/new.py',
@@ -249,15 +249,15 @@ class TestHandleStrReplaceEditorTool:
 
     def test_missing_command_raises(self):
         with pytest.raises(FunctionCallValidationError, match='command'):
-            _handle_str_replace_editor_tool({'path': '/workspace/app.py'})
+            _handle_text_editor_tool({'path': '/workspace/app.py'})
 
     def test_missing_path_raises(self):
         with pytest.raises(FunctionCallValidationError, match='path'):
-            _handle_str_replace_editor_tool({'command': 'read_file'})
+            _handle_text_editor_tool({'command': 'read_file'})
 
     def test_invalid_argument_raises(self):
         with pytest.raises(FunctionCallValidationError, match='Unexpected'):
-            _handle_str_replace_editor_tool(
+            _handle_text_editor_tool(
                 {
                     'command': 'create_file',
                     'path': '/workspace/app.py',

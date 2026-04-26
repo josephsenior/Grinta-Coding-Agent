@@ -11,7 +11,7 @@
 <TOOL_ROUTING_LADDER>
 
 - **Search & Explore:** Prefer `search_code`, `read_symbol_definition`, or `analyze_project_structure`.
-- **Read & Edit:** Use `edit_code` or `str_replace_editor`; read before editing.
+- **Read & Edit:** Use `symbol_editor` or `text_editor`; read before editing.
 - **Shell & Execution:** Use the terminal for build/test/git/processes; shell text tools are fallback only.
   </TOOL_ROUTING_LADDER>
 

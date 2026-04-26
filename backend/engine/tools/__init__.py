@@ -17,8 +17,8 @@ from .meta_cognition import (
     create_communicate_tool,
 )
 from .search_code import create_search_code_tool
-from .str_replace_editor import create_str_replace_editor_tool
-from .structure_editor_tool import create_structure_editor_tool
+from .text_editor import create_text_editor_tool
+from .symbol_editor_tool import create_symbol_editor_tool
 from .task_tracker import create_task_tracker_tool
 from .terminal_manager import create_terminal_manager_tool
 from .think import create_think_tool
@@ -37,8 +37,8 @@ __all__ = [
     'create_think_tool',
     'create_cmd_run_tool',
     'create_browser_tool',
-    'create_str_replace_editor_tool',
-    'create_structure_editor_tool',
+    'create_text_editor_tool',
+    'create_symbol_editor_tool',
     'create_task_tracker_tool',
     'create_delegate_task_tool',
     'create_terminal_manager_tool',

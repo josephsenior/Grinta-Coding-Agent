@@ -29,8 +29,8 @@ from backend.engine.common import (
 from backend.engine.tools import (
     create_cmd_run_tool,
     create_finish_tool,
-    create_str_replace_editor_tool,
-    create_structure_editor_tool,
+    create_text_editor_tool,
+    create_symbol_editor_tool,
     create_summarize_context_tool,
     create_think_tool,
 )
@@ -329,11 +329,11 @@ def _handle_analyze_project_structure_tool(
     return build_analyze_project_structure_action(dict(arguments))
 
 
-def _validate_str_replace_editor_args(
+def _validate_text_editor_args(
     arguments: Mapping[str, Any]
 ) -> tuple[str, str]:
-    """Validate required arguments for str_replace_editor tool."""
-    tool_name = cast(str, create_str_replace_editor_tool().get("function", {}).get("name", ""))
+    """Validate required arguments for text_editor tool."""
+    tool_name = cast(str, create_text_editor_tool().get("function", {}).get("name", ""))
     command = _require_tool_argument(arguments, "command", tool_name)
     path = arguments.get("path")
     if not path:
@@ -359,12 +359,12 @@ def _filter_valid_editor_kwargs(
     other_kwargs: Mapping[str, Any]
 ) -> dict[str, Any]:
     """Filter and validate kwargs for file editor."""
-    str_replace_editor_tool = create_str_replace_editor_tool()
+    text_editor_tool = create_text_editor_tool()
     valid_params = set(
-        cast(dict[str, Any], str_replace_editor_tool.get("function", {}).get("parameters", {})).get("properties", {}).keys()
+        cast(dict[str, Any], text_editor_tool.get("function", {}).get("parameters", {})).get("properties", {}).keys()
     )
     valid_kwargs_for_editor: dict[str, Any] = {}
-    tool_name = cast(str, str_replace_editor_tool.get("function", {}).get("name", ""))
+    tool_name = cast(str, text_editor_tool.get("function", {}).get("name", ""))
 
     for key, value in other_kwargs.items():
         if key not in valid_params:
@@ -458,11 +458,11 @@ def _handle_llm_based_file_edit_tool(arguments: Mapping[str, Any]) -> FileEditAc
     return action
 
 
-def _handle_str_replace_editor_tool(arguments: Mapping[str, Any]) -> Action:
-    """Handle str_replace_editor tool call."""
+def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle text_editor tool call."""
     command = cast(str, arguments.get("command", ""))
 
-    path, command = _validate_str_replace_editor_args(arguments)
+    path, command = _validate_text_editor_args(arguments)
     command, normalized_args = _normalize_file_editor_command_and_args(
         command, arguments
     )
@@ -489,7 +489,7 @@ def _handle_str_replace_editor_tool(arguments: Mapping[str, Any]) -> Action:
     }
     if command not in valid_commands:
         raise FunctionCallValidationError(
-            f"Unknown command '{command}' for str_replace_editor tool. "
+            f"Unknown command '{command}' for text_editor tool. "
             f"Valid commands: {sorted(valid_commands)}"
         )
     path = str(normalized_args.get("path", path))
@@ -690,7 +690,7 @@ def _handle_execute_mcp_tool_tool(arguments: dict[str, Any]) -> MCPAction:
     return MCPAction(name=tool_name, arguments=inner_args)
 
 
-def _validate_ast_code_editor_args(
+def _validate_symbol_editor_args(
     arguments: Mapping[str, Any], tool_name: str
 ) -> tuple[str, str]:
     """Validate required arguments for structure editor.
@@ -711,11 +711,11 @@ def _validate_ast_code_editor_args(
     return str(command), str(path)
 
 
-def _normalize_ast_code_editor_alias(
+def _normalize_symbol_editor_alias(
     command: str,
     arguments: Mapping[str, Any],
 ) -> tuple[str, dict[str, Any]]:
-    """Normalize ast_code_editor command casing.
+    """Normalize symbol_editor command casing.
 
     Canonical-only mode: no legacy command or field aliases are accepted.
     """
@@ -927,7 +927,7 @@ def _handle_normalize_indent_command(
 
 
 def _handle_create_file_command(path: str, arguments: Mapping[str, Any]) -> Action:
-    """Handle create_file command — delegates to str_replace_editor create_file."""
+    """Handle create_file command — delegates to text_editor create_file."""
     file_text = cast(str, arguments.get("file_text", ""))
     return FileEditAction(
         path=path,
@@ -972,26 +972,26 @@ def _handle_undo_last_edit_command(
     )
 
 
-def _handle_ast_code_editor_tool(arguments: Mapping[str, Any]) -> Action:
+def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle StructureEditor tool call."""
     tool_name = cast(
-        str, create_structure_editor_tool().get("function", {}).get("name", "")
+        str, create_symbol_editor_tool().get("function", {}).get("name", "")
     )
 
     # Validate arguments
-    command, path = _validate_ast_code_editor_args(dict(arguments), tool_name)
-    command, normalized_args = _normalize_ast_code_editor_alias(command, dict(arguments))
+    command, path = _validate_symbol_editor_args(dict(arguments), tool_name)
+    command, normalized_args = _normalize_symbol_editor_alias(command, dict(arguments))
 
     # Repair double-escaped content (``\n`` / ``\"``) before it reaches the
     # StructureEditor. Structure-aware commands (replace_range, etc.) build
     # FileEditActions directly and would otherwise bypass the repair applied
-    # in ``_handle_str_replace_editor_tool``.
+    # in ``_handle_text_editor_tool``.
     from backend.core.content_escape_repair import repair_arguments_in_place
 
     repair_changes = repair_arguments_in_place(normalized_args, path)
     if repair_changes:
         logger.warning(
-            "[escape_repair] %s (edit_code): corrected literal escapes in %s",
+            "[escape_repair] %s (symbol_editor): corrected literal escapes in %s",
             path,
             ", ".join(f"{name}(x{count})" for name, count in repair_changes),
         )
@@ -1039,7 +1039,7 @@ def _handle_ast_code_editor_tool(arguments: Mapping[str, Any]) -> Action:
         ):
             if key in normalized_args:
                 passthrough_args[key] = normalized_args[key]
-        return _handle_str_replace_editor_tool(passthrough_args)
+        return _handle_text_editor_tool(passthrough_args)
 
     # Initialize editor
     try:
@@ -1082,7 +1082,7 @@ def _handle_ast_code_editor_tool(arguments: Mapping[str, Any]) -> Action:
                 simple_command_handlers.keys()
             )
             raise FunctionCallValidationError(
-                f"Unknown command '{command}' for edit_code tool. "
+                f"Unknown command '{command}' for symbol_editor tool. "
                 f"Valid commands: {all_cmds}"
             )
 
@@ -1152,8 +1152,8 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     return {
         cast(str, create_cmd_run_tool().get("function", {}).get("name", "")): _handle_cmd_run_tool,
         cast(str, create_finish_tool().get("function", {}).get("name", "")): _handle_finish_tool,
-        cast(str, create_str_replace_editor_tool().get("function", {}).get("name", "")): _handle_str_replace_editor_tool,
-        cast(str, create_structure_editor_tool().get("function", {}).get("name", "")): _handle_ast_code_editor_tool,
+        cast(str, create_text_editor_tool().get("function", {}).get("name", "")): _handle_text_editor_tool,
+        cast(str, create_symbol_editor_tool().get("function", {}).get("name", "")): _handle_symbol_editor_tool,
         cast(str, create_think_tool().get("function", {}).get("name", "")): _handle_think_tool,
         cast(str, create_summarize_context_tool().get("function", {}).get("name", "")): _handle_summarize_context_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
