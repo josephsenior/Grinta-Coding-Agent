@@ -322,7 +322,7 @@ async def test_missing_tool_no_annotation(mock_executor):
     """Raw stderr is returned unchanged; no [MISSING_TOOL] tag is appended."""
     mock_session = MagicMock()
     mock_executor.session_manager.get_session.return_value = mock_session
-    mock_session.cwd = "C:/tmp"
+    mock_session.cwd = "C:/project/space"
     raw_err = "[ERROR STREAM]\n/bin/bash: line 1: poetry: command not found"
     mock_session.execute.return_value = CmdOutputObservation(
         content=raw_err,

@@ -38,7 +38,7 @@ class TestToolCallDisplay(unittest.TestCase):
             {
                 "action": "open",
                 "command": "pytest -q",
-                "cwd": "/fake/tmp/proj",
+                "cwd": "/project/space/proj",
             },
         )
         self.assertIn("open", s)
