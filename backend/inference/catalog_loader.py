@@ -44,6 +44,7 @@ class ModelEntry:
     thinking_mode: str | None = None  # "disabled", "budget:<N>", "enabled:<low>:<high>"
     strip_temperature: bool = False  # Remove temperature when thinking is active
     strip_top_p: bool = False  # Remove top_p from kwargs
+    strip_penalties: bool = False  # Remove presence_penalty and frequency_penalty
 
 
 @functools.lru_cache(maxsize=1)
@@ -80,6 +81,7 @@ def get_catalog() -> tuple[ModelEntry, ...]:
                 thinking_mode=info.get('thinking_mode'),
                 strip_temperature=info.get('strip_temperature', False),
                 strip_top_p=info.get('strip_top_p', False),
+                strip_penalties=info.get('strip_penalties', False),
             )
         )
     return tuple(entries)
@@ -347,6 +349,9 @@ def apply_model_param_overrides(
         call_kwargs.pop('top_p', None)
     if entry.strip_temperature:
         call_kwargs.pop('temperature', None)
+    if entry.strip_penalties:
+        call_kwargs.pop('presence_penalty', None)
+        call_kwargs.pop('frequency_penalty', None)
 
     return call_kwargs
 

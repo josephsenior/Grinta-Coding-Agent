@@ -1,5 +1,19 @@
 {
   "models": {
+    "gpt-5-nano": {
+      "provider": "openai",
+      "aliases": [
+        "openai/gpt-5-nano"
+      ],
+      "max_input_tokens": 128000,
+      "max_output_tokens": 32768,
+      "verified": false,
+      "featured": false,
+      "supports_function_calling": true,
+      "strip_temperature": true,
+      "strip_top_p": true,
+      "strip_penalties": true
+    },
     "gpt-5.3-codex-spark": {
       "provider": "openai",
       "aliases": [
