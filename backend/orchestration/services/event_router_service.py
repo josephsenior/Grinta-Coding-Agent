@@ -400,6 +400,19 @@ class EventRouterService:
             if pending_service is not None:
                 pending_service.set(None)
 
+            # Reset circuit breaker counters accumulated during the previous turn.
+            # Without this, a tripped CB (e.g. "too many high-risk actions") would
+            # re-emit the same TRIPPED observation on the very first step of the new
+            # turn, even though no new high-risk action has been taken.
+            cb_svc = getattr(self._ctrl, 'circuit_breaker_service', None)
+            if cb_svc is not None:
+                cb_svc.reset_for_new_turn()
+            # Also clear the per-trip warning counts stored in state so warnings
+            # restart from 1/N if the agent hits the limit again this turn.
+            _state = getattr(self._ctrl, 'state', None)
+            if _state is not None:
+                _state.extra_data.pop('__step_guard_warning_trip_counts', None)
+
         if self._ctrl.get_agent_state() != AgentState.RUNNING:
             await self._ctrl.set_agent_state_to(AgentState.RUNNING)
 

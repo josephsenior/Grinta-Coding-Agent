@@ -3789,7 +3789,9 @@ class CLIEventRenderer:
         self._last_committed_reasoning_lines = list(thoughts)
         if not fresh:
             return
-        self._print_or_buffer(format_reasoning_snapshot(fresh))
+        self._print_or_buffer(
+            Padding(format_reasoning_snapshot(fresh), pad=ACTIVITY_BLOCK_BOTTOM_PAD)
+        )
 
     def _stop_reasoning(self) -> None:
         """Flush any accumulated thoughts to static output, then stop the spinner.

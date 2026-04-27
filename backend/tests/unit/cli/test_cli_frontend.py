@@ -1737,8 +1737,8 @@ def test_ensure_default_model_sets_model_from_google_key() -> None:
     with patch.dict(os.environ, {"LLM_API_KEY": "AIzaSyBxxxxxxxxxxxxxxx"}, clear=True):
         selected = ensure_default_model(config)
 
-    assert selected == "google/gemini-2.5-flash"
-    assert llm_cfg.model == "google/gemini-2.5-flash"
+    assert selected == 'google/gemini-3-flash-preview'
+    assert llm_cfg.model == 'google/gemini-3-flash-preview'
 
 
 def test_ensure_default_model_preserves_existing_model() -> None:
@@ -1798,7 +1798,7 @@ def test_run_onboarding_uses_provider_default_model(tmp_path: Path) -> None:
 
     saved = json.loads(settings_file.read_text(encoding="utf-8"))
     assert saved["llm_api_key"] == LLM_API_KEY_SETTINGS_PLACEHOLDER
-    assert saved["llm_model"] == "anthropic/claude-sonnet-4-20250514"
+    assert saved["llm_model"] == 'anthropic/claude-sonnet-4.6'
     assert saved["llm_provider"] == "anthropic"
     env_file = settings_file.parent / ".env"
     assert env_file.is_file()

@@ -124,3 +124,15 @@ class CircuitBreakerService:
         """Adapt thresholds to task complexity and iteration budget."""
         if self._circuit_breaker:
             self._circuit_breaker.adapt(complexity, max_iterations)
+
+    def reset_for_new_turn(self) -> None:
+        """Reset per-turn counters when a new user message arrives.
+
+        A new user message is an implicit acknowledgment of any previous
+        circuit breaker trip. Carrying stale counters into the next turn
+        would immediately re-trip on the very first step of the new turn,
+        causing the warning to re-render without any new high-risk action
+        being taken.
+        """
+        if self._circuit_breaker is not None:
+            self._circuit_breaker.reset()
