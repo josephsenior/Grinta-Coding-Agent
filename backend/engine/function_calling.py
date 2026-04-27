@@ -14,8 +14,8 @@ import backend.engine.tools.checkpoint as checkpoint_tools
 import backend.engine.tools.delegate_task as delegate_task_tools
 import backend.engine.tools.explore_code as explore_code_tools
 import backend.engine.tools.lsp_query as lsp_query_tools
+import backend.engine.tools.python_debugger as python_debugger_tools
 import backend.engine.tools.terminal_manager as terminal_manager_tools
-
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.errors import (
@@ -29,9 +29,9 @@ from backend.engine.common import (
 from backend.engine.tools import (
     create_cmd_run_tool,
     create_finish_tool,
-    create_text_editor_tool,
-    create_symbol_editor_tool,
     create_summarize_context_tool,
+    create_symbol_editor_tool,
+    create_text_editor_tool,
     create_think_tool,
 )
 from backend.engine.tools.analyze_project_structure import (
@@ -59,6 +59,7 @@ from backend.engine.tools.memory_manager import (
 )
 from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.note import build_note_action, build_recall_action
+from backend.engine.tools.python_debugger import PYTHON_DEBUGGER_TOOL_NAME
 from backend.engine.tools.search_code import (
     SEARCH_CODE_TOOL_NAME,
     build_search_code_action,
@@ -113,6 +114,9 @@ build_lsp_query_action = cast(
 )
 handle_terminal_manager_tool = cast(
     ToolHandler, cast(Any, terminal_manager_tools).handle_terminal_manager_tool
+)
+handle_python_debugger_tool = cast(
+    ToolHandler, cast(Any, python_debugger_tools).handle_python_debugger_tool
 )
 
 # Callback for semantic recall — set by the orchestrator at init time.
@@ -1162,6 +1166,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         DELEGATE_TASK_TOOL_NAME: lambda args: build_delegate_task_action(dict(args)),
         CODE_INTELLIGENCE_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
+        PYTHON_DEBUGGER_TOOL_NAME: lambda args: handle_python_debugger_tool(dict(args)),
         BLACKBOARD_TOOL_NAME: lambda args: build_blackboard_action(dict(args)),
         TERMINAL_MANAGER_TOOL_NAME: lambda args: handle_terminal_manager_tool(dict(args)),
         "explore_tree_structure": lambda args: build_explore_tree_structure_action(dict(args)),

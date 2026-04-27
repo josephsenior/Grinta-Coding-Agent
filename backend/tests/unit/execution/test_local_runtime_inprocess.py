@@ -7,6 +7,7 @@ from backend.execution.drivers.local.local_runtime_inprocess import (
 )
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
+from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
@@ -79,6 +80,18 @@ def test_lsp_query_forwards_to_runtime_executor() -> None:
 
     assert result is obs
     executor.lsp_query.assert_awaited_once_with(action)
+
+
+def test_debugger_forwards_to_runtime_executor() -> None:
+    runtime = _make_runtime()
+    obs = NullObservation(content='debug')
+    executor = MagicMock()
+    executor.debugger = AsyncMock(return_value=obs)
+    runtime._executor = executor
+    action = DebuggerAction(debug_action='status', session_id='dbg-1')
+    result = runtime.debugger(action)
+    assert result is obs
+    executor.debugger.assert_awaited_once_with(action)
 
 
 def test_browser_tool_uses_persistent_loop_runner() -> None:

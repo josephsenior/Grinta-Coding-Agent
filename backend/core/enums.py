@@ -66,6 +66,7 @@ class ActionType(str, Enum):
     TERMINAL_RUN = 'terminal_run'
     TERMINAL_INPUT = 'terminal_input'
     TERMINAL_READ = 'terminal_read'
+    DEBUGGER = 'debugger'
     BROWSE = 'browse'
     BROWSE_INTERACTIVE = 'browse_interactive'
     # Native in-process browser (browser-use library; name avoids clashing with RuntimeExecutor.browser)
@@ -157,6 +158,7 @@ class ObservationType(str, Enum):
     RECALL_FAILURE = 'recall_failure'
     STATUS = 'status'
     TERMINAL = 'terminal'
+    DEBUGGER = 'debugger'
     DELEGATE_TASK_RESULT = 'delegate_task_result'
     LSP_QUERY_RESULT = 'lsp_query_result'
     SIGNAL_PROGRESS = 'signal_progress'

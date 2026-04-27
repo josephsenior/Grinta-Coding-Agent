@@ -121,6 +121,17 @@ class TerminalObservationSchema(ObservationSchemaV1):
     content: str = Field(..., description='Terminal output buffer')
 
 
+class DebuggerObservationSchema(ObservationSchemaV1):
+    """Schema for DebuggerObservation."""
+
+    observation_type: Literal['debugger'] = Field(
+        ObservationType.DEBUGGER.value, frozen=True
+    )
+    content: str = Field(..., description='Debugger result JSON')
+    session_id: str | None = Field(default=None, description='Debug session ID')
+    state: str | None = Field(default=None, description='Debugger state')
+
+
 # Union type for all observation schemas
 ObservationSchemaUnion = (
     CmdOutputObservationSchema
@@ -129,4 +140,5 @@ ObservationSchemaUnion = (
     | ErrorObservationSchema
     | MessageObservationSchema
     | TerminalObservationSchema
+    | DebuggerObservationSchema
 )

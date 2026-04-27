@@ -172,6 +172,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     # Agent Tools configuration
     enable_terminal: bool = Field(default=True)
+    enable_debugger: bool = Field(default=True)
     enable_editor: bool = Field(default=True)
     enable_working_memory: bool = Field(default=True)
     enable_lsp_query: bool = Field(default=False)

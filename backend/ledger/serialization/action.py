@@ -27,6 +27,7 @@ from backend.ledger.action.agent import (
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.commands import CmdRunAction
+from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.action.empty import NullAction
 from backend.ledger.action.files import (
     FileEditAction,
@@ -74,6 +75,7 @@ actions = (
     TerminalRunAction,
     TerminalInputAction,
     TerminalReadAction,
+    DebuggerAction,
 )
 ACTION_TYPE_TO_CLASS = {action_class.action: action_class for action_class in actions}
 

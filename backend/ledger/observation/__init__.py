@@ -14,6 +14,7 @@ from backend.ledger.observation.commands import (
     CmdOutputMetadata,
     CmdOutputObservation,
 )
+from backend.ledger.observation.debugger import DebuggerObservation
 from backend.ledger.observation.empty import NullObservation
 from backend.ledger.observation.error import ErrorObservation
 from backend.ledger.observation.file_download import FileDownloadObservation
@@ -38,6 +39,7 @@ __all__ = [
     'AgentThinkObservation',
     'CmdOutputMetadata',
     'CmdOutputObservation',
+    'DebuggerObservation',
     'DelegateTaskObservation',
     'LspQueryObservation',
     'ErrorObservation',

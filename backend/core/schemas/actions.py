@@ -321,6 +321,30 @@ class TerminalReadActionSchema(ActionSchemaV1):
         return self
 
 
+class DebuggerActionSchema(ActionSchemaV1):
+    """Schema for DebuggerAction."""
+
+    action_type: Literal['debugger'] = Field(ActionType.DEBUGGER.value, frozen=True)
+    runnable: bool = Field(True, frozen=True)
+    debug_action: str = Field(..., min_length=1, description='Debugger operation')
+    session_id: str | None = Field(default=None, description='Debug session ID')
+    program: str | None = Field(default=None, description='Python program to debug')
+    cwd: str | None = Field(default=None, description='Debuggee working directory')
+    args: list[str] = Field(default_factory=list, description='Program arguments')
+    breakpoints: list[dict[str, Any]] = Field(default_factory=list)
+    file: str | None = Field(default=None, description='Source file for breakpoints')
+    lines: list[int] = Field(default_factory=list, description='Breakpoint lines')
+    thread_id: int | None = Field(default=None)
+    frame_id: int | None = Field(default=None)
+    variables_reference: int | None = Field(default=None)
+    expression: str | None = Field(default=None)
+    count: int | None = Field(default=None)
+    stop_on_entry: bool = Field(default=False)
+    just_my_code: bool = Field(default=False)
+    python: str | None = Field(default=None)
+    timeout: float | None = Field(default=None)
+
+
 class BrowseInteractiveActionSchema(ActionSchemaV1):
     """Schema for BrowseInteractiveAction.
 
@@ -592,6 +616,7 @@ ActionSchemaUnion = (
     | TerminalRunActionSchema
     | TerminalInputActionSchema
     | TerminalReadActionSchema
+    | DebuggerActionSchema
     | AgentThinkActionSchema
     | ClarificationRequestActionSchema
     | EscalateToHumanActionSchema

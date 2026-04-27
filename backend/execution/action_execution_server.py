@@ -25,6 +25,7 @@ from uvicorn import Config, Server
 
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.logger import app_logger as logger
+from backend.execution.debugger import PythonDebugManager
 from backend.execution.file_operations import (
     ensure_directory_exists,
     execute_file_editor,
@@ -43,14 +44,14 @@ from backend.execution.file_viewer_server import start_file_viewer_server
 from backend.execution.mcp.proxy import MCPProxyManager
 from backend.execution.plugin_loader import init_plugins
 from backend.execution.plugins import ALL_PLUGINS, Plugin
+from backend.execution.sandboxing import (
+    is_sandboxed_local_profile,
+    is_workspace_restricted_profile,
+)
 from backend.execution.security_enforcement import (
     evaluate_hardened_local_command_policy,
     path_is_within_workspace,
     tokenize_command,
-)
-from backend.execution.sandboxing import (
-    is_sandboxed_local_profile,
-    is_workspace_restricted_profile,
 )
 from backend.execution.server_routes import (
     register_exception_handlers,
@@ -64,6 +65,7 @@ from backend.execution.utils.memory_monitor import MemoryMonitor
 from backend.execution.utils.session_manager import SessionManager
 from backend.ledger.action import (
     CmdRunAction,
+    DebuggerAction,
     FileEditAction,
     FileReadAction,
     FileWriteAction,
@@ -177,6 +179,7 @@ class RuntimeExecutor:
         self.last_execution_time = time.time()
         self.downloaded_files: list[str] = []
         self.downloads_directory = get_workspace_downloads_dir(work_dir)
+        self.debug_manager = PythonDebugManager(work_dir)
 
         self._terminal_session_seq: int = 0
         self._terminal_sessions_awaiting_interaction: list[str] = []
@@ -205,6 +208,7 @@ class RuntimeExecutor:
 
     async def hard_kill(self) -> None:
         """Best-effort immediate termination of processes started by this runtime."""
+        self.debug_manager.close_all()
         self.session_manager.close_all()
 
     async def ainit(self) -> None:
@@ -717,6 +721,10 @@ class RuntimeExecutor:
             session_id=session_id,
             content=f"Background task started. Session ID: {session_id}\nInitial Output:\n{content}",
         )
+
+    async def debugger(self, action: DebuggerAction) -> Observation:
+        """Execute a Python debugger action through the debugpy DAP manager."""
+        return self.debug_manager.handle(action)
 
     async def _run_foreground_cmd(
         self, action: CmdRunAction
@@ -1683,6 +1691,11 @@ class RuntimeExecutor:
                 call_async_from_sync(_disconnect_mcp, GENERAL_TIMEOUT)
             except Exception as exc:
                 logger.debug("MCP disconnect during RuntimeExecutor.close: %s", exc)
+
+        try:
+            self.debug_manager.close_all()
+        except Exception:
+            pass
 
         try:
             self.session_manager.close_all()

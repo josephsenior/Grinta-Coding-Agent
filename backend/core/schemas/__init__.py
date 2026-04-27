@@ -16,6 +16,7 @@ from backend.core.schemas.actions import (
     CmdRunActionSchema,
     CondensationActionSchema,
     CondensationRequestActionSchema,
+    DebuggerActionSchema,
     DelegateTaskActionSchema,
     EscalateToHumanActionSchema,
     FileEditActionSchema,
@@ -54,6 +55,7 @@ from backend.core.schemas.enums import (
 )
 from backend.core.schemas.observations import (
     CmdOutputObservationSchema,
+    DebuggerObservationSchema,
     ErrorObservationSchema,
     FileEditObservationSchema,
     FileReadObservationSchema,
@@ -87,6 +89,7 @@ __all__ = [
     'CmdRunActionSchema',
     'CondensationActionSchema',
     'CondensationRequestActionSchema',
+    'DebuggerActionSchema',
     'DelegateTaskActionSchema',
     'EscalateToHumanActionSchema',
     'FileEditActionSchema',
@@ -106,6 +109,7 @@ __all__ = [
     # Observation schemas
     'ObservationSchemaV1',
     'CmdOutputObservationSchema',
+    'DebuggerObservationSchema',
     'ObservationType',
     'FileReadObservationSchema',
     'FileEditObservationSchema',

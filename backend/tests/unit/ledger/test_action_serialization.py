@@ -9,6 +9,7 @@ import pytest
 from backend.core.errors import LLMMalformedActionError
 from backend.ledger.action import (
     CmdRunAction,
+    DebuggerAction,
     MessageAction,
     NullAction,
 )
@@ -172,6 +173,22 @@ class TestActionFromDict:
         assert isinstance(evt, TerminalReadAction)
         assert evt.session_id == 's2'
 
+    def test_debugger_action(self):
+        d = {
+            'action': 'debugger',
+            'args': {
+                'debug_action': 'start',
+                'program': 'app.py',
+                'args': ['--flag'],
+                'breakpoints': [{'file': 'app.py', 'line': 10}],
+            },
+        }
+        evt = action_from_dict(d)
+        assert isinstance(evt, DebuggerAction)
+        assert evt.debug_action == 'start'
+        assert evt.program == 'app.py'
+        assert evt.args == ['--flag']
+
     def test_is_confirmed_remapped(self):
         """Verify that is_confirmed is removed and mapped to confirmation_state in args."""
         from backend.ledger.serialization.action import _process_action_args
@@ -196,3 +213,4 @@ class TestActionTypeToClass:
         assert 'terminal_run' in ACTION_TYPE_TO_CLASS
         assert 'terminal_input' in ACTION_TYPE_TO_CLASS
         assert 'terminal_read' in ACTION_TYPE_TO_CLASS
+        assert 'debugger' in ACTION_TYPE_TO_CLASS

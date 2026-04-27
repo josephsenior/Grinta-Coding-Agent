@@ -16,6 +16,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from backend.ledger.action import (
     CmdRunAction,
+    DebuggerAction,
     FileEditAction,
     FileReadAction,
     FileWriteAction,
@@ -70,6 +71,8 @@ class RuntimeExecutorProtocol(Protocol):
         ...
 
     async def run(self, action: CmdRunAction) -> Observation: ...
+
+    async def debugger(self, action: DebuggerAction) -> Observation: ...
 
     async def read(self, action: FileReadAction) -> Observation: ...
 

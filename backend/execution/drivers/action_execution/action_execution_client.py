@@ -51,6 +51,7 @@ class ActionExecutionClient(Runtime):
             'terminal_run',
             'terminal_input',
             'terminal_read',
+            'debugger',
             'read',
             'write',
             'edit',
@@ -161,6 +162,9 @@ class ActionExecutionClient(Runtime):
         return self._execute_action_on_server(action)
 
     def terminal_read(self, action: Any) -> Any:
+        return self._execute_action_on_server(action)
+
+    def debugger(self, action: Any) -> Any:
         return self._execute_action_on_server(action)
 
     def copy_to(
