@@ -18,6 +18,7 @@ in ``EventStream._persist_event()``.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 import threading
 from pathlib import Path
@@ -26,6 +27,8 @@ from typing import Any
 from backend.core import json_compat as json
 
 _SCHEMA_VERSION = 1
+
+logger = logging.getLogger(__name__)
 
 _CREATE_SQL = """\
 CREATE TABLE IF NOT EXISTS events (
@@ -178,7 +181,7 @@ class SQLiteEventStore:
         """
         import time as _time
 
-        rows = []
+        rows: list[tuple[int, float, str, str | None, str]] = []
         for event_id, event_dict in events:
             payload = json.dumps(event_dict, ensure_ascii=False)
             timestamp = event_dict.get('timestamp', _time.time())

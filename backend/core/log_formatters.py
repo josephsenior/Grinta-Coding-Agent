@@ -90,7 +90,12 @@ class NoColorFormatter(logging.Formatter):
 class EnhancedJSONFormatter(JsonFormatter):
     """Enhanced JSON formatter with request IDs and structured data."""
 
-    def add_fields(self, log_record, record, message_dict):
+    def add_fields(
+        self,
+        log_record: dict[str, Any],
+        record: logging.LogRecord,
+        message_dict: dict[str, Any],
+    ) -> None:
         super().add_fields(log_record, record, message_dict)
 
         request_id = getattr(record, 'request_id', None)
@@ -181,7 +186,7 @@ class SensitiveDataFilter(logging.Filter):
     """Filter that redacts sensitive data from log messages."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        sensitive_values = []
+        sensitive_values: list[str] = []
         for key, value in os.environ.items():
             key_upper = key.upper()
             if (
@@ -214,13 +219,10 @@ class TraceContextFilter(logging.Filter):
     """Injects thread-local trace context keys into log records."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        try:
-            ctx = getattr(_TRACE_LOCAL, 'context', None) or {}
-            for k, v in ctx.items():
-                if not hasattr(record, k):
-                    setattr(record, k, v)
-        except Exception:
-            pass
+        ctx: dict[str, Any] = getattr(_TRACE_LOCAL, "context", None) or {}
+        for k, v in ctx.items():
+            if not hasattr(record, k):
+                setattr(record, k, v)
         return True
 
 
@@ -235,16 +237,16 @@ class OpenTelemetryTraceFilter(logging.Filter):
             if span is None:
                 return True
             ctx = span.get_span_context()
-            if not getattr(ctx, 'is_valid', False):
+            if not getattr(ctx, "is_valid", False):
                 return True
 
-            trace_id_hex = f'{ctx.trace_id:032x}'
-            span_id_hex = f'{ctx.span_id:016x}'
+            trace_id_hex = f"{ctx.trace_id:032x}"
+            span_id_hex = f"{ctx.span_id:016x}"
 
-            if not hasattr(record, 'trace_id'):
-                setattr(record, 'trace_id', trace_id_hex)
-            if not hasattr(record, 'span_id'):
-                setattr(record, 'span_id', span_id_hex)
+            if not hasattr(record, "trace_id"):
+                record.trace_id = trace_id_hex
+            if not hasattr(record, "span_id"):
+                record.span_id = span_id_hex
         except Exception:
             pass
         return True
