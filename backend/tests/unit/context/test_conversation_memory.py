@@ -100,7 +100,8 @@ class TestErrorObservationNotifyUiOnly:
 class TestMcpUserAddendum:
     def test_normalize_system_messages_inserts_mcp_addendum_after_system(self):
         mem = _make_memory()
-        mem.prompt_manager.get_mcp_user_addendum.return_value = (
+        prompt_manager = cast(MagicMock, mem.prompt_manager)
+        prompt_manager.get_mcp_user_addendum.return_value = (
             '<MCP_TOOLS>\n`github_search`\n</MCP_TOOLS>'
         )
 
@@ -236,9 +237,12 @@ class TestToolResultPropagation:
         )
 
         assert not out
-        payload = decode_tool_result_payload(tool_messages['call_5'].content[0].text)  # type: ignore[arg-type]
+        message_text = extract_first_text(tool_messages['call_5'])
+        assert message_text is not None
+        payload = decode_tool_result_payload(message_text)
         assert payload is not None
         assert payload[0] == 'checkpoint'
+        assert isinstance(payload[1], dict)
         assert payload[1]['tool_result'] == obs.tool_result
         assert json.loads(payload[1]['message']) == obs.tool_result
 

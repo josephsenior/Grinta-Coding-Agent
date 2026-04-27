@@ -14,6 +14,8 @@ from __future__ import annotations
 import threading
 from typing import IO, Any
 
+from backend.execution.utils.unified_shell import UnifiedShellSession
+
 # Maximum bytes retained per OutputCapture before older output is dropped.
 # Keeps long-running background commands from exhausting RAM while still
 # preserving recent context for `terminal_read`.
@@ -81,7 +83,7 @@ class OutputCapture:
             return body
 
 
-class SubprocessBackgroundSession:
+class SubprocessBackgroundSession(UnifiedShellSession):
     """Read-only polling session wrapping a still-running subprocess.
 
     Created when a foreground command's idle-output timeout fires in

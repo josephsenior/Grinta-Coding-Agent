@@ -71,8 +71,8 @@ class TestToolNames(TestCase):
         from backend.inference.tool_names import (
             FINISH_TOOL_NAME,
             LLM_BASED_EDIT_TOOL_NAME,
-            TEXT_EDITOR_TOOL_NAME,
             TASK_TRACKER_TOOL_NAME,
+            TEXT_EDITOR_TOOL_NAME,
         )
 
         # Verify all imports succeeded

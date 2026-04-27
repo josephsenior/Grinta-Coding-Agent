@@ -20,7 +20,7 @@ import time
 from collections import OrderedDict
 from typing import Any
 
-_LOCAL_VECTOR_STORE = importlib.import_module("backend.context.local_vector_store")
+_LOCAL_VECTOR_STORE = importlib.import_module('backend.context.local_vector_store')
 SQLiteBM25Backend = _LOCAL_VECTOR_STORE.SQLiteBM25Backend
 
 logger = logging.getLogger(__name__)

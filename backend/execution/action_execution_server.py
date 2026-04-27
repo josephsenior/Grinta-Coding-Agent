@@ -63,6 +63,7 @@ from backend.execution.utils.file_editor import FileEditor
 from backend.execution.utils.files import resolve_path as resolve_workspace_path
 from backend.execution.utils.memory_monitor import MemoryMonitor
 from backend.execution.utils.session_manager import SessionManager
+from backend.execution.utils.unified_shell import BaseShellSession
 from backend.ledger.action import (
     CmdRunAction,
     DebuggerAction,
@@ -94,24 +95,24 @@ from backend.persistence.locations import get_workspace_downloads_dir
 from backend.utils.async_utils import call_sync_from_async
 from backend.utils.regex_limits import try_compile_user_regex
 
-_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
+_ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m')
 _POWERSHELL_BUILTIN_COMMANDS = frozenset(
     {
-        "Get-Content",
-        "Write-Output",
-        "Get-ChildItem",
-        "Select-String",
-        "Set-Location",
-        "Select-Object",
-        "Measure-Object",
-        "Out-File",
-        "Test-Path",
-        "Remove-Item",
+        'Get-Content',
+        'Write-Output',
+        'Get-ChildItem',
+        'Select-String',
+        'Set-Location',
+        'Select-Object',
+        'Measure-Object',
+        'Out-File',
+        'Test-Path',
+        'Remove-Item',
     }
 )
 
 # Note: Import is deferred to avoid executing windows_bash.py on non-Windows platforms
-if sys.platform == "win32":
+if sys.platform == 'win32':
     pass
 
 
@@ -225,26 +226,26 @@ class RuntimeExecutor:
             self.session_manager.max_memory_gb = self.max_memory_gb
 
             # Step 1: Initialize bash session
-            logger.info("Step 1/4: Initializing default shell session...")
-            self.session_manager.create_session(session_id="default")
+            logger.info('Step 1/4: Initializing default shell session...')
+            self.session_manager.create_session(session_id='default')
 
             # Step 2: Initialize plugins
-            logger.info("Step 2/4: Initializing plugins...")
+            logger.info('Step 2/4: Initializing plugins...')
             self.plugins = await init_plugins(self.plugins_to_load, self.username)
 
             # Step 3: Initialize shell commands/aliases
-            logger.info("Step 3/4: Setting up shell commands...")
+            logger.info('Step 3/4: Setting up shell commands...')
             self._init_shell_commands()
 
             # Step 4: Start memory monitoring
-            logger.info("Step 4/4: Starting memory monitor...")
+            logger.info('Step 4/4: Starting memory monitor...')
             self.memory_monitor.start_monitoring()
 
-            logger.info("All initialization steps completed successfully")
+            logger.info('All initialization steps completed successfully')
             self._initialized = True
         except Exception as e:
             logger.error(
-                "RuntimeExecutor initialization failed at step: %s",
+                'RuntimeExecutor initialization failed at step: %s',
                 e,
                 exc_info=True,
             )
@@ -258,7 +259,7 @@ class RuntimeExecutor:
 
     def _init_shell_commands(self):
         # We need to set up shell-native aliases and functions for better UX.
-        shell_session = self.session_manager.get_session("default")
+        shell_session = self.session_manager.get_session('default')
         assert shell_session is not None
 
         use_powershell = self._uses_powershell_shell_contract()
@@ -284,7 +285,7 @@ class RuntimeExecutor:
                     shell_session.execute(CmdRunAction(command=cmd))
 
     def _build_shell_git_config_command(self, use_powershell: bool) -> str:
-        separator = ";" if use_powershell else "&&"
+        separator = ';' if use_powershell else '&&'
         return (
             f'git config --global user.name "{self.username}" '
             f'{separator} git config --global user.email "{self.username}@example.com"'
@@ -325,17 +326,17 @@ class RuntimeExecutor:
 
     def _uses_powershell_shell_contract(self) -> bool:
         """Return True only when the active Windows terminal contract is PowerShell."""
-        if sys.platform != "win32":
+        if sys.platform != 'win32':
             return False
 
-        tool_registry = getattr(self.session_manager, "tool_registry", None)
+        tool_registry = getattr(self.session_manager, 'tool_registry', None)
         if tool_registry is not None:
             from backend.execution.utils.tool_registry import (
                 resolve_windows_powershell_preference,
             )
 
-            has_bash_raw = getattr(tool_registry, "has_bash", False)
-            has_powershell_raw = getattr(tool_registry, "has_powershell", False)
+            has_bash_raw = getattr(tool_registry, 'has_bash', False)
+            has_powershell_raw = getattr(tool_registry, 'has_powershell', False)
             has_bash = has_bash_raw if isinstance(has_bash_raw, bool) else False
             has_powershell = (
                 has_powershell_raw if isinstance(has_powershell_raw, bool) else False
@@ -348,11 +349,11 @@ class RuntimeExecutor:
                 )
 
         # Fallback when tool registry details are unavailable in tests/mocks.
-        default_session = self.session_manager.get_session("default")
+        default_session = self.session_manager.get_session('default')
         session_name = (
-            default_session.__class__.__name__.lower() if default_session else ""
+            default_session.__class__.__name__.lower() if default_session else ''
         )
-        return "powershell" in session_name
+        return 'powershell' in session_name
 
     async def run_action(self, action) -> Observation:
         """Execute any action through action execution server."""
@@ -361,11 +362,11 @@ class RuntimeExecutor:
             obs = await getattr(self, action_type)(action)
 
         # Strip ANSI from text fields for consistent CLI / log display.
-        if hasattr(obs, "content") and isinstance(obs.content, str):
+        if hasattr(obs, 'content') and isinstance(obs.content, str):
             obs.content = self._strip_ansi_obs_text(obs.content)
-        if hasattr(obs, "path") and isinstance(obs.path, str):
+        if hasattr(obs, 'path') and isinstance(obs.path, str):
             obs.path = self._strip_ansi_obs_text(obs.path)
-        if hasattr(obs, "message") and isinstance(obs.message, str):
+        if hasattr(obs, 'message') and isinstance(obs.message, str):
             try:
                 obs.message = self._strip_ansi_obs_text(obs.message)
             except AttributeError:
@@ -377,7 +378,7 @@ class RuntimeExecutor:
         """Strip ANSI escape codes from observation text."""
         if not text:
             return text
-        return _ANSI_ESCAPE_RE.sub("", text)
+        return _ANSI_ESCAPE_RE.sub('', text)
 
     def _should_rewrite_python3_to_python(self) -> bool:
         """Return True only when active Windows terminal contract is PowerShell.
@@ -391,12 +392,12 @@ class RuntimeExecutor:
     def _extract_failure_signature(content: str) -> str:
         """Build a compact error signature for repeated-failure detection."""
         if not content:
-            return ""
+            return ''
         lines = [line.strip().lower() for line in content.splitlines() if line.strip()]
         if not lines:
-            return ""
+            return ''
         # Prefer the tail where shell errors usually appear.
-        tail = " | ".join(lines[-3:])
+        tail = ' | '.join(lines[-3:])
         return tail[:300]
 
     def _workspace_root(self) -> Path:
@@ -414,7 +415,7 @@ class RuntimeExecutor:
         if not self._is_workspace_restricted_profile():
             return None
 
-        current_cwd = Path(getattr(session, "cwd", self._initial_cwd)).resolve()
+        current_cwd = Path(getattr(session, 'cwd', self._initial_cwd)).resolve()
         if path_is_within_workspace(current_cwd, self._workspace_root()):
             return None
 
@@ -422,8 +423,8 @@ class RuntimeExecutor:
         self._clear_terminal_read_cursor(session_id)
         return ErrorObservation(
             content=(
-                "Interactive terminal session closed by hardened_local policy: "
-                f"session cwd escaped the workspace. Session: {session_id} | cwd={current_cwd}"
+                'Interactive terminal session closed by hardened_local policy: '
+                f'session cwd escaped the workspace. Session: {session_id} | cwd={current_cwd}'
             )
         )
 
@@ -435,19 +436,19 @@ class RuntimeExecutor:
             return (None, None)
 
         op = tokens[0].strip().lower()
-        if op not in {"cd", "pushd", "set-location", "sl"}:
+        if op not in {'cd', 'pushd', 'set-location', 'sl'}:
             return (None, None)
 
         if len(tokens) < 2 or tokens[1].strip() in {
-            "",
-            "~",
-            "$HOME",
-            "%USERPROFILE%",
-            "-",
+            '',
+            '~',
+            '$HOME',
+            '%USERPROFILE%',
+            '-',
         }:
             return (
                 None,
-                "Action blocked by hardened_local policy: interactive directory changes must target an explicit path inside the workspace.",
+                'Action blocked by hardened_local policy: interactive directory changes must target an explicit path inside the workspace.',
             )
 
         target = Path(tokens[1])
@@ -459,8 +460,8 @@ class RuntimeExecutor:
         if not path_is_within_workspace(predicted, self._workspace_root()):
             return (
                 None,
-                "Action blocked by hardened_local policy: interactive terminal sessions cannot change directory outside the workspace. "
-                f"Requested cwd: {predicted}",
+                'Action blocked by hardened_local policy: interactive terminal sessions cannot change directory outside the workspace. '
+                f'Requested cwd: {predicted}',
             )
         return (predicted, None)
 
@@ -474,12 +475,12 @@ class RuntimeExecutor:
         if not stripped:
             return (None, None)
 
-        if any(separator in stripped for separator in ("\n", "&&", ";", "||")):
+        if any(separator in stripped for separator in ('\n', '&&', ';', '||')):
             return (
                 None,
                 ErrorObservation(
                     content=(
-                        "Action blocked by hardened_local policy: interactive terminal input cannot contain chained or multiline commands."
+                        'Action blocked by hardened_local policy: interactive terminal input cannot contain chained or multiline commands.'
                     )
                 ),
             )
@@ -490,7 +491,7 @@ class RuntimeExecutor:
             workspace_root=self._workspace_root(),
             requested_cwd=str(current_cwd),
             base_cwd=str(current_cwd),
-            is_background=stripped.endswith("&"),
+            is_background=stripped.endswith('&'),
         )
         if block_message is not None:
             return (None, ErrorObservation(content=block_message))
@@ -531,8 +532,8 @@ class RuntimeExecutor:
         except ValueError:
             return ErrorObservation(
                 content=(
-                    "Action blocked by hardened_local policy: command execution must stay inside the workspace. "
-                    f"Command: {command} | cwd={effective_cwd}"
+                    'Action blocked by hardened_local policy: command execution must stay inside the workspace. '
+                    f'Command: {command} | cwd={effective_cwd}'
                 )
             )
         return None
@@ -546,24 +547,24 @@ class RuntimeExecutor:
         if not content:
             return
 
-        exit_code = int(getattr(observation.metadata, "exit_code", 0) or 0)
+        exit_code = int(getattr(observation.metadata, 'exit_code', 0) or 0)
         if exit_code == 0:
             return
 
         shell_mismatch = self._detect_powershell_in_bash_mismatch(
-            getattr(observation, "command", ""),
+            getattr(observation, 'command', ''),
             content,
         )
         if shell_mismatch:
-            observation.content += f"\n\n[SHELL_MISMATCH] {shell_mismatch}"
+            observation.content += f'\n\n[SHELL_MISMATCH] {shell_mismatch}'
             return
 
         scaffold_failure = self._detect_scaffold_setup_failure(
-            getattr(observation, "command", ""),
+            getattr(observation, 'command', ''),
             content,
         )
         if scaffold_failure:
-            observation.content += f"\n\n[SCAFFOLD_SETUP_FAILED] {scaffold_failure}"
+            observation.content += f'\n\n[SCAFFOLD_SETUP_FAILED] {scaffold_failure}'
 
     @staticmethod
     def _detect_powershell_in_bash_mismatch(command: str, content: str) -> str | None:
@@ -572,37 +573,37 @@ class RuntimeExecutor:
             return None
 
         lower_content = content.lower()
-        if "/bin/bash" not in lower_content and "bash:" not in lower_content:
+        if '/bin/bash' not in lower_content and 'bash:' not in lower_content:
             return None
         if (
-            "command not found" not in lower_content
-            and "not recognized as" not in lower_content
+            'command not found' not in lower_content
+            and 'not recognized as' not in lower_content
         ):
             return None
 
         _bash_fix = (
-            "This terminal is Git Bash — rewrite the command using bash syntax only "
-            "(ls, cat, grep, find, echo, cd, mkdir, rm, pwd). "
-            "Do NOT use any PowerShell cmdlets."
+            'This terminal is Git Bash — rewrite the command using bash syntax only '
+            '(ls, cat, grep, find, echo, cd, mkdir, rm, pwd). '
+            'Do NOT use any PowerShell cmdlets.'
         )
 
         missing_match = re.search(
-            r"([A-Za-z][A-Za-z0-9-]*)\s*:\s*command not found", content
+            r'([A-Za-z][A-Za-z0-9-]*)\s*:\s*command not found', content
         )
         if missing_match:
             missing_cmd = missing_match.group(1)
             if missing_cmd in _POWERSHELL_BUILTIN_COMMANDS:
                 return (
-                    f"`{missing_cmd}` is a PowerShell cmdlet, not available in bash. "
-                    f"{_bash_fix}"
+                    f'`{missing_cmd}` is a PowerShell cmdlet, not available in bash. '
+                    f'{_bash_fix}'
                 )
 
-        command_tokens = set(re.findall(r"\b[A-Za-z][A-Za-z0-9-]*\b", command))
+        command_tokens = set(re.findall(r'\b[A-Za-z][A-Za-z0-9-]*\b', command))
         for token in _POWERSHELL_BUILTIN_COMMANDS:
             if token in command_tokens:
                 return (
-                    f"`{token}` is a PowerShell cmdlet, not available in bash. "
-                    f"{_bash_fix}"
+                    f'`{token}` is a PowerShell cmdlet, not available in bash. '
+                    f'{_bash_fix}'
                 )
 
         return None
@@ -614,32 +615,32 @@ class RuntimeExecutor:
             return None
 
         lower_command = command.lower()
-        if "&&" not in lower_command:
+        if '&&' not in lower_command:
             return None
 
         scaffold_tokens = (
-            "create-vite",
-            "npm create vite",
-            "npm init vite",
-            "create-next-app",
-            "create-react-app",
-            "cargo new",
+            'create-vite',
+            'npm create vite',
+            'npm init vite',
+            'create-next-app',
+            'create-react-app',
+            'cargo new',
         )
         if not any(token in lower_command for token in scaffold_tokens):
             return None
 
         lower_content = content.lower()
-        if "could not read package.json" not in lower_content:
+        if 'could not read package.json' not in lower_content:
             return None
         if (
-            "enoent" not in lower_content
-            and "no such file or directory" not in lower_content
+            'enoent' not in lower_content
+            and 'no such file or directory' not in lower_content
         ):
             return None
 
         return (
-            "The scaffold step did not create a project before follow-up install commands ran. "
-            "Run the generator by itself first, inspect its output, and if the current directory "
+            'The scaffold step did not create a project before follow-up install commands ran. '
+            'Run the generator by itself first, inspect its output, and if the current directory '
             'is not empty scaffold into a fresh subdirectory instead of ".".'
         )
 
@@ -656,9 +657,9 @@ class RuntimeExecutor:
         try:
             # Rewrite python3->python only in Windows PowerShell mode.
             if self._should_rewrite_python3_to_python() and action.command:
-                action.command = re.sub(r"\bpython3\b", "python", action.command)
+                action.command = re.sub(r'\bpython3\b', 'python', action.command)
 
-            default_session = self.session_manager.get_session("default")
+            default_session = self.session_manager.get_session('default')
             base_cwd = default_session.cwd if default_session else self._initial_cwd
             cwd_error = self._validate_workspace_scoped_cwd(
                 action.command,
@@ -687,12 +688,12 @@ class RuntimeExecutor:
 
             if not action.is_static:
                 self._attach_detected_server(
-                    observation, self.session_manager.get_session("default")
+                    observation, self.session_manager.get_session('default')
                 )
 
             return observation
         except Exception as e:
-            logger.error("Error running command: %s", e)
+            logger.error('Error running command: %s', e)
             return ErrorObservation(str(e))
 
     async def _run_background_cmd(self, action: CmdRunAction) -> TerminalObservation:
@@ -702,8 +703,8 @@ class RuntimeExecutor:
         initial output, and returns a TerminalObservation with the session ID
         for later checking.
         """
-        session_id = f"bg-{uuid.uuid4().hex[:8]}"
-        default_session = self.session_manager.get_session("default")
+        session_id = f'bg-{uuid.uuid4().hex[:8]}'
+        default_session = self.session_manager.get_session('default')
         cwd = str(
             self._resolve_effective_cwd(
                 action.cwd,
@@ -712,14 +713,14 @@ class RuntimeExecutor:
         )
         session = self.session_manager.create_session(session_id=session_id, cwd=cwd)
         logger.debug(
-            "Starting background task in session %s: %s", session_id, action.command
+            'Starting background task in session %s: %s', session_id, action.command
         )
-        session.write_input(action.command + "\n")
+        session.write_input(action.command + '\n')
         await asyncio.sleep(0.5)
         content = session.read_output()
         return TerminalObservation(
             session_id=session_id,
-            content=f"Background task started. Session ID: {session_id}\nInitial Output:\n{content}",
+            content=f'Background task started. Session ID: {session_id}\nInitial Output:\n{content}',
         )
 
     async def debugger(self, action: DebuggerAction) -> Observation:
@@ -746,10 +747,12 @@ class RuntimeExecutor:
         try:
             self.session_manager.cleanup_idle_sessions(max_idle_seconds=3600)
         except Exception:
-            logger.debug("cleanup_idle_sessions failed", exc_info=True)
-        bash_session = self.session_manager.get_session("default")
+            logger.debug('cleanup_idle_sessions failed', exc_info=True)
+        bash_session = self.session_manager.get_session('default')
         if bash_session is None:
-            return ErrorObservation("Default shell session not initialized")
+            return ErrorObservation('Default shell session not initialized')
+        if not isinstance(bash_session, BaseShellSession):
+            return ErrorObservation('Default shell session is not a foreground shell')
 
         # T-P0-1: auto-promote known-slow commands (npm install, cargo build…)
         # to ``blocking=True`` so they get the longer idle threshold.  We only
@@ -760,21 +763,21 @@ class RuntimeExecutor:
                 is_known_slow_command,
             )
 
-            if not getattr(action, "blocking", False) and is_known_slow_command(
-                getattr(action, "command", "") or ""
+            if not getattr(action, 'blocking', False) and is_known_slow_command(
+                getattr(action, 'command', '') or ''
             ):
                 action.blocking = True  # type: ignore[attr-defined]
                 logger.info(
-                    "Auto-promoted blocking=True for slow command: %s",
-                    (action.command or "").splitlines()[0][:120],
+                    'Auto-promoted blocking=True for slow command: %s',
+                    (action.command or '').splitlines()[0][:120],
                 )
         except Exception:
-            logger.debug("blocking-heuristic check failed", exc_info=True)
+            logger.debug('blocking-heuristic check failed', exc_info=True)
 
         # Arm the background-detach mechanism so idle-output timeouts preserve
         # the process instead of killing it.
-        bg_id = f"bg-{uuid.uuid4().hex[:8]}"
-        if hasattr(bash_session, "_pending_bg_id"):
+        bg_id = f'bg-{uuid.uuid4().hex[:8]}'
+        if hasattr(bash_session, '_pending_bg_id'):
             bash_session._pending_bg_id = bg_id  # type: ignore[union-attr]
 
         observation = cast(
@@ -784,33 +787,38 @@ class RuntimeExecutor:
 
         # If the timeout handler performed a background detach, register the
         # detached pane as a readable background session (BashSession / tmux path).
-        detached_pane = getattr(bash_session, "_detached_pane", None)
-        registered_bg_id = getattr(bash_session, "_bg_session_id", None)
-        if detached_pane is not None and registered_bg_id is not None:
+        detached_pane = getattr(bash_session, '_detached_pane', None)
+        detached_window = getattr(bash_session, '_detached_window', None)
+        registered_bg_id = getattr(bash_session, '_bg_session_id', None)
+        if (
+            detached_pane is not None
+            and detached_window is not None
+            and registered_bg_id is not None
+        ):
             from backend.execution.utils.bash import BackgroundPaneSession
 
             bg_pane_session = BackgroundPaneSession(
                 pane=detached_pane,
-                window=getattr(bash_session, "_detached_window", None),
+                window=detached_window,
                 cwd=str(
-                    getattr(bash_session, "_cwd", None) or self._initial_cwd
+                    getattr(bash_session, '_cwd', None) or self._initial_cwd
                 ),
             )
             self.session_manager.sessions[registered_bg_id] = bg_pane_session
             logger.info(
-                "Registered background pane session %s after idle-timeout detach",
+                'Registered background pane session %s after idle-timeout detach',
                 registered_bg_id,
             )
             # Reset detach state so subsequent commands don't re-register.
-            bash_session._detached_pane = None  # type: ignore[union-attr]
-            bash_session._detached_window = None  # type: ignore[union-attr]
-            bash_session._bg_session_id = None  # type: ignore[union-attr]
+            bash_session._detached_pane = None
+            bash_session._detached_window = None
+            bash_session._bg_session_id = None
 
         # subprocess bg path (SimpleBashSession / WindowsPowershellSession):
         # the session stored the Popen + OutputCapture objects as instance state.
-        bg_process = getattr(bash_session, "_bg_process", None)
-        bg_sub_id = getattr(bash_session, "_bg_session_id", None) or registered_bg_id
-        bg_stdout_cap = getattr(bash_session, "_bg_stdout_capture", None)
+        bg_process = getattr(bash_session, '_bg_process', None)
+        bg_sub_id = getattr(bash_session, '_bg_session_id', None) or registered_bg_id
+        bg_stdout_cap = getattr(bash_session, '_bg_stdout_capture', None)
         if (
             bg_process is not None
             and bg_sub_id is not None
@@ -824,21 +832,21 @@ class RuntimeExecutor:
             bg_sub_session = SubprocessBackgroundSession(
                 process=bg_process,
                 stdout_capture=bg_stdout_cap,
-                stderr_capture=getattr(bash_session, "_bg_stderr_capture", None),
-                cwd=str(getattr(bash_session, "_cwd", None) or self._initial_cwd),
+                stderr_capture=getattr(bash_session, '_bg_stderr_capture', None),
+                cwd=str(getattr(bash_session, '_cwd', None) or self._initial_cwd),
             )
             self.session_manager.sessions[bg_sub_id] = bg_sub_session
             logger.info(
-                "Registered subprocess background session %s after idle-timeout detach",
+                'Registered subprocess background session %s after idle-timeout detach',
                 bg_sub_id,
             )
-            bash_session._bg_process = None  # type: ignore[union-attr]
-            bash_session._bg_session_id = None  # type: ignore[union-attr]
-            bash_session._bg_stdout_capture = None  # type: ignore[union-attr]
-            bash_session._bg_stderr_capture = None  # type: ignore[union-attr]
+            bash_session._bg_process = None
+            bash_session._bg_session_id = None
+            bash_session._bg_stdout_capture = None
+            bash_session._bg_stderr_capture = None
 
         # Clear the pending bg_id for the next command.
-        if hasattr(bash_session, "_pending_bg_id"):
+        if hasattr(bash_session, '_pending_bg_id'):
             bash_session._pending_bg_id = None  # type: ignore[union-attr]
 
         return observation
@@ -851,8 +859,8 @@ class RuntimeExecutor:
         Creates a short-lived session, runs the command, and closes the
         session immediately. Used for isolated/one-off executions.
         """
-        temp_id = f"static-{uuid.uuid4().hex[:8]}"
-        default_session = self.session_manager.get_session("default")
+        temp_id = f'static-{uuid.uuid4().hex[:8]}'
+        default_session = self.session_manager.get_session('default')
         cwd = str(
             self._resolve_effective_cwd(
                 action.cwd,
@@ -882,7 +890,7 @@ class RuntimeExecutor:
 
         lines = content.splitlines()
         filtered = [line for line in lines if pattern.search(line)]
-        result = "\n".join(filtered)
+        result = '\n'.join(filtered)
         return result or f"[Grep: No lines matched pattern '{pattern_str}']"
 
     def _attach_detected_server(
@@ -899,14 +907,14 @@ class RuntimeExecutor:
         detected = cast(Any, bash_session.get_detected_server())
         if not detected:
             return
-        logger.info("🚀 Adding detected server to observation extras: %s", detected.url)
-        if not hasattr(observation, "extras"):
+        logger.info('🚀 Adding detected server to observation extras: %s', detected.url)
+        if not hasattr(observation, 'extras'):
             observation.extras = {}  # type: ignore[attr-defined]
-        observation.extras["server_ready"] = {  # type: ignore[attr-defined]
-            "port": detected.port,
-            "url": detected.url,
-            "protocol": detected.protocol,
-            "health_status": detected.health_status,
+        observation.extras['server_ready'] = {  # type: ignore[attr-defined]
+            'port': detected.port,
+            'url': detected.url,
+            'protocol': detected.protocol,
+            'health_status': detected.health_status,
         }
 
     def _apply_terminal_resize_if_requested(
@@ -917,36 +925,36 @@ class RuntimeExecutor:
             return None
         if rows is None or cols is None:
             return ErrorObservation(
-                "Terminal resize requires both `rows` and `cols` (or omit both)."
+                'Terminal resize requires both `rows` and `cols` (or omit both).'
             )
         r, c = int(rows), int(cols)
         if not (1 <= r <= 500 and 1 <= c <= 2000):
             return ErrorObservation(
-                f"Invalid terminal size: rows={r}, cols={c} "
-                "(allowed: rows 1–500, cols 1–2000)."
+                f'Invalid terminal size: rows={r}, cols={c} '
+                '(allowed: rows 1–500, cols 1–2000).'
             )
         try:
             session.resize(r, c)
         except Exception as exc:  # noqa: BLE001
-            logger.debug("Terminal resize not applied: %s", exc)
+            logger.debug('Terminal resize not applied: %s', exc)
         return None
 
     def _next_terminal_session_id(self) -> str:
         """Return a human-friendly unique terminal id for this runtime."""
-        sessions_obj = getattr(self.session_manager, "sessions", None)
+        sessions_obj = getattr(self.session_manager, 'sessions', None)
         existing_ids = (
             set(sessions_obj.keys()) if isinstance(sessions_obj, dict) else set()
         )
         while True:
             self._terminal_session_seq += 1
-            candidate = f"terminal_{self._terminal_session_seq}"
+            candidate = f'terminal_{self._terminal_session_seq}'
             if candidate not in existing_ids:
                 return candidate
 
     @staticmethod
     def _normalize_terminal_command(command: str) -> str:
         """Normalize command text for loop detection comparisons."""
-        return " ".join((command or "").strip().lower().split())
+        return ' '.join((command or '').strip().lower().split())
 
     def _mark_terminal_session_interaction(self, session_id: str) -> None:
         """Mark a terminal session as used (read/input happened)."""
@@ -974,21 +982,21 @@ class RuntimeExecutor:
         if not repetitive and len(pending) < 6:
             return None
 
-        sample_ids = ", ".join(pending[:8]) if pending else "none"
+        sample_ids = ', '.join(pending[:8]) if pending else 'none'
         return ErrorObservation(
-            "terminal_manager open loop detected: multiple sessions were opened but "
-            "none were used via action=read or action=input. "
-            f"Current command={command!r}. "
-            f"Use one of these existing session_id values next: {sample_ids}."
+            'terminal_manager open loop detected: multiple sessions were opened but '
+            'none were used via action=read or action=input. '
+            f'Current command={command!r}. '
+            f'Use one of these existing session_id values next: {sample_ids}.'
         )
 
     def _missing_terminal_session_error(
         self, session_id: str, *, operation: str
     ) -> ErrorObservation:
         """Return a clear agent-facing message for nonexistent terminal IDs."""
-        sessions_obj = getattr(self.session_manager, "sessions", None)
+        sessions_obj = getattr(self.session_manager, 'sessions', None)
         active_ids = (
-            sorted(k for k in sessions_obj if k != "default")
+            sorted(k for k in sessions_obj if k != 'default')
             if isinstance(sessions_obj, dict)
             else []
         )
@@ -999,8 +1007,8 @@ class RuntimeExecutor:
             )
         else:
             suggestion = (
-                "No active terminal sessions exist right now. "
-                "Call terminal_manager with action=open first, then reuse that session_id."
+                'No active terminal sessions exist right now. '
+                'Call terminal_manager with action=open first, then reuse that session_id.'
             )
         return ErrorObservation(
             f"Terminal session '{session_id}' does not exist for action={operation}. "
@@ -1009,9 +1017,9 @@ class RuntimeExecutor:
 
     @staticmethod
     def _terminal_mode(mode: str | None) -> str:
-        normalized = (mode or "delta").strip().lower()
-        if normalized not in {"delta", "snapshot"}:
-            return "delta"
+        normalized = (mode or 'delta').strip().lower()
+        if normalized not in {'delta', 'snapshot'}:
+            return 'delta'
         return normalized
 
     @staticmethod
@@ -1021,14 +1029,14 @@ class RuntimeExecutor:
         """Structured hints when a read returns no new bytes (honest, not heuristics)."""
         if has_new_output:
             return {}
-        if mode == "delta":
+        if mode == 'delta':
             return {
-                "delta_empty": True,
-                "empty_reason": "no_new_bytes_since_offset",
+                'delta_empty': True,
+                'empty_reason': 'no_new_bytes_since_offset',
             }
         return {
-            "snapshot_empty": True,
-            "empty_reason": "no_printable_output_in_buffer",
+            'snapshot_empty': True,
+            'empty_reason': 'no_printable_output_in_buffer',
         }
 
     def _read_terminal_with_mode(
@@ -1039,13 +1047,13 @@ class RuntimeExecutor:
         offset: int | None,
     ) -> tuple[str, int | None, bool, int | None]:
         """Read terminal output using either delta cursor or snapshot semantics."""
-        if mode == "snapshot":
+        if mode == 'snapshot':
             content = session.read_output()
-            has_new_output = bool((content or "").strip())
+            has_new_output = bool((content or '').strip())
             return content, None, has_new_output, None
 
         safe_offset = max(0, int(offset or 0))
-        read_since = getattr(session, "read_output_since", None)
+        read_since = getattr(session, 'read_output_since', None)
         if callable(read_since):
             try:
                 result = read_since(safe_offset)
@@ -1056,15 +1064,15 @@ class RuntimeExecutor:
                 ):
                     content, next_offset, dropped_chars = result
                 else:
-                    raise ValueError("invalid read_output_since result shape")
+                    raise ValueError('invalid read_output_since result shape')
             except Exception:
                 content = session.read_output()
-                next_offset = len(content or "")
+                next_offset = len(content or '')
                 dropped_chars = None
         else:
             # Fallback for older/alternate session implementations.
             content = session.read_output()
-            next_offset = len(content or "")
+            next_offset = len(content or '')
             dropped_chars = None
         has_new_output = bool(content)
         return content, int(next_offset), has_new_output, dropped_chars
@@ -1073,9 +1081,9 @@ class RuntimeExecutor:
         return int(self._terminal_read_cursor.get(session_id, 0))
 
     def _advance_terminal_read_cursor(
-        self, session_id: str, next_offset: int | None, *, mode: str = "delta"
+        self, session_id: str, next_offset: int | None, *, mode: str = 'delta'
     ) -> None:
-        if (mode or "").lower() != "delta" or next_offset is None:
+        if (mode or '').lower() != 'delta' or next_offset is None:
             return
         self._terminal_read_cursor[session_id] = int(next_offset)
 
@@ -1085,7 +1093,7 @@ class RuntimeExecutor:
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         """Start a new interactive terminal session."""
         try:
-            guard_err = self._terminal_open_guardrail_error(action.command or "")
+            guard_err = self._terminal_open_guardrail_error(action.command or '')
             if guard_err is not None:
                 return guard_err
 
@@ -1094,7 +1102,7 @@ class RuntimeExecutor:
 
             # Determine working directory
             # Prefer provided CWD -> default session CWD -> initial CWD
-            default_session = self.session_manager.get_session("default")
+            default_session = self.session_manager.get_session('default')
             cwd = action.cwd
             if not cwd and default_session:
                 cwd = default_session.cwd
@@ -1102,7 +1110,7 @@ class RuntimeExecutor:
                 cwd = self._initial_cwd
 
             cwd_error = self._validate_workspace_scoped_cwd(
-                action.command or "<interactive terminal>",
+                action.command or '<interactive terminal>',
                 action.cwd,
                 cwd,
             )
@@ -1140,27 +1148,27 @@ class RuntimeExecutor:
                     return policy_error
                 # Send the initial command if provided
                 logger.debug(
-                    "Running initial command in terminal %s: %s",
+                    'Running initial command in terminal %s: %s',
                     session_id,
                     action.command,
                 )
                 # Attempt to write input. If underlying session doesn't support input,
                 # it will log a warning but not crash.
-                session.write_input(action.command + "\n")
-                if predicted_cwd is not None and hasattr(session, "_cwd"):
+                session.write_input(action.command + '\n')
+                if predicted_cwd is not None and hasattr(session, '_cwd'):
                     session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
 
             # Return initial output as typed structured envelope.
             content, next_offset, has_new_output, dropped_chars = (
                 self._read_terminal_with_mode(
                     session=session,
-                    mode="delta",
+                    mode='delta',
                     offset=0,
                 )
             )
             self._terminal_sessions_awaiting_interaction.append(session_id)
             self._terminal_open_commands_no_interaction.append(
-                self._normalize_terminal_command(action.command or "")
+                self._normalize_terminal_command(action.command or '')
             )
             obs = TerminalObservation(
                 session_id=session_id,
@@ -1168,41 +1176,41 @@ class RuntimeExecutor:
                 next_offset=next_offset,
                 has_new_output=has_new_output,
                 dropped_chars=dropped_chars,
-                state="SESSION_OPENED",
+                state='SESSION_OPENED',
             )
             empty_hints = self._terminal_read_empty_hints(
-                mode="delta", has_new_output=has_new_output
+                mode='delta', has_new_output=has_new_output
             )
             obs.tool_result = {
-                "tool": "terminal_manager",
-                "ok": True,
-                "error_code": None,
-                "retryable": False,
-                "state": "SESSION_OPENED",
-                "next_actions": ["read", "input"],
-                "payload": {
-                    "session_id": session_id,
-                    "mode": "delta",
-                    "next_offset": next_offset,
-                    "has_new_output": has_new_output,
-                    "dropped_chars": dropped_chars,
+                'tool': 'terminal_manager',
+                'ok': True,
+                'error_code': None,
+                'retryable': False,
+                'state': 'SESSION_OPENED',
+                'next_actions': ['read', 'input'],
+                'payload': {
+                    'session_id': session_id,
+                    'mode': 'delta',
+                    'next_offset': next_offset,
+                    'has_new_output': has_new_output,
+                    'dropped_chars': dropped_chars,
                     **empty_hints,
                 },
-                "progress": bool(has_new_output),
+                'progress': bool(has_new_output),
             }
-            self._advance_terminal_read_cursor(session_id, next_offset, mode="delta")
+            self._advance_terminal_read_cursor(session_id, next_offset, mode='delta')
             return obs
 
         except Exception as e:
-            logger.error("Error starting terminal session: %s", e, exc_info=True)
-            return ErrorObservation(f"Failed to start terminal: {e}")
+            logger.error('Error starting terminal session: %s', e, exc_info=True)
+            return ErrorObservation(f'Failed to start terminal: {e}')
 
     async def terminal_input(self, action: TerminalInputAction) -> Observation:
         """Send input to an interactive terminal session."""
         session = self.session_manager.get_session(action.session_id)
         if not session:
             return self._missing_terminal_session_error(
-                action.session_id, operation="input"
+                action.session_id, operation='input'
             )
 
         scope_error = self._validate_interactive_session_scope(
@@ -1218,18 +1226,18 @@ class RuntimeExecutor:
             if resize_err is not None:
                 return resize_err
 
-            if action.control is not None and str(action.control).strip() != "":
+            if action.control is not None and str(action.control).strip() != '':
                 session.write_input(str(action.control), is_control=True)
 
             write_content = action.input
             predicted_cwd: Path | None = None
             if write_content:
                 if not action.is_control:
-                    policy_line = write_content.rstrip("\r\n")
+                    policy_line = write_content.rstrip('\r\n')
                     predicted_cwd, policy_error = (
                         self._evaluate_interactive_terminal_command(
                             policy_line,
-                            Path(getattr(session, "cwd", self._initial_cwd)).resolve(),
+                            Path(getattr(session, 'cwd', self._initial_cwd)).resolve(),
                         )
                     )
                     if policy_error is not None:
@@ -1240,12 +1248,12 @@ class RuntimeExecutor:
                     action.submit
                     and not action.is_control
                     and to_send
-                    and not to_send.endswith(("\n", "\r\n"))
+                    and not to_send.endswith(('\n', '\r\n'))
                 ):
-                    to_send = f"{to_send}\n"
+                    to_send = f'{to_send}\n'
 
                 session.write_input(to_send, is_control=action.is_control)
-            if predicted_cwd is not None and hasattr(session, "_cwd"):
+            if predicted_cwd is not None and hasattr(session, '_cwd'):
                 session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
             # Wait briefly for output to appear
             await asyncio.sleep(0.2)
@@ -1253,16 +1261,16 @@ class RuntimeExecutor:
             content, next_offset, has_new_output, dropped_chars = (
                 self._read_terminal_with_mode(
                     session=session,
-                    mode="delta",
+                    mode='delta',
                     offset=read_offset,
                 )
             )
             self._advance_terminal_read_cursor(
-                action.session_id, next_offset, mode="delta"
+                action.session_id, next_offset, mode='delta'
             )
             self._mark_terminal_session_interaction(action.session_id)
             empty_hints = self._terminal_read_empty_hints(
-                mode="delta", has_new_output=has_new_output
+                mode='delta', has_new_output=has_new_output
             )
             obs = TerminalObservation(
                 session_id=action.session_id,
@@ -1270,36 +1278,36 @@ class RuntimeExecutor:
                 next_offset=next_offset,
                 has_new_output=has_new_output,
                 dropped_chars=dropped_chars,
-                state="SESSION_INTERACTED",
+                state='SESSION_INTERACTED',
             )
             obs.tool_result = {
-                "tool": "terminal_manager",
-                "ok": True,
-                "error_code": None,
-                "retryable": False,
-                "state": "SESSION_INTERACTED",
-                "next_actions": ["read", "input"],
-                "payload": {
-                    "session_id": action.session_id,
-                    "mode": "delta",
-                    "next_offset": next_offset,
-                    "has_new_output": has_new_output,
-                    "dropped_chars": dropped_chars,
+                'tool': 'terminal_manager',
+                'ok': True,
+                'error_code': None,
+                'retryable': False,
+                'state': 'SESSION_INTERACTED',
+                'next_actions': ['read', 'input'],
+                'payload': {
+                    'session_id': action.session_id,
+                    'mode': 'delta',
+                    'next_offset': next_offset,
+                    'has_new_output': has_new_output,
+                    'dropped_chars': dropped_chars,
                     **empty_hints,
                 },
-                "progress": bool(has_new_output),
+                'progress': bool(has_new_output),
             }
             return obs
         except Exception as e:
-            logger.error("Error sending input to terminal %s: %s", action.session_id, e)
-            return ErrorObservation(f"Failed to send input: {e}")
+            logger.error('Error sending input to terminal %s: %s', action.session_id, e)
+            return ErrorObservation(f'Failed to send input: {e}')
 
     async def terminal_read(self, action: TerminalReadAction) -> Observation:
         """Read the output of an interactive terminal session."""
         session = self.session_manager.get_session(action.session_id)
         if not session:
             return self._missing_terminal_session_error(
-                action.session_id, operation="read"
+                action.session_id, operation='read'
             )
 
         scope_error = self._validate_interactive_session_scope(
@@ -1321,7 +1329,7 @@ class RuntimeExecutor:
                 if action.offset is not None
                 else (
                     self._get_terminal_read_cursor(action.session_id)
-                    if mode == "delta"
+                    if mode == 'delta'
                     else 0
                 )
             )
@@ -1346,37 +1354,37 @@ class RuntimeExecutor:
                 has_new_output=has_new_output,
                 dropped_chars=dropped_chars,
                 state=(
-                    "SESSION_OUTPUT_DELTA"
-                    if mode == "delta"
-                    else "SESSION_OUTPUT_SNAPSHOT"
+                    'SESSION_OUTPUT_DELTA'
+                    if mode == 'delta'
+                    else 'SESSION_OUTPUT_SNAPSHOT'
                 ),
             )
             obs.tool_result = {
-                "tool": "terminal_manager",
-                "ok": True,
-                "error_code": None,
-                "retryable": False,
-                "state": (
-                    "SESSION_OUTPUT_DELTA"
-                    if mode == "delta"
-                    else "SESSION_OUTPUT_SNAPSHOT"
+                'tool': 'terminal_manager',
+                'ok': True,
+                'error_code': None,
+                'retryable': False,
+                'state': (
+                    'SESSION_OUTPUT_DELTA'
+                    if mode == 'delta'
+                    else 'SESSION_OUTPUT_SNAPSHOT'
                 ),
-                "next_actions": ["read", "input"],
-                "payload": {
-                    "session_id": action.session_id,
-                    "mode": mode,
-                    "request_offset": action.offset,
-                    "next_offset": next_offset,
-                    "has_new_output": has_new_output,
-                    "dropped_chars": dropped_chars,
+                'next_actions': ['read', 'input'],
+                'payload': {
+                    'session_id': action.session_id,
+                    'mode': mode,
+                    'request_offset': action.offset,
+                    'next_offset': next_offset,
+                    'has_new_output': has_new_output,
+                    'dropped_chars': dropped_chars,
                     **empty_hints,
                 },
-                "progress": bool(has_new_output),
+                'progress': bool(has_new_output),
             }
             return obs
         except Exception as e:
-            logger.error("Error reading terminal %s: %s", action.session_id, e)
-            return ErrorObservation(f"Failed to read terminal: {e}")
+            logger.error('Error reading terminal %s: %s', action.session_id, e)
+            return ErrorObservation(f'Failed to read terminal: {e}')
 
     def _resolve_path(self, path: str, working_dir: str) -> str:
         """Resolve a relative or absolute path to an absolute path with security validation."""
@@ -1386,7 +1394,7 @@ class RuntimeExecutor:
         """Handle file reading using the FILE_EDITOR implementation."""
         result_str, _ = execute_file_editor(
             self.file_editor,
-            command="read_file",
+            command='read_file',
             path=action.path,
             view_range=action.view_range,
         )
@@ -1396,13 +1404,13 @@ class RuntimeExecutor:
 
     async def read(self, action: FileReadAction) -> Observation:
         """Read a file and return its content as an observation."""
-        bash_session = self.session_manager.get_session("default")
+        bash_session = self.session_manager.get_session('default')
         if bash_session is None:
-            return ErrorObservation("Default shell session not initialized")
+            return ErrorObservation('Default shell session not initialized')
 
         # Check for binary files (skip probe if path is missing — avoids noisy errors)
         if os.path.isfile(action.path) and is_binary(action.path):
-            return ErrorObservation("ERROR_BINARY_FILE")
+            return ErrorObservation('ERROR_BINARY_FILE')
 
         # Handle FILE_EDITOR implementation
         if action.impl_source == FileReadSource.FILE_EDITOR:
@@ -1419,11 +1427,11 @@ class RuntimeExecutor:
 
         try:
             # Handle different file types
-            if filepath.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".gif")):
+            if filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
                 return read_image_file(filepath)
-            if filepath.lower().endswith(".pdf"):
+            if filepath.lower().endswith('.pdf'):
                 return read_pdf_file(filepath)
-            if filepath.lower().endswith((".mp4", ".webm", ".ogg")):
+            if filepath.lower().endswith(('.mp4', '.webm', '.ogg')):
                 return read_video_file(filepath)
             return read_text_file(filepath, action)
         except Exception:
@@ -1431,15 +1439,15 @@ class RuntimeExecutor:
 
     async def write(self, action: FileWriteAction) -> Observation:
         """Write a file and return an observation."""
-        bash_session = self.session_manager.get_session("default")
+        bash_session = self.session_manager.get_session('default')
         if bash_session is None:
-            return ErrorObservation("Default shell session not initialized")
+            return ErrorObservation('Default shell session not initialized')
 
         working_dir = bash_session.cwd
         try:
             filepath = self._resolve_workspace_file_path(action.path, working_dir)
         except PermissionError as e:
-            return ErrorObservation(f"Permission error on {action.path}: {e}")
+            return ErrorObservation(f'Permission error on {action.path}: {e}')
 
         try:
             ensure_directory_exists(filepath)
@@ -1448,12 +1456,12 @@ class RuntimeExecutor:
             if error_obs:
                 return error_obs
             return FileWriteObservation(
-                content=f"Wrote file: {action.path}",
+                content=f'Wrote file: {action.path}',
                 path=action.path,
             )
         except Exception as e:
-            logger.error("Error writing file %s: %s", action.path, e, exc_info=True)
-            return ErrorObservation(f"Failed to write file {action.path}: {e}")
+            logger.error('Error writing file %s: %s', action.path, e, exc_info=True)
+            return ErrorObservation(f'Failed to write file {action.path}: {e}')
 
     def _edit_try_directory_view(
         self, filepath: str, path_for_obs: str, action: FileEditAction
@@ -1461,7 +1469,7 @@ class RuntimeExecutor:
         """Return directory view observation if path is dir and viewable; else None."""
         try:
             if os.path.isdir(filepath) and (
-                action.command == "read_file" or not action.command
+                action.command == 'read_file' or not action.command
             ):
                 return handle_directory_view(filepath, path_for_obs)
         except Exception:
@@ -1470,7 +1478,7 @@ class RuntimeExecutor:
 
     def _edit_via_file_editor(self, action: FileEditAction) -> Observation:
         """Execute FILE_EDITOR-style edit and return observation."""
-        command = action.command or "write"
+        command = action.command or 'write'
         enable_lint = self._is_auto_lint_enabled()
         result_str, (old_content, new_content) = execute_file_editor(
             self.file_editor,
@@ -1481,39 +1489,39 @@ class RuntimeExecutor:
             old_str=action.old_str,
             new_str=action.new_str,
             insert_line=action.insert_line,
-            start_line=getattr(action, "start_line", None),
-            end_line=getattr(action, "end_line", None),
+            start_line=getattr(action, 'start_line', None),
+            end_line=getattr(action, 'end_line', None),
             normalize_ws=action.normalize_ws,
             enable_linting=enable_lint,
-            edit_mode=getattr(action, "edit_mode", None),
-            format_kind=getattr(action, "format_kind", None),
-            format_op=getattr(action, "format_op", None),
-            format_path=getattr(action, "format_path", None),
-            format_value=getattr(action, "format_value", None),
-            anchor_type=getattr(action, "anchor_type", None),
-            anchor_value=getattr(action, "anchor_value", None),
-            anchor_occurrence=getattr(action, "anchor_occurrence", None),
-            section_action=getattr(action, "section_action", None),
-            section_content=getattr(action, "section_content", None),
-            patch_text=getattr(action, "patch_text", None),
-            expected_hash=getattr(action, "expected_hash", None),
-            expected_file_hash=getattr(action, "expected_file_hash", None),
+            edit_mode=getattr(action, 'edit_mode', None),
+            format_kind=getattr(action, 'format_kind', None),
+            format_op=getattr(action, 'format_op', None),
+            format_path=getattr(action, 'format_path', None),
+            format_value=getattr(action, 'format_value', None),
+            anchor_type=getattr(action, 'anchor_type', None),
+            anchor_value=getattr(action, 'anchor_value', None),
+            anchor_occurrence=getattr(action, 'anchor_occurrence', None),
+            section_action=getattr(action, 'section_action', None),
+            section_content=getattr(action, 'section_content', None),
+            patch_text=getattr(action, 'patch_text', None),
+            expected_hash=getattr(action, 'expected_hash', None),
+            expected_file_hash=getattr(action, 'expected_file_hash', None),
         )
-        if result_str.startswith("ERROR:"):
+        if result_str.startswith('ERROR:'):
             return ErrorObservation(result_str)
         max_chars = get_max_edit_observation_chars()
-        result_str = truncate_large_text(result_str, max_chars, label="edit")
+        result_str = truncate_large_text(result_str, max_chars, label='edit')
         # P1-B: Append a short unified diff to the observation so the LLM can
         # confirm what changed without a follow-up view call.
         if (
             old_content is not None
             and new_content is not None
-            and command != "read_file"
+            and command != 'read_file'
         ):
             try:
                 diff = get_diff(old_content, new_content, action.path)
                 if diff:
-                    result_str = result_str + "\n\n[EDIT_DIFF]\n" + diff
+                    result_str = result_str + '\n\n[EDIT_DIFF]\n' + diff
             except Exception:
                 pass  # diff is a nice-to-have; never block the observation
         # Blast Radius Hook
@@ -1536,7 +1544,7 @@ class RuntimeExecutor:
 
     def _edit_via_llm(self, action: FileEditAction) -> Observation:
         """Execute LLM-based range edit and return observation."""
-        command = action.command or "edit"
+        command = action.command or 'edit'
         enable_lint = self._is_auto_lint_enabled()
         result_str, (old_content, new_content) = execute_file_editor(
             self.file_editor,
@@ -1547,7 +1555,7 @@ class RuntimeExecutor:
             end_line=action.end,
             enable_linting=enable_lint,
         )
-        if result_str.startswith("ERROR:"):
+        if result_str.startswith('ERROR:'):
             return ErrorObservation(result_str)
         if old_content and new_content:
             diff = get_diff(old_content, new_content, action.path)
@@ -1592,7 +1600,7 @@ class RuntimeExecutor:
         new_content: str | None,
     ) -> str:
         """Append blast-radius warning text when available, without interrupting edits."""
-        if command == "read_file" or new_content is None:
+        if command == 'read_file' or new_content is None:
             return base_content
         try:
             from backend.utils.blast_radius import check_blast_radius_from_code
@@ -1601,22 +1609,22 @@ class RuntimeExecutor:
             if warning:
                 return base_content + warning
         except Exception as e:
-            logger.debug("Failed to check blast radius: %s", e)
+            logger.debug('Failed to check blast radius: %s', e)
         return base_content
 
     def _is_auto_lint_enabled(self) -> bool:
         """Return whether auto-lint should run after editor mutations."""
-        return os.environ.get("ENABLE_AUTO_LINT", "").lower() in {
-            "1",
-            "true",
-            "yes",
+        return os.environ.get('ENABLE_AUTO_LINT', '').lower() in {
+            '1',
+            'true',
+            'yes',
         }
 
     async def edit(self, action: FileEditAction) -> Observation:
         """Edit a file (FILE_EDITOR or LLM-based) and return an observation."""
-        bash_session = self.session_manager.get_session("default")
+        bash_session = self.session_manager.get_session('default')
         if bash_session is None:
-            return ErrorObservation("Default shell session not initialized")
+            return ErrorObservation('Default shell session not initialized')
         working_dir = bash_session.cwd
         try:
             filepath = self._resolve_workspace_file_path(action.path, working_dir)
@@ -1635,8 +1643,8 @@ class RuntimeExecutor:
         try:
             return self._edit_via_llm(action)
         except Exception as e:
-            logger.error("Error editing file %s: %s", action.path, e, exc_info=True)
-            return ErrorObservation(f"Failed to edit file {action.path}: {e}")
+            logger.error('Error editing file %s: %s', action.path, e, exc_info=True)
+            return ErrorObservation(f'Failed to edit file {action.path}: {e}')
 
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
         """Execute an MCP tool call using App's MCP client integration."""
@@ -1654,7 +1662,7 @@ class RuntimeExecutor:
                 if cfg is None:
                     cfg = load_app_config().mcp
 
-                servers = getattr(cfg, "servers", []) or []
+                servers = getattr(cfg, 'servers', []) or []
                 # Apply the same allowlist-based Windows filter used during
                 # config loading so that explicitly-allowed stdio servers are
                 # kept while unknown ones are still blocked.
@@ -1666,7 +1674,7 @@ class RuntimeExecutor:
                 )
 
                 _reserved = (
-                    getattr(cfg, "mcp_exposed_name_reserved", None) or frozenset()
+                    getattr(cfg, 'mcp_exposed_name_reserved', None) or frozenset()
                 )
                 prepare_mcp_tool_exposed_names(self._mcp_clients, set(_reserved))
 
@@ -1677,17 +1685,17 @@ class RuntimeExecutor:
             )  # type: ignore[arg-type]
 
             # Apply truncation to large MCP outputs
-            if hasattr(observation, "content") and isinstance(observation.content, str):
+            if hasattr(observation, 'content') and isinstance(observation.content, str):
                 max_chars = (
                     get_max_edit_observation_chars()
                 )  # Reuse same limit or similar logic
                 observation.content = truncate_large_text(
-                    observation.content, max_chars, label=f"MCP:{action.name}"
+                    observation.content, max_chars, label=f'MCP:{action.name}'
                 )
 
             return observation
         except Exception as e:
-            logger.error("MCP call failed for %s: %s", action.name, e, exc_info=True)
+            logger.error('MCP call failed for %s: %s', action.name, e, exc_info=True)
             return ErrorObservation(
                 content=(
                     f"MCP tool call failed for '{action.name}': {type(e).__name__}: {e}. "
@@ -1707,7 +1715,7 @@ class RuntimeExecutor:
                 file=action.file,
                 line=action.line,
                 column=action.column,
-                symbol=getattr(action, "symbol", ""),
+                symbol=getattr(action, 'symbol', ''),
             )
 
             latency_ms = int((time.perf_counter() - start) * 1000)
@@ -1716,15 +1724,15 @@ class RuntimeExecutor:
                 available=bool(result.available),
             )
             obs.tool_result = {
-                "tool": "code_intelligence",
-                "command": action.command,
-                "file": action.file,
-                "latency_ms": latency_ms,
-                "available": bool(result.available),
-                "has_error": bool(result.error),
+                'tool': 'code_intelligence',
+                'command': action.command,
+                'file': action.file,
+                'latency_ms': latency_ms,
+                'available': bool(result.available),
+                'has_error': bool(result.error),
             }
             logger.info(
-                "LSP query completed: command=%s available=%s latency_ms=%d",
+                'LSP query completed: command=%s available=%s latency_ms=%d',
                 action.command,
                 bool(result.available),
                 latency_ms,
@@ -1732,17 +1740,17 @@ class RuntimeExecutor:
             return obs
         except Exception as e:
             latency_ms = int((time.perf_counter() - start) * 1000)
-            logger.error("LSP query failed: %s", e, exc_info=True)
+            logger.error('LSP query failed: %s', e, exc_info=True)
             err = ErrorObservation(
-                f"LSP query failed: {e}. Check if python-lsp-server is installed."
+                f'LSP query failed: {e}. Check if python-lsp-server is installed.'
             )
             err.tool_result = {
-                "tool": "code_intelligence",
-                "command": action.command,
-                "file": action.file,
-                "latency_ms": latency_ms,
-                "available": False,
-                "has_error": True,
+                'tool': 'code_intelligence',
+                'command': action.command,
+                'file': action.file,
+                'latency_ms': latency_ms,
+                'available': False,
+                'has_error': True,
             }
             return err
 
@@ -1756,8 +1764,8 @@ class RuntimeExecutor:
         if not self.enable_browser:
             return ErrorObservation(
                 content=(
-                    "ERROR: Browser runtime is disabled for this session "
-                    "(enable_browser=false on the runtime)."
+                    'ERROR: Browser runtime is disabled for this session '
+                    '(enable_browser=false on the runtime).'
                 )
             )
         from backend.execution.browser import GrintaNativeBrowser
@@ -1780,7 +1788,7 @@ class RuntimeExecutor:
                     except asyncio.CancelledError:
                         raise
                     except Exception as exc:
-                        logger.debug("MCP executor disconnect: %s", exc, exc_info=True)
+                        logger.debug('MCP executor disconnect: %s', exc, exc_info=True)
                     await asyncio.sleep(0)
 
             try:
@@ -1789,7 +1797,7 @@ class RuntimeExecutor:
 
                 call_async_from_sync(_disconnect_mcp, GENERAL_TIMEOUT)
             except Exception as exc:
-                logger.debug("MCP disconnect during RuntimeExecutor.close: %s", exc)
+                logger.debug('MCP disconnect during RuntimeExecutor.close: %s', exc)
 
         try:
             self.debug_manager.close_all()
@@ -1830,8 +1838,8 @@ mcp_proxy_manager: MCPProxyManager | None = None
 # Initializers for routes
 def get_client() -> RuntimeExecutor:
     if client is None:
-        logger.warning("Runtime executor not initialized")
-        raise ReferenceError("Runtime executor not initialized")
+        logger.warning('Runtime executor not initialized')
+        raise ReferenceError('Runtime executor not initialized')
     return client
 
 
@@ -1843,7 +1851,7 @@ def get_mcp_proxy() -> MCPProxyManager | None:
 async def lifespan(app: FastAPI):
     """Manage FastAPI application lifespan."""
     global initialization_task
-    logger.info("Starting server (prewarm check for local models)...")
+    logger.info('Starting server (prewarm check for local models)...')
 
     # Run prewarm check synchronously (in a thread) so we fail startup fast if
     # prebundled model artifacts are missing.
@@ -1853,20 +1861,20 @@ async def lifespan(app: FastAPI):
             get_default_models_to_prewarm,
         )
 
-        prebundle_env = os.getenv("PREBUNDLED_MODELS", "")
+        prebundle_env = os.getenv('PREBUNDLED_MODELS', '')
         models = get_default_models_to_prewarm()
         if prebundle_env:
-            models += [m.strip() for m in prebundle_env.split(",") if m.strip()]
+            models += [m.strip() for m in prebundle_env.split(',') if m.strip()]
         # snapshot_download is blocking; run it in a thread to avoid blocking the loop.
         await asyncio.to_thread(ensure_models_available, models, True)
-        logger.info("Prewarm check succeeded: required models available locally")
+        logger.info('Prewarm check succeeded: required models available locally')
     except Exception as e:
-        logger.error("Prewarm model check failed: %s", e, exc_info=True)
+        logger.error('Prewarm model check failed: %s', e, exc_info=True)
         # Raise to prevent yielding readiness — startup should fail fast when artifacts are missing.
         raise
 
     # Start initialization in background task
-    initialize_background = globals().get("_initialize_background")
+    initialize_background = globals().get('_initialize_background')
     if not callable(initialize_background):
 
         async def _noop_initialize(_: FastAPI) -> None:
@@ -1879,17 +1887,17 @@ async def lifespan(app: FastAPI):
     yield
 
     # Cleanup on shutdown
-    logger.info("Shutting down...")
+    logger.info('Shutting down...')
     global mcp_proxy_manager, client
     if initialization_task and not initialization_task.done():
-        logger.info("Cancelling initialization task...")
+        logger.info('Cancelling initialization task...')
         initialization_task.cancel()
         try:
             await initialization_task
         except asyncio.CancelledError:
             pass
 
-    logger.info("Shutting down MCP Proxy Manager...")
+    logger.info('Shutting down MCP Proxy Manager...')
     if mcp_proxy_manager:
         try:
             # MCP Proxy doesn't have a close/cleanup method?
@@ -1900,15 +1908,15 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
 
-    logger.info("Closing RuntimeExecutor...")
+    logger.info('Closing RuntimeExecutor...')
     if client:
         try:
             client.close()
-            logger.info("RuntimeExecutor closed successfully.")
+            logger.info('RuntimeExecutor closed successfully.')
         except Exception as e:
-            logger.error("Error closing RuntimeExecutor: %s", e, exc_info=True)
+            logger.error('Error closing RuntimeExecutor: %s', e, exc_info=True)
 
-    logger.info("Shutdown complete.")
+    logger.info('Shutdown complete.')
 
 
 app = FastAPI(lifespan=lifespan)
@@ -1919,60 +1927,60 @@ register_routes(app, get_client, get_mcp_proxy)
 def get_uvicorn_json_log_config() -> dict[str, Any]:
     """Return a minimal uvicorn log configuration."""
     return {
-        "version": 1,
-        "disable_existing_loggers": False,
-        "formatters": {
-            "default": {
-                "format": "%(levelname)s %(asctime)s %(name)s %(message)s",
-                "use_colors": None,
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'default': {
+                'format': '%(levelname)s %(asctime)s %(name)s %(message)s',
+                'use_colors': None,
             },
-            "access": {
-                "format": "%(levelname)s %(asctime)s %(message)s",
-                "use_colors": None,
+            'access': {
+                'format': '%(levelname)s %(asctime)s %(message)s',
+                'use_colors': None,
             },
         },
-        "handlers": {
-            "default": {
-                "class": "logging.StreamHandler",
-                "formatter": "default",
+        'handlers': {
+            'default': {
+                'class': 'logging.StreamHandler',
+                'formatter': 'default',
             }
         },
-        "loggers": {
-            "uvicorn": {"handlers": ["default"], "level": "INFO"},
-            "uvicorn.error": {"handlers": ["default"], "level": "INFO"},
-            "uvicorn.access": {"handlers": ["default"], "level": "INFO"},
+        'loggers': {
+            'uvicorn': {'handlers': ['default'], 'level': 'INFO'},
+            'uvicorn.error': {'handlers': ['default'], 'level': 'INFO'},
+            'uvicorn.access': {'handlers': ['default'], 'level': 'INFO'},
         },
     }
 
 
-if __name__ == "__main__":
-    logger.warning("Starting Action Execution Server")
+if __name__ == '__main__':
+    logger.warning('Starting Action Execution Server')
     parser = argparse.ArgumentParser()
-    parser.add_argument("port", type=int, help="Port to listen on")
-    parser.add_argument("--working-dir", type=str, help="Working directory")
-    parser.add_argument("--plugins", type=str, help="Plugins to initialize", nargs="+")
-    parser.add_argument("--username", type=str, help="User to run as", default="app")
-    parser.add_argument("--user-id", type=int, help="User ID to run as", default=1000)
+    parser.add_argument('port', type=int, help='Port to listen on')
+    parser.add_argument('--working-dir', type=str, help='Working directory')
+    parser.add_argument('--plugins', type=str, help='Plugins to initialize', nargs='+')
+    parser.add_argument('--username', type=str, help='User to run as', default='app')
+    parser.add_argument('--user-id', type=int, help='User ID to run as', default=1000)
     parser.add_argument(
-        "--enable-browser",
+        '--enable-browser',
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Enable the browser environment",
+        help='Enable the browser environment',
     )
     args = parser.parse_args()
 
-    logger.info("Starting file viewer server")
+    logger.info('Starting file viewer server')
     _file_viewer_port = find_available_tcp_port(
         min_port=args.port + 1, max_port=min(args.port + 1024, 65535)
     )
     server_url, _ = start_file_viewer_server(port=_file_viewer_port)
-    logger.info("File viewer server started at %s", server_url)
+    logger.info('File viewer server started at %s', server_url)
 
     plugins_to_load: list[Plugin] = []
     if args.plugins:
         for plugin in args.plugins:
             if plugin not in ALL_PLUGINS:
-                msg = f"Plugin {plugin} not found"
+                msg = f'Plugin {plugin} not found'
                 raise ValueError(msg)
             plugins_to_load.append(ALL_PLUGINS[plugin]())
 
@@ -1985,7 +1993,7 @@ if __name__ == "__main__":
         """Initialize RuntimeExecutor and MCP Proxy Manager in the background."""
         global client, mcp_proxy_manager, initialization_error
         try:
-            logger.info("Initializing RuntimeExecutor...")
+            logger.info('Initializing RuntimeExecutor...')
             from backend.core.config.config_loader import load_app_config
 
             client = RuntimeExecutor(
@@ -1997,25 +2005,25 @@ if __name__ == "__main__":
                 security_config=load_app_config().security,
             )
             logger.info(
-                "RuntimeExecutor instance created. Starting async initialization..."
+                'RuntimeExecutor instance created. Starting async initialization...'
             )
 
-            init_timeout = int(os.environ.get("ACTION_EXECUTOR_INIT_TIMEOUT", "300"))
+            init_timeout = int(os.environ.get('ACTION_EXECUTOR_INIT_TIMEOUT', '300'))
             try:
                 await asyncio.wait_for(client.ainit(), timeout=init_timeout)
-                logger.info("RuntimeExecutor initialized successfully.")
+                logger.info('RuntimeExecutor initialized successfully.')
             except TimeoutError as exc:
-                error_msg = f"RuntimeExecutor initialization timed out after {init_timeout} seconds."
+                error_msg = f'RuntimeExecutor initialization timed out after {init_timeout} seconds.'
                 logger.error(error_msg)
                 initialization_error = RuntimeError(error_msg)
                 raise initialization_error from exc
 
-            is_windows = sys.platform == "win32"
+            is_windows = sys.platform == 'win32'
             if is_windows:
-                logger.info("Skipping MCP Proxy initialization on Windows")
+                logger.info('Skipping MCP Proxy initialization on Windows')
                 mcp_proxy_manager = None
             else:
-                logger.info("Initializing MCP Proxy Manager...")
+                logger.info('Initializing MCP Proxy Manager...')
                 mcp_proxy_manager = MCPProxyManager(
                     auth_enabled=False,
                     api_key=None,
@@ -2023,27 +2031,27 @@ if __name__ == "__main__":
                 )
                 app_config = load_app_config()
                 mcp_proxy_manager.initialize(app_config.mcp.servers)
-                allowed_origins = ["*"]
+                allowed_origins = ['*']
                 try:
                     await mcp_proxy_manager.mount_to_app(app, allowed_origins)
-                    logger.info("MCP Proxy Manager mounted to app successfully")
+                    logger.info('MCP Proxy Manager mounted to app successfully')
                 except Exception as e:
-                    logger.error("Error mounting MCP Proxy: %s", e, exc_info=True)
-                    logger.warning("Continuing without MCP Proxy mounting")
+                    logger.error('Error mounting MCP Proxy: %s', e, exc_info=True)
+                    logger.warning('Continuing without MCP Proxy mounting')
 
         except Exception as e:
             logger.error(
-                "Failed to initialize RuntimeExecutor: %s",
+                'Failed to initialize RuntimeExecutor: %s',
                 e,
                 exc_info=True,
             )
             initialization_error = e
 
-    logger.debug("Starting action execution API on port %d", args.port)
+    logger.debug('Starting action execution API on port %d', args.port)
     log_config = None
-    if os.getenv("LOG_JSON", "0") in ("1", "true", "True"):
+    if os.getenv('LOG_JSON', '0') in ('1', 'true', 'True'):
         log_config = get_uvicorn_json_log_config()
-    server_host = os.getenv("ACTION_EXECUTION_HOST", "127.0.0.1")
+    server_host = os.getenv('ACTION_EXECUTION_HOST', '127.0.0.1')
     server = Server(
         Config(
             app,

@@ -22,7 +22,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
-
 SandboxBackend = Literal['bubblewrap', 'sandbox-exec', 'appcontainer']
 _SANDBOX_TMP_DIR = Path('/').joinpath('tmp').as_posix()
 

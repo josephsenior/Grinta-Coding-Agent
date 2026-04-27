@@ -181,6 +181,7 @@ async def test_middleware_blocks_mutating_edit_on_stale_file(
 
     # Advance mtime so the staleness check sees a newer mtime.
     key = _normalize_path_key(str(f))
+    assert key is not None
     snap = mw.tracker._read_snapshots[key]
     future_mtime = snap.mtime + 10
     os.utime(f, (future_mtime, future_mtime))
@@ -207,7 +208,8 @@ async def test_middleware_allows_create_file_on_existing_without_read(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """create_file is a full overwrite — no anchor text to mismatch — so it
-    must NOT be blocked by the read-before-edit guard even on existing files."""
+    must NOT be blocked by the read-before-edit guard even on existing files.
+    """
     monkeypatch.chdir(tmp_path)
     f = tmp_path / 'models.py'
     f.write_text('class Foo: pass\n', encoding='utf-8')

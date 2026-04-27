@@ -93,8 +93,7 @@ def _get_slot(state: Any) -> _TurnSlot:
 
 
 class GuardBus:
-    """Thin helper used by guard services to emit observations + directives
-    according to the per-turn budget and XOR rules.
+    """Thin helper for emitting guard observations and directives.
 
     All methods are static so callers do not need an instance; the bus state
     lives on ``state.extra_data`` keyed by :data:`_STATE_KEY`.
@@ -137,7 +136,7 @@ class GuardBus:
             Bypass the per-turn budget (for terminal conditions that must
             always reach the model regardless of earlier signals).
 
-        Returns
+        Returns:
         -------
         bool
             ``True`` if an :class:`~backend.ledger.observation.ErrorObservation`

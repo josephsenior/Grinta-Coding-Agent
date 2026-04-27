@@ -132,6 +132,43 @@ _POST_CONDENSATION_RECOVERY = (
     'Do NOT re-read files you already created — trust your prior writes.\n'
 )
 
+# Patterns that could be used to inject adversarial instructions via stored memory.
+# Lines starting with any of these prefixes are stripped at injection time (not at
+# storage time, so the raw data is never corrupted).
+_PROMPT_INJECTION_PREFIXES: tuple[str, ...] = (
+    'ignore ',
+    'ignore\n',
+    'ignore:',
+    'system:',
+    '<system>',
+    '[inst]',
+    '[/inst]',
+    '### instruction',
+    '###instruction',
+    '<|im_start|>',
+    '<|im_end|>',
+    '<|system|>',
+    'disregard ',
+    'forget ',
+    'new task:',
+    'new instructions:',
+)
+
+
+def _sanitize_memory_content(text: str) -> str:
+    """Strip lines that look like prompt-injection attempts.
+
+    Only the line is removed; the surrounding content is preserved.
+    Comparison is case-insensitive and strips leading whitespace per line.
+    """
+    clean_lines: list[str] = []
+    for line in text.splitlines():
+        stripped = line.lstrip().lower()
+        if any(stripped.startswith(prefix) for prefix in _PROMPT_INJECTION_PREFIXES):
+            continue
+        clean_lines.append(line)
+    return '\n'.join(clean_lines)
+
 
 def _load_scratchpad_snapshot() -> str:
     """Load scratchpad notes for injection into post-condensation context.
@@ -148,7 +185,7 @@ def _load_scratchpad_snapshot() -> str:
             return ''
         import json
 
-        body = json.dumps(notes, indent=2, ensure_ascii=False)
+        body = _sanitize_memory_content(json.dumps(notes, indent=2, ensure_ascii=False))
         return '\n' + '─' * 60 + f'\n📋 SCRATCHPAD (auto-restored):\n{body}\n'
     except Exception:
         return ''
@@ -164,7 +201,7 @@ def _load_working_memory_snapshot() -> str:
         block = get_working_memory_prompt_block()
         if not block:
             return ''
-        return '\n' + '─' * 60 + '\n' + f'{block}\n'
+        return '\n' + '─' * 60 + '\n' + f'{_sanitize_memory_content(block)}\n'
     except Exception:
         return ''
 

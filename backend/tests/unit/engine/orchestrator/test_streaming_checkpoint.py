@@ -22,22 +22,22 @@ from backend.engine.streaming_checkpoint import (
 class TestCheckpointRecord:
     def test_fields_stored(self):
         rec = CheckpointRecord(
-            token="abc123",
+            token='abc123',
             created_at=1.0,
-            params_summary={"model": "gpt-4"},
+            params_summary={'model': 'gpt-4'},
             attempt=2,
         )
-        assert rec.token == "abc123"
+        assert rec.token == 'abc123'
         assert rec.created_at == 1.0
-        assert rec.params_summary == {"model": "gpt-4"}
+        assert rec.params_summary == {'model': 'gpt-4'}
         assert rec.attempt == 2
 
     def test_default_attempt_is_1(self):
-        rec = CheckpointRecord(token="t", created_at=0.0)
+        rec = CheckpointRecord(token='t', created_at=0.0)
         assert rec.attempt == 1
 
     def test_default_params_summary_is_empty(self):
-        rec = CheckpointRecord(token="t", created_at=0.0)
+        rec = CheckpointRecord(token='t', created_at=0.0)
         assert rec.params_summary == {}
 
 
@@ -48,7 +48,7 @@ class TestCheckpointRecord:
 
 class TestInit:
     def test_creates_directory(self, tmp_path):
-        subdir = tmp_path / "sub" / "ckpt"
+        subdir = tmp_path / 'sub' / 'ckpt'
         StreamingCheckpoint(str(subdir))
         assert subdir.exists()
 
@@ -58,10 +58,10 @@ class TestInit:
 
     def test_wal_path_correct(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        assert ckpt._wal_path.name == "streaming_wal.json"
+        assert ckpt._wal_path.name == 'streaming_wal.json'
 
     def test_rejects_non_positive_max_age(self, tmp_path):
-        with pytest.raises(ValueError, match="max_checkpoint_age_sec must be positive"):
+        with pytest.raises(ValueError, match='max_checkpoint_age_sec must be positive'):
             StreamingCheckpoint(str(tmp_path), max_checkpoint_age_sec=0)
 
 
@@ -73,7 +73,7 @@ class TestInit:
 class TestBegin:
     def test_returns_token_string(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        token = ckpt.begin({"model": "gpt-4"})
+        token = ckpt.begin({'model': 'gpt-4'})
         assert isinstance(token, str)
         assert len(token) == 12
 
@@ -84,20 +84,20 @@ class TestBegin:
 
     def test_creates_wal_file(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        ckpt.begin({"model": "gpt-4o"})
+        ckpt.begin({'model': 'gpt-4o'})
         assert ckpt._wal_path.exists()
 
     def test_wal_file_contains_token(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        token = ckpt.begin({"model": "x"})
+        token = ckpt.begin({'model': 'x'})
         data = json.loads(ckpt._wal_path.read_text())
-        assert data["token"] == token
+        assert data['token'] == token
 
     def test_attempt_number_stored(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
         ckpt.begin({}, attempt=3)
         data = json.loads(ckpt._wal_path.read_text())
-        assert data["attempt"] == 3
+        assert data['attempt'] == 3
 
     def test_each_call_produces_unique_token(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
@@ -128,13 +128,13 @@ class TestCommit:
         ckpt = StreamingCheckpoint(str(tmp_path))
         ckpt.begin({})
         # Commit with wrong token — should still clear the WAL
-        ckpt.commit("wrong-token-xxx")
+        ckpt.commit('wrong-token-xxx')
         assert not ckpt._wal_path.exists()
         assert ckpt.active_token is None
 
     def test_commit_without_begin_no_crash(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        ckpt.commit("nonexistent")  # Should not raise
+        ckpt.commit('nonexistent')  # Should not raise
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ class TestRecover:
 
     def test_uncommitted_returns_record(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        token = ckpt.begin({"model": "gpt-4"})
+        token = ckpt.begin({'model': 'gpt-4'})
         # Simulate restart: create a fresh instance pointing to same dir
         ckpt2 = StreamingCheckpoint(str(tmp_path))
         record = ckpt2.recover()
@@ -194,12 +194,12 @@ class TestRecover:
 
     def test_corrupt_wal_returns_none_not_raises(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        ckpt._wal_path.write_text("NOT JSON", encoding="utf-8")
+        ckpt._wal_path.write_text('NOT JSON', encoding='utf-8')
         assert ckpt.recover() is None
 
     def test_recover_returns_correct_attempt(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        ckpt.begin({"model": "x"}, attempt=4)
+        ckpt.begin({'model': 'x'}, attempt=4)
         ckpt2 = StreamingCheckpoint(str(tmp_path))
         record = ckpt2.recover()
         assert record is not None
@@ -207,7 +207,7 @@ class TestRecover:
 
     def test_recover_clears_corrupt_wal(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        ckpt._wal_path.write_text("{bad: json}", encoding="utf-8")
+        ckpt._wal_path.write_text('{bad: json}', encoding='utf-8')
         ckpt.recover()
         assert not ckpt._wal_path.exists()
 
@@ -218,33 +218,33 @@ class TestRecoveryInspection:
 
         inspection = ckpt.inspect_recovery()
 
-        assert inspection.status == "clean"
+        assert inspection.status == 'clean'
         assert inspection.record is None
 
     def test_inspect_recovery_blocks_recent_uncommitted_wal(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        token = ckpt.begin({"model": "gpt-4"}, attempt=2)
+        token = ckpt.begin({'model': 'gpt-4'}, attempt=2)
 
         inspection = ckpt.inspect_recovery()
 
-        assert inspection.status == "blocked_uncommitted"
+        assert inspection.status == 'blocked_uncommitted'
         assert inspection.record is not None
         assert inspection.record.token == token
-        assert "attempt=2" in inspection.reason
+        assert 'attempt=2' in inspection.reason
 
     def test_inspect_recovery_discards_stale_wal(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        token = ckpt.begin({"model": "gpt-4"})
-        raw = json.loads(ckpt._wal_path.read_text(encoding="utf-8"))
-        raw["created_at"] = 0.0
-        ckpt._wal_path.write_text(json.dumps(raw), encoding="utf-8")
+        token = ckpt.begin({'model': 'gpt-4'})
+        raw = json.loads(ckpt._wal_path.read_text(encoding='utf-8'))
+        raw['created_at'] = 0.0
+        ckpt._wal_path.write_text(json.dumps(raw), encoding='utf-8')
 
         inspection = ckpt.inspect_recovery()
 
-        assert inspection.status == "stale_discarded"
+        assert inspection.status == 'stale_discarded'
         assert inspection.record is not None
         assert inspection.record.token == token
-        assert "auto-discard enabled" in inspection.reason
+        assert 'auto-discard enabled' in inspection.reason
         assert not ckpt._wal_path.exists()
 
     def test_inspect_recovery_blocks_stale_wal_when_auto_discard_disabled(
@@ -255,17 +255,17 @@ class TestRecoveryInspection:
             max_checkpoint_age_sec=1.0,
             discard_stale_on_recovery=False,
         )
-        token = ckpt.begin({"model": "gpt-4"})
-        raw = json.loads(ckpt._wal_path.read_text(encoding="utf-8"))
-        raw["created_at"] = 0.0
-        ckpt._wal_path.write_text(json.dumps(raw), encoding="utf-8")
+        token = ckpt.begin({'model': 'gpt-4'})
+        raw = json.loads(ckpt._wal_path.read_text(encoding='utf-8'))
+        raw['created_at'] = 0.0
+        ckpt._wal_path.write_text(json.dumps(raw), encoding='utf-8')
 
         inspection = ckpt.inspect_recovery()
 
-        assert inspection.status == "blocked_stale"
+        assert inspection.status == 'blocked_stale'
         assert inspection.record is not None
         assert inspection.record.token == token
-        assert "auto-discard disabled" in inspection.reason
+        assert 'auto-discard disabled' in inspection.reason
         assert ckpt._wal_path.exists()
 
     def test_recover_returns_stale_record_when_auto_discard_disabled(self, tmp_path):
@@ -274,10 +274,10 @@ class TestRecoveryInspection:
             max_checkpoint_age_sec=1.0,
             discard_stale_on_recovery=False,
         )
-        token = ckpt.begin({"model": "gpt-4"})
-        raw = json.loads(ckpt._wal_path.read_text(encoding="utf-8"))
-        raw["created_at"] = 0.0
-        ckpt._wal_path.write_text(json.dumps(raw), encoding="utf-8")
+        token = ckpt.begin({'model': 'gpt-4'})
+        raw = json.loads(ckpt._wal_path.read_text(encoding='utf-8'))
+        raw['created_at'] = 0.0
+        ckpt._wal_path.write_text(json.dumps(raw), encoding='utf-8')
 
         record = ckpt.recover()
 
@@ -286,11 +286,11 @@ class TestRecoveryInspection:
 
     def test_inspect_recovery_discards_corrupt_wal(self, tmp_path):
         ckpt = StreamingCheckpoint(str(tmp_path))
-        ckpt._wal_path.write_text("{bad json", encoding="utf-8")
+        ckpt._wal_path.write_text('{bad json', encoding='utf-8')
 
         inspection = ckpt.inspect_recovery()
 
-        assert inspection.status == "corrupt_discarded"
+        assert inspection.status == 'corrupt_discarded'
         assert inspection.record is None
         assert not ckpt._wal_path.exists()
 
@@ -299,13 +299,13 @@ class TestExecutorRecoveryBlock:
     def test_executor_blocks_once_after_recent_uncommitted_checkpoint(
         self, tmp_path, monkeypatch
     ):
-        monkeypatch.setenv("APP_DATA_DIR", str(tmp_path))
-        ckpt_dir = tmp_path / "streaming_checkpoints"
+        monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
+        ckpt_dir = tmp_path / 'streaming_checkpoints'
         ckpt = StreamingCheckpoint(str(ckpt_dir))
         ckpt.begin(
             {
-                "model": "gpt-4",
-                "messages": [{"role": "user", "content": "hi"}],
+                'model': 'gpt-4',
+                'messages': [{'role': 'user', 'content': 'hi'}],
             }
         )
 
@@ -317,7 +317,7 @@ class TestExecutorRecoveryBlock:
             mcp_tools_provider=lambda: {},
         )
 
-        with pytest.raises(ModelProviderError, match="manual confirmation"):
+        with pytest.raises(ModelProviderError, match='manual confirmation'):
             executor.execute({}, event_stream=None)
 
         llm.completion.assert_not_called()
@@ -330,26 +330,26 @@ class TestExecutorRecoveryBlock:
         import backend.engine.function_calling as fc
         from backend.engine import executor as executor_module
 
-        monkeypatch.setenv("APP_DATA_DIR", str(tmp_path))
-        sys.modules.setdefault("app.engine.function_calling", fc)
+        monkeypatch.setenv('APP_DATA_DIR', str(tmp_path))
+        sys.modules.setdefault('app.engine.function_calling', fc)
         monkeypatch.setattr(
             executor_module.orchestrator_function_calling,
-            "response_to_actions",
+            'response_to_actions',
             lambda *args, **kwargs: [],
         )
-        ckpt_dir = tmp_path / "streaming_checkpoints" / "session-a"
+        ckpt_dir = tmp_path / 'streaming_checkpoints' / 'session-a'
         ckpt = StreamingCheckpoint(str(ckpt_dir))
         ckpt.begin(
             {
-                "model": "gpt-4",
-                "messages": [{"role": "user", "content": "hi"}],
+                'model': 'gpt-4',
+                'messages': [{'role': 'user', 'content': 'hi'}],
             }
         )
 
         llm = MagicMock()
         llm.completion.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content="ok"))],
-            id="resp-1",
+            choices=[MagicMock(message=MagicMock(content='ok'))],
+            id='resp-1',
         )
         safety = MagicMock()
         safety.apply.return_value = (True, [])
@@ -361,11 +361,11 @@ class TestExecutorRecoveryBlock:
         )
 
         session_a_stream = MagicMock()
-        session_a_stream.sid = "session-a"
+        session_a_stream.sid = 'session-a'
         session_b_stream = MagicMock()
-        session_b_stream.sid = "session-b"
+        session_b_stream.sid = 'session-b'
 
-        with pytest.raises(ModelProviderError, match="manual confirmation"):
+        with pytest.raises(ModelProviderError, match='manual confirmation'):
             executor.execute({}, event_stream=session_a_stream)
 
         executor.execute({}, event_stream=session_b_stream)
@@ -386,27 +386,27 @@ class TestSummariseParams:
         self.ckpt = StreamingCheckpoint(self._tmp)
 
     def test_extracts_model(self):
-        summary = self.ckpt._summarise_params({"model": "claude-3", "messages": []})
-        assert summary["model"] == "claude-3"
+        summary = self.ckpt._summarise_params({'model': 'claude-3', 'messages': []})
+        assert summary['model'] == 'claude-3'
 
     def test_counts_messages(self):
         summary = self.ckpt._summarise_params(
-            {"messages": [{"role": "user"}, {"role": "assistant"}]}
+            {'messages': [{'role': 'user'}, {'role': 'assistant'}]}
         )
-        assert summary["message_count"] == 2
+        assert summary['message_count'] == 2
 
     def test_counts_tools(self):
-        summary = self.ckpt._summarise_params({"tools": ["a", "b", "c"]})
-        assert summary["tool_count"] == 3
+        summary = self.ckpt._summarise_params({'tools': ['a', 'b', 'c']})
+        assert summary['tool_count'] == 3
 
     def test_empty_params_returns_empty_summary(self):
         summary = self.ckpt._summarise_params({})
         assert summary == {}
 
     def test_unknown_keys_ignored(self):
-        summary = self.ckpt._summarise_params({"temperature": 0.7, "foo": "bar"})
-        assert "temperature" not in summary
-        assert "foo" not in summary
+        summary = self.ckpt._summarise_params({'temperature': 0.7, 'foo': 'bar'})
+        assert 'temperature' not in summary
+        assert 'foo' not in summary
 
 
 # ---------------------------------------------------------------------------

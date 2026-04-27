@@ -1,7 +1,7 @@
 """Tests for backend.orchestration.action_parser module."""
 
 from abc import ABC
-from typing import Any, cast
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest

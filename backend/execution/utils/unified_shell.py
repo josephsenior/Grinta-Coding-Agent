@@ -96,6 +96,8 @@ class BaseShellSession(UnifiedShellSession, ABC):
             no_change_timeout_seconds: Timeout for no output change
             max_memory_mb: Optional memory limit
             cancellation_service: Service for handling task cancellation
+            security_config: Optional execution security policy/configuration
+            workspace_root: Optional workspace root used for boundary checks
         """
         self._closed = False
         self._initialized = False
@@ -106,6 +108,13 @@ class BaseShellSession(UnifiedShellSession, ABC):
         self.NO_CHANGE_TIMEOUT_SECONDS = no_change_timeout_seconds
         self.max_memory_mb = max_memory_mb
         self.security_config = security_config
+        self._pending_bg_id: str | None = None
+        self._bg_session_id: str | None = None
+        self._detached_pane: Any | None = None
+        self._detached_window: Any | None = None
+        self._bg_process: Any | None = None
+        self._bg_stdout_capture: Any | None = None
+        self._bg_stderr_capture: Any | None = None
         from backend.execution.utils.process_registry import TaskCancellationService
 
         self._cancellation = cancellation_service or TaskCancellationService(
@@ -115,14 +124,6 @@ class BaseShellSession(UnifiedShellSession, ABC):
             security_config=security_config,
             workspace_root=self.workspace_root,
         )
-        # Background-detach state used by all session backends.
-        # Set by action_execution_server._run_foreground_cmd() before execute();
-        # read back after execute() to register the background session.
-        self._pending_bg_id: str | None = None
-        self._bg_session_id: str | None = None
-        self._bg_process: Any = None
-        self._bg_stdout_capture: Any = None
-        self._bg_stderr_capture: Any = None
         # T-P1-2: rolling buffer of the last command's combined stdout+stderr
         # so subprocess-backed sessions (SimpleBash / WindowsPowerShell) can
         # implement read_output() instead of returning ''.
@@ -445,6 +446,8 @@ def create_shell_session(
         no_change_timeout_seconds: Timeout for no output change
         max_memory_mb: Optional memory limit
         cancellation_service: Optional hook to cancel in-flight shell work
+        security_config: Optional execution security policy/configuration
+        workspace_root: Optional workspace root used for boundary checks
         interactive: If True, return a PTY-backed session that supports
             real-time ``read_output`` / ``write_input`` cross-platform. Falls
             back to the legacy session if the PTY backend is unavailable.

@@ -267,8 +267,7 @@ def _is_windows_junction(p: Path) -> bool:
 
 
 def _reject_unsafe_links(path_str: str, full_path: Path, workspace: Path) -> None:
-    """Reject paths whose components include symlinks or junctions that
-    would let an edit/read escape the workspace once dereferenced.
+    """Reject paths that would escape the workspace through links.
 
     A symlink that resolves *inside* the workspace is allowed (common in
     ``node_modules/.bin``); one that resolves *outside* is rejected with a

@@ -99,5 +99,8 @@ async def test_progress_policy_blocks_repeated_terminal_read_earlier() -> None:
     assert not ctx.blocked
 
     await mw.execute(ctx)
-    assert ctx.blocked
-    assert 'POLICY_GATE_REPLAN_REQUIRED' in (ctx.block_reason or '')
+    blocked = bool(getattr(ctx, 'blocked', False))
+    block_reason = getattr(ctx, 'block_reason', None)
+    assert blocked
+    assert isinstance(block_reason, str)
+    assert 'POLICY_GATE_REPLAN_REQUIRED' in block_reason

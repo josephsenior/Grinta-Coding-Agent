@@ -109,7 +109,7 @@ class TestSimpleBashSession:
         # cd triggers a follow-up `pwd` via subprocess.run inside
         # _update_cwd_from_output, so Popen runs at least once for the
         # original command.
-        assert cast(int, mock_popen.call_count) >= 1
+        assert mock_popen.call_count >= 1
 
     @patch('backend.execution.utils.simple_bash.bounded_communicate')
     @patch('subprocess.Popen')

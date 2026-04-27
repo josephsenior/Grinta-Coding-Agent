@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass, field
 from itertools import islice
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from backend.core.message import Message, TextContent
 
@@ -301,9 +301,15 @@ class OrchestratorPromptManager(PromptManager):
         context.setdefault('mcp_tool_descriptions', self.mcp_tool_descriptions)
         context.setdefault('mcp_server_hints', self.mcp_server_hints)
         return build_mcp_user_addendum(
-            mcp_tool_names=context.get('mcp_tool_names'),
-            mcp_tool_descriptions=context.get('mcp_tool_descriptions'),
-            mcp_server_hints=context.get('mcp_server_hints'),
+            mcp_tool_names=cast(list[str] | None, context.get('mcp_tool_names')),
+            mcp_tool_descriptions=cast(
+                dict[str, str] | None,
+                context.get('mcp_tool_descriptions'),
+            ),
+            mcp_server_hints=cast(
+                list[dict[str, str]] | None,
+                context.get('mcp_server_hints'),
+            ),
             config=context.get('config'),
         ).strip()
 

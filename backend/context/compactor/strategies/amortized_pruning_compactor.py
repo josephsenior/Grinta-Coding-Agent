@@ -60,12 +60,13 @@ class AmortizedPruningCompactor(RollingCompactor):
         events_from_tail = target_size - len(head)
         tail = view[-events_from_tail:]
         event_ids_to_keep = {event.id for event in head + tail}
-        event_ids_to_prune = {event.id for event in view} - event_ids_to_keep
-        event = CondensationAction(
-            pruned_events_start_id=min(event_ids_to_prune),
-            pruned_events_end_id=max(event_ids_to_prune),
+        event_ids_to_prune = sorted(
+            {event.id for event in view} - event_ids_to_keep
         )
-        return Compaction(action=event)
+        # Use explicit list to avoid claiming we pruned protected head events
+        # when keep_first > 0 makes the range non-contiguous.
+        action = CondensationAction(pruned_event_ids=event_ids_to_prune)
+        return Compaction(action=action)
 
     def should_compact(self, view: View) -> bool:
         """Check if view exceeds max_size threshold.

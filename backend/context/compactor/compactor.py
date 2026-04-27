@@ -446,15 +446,35 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         except Exception:
             return None
 
+    def _model_token_multiplier(self) -> float:
+        """Return a correction factor to compensate for tokenizer family mismatch.
+
+        ``estimate_view_tokens`` always uses ``cl100k_base`` (GPT family).
+        Claude-family models diverge by ~5% on prose and up to ~20% on
+        dense code, so we apply the same 1.05x correction used by the prompt
+        builder when the active model is a Claude variant.
+        """
+        model: str = ''
+        try:
+            model = (getattr(getattr(self, 'llm', None), 'config', None) or object()).__class__.__name__
+            model = str(getattr(getattr(getattr(self, 'llm', None), 'config', None), 'model', '') or '')
+        except Exception:
+            pass
+        if model and ('claude' in model.lower() or 'anthropic' in model.lower()):
+            return 1.05
+        return 1.0
+
     def _exceeds_token_budget(self, view: View) -> bool:
         """Return True when a token_budget is set and the view exceeds it."""
         if self.token_budget is None:
             return False
-        estimated = self.estimate_view_tokens(view)
+        raw = self.estimate_view_tokens(view)
+        estimated = int(raw * self._model_token_multiplier())
         if estimated > self.token_budget:
             logger.debug(
-                'Token budget exceeded: %d estimated > %d budget',
+                'Token budget exceeded: %d estimated (×%.2f) > %d budget',
                 estimated,
+                self._model_token_multiplier(),
                 self.token_budget,
             )
             return True

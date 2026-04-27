@@ -15,6 +15,10 @@ from typing import (
     runtime_checkable,
 )
 
+from backend.core.constants import (
+    DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
+    DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
+)
 from backend.core.errors import ModelProviderError
 from backend.core.logger import app_logger as logger
 from backend.engine import function_calling as _function_calling_module  # noqa: F401
@@ -22,10 +26,6 @@ from backend.engine.streaming_checkpoint import (
     StreamingCheckpoint,
 )
 from backend.ledger.persistence import EventPersistence
-from backend.core.constants import (
-    DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
-    DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
-)
 
 if TYPE_CHECKING:
     from backend.inference.llm import LLM

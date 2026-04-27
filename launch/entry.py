@@ -19,11 +19,11 @@ from urllib.parse import unquote, urlparse
 def _editable_project_root() -> Path | None:
     """Resolve editable project root from distribution metadata when available."""
     try:
-        dist = metadata.distribution("grinta-ai")
+        dist = metadata.distribution('grinta-ai')
     except metadata.PackageNotFoundError:
         return None
 
-    raw = dist.read_text("direct_url.json")
+    raw = dist.read_text('direct_url.json')
     if not raw:
         return None
 
@@ -32,15 +32,15 @@ def _editable_project_root() -> Path | None:
     except json.JSONDecodeError:
         return None
 
-    url = str(payload.get("url", "")).strip()
-    if not url.lower().startswith("file://"):
+    url = str(payload.get('url', '')).strip()
+    if not url.lower().startswith('file://'):
         return None
 
     parsed = urlparse(url)
-    path = unquote(parsed.path or "")
+    path = unquote(parsed.path or '')
 
     # Normalize Windows file:// URLs like /C:/Users/... to C:/Users/...
-    if len(path) >= 3 and path[0] == "/" and path[2] == ":":
+    if len(path) >= 3 and path[0] == '/' and path[2] == ':':
         path = path[1:]
 
     root = Path(path)
@@ -51,16 +51,16 @@ def _resolve_entry_file() -> Path | None:
     """Find backend/cli/entry.py without relying on import precedence."""
     root = _editable_project_root()
     if root is not None:
-        editable_entry = root / "backend" / "cli" / "entry.py"
+        editable_entry = root / 'backend' / 'cli' / 'entry.py'
         if editable_entry.exists():
             return editable_entry
 
     try:
-        dist = metadata.distribution("grinta-ai")
+        dist = metadata.distribution('grinta-ai')
     except metadata.PackageNotFoundError:
         return None
 
-    wheel_entry = Path(str(dist.locate_file("backend/cli/entry.py")))
+    wheel_entry = Path(str(dist.locate_file('backend/cli/entry.py')))
     return wheel_entry if wheel_entry.exists() else None
 
 
@@ -88,16 +88,16 @@ def main() -> None:
     entry_file = _resolve_entry_file()
     if entry_file is not None:
         _prepend_sys_path(_entry_project_root(entry_file))
-        runpy.run_path(str(entry_file), run_name="__main__")
+        runpy.run_path(str(entry_file), run_name='__main__')
         return
 
     # Last-resort fallback; may be vulnerable to package-name collisions.
     root = _editable_project_root()
     if root is not None:
         _prepend_sys_path(root)
-    fallback_main = importlib.import_module("backend.cli.entry").main
+    fallback_main = importlib.import_module('backend.cli.entry').main
     fallback_main()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

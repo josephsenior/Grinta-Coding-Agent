@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from backend.context import ContextMemory
 from backend.context.compactor import Compactor
 from backend.context.pre_condensation_snapshot import (
+    delete_snapshot,
     extract_snapshot,
     format_snapshot_for_injection,
     load_snapshot,
@@ -135,6 +136,9 @@ class ContextMemoryManager:
             state.ack_memory_pressure(source='ContextMemoryManager')
 
         if isinstance(condensation_result, View):
+            # Compaction did not fire — remove the snapshot we eagerly wrote
+            # above so it cannot be injected stale on a future turn or session.
+            delete_snapshot()
             return CondensedHistory(condensation_result.events, None)
 
         action = condensation_result.action

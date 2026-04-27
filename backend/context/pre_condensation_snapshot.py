@@ -319,6 +319,21 @@ def load_snapshot() -> dict[str, Any] | None:
         return None
 
 
+def delete_snapshot() -> None:
+    """Delete the on-disk snapshot if it exists.
+
+    Called when compaction did NOT fire so the snapshot written eagerly before
+    the compactor ran is removed.  This prevents a stale snapshot from being
+    injected alongside a full history on the next session or turn.
+    """
+    try:
+        p = _snapshot_path()
+        if p.exists():
+            p.unlink()
+    except OSError:
+        pass
+
+
 def format_snapshot_for_injection(snapshot: dict[str, Any]) -> str:
     """Format a snapshot into a human-readable block for LLM context injection.
 

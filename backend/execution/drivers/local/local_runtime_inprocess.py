@@ -56,8 +56,8 @@ if TYPE_CHECKING:
 
 def get_user_info() -> tuple[int, str | None]:
     """Get user ID and username in a cross-platform way."""
-    username = os.getenv("USER") or os.getenv("USERNAME")
-    uid_getter = getattr(os, "getuid", None)
+    username = os.getenv('USER') or os.getenv('USERNAME')
+    uid_getter = getattr(os, 'getuid', None)
     if uid_getter and callable(uid_getter):
         return (uid_getter(), username)  # pylint: disable=not-callable
     return (0, username)
@@ -71,7 +71,7 @@ class _PersistentAsyncLoopRunner:
     alive for all browser tool calls in the LocalRuntime lifecycle.
     """
 
-    def __init__(self, name: str = "local-runtime-browser-loop") -> None:
+    def __init__(self, name: str = 'local-runtime-browser-loop') -> None:
         self._name = name
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(
@@ -95,7 +95,7 @@ class _PersistentAsyncLoopRunner:
         except concurrent.futures.TimeoutError as exc:
             future.cancel()
             raise TimeoutError(
-                f"call_async_from_sync timed out after {timeout}s for "
+                f'call_async_from_sync timed out after {timeout}s for '
                 f'{getattr(corofn, "__name__", corofn)}'
             ) from exc
 
@@ -121,7 +121,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         config: AppConfig,
         event_stream: EventStream,
         llm_registry: LLMRegistry,
-        sid: str = "default",
+        sid: str = 'default',
         plugins: list[PluginRequirement] | None = None,
         env_vars: dict[str, str] | None = None,
         status_callback: Callable[[str, RuntimeStatus, str], None] | None = None,
@@ -133,8 +133,8 @@ class LocalRuntimeInProcess(ActionExecutionClient):
     ) -> None:
         """Initialize in-process local runtime."""
         # Initialize parent
-        safe_event_stream = event_stream if hasattr(event_stream, "subscribe") else None
-        self.is_windows = sys.platform == "win32"
+        safe_event_stream = event_stream if hasattr(event_stream, 'subscribe') else None
+        self.is_windows = sys.platform == 'win32'
 
         # Initialize tooling and security
         self._init_tooling_and_platform()
@@ -147,7 +147,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         self._user_id, self._username = get_user_info()
 
         logger.info(
-            "Initializing In-Process LocalRuntime. User ID: %s. Username: %s.",
+            'Initializing In-Process LocalRuntime. User ID: %s. Username: %s.',
             self._user_id,
             self._username,
         )
@@ -202,30 +202,30 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             if plugin_req.name in ALL_PLUGINS:
                 plugins_to_load.append(ALL_PLUGINS[plugin_req.name]())
             else:
-                logger.warning("Plugin %s not found, skipping", plugin_req.name)
+                logger.warning('Plugin %s not found, skipping', plugin_req.name)
 
         # Create RuntimeExecutor directly (no subprocess!)
-        logger.info("Creating RuntimeExecutor in-process...")
+        logger.info('Creating RuntimeExecutor in-process...')
         if self._temp_workspace is None:
             self._setup_workspace_directory()
         if self._temp_workspace is None:
-            raise ValueError("Workspace directory must be set")
+            raise ValueError('Workspace directory must be set')
         work_dir = self._temp_workspace
         os.makedirs(work_dir, exist_ok=True)
 
         self._executor = RuntimeExecutor(
             plugins_to_load=plugins_to_load,
             work_dir=work_dir,
-            username=self._username or "app",
+            username=self._username or 'app',
             user_id=self._user_id,
             enable_browser=self.config.enable_browser,
             tool_registry=self._tool_registry,  # Pass ToolRegistry for cross-platform support
-            mcp_config=getattr(self.config, "mcp", None),
+            mcp_config=getattr(self.config, 'mcp', None),
             security_config=self.config.security,
         )
 
         # Initialize RuntimeExecutor (this sets up bash, plugins, etc.)
-        logger.info("Initializing RuntimeExecutor...")
+        logger.info('Initializing RuntimeExecutor...')
         await self._executor.ainit()
 
         self.set_runtime_status(RuntimeStatus.READY)
@@ -234,45 +234,45 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         # Populate the capability matrix once at startup
         self.capabilities = detect_capabilities(
             enable_browser=self.config.enable_browser,
-            mcp_config=getattr(self.config, "mcp", None),
+            mcp_config=getattr(self.config, 'mcp', None),
         )
         if self.capabilities.missing_tools:
             logger.warning(
-                "Missing expected tools: %s",
-                ", ".join(self.capabilities.missing_tools),
+                'Missing expected tools: %s',
+                ', '.join(self.capabilities.missing_tools),
             )
 
         elapsed = time.time() - start_time
-        logger.info("🚀 In-process runtime ready in %.2fs", elapsed)
+        logger.info('🚀 In-process runtime ready in %.2fs', elapsed)
 
     def _setup_workspace_directory(self) -> None:
         """Create temporary workspace directory."""
         if self._temp_workspace is None:
             # If project_root is provided in init, use it; otherwise create temp
-            base = getattr(self, "project_root", None)
+            base = getattr(self, 'project_root', None)
             self._owns_workspace = not bool(base)
             if base:
                 self._temp_workspace = base
                 os.makedirs(base, exist_ok=True)
             else:
                 self._temp_workspace = tempfile.mkdtemp(
-                    prefix=f"app_workspace_{self.sid}_"
+                    prefix=f'app_workspace_{self.sid}_'
                 )
             self.config.workspace_mount_path_in_runtime = self._temp_workspace
-            logger.info("Using workspace: %s", self._temp_workspace)
+            logger.info('Using workspace: %s', self._temp_workspace)
             if self._owns_workspace:
                 # Temporary workspaces need a disposable git repo for change tracking.
                 import subprocess
 
                 try:
                     subprocess.run(
-                        ["git", "init"],
+                        ['git', 'init'],
                         cwd=self._temp_workspace,
                         check=True,
                         capture_output=True,
                     )
                 except Exception as e:
-                    logger.warning("Failed to init git in temp workspace: %s", e)
+                    logger.warning('Failed to init git in temp workspace: %s', e)
             return
 
         self.config.workspace_mount_path_in_runtime = self._temp_workspace
@@ -280,7 +280,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
     async def execute_action(self, action: Any) -> Observation:
         """Execute action directly via RuntimeExecutor."""
         if not self._runtime_initialized or self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
 
         return await self._executor.run_action(action)
 
@@ -291,12 +291,12 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         try:
             call_async_from_sync(self._executor.hard_kill, 5.0)
         except Exception:
-            logger.debug("LocalRuntimeInProcess hard_kill failed", exc_info=True)
+            logger.debug('LocalRuntimeInProcess hard_kill failed', exc_info=True)
 
     def run(self, action: CmdRunAction) -> Observation:
         """Execute command via RuntimeExecutor."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         # Use the action's own timeout (set by _set_action_timeout) plus a
         # buffer for thread-pool scheduling, instead of the fixed 15s which
         # was too short for commands with larger timeouts.
@@ -306,49 +306,49 @@ class LocalRuntimeInProcess(ActionExecutionClient):
     def read(self, action: FileReadAction) -> Observation:
         """Read file via RuntimeExecutor."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(self._executor.read, 15.0, action)
 
     def write(self, action: FileWriteAction) -> Observation:
         """Write file via RuntimeExecutor."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(self._executor.write, 15.0, action)
 
     def edit(self, action: FileEditAction) -> Observation:
         """Edit file via RuntimeExecutor."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(self._executor.edit, 15.0, action)
 
     def terminal_run(self, action: TerminalRunAction) -> Observation:
         """Start an interactive terminal session via RuntimeExecutor."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(self._executor.terminal_run, 130.0, action)
 
     def terminal_input(self, action: TerminalInputAction) -> Observation:
         """Send input to a terminal session via RuntimeExecutor."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(self._executor.terminal_input, 30.0, action)
 
     def terminal_read(self, action: TerminalReadAction) -> Observation:
         """Read terminal output via RuntimeExecutor."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(self._executor.terminal_read, 30.0, action)
 
     def debugger(self, action: DebuggerAction) -> Observation:
         """Execute a debugger action via RuntimeExecutor."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(self._executor.debugger, 30.0, action)
 
     def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute LSP query via RuntimeExecutor."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         return call_async_from_sync(self._executor.lsp_query, 15.0, action)
 
     def browser_tool(self, action: Any) -> Observation:
@@ -356,9 +356,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         from backend.ledger.action.browser_tool import BrowserToolAction
 
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         if not isinstance(action, BrowserToolAction):
-            raise TypeError("expected BrowserToolAction")
+            raise TypeError('expected BrowserToolAction')
         try:
             if self._browser_loop_runner is None:
                 self._browser_loop_runner = _PersistentAsyncLoopRunner()
@@ -368,20 +368,20 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                 action,
             )
         except TimeoutError as exc:
-            sub = getattr(action, "command", "") or ""
+            sub = getattr(action, 'command', '') or ''
             raise TimeoutError(
-                f"call_async_from_sync timed out after {BROWSER_TOOL_SYNC_TIMEOUT_SECONDS}s "
-                f"for browser_tool (subcommand={sub!r}). "
-                "Typical causes: Chromium first-time download inside browser.start(), "
-                "a slow CDP navigate, or async teardown blocked — use GRINTA_BROWSER_TRACE=1, "
-                "CALL_ASYNC_LOOP_SHUTDOWN_WAIT_SEC, CALL_ASYNC_LOOP_FINALIZE_WAIT_SEC; "
-                "run `uvx browser-use install` once in a normal shell if cold start is slow."
+                f'call_async_from_sync timed out after {BROWSER_TOOL_SYNC_TIMEOUT_SECONDS}s '
+                f'for browser_tool (subcommand={sub!r}). '
+                'Typical causes: Chromium first-time download inside browser.start(), '
+                'a slow CDP navigate, or async teardown blocked — use GRINTA_BROWSER_TRACE=1, '
+                'CALL_ASYNC_LOOP_SHUTDOWN_WAIT_SEC, CALL_ASYNC_LOOP_FINALIZE_WAIT_SEC; '
+                'run `uvx browser-use install` once in a normal shell if cold start is slow.'
             ) from exc
 
     def list_files(self, path: str | None = None, recursive: bool = False) -> list[str]:
         """List files in the specified path."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
 
         # Resolve path
         full_path = self._resolve_list_files_path(path)
@@ -395,7 +395,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                 return []
         except (OSError, ValueError) as e:
             # Path is invalid or inaccessible
-            logger.warning("Invalid path for list_files: %s - %s", full_path, e)
+            logger.warning('Invalid path for list_files: %s - %s', full_path, e)
             return []
 
         # Get sorted directory entries
@@ -403,11 +403,11 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             entries = os.listdir(full_path)
         except (OSError, NotADirectoryError) as e:
             # Path is not a directory or cannot be listed
-            logger.warning("Cannot list directory %s: %s", full_path, e)
+            logger.warning('Cannot list directory %s: %s', full_path, e)
             return []
 
         directories, files = self._process_directory_entries(
-            full_path, entries, path or "", recursive
+            full_path, entries, path or '', recursive
         )
 
         directories.sort(key=lambda s: s.lower())
@@ -417,7 +417,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
 
     def _resolve_list_files_path(self, path: str | None) -> str:
         """Resolve the path for file listing."""
-        assert self._executor is not None, "Runtime not initialized"
+        assert self._executor is not None, 'Runtime not initialized'
         if not path:
             return self._executor.initial_cwd
 
@@ -444,17 +444,17 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         files = []
 
         for entry in entries:
-            entry_relative = entry.lstrip("/").split("/")[-1]
+            entry_relative = entry.lstrip('/').split('/')[-1]
             full_entry_path = os.path.join(full_path, entry_relative)
 
             try:
                 if os.path.exists(full_entry_path):
                     if os.path.isdir(full_entry_path):
-                        directories.append(entry.rstrip("/") + "/")
+                        directories.append(entry.rstrip('/') + '/')
                         if recursive:
                             sub_path = os.path.join(path, entry) if path else entry
                             sub_files = self.list_files(sub_path, recursive=True)
-                            files.extend([f"{entry}/{f}" for f in sub_files])
+                            files.extend([f'{entry}/{f}' for f in sub_files])
                     else:
                         files.append(entry)
             except (OSError, ValueError):
@@ -466,7 +466,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
     ) -> None:
         """Copy file from host to runtime."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         # For in-process, just use shutil
         import shutil
 
@@ -474,7 +474,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             if recursive:
                 shutil.copytree(host_src, runtime_dest, dirs_exist_ok=True)
             else:
-                raise ValueError("Cannot copy directory without recursive=True")
+                raise ValueError('Cannot copy directory without recursive=True')
         else:
             os.makedirs(os.path.dirname(runtime_dest), exist_ok=True)
             shutil.copy2(host_src, runtime_dest)
@@ -482,21 +482,21 @@ class LocalRuntimeInProcess(ActionExecutionClient):
     def copy_from(self, path: str) -> Any:
         """Copy file from runtime to host."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         # For in-process, file is already accessible
         return Path(path)  # pylint: disable=redefined-outer-name,reimported
 
     def get_mcp_config(self, extra_servers: list[Any] | None = None) -> Any:
         """Get MCP configuration."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         # MCP is handled by RuntimeExecutor if available
-        return self.config.mcp if hasattr(self.config, "mcp") else None
+        return self.config.mcp if hasattr(self.config, 'mcp') else None
 
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
         """Call MCP tool via RuntimeExecutor."""
         if self._executor is None:
-            raise AgentRuntimeDisconnectedError("Runtime not initialized")
+            raise AgentRuntimeDisconnectedError('Runtime not initialized')
         # RuntimeExecutor handles MCP through run_action
         return await self._executor.run_action(action)
 
@@ -507,12 +507,12 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                 self._browser_loop_runner.close()
             except Exception:
                 logger.debug(
-                    "LocalRuntimeInProcess browser loop close failed", exc_info=True
+                    'LocalRuntimeInProcess browser loop close failed', exc_info=True
                 )
             self._browser_loop_runner = None
         if self._executor:
             # RuntimeExecutor cleanup (this is synchronous)
-            if hasattr(self._executor, "close"):
+            if hasattr(self._executor, 'close'):
                 self._executor.close()
             self._executor = None
 
@@ -541,7 +541,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
                     # Last attempt failed, log warning but don't raise
                     try:
                         logger.warning(
-                            "Failed to remove workspace %s after %s attempts: %s",
+                            'Failed to remove workspace %s after %s attempts: %s',
                             self._temp_workspace,
                             max_retries,
                             e,
@@ -556,7 +556,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
     def workspace_root(self) -> Path:
         """Return the workspace root path."""
         return (
-            Path(self._temp_workspace) if self._temp_workspace else Path(".")
+            Path(self._temp_workspace) if self._temp_workspace else Path('.')
         )  # pylint: disable=redefined-outer-name,reimported
 
     @workspace_root.setter
@@ -576,7 +576,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         """Initialize ToolRegistry and platform-specific tooling."""
         from backend.execution.utils.tool_registry import ToolRegistry
 
-        logger.info("Initializing ToolRegistry for cross-platform support...")
+        logger.info('Initializing ToolRegistry for cross-platform support...')
         self._tool_registry = ToolRegistry()
 
         # Initialize Security Analyzer for default safety
@@ -585,24 +585,24 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         # Check for required tools
         if not self._tool_registry.has_git:
             logger.error(
-                "Git is required but not found. Please install Git from: https://git-scm.com/downloads"
+                'Git is required but not found. Please install Git from: https://git-scm.com/downloads'
             )
 
         # Log platform-specific warnings
         if self.is_windows:
             logger.info(
-                "Running on Windows with %s shell",
+                'Running on Windows with %s shell',
                 self._tool_registry.shell_type,
             )
         else:
             if not self._tool_registry.has_tmux:
                 logger.warning(
-                    "tmux not found. Using simple subprocess-based Bash session. "
-                    "Install tmux for better command management: sudo apt install tmux"
+                    'tmux not found. Using simple subprocess-based Bash session. '
+                    'Install tmux for better command management: sudo apt install tmux'
                 )
 
     def _sanitize_config(self) -> None:
         """Sanitize configuration and ensure compatibility."""
-        security_cfg = getattr(self.config, "security", None)
+        security_cfg = getattr(self.config, 'security', None)
         if not isinstance(security_cfg, SecurityConfig):
             self.config.security = SecurityConfig()

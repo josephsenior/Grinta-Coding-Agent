@@ -22,7 +22,7 @@ from backend.engine.tools.prompt import (
 ChatCompletionToolParam = Any
 
 # e.g. ``componentsC:/Users/...`` (missing ``/`` before the drive letter)
-_WINDOWS_DRIVE_GLUED_RE = re.compile(r"[A-Za-z0-9_]C:/", re.IGNORECASE)
+_WINDOWS_DRIVE_GLUED_RE = re.compile(r'[A-Za-z0-9_]C:/', re.IGNORECASE)
 
 
 def windows_drive_glued_in_command(command: str) -> bool:
@@ -35,8 +35,8 @@ def windows_drive_glued_in_command(command: str) -> bool:
 def windows_drive_glued_hint() -> str:
     """Short hint for the reasoning line when a command may have a glued Windows path."""
     return (
-        "[SHELL] Possible typo: a folder name may be glued to a Windows drive "
-        "(e.g. componentsC:/...). Insert a separator: components/C:/... or quote the path."
+        '[SHELL] Possible typo: a folder name may be glued to a Windows drive '
+        '(e.g. componentsC:/...). Insert a separator: components/C:/... or quote the path.'
     )
 
 
@@ -58,11 +58,11 @@ _DETAILED_BASH_DESCRIPTION = (
     "not `dirC:/path`.\n"
 )
 _SHORT_BASH_DESCRIPTION = (
-    "Execute a {shell} command. Prefer `search_code` / `analyze_project_structure` / editor `read_file` "
-    "for repo reads—not cat/grep. Chain with `&&`/`;`. "
-    "Background long-running commands with `cmd > out.log 2>&1 &`. "
-    "Exit code -1 means still running — set is_input=true to interact. "
-    "Do not glue paths to Windows drives (`dirC:/`); use `dir/C:/` or quotes."
+    'Execute a {shell} command. Prefer `search_code` / `analyze_project_structure` / editor `read_file` '
+    'for repo reads—not cat/grep. Chain with `&&`/`;`. '
+    'Background long-running commands with `cmd > out.log 2>&1 &`. '
+    'Exit code -1 means still running — set is_input=true to interact. '
+    'Do not glue paths to Windows drives (`dirC:/`); use `dir/C:/` or quotes.'
 )
 
 
@@ -86,53 +86,53 @@ def create_cmd_run_tool(use_short_description: bool = False):
     # Explicit identity note for Windows + Git Bash / PowerShell to prevent shell confusion
     if uses_powershell_terminal():
         description += (
-            "\n* **IMPORTANT — PowerShell on Windows:** This terminal runs PowerShell, "
-            "NOT Bash. DO NOT use these FORBIDDEN commands: grep, ls, cat, find, echo, mkdir, rm, pwd, which, chmod, sed, awk. "
-            "Use PowerShell native cmdlets or Python. Windows paths (C:\\...) are normal."
+            '\n* **IMPORTANT — PowerShell on Windows:** This terminal runs PowerShell, '
+            'NOT Bash. DO NOT use these FORBIDDEN commands: grep, ls, cat, find, echo, mkdir, rm, pwd, which, chmod, sed, awk. '
+            'Use PowerShell native cmdlets or Python. Windows paths (C:\\...) are normal.'
         )
     elif is_windows_with_bash():
         description += (
-            "\n* **IMPORTANT — Git Bash on Windows:** This terminal runs Git Bash, "
-            "NOT PowerShell. Use only bash commands. DO NOT use these FORBIDDEN PowerShell "
-            "cmdlets: Get-ChildItem, Get-Process, Get-Content, Select-String, Write-Output, "
-            "Set-Location, ForEach-Object, Where-Object, $PSVersionTable. "
-            "Use `python` (not `python3`). Windows paths (C:\\...) in output are normal."
+            '\n* **IMPORTANT — Git Bash on Windows:** This terminal runs Git Bash, '
+            'NOT PowerShell. Use only bash commands. DO NOT use these FORBIDDEN PowerShell '
+            'cmdlets: Get-ChildItem, Get-Process, Get-Content, Select-String, Write-Output, '
+            'Set-Location, ForEach-Object, Where-Object, $PSVersionTable. '
+            'Use `python` (not `python3`). Windows paths (C:\\...) in output are normal.'
         )
     else:
         description += (
-            "\n* **IMPORTANT — Bash:** This terminal runs Bash, NOT PowerShell. "
-            "DO NOT use these FORBIDDEN PowerShell cmdlets: Get-ChildItem, Get-Process, "
-            "Get-Content, Select-String, Write-Output, Set-Location, ForEach-Object, "
-            "Where-Object, $PSVersionTable."
+            '\n* **IMPORTANT — Bash:** This terminal runs Bash, NOT PowerShell. '
+            'DO NOT use these FORBIDDEN PowerShell cmdlets: Get-ChildItem, Get-Process, '
+            'Get-Content, Select-String, Write-Output, Set-Location, ForEach-Object, '
+            'Where-Object, $PSVersionTable.'
         )
 
     return create_tool_definition(
         name=tool_name,
         description=description,
         properties={
-            "command": get_command_param(
-                f"The {shell} command to execute. Empty string for more logs when exit code is -1. `C-c` to interrupt.",
+            'command': get_command_param(
+                f'The {shell} command to execute. Empty string for more logs when exit code is -1. `C-c` to interrupt.',
             ),
-            "truncation_strategy": {
-                "type": "string",
-                "enum": ["tail_heavy", "head_heavy", "balanced"],
-                "description": "How to truncate long output. 'tail_heavy' (default) keeps the end of the log in case of error. 'head_heavy' keeps the beginning. 'balanced' keeps both.",
+            'truncation_strategy': {
+                'type': 'string',
+                'enum': ['tail_heavy', 'head_heavy', 'balanced'],
+                'description': "How to truncate long output. 'tail_heavy' (default) keeps the end of the log in case of error. 'head_heavy' keeps the beginning. 'balanced' keeps both.",
             },
-            "is_input": get_is_input_param(
-                f"If True, the command is an input to the running process. If False, the command is a {shell} command to be executed in the terminal. Default is False."
+            'is_input': get_is_input_param(
+                f'If True, the command is an input to the running process. If False, the command is a {shell} command to be executed in the terminal. Default is False.'
             ),
-            "is_background": {
-                "type": "boolean",
-                "description": "If true, run the command in a background shell session. Returns immediately with a session ID. Use for long-running processes like servers or build watchers.",
+            'is_background': {
+                'type': 'boolean',
+                'description': 'If true, run the command in a background shell session. Returns immediately with a session ID. Use for long-running processes like servers or build watchers.',
             },
-            "grep_pattern": {
-                "type": "string",
-                "description": "Optional regex pattern to filter the command output. Only lines matching this pattern will be included in the response. Use this to reduce noise from large outputs.",
+            'grep_pattern': {
+                'type': 'string',
+                'description': 'Optional regex pattern to filter the command output. Only lines matching this pattern will be included in the response. Use this to reduce noise from large outputs.',
             },
-            "timeout": get_timeout_param(
-                "Optional. Sets a hard timeout in seconds for the command execution. If not provided, the command will use the default soft timeout behavior.",
+            'timeout': get_timeout_param(
+                'Optional. Sets a hard timeout in seconds for the command execution. If not provided, the command will use the default soft timeout behavior.',
             ),
-            "security_risk": get_security_risk_param(),
+            'security_risk': get_security_risk_param(),
         },
-        required=["command"],
+        required=['command'],
     )

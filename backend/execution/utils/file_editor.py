@@ -1023,7 +1023,11 @@ class FileEditor:
                     if not isinstance(fuzzy_result, ToolResult):
                         new_content = fuzzy_result
                     else:
-                        tolerant.error = tolerant.error + '\n\n' + fuzzy_result.error
+                        tolerant.error = (
+                            (tolerant.error or '')
+                            + '\n\n'
+                            + (fuzzy_result.error or '')
+                        )
                         return tolerant
                 else:
                     return tolerant

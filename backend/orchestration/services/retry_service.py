@@ -40,7 +40,7 @@ class RetryService:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             logger.warning(
-                "Retry queue enabled but no running event loop; worker for %s not started",
+                'Retry queue enabled but no running event loop; worker for %s not started',
                 self.controller.id,
             )
             return
@@ -51,16 +51,16 @@ class RetryService:
             except Exception as exc:  # pragma: no cover - logged for diagnostics
                 # CancelledError propagates; only log/handle Exception
                 logger.exception(
-                    "Retry worker crashed for controller %s: %s",
+                    'Retry worker crashed for controller %s: %s',
                     self.controller.id,
                     exc,
                 )
 
         self._retry_worker_task = loop.create_task(
-            _worker_wrapper(), name=f"app-retry-worker-{self.controller.id}"
+            _worker_wrapper(), name=f'app-retry-worker-{self.controller.id}'
         )
         self._task_loop = loop
-        logger.debug("Retry worker started for controller %s", self.controller.id)
+        logger.debug('Retry worker started for controller %s', self.controller.id)
 
     def reset_retry_metrics(self) -> None:
         """Reset retry tracking state after successful execution or initialization."""
@@ -111,10 +111,10 @@ class RetryService:
         if isinstance(exc, RateLimitError):
             delay = max(delay, queue.base_delay * 2)
         circuit_breaker = getattr(
-            self.controller.circuit_breaker_service, "circuit_breaker", None
+            self.controller.circuit_breaker_service, 'circuit_breaker', None
         )
         if circuit_breaker:
-            consecutive = max(1, getattr(circuit_breaker, "consecutive_errors", 1))
+            consecutive = max(1, getattr(circuit_breaker, 'consecutive_errors', 1))
             delay = min(queue.max_delay, delay * consecutive)
         return delay
 
@@ -122,8 +122,8 @@ class RetryService:
     def _format_retry_delay(delay_seconds: float) -> str:
         rounded = round(float(delay_seconds), 1)
         if rounded.is_integer():
-            return f"{int(rounded)}s"
-        return f"{rounded:.1f}s"
+            return f'{int(rounded)}s'
+        return f'{rounded:.1f}s'
 
     def _emit_retry_status(
         self,
@@ -150,7 +150,7 @@ class RetryService:
 
         controller = self.controller
         if self._retry_pending:
-            logger.debug("Retry already pending for controller %s", controller.id)
+            logger.debug('Retry already pending for controller %s', controller.id)
             return True
 
         if not self._retry_worker_task or self._retry_worker_task.done():
@@ -158,18 +158,18 @@ class RetryService:
             self.initialize()
 
         metadata: dict[str, Any] = {
-            "error": str(exc),
-            "retry_reason": type(exc).__name__,
+            'error': str(exc),
+            'retry_reason': type(exc).__name__,
         }
         if controller._pending_action is not None:
-            metadata["pending_action"] = ToolTelemetry.action_to_dict(
+            metadata['pending_action'] = ToolTelemetry.action_to_dict(
                 controller._pending_action
             )
         initial_delay = self._compute_initial_delay(exc, queue)
 
         task = await queue.schedule(
-            controller_id=controller.id or "",
-            payload={"operation": "agent_step"},
+            controller_id=controller.id or '',
+            payload={'operation': 'agent_step'},
             reason=type(exc).__name__,
             metadata=metadata,
             initial_delay=initial_delay,
@@ -181,27 +181,27 @@ class RetryService:
         # budget so recovery overhead doesn't burn into the task runway.
         self._compensate_iterations_for_connection_error(exc)
 
-        next_attempt = max(1, int(getattr(task, "attempts", 0) or 0) + 1)
+        next_attempt = max(1, int(getattr(task, 'attempts', 0) or 0) + 1)
         human_message = (
-            "Waiting on autonomous recovery: retry "
-            f"{next_attempt}/{task.max_attempts} in "
-            f"{self._format_retry_delay(initial_delay)} after {type(exc).__name__}."
+            'Waiting on autonomous recovery: retry '
+            f'{next_attempt}/{task.max_attempts} in '
+            f'{self._format_retry_delay(initial_delay)} after {type(exc).__name__}.'
         )
         controller.state.set_last_error(
-            f"{type(exc).__name__}: retry scheduled", source="RetryService"
+            f'{type(exc).__name__}: retry scheduled', source='RetryService'
         )
         self._emit_retry_status(
-            status_type="retry_pending",
+            status_type='retry_pending',
             content=human_message,
             extras={
-                "attempt": next_attempt,
-                "max_attempts": task.max_attempts,
-                "delay_seconds": initial_delay,
-                "reason": type(exc).__name__,
+                'attempt': next_attempt,
+                'max_attempts': task.max_attempts,
+                'delay_seconds': initial_delay,
+                'reason': type(exc).__name__,
             },
         )
         logger.warning(
-            "Scheduled retry task %s for controller %s due to %s (delay=%.1fs)",
+            'Scheduled retry task %s for controller %s due to %s (delay=%.1fs)',
             task.id,
             controller.id,
             type(exc).__name__,
@@ -228,17 +228,17 @@ class RetryService:
             else:
                 # Different or no running loop; rely on cancellation without awaiting
                 logger.debug(
-                    "Retry worker for controller %s cancelled without await due to loop mismatch",
+                    'Retry worker for controller %s cancelled without await due to loop mismatch',
                     self.controller.id,
                 )
         except asyncio.CancelledError:  # pragma: no cover - expected cancellation path
             logger.debug(
-                "Retry worker cancellation acknowledged for controller %s",
+                'Retry worker cancellation acknowledged for controller %s',
                 self.controller.id,
             )
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.debug(
-                "Retry worker shutdown ignored error for controller %s: %s",
+                'Retry worker shutdown ignored error for controller %s: %s',
                 self.controller.id,
                 exc,
             )
@@ -266,10 +266,10 @@ class RetryService:
                 except asyncio.CancelledError:
                     raise
                 except Exception as loop_exc:
-                    logger.error("Error inside retry worker loop: %s", loop_exc)
+                    logger.error('Error inside retry worker loop: %s', loop_exc)
                     await asyncio.sleep(poll_interval)
         except asyncio.CancelledError:  # pragma: no cover - cooperative cancellation
-            logger.debug("Retry worker cancelled for controller %s", controller.id)
+            logger.debug('Retry worker cancelled for controller %s', controller.id)
             raise
 
     async def _fetch_ready_tasks(
@@ -284,7 +284,7 @@ class RetryService:
         except Exception as exc:
             if self._is_retry_backend_failure(exc):
                 logger.warning(
-                    "Retry queue backend connection lost for controller %s; worker exiting: %s",
+                    'Retry queue backend connection lost for controller %s; worker exiting: %s',
                     controller.id,
                     exc,
                 )
@@ -311,26 +311,26 @@ class RetryService:
         if not isinstance(exc, (APIConnectionError, Timeout)):
             return
         try:
-            iteration_flag = getattr(self.controller.state, "iteration_flag", None)
+            iteration_flag = getattr(self.controller.state, 'iteration_flag', None)
             if iteration_flag is None:
                 return
-            current_max = getattr(iteration_flag, "max_value", None)
+            current_max = getattr(iteration_flag, 'max_value', None)
             if current_max is not None:
                 iteration_flag.max_value = current_max + 8
                 logger.info(
-                    "Connection error (%s): granted 8 extra iterations to controller %s "
-                    "(budget now %d)",
+                    'Connection error (%s): granted 8 extra iterations to controller %s '
+                    '(budget now %d)',
                     type(exc).__name__,
                     self.controller.id,
                     iteration_flag.max_value,
                 )
         except Exception as budget_exc:  # pragma: no cover - defensive
-            logger.debug("Could not compensate iteration budget: %s", budget_exc)
+            logger.debug('Could not compensate iteration budget: %s', budget_exc)
 
     async def _process_tasks(self, tasks: list[RetryTask]) -> None:
         queue = self._retry_queue
         if queue is None:
-            logger.debug("Retry queue no longer available; stopping task processing.")
+            logger.debug('Retry queue no longer available; stopping task processing.')
             return
 
         for task in tasks:
@@ -341,7 +341,7 @@ class RetryService:
             except Exception as exc:
                 # CancelledError propagates; only handle Exception
                 logger.exception(
-                    "Retry task %s failed for controller %s: %s",
+                    'Retry task %s failed for controller %s: %s',
                     task.id,
                     self.controller.id,
                     exc,
@@ -353,7 +353,7 @@ class RetryService:
         queue = self._retry_queue
         if queue is None:
             logger.debug(
-                "Retry queue missing; cannot handle failure for task %s", task.id
+                'Retry queue missing; cannot handle failure for task %s', task.id
             )
             self._retry_pending = False
             await self._transition_to_awaiting_user()
@@ -365,7 +365,7 @@ class RetryService:
                 # All retries exhausted — show the prompt so user can act.
                 await self._transition_to_awaiting_user()
         except Exception as backend_exc:
-            logger.warning("Retry queue backend error during cleanup: %s", backend_exc)
+            logger.warning('Retry queue backend error during cleanup: %s', backend_exc)
             self._retry_pending = False
             await self._transition_to_awaiting_user()
 
@@ -378,50 +378,50 @@ class RetryService:
         controller = self.controller
         controller.event_stream.add_event(
             AgentThinkObservation(
-                content="All automatic retries exhausted. Returning to prompt."
+                content='All automatic retries exhausted. Returning to prompt.'
             ),
             EventSource.ENVIRONMENT,
         )
         try:
             await controller.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
         except Exception:
-            logger.debug("Failed to transition to AWAITING_USER_INPUT", exc_info=True)
+            logger.debug('Failed to transition to AWAITING_USER_INPUT', exc_info=True)
 
     async def _process_retry_task(self, task: RetryTask) -> None:
         """Process an individual retry queue task."""
         controller = self.controller
         if controller._closed:
             logger.debug(
-                "Controller %s closed; ignoring retry task %s", controller.id, task.id
+                'Controller %s closed; ignoring retry task %s', controller.id, task.id
             )
             return
 
-        operation = task.payload.get("operation", "agent_step")
-        if operation == "agent_step":
+        operation = task.payload.get('operation', 'agent_step')
+        if operation == 'agent_step':
             await self._resume_agent_after_retry(task)
             return
 
-        if operation == "action":
-            action_dict = task.payload.get("action")
+        if operation == 'action':
+            action_dict = task.payload.get('action')
             if not action_dict:
                 logger.warning(
-                    "Retry task %s missing action payload; skipping", task.id
+                    'Retry task %s missing action payload; skipping', task.id
                 )
                 return
             from backend.ledger.serialization.action import action_from_dict
 
             action = action_from_dict(action_dict)
             controller.log(
-                "info",
-                f"Replaying action from retry queue: {type(action).__name__}",
-                extra={"msg_type": "RETRY_EXECUTE"},
+                'info',
+                f'Replaying action from retry queue: {type(action).__name__}',
+                extra={'msg_type': 'RETRY_EXECUTE'},
             )
-            process_action = getattr(controller, "_process_action", None)
+            process_action = getattr(controller, '_process_action', None)
             if callable(process_action):
                 await process_action(action)
             else:
                 logger.warning(
-                    "Controller %s lacks _process_action; unable to replay action task %s",
+                    'Controller %s lacks _process_action; unable to replay action task %s',
                     controller.id,
                     task.id,
                 )
@@ -439,21 +439,21 @@ class RetryService:
         from backend.orchestration.state.state import AgentState
 
         controller = self.controller
-        metadata = getattr(task, "metadata", None)
-        retry_reason = ""
+        metadata = getattr(task, 'metadata', None)
+        retry_reason = ''
         if isinstance(metadata, dict):
-            retry_reason = str(metadata.get("retry_reason") or "").strip()
+            retry_reason = str(metadata.get('retry_reason') or '').strip()
         if not retry_reason:
-            retry_reason = str(getattr(task, "reason", "") or "transient failure")
-        attempt = max(1, int(getattr(task, "attempts", 0) or 0))
+            retry_reason = str(getattr(task, 'reason', '') or 'transient failure')
+        attempt = max(1, int(getattr(task, 'attempts', 0) or 0))
 
         # Guard: if budget or iteration limit is already exceeded, resuming the
         # agent would immediately raise the same RuntimeError in _run_control_flags
         # and loop forever.  Abort the retry and return control to the user.
-        state = getattr(controller, "state", None)
+        state = getattr(controller, 'state', None)
         if state is not None:
-            budget_flag = getattr(state, "budget_flag", None)
-            iteration_flag = getattr(state, "iteration_flag", None)
+            budget_flag = getattr(state, 'budget_flag', None)
+            iteration_flag = getattr(state, 'iteration_flag', None)
             limit_exceeded = (
                 budget_flag is not None and budget_flag.reached_limit()
             ) or (
@@ -461,8 +461,8 @@ class RetryService:
             )
             if limit_exceeded:
                 logger.warning(
-                    "Budget/iteration limit already reached on controller %s; "
-                    "aborting retry task %s and returning to AWAITING_USER_INPUT.",
+                    'Budget/iteration limit already reached on controller %s; '
+                    'aborting retry task %s and returning to AWAITING_USER_INPUT.',
                     controller.id,
                     task.id,
                 )
@@ -472,16 +472,16 @@ class RetryService:
                 return
 
         message = (
-            f"Autonomous recovery attempt {attempt}/{task.max_attempts} "
-            f"starting after {retry_reason}."
+            f'Autonomous recovery attempt {attempt}/{task.max_attempts} '
+            f'starting after {retry_reason}.'
         )
         self._emit_retry_status(
-            status_type="retry_resuming",
+            status_type='retry_resuming',
             content=message,
             extras={
-                "attempt": attempt,
-                "max_attempts": task.max_attempts,
-                "reason": retry_reason,
+                'attempt': attempt,
+                'max_attempts': task.max_attempts,
+                'reason': retry_reason,
             },
         )
 

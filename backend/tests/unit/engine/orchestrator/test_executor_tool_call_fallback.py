@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -60,8 +61,8 @@ def _make_orchestrator(tmp_path) -> Orchestrator:
     orch.tools = MagicMock()
     orch.memory_manager = MagicMock()
     orch.event_stream = MagicMock()
-    orch.pending_actions = []
-    orch.deferred_actions = []
+    orch.pending_actions = deque()
+    orch.deferred_actions = deque()
     return orch
 
 

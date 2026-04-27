@@ -61,8 +61,8 @@ def _prompt_toolkit_available() -> bool:
 # ---------------------------------------------------------------------------
 # History file
 # ---------------------------------------------------------------------------
-_HISTORY_DIR = Path.home() / ".grinta"
-_HISTORY_FILE = _HISTORY_DIR / "history.txt"
+_HISTORY_DIR = Path.home() / '.grinta'
+_HISTORY_FILE = _HISTORY_DIR / 'history.txt'
 
 
 @dataclass(frozen=True)
@@ -74,7 +74,7 @@ class SlashCommandSpec:
     usage: str
     aliases: tuple[str, ...] = ()
     #: Grouping key for `/help` (see `_HELP_SECTIONS_ORDER`).
-    help_section: str = "system"
+    help_section: str = 'system'
 
 
 @dataclass(frozen=True)
@@ -91,110 +91,110 @@ class SlashCommandParseError(ValueError):
 
 
 _AUTONOMY_LEVEL_HINTS = {
-    "supervised": "Always ask before actions",
-    "balanced": "Ask only for high-risk actions",
-    "full": "Run without confirmation prompts",
+    'supervised': 'Always ask before actions',
+    'balanced': 'Ask only for high-risk actions',
+    'full': 'Run without confirmation prompts',
 }
 _SLASH_COMMANDS = (
     SlashCommandSpec(
-        "/help",
-        "Show commands and shortcuts",
-        "/help [command]",
-        aliases=("/?",),
-        help_section="system",
+        '/help',
+        'Show commands and shortcuts',
+        '/help [command]',
+        aliases=('/?',),
+        help_section='system',
     ),
     SlashCommandSpec(
-        "/settings",
-        "Open settings (model, API key, MCP)",
-        "/settings",
-        help_section="model",
+        '/settings',
+        'Open settings (model, API key, MCP)',
+        '/settings',
+        help_section='model',
     ),
     SlashCommandSpec(
-        "/sessions", "List past sessions", "/sessions", help_section="session"
+        '/sessions', 'List past sessions', '/sessions', help_section='session'
     ),
     SlashCommandSpec(
-        "/resume",
-        "Resume a past session by index or ID",
-        "/resume <N|id>",
-        help_section="session",
+        '/resume',
+        'Resume a past session by index or ID',
+        '/resume <N|id>',
+        help_section='session',
     ),
     SlashCommandSpec(
-        "/autonomy",
-        "View or set autonomy (supervised/balanced/full)",
-        "/autonomy [supervised|balanced|full]",
-        help_section="model",
+        '/autonomy',
+        'View or set autonomy (supervised/balanced/full)',
+        '/autonomy [supervised|balanced|full]',
+        help_section='model',
     ),
     SlashCommandSpec(
-        "/model",
-        "Show or switch the active model",
-        "/model [provider/model]",
-        help_section="model",
+        '/model',
+        'Show or switch the active model',
+        '/model [provider/model]',
+        help_section='model',
     ),
     SlashCommandSpec(
-        "/compact",
-        "Condense context to free token budget",
-        "/compact",
-        help_section="control",
+        '/compact',
+        'Condense context to free token budget',
+        '/compact',
+        help_section='control',
     ),
     SlashCommandSpec(
-        "/retry", "Re-send the last message", "/retry", help_section="control"
+        '/retry', 'Re-send the last message', '/retry', help_section='control'
     ),
     SlashCommandSpec(
-        "/status", "Show the current HUD snapshot", "/status", help_section="control"
+        '/status', 'Show the current HUD snapshot', '/status', help_section='control'
     ),
     SlashCommandSpec(
-        "/cost",
-        "Show running token & USD cost for this session",
-        "/cost",
-        help_section="control",
+        '/cost',
+        'Show running token & USD cost for this session',
+        '/cost',
+        help_section='control',
     ),
     SlashCommandSpec(
-        "/diff",
-        "Show workspace git changes",
-        "/diff [--stat|--name-only|--patch] [path]",
-        help_section="control",
+        '/diff',
+        'Show workspace git changes',
+        '/diff [--stat|--name-only|--patch] [path]',
+        help_section='control',
     ),
     SlashCommandSpec(
-        "/think",
-        "Toggle the optional `think` reasoning tool",
-        "/think [on|off]",
-        help_section="control",
+        '/think',
+        'Toggle the optional `think` reasoning tool',
+        '/think [on|off]',
+        help_section='control',
     ),
     SlashCommandSpec(
-        "/checkpoint",
-        "Save a manual checkpoint of the workspace",
-        "/checkpoint [label]",
-        help_section="control",
+        '/checkpoint',
+        'Save a manual checkpoint of the workspace',
+        '/checkpoint [label]',
+        help_section='control',
     ),
     SlashCommandSpec(
-        "/copy",
-        "Copy last assistant message to system clipboard",
-        "/copy",
-        help_section="control",
+        '/copy',
+        'Copy last assistant message to system clipboard',
+        '/copy',
+        help_section='control',
     ),
     SlashCommandSpec(
-        "/clear", "Clear the visible transcript", "/clear", help_section="control"
+        '/clear', 'Clear the visible transcript', '/clear', help_section='control'
     ),
     SlashCommandSpec(
-        "/exit", "Quit grinta", "/exit", aliases=("/quit",), help_section="system"
+        '/exit', 'Quit grinta', '/exit', aliases=('/quit',), help_section='system'
     ),
 )
 
 # Known models surfaced in `/model` tab-completion.
 # provider/model pairs — provider shown as display_meta in the completer.
 _KNOWN_MODELS: tuple[tuple[str, str], ...] = (
-    ("openai/gpt-4.1", "OpenAI"),
-    ("openai/gpt-4o", "OpenAI"),
-    ("openai/o4-mini", "OpenAI"),
-    ("anthropic/claude-opus-4-20250514", "Anthropic"),
-    ("anthropic/claude-sonnet-4-20250514", "Anthropic"),
-    ("anthropic/claude-haiku-4-20250514", "Anthropic"),
-    ("google/gemini-2.5-pro", "Google"),
-    ("google/gemini-2.5-flash", "Google"),
-    ("groq/meta-llama/llama-4-scout", "Groq"),
-    ("xai/grok-4.1-fast", "xAI"),
-    ("deepseek/deepseek-chat", "DeepSeek"),
-    ("openrouter/anthropic/claude-3.5-sonnet", "OpenRouter"),
+    ('openai/gpt-4.1', 'OpenAI'),
+    ('openai/gpt-4o', 'OpenAI'),
+    ('openai/o4-mini', 'OpenAI'),
+    ('anthropic/claude-opus-4-20250514', 'Anthropic'),
+    ('anthropic/claude-sonnet-4-20250514', 'Anthropic'),
+    ('anthropic/claude-haiku-4-20250514', 'Anthropic'),
+    ('google/gemini-2.5-pro', 'Google'),
+    ('google/gemini-2.5-flash', 'Google'),
+    ('groq/meta-llama/llama-4-scout', 'Groq'),
+    ('xai/grok-4.1-fast', 'xAI'),
+    ('deepseek/deepseek-chat', 'DeepSeek'),
+    ('openrouter/anthropic/claude-3.5-sonnet', 'OpenRouter'),
 )
 _COMMAND_ALIASES = {
     alias: spec.name for spec in _SLASH_COMMANDS for alias in spec.aliases
@@ -236,7 +236,7 @@ def _split_command_words(text: str) -> tuple[str, ...]:
                 continue
         if char.isspace() and quote is None:
             if in_word:
-                words.append("".join(current))
+                words.append(''.join(current))
                 current = []
                 in_word = False
             continue
@@ -244,17 +244,17 @@ def _split_command_words(text: str) -> tuple[str, ...]:
         in_word = True
 
     if quote is not None:
-        raise SlashCommandParseError(f"Unclosed {quote} quote in command.")
+        raise SlashCommandParseError(f'Unclosed {quote} quote in command.')
     if in_word:
-        words.append("".join(current))
+        words.append(''.join(current))
     return tuple(words)
 
 
 def _parse_slash_command(text: str) -> ParsedSlashCommand:
     """Parse and canonicalize a slash command line."""
     words = _split_command_words(text)
-    if not words or not words[0].startswith("/"):
-        raise SlashCommandParseError("Expected a slash command.")
+    if not words or not words[0].startswith('/'):
+        raise SlashCommandParseError('Expected a slash command.')
     raw_name = words[0].lower()
     return ParsedSlashCommand(
         raw_name=raw_name,
@@ -268,22 +268,22 @@ def _iter_command_completion_entries() -> list[tuple[str, str]]:
     entries: list[tuple[str, str]] = []
     for spec in _SLASH_COMMANDS:
         entries.append((spec.name, spec.description))
-        entries.extend((alias, f"Alias for {spec.name}") for alias in spec.aliases)
+        entries.extend((alias, f'Alias for {spec.name}') for alias in spec.aliases)
     return entries
 
 
 _HELP_SECTIONS_ORDER: tuple[tuple[str, str], ...] = (
-    ("session", "Session & history"),
-    ("model", "Model & configuration"),
-    ("control", "Context & control"),
-    ("system", "System"),
+    ('session', 'Session & history'),
+    ('model', 'Model & configuration'),
+    ('control', 'Context & control'),
+    ('system', 'System'),
 )
 
 
 def _find_command_spec(command_name: str) -> SlashCommandSpec | None:
     normalized = command_name.strip().lower()
-    if normalized and not normalized.startswith("/"):
-        normalized = f"/{normalized}"
+    if normalized and not normalized.startswith('/'):
+        normalized = f'/{normalized}'
     canonical = _canonical_command_name(normalized)
     for spec in _SLASH_COMMANDS:
         if spec.name == canonical:
@@ -299,22 +299,22 @@ def _build_help_markdown(command_name: str | None = None) -> str:
         spec = _find_command_spec(command_name)
         if spec is None:
             suggestions = _closest_command_names(command_name)
-            suffix = ""
+            suffix = ''
             if suggestions:
                 suffix = (
-                    "\n\nTry " + " or ".join(f"`{item}`" for item in suggestions) + "."
+                    '\n\nTry ' + ' or '.join(f'`{item}`' for item in suggestions) + '.'
                 )
-            return f"No help topic for `{command_name}`.{suffix}"
+            return f'No help topic for `{command_name}`.{suffix}'
         detail_lines = [
-            f"`{spec.usage}`",
-            "",
+            f'`{spec.usage}`',
+            '',
             spec.description,
         ]
         if spec.aliases:
             detail_lines.extend(
-                ["", "Aliases: " + ", ".join(f"`{alias}`" for alias in spec.aliases)]
+                ['', 'Aliases: ' + ', '.join(f'`{alias}`' for alias in spec.aliases)]
             )
-        return "\n".join(detail_lines)
+        return '\n'.join(detail_lines)
 
     by_section: dict[str, list[SlashCommandSpec]] = defaultdict(list)
     for spec in _SLASH_COMMANDS:
@@ -327,32 +327,32 @@ def _build_help_markdown(command_name: str | None = None) -> str:
         if not specs:
             continue
         if not first_section:
-            lines.append("")
+            lines.append('')
         first_section = False
-        lines.append(f"**{title}**")
-        lines.append("")
+        lines.append(f'**{title}**')
+        lines.append('')
         for spec in specs:
             alias_text = (
-                " _(aliases: "
-                + ", ".join(f"`{alias}`" for alias in spec.aliases)
-                + ")_"
+                ' _(aliases: '
+                + ', '.join(f'`{alias}`' for alias in spec.aliases)
+                + ')_'
                 if spec.aliases
-                else ""
+                else ''
             )
-            lines.append(f"- `{spec.usage}` — {spec.description}{alias_text}")
+            lines.append(f'- `{spec.usage}` — {spec.description}{alias_text}')
 
     lines.extend(
         [
-            "",
-            "**Input tips**",
-            "",
-            "- `Tab` autocomplete slash commands and common arguments",
-            "- `↑` / `↓` search prompt history",
-            "- `Alt+Enter` insert a newline",
-            "- `Ctrl+C` interrupt the current run",
+            '',
+            '**Input tips**',
+            '',
+            '- `Tab` autocomplete slash commands and common arguments',
+            '- `↑` / `↓` search prompt history',
+            '- `Alt+Enter` insert a newline',
+            '- `Ctrl+C` interrupt the current run',
         ]
     )
-    return "\n".join(lines)
+    return '\n'.join(lines)
 
 
 def _closest_command_names(command: str, *, limit: int = 2) -> list[str]:
@@ -368,26 +368,26 @@ def _closest_command_names(command: str, *, limit: int = 2) -> list[str]:
 def _copy_to_system_clipboard(text: str) -> tuple[bool, str]:
     """Copy plain text to OS clipboard with multi-platform fallbacks."""
     if not text.strip():
-        return False, "No assistant reply available to copy yet."
+        return False, 'No assistant reply available to copy yet.'
 
     try:
         import pyperclip  # type: ignore
 
         pyperclip.copy(text)
-        return True, "Copied last assistant reply to clipboard."
+        return True, 'Copied last assistant reply to clipboard.'
     except Exception:
         pass
 
     candidates: list[list[str]] = []
-    if sys.platform.startswith("win"):
-        candidates = [["clip"]]
-    elif sys.platform == "darwin":
-        candidates = [["pbcopy"]]
+    if sys.platform.startswith('win'):
+        candidates = [['clip']]
+    elif sys.platform == 'darwin':
+        candidates = [['pbcopy']]
     else:
         candidates = [
-            ["wl-copy"],
-            ["xclip", "-selection", "clipboard"],
-            ["xsel", "--clipboard", "--input"],
+            ['wl-copy'],
+            ['xclip', '-selection', 'clipboard'],
+            ['xsel', '--clipboard', '--input'],
         ]
 
     for cmd in candidates:
@@ -395,35 +395,35 @@ def _copy_to_system_clipboard(text: str) -> tuple[bool, str]:
             continue
         try:
             subprocess.run(cmd, input=text, text=True, check=True)
-            return True, "Copied last assistant reply to clipboard."
+            return True, 'Copied last assistant reply to clipboard.'
         except Exception:
             continue
 
     return (
         False,
-        "Clipboard copy failed. Install `pyperclip` (recommended) or a system clipboard tool and retry.",
+        'Clipboard copy failed. Install `pyperclip` (recommended) or a system clipboard tool and retry.',
     )
 
 
 # Leaked bracket-param sequences (e.g. Windows Terminal / ConPTY) — often no ESC.
 _ORPHAN_BRACKET_CSI = re.compile(
-    r"\[+(?:\d+;){2,}[\d;:_\s-]*[OI]?(?=\[|$| |\Z)",
+    r'\[+(?:\d+;){2,}[\d;:_\s-]*[OI]?(?=\[|$| |\Z)',
     re.MULTILINE,
 )
 # Bracketless leaked parameter chunks seen in some ConPTY/Cursor terminals:
 # e.g. ``0;1;40;1_0;0;32;1_8;1;32;1_``.
 _ORPHAN_PARAM_CHUNK_STREAM = re.compile(
-    r"(?<![A-Za-z0-9])(?:\[?(?:\d+;){2,}\d+[OI]?_){2,}",
+    r'(?<![A-Za-z0-9])(?:\[?(?:\d+;){2,}\d+[OI]?_){2,}',
     re.MULTILINE,
 )
 _ORPHAN_PARAM_CHUNK_SINGLE = re.compile(
-    r"(?<![A-Za-z0-9])\[?(?:\d+;){4,}\d+[OI]?_",
+    r'(?<![A-Za-z0-9])\[?(?:\d+;){4,}\d+[OI]?_',
     re.MULTILINE,
 )
 # Well-formed 7-bit CSI and OSC (bell or ST-terminated).
 _CSI_OSC_DCS = re.compile(
-    r"(?:\x1B\][^\x07\x1B]*(?:\x07|\x1B\\))"
-    r"|(?:\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))",
+    r'(?:\x1B\][^\x07\x1B]*(?:\x07|\x1B\\))'
+    r'|(?:\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]))',
     re.DOTALL,
 )
 
@@ -435,12 +435,12 @@ def _strip_leaked_terminal_artifacts(text: str) -> str:
     out = text
     for _ in range(16):
         prev = out
-        out = _CSI_OSC_DCS.sub("", out)
-        out = _ORPHAN_BRACKET_CSI.sub("", out)
-        out = _ORPHAN_PARAM_CHUNK_STREAM.sub("", out)
-        out = _ORPHAN_PARAM_CHUNK_SINGLE.sub("", out)
+        out = _CSI_OSC_DCS.sub('', out)
+        out = _ORPHAN_BRACKET_CSI.sub('', out)
+        out = _ORPHAN_PARAM_CHUNK_STREAM.sub('', out)
+        out = _ORPHAN_PARAM_CHUNK_SINGLE.sub('', out)
         # focus in/out and similar two-letter CSI finals without a leading esc byte
-        out = re.sub(r"\[+(?:O|I)+", "", out)
+        out = re.sub(r'\[+(?:O|I)+', '', out)
         if out == prev:
             break
     return out
@@ -448,7 +448,7 @@ def _strip_leaked_terminal_artifacts(text: str) -> str:
 
 def _looks_like_terminal_selection_noise(text: str) -> bool:
     """Best-effort: whole buffer is only leaked terminal control noise."""
-    sample = (text or "").strip()
+    sample = (text or '').strip()
     if len(sample) < 8:
         return False
     cleaned = _strip_leaked_terminal_artifacts(sample)
@@ -461,7 +461,7 @@ def _attach_prompt_buffer_csi_sanitizer(session: Any) -> None:
     Without this, leaked ``[nn;...`` sequences from the terminal appear *in* the
     input line; filtering only on submit is too late for the user.
     """
-    buf = getattr(session, "default_buffer", None)
+    buf = getattr(session, 'default_buffer', None)
     if buf is None:
         return
     from prompt_toolkit.document import Document
@@ -485,7 +485,7 @@ def _attach_prompt_buffer_csi_sanitizer(session: Any) -> None:
     try:
         buf.on_text_changed += _on_text_changed
     except Exception:  # pragma: no cover
-        logger.debug("Could not attach CSI sanitizer to prompt buffer", exc_info=True)
+        logger.debug('Could not attach CSI sanitizer to prompt buffer', exc_info=True)
 
 
 def _build_command_completer(
@@ -500,10 +500,10 @@ def _build_command_completer(
         def get_completions(self, document, complete_event):  # type: ignore[override]
             del complete_event
             text_before_cursor = document.text_before_cursor.lstrip()
-            if not text_before_cursor.startswith("/"):
+            if not text_before_cursor.startswith('/'):
                 return
 
-            has_trailing_space = document.text_before_cursor.endswith(" ")
+            has_trailing_space = document.text_before_cursor.endswith(' ')
             parts = text_before_cursor.split()
             if not parts:
                 return
@@ -521,9 +521,9 @@ def _build_command_completer(
                 return
 
             canonical_command = _canonical_command_name(command_token)
-            argument_prefix = "" if has_trailing_space or len(parts) < 2 else parts[1]
+            argument_prefix = '' if has_trailing_space or len(parts) < 2 else parts[1]
 
-            if canonical_command == "/autonomy":
+            if canonical_command == '/autonomy':
                 lowered_prefix = argument_prefix.lower()
                 for level, description in _AUTONOMY_LEVEL_HINTS.items():
                     if level.startswith(lowered_prefix):
@@ -534,7 +534,7 @@ def _build_command_completer(
                         )
                 return
 
-            if canonical_command == "/model":
+            if canonical_command == '/model':
                 lowered_prefix = argument_prefix.lower()
                 for model_id, provider in _KNOWN_MODELS:
                     if lowered_prefix and not model_id.startswith(lowered_prefix):
@@ -546,7 +546,7 @@ def _build_command_completer(
                     )
                 return
 
-            if canonical_command == "/help":
+            if canonical_command == '/help':
                 lowered_prefix = argument_prefix.lower()
                 for name, description in _iter_command_completion_entries():
                     if name.startswith(lowered_prefix):
@@ -557,12 +557,12 @@ def _build_command_completer(
                         )
                 return
 
-            if canonical_command == "/diff":
+            if canonical_command == '/diff':
                 lowered_prefix = argument_prefix.lower()
                 for option, description in (
-                    ("--stat", "Summary by file"),
-                    ("--name-only", "Changed file names"),
-                    ("--patch", "Full patch"),
+                    ('--stat', 'Summary by file'),
+                    ('--name-only', 'Changed file names'),
+                    ('--patch', 'Full patch'),
                 ):
                     if option.startswith(lowered_prefix):
                         yield Completion(
@@ -572,7 +572,7 @@ def _build_command_completer(
                         )
                 return
 
-            if canonical_command == "/resume":
+            if canonical_command == '/resume':
                 lowered_prefix = argument_prefix.lower()
                 seen: set[str] = set()
                 for candidate, description in session_loader():
@@ -606,15 +606,15 @@ def _build_bindings() -> Any:
     @kb.add(Keys.Escape, Keys.Enter)
     def _newline(event):
         """Alt+Enter inserts a newline (multi-line input)."""
-        event.current_buffer.insert_text("\n")
+        event.current_buffer.insert_text('\n')
 
     return kb
 
 
 def _supports_prompt_session(input_stream: Any, output_stream: Any) -> bool:
     """Use prompt_toolkit only when both streams are attached to a TTY."""
-    input_is_tty = bool(getattr(input_stream, "isatty", lambda: False)())
-    output_is_tty = bool(getattr(output_stream, "isatty", lambda: False)())
+    input_is_tty = bool(getattr(input_stream, 'isatty', lambda: False)())
+    output_is_tty = bool(getattr(output_stream, 'isatty', lambda: False)())
     return input_is_tty and output_is_tty and _prompt_toolkit_available()
 
 
@@ -647,8 +647,8 @@ class Repl:
         self._last_user_message: str | None = None
         self._queued_input: list[str] = []
         #: Single-line bootstrap / idle status under the stats bar (prompt_toolkit only).
-        self._footer_system_status: str = ""
-        self._footer_system_kind: str = "system"
+        self._footer_system_status: str = ''
+        self._footer_system_kind: str = 'system'
         self._pt_session: Any | None = None
         #: Shown once per REPL run when Ctrl+C is pressed at the input prompt.
         self._prompt_ctrl_c_hint_shown: bool = False
@@ -657,7 +657,7 @@ class Repl:
         sess = self._pt_session
         if sess is None:
             return
-        app = getattr(sess, "app", None)
+        app = getattr(sess, 'app', None)
         if app is not None:
             app.invalidate()
 
@@ -679,17 +679,17 @@ class Repl:
             self._console.show_cursor(True)
         except Exception:
             pass
-        out = getattr(session, "output", None)
+        out = getattr(session, 'output', None)
         if out is not None:
             try:
                 # Leave the cursor on a fresh row after Rich scrollback so the
                 # next full-screen prompt layout computes correctly.
-                out.write("\n")
+                out.write('\n')
                 out.flush()
             except Exception:
                 pass
 
-    def _set_footer_system_line(self, text: str, *, kind: str = "system") -> None:
+    def _set_footer_system_line(self, text: str, *, kind: str = 'system') -> None:
         """One shared status line under the stats bar; replaces previous text."""
         self._footer_system_status = text
         self._footer_system_kind = kind
@@ -703,30 +703,30 @@ class Repl:
         status = self._footer_system_status.strip()
         if not status:
             return
-        warn = self._footer_system_kind.strip().lower() == "warning"
+        warn = self._footer_system_kind.strip().lower() == 'warning'
         body_cls = (
-            "class:prompt.footer.warn_body" if warn else "class:prompt.footer.body"
+            'class:prompt.footer.warn_body' if warn else 'class:prompt.footer.body'
         )
-        label = "system"
-        sep = ": "
+        label = 'system'
+        sep = ': '
         cols = shutil.get_terminal_size((110, 24)).columns
         reserve = 5 + len(label) + len(sep)
         max_w = max(16, cols - reserve)
         if len(status) > max_w:
-            status = status[: max_w - 1] + "…"
-        add("", "\n")
+            status = status[: max_w - 1] + '…'
+        add('', '\n')
         if warn:
-            add("class:prompt.footer.warn_bracket", "[")
-            add("class:prompt.footer.warn_core", "!")
-            add("class:prompt.footer.warn_bracket", "]  ")
-            add("class:prompt.footer.warn_kicker", label)
-            add("class:prompt.footer.warn_sep", sep)
+            add('class:prompt.footer.warn_bracket', '[')
+            add('class:prompt.footer.warn_core', '!')
+            add('class:prompt.footer.warn_bracket', ']  ')
+            add('class:prompt.footer.warn_kicker', label)
+            add('class:prompt.footer.warn_sep', sep)
         else:
-            add("class:prompt.footer.badge_bracket", "[")
-            add("class:prompt.footer.badge_core", "i")
-            add("class:prompt.footer.badge_bracket", "]  ")
-            add("class:prompt.footer.kicker", label)
-            add("class:prompt.footer.sep", sep)
+            add('class:prompt.footer.badge_bracket', '[')
+            add('class:prompt.footer.badge_core', 'i')
+            add('class:prompt.footer.badge_bracket', ']  ')
+            add('class:prompt.footer.kicker', label)
+            add('class:prompt.footer.sep', sep)
         add(body_cls, status)
 
     @property
@@ -772,7 +772,7 @@ class Repl:
     def _current_prompt_state(self) -> AgentState | None:
         renderer = self._renderer
         state = (
-            getattr(renderer, "current_state", None) if renderer is not None else None
+            getattr(renderer, 'current_state', None) if renderer is not None else None
         )
         if isinstance(state, AgentState):
             return state
@@ -788,10 +788,10 @@ class Repl:
     def _prompt_message(self) -> str:
         state = self._current_prompt_state()
         if state in {AgentState.ERROR, AgentState.REJECTED}:
-            label = "retry "
+            label = 'retry '
         else:
-            label = ""
-        return f"{label}❯ "
+            label = ''
+        return f'{label}❯ '
 
     def _prompt_placeholder(self) -> Any:
         from prompt_toolkit.formatted_text import HTML
@@ -803,114 +803,114 @@ class Repl:
     def _prompt_state_label(self) -> str:
         state = self._current_prompt_state()
         if state == AgentState.AWAITING_USER_CONFIRMATION:
-            return "Needs approval"
+            return 'Needs approval'
         if state in {AgentState.ERROR, AgentState.REJECTED}:
-            return "Needs attention"
+            return 'Needs attention'
         if state == AgentState.RUNNING:
-            return "Running"
+            return 'Running'
         if state == AgentState.FINISHED:
-            return "Done"
+            return 'Done'
         if state == AgentState.STOPPED:
-            return "Stopped"
-        return "Ready"
+            return 'Stopped'
+        return 'Ready'
 
     def _prompt_autonomy_label(self) -> str:
         controller = self._controller
         if controller is not None:
-            ac = getattr(controller, "autonomy_controller", None)
+            ac = getattr(controller, 'autonomy_controller', None)
             if ac is not None:
-                level = str(getattr(ac, "autonomy_level", "balanced")).strip().lower()
+                level = str(getattr(ac, 'autonomy_level', 'balanced')).strip().lower()
                 if level in _AUTONOMY_LEVEL_HINTS:
-                    return f"autonomy:{level}"
-        return "autonomy:balanced"
+                    return f'autonomy:{level}'
+        return 'autonomy:balanced'
 
     def _prompt_panel_data(self) -> dict[str, str]:
         hud = self._hud.state
         provider, model = HUDBar.describe_model(hud.model)
         tokens = (
-            HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else "0"
+            HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
         )
-        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else "?"
+        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else '?'
         if hud.context_tokens == 0 and hud.context_limit == 0:
-            token_display = "0 tokens"
+            token_display = '0 tokens'
         elif hud.context_limit == 0:
-            token_display = f"{tokens} tokens"
+            token_display = f'{tokens} tokens'
         else:
-            token_display = f"{tokens}/{lim}"
+            token_display = f'{tokens}/{lim}'
         mcp_txt = HUDBar._format_mcp_servers_label(hud.mcp_servers)
         skills_txt = HUDBar._format_skills_label(self._hud.bundled_skill_count)
         return {
-            "state_label": self._prompt_state_label(),
-            "autonomy_label": self._prompt_autonomy_label(),
-            "workspace": (hud.workspace_path or "").strip(),
-            "provider": provider,
-            "model": model,
-            "token_display": token_display,
-            "cost": f"${hud.cost_usd:.4f}",
-            "calls": f"{hud.llm_calls} calls",
-            "mcp": mcp_txt,
-            "skills": skills_txt,
-            "ledger": hud.ledger_status,
+            'state_label': self._prompt_state_label(),
+            'autonomy_label': self._prompt_autonomy_label(),
+            'workspace': (hud.workspace_path or '').strip(),
+            'provider': provider,
+            'model': model,
+            'token_display': token_display,
+            'cost': f'${hud.cost_usd:.4f}',
+            'calls': f'{hud.llm_calls} calls',
+            'mcp': mcp_txt,
+            'skills': skills_txt,
+            'ledger': hud.ledger_status,
         }
 
     def _prompt_state_style(self) -> str:
         state = self._current_prompt_state()
         if state == AgentState.AWAITING_USER_CONFIRMATION:
-            return "class:prompt.badge.review"
+            return 'class:prompt.badge.review'
         if state in {AgentState.ERROR, AgentState.REJECTED}:
-            return "class:prompt.badge.error"
+            return 'class:prompt.badge.error'
         if state == AgentState.RUNNING:
-            return "class:prompt.badge.running"
-        return "class:prompt.badge.ready"
+            return 'class:prompt.badge.running'
+        return 'class:prompt.badge.ready'
 
     def _prompt_autonomy_style(self) -> str:
         label = self._prompt_autonomy_label()
-        if "full" in label:
-            return "class:prompt.autonomy.full"
-        if "supervised" in label:
-            return "class:prompt.autonomy.supervised"
-        return "class:prompt.autonomy.balanced"
+        if 'full' in label:
+            return 'class:prompt.autonomy.full'
+        if 'supervised' in label:
+            return 'class:prompt.autonomy.supervised'
+        return 'class:prompt.autonomy.balanced'
 
     @staticmethod
     def _prompt_ledger_style(ledger_status: str) -> str:
-        if ledger_status in {"Healthy", "Ready", "Idle", "Starting"}:
-            return "class:prompt.health.good"
-        if ledger_status in {"Review", "Paused"}:
-            return "class:prompt.health.warn"
-        return "class:prompt.health.bad"
+        if ledger_status in {'Healthy', 'Ready', 'Idle', 'Starting'}:
+            return 'class:prompt.health.good'
+        if ledger_status in {'Review', 'Paused'}:
+            return 'class:prompt.health.warn'
+        return 'class:prompt.health.bad'
 
     def _prompt_toolbar_text(self) -> str:
         data = self._prompt_panel_data()
-        state_label = data["state_label"]
-        autonomy_label = data["autonomy_label"]
-        controls = f"{state_label}  │  {autonomy_label}  │  Tab for commands"
+        state_label = data['state_label']
+        autonomy_label = data['autonomy_label']
+        controls = f'{state_label}  │  {autonomy_label}  │  Tab for commands'
         telemetry = (
             f'provider: {data["provider"]}  │  model: {data["model"]}  │  {data["token_display"]}  │  {data["cost"]}  │  '
             f'{data["calls"]}  │  {data["mcp"]}  │  {data["skills"]}  │  {data["ledger"]}'
         )
-        return f" {controls}\n {telemetry} "
+        return f' {controls}\n {telemetry} '
 
     def _prompt_stats_row1_fragments(
         self, data: dict[str, str], compact: bool
     ) -> list[tuple[str, str]]:
         frags: list[tuple[str, str]] = []
-        frags.append(("class:prompt.brand", "GRINTA"))
-        frags.append(("class:prompt.dim", "  "))
+        frags.append(('class:prompt.brand', 'GRINTA'))
+        frags.append(('class:prompt.dim', '  '))
         frags.append((self._prompt_state_style(), f' {data["state_label"].upper()} '))
-        frags.append(("class:prompt.dim", "  "))
-        frags.append((self._prompt_autonomy_style(), data["autonomy_label"]))
+        frags.append(('class:prompt.dim', '  '))
+        frags.append((self._prompt_autonomy_style(), data['autonomy_label']))
         if not compact:
-            frags.append(("class:prompt.dim", "  "))
-            frags.append(("class:prompt.hint", "Tab for commands"))
+            frags.append(('class:prompt.dim', '  '))
+            frags.append(('class:prompt.hint', 'Tab for commands'))
         return frags
 
     def _prompt_stats_row2_fragments(
         self, data: dict[str, str], compact: bool, width: int = 120
     ) -> list[tuple[str, str]]:
         """Build row-2 fragments, wrapping to a second line when content exceeds width."""
-        sep = "  \u2022  "
+        sep = '  \u2022  '
 
-        ws_raw = (data.get("workspace") or "").strip()
+        ws_raw = (data.get('workspace') or '').strip()
         # Required prefix: optional workspace, then provider + model + tokens + cost
         base: list[tuple[str, str]] = []
         if ws_raw:
@@ -918,34 +918,34 @@ class Repl:
             ws_show = HUDBar.ellipsize_path(ws_raw, ws_max)
             base.extend(
                 [
-                    ("class:prompt.dim", "workspace:"),
-                    ("class:prompt.sep", " "),
-                    ("class:prompt.model", ws_show),
-                    ("class:prompt.sep", sep),
+                    ('class:prompt.dim', 'workspace:'),
+                    ('class:prompt.sep', ' '),
+                    ('class:prompt.model', ws_show),
+                    ('class:prompt.sep', sep),
                 ]
             )
         base.extend(
             [
-                ("class:prompt.dim", "provider:"),
-                ("class:prompt.sep", " "),
-                ("class:prompt.model", data["provider"]),
-                ("class:prompt.sep", sep),
-                ("class:prompt.dim", "model:"),
-                ("class:prompt.sep", " "),
-                ("class:prompt.model", data["model"]),
-                ("class:prompt.sep", sep),
-                ("class:prompt.value", data["token_display"]),
-                ("class:prompt.sep", sep),
-                ("class:prompt.value", data["cost"]),
+                ('class:prompt.dim', 'provider:'),
+                ('class:prompt.sep', ' '),
+                ('class:prompt.model', data['provider']),
+                ('class:prompt.sep', sep),
+                ('class:prompt.dim', 'model:'),
+                ('class:prompt.sep', ' '),
+                ('class:prompt.model', data['model']),
+                ('class:prompt.sep', sep),
+                ('class:prompt.value', data['token_display']),
+                ('class:prompt.sep', sep),
+                ('class:prompt.value', data['cost']),
             ]
         )
 
         # Optional fields in priority order.
         optionals: list[tuple[str, str]] = [
-            (self._prompt_ledger_style(data["ledger"]), data["ledger"]),
-            ("class:prompt.value", data["calls"]),
-            ("class:prompt.value", data["mcp"]),
-            ("class:prompt.value", data["skills"]),
+            (self._prompt_ledger_style(data['ledger']), data['ledger']),
+            ('class:prompt.value', data['calls']),
+            ('class:prompt.value', data['mcp']),
+            ('class:prompt.value', data['skills']),
         ]
 
         def _len(frags: list[tuple[str, str]]) -> int:
@@ -954,7 +954,7 @@ class Repl:
         # Build the full single-line version first.
         opt_frags: list[tuple[str, str]] = []
         for item_style, item_text in optionals:
-            opt_frags.extend([("class:prompt.sep", sep), (item_style, item_text)])
+            opt_frags.extend([('class:prompt.sep', sep), (item_style, item_text)])
 
         all_frags = list(base) + opt_frags
         if _len(all_frags) <= width:
@@ -962,12 +962,12 @@ class Repl:
 
         # Overflow → wrap: required fields on line 1, optionals on line 2.
         result = list(base)
-        result.append(("", "\n"))
-        indent = " " * 10  # width of "provider: " to align the wrapped row
-        result.append(("class:prompt.dim", indent))
+        result.append(('', '\n'))
+        indent = ' ' * 10  # width of "provider: " to align the wrapped row
+        result.append(('class:prompt.dim', indent))
         for idx, (item_style, item_text) in enumerate(optionals):
             if idx > 0:
-                result.append(("class:prompt.sep", sep))
+                result.append(('class:prompt.sep', sep))
             result.append((item_style, item_text))
 
         return result
@@ -979,14 +979,14 @@ class Repl:
         compact = width < 110
 
         # Keep HUD state/autonomy in sync so the Live-mode HUD matches.
-        self._hud.update_agent_state(data["state_label"])
-        level = data["autonomy_label"].replace("autonomy:", "")
+        self._hud.update_agent_state(data['state_label'])
+        level = data['autonomy_label'].replace('autonomy:', '')
         self._hud.update_autonomy(level)
 
         # Keep the compact line readable by folding provider/model into one token.
         model = (
-            data["model"]
-            if data["provider"] in {"(not set)", "(unknown)"}
+            data['model']
+            if data['provider'] in {'(not set)', '(unknown)'}
             else f'{data["provider"]}/{data["model"]}'
         )
 
@@ -996,20 +996,20 @@ class Repl:
             fragments.append((style, text))
 
         if width < 72:
-            ws = (data.get("workspace") or "").strip()
-            ws_prefix = f"{HUDBar.ellipsize_path(ws, 28)} · " if ws else ""
+            ws = (data.get('workspace') or '').strip()
+            ws_prefix = f'{HUDBar.ellipsize_path(ws, 28)} · ' if ws else ''
             line = (
                 f'{ws_prefix}{data["state_label"]} · {data["autonomy_label"]} · '
                 f'{model} · {data["token_display"]} · {data["cost"]}'
             )
-            add("class:prompt.dim", line)
+            add('class:prompt.dim', line)
             self._append_footer_system_fragments(fragments, add)
             return fragments
 
-        add("class:prompt.dim", "\u2500" * width)
-        add("", "\n")
+        add('class:prompt.dim', '\u2500' * width)
+        add('', '\n')
         fragments.extend(self._prompt_stats_row1_fragments(data, compact))
-        add("", "\n")
+        add('', '\n')
         # Pass actual terminal width so row 2 never overflows.
         fragments.extend(self._prompt_stats_row2_fragments(data, compact, width=width))
         self._append_footer_system_fragments(fragments, add)
@@ -1017,7 +1017,7 @@ class Repl:
 
     def _prompt_panel_message(self) -> Any:
         return [
-            ("class:prompt.arrow", self._prompt_message()),
+            ('class:prompt.arrow', self._prompt_message()),
         ]
 
     def _create_prompt_session(self) -> Any:
@@ -1032,49 +1032,49 @@ class Repl:
         prompt_style = Style.from_dict(
             {
                 # Default prompt text; no bg so the terminal background shows through.
-                "": "noreverse #e6eef7",
+                '': 'noreverse #e6eef7',
                 # PT defaults bottom-toolbar to reverse — disable without adding a fill color.
-                "bottom-toolbar": "noreverse",
-                "bottom-toolbar.text": "noreverse",
-                "prompt.border": CLR_THINKING_BORDER,
-                "prompt.frame.border": f"bold {CLR_STATUS_OK}",
-                "prompt.brand": CLR_BRAND,
-                "prompt.dim": CLR_META,
-                "prompt.model": CLR_HUD_MODEL,
-                "prompt.value": CLR_HUD_DETAIL,
-                "prompt.sep": CLR_SEP,
-                "prompt.arrow": CLR_BRAND,
-                "prompt.hint": CLR_AUTONOMY_FULL,
-                "prompt.badge.ready": f"bold {CLR_STATUS_OK}",
-                "prompt.badge.running": CLR_STATE_RUNNING,
-                "prompt.badge.review": f"bold {CLR_STATUS_WARN}",
-                "prompt.badge.paused": f"bold {CLR_STATUS_WARN}",
-                "prompt.badge.error": f"bold {CLR_STATUS_ERR}",
-                "prompt.autonomy.balanced": CLR_AUTONOMY_BALANCED,
-                "prompt.autonomy.full": CLR_AUTONOMY_FULL,
-                "prompt.autonomy.supervised": CLR_AUTONOMY_SUPERVISED,
-                "prompt.health.good": f"bold {CLR_STATUS_OK}",
-                "prompt.health.warn": f"bold {CLR_STATUS_WARN}",
-                "prompt.health.bad": f"bold {CLR_STATUS_ERR}",
-                "prompt.footer.badge_bracket": "#0e7490",
-                "prompt.footer.badge_core": "bold #22d3ee",
-                "prompt.footer.kicker": "bold #a5f3fc",
-                "prompt.footer.sep": CLR_META,
-                "prompt.footer.body": CLR_MUTED_TEXT,
-                "prompt.footer.warn_bracket": "#a16207",
-                "prompt.footer.warn_core": "bold #facc15",
-                "prompt.footer.warn_kicker": "bold #fde68a",
-                "prompt.footer.warn_sep": "#92400e",
-                "prompt.footer.warn_body": CLR_STATUS_WARN,
-                "completion-menu": "bg:#0d1f30 #b8c7d8",
-                "completion-menu.completion": "bg:#0d1f30 #b8c7d8",
-                "completion-menu.completion.current": "bg:#1e4976 bold #ffffff",
-                "completion-menu.meta": "bg:#0a1929 #5c7fa0",
-                "completion-menu.meta.completion": "bg:#0a1929 #5c7fa0",
-                "completion-menu.meta.completion.current": "bg:#163350 #93c5fd",
-                "completion-menu.multi-column-meta": "bg:#0a1929 #5c7fa0",
-                "scrollbar.background": "bg:#0d1f30",
-                "scrollbar.button": "bg:#1e4976",
+                'bottom-toolbar': 'noreverse',
+                'bottom-toolbar.text': 'noreverse',
+                'prompt.border': CLR_THINKING_BORDER,
+                'prompt.frame.border': f'bold {CLR_STATUS_OK}',
+                'prompt.brand': CLR_BRAND,
+                'prompt.dim': CLR_META,
+                'prompt.model': CLR_HUD_MODEL,
+                'prompt.value': CLR_HUD_DETAIL,
+                'prompt.sep': CLR_SEP,
+                'prompt.arrow': CLR_BRAND,
+                'prompt.hint': CLR_AUTONOMY_FULL,
+                'prompt.badge.ready': f'bold {CLR_STATUS_OK}',
+                'prompt.badge.running': CLR_STATE_RUNNING,
+                'prompt.badge.review': f'bold {CLR_STATUS_WARN}',
+                'prompt.badge.paused': f'bold {CLR_STATUS_WARN}',
+                'prompt.badge.error': f'bold {CLR_STATUS_ERR}',
+                'prompt.autonomy.balanced': CLR_AUTONOMY_BALANCED,
+                'prompt.autonomy.full': CLR_AUTONOMY_FULL,
+                'prompt.autonomy.supervised': CLR_AUTONOMY_SUPERVISED,
+                'prompt.health.good': f'bold {CLR_STATUS_OK}',
+                'prompt.health.warn': f'bold {CLR_STATUS_WARN}',
+                'prompt.health.bad': f'bold {CLR_STATUS_ERR}',
+                'prompt.footer.badge_bracket': '#0e7490',
+                'prompt.footer.badge_core': 'bold #22d3ee',
+                'prompt.footer.kicker': 'bold #a5f3fc',
+                'prompt.footer.sep': CLR_META,
+                'prompt.footer.body': CLR_MUTED_TEXT,
+                'prompt.footer.warn_bracket': '#a16207',
+                'prompt.footer.warn_core': 'bold #facc15',
+                'prompt.footer.warn_kicker': 'bold #fde68a',
+                'prompt.footer.warn_sep': '#92400e',
+                'prompt.footer.warn_body': CLR_STATUS_WARN,
+                'completion-menu': 'bg:#0d1f30 #b8c7d8',
+                'completion-menu.completion': 'bg:#0d1f30 #b8c7d8',
+                'completion-menu.completion.current': 'bg:#1e4976 bold #ffffff',
+                'completion-menu.meta': 'bg:#0a1929 #5c7fa0',
+                'completion-menu.meta.completion': 'bg:#0a1929 #5c7fa0',
+                'completion-menu.meta.completion.current': 'bg:#163350 #93c5fd',
+                'completion-menu.multi-column-meta': 'bg:#0a1929 #5c7fa0',
+                'scrollbar.background': 'bg:#0d1f30',
+                'scrollbar.button': 'bg:#1e4976',
             }
         )
 
@@ -1161,7 +1161,7 @@ class Repl:
     def handle_command(self, text: str) -> bool:
         return self._handle_command(text)
 
-    def _warn(self, message: str, *, title: str = "warning") -> None:
+    def _warn(self, message: str, *, title: str = 'warning') -> None:
         if self._renderer is not None:
             self._renderer.add_system_message(message, title=title)
 
@@ -1172,11 +1172,11 @@ class Repl:
     def _reject_extra_args(self, parsed: ParsedSlashCommand) -> bool:
         if not parsed.args:
             return False
-        self._warn(f"Usage: {self._usage(parsed.name)}")
+        self._warn(f'Usage: {self._usage(parsed.name)}')
         return True
 
     def _command_project_root(self) -> Path:
-        raw_project = getattr(self._config, "project_root", None)
+        raw_project = getattr(self._config, 'project_root', None)
         if isinstance(raw_project, str) and raw_project.strip():
             with contextlib.suppress(OSError):
                 return Path(raw_project).expanduser().resolve()
@@ -1185,7 +1185,7 @@ class Repl:
     async def _read_non_interactive_input(self) -> str:
         if self._queued_input:
             return self._queued_input.pop(0)
-        self._console.print(">>> ", end="")
+        self._console.print('>>> ', end='')
         return await asyncio.to_thread(sys.stdin.readline)
 
     # -- public entry point ------------------------------------------------
@@ -1211,7 +1211,7 @@ class Repl:
             bootstrap_task: asyncio.Task[None] | None = None  # type: ignore
             config = self._config
             self._hud.update_model(get_current_model(config))
-            self._hud.update_workspace(getattr(config, "project_root", None))
+            self._hud.update_workspace(getattr(config, 'project_root', None))
 
             # -- prompt session (fast, no I/O) --------------------------------
             session: Any | None = None
@@ -1233,7 +1233,7 @@ class Repl:
             )
             renderer = self._renderer
             if renderer is None:
-                raise RuntimeError("CLI renderer did not initialize.")
+                raise RuntimeError('CLI renderer did not initialize.')
 
             # -- staged init runs in background while user sees the prompt -----
             chat_ready_done = asyncio.Event()
@@ -1243,25 +1243,25 @@ class Repl:
             def _invalidate_prompt_session() -> None:
                 if session is None:
                     return
-                app = getattr(session, "app", None)
+                app = getattr(session, 'app', None)
                 if app is not None:
                     app.invalidate()
 
             def _handle_bootstrap_failure(exc: BaseException) -> None:
                 engine_init_exc[0] = exc
-                self._set_footer_system_line("")
+                self._set_footer_system_line('')
                 exc_name = type(exc).__name__
-                if "AuthenticationError" in exc_name or "api_key" in str(exc).lower():
+                if 'AuthenticationError' in exc_name or 'api_key' in str(exc).lower():
                     renderer.add_system_message(
-                        "No API key or model configured.\n"
-                        "Run grinta again and complete onboarding, "
-                        "or edit settings.json directly.\n"
-                        f"{exc}",
-                        title="error",
+                        'No API key or model configured.\n'
+                        'Run grinta again and complete onboarding, '
+                        'or edit settings.json directly.\n'
+                        f'{exc}',
+                        title='error',
                     )
                 else:
                     renderer.add_system_message(
-                        f"Initialization failed: {exc}", title="error"
+                        f'Initialization failed: {exc}', title='error'
                     )
                 self._running = False
                 _invalidate_prompt_session()
@@ -1286,7 +1286,7 @@ class Repl:
                         self._conversation_stats = conversation_stats
                         self._config = config_
                         self._hud.update_workspace(
-                            getattr(config_, "project_root", None)
+                            getattr(config_, 'project_root', None)
                         )
                     except Exception as exc:
                         _handle_bootstrap_failure(exc)
@@ -1309,7 +1309,7 @@ class Repl:
                         event_stream = runtime.event_stream
                         if event_stream is None:
                             raise RuntimeError(
-                                "Runtime did not produce an event stream."
+                                'Runtime did not produce an event stream.'
                             )
 
                         self._event_stream = event_stream
@@ -1331,20 +1331,20 @@ class Repl:
                         if agent.config.enable_mcp:
                             if session is not None:
                                 self._set_footer_system_line(
-                                    "Chat ready. MCP tools warming in background."
+                                    'Chat ready. MCP tools warming in background.'
                                 )
                             else:
                                 renderer.add_system_message(
-                                    "Chat ready. MCP tools warming in background.",
-                                    title="system",
+                                    'Chat ready. MCP tools warming in background.',
+                                    title='system',
                                 )
                         else:
                             self._hud.update_mcp_servers(0)
                             if session is not None:
-                                self._set_footer_system_line("Ready.")
+                                self._set_footer_system_line('Ready.')
                             else:
-                                renderer.add_system_message("Ready.", title="system")
-                        self._hud.update_ledger("Healthy")
+                                renderer.add_system_message('Ready.', title='system')
+                        self._hud.update_ledger('Healthy')
                         _invalidate_prompt_session()
                         chat_ready_done.set()
                     except Exception as exc:
@@ -1358,26 +1358,26 @@ class Repl:
                         await _setup_mcp_tools(agent, runtime, memory)
                     except Exception as exc:
                         logger.warning(
-                            "MCP warmup failed after chat became ready", exc_info=True
+                            'MCP warmup failed after chat became ready', exc_info=True
                         )
                         self._hud.update_mcp_servers(0)
-                        msg = f"MCP warmup failed: {exc}"
+                        msg = f'MCP warmup failed: {exc}'
                         if session is not None:
-                            self._set_footer_system_line(msg, kind="warning")
+                            self._set_footer_system_line(msg, kind='warning')
                         else:
-                            renderer.add_system_message(msg, title="warning")
+                            renderer.add_system_message(msg, title='warning')
                     else:
-                        mcp_status = getattr(agent, "mcp_capability_status", None) or {}
+                        mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
                         try:
-                            mcp_n = int(mcp_status.get("connected_client_count") or 0)
+                            mcp_n = int(mcp_status.get('connected_client_count') or 0)
                         except (TypeError, ValueError):
                             mcp_n = 0
                         self._hud.update_mcp_servers(mcp_n)
                         if session is not None:
-                            self._set_footer_system_line("MCP tools loaded.")
+                            self._set_footer_system_line('MCP tools loaded.')
                         else:
                             renderer.add_system_message(
-                                "MCP tools loaded.", title="system"
+                                'MCP tools loaded.', title='system'
                             )
                 finally:
                     chat_ready_done.set()
@@ -1396,38 +1396,38 @@ class Repl:
                 AgentState.STOPPED,
             ]
 
-            self._hud.update_ledger("Starting")
+            self._hud.update_ledger('Starting')
             if session is not None:
-                self._set_footer_system_line("Initializing engine...")
+                self._set_footer_system_line('Initializing engine...')
             else:
-                renderer.add_system_message("Initializing engine...", title="system")
+                renderer.add_system_message('Initializing engine...', title='system')
             bootstrap_task = asyncio.create_task(
-                _engine_bootstrap(), name="grinta-engine-bootstrap"
+                _engine_bootstrap(), name='grinta-engine-bootstrap'
             )
 
             while self._running:
                 try:
                     if session is None:
                         user_input = await self._read_non_interactive_input()
-                        if user_input == "":
+                        if user_input == '':
                             raise EOFError
                     else:
                         user_input = await session.prompt_async()
                 except KeyboardInterrupt:
                     if not self._prompt_ctrl_c_hint_shown:
                         self._console.print(
-                            "[dim]Ctrl+C at the prompt does not exit the REPL; "
-                            "type /quit or exit. While the agent is running, "
-                            "Ctrl+C cancels the run (on some terminals you may need "
-                            "to press it more than once).[/dim]"
+                            '[dim]Ctrl+C at the prompt does not exit the REPL; '
+                            'type /quit or exit. While the agent is running, '
+                            'Ctrl+C cancels the run (on some terminals you may need '
+                            'to press it more than once).[/dim]'
                         )
                         self._prompt_ctrl_c_hint_shown = True
                     continue
                 except EOFError:
-                    self._console.print("EOF Error received in prompt loop.")
+                    self._console.print('EOF Error received in prompt loop.')
                     break
                 except Exception as e:
-                    self._console.print(f"CRASH: {e}")
+                    self._console.print(f'CRASH: {e}')
                     import traceback
 
                     traceback.print_exc()
@@ -1442,18 +1442,18 @@ class Repl:
                 if _looks_like_terminal_selection_noise(text):
                     if self._renderer is not None:
                         self._renderer.add_system_message(
-                            "Ignored terminal control sequence noise from selection/copy input.",
-                            title="warning",
+                            'Ignored terminal control sequence noise from selection/copy input.',
+                            title='warning',
                         )
                     continue
 
-                if text.startswith("/"):
+                if text.startswith('/'):
                     try:
                         parsed_command = _parse_slash_command(text)
                     except SlashCommandParseError as exc:
                         self._warn(str(exc))
                         continue
-                    if parsed_command.name in ("/resume", "/compact", "/retry"):
+                    if parsed_command.name in ('/resume', '/compact', '/retry'):
                         await engine_init_done.wait()
                         if engine_init_exc[0] is not None:
                             continue
@@ -1504,17 +1504,17 @@ class Repl:
                     or event_stream is None
                 ):
                     self._renderer.add_system_message(
-                        "Initialization failed: engine components were not created.",
-                        title="error",
+                        'Initialization failed: engine components were not created.',
+                        title='error',
                     )
                     break
 
                 # -- user message: start Live for agent turn
-                self._set_footer_system_line("")
+                self._set_footer_system_line('')
                 if self._next_action is not None:
                     initial_action = self._next_action
                     self._next_action = None
-                    msg_content = getattr(initial_action, "content", None)
+                    msg_content = getattr(initial_action, 'content', None)
                     if msg_content is not None:
                         # Start Live before committing the user bubble to scrollback.
                         # Printing first then starting Live can erase the bubble on some
@@ -1524,7 +1524,7 @@ class Repl:
                     else:
                         if self._renderer is not None:
                             self._renderer.add_system_message(
-                                "Condensing context\u2026", title="grinta"
+                                'Condensing context\u2026', title='grinta'
                             )
                         self._renderer.start_live()
                 else:
@@ -1553,7 +1553,7 @@ class Repl:
                     controller.step()
                 except Exception:
                     logger.debug(
-                        "controller.step() failed, agent loop will retry",
+                        'controller.step() failed, agent loop will retry',
                         exc_info=True,
                     )
 
@@ -1599,7 +1599,7 @@ class Repl:
                 runtime_orchestrator.release(self._acquire_result)
             event_stream = self._event_stream
             if event_stream is not None:
-                close = getattr(event_stream, "close", None)
+                close = getattr(event_stream, 'close', None)
                 if callable(close):
                     with contextlib.suppress(Exception):
                         close()
@@ -1628,7 +1628,7 @@ class Repl:
             try:
                 memory.status_callback = early_cb
             except Exception:
-                logger.debug("Could not set memory status callback", exc_info=True)
+                logger.debug('Could not set memory status callback', exc_info=True)
             self._controller = controller
 
         current_state = controller.get_agent_state()
@@ -1644,7 +1644,7 @@ class Repl:
         if agent_task is None or agent_task.done():
             agent_task = asyncio.create_task(
                 run_agent_until_done(controller, runtime, memory, end_states),
-                name="grinta-agent-loop",
+                name='grinta-agent-loop',
             )
 
         return controller, agent_task
@@ -1674,13 +1674,13 @@ class Repl:
         # Disabled by default to avoid aborting long-running sessions.
         # Set APP_AGENT_HARD_TIMEOUT_SECONDS / APP_AGENT_HARD_TIMEOUT_CMD_SECONDS
         # to a positive value to re-enable limits.
-        _hard_timeout_raw = os.getenv("APP_AGENT_HARD_TIMEOUT_SECONDS", "0")
+        _hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_SECONDS', '0')
         try:
             _HARD_TIMEOUT = max(0, int(_hard_timeout_raw))
         except (ValueError, TypeError):
             _HARD_TIMEOUT = 0
 
-        _cmd_hard_timeout_raw = os.getenv("APP_AGENT_HARD_TIMEOUT_CMD_SECONDS", "0")
+        _cmd_hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS', '0')
         try:
             _CMD_HARD_TIMEOUT = max(0, int(_cmd_hard_timeout_raw))
         except (ValueError, TypeError):
@@ -1735,7 +1735,7 @@ class Repl:
             # hanging forever (e.g. LLM API unresponsive). Allow a longer
             # budget while a foreground command action is still pending.
             active_timeout = _HARD_TIMEOUT
-            pending_action = getattr(controller, "_pending_action", None)
+            pending_action = getattr(controller, '_pending_action', None)
             if pending_action is not None:
                 with contextlib.suppress(Exception):
                     from backend.ledger.action import CmdRunAction
@@ -1747,11 +1747,11 @@ class Repl:
                         active_timeout = _CMD_HARD_TIMEOUT
 
             if active_timeout > 0 and time.monotonic() - _start > active_timeout:
-                logger.warning("Agent wait exceeded %ds hard timeout", active_timeout)
+                logger.warning('Agent wait exceeded %ds hard timeout', active_timeout)
                 if renderer is not None:
                     renderer.add_system_message(
-                        f"Agent timed out after {active_timeout} seconds. Returning to prompt.",
-                        title="⏱ Timeout",
+                        f'Agent timed out after {active_timeout} seconds. Returning to prompt.',
+                        title='⏱ Timeout',
                     )
                     renderer.drain_events()
                 # Cancel the stale task so it does not linger into the next turn.
@@ -1771,10 +1771,10 @@ class Repl:
         """Drain queued CLI events until the delivery queue stays quiet briefly."""
         for _ in range(max_passes):
             renderer.drain_events()
-            if getattr(renderer, "pending_event_count", 0) == 0:
+            if getattr(renderer, 'pending_event_count', 0) == 0:
                 await asyncio.sleep(settle_delay)
                 renderer.drain_events()
-                if getattr(renderer, "pending_event_count", 0) == 0:
+                if getattr(renderer, 'pending_event_count', 0) == 0:
                     return
             else:
                 await asyncio.sleep(settle_delay)
@@ -1807,7 +1807,7 @@ class Repl:
         self._reasoning.stop()
         if self._renderer is not None:
             self._renderer.add_system_message(
-                "Interrupted. Ready for input.", title="grinta"
+                'Interrupted. Ready for input.', title='grinta'
             )
 
     # -- session resume ----------------------------------------------------
@@ -1837,8 +1837,8 @@ class Repl:
         if llm_registry is None or agent is None or conversation_stats is None:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    "Resume failed: session bootstrap state is incomplete.",
-                    title="error",
+                    'Resume failed: session bootstrap state is incomplete.',
+                    title='error',
                 )
             return None
 
@@ -1846,13 +1846,13 @@ class Repl:
         if resolve_error or resolved_id is None:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    resolve_error or f"No session matches: {target}", title="warning"
+                    resolve_error or f'No session matches: {target}', title='warning'
                 )
             return None
 
         if self._renderer is not None:
             self._renderer.add_system_message(
-                f"Resuming session: {resolved_id}", title="grinta"
+                f'Resuming session: {resolved_id}', title='grinta'
             )
 
         try:
@@ -1871,7 +1871,7 @@ class Repl:
         except Exception as exc:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    f"Resume failed: {exc}", title="error"
+                    f'Resume failed: {exc}', title='error'
                 )
             return None
 
@@ -1884,7 +1884,7 @@ class Repl:
         if event_stream is None:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    "Resume failed: no event stream.", title="error"
+                    'Resume failed: no event stream.', title='error'
                 )
             return None
 
@@ -1902,9 +1902,9 @@ class Repl:
             agent,
         )
         self._memory = memory
-        mcp_status = getattr(agent, "mcp_capability_status", None) or {}
+        mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
         try:
-            mcp_n = int(mcp_status.get("connected_client_count") or 0)
+            mcp_n = int(mcp_status.get('connected_client_count') or 0)
         except (TypeError, ValueError):
             mcp_n = 0
         self._hud.update_mcp_servers(mcp_n)
@@ -1929,17 +1929,17 @@ class Repl:
         try:
             memory.status_callback = early_cb
         except Exception:
-            logger.debug("Could not set memory status callback", exc_info=True)
+            logger.debug('Could not set memory status callback', exc_info=True)
 
         agent_task = asyncio.create_task(
             run_agent_until_done(controller, runtime, memory, end_states),
-            name="grinta-agent-loop",
+            name='grinta-agent-loop',
         )
 
         if self._renderer is not None:
             self._renderer.add_system_message(
-                f"Session {resolved_id} resumed. Send a message to continue.",
-                title="grinta",
+                f'Session {resolved_id} resumed. Send a message to continue.',
+                title='grinta',
             )
 
         return controller, agent_task
@@ -1952,8 +1952,8 @@ class Repl:
         try:
             pending = controller.get_pending_action()
         except Exception:
-            logger.debug("get_pending_action() failed, trying fallback", exc_info=True)
-            pending = getattr(controller, "_pending_action", None)
+            logger.debug('get_pending_action() failed, trying fallback', exc_info=True)
+            pending = getattr(controller, '_pending_action', None)
 
         if pending is not None:
             if self._renderer is not None:
@@ -1968,12 +1968,12 @@ class Repl:
             if self._renderer is not None:
                 with self._renderer.suspend_live():
                     approved = Confirm.ask(
-                        "[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]",
+                        '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
                         console=self._console,
                     )
             else:
                 approved = Confirm.ask(
-                    "[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]",
+                    '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
                     console=self._console,
                 )
 
@@ -1984,18 +1984,21 @@ class Repl:
     # -- checkpoint inspection --------------------------------------------
 
     def _resolve_rollback_manager(self):
-        """Return the active RollbackManager via the controller's middleware,
-        or ``None`` if checkpoints aren't available in this session."""
+        """Return the active RollbackManager for the current session.
+
+        The value is resolved via the controller's middleware, or ``None`` if
+        checkpoints are not available in this session.
+        """
         try:
-            controller = getattr(self, "_controller", None) or getattr(
-                self, "_orchestrator", None
+            controller = getattr(self, '_controller', None) or getattr(
+                self, '_orchestrator', None
             )
             if controller is None:
                 return None
-            mw = getattr(controller, "_rollback_middleware", None)
+            mw = getattr(controller, '_rollback_middleware', None)
             if mw is None:
                 return None
-            return getattr(mw, "_manager", None)
+            return getattr(mw, '_manager', None)
         except Exception:
             return None
 
@@ -2006,100 +2009,100 @@ class Repl:
             try:
                 limit = max(1, int(args[0]))
             except ValueError:
-                self._warn("Usage: /checkpoint list [limit]")
+                self._warn('Usage: /checkpoint list [limit]')
                 return
         manager = self._resolve_rollback_manager()
         if manager is None:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    "No active rollback manager (workspace may not be initialised yet).",
-                    title="checkpoint",
+                    'No active rollback manager (workspace may not be initialised yet).',
+                    title='checkpoint',
                 )
             return
         try:
             entries = manager.list_checkpoints()
         except Exception as exc:
-            self._warn(f"Failed to list checkpoints: {exc}")
+            self._warn(f'Failed to list checkpoints: {exc}')
             return
         if not entries:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    "No checkpoints recorded yet.", title="checkpoint"
+                    'No checkpoints recorded yet.', title='checkpoint'
                 )
             return
         # Newest first.
-        entries = sorted(entries, key=lambda e: e.get("timestamp", 0), reverse=True)[:limit]
+        entries = sorted(entries, key=lambda e: e.get('timestamp', 0), reverse=True)[:limit]
         from datetime import datetime as _dt
 
         lines = []
         for e in entries:
-            ts = e.get("timestamp", 0)
+            ts = e.get('timestamp', 0)
             try:
-                ts_str = _dt.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M:%S")
+                ts_str = _dt.fromtimestamp(float(ts)).strftime('%Y-%m-%d %H:%M:%S')
             except Exception:
                 ts_str = str(ts)
             lines.append(
                 f"  {e.get('id', '?')[:12]:<12} {ts_str}  {e.get('checkpoint_type', '?'):<18} {e.get('description', '')[:60]}"
             )
-        body = "\n".join(lines)
+        body = '\n'.join(lines)
         if self._renderer is not None:
-            self._renderer.add_system_message(body, title="checkpoint list")
+            self._renderer.add_system_message(body, title='checkpoint list')
 
     def _handle_checkpoint_diff(self, args: list[str]) -> None:
         """Show a git diff (or directory diff fallback) since a checkpoint."""
         if not args:
-            self._warn("Usage: /checkpoint diff <id>")
+            self._warn('Usage: /checkpoint diff <id>')
             return
         cp_id = args[0]
         manager = self._resolve_rollback_manager()
         if manager is None:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    "No active rollback manager.", title="checkpoint"
+                    'No active rollback manager.', title='checkpoint'
                 )
             return
         # Resolve full id from prefix.
         try:
             entries = manager.list_checkpoints()
         except Exception as exc:
-            self._warn(f"Failed to list checkpoints: {exc}")
+            self._warn(f'Failed to list checkpoints: {exc}')
             return
         match = next(
-            (e for e in entries if str(e.get("id", "")).startswith(cp_id)),
+            (e for e in entries if str(e.get('id', '')).startswith(cp_id)),
             None,
         )
         if match is None:
-            self._warn(f"Checkpoint not found: {cp_id}")
+            self._warn(f'Checkpoint not found: {cp_id}')
             return
-        sha = match.get("git_commit_sha")
+        sha = match.get('git_commit_sha')
         diff_text: str
         if sha:
             import subprocess as _sp
 
             try:
                 proc = _sp.run(
-                    ["git", "diff", str(sha)],
+                    ['git', 'diff', str(sha)],
                     cwd=str(manager.workspace_path),
                     capture_output=True,
                     text=True,
                     timeout=30,
                     check=False,
                 )
-                diff_text = proc.stdout or proc.stderr or "(empty diff)"
+                diff_text = proc.stdout or proc.stderr or '(empty diff)'
             except Exception as exc:
-                diff_text = f"(git diff failed: {exc})"
+                diff_text = f'(git diff failed: {exc})'
         else:
             diff_text = (
-                "(checkpoint has no git commit; file-snapshot diff is not implemented "
-                "in the CLI — use the `revert_to_checkpoint` tool to inspect)."
+                '(checkpoint has no git commit; file-snapshot diff is not implemented '
+                'in the CLI — use the `revert_to_checkpoint` tool to inspect).'
             )
         if self._renderer is not None:
             # Trim to keep the panel manageable.
             if len(diff_text) > 8000:
-                diff_text = diff_text[:8000] + "\n[... diff truncated ...]\n"
+                diff_text = diff_text[:8000] + '\n[... diff truncated ...]\n'
             self._renderer.add_markdown_block(
                 f"checkpoint diff {match.get('id', '?')[:12]}",
-                f"```diff\n{diff_text}\n```",
+                f'```diff\n{diff_text}\n```',
             )
 
     # -- autonomy control --------------------------------------------------
@@ -2112,20 +2115,20 @@ class Repl:
             # Show current level
             level = self._get_current_autonomy()
             if self._renderer is not None:
-                level_lines = "\n".join(
-                    f"  {name:<10} — {_AUTONOMY_LEVEL_HINTS[name]}"
+                level_lines = '\n'.join(
+                    f'  {name:<10} — {_AUTONOMY_LEVEL_HINTS[name]}'
                     for name in valid_levels
                 )
                 self._renderer.add_system_message(
-                    f"Autonomy: {level}\n"
-                    f"{level_lines}\n"
+                    f'Autonomy: {level}\n'
+                    f'{level_lines}\n'
                     f'Change with: /autonomy <{"|".join(valid_levels)}>',
-                    title="autonomy",
+                    title='autonomy',
                 )
             return
 
         if len(parsed.args) > 1:
-            self._warn(f"Usage: {self._usage(parsed.name)}")
+            self._warn(f'Usage: {self._usage(parsed.name)}')
             return
 
         new_level = parsed.args[0].lower()
@@ -2133,34 +2136,34 @@ class Repl:
             if self._renderer is not None:
                 self._renderer.add_system_message(
                     f"Invalid level '{new_level}'. Use: {', '.join(valid_levels)}",
-                    title="warning",
+                    title='warning',
                 )
             return
 
         controller = self._controller
         if controller is not None:
-            ac = getattr(controller, "autonomy_controller", None)
+            ac = getattr(controller, 'autonomy_controller', None)
             if ac is not None:
                 ac.autonomy_level = new_level
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f"Autonomy set to: {new_level}", title="autonomy"
+                        f'Autonomy set to: {new_level}', title='autonomy'
                     )
                 return
 
         if self._renderer is not None:
             self._renderer.add_system_message(
-                "No active controller. Send a message first to initialize, then set autonomy.",
-                title="warning",
+                'No active controller. Send a message first to initialize, then set autonomy.',
+                title='warning',
             )
 
     def _get_current_autonomy(self) -> str:
         controller = self._controller
         if controller is not None:
-            ac = getattr(controller, "autonomy_controller", None)
+            ac = getattr(controller, 'autonomy_controller', None)
             if ac is not None:
-                return str(getattr(ac, "autonomy_level", "balanced"))
-        return "balanced (default)"
+                return str(getattr(ac, 'autonomy_level', 'balanced'))
+        return 'balanced (default)'
 
     # -- slash commands ----------------------------------------------------
 
@@ -2178,12 +2181,12 @@ class Repl:
         raw_cmd = parsed.raw_name
         cmd = parsed.name
 
-        if cmd in ("/exit", "/quit"):
+        if cmd in ('/exit', '/quit'):
             if self._renderer is not None:
-                self._renderer.add_system_message("Goodbye.", title="grinta")
+                self._renderer.add_system_message('Goodbye.', title='grinta')
             return False
 
-        if cmd == "/settings":
+        if cmd == '/settings':
             if self._renderer is not None:
                 with self._renderer.suspend_live():
                     open_settings(self._console)
@@ -2197,63 +2200,63 @@ class Repl:
             # the agentic conversation and should not appear in chat history.
             return True
 
-        if cmd == "/clear":
+        if cmd == '/clear':
             if self._reject_extra_args(parsed):
                 return True
             if self._renderer is not None:
                 self._renderer.clear_history()
                 self._renderer.add_system_message(
-                    "Screen cleared. Type a task or press Tab after `/` for commands.",
-                    title="grinta",
+                    'Screen cleared. Type a task or press Tab after `/` for commands.',
+                    title='grinta',
                 )
             return True
 
-        if cmd == "/status":
+        if cmd == '/status':
             if self._reject_extra_args(parsed):
                 return True
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    self._hud.plain_text(), title="status"
+                    self._hud.plain_text(), title='status'
                 )
             return True
 
-        if cmd == "/cost":
+        if cmd == '/cost':
             if self._reject_extra_args(parsed):
                 return True
             hud = self._hud.state
             tokens = (
-                f"{hud.context_tokens:,} ctx · {hud.llm_calls} LLM calls"
+                f'{hud.context_tokens:,} ctx · {hud.llm_calls} LLM calls'
                 if hud.llm_calls
-                else "no LLM calls yet"
+                else 'no LLM calls yet'
             )
             msg = (
-                f"Session cost: ${hud.cost_usd:.4f}  ·  {tokens}\n"
-                f"Model: {hud.model}"
+                f'Session cost: ${hud.cost_usd:.4f}  ·  {tokens}\n'
+                f'Model: {hud.model}'
             )
             if self._renderer is not None:
-                self._renderer.add_system_message(msg, title="cost")
+                self._renderer.add_system_message(msg, title='cost')
             return True
 
-        if cmd == "/diff":
-            mode = "--stat"
+        if cmd == '/diff':
+            mode = '--stat'
             paths: list[str] = []
             for arg in parsed.args:
-                if arg in {"--stat", "--name-only", "--patch"}:
+                if arg in {'--stat', '--name-only', '--patch'}:
                     mode = arg
                     continue
-                if arg.startswith("-"):
-                    self._warn(f"Usage: {self._usage(cmd)}")
+                if arg.startswith('-'):
+                    self._warn(f'Usage: {self._usage(cmd)}')
                     return True
                 paths.append(arg)
             if len(paths) > 1:
-                self._warn(f"Usage: {self._usage(cmd)}")
+                self._warn(f'Usage: {self._usage(cmd)}')
                 return True
             cwd = self._command_project_root()
-            git_args = ["git", "diff"]
-            if mode != "--patch":
+            git_args = ['git', 'diff']
+            if mode != '--patch':
                 git_args.append(mode)
             if paths:
-                git_args.extend(["--", paths[0]])
+                git_args.extend(['--', paths[0]])
             try:
                 completed = subprocess.run(
                     git_args,
@@ -2262,37 +2265,37 @@ class Repl:
                     cwd=cwd,
                     check=False,
                 )
-                body = (completed.stdout or "").strip() or "(no changes)"
+                body = (completed.stdout or '').strip() or '(no changes)'
                 if completed.stderr and completed.returncode != 0:
                     body = (
-                        f"git diff failed in {cwd}\n\n"
-                        f"{completed.stderr.strip() or body}"
+                        f'git diff failed in {cwd}\n\n'
+                        f'{completed.stderr.strip() or body}'
                     )
                 if self._renderer is not None:
-                    self._renderer.add_system_message(body, title="diff")
+                    self._renderer.add_system_message(body, title='diff')
             except FileNotFoundError:
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        "`git` not found on PATH; cannot show diff.",
-                        title="warning",
+                        '`git` not found on PATH; cannot show diff.',
+                        title='warning',
                     )
             return True
 
-        if cmd == "/think":
-            cur = bool(getattr(self._config, "enable_think", False))
+        if cmd == '/think':
+            cur = bool(getattr(self._config, 'enable_think', False))
             if len(parsed.args) > 1:
-                self._warn(f"Usage: {self._usage(cmd)}")
+                self._warn(f'Usage: {self._usage(cmd)}')
                 return True
             if parsed.args:
                 target = parsed.args[0].lower()
-                if target in ("on", "true", "1", "yes"):
+                if target in ('on', 'true', '1', 'yes'):
                     new_val = True
-                elif target in ("off", "false", "0", "no"):
+                elif target in ('off', 'false', '0', 'no'):
                     new_val = False
                 else:
                     if self._renderer is not None:
                         self._renderer.add_system_message(
-                            "Usage: /think [on|off]", title="warning"
+                            'Usage: /think [on|off]', title='warning'
                         )
                     return True
             else:
@@ -2304,66 +2307,66 @@ class Repl:
             if self._renderer is not None:
                 self._renderer.add_system_message(
                     f'`think` tool now {"ON" if new_val else "OFF"} (applies to next system-prompt build).',
-                    title="think",
+                    title='think',
                 )
             return True
 
-        if cmd == "/checkpoint":
+        if cmd == '/checkpoint':
             args = list(parsed.args)
-            sub = args[0].lower() if args else ""
-            if sub in {"list", "ls"}:
+            sub = args[0].lower() if args else ''
+            if sub in {'list', 'ls'}:
                 self._handle_checkpoint_list(args[1:])
                 return True
-            if sub == "diff":
+            if sub == 'diff':
                 self._handle_checkpoint_diff(args[1:])
                 return True
-            label = " ".join(args).strip()
+            label = ' '.join(args).strip()
             instruction = (
-                "Use the `checkpoint` tool now to snapshot the current workspace state."
+                'Use the `checkpoint` tool now to snapshot the current workspace state.'
             )
             if label:
-                instruction += f" Use this label: {label}"
+                instruction += f' Use this label: {label}'
             self._next_action = MessageAction(content=instruction)
             if self._renderer is not None:
                 self._renderer.add_system_message(
                     f'Checkpoint queued{(" (" + label + ")") if label else ""}.',
-                    title="checkpoint",
+                    title='checkpoint',
                 )
             return True
 
-        if cmd == "/copy":
+        if cmd == '/copy':
             if self._reject_extra_args(parsed):
                 return True
             last_reply = (
                 self._renderer.last_assistant_message_text
                 if self._renderer is not None
-                else ""
+                else ''
             )
             ok, msg = _copy_to_system_clipboard(last_reply)
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    msg, title="clipboard" if ok else "warning"
+                    msg, title='clipboard' if ok else 'warning'
                 )
             return True
 
-        if cmd == "/sessions":
+        if cmd == '/sessions':
             from backend.cli.session_manager import list_sessions
 
             args = list(parsed.args)
-            if args and args[0].lower() == "list":
+            if args and args[0].lower() == 'list':
                 args.pop(0)
             if len(args) > 1:
-                self._warn("Usage: /sessions [list] [limit]")
+                self._warn('Usage: /sessions [list] [limit]')
                 return True
             limit = 20
             if args:
                 try:
                     limit = int(args[0])
                 except ValueError:
-                    self._warn("Usage: /sessions [list] [limit]")
+                    self._warn('Usage: /sessions [list] [limit]')
                     return True
                 if limit < 1:
-                    self._warn("Session limit must be 1 or greater.")
+                    self._warn('Session limit must be 1 or greater.')
                     return True
             if self._renderer is not None:
                 with self._renderer.suspend_live():
@@ -2372,33 +2375,33 @@ class Repl:
                 list_sessions(self._console, limit=limit, config=self._config)
             return True
 
-        if cmd == "/resume":
+        if cmd == '/resume':
             if len(parsed.args) != 1:
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        "Usage: /resume <N> or /resume <session_id>. Press Tab to autocomplete recent sessions.",
-                        title="warning",
+                        'Usage: /resume <N> or /resume <session_id>. Press Tab to autocomplete recent sessions.',
+                        title='warning',
                     )
                 return True
             self._pending_resume = parsed.args[0]
             return True
 
-        if cmd == "/autonomy":
+        if cmd == '/autonomy':
             self._handle_autonomy_command(parsed)
             return True
 
-        if cmd == "/help":
+        if cmd == '/help':
             if len(parsed.args) > 1:
-                self._warn(f"Usage: {self._usage(cmd)}")
+                self._warn(f'Usage: {self._usage(cmd)}')
                 return True
             if self._renderer is not None:
                 self._renderer.add_markdown_block(
-                    "Help",
+                    'Help',
                     _build_help_markdown(parsed.args[0] if parsed.args else None),
                 )
             return True
 
-        if cmd == "/model":
+        if cmd == '/model':
             from backend.cli.config_manager import update_model
 
             if not parsed.args:
@@ -2406,21 +2409,21 @@ class Repl:
                 provider, model = HUDBar.describe_model(current)
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f"Current provider: {provider}  model: {model}  (use `/model <provider/model>` to switch)",
-                        title="model",
+                        f'Current provider: {provider}  model: {model}  (use `/model <provider/model>` to switch)',
+                        title='model',
                     )
             else:
                 if len(parsed.args) != 1:
-                    self._warn(f"Usage: {self._usage(cmd)}")
+                    self._warn(f'Usage: {self._usage(cmd)}')
                     return True
                 new_model = parsed.args[0].strip()
                 if (
-                    "/" not in new_model
-                    or new_model.startswith("/")
-                    or new_model.endswith("/")
+                    '/' not in new_model
+                    or new_model.startswith('/')
+                    or new_model.endswith('/')
                 ):
                     self._warn(
-                        "Use a provider-qualified model, for example `openai/gpt-4.1`."
+                        'Use a provider-qualified model, for example `openai/gpt-4.1`.'
                     )
                     return True
                 update_model(new_model)
@@ -2429,12 +2432,12 @@ class Repl:
                 provider, model = HUDBar.describe_model(get_current_model(self._config))
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        f"Model switched to provider: {provider}  model: {model}. Changes apply to the next session.",
-                        title="model",
+                        f'Model switched to provider: {provider}  model: {model}. Changes apply to the next session.',
+                        title='model',
                     )
             return True
 
-        if cmd == "/compact":
+        if cmd == '/compact':
             if self._reject_extra_args(parsed):
                 return True
             from backend.ledger.action.agent import CondensationRequestAction
@@ -2442,7 +2445,7 @@ class Repl:
             self._next_action = CondensationRequestAction()
             return True
 
-        if cmd == "/retry":
+        if cmd == '/retry':
             if self._reject_extra_args(parsed):
                 return True
             if self._last_user_message:
@@ -2450,21 +2453,21 @@ class Repl:
             else:
                 if self._renderer is not None:
                     self._renderer.add_system_message(
-                        "No previous message to retry.",
-                        title="warning",
+                        'No previous message to retry.',
+                        title='warning',
                     )
             return True
 
         if self._renderer is not None:
             suggestion_text = _closest_command_names(raw_cmd)
-            suffix = ""
+            suffix = ''
             if suggestion_text:
-                rendered_suggestions = " or ".join(
-                    f"`{item}`" for item in suggestion_text
+                rendered_suggestions = ' or '.join(
+                    f'`{item}`' for item in suggestion_text
                 )
-                suffix = f" Try {rendered_suggestions}."
+                suffix = f' Try {rendered_suggestions}.'
             self._renderer.add_system_message(
-                f"Unknown command: {raw_cmd}.{suffix} Press Tab after `/` for autocomplete.",
-                title="warning",
+                f'Unknown command: {raw_cmd}.{suffix} Press Tab after `/` for autocomplete.',
+                title='warning',
             )
         return True

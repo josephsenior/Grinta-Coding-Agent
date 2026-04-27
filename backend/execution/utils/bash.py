@@ -17,7 +17,7 @@ import libtmux
 from backend.core.logger import app_logger as logger
 from backend.execution.utils.bash_constants import TIMEOUT_MESSAGE_TEMPLATE
 from backend.execution.utils.prompt_detector import detect_interactive_prompt
-from backend.execution.utils.unified_shell import BaseShellSession
+from backend.execution.utils.unified_shell import BaseShellSession, UnifiedShellSession
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (
     CMD_OUTPUT_PS1_END,
@@ -182,7 +182,7 @@ def _remove_command_prefix(command_output: str, command: str) -> str:
     return command_output.lstrip().removeprefix(command.lstrip()).lstrip()
 
 
-class BackgroundPaneSession:
+class BackgroundPaneSession(UnifiedShellSession):
     """Read-only view of a backgrounded tmux pane.
 
     Created when a foreground command's idle-output timeout fires and the
@@ -594,8 +594,7 @@ class BashSession(BaseShellSession):
         )
 
     def _detach_pane_to_background(self, bg_session_id: str) -> None:
-        """Keep the running process alive by migrating the current pane to a
-        background "slot" and opening a fresh window for future default commands.
+        """Keep the running process alive while detaching the current pane.
 
         After this call:
         - ``self.pane`` / ``self.window`` point to the new, idle window.
@@ -643,13 +642,10 @@ class BashSession(BaseShellSession):
             )
 
         # Create a new window in the same tmux session for future default commands.
-        new_window = cast(
-            'Window',
-            session.new_window(
-                window_name='bash',
-                start_directory=live_cwd,
-                attach=False,
-            ),
+        new_window = session.new_window(
+            window_name='bash',
+            start_directory=live_cwd,  # type: ignore[arg-type]
+            attach=False,
         )
         # Wait for the pane to become available (libtmux may lag slightly).
         new_pane: Pane | None = None

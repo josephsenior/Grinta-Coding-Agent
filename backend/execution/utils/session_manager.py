@@ -39,6 +39,7 @@ class SessionManager:
             tool_registry: Optional tool registry.
             max_memory_gb: Optional memory limit in GB.
             cancellation_service: Optional cancellation service.
+            security_config: Optional execution security policy/configuration.
         """
         self.work_dir = work_dir
         self.username = username
@@ -146,8 +147,7 @@ class SessionManager:
         *,
         require_exited: bool = True,
     ) -> list[str]:
-        """Close background sessions whose underlying process exited and have
-        been idle longer than ``max_idle_seconds``.
+        """Close exited background sessions that have been idle long enough.
 
         T-P1-1: prevents unbounded growth of ``bg-XXXXXXXX`` background
         sessions and detached tmux windows over long autonomous runs.
@@ -162,7 +162,7 @@ class SessionManager:
             idle time.  Set False to force-close idle background sessions
             even if the underlying process is alive (caller responsibility).
 
-        Returns
+        Returns:
         -------
         list[str]
             Session IDs that were closed.
