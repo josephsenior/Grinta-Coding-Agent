@@ -139,3 +139,64 @@ class SessionManager:
     def default_session(self) -> Optional[UnifiedShellSession]:
         """Get the default session if it exists."""
         return self.sessions.get('default')
+
+    def cleanup_idle_sessions(
+        self,
+        max_idle_seconds: int = 3600,
+        *,
+        require_exited: bool = True,
+    ) -> list[str]:
+        """Close background sessions whose underlying process exited and have
+        been idle longer than ``max_idle_seconds``.
+
+        T-P1-1: prevents unbounded growth of ``bg-XXXXXXXX`` background
+        sessions and detached tmux windows over long autonomous runs.
+
+        Parameters
+        ----------
+        max_idle_seconds : int
+            Minimum idle time (seconds) before a candidate is eligible.
+        require_exited : bool
+            When True (default), only sessions whose backing process has
+            exited are closed; still-running ones are kept regardless of
+            idle time.  Set False to force-close idle background sessions
+            even if the underlying process is alive (caller responsibility).
+
+        Returns
+        -------
+        list[str]
+            Session IDs that were closed.
+        """
+        import time as _time
+
+        now = _time.time()
+        closed: list[str] = []
+        # Never auto-close the default foreground session.
+        for sid in list(self.sessions.keys()):
+            if sid == 'default':
+                continue
+            session = self.sessions.get(sid)
+            if session is None:
+                continue
+            last_at = getattr(session, '_last_interaction_at', None)
+            if last_at is None or (now - float(last_at)) < max_idle_seconds:
+                continue
+            if require_exited:
+                proc = getattr(session, '_process', None)
+                # SubprocessBackgroundSession exposes the live Popen as ``_process``.
+                if proc is not None and getattr(proc, 'poll', lambda: None)() is None:
+                    # process still running — skip
+                    continue
+            try:
+                self.close_session(sid)
+                closed.append(sid)
+                logger.info(
+                    'cleanup_idle_sessions: closed idle session %s', sid
+                )
+            except Exception:
+                logger.warning(
+                    'cleanup_idle_sessions: failed to close %s',
+                    sid,
+                    exc_info=True,
+                )
+        return closed

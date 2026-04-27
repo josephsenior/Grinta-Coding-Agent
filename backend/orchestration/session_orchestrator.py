@@ -259,6 +259,9 @@ class SessionOrchestrator:
     def _initialize_operation_pipeline(self) -> None:
         """Build the default tool pipeline directly on the controller."""
         from backend.orchestration.file_state_tracker import FileStateMiddleware
+        from backend.orchestration.middleware.destructive_command import (
+            DestructiveCommandMiddleware,
+        )
         from backend.orchestration.pre_exec_diff import PreExecDiffMiddleware
         from backend.orchestration.rollback_middleware import RollbackMiddleware
         from backend.orchestration.tool_pipeline import (
@@ -282,6 +285,7 @@ class SessionOrchestrator:
             CostQuotaMiddleware(self),
             ContextWindowMiddleware(self),
             RollbackMiddleware(),
+            DestructiveCommandMiddleware(),
             PreExecDiffMiddleware(),
             AutoCheckMiddleware(),
         ]
@@ -291,6 +295,46 @@ class SessionOrchestrator:
         middlewares.extend([LoggingMiddleware(self), TelemetryMiddleware(self)])
         middlewares.append(ToolResultValidator())
         self.services.context.initialize_operation_pipeline(middlewares)
+        # Stash the rollback middleware reference for phase-boundary checkpoints.
+        self._rollback_middleware = next(
+            (m for m in middlewares if isinstance(m, RollbackMiddleware)),
+            None,
+        )
+
+    def _create_phase_boundary_checkpoint(self, label: str) -> None:
+        """Create a ``phase_boundary`` checkpoint at lifecycle transitions.
+
+        Reuses the existing ``RollbackMiddleware``'s ``RollbackManager`` so we
+        don't snapshot through a second instance (which would race on the
+        on-disk ``checkpoints.json`` file).  Failures are non-fatal — a missed
+        phase-boundary checkpoint must never block a lifecycle transition.
+        """
+        mw = getattr(self, '_rollback_middleware', None)
+        if mw is None:
+            return
+        try:
+            from backend.orchestration.tool_pipeline import ToolInvocationContext
+
+            ctx = ToolInvocationContext(controller=self, action=None, state=None)  # type: ignore[arg-type]
+            manager = mw._get_manager(ctx)  # type: ignore[attr-defined]
+            if manager is None:
+                return
+            cid = manager.create_checkpoint(
+                description=f'phase boundary: {label}',
+                checkpoint_type='phase_boundary',
+                metadata={
+                    'phase_label': label,
+                    'session_id': getattr(self, 'id', 'unknown'),
+                },
+                use_git=False,
+            )
+            logger.debug('Phase-boundary checkpoint %s created at %s', cid, label)
+        except Exception:
+            logger.debug(
+                'Phase-boundary checkpoint creation failed at %s',
+                label,
+                exc_info=True,
+            )
 
     def handle_blocked_invocation(
         self,
@@ -403,6 +447,11 @@ class SessionOrchestrator:
         Note that it's fairly important that this closes properly, otherwise the state is incomplete.
         """
         self._lifecycle = LifecyclePhase.CLOSING
+        # C-P1-1: snapshot final state for post-mortem rollback.
+        try:
+            self._create_phase_boundary_checkpoint('active_to_closing')
+        except Exception:
+            pass
         stream = self.event_stream
         try:
             if self._step_task is not None and not self._step_task.done():

@@ -741,9 +741,35 @@ class RuntimeExecutor:
         """
         if action.is_static:
             return await self._run_static_cmd(action)
+        # T-P1-1: opportunistic background-session GC. Cheap because the
+        # default idle threshold is 1h and we only iterate session metadata.
+        try:
+            self.session_manager.cleanup_idle_sessions(max_idle_seconds=3600)
+        except Exception:
+            logger.debug("cleanup_idle_sessions failed", exc_info=True)
         bash_session = self.session_manager.get_session("default")
         if bash_session is None:
             return ErrorObservation("Default shell session not initialized")
+
+        # T-P0-1: auto-promote known-slow commands (npm install, cargo build…)
+        # to ``blocking=True`` so they get the longer idle threshold.  We only
+        # touch the flag when the agent left it at the default value (False);
+        # an explicit ``blocking=True`` from the caller is always respected.
+        try:
+            from backend.execution.utils.blocking_heuristics import (
+                is_known_slow_command,
+            )
+
+            if not getattr(action, "blocking", False) and is_known_slow_command(
+                getattr(action, "command", "") or ""
+            ):
+                action.blocking = True  # type: ignore[attr-defined]
+                logger.info(
+                    "Auto-promoted blocking=True for slow command: %s",
+                    (action.command or "").splitlines()[0][:120],
+                )
+        except Exception:
+            logger.debug("blocking-heuristic check failed", exc_info=True)
 
         # Arm the background-detach mechanism so idle-output timeouts preserve
         # the process instead of killing it.

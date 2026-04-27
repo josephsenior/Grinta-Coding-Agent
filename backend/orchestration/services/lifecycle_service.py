@@ -66,6 +66,12 @@ class LifecycleService:
         from backend.core.enums import LifecyclePhase
 
         controller._lifecycle = LifecyclePhase.ACTIVE
+        # C-P1-1: snapshot post-init state so users can rewind to a "fresh
+        # session" baseline.  Best-effort; failure must not block startup.
+        try:
+            controller._create_phase_boundary_checkpoint('init_to_active')
+        except Exception:
+            pass
 
     def initialize_state_and_tracking(
         self,

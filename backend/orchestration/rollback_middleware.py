@@ -12,6 +12,7 @@ downstream consumers (audit logger, debug endpoint, undo UI).
 from __future__ import annotations
 
 import os
+import re
 from typing import TYPE_CHECKING
 
 from backend.core.logger import app_logger as logger
@@ -29,6 +30,41 @@ _RISKY_ACTION_TYPES = frozenset(
         'CmdRunAction',
     }
 )
+
+# Read-only / inspection commands that never mutate state.  Skipping a
+# checkpoint for these keeps the rollback history meaningful (only real
+# mutations show up) and avoids wasteful disk snapshots.
+# Pattern is matched against the leading token of the command body.
+_TRIVIAL_CMD_PATTERN = re.compile(
+    r'^\s*(?:'
+    # POSIX read-only utilities
+    r'ls|pwd|cat|echo|which|whereis|whoami|id|date|uptime|hostname|uname|env|printenv|'
+    r'grep|egrep|fgrep|rg|ag|find|locate|head|tail|wc|sort|uniq|cut|column|awk|sed|'
+    r'file|stat|du|df|ps|top|htop|free|lsof|netstat|ss|ip|ifconfig|history|alias|type|'
+    # Git read-only
+    r'git\s+(?:status|log|show|diff|branch(?!\s+-D)|remote(?:\s+-v)?|config\s+--get|'
+        r'rev-parse|describe|stash\s+list|tag(?:\s+-l)?|ls-files|ls-tree|blame)|'
+    # Python / Node read-only invocations
+    r'python(?:3)?\s+--version|node\s+--version|npm\s+(?:list|ls|view|info|outdated)|'
+    r'pip\s+(?:list|show|freeze)|'
+    # PowerShell read-only verbs
+    r'Get-[A-Z][A-Za-z]+|Test-[A-Z][A-Za-z]+|Where-Object|Select-Object|Measure-Object'
+    r')\b'
+)
+
+
+def _is_trivial_command(command: str) -> bool:
+    """Return True for read-only commands whose pre-execution checkpoint adds no value."""
+    if not command:
+        return False
+    head = command.strip()
+    # Strip leading env-var assignments such as ``DEBUG=1 ls``.
+    while True:
+        m = re.match(r'^[A-Za-z_][A-Za-z0-9_]*=\S*\s+', head)
+        if not m:
+            break
+        head = head[m.end():]
+    return bool(_TRIVIAL_CMD_PATTERN.match(head))
 
 
 class RollbackMiddleware(ToolInvocationMiddleware):
@@ -109,8 +145,27 @@ class RollbackMiddleware(ToolInvocationMiddleware):
             return
 
         action_type = type(ctx.action).__name__
-        if action_type not in _RISKY_ACTION_TYPES:
+        risky = action_type in _RISKY_ACTION_TYPES
+        # Also treat any action explicitly marked HIGH security risk as risky
+        # so future tool types are covered automatically (C-P0-2).
+        if not risky:
+            try:
+                from backend.core.enums import ActionSecurityRisk
+
+                if getattr(ctx.action, 'security_risk', None) == ActionSecurityRisk.HIGH:
+                    risky = True
+            except Exception:
+                pass
+        if not risky:
             return
+
+        # Skip trivial read-only CmdRunActions to keep checkpoint history clean.
+        if action_type == 'CmdRunAction':
+            cmd_attr = getattr(ctx.action, 'command', '') or ''
+            cmd = cmd_attr if isinstance(cmd_attr, str) else ''
+            if cmd and _is_trivial_command(cmd):
+                logger.debug('Skipping checkpoint for trivial command: %s', cmd[:80])
+                return
 
         manager = self._get_manager(ctx)
         if manager is None:

@@ -159,7 +159,7 @@ class SimpleBashSession(BaseShellSession):
             process = self._start_subprocess(command)
             result = bounded_communicate(process, timeout=timeout)
 
-            if 'cd ' in command:
+            if self._command_changes_cwd(command):
                 self._update_cwd_if_needed()
 
             if result.timed_out:
@@ -208,11 +208,6 @@ class SimpleBashSession(BaseShellSession):
         # Process cleanup is handled by cancellation service if registered,
         # but we also attempt a direct kill here for safety.
         return ('', f'Command timed out after {timeout} seconds', 124)
-
-    def read_output(self) -> str:
-        """Read pending output from the shell session."""
-        # Not supported as there is no persistent output buffer in simple bash
-        return ''
 
     def write_input(self, data: str, is_control: bool = False) -> None:
         """Write input to the shell session."""

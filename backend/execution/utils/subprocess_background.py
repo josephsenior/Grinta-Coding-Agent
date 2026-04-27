@@ -14,17 +14,29 @@ from __future__ import annotations
 import threading
 from typing import IO, Any
 
+# Maximum bytes retained per OutputCapture before older output is dropped.
+# Keeps long-running background commands from exhausting RAM while still
+# preserving recent context for `terminal_read`.
+_MAX_BUFFER_BYTES = 16 * 1024 * 1024  # 16 MiB
+_TRUNCATION_MARKER = '\n[... earlier output truncated ...]\n'
+
 
 class OutputCapture:
-    """Continuously drains a stream into a buffer on a background thread.
+    """Continuously drains a stream into a bounded buffer on a background thread.
 
     Works with both binary-mode (``bytes``) and text-mode (``str``) pipes so
     it can be paired with ``SimpleBashSession`` (binary) or
     ``WindowsPowershellSession`` (text).
+
+    The internal buffer is capped at ``_MAX_BUFFER_BYTES``; when the cap is
+    exceeded, oldest chunks are dropped and a single truncation marker is
+    inserted at the head so the consumer knows data was lost.
     """
 
     def __init__(self, stream: IO[Any], *, is_text: bool = False) -> None:
         self._buf: list[str] = []
+        self._buf_bytes: int = 0
+        self._truncated: bool = False
         self._lock = threading.Lock()
         self._stream = stream
         self._is_text = is_text
@@ -33,12 +45,23 @@ class OutputCapture:
         )
         self._thread.start()
 
+    def _append(self, text: str) -> None:
+        if not text:
+            return
+        with self._lock:
+            self._buf.append(text)
+            self._buf_bytes += len(text)
+            # Roll oldest chunks off until we are back under the cap.
+            while self._buf_bytes > _MAX_BUFFER_BYTES and len(self._buf) > 1:
+                dropped = self._buf.pop(0)
+                self._buf_bytes -= len(dropped)
+                self._truncated = True
+
     def _run(self) -> None:
         try:
             if self._is_text:
                 for line in iter(self._stream.readline, ''):
-                    with self._lock:
-                        self._buf.append(line)
+                    self._append(line)
             else:
                 for chunk in iter(lambda: self._stream.read(4096), b''):
                     text = (
@@ -46,14 +69,16 @@ class OutputCapture:
                         if isinstance(chunk, bytes)
                         else chunk
                     )
-                    with self._lock:
-                        self._buf.append(text)
+                    self._append(text)
         except (OSError, ValueError):
             pass
 
     def read_all(self) -> str:
         with self._lock:
-            return ''.join(self._buf)
+            body = ''.join(self._buf)
+            if self._truncated:
+                return _TRUNCATION_MARKER + body
+            return body
 
 
 class SubprocessBackgroundSession:
@@ -75,10 +100,14 @@ class SubprocessBackgroundSession:
         stderr_capture: OutputCapture | None,
         cwd: str,
     ) -> None:
+        import time as _time
+
         self._process = process
         self._stdout_capture = stdout_capture
         self._stderr_capture = stderr_capture
         self._cwd = cwd
+        # Liveness timestamp consulted by SessionManager.cleanup_idle_sessions.
+        self._last_interaction_at: float = _time.time()
 
     # --- UnifiedShellSession-compatible interface ---
 
@@ -109,6 +138,9 @@ class SubprocessBackgroundSession:
 
     def read_output(self) -> str:
         """Return the full captured output so far (stdout + optional stderr)."""
+        import time as _time
+
+        self._last_interaction_at = _time.time()
         out = self._stdout_capture.read_all()
         err = self._stderr_capture.read_all() if self._stderr_capture else ''
         if err:

@@ -7,6 +7,7 @@ and shell types (Bash, PowerShell, etc.).
 from __future__ import annotations
 
 import os
+import re
 import sys
 import time
 from abc import ABC, abstractmethod
@@ -122,6 +123,12 @@ class BaseShellSession(UnifiedShellSession, ABC):
         self._bg_process: Any = None
         self._bg_stdout_capture: Any = None
         self._bg_stderr_capture: Any = None
+        # T-P1-2: rolling buffer of the last command's combined stdout+stderr
+        # so subprocess-backed sessions (SimpleBash / WindowsPowerShell) can
+        # implement read_output() instead of returning ''.
+        self._last_output_buffer: str = ''
+        # T-P1-1: liveness timestamp for idle-session cleanup.
+        self._last_interaction_at: float = time.time()
 
     def _wrap_subprocess_argv(self, argv: list[str], *, cwd: str) -> list[str]:
         """Prefix child argv with the active sandbox launcher when configured."""
@@ -171,10 +178,11 @@ class BaseShellSession(UnifiedShellSession, ABC):
     def read_output(self) -> str:
         """Read pending output from the shell session.
 
-        Subclasses with interactive shell support should override this.
+        Default implementation returns the rolling per-session buffer
+        populated by ``_record_command_output``.  Subclasses with live
+        interactive streams (e.g. tmux/PTY) should override.
         """
-        msg = f'{self.__class__.__name__} does not implement read_output()'
-        raise NotImplementedError(msg)
+        return self._last_output_buffer
 
     def write_input(self, data: str, is_control: bool = False) -> None:
         """Write input to the shell session.
@@ -231,10 +239,16 @@ class BaseShellSession(UnifiedShellSession, ABC):
 
         hard_limit = float(timeout or 600)
         idle_timeout = float(self.NO_CHANGE_TIMEOUT_SECONDS)
+        # T-P0-1: Slow-start commands (npm install, pip install, cargo build…)
+        # often spend a long time fetching metadata before printing anything.
+        # Give them an extra grace window for the FIRST output only; once any
+        # output is observed, the normal idle threshold takes over.
+        initial_grace = idle_timeout * 2
 
         wall_start = time.monotonic()
         last_change_time = time.monotonic()
         last_output_len = 0
+        first_output_seen = False
 
         while True:
             if process.poll() is not None:
@@ -256,8 +270,10 @@ class BaseShellSession(UnifiedShellSession, ABC):
             if current_len > last_output_len:
                 last_output_len = current_len
                 last_change_time = now
+                first_output_seen = True
 
-            if now - last_change_time >= idle_timeout:
+            effective_idle = idle_timeout if first_output_seen else initial_grace
+            if now - last_change_time >= effective_idle:
                 # Idle-output timeout — keep the process alive and detach it.
                 logger.info(
                     'Subprocess idle-output timeout after %ss; detaching to bg session %s',
@@ -284,7 +300,21 @@ class BaseShellSession(UnifiedShellSession, ABC):
                     process.kill()
                 except Exception:
                     pass
-                return '', f'Command exceeded hard timeout of {int(hard_limit)}s', 124
+                # T-P1-3: drain capture threads so partial output isn't lost.
+                try:
+                    process.wait(timeout=2)
+                except Exception:
+                    pass
+                stdout_cap._thread.join(timeout=2.0)
+                if stderr_cap:
+                    stderr_cap._thread.join(timeout=2.0)
+                partial_out = stdout_cap.read_all()
+                partial_err = stderr_cap.read_all() if stderr_cap else ''
+                err_msg = (
+                    f'Command exceeded hard timeout of {int(hard_limit)}s\n'
+                    + (partial_err or '')
+                )
+                return partial_out, err_msg, 124
 
             time.sleep(0.5)
 
@@ -304,6 +334,11 @@ class BaseShellSession(UnifiedShellSession, ABC):
         """
         from backend.execution.utils.shell_utils import format_shell_output
 
+        # T-P1-2: capture output into the rolling buffer so that
+        # ``read_output()`` and ``terminal_read(session_id="default")`` work
+        # for non-tmux shells too.
+        self._record_command_output(stdout, stderr)
+
         return format_shell_output(
             command=command,
             stdout=stdout,
@@ -311,6 +346,58 @@ class BaseShellSession(UnifiedShellSession, ABC):
             exit_code=exit_code,
             working_dir=self._cwd,
         )
+
+    # ------------------------------------------------------------------
+    # Output buffer helpers (T-P1-2)
+    # ------------------------------------------------------------------
+    _MAX_OUTPUT_BUFFER_BYTES = 16 * 1024 * 1024  # 16 MiB
+
+    def _record_command_output(self, stdout: str, stderr: str) -> None:
+        """Update the rolling buffer with the most recent command output.
+
+        Replaces (rather than appends) so ``read_output()`` always returns the
+        most recently completed command's full output.  Bounded at 16 MiB to
+        mirror ``OutputCapture``'s cap; oversize chunks are truncated from the
+        head with a single marker.
+        """
+        combined = stdout or ''
+        if stderr:
+            combined = (
+                combined + '\n[stderr]:\n' + stderr if combined else stderr
+            )
+        if len(combined) > self._MAX_OUTPUT_BUFFER_BYTES:
+            keep = self._MAX_OUTPUT_BUFFER_BYTES
+            combined = (
+                '\n[... earlier output truncated ...]\n' + combined[-keep:]
+            )
+        self._last_output_buffer = combined
+        self._last_interaction_at = time.time()
+
+    # ------------------------------------------------------------------
+    # CWD-changing command detection (T-P0-3)
+    # ------------------------------------------------------------------
+    # Matches `cd`, `pushd`, `popd`, `chdir` only when they appear as a
+    # statement-leading token (start of string, or after a shell separator).
+    _CD_TOKEN_RE = re.compile(r'(?:^|[;&|\n]|&&|\|\|)\s*(?:cd|pushd|popd|chdir)\b')
+    # PowerShell variant — also covers `sl` and `Set-Location` aliases.
+    _PS_CD_TOKEN_RE = re.compile(
+        r'(?:^|[;|\n]|&&|\|\|)\s*(?:cd|sl|chdir|pushd|popd|Set-Location)\b',
+        re.IGNORECASE,
+    )
+
+    def _command_changes_cwd(self, command: str, *, powershell: bool = False) -> bool:
+        """Return True if ``command`` invokes a CWD-changing builtin/alias.
+
+        Replaces brittle substring checks (``'cd ' in command``) that
+        produced false positives on ``cd_helper``, ``echo "cd /tmp"``,
+        function definitions, etc.  The check operates on the raw command
+        string and is OS-agnostic — callers select the dialect via
+        ``powershell``.
+        """
+        if not command:
+            return False
+        pattern = self._PS_CD_TOKEN_RE if powershell else self._CD_TOKEN_RE
+        return bool(pattern.search(command))
 
     def _update_cwd_from_output(self, pwd_command: list[str]) -> None:
         """Update current working directory by running a PWD command.

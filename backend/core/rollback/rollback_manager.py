@@ -493,21 +493,45 @@ class RollbackManager:
 
         return True
 
+    # Checkpoint types that should never be auto-evicted to free space.
+    # ``before_destructive`` records a known-dangerous shell command; losing
+    # it would defeat the purpose of recording it in the first place.
+    # ``phase_boundary`` records a lifecycle transition snapshot.
+    PROTECTED_CHECKPOINT_TYPES = frozenset(
+        {'before_destructive', 'phase_boundary'}
+    )
+
     def _cleanup_old_checkpoints(self) -> None:
-        """Remove old checkpoints to stay within max_checkpoints limit."""
+        """Remove old checkpoints to stay within max_checkpoints limit.
+
+        ``PROTECTED_CHECKPOINT_TYPES`` (e.g. ``before_destructive``,
+        ``phase_boundary``) are always kept regardless of age.
+        """
         if len(self.checkpoints) <= self.max_checkpoints:
             return
 
-        # Sort by timestamp (oldest first)
-        sorted_checkpoints = sorted(self.checkpoints, key=lambda x: x.timestamp)
+        evictable = [
+            cp for cp in self.checkpoints
+            if cp.checkpoint_type not in self.PROTECTED_CHECKPOINT_TYPES
+        ]
+        protected_count = len(self.checkpoints) - len(evictable)
+        # Allow at most max_checkpoints rows total; protected ones eat into
+        # the budget but are never themselves evicted.
+        keep_evictable = max(0, self.max_checkpoints - protected_count)
+        if len(evictable) <= keep_evictable:
+            return
 
-        # Keep only the most recent max_checkpoints
-        to_delete = sorted_checkpoints[: len(sorted_checkpoints) - self.max_checkpoints]
+        sorted_evictable = sorted(evictable, key=lambda x: x.timestamp)
+        to_delete = sorted_evictable[: len(sorted_evictable) - keep_evictable]
 
         for checkpoint in to_delete:
             self.delete_checkpoint(checkpoint.id)
 
-        logger.info('Cleaned up %s old checkpoints', len(to_delete))
+        logger.info(
+            'Cleaned up %s old checkpoints (kept %s protected)',
+            len(to_delete),
+            protected_count,
+        )
 
     def get_latest_checkpoint(self) -> Checkpoint | None:
         """Get the most recent checkpoint.

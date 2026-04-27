@@ -1981,6 +1981,127 @@ class Repl:
         if self._event_stream:
             self._event_stream.add_event(action, EventSource.USER)
 
+    # -- checkpoint inspection --------------------------------------------
+
+    def _resolve_rollback_manager(self):
+        """Return the active RollbackManager via the controller's middleware,
+        or ``None`` if checkpoints aren't available in this session."""
+        try:
+            controller = getattr(self, "_controller", None) or getattr(
+                self, "_orchestrator", None
+            )
+            if controller is None:
+                return None
+            mw = getattr(controller, "_rollback_middleware", None)
+            if mw is None:
+                return None
+            return getattr(mw, "_manager", None)
+        except Exception:
+            return None
+
+    def _handle_checkpoint_list(self, args: list[str]) -> None:
+        """Render up to ``limit`` checkpoints (default 10, newest first)."""
+        limit = 10
+        if args:
+            try:
+                limit = max(1, int(args[0]))
+            except ValueError:
+                self._warn("Usage: /checkpoint list [limit]")
+                return
+        manager = self._resolve_rollback_manager()
+        if manager is None:
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    "No active rollback manager (workspace may not be initialised yet).",
+                    title="checkpoint",
+                )
+            return
+        try:
+            entries = manager.list_checkpoints()
+        except Exception as exc:
+            self._warn(f"Failed to list checkpoints: {exc}")
+            return
+        if not entries:
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    "No checkpoints recorded yet.", title="checkpoint"
+                )
+            return
+        # Newest first.
+        entries = sorted(entries, key=lambda e: e.get("timestamp", 0), reverse=True)[:limit]
+        from datetime import datetime as _dt
+
+        lines = []
+        for e in entries:
+            ts = e.get("timestamp", 0)
+            try:
+                ts_str = _dt.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                ts_str = str(ts)
+            lines.append(
+                f"  {e.get('id', '?')[:12]:<12} {ts_str}  {e.get('checkpoint_type', '?'):<18} {e.get('description', '')[:60]}"
+            )
+        body = "\n".join(lines)
+        if self._renderer is not None:
+            self._renderer.add_system_message(body, title="checkpoint list")
+
+    def _handle_checkpoint_diff(self, args: list[str]) -> None:
+        """Show a git diff (or directory diff fallback) since a checkpoint."""
+        if not args:
+            self._warn("Usage: /checkpoint diff <id>")
+            return
+        cp_id = args[0]
+        manager = self._resolve_rollback_manager()
+        if manager is None:
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    "No active rollback manager.", title="checkpoint"
+                )
+            return
+        # Resolve full id from prefix.
+        try:
+            entries = manager.list_checkpoints()
+        except Exception as exc:
+            self._warn(f"Failed to list checkpoints: {exc}")
+            return
+        match = next(
+            (e for e in entries if str(e.get("id", "")).startswith(cp_id)),
+            None,
+        )
+        if match is None:
+            self._warn(f"Checkpoint not found: {cp_id}")
+            return
+        sha = match.get("git_commit_sha")
+        diff_text: str
+        if sha:
+            import subprocess as _sp
+
+            try:
+                proc = _sp.run(
+                    ["git", "diff", str(sha)],
+                    cwd=str(manager.workspace_path),
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                diff_text = proc.stdout or proc.stderr or "(empty diff)"
+            except Exception as exc:
+                diff_text = f"(git diff failed: {exc})"
+        else:
+            diff_text = (
+                "(checkpoint has no git commit; file-snapshot diff is not implemented "
+                "in the CLI — use the `revert_to_checkpoint` tool to inspect)."
+            )
+        if self._renderer is not None:
+            # Trim to keep the panel manageable.
+            if len(diff_text) > 8000:
+                diff_text = diff_text[:8000] + "\n[... diff truncated ...]\n"
+            self._renderer.add_markdown_block(
+                f"checkpoint diff {match.get('id', '?')[:12]}",
+                f"```diff\n{diff_text}\n```",
+            )
+
     # -- autonomy control --------------------------------------------------
 
     def _handle_autonomy_command(self, parsed: ParsedSlashCommand) -> None:
@@ -2188,7 +2309,15 @@ class Repl:
             return True
 
         if cmd == "/checkpoint":
-            label = " ".join(parsed.args).strip()
+            args = list(parsed.args)
+            sub = args[0].lower() if args else ""
+            if sub in {"list", "ls"}:
+                self._handle_checkpoint_list(args[1:])
+                return True
+            if sub == "diff":
+                self._handle_checkpoint_diff(args[1:])
+                return True
+            label = " ".join(args).strip()
             instruction = (
                 "Use the `checkpoint` tool now to snapshot the current workspace state."
             )

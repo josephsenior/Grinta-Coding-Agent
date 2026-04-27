@@ -306,7 +306,7 @@ class WindowsPowershellSession(BaseShellSession):
                 if code != -2:
                     # Command completed normally — still do CWD tracking.
                     self._cancellation.unregister_process(process.pid)
-                    if 'cd ' in command.lower() or 'Set-Location' in command:
+                    if self._command_changes_cwd(command, powershell=True):
                         self._update_cwd_from_output(  # type: ignore[attr-defined]
                             [
                                 self.powershell_exe,
@@ -321,7 +321,7 @@ class WindowsPowershellSession(BaseShellSession):
             return_code = process.returncode
 
             # Update CWD if command changed directory
-            if 'cd ' in command.lower() or 'Set-Location' in command:
+            if self._command_changes_cwd(command, powershell=True):
                 self._update_cwd_from_output(  # type: ignore[attr-defined]
                     [
                         self.powershell_exe,
@@ -498,11 +498,6 @@ class WindowsPowershellSession(BaseShellSession):
         return ErrorObservation(
             content='PowerShell session is not initialized or has been closed.'
         )
-
-    def read_output(self) -> str:
-        """Read pending output from the shell session."""
-        # Not supported in current Windows implementation (subprocess-based)
-        return ''
 
     def write_input(self, data: str, is_control: bool = False) -> None:
         """Write input to the shell session."""

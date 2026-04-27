@@ -614,12 +614,40 @@ class BashSession(BaseShellSession):
         self._detached_window = self.window
         self._bg_session_id = bg_session_id
 
+        # T-P0-2: query the live pane's current cwd BEFORE creating the new
+        # window so a `cd $foo && long-cmd` background-detach doesn't leave
+        # the new foreground window in the stale parent directory.
+        live_cwd = self._cwd
+        try:
+            pane_for_query = self._detached_pane
+            if pane_for_query is not None:
+                result = pane_for_query.cmd(
+                    'display-message', '-p', '#{pane_current_path}'
+                )
+                stdout = getattr(result, 'stdout', None) or []
+                if stdout:
+                    candidate = stdout[0].strip()
+                    if candidate and os.path.isdir(candidate):
+                        live_cwd = candidate
+                        if candidate != self._cwd:
+                            logger.info(
+                                'Detach CWD updated from %s -> %s via tmux query',
+                                self._cwd,
+                                candidate,
+                            )
+                            self._cwd = candidate
+        except Exception:
+            logger.debug(
+                'pane_current_path query failed before detach; using cached cwd',
+                exc_info=True,
+            )
+
         # Create a new window in the same tmux session for future default commands.
         new_window = cast(
             'Window',
             session.new_window(
                 window_name='bash',
-                start_directory=self._cwd,
+                start_directory=live_cwd,
                 attach=False,
             ),
         )
@@ -948,12 +976,17 @@ class BashSession(BaseShellSession):
         command: str,
         cur_pane_output: str,
         ps1_matches: list,
+        first_output_seen: bool = True,
     ) -> CmdOutputObservation | None:
         """Check for various timeout conditions.
 
         Idle-output timeout fires for ALL commands (blocking or not).
         Blocking commands get a longer idle threshold (2×) to accommodate
         slow builds/installs that produce periodic output.
+
+        Before the FIRST output is observed (``first_output_seen=False``),
+        the idle threshold is doubled to give slow-start commands such as
+        ``npm install`` or ``pip install`` time to complete network setup.
         """
         time_since_last_change = time.time() - last_change_time
 
@@ -965,6 +998,10 @@ class BashSession(BaseShellSession):
             if action.blocking
             else self.NO_CHANGE_TIMEOUT_SECONDS
         )
+        # T-P0-1: extend the FIRST idle window so commands that download
+        # metadata before printing don't get prematurely detached.
+        if not first_output_seen:
+            idle_threshold *= 2
         logger.debug(
             'CHECKING NO CHANGE TIMEOUT (%ss): elapsed %s. Action blocking: %s',
             idle_threshold,
@@ -1010,11 +1047,19 @@ class BashSession(BaseShellSession):
         initial_ps1_count: int,
         is_input: bool,
         action: CmdRunAction,
+        initial_pane_output: str | None = None,
     ) -> CmdOutputObservation:
         """Monitor command execution until completion or timeout."""
         start_time = time.time()
         last_change_time = start_time
         last_pane_output = self._get_pane_content()
+        # Baseline used to detect the FIRST output produced by *this* command.
+        # Falls back to the post-send pane content if the caller didn't pass
+        # the pre-send snapshot (preserves legacy callers).
+        baseline_pane_output = (
+            initial_pane_output if initial_pane_output is not None else last_pane_output
+        )
+        first_output_seen = last_pane_output != baseline_pane_output
 
         while should_continue():
             _start_time = time.time()
@@ -1029,6 +1074,8 @@ class BashSession(BaseShellSession):
             if cur_pane_output != last_pane_output:
                 last_pane_output = cur_pane_output
                 last_change_time = time.time()
+                if cur_pane_output != baseline_pane_output:
+                    first_output_seen = True
                 logger.debug('CONTENT UPDATED DETECTED at %s', last_change_time)
 
                 # Check for interactive prompts and auto-respond
@@ -1056,6 +1103,7 @@ class BashSession(BaseShellSession):
                 command,
                 cur_pane_output,
                 ps1_matches,
+                first_output_seen=first_output_seen,
             ):
                 return timeout_result
 
@@ -1134,7 +1182,11 @@ class BashSession(BaseShellSession):
 
         # Monitor execution
         return self._monitor_command_execution(
-            command, initial_ps1_count, is_input, action
+            command,
+            initial_ps1_count,
+            is_input,
+            action,
+            initial_pane_output=initial_pane_output,
         )
 
     def get_detected_server(self):
