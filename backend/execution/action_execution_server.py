@@ -25,7 +25,7 @@ from uvicorn import Config, Server
 
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.logger import app_logger as logger
-from backend.execution.debugger import PythonDebugManager
+from backend.execution.debugger import DAPDebugManager
 from backend.execution.file_operations import (
     ensure_directory_exists,
     execute_file_editor,
@@ -179,7 +179,7 @@ class RuntimeExecutor:
         self.last_execution_time = time.time()
         self.downloaded_files: list[str] = []
         self.downloads_directory = get_workspace_downloads_dir(work_dir)
-        self.debug_manager = PythonDebugManager(work_dir)
+        self.debug_manager = DAPDebugManager(work_dir)
 
         self._terminal_session_seq: int = 0
         self._terminal_sessions_awaiting_interaction: list[str] = []
@@ -723,7 +723,7 @@ class RuntimeExecutor:
         )
 
     async def debugger(self, action: DebuggerAction) -> Observation:
-        """Execute a Python debugger action through the debugpy DAP manager."""
+        """Execute a debugger action through the DAP manager."""
         return self.debug_manager.handle(action)
 
     async def _run_foreground_cmd(

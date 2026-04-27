@@ -170,11 +170,11 @@ class OrchestratorPlanner:
 
             tools.append(create_terminal_manager_tool())
         if getattr(self._config, 'enable_debugger', True):
-            from backend.engine.tools.python_debugger import (
-                create_python_debugger_tool,
+            from backend.engine.tools.debugger import (
+                create_debugger_tool,
             )
 
-            tools.append(create_python_debugger_tool())
+            tools.append(create_debugger_tool())
 
     def _add_optional_feature_tools(self, tools: list) -> None:
         """Add delegate, analyze_project_structure, etc."""

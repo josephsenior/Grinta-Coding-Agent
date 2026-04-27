@@ -1,8 +1,9 @@
-"""Small Debug Adapter Protocol client for Python/debugpy sessions."""
+"""Debug Adapter Protocol client and session manager."""
 
 from __future__ import annotations
 
 import json
+import os
 import queue
 import subprocess
 import sys
@@ -44,6 +45,8 @@ class DAPClient:
         """Start the adapter subprocess and reader threads."""
         if self.process is not None:
             return
+        if not self.adapter_command:
+            raise DAPError('DAP adapter command is empty')
         self.process = subprocess.Popen(
             self.adapter_command,
             cwd=self.cwd,
@@ -227,78 +230,68 @@ class DAPClient:
                 self._event_condition.notify_all()
 
 
-class PythonDebugSession:
-    """Stateful debugpy session controlled through DAP requests."""
+class DAPDebugSession:
+    """Stateful DAP session controlled through standard DAP requests."""
 
     def __init__(
         self,
         session_id: str,
         *,
         workspace_root: str,
-        program: str,
+        adapter_command: list[str],
+        adapter_id: str,
+        language: str | None,
+        request: str,
+        program: str | None,
         cwd: str | None,
         args: list[str],
         breakpoints: list[dict[str, Any]],
         stop_on_entry: bool,
         just_my_code: bool,
+        launch_config: dict[str, Any],
+        initialize_options: dict[str, Any],
         python: str | None,
     ) -> None:
         self.session_id = session_id
         self.workspace_root = Path(workspace_root).resolve()
-        self.program = self._resolve_path(program)
-        self.cwd = str(self._resolve_path(cwd)) if cwd else str(self.program.parent)
+        self.adapter_command = adapter_command
+        self.adapter_id = adapter_id
+        self.language = language
+        self.request = request
+        self.program = self._resolve_optional_path(program)
+        self.cwd = self._resolve_cwd(cwd)
         self.args = args
         self.breakpoints_by_file: dict[str, list[dict[str, Any]]] = {}
         self.stop_on_entry = stop_on_entry
         self.just_my_code = just_my_code
-        self.python = python or sys.executable
-        self.client = DAPClient([self.python, '-m', 'debugpy.adapter'], cwd=self.cwd)
+        self.launch_config = launch_config
+        self.initialize_options = initialize_options
+        self.python = python
+        self.client = DAPClient(adapter_command, cwd=self.cwd or str(self.workspace_root))
         self.current_thread_id: int | None = None
-        self.launch_request_seq: int | None = None
+        self.debuggee_process_ids: set[int] = set()
+        self.start_request_seq: int | None = None
         self._set_initial_breakpoints(breakpoints)
 
     def start(self, timeout: float = 15.0) -> dict[str, Any]:
-        """Start debugpy, launch the program, and configure breakpoints."""
+        """Start the adapter, send launch/attach, and configure breakpoints."""
         self.client.start()
-        self.client.request(
-            'initialize',
-            {
-                'adapterID': 'python',
-                'clientID': 'grinta',
-                'clientName': 'Grinta',
-                'pathFormat': 'path',
-                'linesStartAt1': True,
-                'columnsStartAt1': True,
-                'supportsVariableType': True,
-                'supportsVariablePaging': True,
-                'supportsRunInTerminalRequest': False,
-            },
-            timeout=timeout,
-        )
-        self.launch_request_seq = self.client.request_nowait(
-            'launch',
-            {
-                'program': str(self.program),
-                'cwd': self.cwd,
-                'args': self.args,
-                'console': 'internalConsole',
-                'stopOnEntry': self.stop_on_entry,
-                'justMyCode': self.just_my_code,
-                'python': self.python,
-            },
+        self.client.request('initialize', self._initialize_arguments(), timeout=timeout)
+        self.start_request_seq = self.client.request_nowait(
+            self.request, self._start_arguments()
         )
         initialized = self.client.wait_for_event('initialized', timeout=timeout)
         if initialized is None:
-            raise DAPError('debugpy did not send initialized event')
+            raise DAPError('DAP adapter did not send initialized event')
         breakpoint_results = self._sync_all_breakpoints(timeout=timeout)
         self.client.request('configurationDone', {}, timeout=timeout)
-        if self.launch_request_seq is not None:
+        if self.start_request_seq is not None:
             try:
                 self.client.wait_for_response(
-                    self.launch_request_seq, timeout=min(timeout, 1.0)
+                    self.start_request_seq, timeout=min(timeout, 1.0)
                 )
             except DAPError:
-                logger.debug('debugpy launch response was not available yet', exc_info=True)
+                logger.debug('DAP start response was not available yet', exc_info=True)
         event = self._wait_for_pause_or_exit(timeout=0.5)
         return self._snapshot(
             state='started',
@@ -422,11 +415,19 @@ class PythonDebugSession:
             self.client.request(
                 'disconnect', {'terminateDebuggee': True}, timeout=timeout
             )
+            self.client.wait_for_event('terminated', timeout=min(timeout, 2.0))
+            self.client.wait_for_event('exited', timeout=0.5)
         except DAPError:
-            logger.debug('debugpy disconnect failed', exc_info=True)
+            logger.debug('DAP disconnect failed', exc_info=True)
         finally:
+            self._terminate_debuggee_processes()
             self.client.close()
-        return {'session_id': self.session_id, 'state': 'stopped'}
+        return {
+            'session_id': self.session_id,
+            'state': 'stopped',
+            'adapter': self.adapter_id,
+            'language': self.language,
+        }
 
     def close(self) -> None:
         """Close the session without raising."""
@@ -434,6 +435,45 @@ class PythonDebugSession:
             self.stop(timeout=1.0)
         except Exception:
             self.client.close()
+
+    def _initialize_arguments(self) -> dict[str, Any]:
+        arguments: dict[str, Any] = {
+            'adapterID': self.adapter_id,
+            'clientID': 'grinta',
+            'clientName': 'Grinta',
+            'pathFormat': 'path',
+            'linesStartAt1': True,
+            'columnsStartAt1': True,
+            'supportsVariableType': True,
+            'supportsVariablePaging': True,
+            'supportsRunInTerminalRequest': False,
+        }
+        if self.initialize_options:
+            arguments['initializationOptions'] = self.initialize_options
+        return arguments
+
+    def _start_arguments(self) -> dict[str, Any]:
+        arguments = dict(self.launch_config)
+        if self.program is not None:
+            arguments.setdefault('program', str(self.program))
+        if self.cwd is not None:
+            arguments.setdefault('cwd', self.cwd)
+        if self.args:
+            arguments.setdefault('args', self.args)
+        if self.stop_on_entry:
+            arguments.setdefault('stopOnEntry', True)
+        if self._uses_python_defaults():
+            if self.request == 'launch':
+                arguments.setdefault('console', 'internalConsole')
+            arguments.setdefault('justMyCode', self.just_my_code)
+            if self.python:
+                arguments.setdefault('python', self.python)
+        return arguments
+
+    def _uses_python_defaults(self) -> bool:
+        adapter = self.adapter_id.lower()
+        language = (self.language or '').lower()
+        return adapter in {'python', 'debugpy'} or language == 'python'
 
     def _set_initial_breakpoints(self, breakpoints: list[dict[str, Any]]) -> None:
         for entry in breakpoints:
@@ -465,6 +505,8 @@ class PythonDebugSession:
         if line_value is None:
             raise DAPError('Breakpoint entry requires line')
         breakpoint: dict[str, Any] = {'line': int(line_value)}
+        if entry.get('column'):
+            breakpoint['column'] = int(entry['column'])
         if entry.get('condition'):
             breakpoint['condition'] = str(entry['condition'])
         if entry.get('hit_condition'):
@@ -477,13 +519,23 @@ class PythonDebugSession:
             breakpoint['logMessage'] = str(entry['logMessage'])
         return breakpoint
 
-    def _resolve_path(self, path: str | None) -> Path:
+    def _resolve_optional_path(self, path: str | None) -> Path | None:
         if not path:
-            return self.workspace_root
+            return None
+        return self._resolve_path(path)
+
+    def _resolve_path(self, path: str) -> Path:
         resolved = Path(path)
         if not resolved.is_absolute():
             resolved = self.workspace_root / resolved
         return resolved.resolve()
+
+    def _resolve_cwd(self, cwd: str | None) -> str | None:
+        if cwd:
+            return str(self._resolve_path(cwd))
+        if self.program is not None:
+            return str(self.program.parent)
+        return None
 
     def _resolve_thread_id(self, thread_id: int | None, timeout: float) -> int:
         if thread_id is not None:
@@ -504,22 +556,79 @@ class PythonDebugSession:
         if event is None:
             event = self.client.wait_for_event('exited', timeout=0.05)
         if event is not None:
-            self._remember_thread(event)
+            self._remember_event(event)
         return event
+
+    def _remember_event(self, event: dict[str, Any]) -> None:
+        self._remember_thread(event)
+        self._remember_process(event)
 
     def _remember_thread(self, event: dict[str, Any]) -> None:
         thread_id = event.get('body', {}).get('threadId')
         if thread_id is not None:
             self.current_thread_id = int(thread_id)
 
+    def _remember_process(self, event: dict[str, Any]) -> None:
+        if event.get('event') != 'process':
+            return
+        process_id = event.get('body', {}).get('systemProcessId')
+        if process_id is None:
+            return
+        try:
+            pid = int(process_id)
+        except (TypeError, ValueError):
+            return
+        if pid > 0 and pid != os.getpid():
+            self.debuggee_process_ids.add(pid)
+
+    def _terminate_debuggee_processes(self) -> None:
+        if not self.debuggee_process_ids:
+            return
+        try:
+            import psutil
+
+            for process_id in list(self.debuggee_process_ids):
+                try:
+                    process = psutil.Process(process_id)
+                except psutil.NoSuchProcess:
+                    continue
+                processes = process.children(recursive=True) + [process]
+                for candidate in processes:
+                    try:
+                        candidate.terminate()
+                    except psutil.NoSuchProcess:
+                        pass
+                _, alive = psutil.wait_procs(processes, timeout=2)
+                for candidate in alive:
+                    try:
+                        candidate.kill()
+                    except psutil.NoSuchProcess:
+                        pass
+        except Exception:
+            logger.debug('Failed to clean up DAP debuggee process tree', exc_info=True)
+        finally:
+            self.debuggee_process_ids.clear()
+
+    def _target(self) -> str | None:
+        if self.program is not None:
+            return str(self.program)
+        for key in ('program', 'processId', 'processIdString'):
+            value = self.launch_config.get(key)
+            if value is not None:
+                return str(value)
+        return None
+
     def _snapshot(self, state: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
         events = self.client.drain_events()
         for event in events:
-            self._remember_thread(event)
+            self._remember_event(event)
         return {
             'session_id': self.session_id,
             'state': state,
-            'program': str(self.program),
+            'adapter': self.adapter_id,
+            'language': self.language,
+            'request': self.request,
+            'target': self._target(),
             'cwd': self.cwd,
             'current_thread_id': self.current_thread_id,
             'events': events,
@@ -528,12 +637,32 @@ class PythonDebugSession:
         }
 
 
-class PythonDebugManager:
-    """Manage multiple Python debugpy sessions."""
+class DAPDebugManager:
+    """Manage multiple DAP debugger sessions."""
+
+    _PYTHON_ADAPTERS = {'python', 'debugpy'}
+    _EXTENSION_ADAPTERS = {
+        '.py': 'python',
+        '.pyw': 'python',
+        '.js': 'javascript',
+        '.mjs': 'javascript',
+        '.cjs': 'javascript',
+        '.ts': 'typescript',
+        '.tsx': 'typescript',
+        '.jsx': 'javascript',
+        '.go': 'go',
+        '.rs': 'rust',
+        '.java': 'java',
+        '.cs': 'csharp',
+        '.cpp': 'cpp',
+        '.cc': 'cpp',
+        '.cxx': 'cpp',
+        '.c': 'c',
+    }
 
     def __init__(self, workspace_root: str) -> None:
         self.workspace_root = workspace_root
-        self.sessions: dict[str, PythonDebugSession] = {}
+        self.sessions: dict[str, DAPDebugSession] = {}
 
     def handle(self, action: DebuggerAction) -> DebuggerObservation | ErrorObservation:
         """Dispatch a debugger action and wrap it as an observation."""
@@ -547,7 +676,7 @@ class PythonDebugManager:
                 payload = self._dispatch_existing(session, action, debug_action, timeout)
             return self._observation(debug_action, payload)
         except Exception as exc:
-            return ErrorObservation(f'Python debugger error: {type(exc).__name__}: {exc}')
+            return ErrorObservation(f'Debugger error: {type(exc).__name__}: {exc}')
 
     def close_all(self) -> None:
         """Close all active debug sessions."""
@@ -557,20 +686,34 @@ class PythonDebugManager:
             session.close()
 
     def _start(self, action: DebuggerAction, timeout: float) -> dict[str, Any]:
-        if not action.program:
-            raise DAPError('debugger start requires program')
+        request = (action.request or 'launch').strip().lower()
+        if request not in {'launch', 'attach'}:
+            raise DAPError("debugger request must be 'launch' or 'attach'")
+
         session_id = action.session_id or f'dbg-{uuid.uuid4().hex[:8]}'
         if session_id in self.sessions:
             raise DAPError(f'Debug session already exists: {session_id}')
-        session = PythonDebugSession(
+
+        adapter = self._adapter_name(action)
+        adapter_command = self._adapter_command(action, adapter)
+        adapter_id = action.adapter_id or adapter or 'generic'
+        language = action.language or adapter
+
+        session = DAPDebugSession(
             session_id,
             workspace_root=self.workspace_root,
+            adapter_command=adapter_command,
+            adapter_id=adapter_id,
+            language=language,
+            request=request,
             program=action.program,
             cwd=action.cwd,
             args=[str(arg) for arg in action.args],
             breakpoints=action.breakpoints,
             stop_on_entry=bool(action.stop_on_entry),
             just_my_code=bool(action.just_my_code),
+            launch_config=action.launch_config,
+            initialize_options=action.initialize_options,
             python=action.python,
         )
         self.sessions[session_id] = session
@@ -583,7 +726,7 @@ class PythonDebugManager:
 
     def _dispatch_existing(
         self,
-        session: PythonDebugSession,
+        session: DAPDebugSession,
         action: DebuggerAction,
         debug_action: str,
         timeout: float,
@@ -628,7 +771,28 @@ class PythonDebugManager:
             return payload
         raise DAPError(f'Unknown debugger action: {debug_action}')
 
-    def _get_session(self, session_id: str | None) -> PythonDebugSession:
+    def _adapter_name(self, action: DebuggerAction) -> str | None:
+        adapter = action.adapter or action.language
+        if adapter:
+            return adapter.strip().lower()
+        if action.program:
+            return self._EXTENSION_ADAPTERS.get(Path(action.program).suffix.lower())
+        return None
+
+    def _adapter_command(
+        self, action: DebuggerAction, adapter: str | None
+    ) -> list[str]:
+        if action.adapter_command:
+            return action.adapter_command
+        if adapter in self._PYTHON_ADAPTERS:
+            return [action.python or sys.executable, '-m', 'debugpy.adapter']
+        hint = f' for adapter {adapter!r}' if adapter else ''
+        raise DAPError(
+            'debugger start requires adapter_command'
+            f'{hint}. Provide a DAP adapter command over stdio, or use adapter="python".'
+        )
+
+    def _get_session(self, session_id: str | None) -> DAPDebugSession:
         if not session_id:
             raise DAPError('debugger action requires session_id')
         session = self.sessions.get(session_id)
@@ -646,7 +810,7 @@ class PythonDebugManager:
             payload=payload,
         )
         observation.tool_result = {
-            'tool': 'python_debugger',
+            'tool': 'debugger',
             'ok': True,
             'error_code': None,
             'retryable': False,
@@ -656,3 +820,7 @@ class PythonDebugManager:
             'progress': True,
         }
         return observation
+
+
+PythonDebugSession = DAPDebugSession
+PythonDebugManager = DAPDebugManager

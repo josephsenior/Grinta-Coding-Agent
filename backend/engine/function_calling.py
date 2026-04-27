@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING, Any, cast
 import backend.engine.tools.analyze_project_structure as analyze_project_structure_tools
 import backend.engine.tools.blackboard as blackboard_tools
 import backend.engine.tools.checkpoint as checkpoint_tools
+import backend.engine.tools.debugger as debugger_tools
 import backend.engine.tools.delegate_task as delegate_task_tools
 import backend.engine.tools.explore_code as explore_code_tools
 import backend.engine.tools.lsp_query as lsp_query_tools
-import backend.engine.tools.python_debugger as python_debugger_tools
 import backend.engine.tools.terminal_manager as terminal_manager_tools
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
 from backend.core.enums import FileEditSource, FileReadSource
@@ -47,6 +47,7 @@ from backend.engine.tools.browser_native import (
 from backend.engine.tools.checkpoint import (
     CHECKPOINT_TOOL_NAME,
 )
+from backend.engine.tools.debugger import DEBUGGER_TOOL_NAME, PYTHON_DEBUGGER_TOOL_NAME
 from backend.engine.tools.delegate_task import (
     DELEGATE_TASK_TOOL_NAME,
 )
@@ -59,7 +60,6 @@ from backend.engine.tools.memory_manager import (
 )
 from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.note import build_note_action, build_recall_action
-from backend.engine.tools.python_debugger import PYTHON_DEBUGGER_TOOL_NAME
 from backend.engine.tools.search_code import (
     SEARCH_CODE_TOOL_NAME,
     build_search_code_action,
@@ -115,8 +115,11 @@ build_lsp_query_action = cast(
 handle_terminal_manager_tool = cast(
     ToolHandler, cast(Any, terminal_manager_tools).handle_terminal_manager_tool
 )
+handle_debugger_tool = cast(
+    ToolHandler, cast(Any, debugger_tools).handle_debugger_tool
+)
 handle_python_debugger_tool = cast(
-    ToolHandler, cast(Any, python_debugger_tools).handle_python_debugger_tool
+    ToolHandler, cast(Any, debugger_tools).handle_python_debugger_tool
 )
 
 # Callback for semantic recall — set by the orchestrator at init time.
@@ -1166,6 +1169,7 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         DELEGATE_TASK_TOOL_NAME: lambda args: build_delegate_task_action(dict(args)),
         CODE_INTELLIGENCE_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
+        DEBUGGER_TOOL_NAME: lambda args: handle_debugger_tool(dict(args)),
         PYTHON_DEBUGGER_TOOL_NAME: lambda args: handle_python_debugger_tool(dict(args)),
         BLACKBOARD_TOOL_NAME: lambda args: build_blackboard_action(dict(args)),
         TERMINAL_MANAGER_TOOL_NAME: lambda args: handle_terminal_manager_tool(dict(args)),

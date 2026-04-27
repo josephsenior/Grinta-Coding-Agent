@@ -1,4 +1,4 @@
-"""Observation returned by Python debugger actions."""
+"""Observation returned by debugger actions."""
 
 from __future__ import annotations
 

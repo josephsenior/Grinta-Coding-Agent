@@ -178,16 +178,20 @@ class TestActionFromDict:
             'action': 'debugger',
             'args': {
                 'debug_action': 'start',
+                'adapter': 'python',
                 'program': 'app.py',
                 'args': ['--flag'],
+                'launch_config': {'module': 'pytest'},
                 'breakpoints': [{'file': 'app.py', 'line': 10}],
             },
         }
         evt = action_from_dict(d)
         assert isinstance(evt, DebuggerAction)
         assert evt.debug_action == 'start'
+        assert evt.adapter == 'python'
         assert evt.program == 'app.py'
         assert evt.args == ['--flag']
+        assert evt.launch_config == {'module': 'pytest'}
 
     def test_is_confirmed_remapped(self):
         """Verify that is_confirmed is removed and mapped to confirmation_state in args."""

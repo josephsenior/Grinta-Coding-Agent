@@ -16,7 +16,7 @@ from .memory_manager import create_memory_manager_tool
 from .meta_cognition import (
     create_communicate_tool,
 )
-from .python_debugger import create_python_debugger_tool
+from .debugger import create_debugger_tool, create_python_debugger_tool
 from .search_code import create_search_code_tool
 from .text_editor import create_text_editor_tool
 from .symbol_editor_tool import create_symbol_editor_tool
@@ -33,6 +33,7 @@ __all__ = [
     'create_finish_tool',
     'create_lsp_query_tool',
     'create_memory_manager_tool',
+    'create_debugger_tool',
     'create_python_debugger_tool',
     'create_analyze_project_structure_tool',
     'create_search_code_tool',

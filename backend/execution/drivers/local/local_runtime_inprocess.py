@@ -340,7 +340,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         return call_async_from_sync(self._executor.terminal_read, 30.0, action)
 
     def debugger(self, action: DebuggerAction) -> Observation:
-        """Execute a Python debugger action via RuntimeExecutor."""
+        """Execute a debugger action via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError("Runtime not initialized")
         return call_async_from_sync(self._executor.debugger, 30.0, action)
