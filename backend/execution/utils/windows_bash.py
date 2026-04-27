@@ -296,6 +296,27 @@ class WindowsPowershellSession(BaseShellSession):
             # Register for cancellation
             self._cancellation.register_process(process)
 
+            # If the action server armed a background-detach ID, use the
+            # idle-output–aware monitoring path (text-mode pipe).
+            pending_bg_id = self._pending_bg_id
+            if pending_bg_id is not None:
+                out, err, code = self._run_backgroundable(
+                    process, timeout, pending_bg_id, is_text=True
+                )
+                if code != -2:
+                    # Command completed normally — still do CWD tracking.
+                    self._cancellation.unregister_process(process.pid)
+                    if 'cd ' in command.lower() or 'Set-Location' in command:
+                        self._update_cwd_from_output(  # type: ignore[attr-defined]
+                            [
+                                self.powershell_exe,
+                                '-NoProfile',
+                                '-Command',
+                                'Get-Location | Select-Object -ExpandProperty Path',
+                            ]
+                        )
+                return out, err, code
+
             stdout, stderr = process.communicate(input=input_text, timeout=timeout)
             return_code = process.returncode
 
@@ -446,6 +467,27 @@ class WindowsPowershellSession(BaseShellSession):
             timeout=timeout,
             input_text=stdin,
         )
+
+        if exit_code == -2 and self._bg_process is not None:
+            # Idle-output timeout — process was detached to a background session.
+            # action_execution_server will pick up _bg_process and register it.
+            from backend.ledger.observation.commands import (
+                CmdOutputMetadata,
+                CmdOutputObservation,
+            )
+
+            bg_id = self._bg_session_id or ''
+            metadata = CmdOutputMetadata(exit_code=-2, working_dir=self._cwd)
+            metadata.suffix = (
+                f'\n[The command has no new output after {self.NO_CHANGE_TIMEOUT_SECONDS} seconds. '
+                f'It is still running in background session "{bg_id}". '
+                f'Use terminal_read(session_id="{bg_id}") to poll for new output, '
+                f'or terminal_read(session_id="{bg_id}", mode="snapshot") for the full buffer. '
+                f'When the command completes, the session will show an exit indicator.]'
+            )
+            return CmdOutputObservation(  # type: ignore[return-value]
+                content=stdout, command=command, metadata=metadata
+            )
 
         return self._format_execution_observation(command, stdout, stderr, exit_code)  # type: ignore[return-value]
 

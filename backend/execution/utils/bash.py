@@ -182,6 +182,66 @@ def _remove_command_prefix(command_output: str, command: str) -> str:
     return command_output.lstrip().removeprefix(command.lstrip()).lstrip()
 
 
+class BackgroundPaneSession:
+    """Read-only view of a backgrounded tmux pane.
+
+    Created when a foreground command's idle-output timeout fires and the
+    pane is detached rather than killed.  The agent can poll it via
+    ``terminal_read(session_id=<bg_id>)`` while the process continues
+    running in the tmux window.
+    """
+
+    def __init__(self, pane: 'Pane', window: 'Window', cwd: str) -> None:
+        self._pane = pane
+        self._window = window
+        self._cwd = cwd
+
+    # --- UnifiedShellSession interface ----------------------------------------
+
+    def initialize(self) -> None:  # noqa: D401
+        pass
+
+    def execute(self, action: 'CmdRunAction') -> ErrorObservation:
+        return ErrorObservation(
+            'Cannot execute commands on a background-only pane session.'
+        )
+
+    def close(self) -> None:
+        try:
+            self._window.kill_window()
+        except Exception:
+            logger.debug('Failed to kill background pane window', exc_info=True)
+
+    @property
+    def cwd(self) -> str:
+        return self._cwd
+
+    def get_detected_server(self):
+        return None
+
+    def read_output(self) -> str:
+        """Capture the full pane content."""
+        try:
+            lines = self._pane.cmd('capture-pane', '-J', '-pS', '-').stdout
+            return '\n'.join(line.rstrip() for line in lines)
+        except Exception:
+            return ''
+
+    def read_output_since(self, offset: int) -> tuple[str, int, int | None]:
+        """Return (delta, next_offset, dropped_chars) for incremental reads."""
+        full = self.read_output()
+        total = len(full)
+        safe = max(0, offset)
+        delta = full[safe:] if safe < total else ''
+        return delta, total, None
+
+    def write_input(self, data: str, is_control: bool = False) -> None:
+        if is_control:
+            self._pane.send_keys(data, enter=False)
+        else:
+            self._pane.send_keys(data, enter=True)
+
+
 class BashSession(BaseShellSession):
     """Manage a tmux-backed bash session for running agent commands."""
 
@@ -216,6 +276,10 @@ class BashSession(BaseShellSession):
         self.pane: Pane | None = None
         self.prev_status: BashCommandStatus | None = None
         self.prev_output: str = ''
+        # tmux-specific background-detach state (populated by _detach_pane_to_background).
+        # _pending_bg_id and _bg_session_id are inherited from BaseShellSession.
+        self._detached_pane: Pane | None = None
+        self._detached_window: Window | None = None
 
     def initialize(self) -> None:
         """Initialize tmux server and session for bash runtime."""
@@ -529,6 +593,68 @@ class BashSession(BaseShellSession):
             content=command_output, command=command, metadata=metadata, hidden=hidden
         )
 
+    def _detach_pane_to_background(self, bg_session_id: str) -> None:
+        """Keep the running process alive by migrating the current pane to a
+        background "slot" and opening a fresh window for future default commands.
+
+        After this call:
+        - ``self.pane`` / ``self.window`` point to the new, idle window.
+        - ``self._detached_pane`` / ``self._detached_window`` hold the old window
+          so the action server can wrap them in a ``BackgroundPaneSession``.
+        - ``self._bg_session_id`` is the new session ID for the caller to register.
+        - ``self.prev_status`` is reset to ``COMPLETED`` so the next command runs
+          normally on the fresh window.
+        """
+        session = self.session
+        if session is None:
+            raise RuntimeError('Cannot detach: tmux session is not initialized')
+
+        # Preserve the current (still-running) pane/window.
+        self._detached_pane = self.pane
+        self._detached_window = self.window
+        self._bg_session_id = bg_session_id
+
+        # Create a new window in the same tmux session for future default commands.
+        new_window = cast(
+            'Window',
+            session.new_window(
+                window_name='bash',
+                start_directory=self._cwd,
+                attach=False,
+            ),
+        )
+        # Wait for the pane to become available (libtmux may lag slightly).
+        new_pane: Pane | None = None
+        for _ in range(10):
+            new_pane = cast('Pane | None', getattr(new_window, 'active_pane', None))
+            if new_pane is not None:
+                break
+            time.sleep(0.1)
+
+        if new_pane is None:
+            # Failed to get the pane — roll back and let the caller kill instead.
+            self._detached_pane = None
+            self._detached_window = None
+            self._bg_session_id = None
+            raise RuntimeError('New tmux window has no active pane after retries')
+
+        # Point self at the new window so all future commands run there.
+        self.window = new_window
+        self.pane = new_pane
+
+        # Set up PS1 on the new pane (matches what initialize() does).
+        new_pane.send_keys(
+            f'''export PROMPT_COMMAND='export PS1="{self.PS1}"'; export PS2=""'''
+        )
+        time.sleep(0.1)
+        self._clear_screen()
+
+        # Mark the session as ready for a fresh command.
+        self.prev_status = BashCommandStatus.COMPLETED
+        logger.info(
+            'Detached timed-out process to background session %s', bg_session_id
+        )
+
     def _kill_hung_process(self) -> None:
         r"""Escalate kill signals to terminate a hung foreground process.
 
@@ -594,9 +720,6 @@ class BashSession(BaseShellSession):
             pane_content, ps1_matches
         )
         metadata = CmdOutputMetadata()
-        metadata.suffix = f'\n[The command has no new output after {
-            self.NO_CHANGE_TIMEOUT_SECONDS
-        } seconds. {TIMEOUT_MESSAGE_TEMPLATE}]'
         command_output = self._get_command_output(
             command,
             raw_command_output,
@@ -604,8 +727,37 @@ class BashSession(BaseShellSession):
             continue_prefix='[Below is the output of the previous command.]\n',
         )
 
-        # Kill the hung process so the tmux pane is freed for the next command.
-        self._kill_hung_process()
+        bg_id = self._pending_bg_id
+        if bg_id is not None:
+            # Try to detach the running process to a background session so the
+            # agent can poll it with terminal_read() instead of losing output.
+            try:
+                self._detach_pane_to_background(bg_id)
+                metadata.suffix = (
+                    f'\n[The command has no new output after {self.NO_CHANGE_TIMEOUT_SECONDS} seconds. '
+                    f'It is still running in background session "{bg_id}". '
+                    f'Use terminal_read(session_id="{bg_id}") to poll for new output, '
+                    f'or terminal_read(session_id="{bg_id}", mode="snapshot") for the full buffer. '
+                    f'When the command completes, the session will show the shell prompt.]'
+                )
+                logger.info(
+                    'No-change timeout: moved command to background session %s', bg_id
+                )
+            except Exception:
+                logger.warning(
+                    'Background detach failed for session %s, killing process instead',
+                    bg_id,
+                    exc_info=True,
+                )
+                self._bg_session_id = None
+                self._detached_pane = None
+                self._detached_window = None
+                metadata.suffix = f'\n[The command has no new output after {self.NO_CHANGE_TIMEOUT_SECONDS} seconds. {TIMEOUT_MESSAGE_TEMPLATE}]'
+                self._kill_hung_process()
+        else:
+            # No background-detach requested: kill and free the pane (original behavior).
+            metadata.suffix = f'\n[The command has no new output after {self.NO_CHANGE_TIMEOUT_SECONDS} seconds. {TIMEOUT_MESSAGE_TEMPLATE}]'
+            self._kill_hung_process()
 
         return CmdOutputObservation(
             content=command_output, command=command, metadata=metadata

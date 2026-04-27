@@ -733,16 +733,89 @@ class RuntimeExecutor:
 
         Routes to _run_static_cmd for isolated execution, or uses the default
         session for normal foreground commands.
+
+        When the session's idle-output timeout fires, the running process is
+        migrated to a background session (``bg-XXXXXXXX``) rather than killed.
+        The observation content will include the new session ID and instructions
+        for polling with ``terminal_read``.
         """
         if action.is_static:
             return await self._run_static_cmd(action)
         bash_session = self.session_manager.get_session("default")
         if bash_session is None:
             return ErrorObservation("Default shell session not initialized")
-        return cast(
+
+        # Arm the background-detach mechanism so idle-output timeouts preserve
+        # the process instead of killing it.
+        bg_id = f"bg-{uuid.uuid4().hex[:8]}"
+        if hasattr(bash_session, "_pending_bg_id"):
+            bash_session._pending_bg_id = bg_id  # type: ignore[union-attr]
+
+        observation = cast(
             CmdOutputObservation,
             await call_sync_from_async(bash_session.execute, action),
         )
+
+        # If the timeout handler performed a background detach, register the
+        # detached pane as a readable background session (BashSession / tmux path).
+        detached_pane = getattr(bash_session, "_detached_pane", None)
+        registered_bg_id = getattr(bash_session, "_bg_session_id", None)
+        if detached_pane is not None and registered_bg_id is not None:
+            from backend.execution.utils.bash import BackgroundPaneSession
+
+            bg_pane_session = BackgroundPaneSession(
+                pane=detached_pane,
+                window=getattr(bash_session, "_detached_window", None),
+                cwd=str(
+                    getattr(bash_session, "_cwd", None) or self._initial_cwd
+                ),
+            )
+            self.session_manager.sessions[registered_bg_id] = bg_pane_session
+            logger.info(
+                "Registered background pane session %s after idle-timeout detach",
+                registered_bg_id,
+            )
+            # Reset detach state so subsequent commands don't re-register.
+            bash_session._detached_pane = None  # type: ignore[union-attr]
+            bash_session._detached_window = None  # type: ignore[union-attr]
+            bash_session._bg_session_id = None  # type: ignore[union-attr]
+
+        # subprocess bg path (SimpleBashSession / WindowsPowershellSession):
+        # the session stored the Popen + OutputCapture objects as instance state.
+        bg_process = getattr(bash_session, "_bg_process", None)
+        bg_sub_id = getattr(bash_session, "_bg_session_id", None) or registered_bg_id
+        bg_stdout_cap = getattr(bash_session, "_bg_stdout_capture", None)
+        if (
+            bg_process is not None
+            and bg_sub_id is not None
+            and bg_stdout_cap is not None
+            and detached_pane is None  # don't double-register for BashSession
+        ):
+            from backend.execution.utils.subprocess_background import (
+                SubprocessBackgroundSession,
+            )
+
+            bg_sub_session = SubprocessBackgroundSession(
+                process=bg_process,
+                stdout_capture=bg_stdout_cap,
+                stderr_capture=getattr(bash_session, "_bg_stderr_capture", None),
+                cwd=str(getattr(bash_session, "_cwd", None) or self._initial_cwd),
+            )
+            self.session_manager.sessions[bg_sub_id] = bg_sub_session
+            logger.info(
+                "Registered subprocess background session %s after idle-timeout detach",
+                bg_sub_id,
+            )
+            bash_session._bg_process = None  # type: ignore[union-attr]
+            bash_session._bg_session_id = None  # type: ignore[union-attr]
+            bash_session._bg_stdout_capture = None  # type: ignore[union-attr]
+            bash_session._bg_stderr_capture = None  # type: ignore[union-attr]
+
+        # Clear the pending bg_id for the next command.
+        if hasattr(bash_session, "_pending_bg_id"):
+            bash_session._pending_bg_id = None  # type: ignore[union-attr]
+
+        return observation
 
     async def _run_static_cmd(
         self, action: CmdRunAction

@@ -75,7 +75,41 @@ class SimpleBashSession(BaseShellSession):
         if run_in_background:
             return self._handle_background_execution(command)
 
-        # Regular foreground command
+        # If the action server armed a background-detach ID, use the
+        # idle-output–aware monitoring path so slow commands are kept alive
+        # rather than killed on timeout.
+        pending_bg_id = self._pending_bg_id
+        if pending_bg_id is not None:
+            process = self._start_subprocess(command)
+            out, err, code = self._run_backgroundable(
+                process, timeout_seconds, pending_bg_id
+            )
+            if code == -2:
+                # Process was detached to a background session.
+                # action_execution_server will pick up _bg_process and register it.
+                from backend.ledger.observation.commands import (
+                    CmdOutputMetadata,
+                    CmdOutputObservation,
+                )
+
+                metadata = CmdOutputMetadata(exit_code=-2, working_dir=self._cwd)
+                metadata.suffix = (
+                    f'\n[The command has no new output after {self.NO_CHANGE_TIMEOUT_SECONDS} seconds. '
+                    f'It is still running in background session "{pending_bg_id}". '
+                    f'Use terminal_read(session_id="{pending_bg_id}") to poll for new output, '
+                    f'or terminal_read(session_id="{pending_bg_id}", mode="snapshot") for the full buffer. '
+                    f'When the command completes, the session will show an exit indicator.]'
+                )
+                return CmdOutputObservation(
+                    content=out, command=command, metadata=metadata
+                )
+            if process.pid:
+                self._cancellation.unregister_process(process.pid)
+            return self._format_execution_observation(  # type: ignore[return-value]
+                command, out, err, code
+            )
+
+        # Regular foreground command (original path)
         stdout, stderr, exit_code = self._run_command(command, timeout=timeout_seconds)
         return self._format_execution_observation(command, stdout, stderr, exit_code)  # type: ignore[return-value]
 

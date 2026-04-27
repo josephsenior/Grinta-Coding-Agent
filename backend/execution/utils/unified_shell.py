@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -113,6 +114,14 @@ class BaseShellSession(UnifiedShellSession, ABC):
             security_config=security_config,
             workspace_root=self.workspace_root,
         )
+        # Background-detach state used by all session backends.
+        # Set by action_execution_server._run_foreground_cmd() before execute();
+        # read back after execute() to register the background session.
+        self._pending_bg_id: str | None = None
+        self._bg_session_id: str | None = None
+        self._bg_process: Any = None
+        self._bg_stdout_capture: Any = None
+        self._bg_stderr_capture: Any = None
 
     def _wrap_subprocess_argv(self, argv: list[str], *, cwd: str) -> list[str]:
         """Prefix child argv with the active sandbox launcher when configured."""
@@ -186,6 +195,98 @@ class BaseShellSession(UnifiedShellSession, ABC):
         """Close the shell session and clean up resources."""
         self._closed = True
         logger.info('Shell session closed: %s', self.__class__.__name__)
+
+    def _run_backgroundable(
+        self,
+        process: Any,
+        timeout: int | None,
+        bg_id: str,
+        *,
+        is_text: bool = False,
+    ) -> tuple[str, str, int]:
+        """Monitor process with idle-output detection; detach to background on timeout.
+
+        Provides the same "background + poll" semantics as ``BashSession``'s
+        tmux-pane detach, but for subprocess-backed sessions
+        (``SimpleBashSession``, ``WindowsPowershellSession``).
+
+        Unlike ``bounded_communicate``, this does **not** kill the process on
+        timeout.  Instead, it stores the process + ``OutputCapture`` objects as
+        instance state so the caller can wrap them in a
+        ``SubprocessBackgroundSession`` and register it with the session manager.
+
+        Returns:
+            ``(stdout, stderr, exit_code)`` — exit_code ``-2`` signals that the
+            process was detached to a background session.  In that case,
+            ``self._bg_process``, ``self._bg_session_id``,
+            ``self._bg_stdout_capture``, and ``self._bg_stderr_capture`` are
+            populated for the caller to consume.
+        """
+        from backend.execution.utils.subprocess_background import OutputCapture
+
+        stdout_cap = OutputCapture(process.stdout, is_text=is_text)
+        stderr_cap = (
+            OutputCapture(process.stderr, is_text=is_text) if process.stderr else None
+        )
+
+        hard_limit = float(timeout or 600)
+        idle_timeout = float(self.NO_CHANGE_TIMEOUT_SECONDS)
+
+        wall_start = time.monotonic()
+        last_change_time = time.monotonic()
+        last_output_len = 0
+
+        while True:
+            if process.poll() is not None:
+                # Command completed — drain remaining output.
+                stdout_cap._thread.join(timeout=2.0)
+                if stderr_cap:
+                    stderr_cap._thread.join(timeout=2.0)
+                return (
+                    stdout_cap.read_all(),
+                    stderr_cap.read_all() if stderr_cap else '',
+                    process.returncode,
+                )
+
+            now = time.monotonic()
+
+            current_len = len(stdout_cap.read_all()) + (
+                len(stderr_cap.read_all()) if stderr_cap else 0
+            )
+            if current_len > last_output_len:
+                last_output_len = current_len
+                last_change_time = now
+
+            if now - last_change_time >= idle_timeout:
+                # Idle-output timeout — keep the process alive and detach it.
+                logger.info(
+                    'Subprocess idle-output timeout after %ss; detaching to bg session %s',
+                    self.NO_CHANGE_TIMEOUT_SECONDS,
+                    bg_id,
+                )
+                self._bg_process = process
+                self._bg_session_id = bg_id
+                self._bg_stdout_capture = stdout_cap
+                self._bg_stderr_capture = stderr_cap
+                partial = stdout_cap.read_all()
+                err_partial = stderr_cap.read_all() if stderr_cap else ''
+                combined = partial + (
+                    f'\n[stderr so far]:\n{err_partial}' if err_partial else ''
+                )
+                return combined, '', -2
+
+            if now - wall_start >= hard_limit:
+                # Hard wall-clock safety-net — kill (same as original behaviour).
+                logger.warning(
+                    'Hard timeout after %ss; killing subprocess', hard_limit
+                )
+                try:
+                    process.kill()
+                except Exception:
+                    pass
+                return '', f'Command exceeded hard timeout of {int(hard_limit)}s', 124
+
+            time.sleep(0.5)
 
     def _format_execution_observation(
         self, command: str, stdout: str, stderr: str, exit_code: int
