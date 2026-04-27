@@ -14,7 +14,20 @@ from collections import deque
 from typing import Any
 from unittest.mock import MagicMock
 
+from backend.context.compactor.strategies.conversation_window_compactor import (
+    ConversationWindowCompactor,
+)
+from backend.engine.memory_manager import ContextMemoryManager
+from backend.engine.tools.working_memory import get_working_memory_prompt_block
+from backend.engine.tools.working_memory import (
+    build_working_memory_action as build_working_memory_action,
+)
 from backend.ledger.action import ActionSecurityRisk
+from backend.ledger.action.files import FileEditAction
+from backend.ledger.action.message import MessageAction, SystemMessageAction
+from backend.ledger.event import EventSource
+from backend.ledger.observation.error import ErrorObservation
+from backend.ledger.observation.files import FileEditObservation
 from backend.orchestration.agent_circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerConfig,
@@ -345,6 +358,101 @@ class TestMemoryPressureCompactorWiring:
         assert pressure3 is None
         # Events returned as-is (View)
         assert result.events == ['e1', 'e2']
+
+
+class TestLongSessionCompactionInvariants:
+    def test_repeated_compaction_preserves_task_roots_and_recovery_artifacts(
+        self, monkeypatch, tmp_path
+    ):
+        monkeypatch.setattr(
+            'backend.core.workspace_resolution.workspace_agent_state_dir',
+            lambda project_root=None: tmp_path,
+        )
+
+        build_working_memory_action(
+            {
+                'command': 'update',
+                'section': 'plan',
+                'content': 'Keep the parser fix moving forward.',
+            }
+        )
+
+        manager = ContextMemoryManager(MagicMock(compactor_config=None), MagicMock())
+        manager.compactor = ConversationWindowCompactor(max_events=4)
+
+        system = SystemMessageAction(content='system prompt')
+        system.id = 0
+        system.source = EventSource.AGENT
+
+        user = MessageAction(content='Fix the parser bug and keep tests green.')
+        user.id = 1
+        user.source = EventSource.USER
+
+        file_edit = FileEditAction(
+            path='src/main.py',
+            command='replace_text',
+            old_str='old',
+            new_str='new',
+        )
+        file_edit.id = 2
+        file_edit.source = EventSource.AGENT
+
+        file_edit_result = FileEditObservation(
+            content='updated src/main.py',
+            path='src/main.py',
+            old_content='old',
+            new_content='new',
+            prev_exist=True,
+        )
+        file_edit_result.id = 3
+        file_edit_result.source = EventSource.ENVIRONMENT
+        file_edit_result.cause = file_edit.id
+
+        error = ErrorObservation(content='AssertionError: parser still fails')
+        error.id = 4
+        error.source = EventSource.ENVIRONMENT
+
+        filler_events: list[MessageAction] = []
+        for event_id in range(5, 11):
+            filler = MessageAction(content=f'filler-{event_id}')
+            filler.id = event_id
+            filler.source = EventSource.AGENT
+            filler_events.append(filler)
+
+        state = State(session_id='long-session')
+        state.history = [system, user, file_edit, file_edit_result, error, *filler_events]
+
+        first = manager.condense_history(state)
+        assert first.pending_action is not None
+        first.pending_action.id = 11
+        first.pending_action.source = EventSource.AGENT
+        state.history.append(first.pending_action)
+
+        for event_id in range(12, 17):
+            filler = MessageAction(content=f'post-condense-{event_id}')
+            filler.id = event_id
+            filler.source = EventSource.AGENT
+            state.history.append(filler)
+
+        second = manager.condense_history(state)
+        assert second.pending_action is not None
+        second.pending_action.id = 17
+        second.pending_action.source = EventSource.AGENT
+        state.history.append(second.pending_action)
+
+        visible_ids = {event.id for event in state.view.events}
+        assert user.id in visible_ids
+        assert file_edit.id in visible_ids
+        assert file_edit_result.id in visible_ids
+        assert 5 not in visible_ids
+
+        restored = manager.get_restored_context()
+        assert '<RESTORED_CONTEXT>' in restored
+        assert 'src/main.py' in restored
+        assert 'AssertionError: parser still fails' in restored
+
+        working_memory = get_working_memory_prompt_block()
+        assert 'Keep the parser fix moving forward.' in working_memory
 
 
 # ================================================================== #
