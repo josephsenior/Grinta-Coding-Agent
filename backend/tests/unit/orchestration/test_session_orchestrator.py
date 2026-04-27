@@ -3,11 +3,15 @@
 
 import asyncio
 import unittest
+from types import SimpleNamespace
+from typing import cast
+import pytest
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from backend.core.enums import LifecyclePhase
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
+from backend.orchestration.orchestration_config import OrchestrationConfig
 from backend.orchestration.session_orchestrator import (
     ERROR_ACTION_NOT_EXECUTED_ERROR,
     ERROR_ACTION_NOT_EXECUTED_STOPPED,
@@ -95,6 +99,113 @@ class TestSessionOrchestratorProperties(unittest.TestCase):
 
     def test_task_id_equals_id(self):
         self.assertEqual(self.ctrl.task_id, self.ctrl.id)
+
+
+@pytest.mark.asyncio
+async def test_init_registers_main_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_loops: list[asyncio.AbstractEventLoop] = []
+
+    def _noop(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+
+    def _initialize_stuck(state: object) -> None:
+        del state
+
+    def _initialize_autonomy(agent: object) -> None:
+        del agent
+
+    def _initialize_operation_pipeline(middlewares: object) -> None:
+        del middlewares
+
+    def _make_mock() -> MagicMock:
+        return MagicMock()
+
+    def _make_scheduler(enabled: object) -> MagicMock:
+        return MagicMock(enabled=enabled)
+
+    def _disable_pipeline(_controller: SessionOrchestrator) -> None:
+        return None
+
+    def _record_main_loop(loop: asyncio.AbstractEventLoop | None = None) -> None:
+        captured_loops.append(loop if loop is not None else asyncio.get_running_loop())
+
+    class FakeServices:
+        def __init__(self, controller: SessionOrchestrator) -> None:
+            self._controller = controller
+            self.lifecycle = SimpleNamespace(
+                initialize_core_attributes=_noop,
+                initialize_state_and_tracking=self._initialize_state_and_tracking,
+                initialize_agent_configs=_noop,
+            )
+            self.stuck = SimpleNamespace(initialize=_initialize_stuck)
+            self.autonomy = SimpleNamespace(initialize=_initialize_autonomy)
+            self.retry = SimpleNamespace(initialize=_make_mock)
+            self.context = SimpleNamespace(
+                initialize_operation_pipeline=_initialize_operation_pipeline
+            )
+
+        def _initialize_state_and_tracking(
+            self, *args: object, **kwargs: object
+        ) -> None:
+            del args, kwargs
+            self._controller.state_tracker = MagicMock()
+            self._controller.state_tracker.state = MagicMock()
+
+    monkeypatch.setattr(
+        'backend.orchestration.session_orchestrator.OrchestrationServices',
+        FakeServices,
+    )
+    monkeypatch.setattr(
+        'backend.orchestration.session_orchestrator.LLMRateGovernor',
+        _make_mock,
+    )
+    monkeypatch.setattr(
+        'backend.orchestration.session_orchestrator.MemoryPressureMonitor',
+        _make_mock,
+    )
+    monkeypatch.setattr(
+        'backend.orchestration.session_orchestrator.ActionScheduler',
+        _make_scheduler,
+    )
+    monkeypatch.setattr(
+        'backend.orchestration.session_orchestrator.SessionOrchestrator._initialize_operation_pipeline',
+        _disable_pipeline,
+    )
+    monkeypatch.setattr(
+        'backend.orchestration.session_orchestrator.set_main_event_loop',
+        _record_main_loop,
+    )
+
+    config = cast(
+        OrchestrationConfig,
+        SimpleNamespace(
+            pending_action_timeout=30.0,
+            sid='test-sid',
+            event_stream=MagicMock(),
+            agent=MagicMock(),
+            user_id=None,
+            file_store=MagicMock(),
+            headless_mode=False,
+            conversation_stats=MagicMock(),
+            status_callback=None,
+            security_analyzer=None,
+            initial_state=None,
+            iteration_delta=10,
+            budget_per_task_delta=1.0,
+            confirmation_mode=None,
+            replay_events=None,
+            agent_to_llm_config={},
+            agent_configs={},
+            enable_parallel_tool_scheduling=False,
+        ),
+    )
+
+    SessionOrchestrator(config)
+    running_loop = asyncio.get_running_loop()
+
+    assert captured_loops == [running_loop]
 
 
 # ── Service aliasing ────────────────────────────────────────────────

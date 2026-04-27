@@ -8,7 +8,7 @@ import time
 from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from backend.utils.async_utils import run_or_schedule
+from backend.utils.async_utils import run_or_schedule, set_main_event_loop
 
 if TYPE_CHECKING:
     from backend.core.config import AgentConfig, LLMConfig
@@ -193,6 +193,8 @@ class SessionOrchestrator:
             )
         except RuntimeError:
             self._main_loop = None
+        if self._main_loop is not None:
+            set_main_event_loop(self._main_loop)
 
         # Attributes set by telemetry service during pipeline initialization
         self._reflection_middleware_enabled: bool = False

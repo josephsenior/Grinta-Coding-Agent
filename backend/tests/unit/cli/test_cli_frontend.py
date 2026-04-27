@@ -1458,6 +1458,24 @@ async def test_wait_for_agent_idle_default_timeout_disabled(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
+async def test_wait_for_agent_idle_uses_controller_idle_state_when_renderer_is_stale() -> None:
+    repl = Repl(_make_config(), _make_console())
+    renderer = CLIEventRenderer(
+        _make_console(),
+        HUDBar(),
+        ReasoningDisplay(),
+        loop=asyncio.get_running_loop(),
+    )
+    repl.set_renderer(renderer)
+    renderer._current_state = AgentState.RUNNING
+
+    controller = MagicMock()
+    controller.get_agent_state.return_value = AgentState.AWAITING_USER_INPUT
+
+    await asyncio.wait_for(repl._wait_for_agent_idle(controller, None), timeout=0.2)
+
+
+@pytest.mark.asyncio
 async def test_wait_for_agent_idle_rate_limited_not_treated_as_idle() -> None:
     """RATE_LIMITED must not end _wait_for_agent_idle while backoff is pending.
 

@@ -1698,14 +1698,14 @@ class Repl:
             # where Live.update() happens during agent execution.
             if renderer is not None:
                 renderer.drain_events()
-                state = renderer.current_state or controller.get_agent_state()
+                state = controller.get_agent_state()
             else:
                 state = controller.get_agent_state()
 
             if state in idle_states:
                 if renderer is not None:
                     await self._drain_renderer_until_settled(renderer)
-                    state = renderer.current_state or controller.get_agent_state()
+                    state = controller.get_agent_state()
                 if state == AgentState.AWAITING_USER_CONFIRMATION:
                     await self._handle_confirmation(controller)
                     continue
