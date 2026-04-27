@@ -14,9 +14,14 @@ from pathlib import Path
 from backend.execution.utils.git_common import get_valid_git_ref, run_git_cmd
 
 try:
-    from backend.core.constants import MAX_FILE_SIZE_FOR_GIT_DIFF
+    from backend.core.constants import (
+        MAX_FILE_SIZE_FOR_GIT_DIFF as IMPORTED_MAX_FILE_SIZE_FOR_GIT_DIFF,
+    )
 except ImportError:
-    MAX_FILE_SIZE_FOR_GIT_DIFF = 1024 * 1024
+    IMPORTED_MAX_FILE_SIZE_FOR_GIT_DIFF = 1024 * 1024
+
+
+MAX_FILE_SIZE_FOR_GIT_DIFF = IMPORTED_MAX_FILE_SIZE_FOR_GIT_DIFF
 
 
 def get_closest_git_repo(path: Path) -> Path | None:
@@ -76,7 +81,7 @@ def get_git_diff(relative_file_path: str) -> dict[str, str]:
 
 
 def _fallback_print(
-    obj,
+    obj: object,
 ) -> None:  # pragma: no cover - exercised via tests with patched stdout
     try:
         sys.stdout.write(json.dumps(obj, ensure_ascii=False, default=str) + '\n')

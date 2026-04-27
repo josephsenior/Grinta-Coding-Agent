@@ -412,8 +412,11 @@ class BashSession(BaseShellSession):
         if os.name == 'nt':
             return False
         try:
-            uid = int(os.geteuid())  # pyright: ignore[reportAttributeAccessIssue]
-        except (AttributeError, OSError, TypeError, ValueError):
+            uid_getter = os.__dict__.get('geteuid')
+            if uid_getter is None or not callable(uid_getter):
+                return False
+            uid = int(uid_getter())
+        except (OSError, TypeError, ValueError):
             return False
         if uid != 0:
             return False
@@ -642,7 +645,7 @@ class BashSession(BaseShellSession):
                 stdout_raw = getattr(result, 'stdout', None)
                 stdout: list[str] = []
                 if isinstance(stdout_raw, list):
-                    stdout_items = cast(list[Any], stdout_raw)
+                    stdout_items = cast(list[object], stdout_raw)
                     stdout = [item for item in stdout_items if isinstance(item, str)]
                 if stdout:
                     candidate = stdout[0].strip()

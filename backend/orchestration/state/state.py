@@ -13,7 +13,7 @@ import backend
 from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
-from backend.core.task_status import TASK_STATUS_TODO, normalize_task_status
+from backend.core.task_status import TASK_STATUS_DONE, TASK_STATUS_TODO, normalize_task_status
 from backend.inference.metrics import Metrics
 from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import PlaybookFinishAction
@@ -198,16 +198,25 @@ def normalize_plan_step_payload(step: Any, idx: int | None = None) -> dict[str, 
         msg = "Plan step 'tags' must be a list"
         raise TypeError(msg)
 
+    normalized_subtasks = [
+        normalize_plan_step_payload(substep, i + 1)
+        for i, substep in enumerate(subtasks)
+    ]
+
+    # Auto-propagate: if all subtasks exist and are all done, the parent is done too.
+    resolved_status = _normalize_plan_step_status(step.get('status'))
+    if normalized_subtasks and all(
+        s['status'] == TASK_STATUS_DONE for s in normalized_subtasks
+    ):
+        resolved_status = TASK_STATUS_DONE
+
     return {
         'id': str(step.get('id') or fallback_id),
         'description': str(step.get('description') or 'Untitled step'),
-        'status': _normalize_plan_step_status(step.get('status')),
+        'status': resolved_status,
         'result': step.get('result'),
         'tags': [str(tag) for tag in tags],
-        'subtasks': [
-            normalize_plan_step_payload(substep, i + 1)
-            for i, substep in enumerate(subtasks)
-        ],
+        'subtasks': normalized_subtasks,
     }
 
 

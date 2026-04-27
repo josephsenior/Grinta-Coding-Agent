@@ -20,10 +20,15 @@ class ErrorObservation(Observation):
 
     Leave ``notify_ui_only`` false for **capability / tool** outcomes (MCP unreachable,
     command failed, file errors, etc.) so the agent still sees actionable feedback.
+
+    ``agent_only`` marks **internal system feedback** that is only intended for the
+    agent (e.g. "FINISH BLOCKED" task-tracker messages): the observation is kept in
+    model context but is NOT rendered in the user-facing transcript.
     """
 
     error_id: str = ''
     notify_ui_only: bool = False
+    agent_only: bool = False
     observation: ClassVar[str] = ObservationType.ERROR
 
     @property

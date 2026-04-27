@@ -205,7 +205,7 @@ class TaskValidationService:
         from backend.ledger.observation_cause import attach_observation_cause
 
         controller = self._context.get_controller()
-        error_obs = ErrorObservation(content=message, error_id=error_id)
+        error_obs = ErrorObservation(content=message, error_id=error_id, agent_only=True)
         attach_observation_cause(
             error_obs,
             cause_action,

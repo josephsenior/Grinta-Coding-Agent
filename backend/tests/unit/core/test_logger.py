@@ -164,6 +164,7 @@ class TestAppLoggerAdapter:
     def test_bind_override_existing(self):
         adapter = AppLoggerAdapter(extra={'trace_id': 'old'})
         bound = adapter.bind(trace_id='new')
+        assert bound.extra is not None
         assert bound.extra['trace_id'] == 'new'
 
     def test_process_merges_extra_in_kwargs(self):
@@ -185,6 +186,7 @@ class TestBindContext:
         logger = logging.getLogger('test_bind')
         adapter = bind_context(logger, trace_id='t1')
         assert isinstance(adapter, AppLoggerAdapter)
+        assert adapter.extra is not None
         assert adapter.extra['trace_id'] == 't1'
 
     def test_with_adapter(self):

@@ -10,6 +10,7 @@ import pytest
 from backend.core.bootstrap.main import (
     _create_early_status_callback,
     _create_event_handler,
+    _detach_and_close_event_stream,
     _execute_controller_lifecycle,
     _initialize_session_components,
     _prepare_final_state,
@@ -116,6 +117,16 @@ def test_prepare_final_state():
     mock_controller._force_iteration_reset = True
     res = _prepare_final_state(mock_controller)
     assert res.iteration_flag.current_value == 0
+
+
+def test_detach_and_close_event_stream_prefers_runtime_rebind() -> None:
+    runtime = MagicMock()
+    event_stream = MagicMock()
+
+    _detach_and_close_event_stream(runtime, event_stream)
+
+    runtime.rebind_event_stream.assert_called_once_with(None)
+    event_stream.close.assert_called_once_with()
 
 
 @patch('backend.core.bootstrap.main.create_registry_and_conversation_stats')
@@ -321,3 +332,5 @@ async def test_execute_controller_lifecycle(
     mock_sm.assert_called()
     mock_create_c.assert_called()
     mock_run_loop.assert_called()
+    mock_runtime.rebind_event_stream.assert_called_once_with(None)
+    mock_runtime.event_stream.close.assert_called_once_with()

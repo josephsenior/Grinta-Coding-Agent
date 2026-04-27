@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 
 from backend.core.constants import MAX_LINES_TO_EDIT
 from backend.core.logger import app_logger as logger
@@ -108,7 +108,8 @@ def get_new_file_contents(
                 ),
             },
         ]
-        resp = llm.completion(messages=messages)
+        completion = cast(Callable[..., dict[str, Any]], cast(Any, llm).completion)
+        resp = completion(messages=messages)
         new_contents = _extract_code(resp['choices'][0]['message']['content'])
         if new_contents is not None:
             return new_contents
@@ -121,9 +122,11 @@ class FileEditRuntimeInterface(Protocol):
 
     async def read(self, path: str) -> str:
         """Read file contents from runtime."""
+        ...
 
     async def write(self, action: FileWriteAction) -> Observation:
         """Write file (must be implemented by subclass)."""
+        ...
 
 
 class FileEditRuntimeMixin(ABC):
@@ -237,11 +240,11 @@ class FileEditRuntimeMixin(ABC):
                     new_content=new_content,
                 )
                 error_message = (
-                    f'\n[Linting failed for edited file {filepath}. {
-                        len(updated_lint_error)
-                    } lint errors found.]\n[begin attempted changes]\n{
-                        _obs.visualize_diff(change_applied=False)
-                    }\n[end attempted changes]\n'
+                    f'\n[Linting failed for edited file {filepath}. '
+                    f'{len(updated_lint_error)} lint errors found.]\n'
+                    f'[begin attempted changes]\n'
+                    f'{_obs.visualize_diff(change_applied=False)}\n'
+                    f'[end attempted changes]\n'
                     + '-' * 40
                     + '\n'
                 )
@@ -314,9 +317,12 @@ class FileEditRuntimeMixin(ABC):
         original_content: str,
     ) -> str:
         """Build error message with relevant snippets when edit range is too long."""
-        error_msg = f'[Edit error: The range of lines to edit is too long.]\n[The maximum number of lines allowed to edit at once is {
-            MAX_LINES_TO_EDIT
-        }. Got (L{start_idx + 1}-L{end_idx}) {length_of_range} lines.]\n'
+        error_msg = (
+            f'[Edit error: The range of lines to edit is too long.]\n'
+            f'[The maximum number of lines allowed to edit at once is '
+            f'{MAX_LINES_TO_EDIT}. Got (L{start_idx + 1}-L{end_idx}) '
+            f'{length_of_range} lines.]\n'
+        )
 
         topk_chunks: list[Chunk] = get_top_k_chunk_matches(
             text=original_content,
@@ -330,9 +336,11 @@ class FileEditRuntimeMixin(ABC):
 
         for i, chunk in enumerate(topk_chunks):
             line_mid = (chunk.line_range[0] + chunk.line_range[1]) // 2
-            error_msg += f'[begin relevant snippet {i + 1}. Line range: L{
-                chunk.line_range[0]
-            }-L{chunk.line_range[1]}. Similarity: {chunk.normalized_lcs}]\n'
+            error_msg += (
+                f'[begin relevant snippet {i + 1}. Line range: '
+                f'L{chunk.line_range[0]}-L{chunk.line_range[1]}. '
+                f'Similarity: {chunk.normalized_lcs}]\n'
+            )
             error_msg += (
                 f'[Browse around it via `open_file("{action.path}", {line_mid})`]\n'
             )
@@ -341,11 +349,12 @@ class FileEditRuntimeMixin(ABC):
             error_msg += '-' * 40 + '\n'
 
         error_msg += 'Consider using `open_file` to explore around the relevant snippets if needed.\n'
-        error_msg += f'**IMPORTANT**: Please REDUCE the range of edits to less than {
-            MAX_LINES_TO_EDIT
-        } lines by setting `start` and `end` in the edit action (e.g. `<file_edit path="{
-            action.path
-        }" start=[PUT LINE NUMBER HERE] end=[PUT LINE NUMBER HERE] />`). '
+        error_msg += (
+            f'**IMPORTANT**: Please REDUCE the range of edits to less than '
+            f'{MAX_LINES_TO_EDIT} lines by setting `start` and `end` in the '
+            f'edit action (e.g. `<file_edit path="{action.path}" '
+            'start=[PUT LINE NUMBER HERE] end=[PUT LINE NUMBER HERE] />`). '
+        )
         return error_msg
 
     def _perform_llm_edit(
@@ -490,7 +499,7 @@ class FileEditRuntimeMixin(ABC):
         length_of_range = end_idx - start_idx
         return start_idx, end_idx, length_of_range
 
-    def check_retry_num(self, retry_num):
+    def check_retry_num(self, retry_num: int) -> bool:
         """Check if retry limit exceeded for LLM-based correction.
 
         Args:
@@ -520,13 +529,19 @@ class FileEditRuntimeMixin(ABC):
         """
         import backend.engine.function_calling as orchestrator_function_calling
         from backend.engine.tools import create_llm_based_edit_tool
-        from backend.inference.llm_utils import check_tools
+        from backend.inference import llm_utils
 
         _retry_num = retry_num + 1
         if self.check_retry_num(_retry_num):
             return error_obs
         draft_llm = self._require_draft_editor_llm()
-        tools = check_tools([dict(create_llm_based_edit_tool())], draft_llm.config)
+        llm_utils_any: Any = llm_utils
+        check_tools = cast(
+            Callable[[list[dict[str, Any]], Any], list[dict[str, Any]]],
+            llm_utils_any.check_tools,
+        )
+        edit_tool = cast(dict[str, Any], dict(create_llm_based_edit_tool()))
+        tools = check_tools([edit_tool], draft_llm.config)
         messages = [
             {'role': 'system', 'content': CORRECT_SYS_MSG},
             {
@@ -536,9 +551,10 @@ class FileEditRuntimeMixin(ABC):
                 ),
             },
         ]
-        params: dict = {'messages': messages, 'tools': tools}
+        params: dict[str, Any] = {'messages': messages, 'tools': tools}
         try:
-            response = draft_llm.completion(**params)
+            completion = cast(Callable[..., Any], cast(Any, draft_llm).completion)
+            response = completion(**params)
             actions = orchestrator_function_calling.response_to_actions(response)
             if len(actions) != 1:
                 return error_obs

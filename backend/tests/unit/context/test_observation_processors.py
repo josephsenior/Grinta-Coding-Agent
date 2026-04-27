@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from backend.context.pre_condensation_snapshot import save_snapshot
+from backend.context.message_formatting import extract_first_text
 from backend.context.observation_processors import (
     _get_observation_content,
     _handle_simple_observation,
     convert_observation_to_message,
 )
+from backend.context.pre_condensation_snapshot import save_snapshot
 from backend.core.message import TextContent
 from backend.ledger.observation import (
     CmdOutputObservation,
@@ -150,11 +151,13 @@ class TestConvertObservation:
         obs = AgentCondensationObservation(content='summary')
 
         first = convert_observation_to_message(obs, max_message_chars=None)
-        first_text = first.content[0].text
+        first_text = extract_first_text(first)
+        assert first_text is not None
         assert '<RESTORED_CONTEXT>' in first_text
         assert 'src/main.py' in first_text
         assert 'failure' in first_text
 
         second = convert_observation_to_message(obs, max_message_chars=None)
-        second_text = second.content[0].text
+        second_text = extract_first_text(second)
+        assert second_text is not None
         assert '<RESTORED_CONTEXT>' not in second_text

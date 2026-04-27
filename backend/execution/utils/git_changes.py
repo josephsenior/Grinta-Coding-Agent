@@ -56,7 +56,7 @@ def _normalize_status(
 def get_changes_in_repo(repo_dir: str) -> list[dict[str, str]]:
     """Get all changes in a git repository."""
     ref = get_valid_git_ref(repo_dir)
-    changed_files = []
+    changed_files: list[str] = []
     try:
         run_git_cmd('git rev-parse --is-inside-work-tree', repo_dir)
     except RuntimeError:
@@ -73,7 +73,7 @@ def get_changes_in_repo(repo_dir: str) -> list[dict[str, str]]:
         changed_files.extend(untracked_files)
     except RuntimeError:
         pass
-    changes = []
+    changes: list[dict[str, str]] = []
     for line in changed_files:
         changes.extend(_parse_git_status_line(line, changed_files))
     return changes

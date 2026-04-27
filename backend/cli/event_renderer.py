@@ -1578,6 +1578,10 @@ class CLIEventRenderer:
         self._pending_activity_card: PendingActivityCard | None = None
         #: First tool/shell row each turn prints a small section marker for scanability.
         self._activity_turn_header_emitted: bool = False
+        #: Finish summary text buffered from PlaybookFinishAction; rendered only
+        #: once the agent actually reaches AgentState.FINISHED (validation may
+        #: block the finish call and keep the agent running).
+        self._pending_finish_text: str | None = None
         #: Monotonic timestamp of the last Live refresh (for throttling).
         self._last_refresh_time: float = 0.0
         #: Last reasoning lines committed to transcript (for prefix de-dup per turn).
@@ -2628,9 +2632,13 @@ class CLIEventRenderer:
             self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
+            # Buffer the finish text — do NOT render it yet.  The validation
+            # service may still block this finish call (e.g. incomplete todo
+            # list), in which case the agent will keep running and the summary
+            # would be misleadingly shown.  _handle_state_change renders it
+            # once the agent actually reaches AgentState.FINISHED.
             finish_text = _sanitize_visible_transcript_text(action.message or '')
-            if finish_text:
-                self._append_assistant_message(finish_text)
+            self._pending_finish_text = finish_text or None
             self.refresh()
             return
 
@@ -2969,6 +2977,11 @@ class CLIEventRenderer:
             return
 
         if isinstance(obs, ErrorObservation):
+            # agent_only observations are internal system feedback (e.g.
+            # "FINISH BLOCKED"). The agent still receives them in context, but
+            # they must not appear in the user-facing transcript.
+            if getattr(obs, 'agent_only', False):
+                return
             self._stop_reasoning()
             self._flush_pending_tool_cards()
             self._clear_streaming_preview()
@@ -3398,6 +3411,9 @@ class CLIEventRenderer:
         elif state == AgentState.RUNNING:
             self._hud.update_ledger('Healthy')
             self._hud.update_agent_state('Running')
+            # Finish was blocked — discard the buffered completion text so it
+            # never appears while the agent is still working.
+            self._pending_finish_text = None
 
         if state == AgentState.AWAITING_USER_CONFIRMATION:
             self._flush_pending_tool_cards()
@@ -3424,6 +3440,12 @@ class CLIEventRenderer:
             self._flush_pending_tool_cards()
             self._stop_reasoning()
             self._clear_streaming_preview()
+            # Render the finish summary that was buffered when PlaybookFinishAction
+            # arrived — we deferred it to here so it only appears when the finish
+            # actually went through (not when validation blocks it).
+            if self._pending_finish_text:
+                self._append_assistant_message(self._pending_finish_text)
+                self._pending_finish_text = None
             return
 
         if state == AgentState.ERROR:

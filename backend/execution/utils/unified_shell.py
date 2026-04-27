@@ -21,8 +21,8 @@ from backend.execution.sandboxing import (
 from backend.execution.utils.tool_registry import resolve_windows_powershell_preference
 
 if TYPE_CHECKING:
-    from backend.execution.utils.server_detector import DetectedServer
     from backend.execution.utils.process_registry import TaskCancellationService
+    from backend.execution.utils.server_detector import DetectedServer
     from backend.ledger.action import CmdRunAction
     from backend.ledger.observation import Observation
 

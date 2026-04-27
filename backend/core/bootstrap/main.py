@@ -465,43 +465,70 @@ async def _execute_controller_lifecycle(
     event_stream = runtime.event_stream
     if event_stream is None:
         raise RuntimeError('Runtime does not have an event stream')
-    resolved_memory = await _setup_memory_and_mcp(
-        config_,
-        runtime,
-        session_id,
-        repo_directory,
-        memory,
-        conversation_instructions,
-        agent,
-    )
-    replay_events, initial_action = _setup_replay_events(config_, initial_action)
-    controller, initial_state = create_controller(
-        agent,
-        runtime,
-        config_,
-        conversation_stats,
-        replay_events=replay_events,
-    )
-    setattr(runtime, 'controller', controller)  # retain for trajectory saving
-    _attach_status_callback(resolved_memory, controller)
-    _validate_initial_action(initial_action)
-    logger.debug(
-        'Agent Controller Initialized: Running agent %s, model %s, with actions: %s',
-        agent.name,
-        agent.llm.config.model,
-        initial_action,
-    )
-    _setup_initial_events(event_stream, initial_action, initial_state)
-    _subscribe_controller_events(
-        config_,
-        event_stream,
-        exit_on_message,
-        fake_user_response_fn,
-        controller,
-    )
-    await _run_agent_loop(controller, runtime, resolved_memory)
-    await _persist_controller_state(config_, controller, event_stream)
-    return _prepare_final_state(controller)
+    try:
+        resolved_memory = await _setup_memory_and_mcp(
+            config_,
+            runtime,
+            session_id,
+            repo_directory,
+            memory,
+            conversation_instructions,
+            agent,
+        )
+        replay_events, initial_action = _setup_replay_events(config_, initial_action)
+        controller, initial_state = create_controller(
+            agent,
+            runtime,
+            config_,
+            conversation_stats,
+            replay_events=replay_events,
+        )
+        setattr(runtime, 'controller', controller)  # retain for trajectory saving
+        _attach_status_callback(resolved_memory, controller)
+        _validate_initial_action(initial_action)
+        logger.debug(
+            'Agent Controller Initialized: Running agent %s, model %s, with actions: %s',
+            agent.name,
+            agent.llm.config.model,
+            initial_action,
+        )
+        _setup_initial_events(event_stream, initial_action, initial_state)
+        _subscribe_controller_events(
+            config_,
+            event_stream,
+            exit_on_message,
+            fake_user_response_fn,
+            controller,
+        )
+        await _run_agent_loop(controller, runtime, resolved_memory)
+        await _persist_controller_state(config_, controller, event_stream)
+        return _prepare_final_state(controller)
+    finally:
+        _detach_and_close_event_stream(runtime, event_stream)
+
+
+def _detach_and_close_event_stream(runtime: Runtime, event_stream: EventStream) -> None:
+    """Detach the current runtime binding and close the conversation stream."""
+    rebind_event_stream = getattr(runtime, 'rebind_event_stream', None)
+    if callable(rebind_event_stream):
+        try:
+            rebind_event_stream(None)
+        except Exception:
+            logger.debug('Failed to detach runtime event stream', exc_info=True)
+    elif getattr(runtime, 'event_stream', None) is event_stream:
+        try:
+            runtime.event_stream = None
+        except Exception:
+            logger.debug('Failed to clear runtime event stream binding', exc_info=True)
+
+    try:
+        event_stream.close()
+    except Exception:
+        logger.debug(
+            'Failed to close event stream for session %s',
+            getattr(event_stream, 'sid', '<unknown>'),
+            exc_info=True,
+        )
 
 
 def _attach_status_callback(memory: Memory, controller) -> None:

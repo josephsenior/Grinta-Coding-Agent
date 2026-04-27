@@ -219,7 +219,7 @@ class TraceContextFilter(logging.Filter):
     """Injects thread-local trace context keys into log records."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        ctx: dict[str, Any] = getattr(_TRACE_LOCAL, "context", None) or {}
+        ctx: dict[str, Any] = getattr(_TRACE_LOCAL, 'context', None) or {}
         for k, v in ctx.items():
             if not hasattr(record, k):
                 setattr(record, k, v)
@@ -237,15 +237,15 @@ class OpenTelemetryTraceFilter(logging.Filter):
             if span is None:
                 return True
             ctx = span.get_span_context()
-            if not getattr(ctx, "is_valid", False):
+            if not getattr(ctx, 'is_valid', False):
                 return True
 
-            trace_id_hex = f"{ctx.trace_id:032x}"
-            span_id_hex = f"{ctx.span_id:016x}"
+            trace_id_hex = f'{ctx.trace_id:032x}'
+            span_id_hex = f'{ctx.span_id:016x}'
 
-            if not hasattr(record, "trace_id"):
+            if not hasattr(record, 'trace_id'):
                 record.trace_id = trace_id_hex
-            if not hasattr(record, "span_id"):
+            if not hasattr(record, 'span_id'):
                 record.span_id = span_id_hex
         except Exception:
             pass

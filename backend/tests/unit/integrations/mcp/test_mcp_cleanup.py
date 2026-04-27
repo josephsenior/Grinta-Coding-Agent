@@ -11,9 +11,13 @@ Covers:
 
 from __future__ import annotations
 
+import asyncio
+from typing import Any, cast
+
 import pytest
 
 from backend.core.config.mcp_config import MCPServerConfig
+from backend.integrations.mcp.client import MCPClient
 from backend.integrations.mcp.mcp_utils import (
     _apply_exa_mcp_url_auth,
     _resolve_server_env,
@@ -195,6 +199,32 @@ class TestResolveServerEnv:
         monkeypatch.setenv('GITHUB_TOKEN', 'ghp_from_github_token')
         resolved = _resolve_server_env({'GITHUB_PERSONAL_ACCESS_TOKEN': ''})
         assert resolved == {}
+
+
+class _CancelOnExitClient:
+    def __init__(self) -> None:
+        self.closed = False
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        raise asyncio.CancelledError()
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+class TestMcpDisconnectCleanup:
+    @pytest.mark.asyncio
+    async def test_disconnect_swallows_cancelled_error_from_aexit(self) -> None:
+        transport = _CancelOnExitClient()
+        client = MCPClient()
+        client.client = cast(Any, transport)
+        client._session_active = True
+
+        await client.disconnect()
+
+        assert transport.closed is True
+        assert client.client is None
+        assert client._session_active is False
 
 
 class TestPromptMcpSection:

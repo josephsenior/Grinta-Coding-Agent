@@ -145,8 +145,19 @@ class MCPClient(BaseModel):
             return
         cli = self.client
         try:
-            await self._close_client_context(cli)
-            await self._close_client_transport(cli)
+            try:
+                await self._close_client_context(cli)
+            except asyncio.CancelledError:
+                logger.debug(
+                    'MCP session __aexit__ cancelled during teardown; treating as closed'
+                )
+
+            try:
+                await self._close_client_transport(cli)
+            except asyncio.CancelledError:
+                logger.debug(
+                    'MCP client.close() cancelled during teardown; treating as closed'
+                )
         finally:
             self._session_active = False
 

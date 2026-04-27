@@ -2617,6 +2617,7 @@ async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> 
 @pytest.mark.asyncio
 async def test_renderer_renders_finish_action_message_and_next_steps() -> None:
     from backend.ledger.action import PlaybookFinishAction
+    from backend.ledger.observation.agent import AgentStateChangedObservation
 
     console = _make_console()
     hud = HUDBar()
@@ -2636,6 +2637,16 @@ async def test_renderer_renders_finish_action_message_and_next_steps() -> None:
     action.source = EventSource.AGENT
 
     await renderer.handle_event(action)
+
+    # Finish text is buffered until AgentState.FINISHED — not shown yet
+    assert 'Completed the Markdown to HTML converter.' not in _console_output(console)
+
+    # Simulate the orchestrator confirming the finish
+    finished_obs = AgentStateChangedObservation(
+        content='', agent_state=AgentState.FINISHED
+    )
+    finished_obs.source = EventSource.ENVIRONMENT
+    await renderer.handle_event(finished_obs)
 
     output = _console_output(console)
     assert 'Completed the Markdown to HTML converter.' in output
