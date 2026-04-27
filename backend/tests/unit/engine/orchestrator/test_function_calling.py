@@ -356,7 +356,8 @@ class TestHandleTaskTrackerTool:
         action = cast(TaskTrackingAction, _handle_task_tracker_tool(args))
         task = action.task_list[0]
         assert task['description'] == 'Top level'
-        assert task['status'] == 'todo'
+        # All subtasks are done → parent is auto-promoted to done
+        assert task['status'] == 'done'
         assert task['result'] == 'In progress note'
         assert task['subtasks'][0]['description'] == 'Child step'
         assert task['subtasks'][0]['status'] == 'done'

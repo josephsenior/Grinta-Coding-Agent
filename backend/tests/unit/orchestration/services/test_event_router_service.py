@@ -387,7 +387,8 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         plan = self.mock_controller.state.plan
         self.assertEqual(plan.steps[0].id, 'step-1')
         self.assertEqual(plan.steps[0].description, 'Top level')
-        self.assertEqual(plan.steps[0].status, 'doing')
+        # All subtasks are done → parent is auto-promoted to done
+        self.assertEqual(plan.steps[0].status, 'done')
         self.assertEqual(plan.steps[0].result, 'progress note')
         self.assertEqual(plan.steps[0].subtasks[0].id, 'step-1')
         self.assertEqual(plan.steps[0].subtasks[0].description, 'Nested child')
