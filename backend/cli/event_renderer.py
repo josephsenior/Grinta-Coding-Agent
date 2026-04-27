@@ -1543,6 +1543,8 @@ class CLIEventRenderer:
         self._last_assistant_message_text: str = ""
         self._budget_warned_80 = False
         self._budget_warned_100 = False
+        #: Running count of stream-fallback retries this session ("Still Working" panels).
+        self._stream_fallback_count: int = 0
         # Per-turn metric snapshots (used to compute deltas at turn completion)
         self._turn_start_cost: float = 0.0
         self._turn_start_tokens: int = 0
@@ -3075,6 +3077,12 @@ class CLIEventRenderer:
                     "stream timed out" in lower_c
                     or "retrying without streaming" in lower_c
                 ):
+                    self._stream_fallback_count += 1
+                    logger.warning(
+                        "stream_fallback_retry: count=%d content=%r",
+                        self._stream_fallback_count,
+                        content[:120],
+                    )
                     self._append_history(_build_llm_stream_fallback_panel())
                 elif (
                     self._pending_activity_card is not None and not force_visible_status

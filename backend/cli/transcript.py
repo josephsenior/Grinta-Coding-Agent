@@ -177,7 +177,7 @@ def format_reasoning_snapshot(lines: list[str]) -> Group:
         cleaned[-1] = f'{last}…'
     # Stronger separation from assistant Markdown (default foreground): dimmer
     # blue-gray + italic so internal reasoning never reads as the main reply.
-    return Group(*[Text(line, style='italic #64748b dim') for line in cleaned])
+    return Group(*[Text(line, style='italic #7e99b5') for line in cleaned])
 
 
 def format_activity_shell_block(
