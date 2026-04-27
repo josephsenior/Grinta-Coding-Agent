@@ -47,7 +47,7 @@ from backend.engine.tools.browser_native import (
 from backend.engine.tools.checkpoint import (
     CHECKPOINT_TOOL_NAME,
 )
-from backend.engine.tools.debugger import DEBUGGER_TOOL_NAME, PYTHON_DEBUGGER_TOOL_NAME
+from backend.engine.tools.debugger import DEBUGGER_TOOL_NAME
 from backend.engine.tools.delegate_task import (
     DELEGATE_TASK_TOOL_NAME,
 )
@@ -117,9 +117,6 @@ handle_terminal_manager_tool = cast(
 )
 handle_debugger_tool = cast(
     ToolHandler, cast(Any, debugger_tools).handle_debugger_tool
-)
-handle_python_debugger_tool = cast(
-    ToolHandler, cast(Any, debugger_tools).handle_python_debugger_tool
 )
 
 # Callback for semantic recall — set by the orchestrator at init time.
@@ -1170,7 +1167,6 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         DELEGATE_TASK_TOOL_NAME: lambda args: build_delegate_task_action(dict(args)),
         CODE_INTELLIGENCE_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
         DEBUGGER_TOOL_NAME: lambda args: handle_debugger_tool(dict(args)),
-        PYTHON_DEBUGGER_TOOL_NAME: lambda args: handle_python_debugger_tool(dict(args)),
         BLACKBOARD_TOOL_NAME: lambda args: build_blackboard_action(dict(args)),
         TERMINAL_MANAGER_TOOL_NAME: lambda args: handle_terminal_manager_tool(dict(args)),
         "explore_tree_structure": lambda args: build_explore_tree_structure_action(dict(args)),

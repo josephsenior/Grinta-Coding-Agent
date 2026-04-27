@@ -7,7 +7,6 @@ from typing import Any, cast
 from backend.ledger.action.debugger import DebuggerAction
 
 DEBUGGER_TOOL_NAME = 'debugger'
-PYTHON_DEBUGGER_TOOL_NAME = 'python_debugger'
 
 
 def create_debugger_tool() -> dict[str, Any]:
@@ -178,13 +177,6 @@ def create_debugger_tool() -> dict[str, Any]:
             },
         },
     }
-
-
-def create_python_debugger_tool() -> dict[str, Any]:
-    """Compatibility wrapper; exposes the generic debugger tool."""
-    return create_debugger_tool()
-
-
 def _list_str(value: object) -> list[str]:
     if value is None:
         return []
@@ -280,10 +272,3 @@ def handle_debugger_tool(arguments: dict[str, Any]) -> DebuggerAction:
         python=arguments.get('python'),
         timeout=_opt_float(arguments.get('timeout')),
     )
-
-
-def handle_python_debugger_tool(arguments: dict[str, Any]) -> DebuggerAction:
-    """Compatibility wrapper for the former python_debugger tool name."""
-    if not arguments.get('adapter') and not arguments.get('language'):
-        arguments = {**arguments, 'adapter': 'python'}
-    return handle_debugger_tool(arguments)

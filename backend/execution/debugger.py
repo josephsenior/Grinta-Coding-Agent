@@ -820,7 +820,3 @@ class DAPDebugManager:
             'progress': True,
         }
         return observation
-
-
-PythonDebugSession = DAPDebugSession
-PythonDebugManager = DAPDebugManager

@@ -8,7 +8,6 @@ from backend.engine.tools.debugger import (
     DEBUGGER_TOOL_NAME,
     create_debugger_tool,
     handle_debugger_tool,
-    handle_python_debugger_tool,
 )
 from backend.ledger.action.debugger import DebuggerAction
 
@@ -48,15 +47,6 @@ def test_start_maps_generic_dap_args() -> None:
     assert act.breakpoints == [{'file': 'server.js', 'line': 5}]
     assert act.stop_on_entry is True
     assert act.timeout == 20.0
-
-
-def test_python_debugger_alias_sets_python_adapter() -> None:
-    act = handle_python_debugger_tool({'action': 'start', 'program': 'app.py'})
-    assert act.debug_action == 'start'
-    assert act.adapter == 'python'
-    assert act.program == 'app.py'
-
-
 def test_status_maps_session() -> None:
     act = handle_debugger_tool({'action': 'status', 'session_id': 'dbg-1'})
     assert act.debug_action == 'status'
