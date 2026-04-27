@@ -2,7 +2,7 @@
 
 import io
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 
@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 async def capture_logs(
     logger_name: str | None,
     level: int = logging.ERROR,
-) -> AsyncIterator[io.StringIO]:
+) -> AsyncGenerator[io.StringIO]:
     """Capture log output for a specific logger.
 
     Temporarily replaces logger handlers to capture log messages to a StringIO buffer.

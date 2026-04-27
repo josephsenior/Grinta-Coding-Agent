@@ -20,6 +20,7 @@ from backend.execution.watchdog import runtime_watchdog
 
 if TYPE_CHECKING:
     from backend.core.config import AppConfig
+    from backend.core.provider_types import ProviderTokenType
     from backend.execution.base import Runtime
     from backend.inference.llm_registry import LLMRegistry
     from backend.ledger.stream import EventStream
@@ -61,7 +62,7 @@ class RuntimeOrchestrator:
         session_id: str | None = None,
         agent: Agent,
         headless_mode: bool,
-        vcs_provider_tokens,
+        vcs_provider_tokens: ProviderTokenType | None,
         repo_initializer: Callable[[Runtime], str | None] | None = None,
         event_stream: EventStream | None = None,
         env_vars: dict[str, str] | None = None,

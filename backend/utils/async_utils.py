@@ -8,7 +8,7 @@ import os
 from collections.abc import Awaitable, Callable, Coroutine, Iterable
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, ParamSpec, TypeVar
 
 from backend.core.constants import GENERAL_TIMEOUT
 
@@ -18,6 +18,9 @@ _logger = logging.getLogger(__name__)
 # Without this, tasks created via ``asyncio.create_task()`` may be
 # garbage-collected before completion (CPython GC behaviour).
 _background_tasks: set[asyncio.Task[Any]] = set()
+
+_P = ParamSpec('_P')
+_R = TypeVar('_R')
 
 
 def create_tracked_task(
@@ -117,11 +120,11 @@ async def call_sync_from_async(
 
 
 def call_async_from_sync(
-    corofn: Callable[..., Awaitable[Any]] | None,
+    corofn: Callable[_P, Awaitable[_R]] | None,
     timeout: float = GENERAL_TIMEOUT,
-    *args,
-    **kwargs,
-) -> Any:
+    *args: _P.args,
+    **kwargs: _P.kwargs,
+) -> _R:
     """Shorthand for running a coroutine in the default background thread pool executor.
 
     and awaiting the result.
@@ -133,12 +136,12 @@ def call_async_from_sync(
         msg = 'corofn is not a coroutine function'
         raise ValueError(msg)
 
-    async def arun():
+    async def arun() -> _R:
         """Execute target coroutine function with provided args/kwargs."""
         coro = corofn(*args, **kwargs)
         return await coro
 
-    def run():
+    def run() -> _R:
         """Run coroutine in a fresh event loop within the worker thread.
 
         After the main coroutine returns, cancel any remaining tasks with a bounded wait so
@@ -196,8 +199,8 @@ def call_async_from_sync(
 async def call_coro_in_bg_thread(
     corofn: Callable[..., Awaitable[Any]] | None,
     timeout_sec: float = GENERAL_TIMEOUT,
-    *args,
-    **kwargs,
+    *args: object,
+    **kwargs: object,
 ) -> None:
     """Function for running a coroutine in a background thread.
 
@@ -207,7 +210,7 @@ async def call_coro_in_bg_thread(
     import importlib
 
     mod = importlib.import_module('backend.utils.async_utils')
-    delegate = getattr(mod, 'call_sync_from_async')
+    delegate = mod.call_sync_from_async
     await delegate(call_async_from_sync, corofn, timeout_sec, *args, **kwargs)
 
 

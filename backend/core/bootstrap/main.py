@@ -16,7 +16,7 @@ import json
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from backend.utils.async_utils import run_or_schedule
 
@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from backend.ledger.action.action import Action
     from backend.ledger.event import Event
     from backend.ledger.stream import EventStream
+    from backend.orchestration import SessionOrchestrator
     from backend.orchestration.agent import Agent
     from backend.orchestration.conversation_stats import ConversationStats
     from backend.orchestration.state.state import State
@@ -81,13 +82,18 @@ class FakeUserResponseFunc(Protocol):
         try_parse: Callable[[Action | None], str] | None = None,
     ) -> str:
         """Simulate a user reply given the current state and parsing helpers."""
+        ...
+
+
+class _RuntimeWithController(Protocol):
+    controller: SessionOrchestrator | None
 
 
 def _setup_runtime_and_repo(
     config_: AppConfig,
     session_id: str,
-    llm_registry,
-    agent,
+    llm_registry: LLMRegistry,
+    agent: Agent,
     headless_mode: bool,
     *,
     vcs_provider_tokens: ProviderTokenType | None = None,
@@ -141,7 +147,7 @@ async def _setup_memory_and_mcp(
     repo_directory: str | None,
     memory: Memory | None,
     conversation_instructions: str | None,
-    agent,
+    agent: Agent,
 ) -> Memory:
     """Setup memory and MCP tools."""
     memory = await _setup_memory(
@@ -164,7 +170,7 @@ async def _setup_memory(
     repo_directory: str | None,
     memory: Memory | None,
     conversation_instructions: str | None,
-    agent,
+    agent: Agent,
 ) -> Memory:
     """Setup conversation memory without waiting for MCP warmup."""
     event_stream = runtime.event_stream
@@ -185,13 +191,13 @@ async def _setup_memory(
     return memory
 
 
-async def _setup_mcp_tools(agent, runtime: Runtime, memory: Memory) -> None:
+async def _setup_mcp_tools(agent: Agent, runtime: Runtime, memory: Memory) -> None:
     """Warm MCP tools after chat becomes usable."""
     if agent.config.enable_mcp:
         await add_mcp_tools_to_agent(agent, runtime, memory)
 
 
-def _warm_agent_vector_memory(agent) -> None:
+def _warm_agent_vector_memory(agent: Agent) -> None:
     """Start optional vector-memory warmup outside the critical agent-init path."""
     conversation_memory = getattr(agent, 'conversation_memory', None)
     starter = getattr(conversation_memory, 'start_vector_memory_warmup', None)
@@ -208,13 +214,15 @@ def _setup_replay_events(
     """Setup replay events if trajectory replay is enabled."""
     if config_.replay_trajectory_path:
         logger.info('Transcript replay is enabled')
-        assert isinstance(initial_action, NullAction)
+        if not isinstance(initial_action, NullAction):
+            msg = 'Transcript replay requires the initial action to be NullAction'
+            raise TypeError(msg)
         return load_replay_log(config_.replay_trajectory_path)
     return None, initial_action
 
 
 def _create_early_status_callback(
-    controller,
+    controller: SessionOrchestrator,
 ) -> Callable[[str, RuntimeStatus, str], None]:
     """Create the early status callback function."""
 
@@ -229,18 +237,19 @@ def _create_early_status_callback(
                 msg,
             )
             try:
-                controller.state.set_last_error(
+                state = controller.state
+                state.set_last_error(
                     msg, source='main._early_status_callback'
                 )
                 if runtime_status == RuntimeStatus.ERROR_MEMORY:
                     logger.info(
                         'MAIN._early_status_callback: recording memory error boundary at iteration %s',
-                        controller.state.iteration_flag.current_value,
+                        state.iteration_flag.current_value,
                     )
-                    setattr(
-                        controller.state,
+                    object.__setattr__(
+                        state,
                         '_memory_error_boundary',
-                        controller.state.iteration_flag.current_value,
+                        state.iteration_flag.current_value,
                     )
             except Exception:
                 logger.warning(
@@ -279,7 +288,9 @@ def _validate_initial_action(initial_action: Action) -> None:
 
 
 def _setup_initial_events(
-    event_stream, initial_action: Action, initial_state: State | None
+    event_stream: EventStream,
+    initial_action: Action,
+    initial_state: State | None,
 ) -> None:
     """Setup initial events based on state and action."""
     loop = None
@@ -309,8 +320,8 @@ def _create_event_handler(
     config_: AppConfig,
     exit_on_message: bool,
     fake_user_response_fn: FakeUserResponseFunc | None,
-    controller,
-    event_stream,
+    controller: SessionOrchestrator,
+    event_stream: EventStream,
 ) -> Callable[[Event], None]:
     """Create the event handler for user input."""
 
@@ -337,7 +348,9 @@ def _create_event_handler(
     return on_event
 
 
-def _save_trajectory(config_: AppConfig, session_id: str, controller) -> None:
+def _save_trajectory(
+    config_: AppConfig, session_id: str, controller: SessionOrchestrator
+) -> None:
     """Save trajectory output to file if configured."""
     if config_.save_trajectory_path is not None:
         if os.path.isdir(config_.save_trajectory_path):
@@ -483,7 +496,8 @@ async def _execute_controller_lifecycle(
             conversation_stats,
             replay_events=replay_events,
         )
-        setattr(runtime, 'controller', controller)  # retain for trajectory saving
+        runtime_with_controller = cast(_RuntimeWithController, runtime)
+        runtime_with_controller.controller = controller
         _attach_status_callback(resolved_memory, controller)
         _validate_initial_action(initial_action)
         logger.debug(
@@ -531,7 +545,9 @@ def _detach_and_close_event_stream(runtime: Runtime, event_stream: EventStream) 
         )
 
 
-def _attach_status_callback(memory: Memory, controller) -> None:
+def _attach_status_callback(
+    memory: Memory, controller: SessionOrchestrator
+) -> None:
     _early_status_callback = _create_early_status_callback(controller)
     try:
         memory.status_callback = _early_status_callback
@@ -544,7 +560,7 @@ def _subscribe_controller_events(
     event_stream: EventStream,
     exit_on_message: bool,
     fake_user_response_fn: FakeUserResponseFunc | None,
-    controller,
+    controller: SessionOrchestrator,
 ) -> None:
     on_event = _create_event_handler(
         config_, exit_on_message, fake_user_response_fn, controller, event_stream
@@ -552,7 +568,9 @@ def _subscribe_controller_events(
     event_stream.subscribe(EventStreamSubscriber.MAIN, on_event, event_stream.sid)
 
 
-async def _run_agent_loop(controller, runtime: Runtime, memory: Memory) -> None:
+async def _run_agent_loop(
+    controller: SessionOrchestrator, runtime: Runtime, memory: Memory
+) -> None:
     end_states = [
         AgentState.FINISHED,
         AgentState.REJECTED,
@@ -567,9 +585,11 @@ async def _run_agent_loop(controller, runtime: Runtime, memory: Memory) -> None:
 
 
 async def _persist_controller_state(
-    config_: AppConfig, controller, event_stream: EventStream
+    config_: AppConfig,
+    controller: SessionOrchestrator,
+    event_stream: EventStream,
 ) -> None:
-    if config_.file_store is None or config_.file_store == 'memory':
+    if config_.file_store == 'memory':
         return
     end_state = controller.get_state()
     end_state.save_to_session(
@@ -580,14 +600,15 @@ async def _persist_controller_state(
     await controller.close(set_stop_state=False)
 
 
-def _prepare_final_state(controller) -> State:
+def _prepare_final_state(controller: SessionOrchestrator) -> State:
     state = controller.get_state()
-    force_iteration_reset = getattr(
-        controller, '_force_iteration_reset', False
-    ) or getattr(
-        state,
-        '_force_iteration_reset',
-        False,
+    force_iteration_reset = bool(
+        getattr(controller, '_force_iteration_reset', False)
+        or getattr(
+            state,
+            '_force_iteration_reset',
+            False,
+        )
     )
     if force_iteration_reset:
         logger.debug(
@@ -631,18 +652,17 @@ def load_replay_log(trajectory_path: str) -> tuple[list[Event] | None, Action]:
             raise ValueError(msg)
         with open(path, encoding='utf-8') as file:
             events = ReplayManager.get_replay_events(json.load(file))
-            if not events:
-                raise ValueError(
-                    f'Trajectory file contains no events: {path}'
-                ) from None
-            if not isinstance(events[0], MessageAction):
-                raise ValueError(
-                    f'Trajectory first event must be MessageAction, got {type(events[0]).__name__}'
-                ) from None
-            return (events[1:], events[0])
     except json.JSONDecodeError as e:
         msg = f'Invalid JSON format in {trajectory_path}: {e}'
         raise ValueError(msg) from e
+
+    if not events:
+        raise ValueError(f'Trajectory file contains no events: {path}') from None
+    if not isinstance(events[0], MessageAction):
+        raise ValueError(
+            f'Trajectory first event must be MessageAction, got {type(events[0]).__name__}'
+        ) from None
+    return (events[1:], events[0])
 
 
 if __name__ == '__main__':

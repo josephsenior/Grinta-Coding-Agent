@@ -944,7 +944,9 @@ class SessionOrchestrator:
         )
         self.state_tracker._init_history(self.event_stream)  # type: ignore[attr-defined]  # bootstrap wiring
 
-    def get_transcript(self, include_screenshots: bool = False) -> list[dict]:
+    def get_transcript(
+        self, include_screenshots: bool = False
+    ) -> list[dict[str, Any]]:
         """Get the complete transcript of agent operations and outcomes.
 
         Must be called after controller is closed.

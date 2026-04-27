@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, cast
 from backend.context.agent_memory import Memory
 from backend.core.constants import GENERAL_TIMEOUT
 from backend.core.errors import AgentNotRegisteredError
+from backend.core.enums import RuntimeStatus
 from backend.core.logger import app_logger as logger
 from backend.execution.plugins import PluginRequirement
 from backend.inference.llm_registry import LLMRegistry
@@ -42,6 +43,9 @@ if TYPE_CHECKING:
     from backend.ledger.event import Event
     from backend.orchestration.conversation_stats import ConversationStats
     from backend.playbooks.engine.playbook import BasePlaybook
+
+
+StatusCallback = Callable[[str, RuntimeStatus, str], None]
 
 
 def _instantiate_runtime(runtime_cls: type[object], **kwargs: Any) -> Runtime:
@@ -277,7 +281,7 @@ def create_memory(
     sid: str,
     selected_repository: str | None = None,
     repo_directory: str | None = None,
-    status_callback: Callable | None = None,
+    status_callback: StatusCallback | None = None,
     conversation_instructions: str | None = None,
     working_dir: str | None = None,
 ) -> Memory:
