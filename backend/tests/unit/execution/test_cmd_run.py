@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from backend.execution.action_execution_server import RuntimeExecutor
+from backend.execution.utils.unified_shell import BaseShellSession
 from backend.ledger.action import CmdRunAction, FileReadAction
 from backend.ledger.action.terminal import (
     TerminalInputAction,
@@ -44,7 +45,7 @@ def mock_executor(tmp_path: Path):
 @pytest.mark.asyncio
 async def test_cmd_run_grep_pattern(mock_executor):
     # Setup
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     # Mock return value of execute to be an Observation
     mock_obs = CmdOutputObservation(
         content='line1\nmatch this\nline3\nalso match this\nline5',
@@ -75,7 +76,7 @@ async def test_cmd_run_grep_pattern(mock_executor):
 @pytest.mark.asyncio
 async def test_cmd_run_grep_pattern_no_match(mock_executor):
     """Test grep_pattern when no lines match."""
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_obs = CmdOutputObservation(
         content='line1\nline2\nline3', command_id=0, command='echo test'
     )
@@ -91,7 +92,7 @@ async def test_cmd_run_grep_pattern_no_match(mock_executor):
 @pytest.mark.asyncio
 async def test_cmd_run_preserves_path_with_workspace_segment(mock_executor):
     """Relative dirs named ``workspace`` must not be rewritten (no virtual /workspace alias)."""
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_obs = CmdOutputObservation(
         content='ok\n', command_id=0, command='ls -F components/workspace/'
     )
@@ -110,7 +111,7 @@ async def test_cmd_run_preserves_path_with_workspace_segment(mock_executor):
 @pytest.mark.asyncio
 async def test_cmd_run_grep_pattern_invalid_regex(mock_executor):
     """Test grep_pattern with invalid regex."""
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_obs = CmdOutputObservation(
         content='line1\nline2', command_id=0, command='echo test'
     )
@@ -128,7 +129,7 @@ async def test_cmd_run_grep_pattern_invalid_regex(mock_executor):
 @pytest.mark.asyncio
 async def test_cmd_run_grep_pattern_oversized_regex(mock_executor):
     """Test grep_pattern with oversized regex rejected by guardrail."""
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_obs = CmdOutputObservation(
         content='line1\nline2', command_id=0, command='echo test'
     )
@@ -148,7 +149,7 @@ async def test_cmd_run_grep_pattern_oversized_regex(mock_executor):
 async def test_cmd_run_background_spawns_session(mock_executor):
     """Test that is_background=True spawns a new session and returns immediately."""
     # Mock the create_session method to return a mock session
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_session.read_output.return_value = 'Background process started'
     mock_executor.session_manager.create_session.return_value = mock_session
     mock_executor.session_manager.get_session.return_value = MagicMock(
@@ -176,7 +177,7 @@ async def test_windows_prefers_powershell_rewrites_python3_when_both_available(
     mock_executor,
 ):
     """When both shells exist on Windows, PowerShell-first contract rewrites python3."""
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_obs = CmdOutputObservation(
         content='ok',
         command='python --version',
@@ -199,7 +200,7 @@ async def test_windows_prefers_powershell_rewrites_python3_when_both_available(
 @pytest.mark.asyncio
 async def test_windows_powershell_rewrites_python3(mock_executor):
     """When bash is unavailable on Windows, rewrite python3 to python."""
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_obs = CmdOutputObservation(
         content='ok',
         command='python --version',
@@ -220,7 +221,7 @@ async def test_windows_powershell_rewrites_python3(mock_executor):
 
 
 def test_init_shell_commands_uses_powershell_helpers_on_windows(mock_executor):
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_executor.session_manager.tool_registry = MagicMock(
         has_bash=True,
@@ -241,7 +242,7 @@ def test_init_shell_commands_uses_powershell_helpers_on_windows(mock_executor):
 
 
 def test_init_shell_commands_keeps_bash_helpers_when_not_powershell(mock_executor):
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_executor.session_manager.tool_registry = MagicMock(
         has_bash=True,
@@ -261,7 +262,7 @@ def test_init_shell_commands_keeps_bash_helpers_when_not_powershell(mock_executo
 
 @pytest.mark.asyncio
 async def test_powershell_syntax_in_bash_adds_shell_mismatch_guidance(mock_executor):
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_executor.session_manager.tool_registry = MagicMock(
         has_bash=True,
@@ -288,7 +289,7 @@ async def test_powershell_syntax_in_bash_adds_shell_mismatch_guidance(mock_execu
 
 @pytest.mark.asyncio
 async def test_chained_scaffold_failure_adds_scaffold_guidance(mock_executor):
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_session.cwd = '/project/space'
     mock_session.execute.return_value = CmdOutputObservation(
@@ -320,7 +321,7 @@ async def test_chained_scaffold_failure_adds_scaffold_guidance(mock_executor):
 @pytest.mark.asyncio
 async def test_missing_tool_no_annotation(mock_executor):
     """Raw stderr is returned unchanged; no [MISSING_TOOL] tag is appended."""
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_session.cwd = 'C:/project/space'
     raw_err = '[ERROR STREAM]\n/bin/bash: line 1: poetry: command not found'
@@ -339,7 +340,7 @@ async def test_missing_tool_no_annotation(mock_executor):
 @pytest.mark.asyncio
 async def test_repeated_failure_no_annotation(mock_executor):
     """Repeated identical failures are passed through without annotation."""
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_executor.session_manager.get_session.return_value = mock_session
 
     def _mk_fail_obs() -> CmdOutputObservation:
@@ -361,7 +362,7 @@ async def test_repeated_failure_no_annotation(mock_executor):
 @pytest.mark.asyncio
 async def test_shell_mismatch_always_emitted(mock_executor):
     """Structural tags that the model cannot infer from raw output are always emitted."""
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_executor.session_manager.tool_registry = MagicMock(
         has_bash=True,
@@ -382,7 +383,7 @@ async def test_shell_mismatch_always_emitted(mock_executor):
 @pytest.mark.asyncio
 async def test_oom_no_extra_commentary(mock_executor):
     """Exit 137 produces no `[OOM_KILLED] ...` suffix — the exit code itself communicates the kill."""
-    mock_session = MagicMock()
+    mock_session = MagicMock(spec=BaseShellSession)
     mock_executor.session_manager.get_session.return_value = mock_session
     mock_session.execute.return_value = CmdOutputObservation(
         content='killed',

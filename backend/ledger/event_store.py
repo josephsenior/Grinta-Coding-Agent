@@ -94,7 +94,19 @@ class EventStore(EventStoreABC):
                         events_dir,
                         'events.db',
                     )
-                    self._sqlite_store = SQLiteEventStore(db_path=db_path)
+                    store = SQLiteEventStore(db_path=db_path)
+                    if store.check_integrity():
+                        self._sqlite_store = store
+                    else:
+                        # DB is corrupt — close it and fall back to file-based path.
+                        # The corrupt DB stays on disk so the user can inspect it;
+                        # new events will be written as individual JSON files.
+                        logger.error(
+                            'SQLite event store for session %s failed integrity check '
+                            '— falling back to file-based event storage.',
+                            self.sid,
+                        )
+                        store.close()
             except Exception as exc:
                 logger.warning('Failed to init SQLite store in EventStore: %s', exc)
 

@@ -11,7 +11,7 @@ import uuid
 from enum import Enum
 from typing import TYPE_CHECKING, Any, cast
 
-import bashlex
+import bashlex  # pyright: ignore[reportMissingTypeStubs]
 import libtmux
 
 from backend.core.logger import app_logger as logger
@@ -36,6 +36,25 @@ if TYPE_CHECKING:
     from backend.ledger.action import CmdRunAction
 
 
+Ps1Match = re.Match[str]
+BashlexNode = Any
+
+
+def _get_bashlex_parsing_errors() -> tuple[type[BaseException], ...]:
+    parsing_error = getattr(getattr(bashlex, 'errors', None), 'ParsingError', None)
+    if isinstance(parsing_error, type) and issubclass(parsing_error, BaseException):
+        return (parsing_error, NotImplementedError, TypeError, AttributeError)
+    return (NotImplementedError, TypeError, AttributeError)
+
+
+_BASHLEX_PARSING_ERRORS = _get_bashlex_parsing_errors()
+
+
+def _parse_bash(command: str) -> list[BashlexNode]:
+    typed_bashlex = cast(Any, bashlex)
+    return cast(list[BashlexNode], typed_bashlex.parse(command))
+
+
 def split_bash_commands(commands: str) -> list[str]:
     """Split bash commands string into individual commands.
 
@@ -49,13 +68,8 @@ def split_bash_commands(commands: str) -> list[str]:
     if not commands.strip():
         return ['']
     try:
-        parsed = bashlex.parse(commands)
-    except (
-        bashlex.errors.ParsingError,
-        NotImplementedError,
-        TypeError,
-        AttributeError,
-    ):
+        parsed = _parse_bash(commands)
+    except _BASHLEX_PARSING_ERRORS:
         logger.debug(
             'Failed to parse bash commands\n[input]: %s\n[warning]: %s\nThe original command will be returned as is.',
             commands,
@@ -97,7 +111,7 @@ def escape_bash_special_chars(command: str) -> str:
     if not command.strip():
         return ''
     try:
-        parts = []
+        parts: list[str] = []
         last_pos = 0
 
         def visit_node(node: Any) -> None:
@@ -140,7 +154,7 @@ def escape_bash_special_chars(command: str) -> str:
                 for part in node.parts:
                     visit_node(part)
 
-        nodes = list(bashlex.parse(command))
+        nodes = _parse_bash(command)
         for node in nodes:
             between = command[last_pos : node.pos[0]]
             between = re.sub('\\\\([;&|><])', '\\\\\\\\\\1', between)
@@ -150,7 +164,7 @@ def escape_bash_special_chars(command: str) -> str:
         remaining = command[last_pos:]
         parts.append(remaining)
         return ''.join(parts)
-    except (bashlex.errors.ParsingError, NotImplementedError, TypeError):
+    except _BASHLEX_PARSING_ERRORS:
         logger.debug(
             'Failed to parse bash commands for special characters escape\n[input]: %s\n[warning]: %s\nThe original command will be returned as is.',
             command,
@@ -315,12 +329,11 @@ class BashSession(BaseShellSession):
 
         # Register a session-scoped kill callback so runtime.hard_kill() can
         # terminate this tmux session (and its process tree) reliably.
-        if self._cancellation is not None:
-            self._cancellation_callback_key = f'tmux-session:{session_name}'
-            self._cancellation.register_kill_callback(
-                self._cancellation_callback_key,
-                self._hard_kill_tmux_session,
-            )
+        self._cancellation_callback_key = f'tmux-session:{session_name}'
+        self._cancellation.register_kill_callback(
+            self._cancellation_callback_key,
+            self._hard_kill_tmux_session,
+        )
         session.set_option('history-limit', str(self.HISTORY_LIMIT), _global=True)
         session.history_limit = str(self.HISTORY_LIMIT)
         window, pane = self._get_window_and_pane_with_retry(session)
@@ -396,11 +409,11 @@ class BashSession(BaseShellSession):
         username = self.username
         if not username:
             return False
-        if not hasattr(os, 'geteuid'):
+        if os.name == 'nt':
             return False
         try:
-            uid = int(os.geteuid())
-        except AttributeError:
+            uid = int(os.geteuid())  # pyright: ignore[reportAttributeAccessIssue]
+        except (AttributeError, OSError, TypeError, ValueError):
             return False
         if uid != 0:
             return False
@@ -424,7 +437,7 @@ class BashSession(BaseShellSession):
         if self._closed:
             return
         logger.info('Closing BashSession...')
-        if self._cancellation is not None and self._cancellation_callback_key:
+        if self._cancellation_callback_key:
             try:
                 self._cancellation.unregister_kill_callback(
                     self._cancellation_callback_key
@@ -485,12 +498,13 @@ class BashSession(BaseShellSession):
             try:
                 pane = cast('Pane | None', getattr(window, 'active_pane', None))
             except libtmux.exc.LibTmuxException as exc:  # type: ignore[attr-defined]
-                last_exc = exc
+                pane_lookup_error = cast(Exception, exc)
+                last_exc = pane_lookup_error
                 logger.debug(
                     'Active pane lookup failed on attempt %s/%s: %s',
                     attempt + 1,
                     retries,
-                    exc,
+                    pane_lookup_error,
                 )
                 time.sleep(delay)
                 continue
@@ -546,14 +560,16 @@ class BashSession(BaseShellSession):
         self,
         command: str,
         pane_content: str,
-        ps1_matches: list[re.Match],
+        ps1_matches: list[Ps1Match],
         hidden: bool,
         is_input: bool = False,
     ) -> CmdOutputObservation:
         is_special_key = self._is_special_key(command)
-        assert ps1_matches, f'Expected at least one PS1 metadata block, but got {
-            len(ps1_matches)
-        }.\n---FULL OUTPUT---\n{pane_content!r}\n---END OF OUTPUT---'
+        assert ps1_matches, (
+            'Expected at least one PS1 metadata block, but got '
+            f'{len(ps1_matches)}.\n---FULL OUTPUT---\n{pane_content!r}'
+            '\n---END OF OUTPUT---'
+        )
         metadata = CmdOutputMetadata.from_ps1_match(ps1_matches[-1])
         get_content_before_last_match = len(ps1_matches) == 1
         if metadata.working_dir != self._cwd and metadata.working_dir:
@@ -623,7 +639,11 @@ class BashSession(BaseShellSession):
                 result = pane_for_query.cmd(
                     'display-message', '-p', '#{pane_current_path}'
                 )
-                stdout = getattr(result, 'stdout', None) or []
+                stdout_raw = getattr(result, 'stdout', None)
+                stdout: list[str] = []
+                if isinstance(stdout_raw, list):
+                    stdout_items = cast(list[Any], stdout_raw)
+                    stdout = [item for item in stdout_items if isinstance(item, str)]
                 if stdout:
                     candidate = stdout[0].strip()
                     if candidate and os.path.isdir(candidate):
@@ -731,7 +751,7 @@ class BashSession(BaseShellSession):
         self,
         command: str,
         pane_content: str,
-        ps1_matches: list[re.Match],
+        ps1_matches: list[Ps1Match],
     ) -> CmdOutputObservation:
         self.prev_status = BashCommandStatus.NO_CHANGE_TIMEOUT
         if len(ps1_matches) != 1:
@@ -791,7 +811,7 @@ class BashSession(BaseShellSession):
         self,
         command: str,
         pane_content: str,
-        ps1_matches: list[re.Match],
+        ps1_matches: list[Ps1Match],
         timeout: float,
     ) -> CmdOutputObservation:
         self.prev_status = BashCommandStatus.HARD_TIMEOUT
@@ -827,7 +847,7 @@ class BashSession(BaseShellSession):
     def _combine_outputs_between_matches(
         self,
         pane_content: str,
-        ps1_matches: list[re.Match],
+        ps1_matches: list[Ps1Match],
         get_content_before_last_match: bool = False,
     ) -> str:
         """Combine all outputs between PS1 matches.
@@ -883,11 +903,16 @@ class BashSession(BaseShellSession):
 
         splited_commands = split_bash_commands(command)
         if len(splited_commands) > 1:
-            msg = f'ERROR: Cannot execute multiple commands at once.\nPlease run each command separately OR chain them into a single command via && or ;\nProvided commands:\n{
-                "\n".join(
-                    (f"({i + 1}) {cmd}" for i, cmd in enumerate(splited_commands))
-                )
-            }'
+            provided_commands = '\n'.join(
+                f'({index + 1}) {cmd}'
+                for index, cmd in enumerate(splited_commands)
+            )
+            msg = (
+                'ERROR: Cannot execute multiple commands at once.\n'
+                'Please run each command separately OR chain them into a single '
+                'command via && or ;\n'
+                f'Provided commands:\n{provided_commands}'
+            )
             raise ValueError(
                 msg,
             )
@@ -896,7 +921,7 @@ class BashSession(BaseShellSession):
         self,
         command: str,
         last_pane_output: str,
-        initial_ps1_matches: list,
+        initial_ps1_matches: list[Ps1Match],
         is_input: bool,
     ) -> CmdOutputObservation | None:
         """Handle case where previous command timed out."""
@@ -945,7 +970,7 @@ class BashSession(BaseShellSession):
     def _check_command_completion(
         self,
         cur_pane_output: str,
-        ps1_matches: list,
+        ps1_matches: list[Ps1Match],
         initial_ps1_count: int,
         command: str,
         is_input: bool,
@@ -971,7 +996,7 @@ class BashSession(BaseShellSession):
         start_time: float,
         command: str,
         cur_pane_output: str,
-        ps1_matches: list,
+        ps1_matches: list[Ps1Match],
         first_output_seen: bool = True,
     ) -> CmdOutputObservation | None:
         """Check for various timeout conditions.
@@ -1013,12 +1038,12 @@ class BashSession(BaseShellSession):
         # Hard timeout: always enforced.  If the action has no explicit
         # timeout we fall back to _SAFETY_NET_TIMEOUT (600s) to prevent
         # truly pathological hangs.
-        from backend.execution.command_timeout import _SAFETY_NET_TIMEOUT
+        from backend.execution.command_timeout import SAFETY_NET_TIMEOUT
 
         effective_timeout = (
-            min(action.timeout, _SAFETY_NET_TIMEOUT)
+            min(action.timeout, SAFETY_NET_TIMEOUT)
             if action.timeout is not None
-            else _SAFETY_NET_TIMEOUT
+            else SAFETY_NET_TIMEOUT
         )
 
         elapsed_time = time.time() - start_time

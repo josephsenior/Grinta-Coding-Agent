@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 from backend.engine.contracts import ChatCompletionToolParam
 from backend.engine.tools.common import create_tool_definition
@@ -102,7 +103,7 @@ def _save_memory(data: dict[str, str]) -> None:
 # --- Action builders ---
 
 
-def build_working_memory_action(arguments: dict) -> AgentThinkAction:
+def build_working_memory_action(arguments: dict[str, Any]) -> AgentThinkAction:
     """Execute a working_memory command and return a think action with results."""
     command = arguments.get('command', 'get')
     section = arguments.get('section', 'all')

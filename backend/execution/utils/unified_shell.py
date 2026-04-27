@@ -21,6 +21,7 @@ from backend.execution.sandboxing import (
 from backend.execution.utils.tool_registry import resolve_windows_powershell_preference
 
 if TYPE_CHECKING:
+    from backend.execution.utils.server_detector import DetectedServer
     from backend.execution.utils.process_registry import TaskCancellationService
     from backend.ledger.action import CmdRunAction
     from backend.ledger.observation import Observation
@@ -168,13 +169,13 @@ class BaseShellSession(UnifiedShellSession, ABC):
             logger.info("Detected background command: '%s'", command)
         return command, run_in_background
 
-    def get_detected_server(self):
+    def get_detected_server(self) -> DetectedServer | None:
         """Get and clear the last detected server.
 
         Default implementation returns None. Subclasses should override if
         they support server detection.
         """
-        return
+        return None
 
     def read_output(self) -> str:
         """Read pending output from the shell session.

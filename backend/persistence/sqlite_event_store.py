@@ -106,6 +106,32 @@ class SQLiteEventStore:
             )
             conn.commit()
 
+    def check_integrity(self) -> bool:
+        """Run PRAGMA integrity_check and return True if the database is healthy.
+
+        Called once on startup.  A corrupted database returns a list of error
+        strings from SQLite; an empty DB or a healthy one returns ``['ok']``.
+        """
+        try:
+            conn = self._get_read_conn()
+            rows = conn.execute('PRAGMA integrity_check').fetchall()
+            results = [r[0] for r in rows]
+            if results == ['ok']:
+                return True
+            logger.error(
+                'SQLite integrity check FAILED for %s: %s',
+                self._db_path,
+                '; '.join(results[:5]),  # cap output length
+            )
+            return False
+        except Exception as exc:
+            logger.error(
+                'SQLite integrity check raised an exception for %s: %s',
+                self._db_path,
+                exc,
+            )
+            return False
+
     def close(self) -> None:
         """Close the database connections."""
         with self._write_lock:

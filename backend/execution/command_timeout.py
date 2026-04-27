@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 # This only fires for commands that keep producing output forever
 # without the shell prompt returning (e.g. infinite log tailing).
 _SAFETY_NET_TIMEOUT: int = 600
+SAFETY_NET_TIMEOUT: int = _SAFETY_NET_TIMEOUT
 
 
 class CommandTimeoutMixin:

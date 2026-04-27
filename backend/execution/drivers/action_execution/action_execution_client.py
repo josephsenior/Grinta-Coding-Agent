@@ -82,8 +82,8 @@ class ActionExecutionClient(Runtime):
         user_id: str | None = None,
         vcs_provider_tokens: Any | None = None,
         project_root: str | None = None,
-        *args,
-        **kwargs,
+        *args: object,
+        **kwargs: object,
     ) -> None:
         super().__init__(
             config=config,
@@ -261,15 +261,16 @@ class ActionExecutionClient(Runtime):
         update_last_execution_time()
         try:
             return self._execute_action_on_server(action)
-        except (httpx.TimeoutException, TimeoutError):
-            raise AgentRuntimeTimeoutError('Action execution timed out')
+        except (httpx.TimeoutException, TimeoutError) as err:
+            raise AgentRuntimeTimeoutError('Action execution timed out') from err
 
     def get_vscode_token(self) -> str:
         if not getattr(self, '_vscode_enabled', False):
             return ''
         if not hasattr(self, '_vscode_token') or self._vscode_token is None:
             resp = self._send_action_server_request('GET', '/vscode/token')
-            self._vscode_token = resp.json().get('token')
+            token = resp.json().get('token')
+            self._vscode_token = token if isinstance(token, str) else ''
         return self._vscode_token
 
     def _execute_action_on_server(self, action: Any) -> Any:
@@ -284,12 +285,16 @@ class ActionExecutionClient(Runtime):
         if not action_name or not hasattr(self, action_name):
             raise ValueError(f'Action type {action_name} does not exist')
 
-    def _send_action_server_request(self, method: str, path: str, **kwargs) -> Any:
+    def _send_action_server_request(
+        self, method: str, path: str, **kwargs: Any
+    ) -> httpx.Response:
         url = f'{getattr(self, "action_execution_server_url", "")}{path}'
         try:
             return send_request(self._action_server_session, method, url, **kwargs)
-        except httpx.TimeoutException:
-            raise TimeoutError(f'Request to action server timed out: {method} {path}')
+        except httpx.TimeoutException as err:
+            raise TimeoutError(
+                f'Request to action server timed out: {method} {path}'
+            ) from err
 
     def _upload_file_to_runtime(
         self, file_handle: Any, runtime_dest: str, recursive: bool, host_src: str

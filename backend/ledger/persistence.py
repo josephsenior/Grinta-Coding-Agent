@@ -258,18 +258,48 @@ class EventPersistence:
                 self.file_store.delete(pending_path)
                 return (1, 0)
             except Exception as exc:
-                logger.warning(
-                    'WAL replay: failed to recover %s for session %s: %s',
+                # Recovery failed — escalate to ERROR and preserve the orphan in
+                # a dedicated directory so it can be inspected without being lost.
+                logger.error(
+                    'WAL replay: UNRECOVERABLE pending file %s for session %s — '
+                    'event may be lost. Error: %s. '
+                    'Moving to lost_events/ for manual inspection.',
                     pending_path,
                     self.sid,
                     exc,
                 )
+                self._quarantine_pending_file(pending_path, events_dir)
                 return (0, 0)
         except Exception:
             logger.debug(
                 'WAL replay: skipping %s (read error)', pending_path, exc_info=True
             )
             return (0, 0)
+
+    def _quarantine_pending_file(self, pending_path: str, events_dir: str) -> None:
+        """Move an unrecoverable .pending file to a lost_events/ subdirectory.
+
+        This preserves the data for post-mortem inspection without silently
+        discarding it, and prevents the replay from re-attempting it on
+        every startup.
+        """
+        try:
+            lost_dir = f'{events_dir}lost_events/'
+            filename = os.path.basename(pending_path.replace('\\', '/'))
+            dest_path = f'{lost_dir}{filename}'
+            event_json = self.file_store.read(pending_path)
+            self.file_store.write(dest_path, event_json)
+            self.file_store.delete(pending_path)
+            logger.error(
+                'WAL replay: quarantined unrecoverable pending file to %s',
+                dest_path,
+            )
+        except Exception as quarantine_exc:
+            logger.error(
+                'WAL replay: could not quarantine %s: %s — file left in place',
+                pending_path,
+                quarantine_exc,
+            )
 
     def replay_pending_events(self) -> None:
         """Scan the events directory for ``.pending`` WAL markers.
@@ -292,20 +322,24 @@ class EventPersistence:
         if not pending_files:
             return
 
-        recovered, cleaned = 0, 0
+        recovered, cleaned, failed = 0, 0, 0
         for pending_name in pending_files:
             pending_path = self._normalize_event_path(pending_name, events_dir)
             event_path = pending_path.removesuffix('.pending')
             r, c = self._process_pending_file(pending_path, event_path, events_dir)
             recovered += r
             cleaned += c
+            if r == 0 and c == 0:
+                failed += 1
 
-        if recovered or cleaned:
-            logger.info(
-                'WAL replay for session %s: recovered=%d, cleaned=%d stale markers',
+        if recovered or cleaned or failed:
+            level = logger.error if failed else logger.info
+            level(
+                'WAL replay for session %s: recovered=%d, cleaned=%d stale markers, failed=%d',
                 self.sid,
                 recovered,
                 cleaned,
+                failed,
                 extra={'session_id': self.sid, 'user_id': self.user_id},
             )
 

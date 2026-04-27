@@ -494,6 +494,17 @@ class EventStream(EventStore):
             next_event_id = self._cur_id
             if next_event_id is None:
                 next_event_id = self._calculate_cur_id()
+                # Guard: _calculate_cur_id() must return a non-negative integer.
+                # A negative value means both SQLite and file-based ID scans
+                # returned no useful data — likely a storage failure.  Raising
+                # here is safer than silently assigning ID 0 and risk colliding
+                # with events that may have persisted but aren't visible right now.
+                if not isinstance(next_event_id, int) or next_event_id < 0:
+                    raise RuntimeError(
+                        f'EventStream({self.sid}): _calculate_cur_id() returned '
+                        f'{next_event_id!r} — cannot assign a safe event ID. '
+                        'Check storage health (SQLite integrity, filesystem access).'
+                    )
             event.id = next_event_id
             event.sequence = next_event_id
             self._cur_id = next_event_id + 1

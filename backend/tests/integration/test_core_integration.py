@@ -11,16 +11,19 @@ Covers:
 from __future__ import annotations
 
 from collections import deque
-from typing import Any
+from pathlib import Path
+from typing import Any, cast
 from unittest.mock import MagicMock
+
+import pytest
 
 from backend.context.compactor.strategies.conversation_window_compactor import (
     ConversationWindowCompactor,
 )
 from backend.engine.memory_manager import ContextMemoryManager
-from backend.engine.tools.working_memory import get_working_memory_prompt_block
 from backend.engine.tools.working_memory import (
-    build_working_memory_action as build_working_memory_action,
+    build_working_memory_action,
+    get_working_memory_prompt_block,
 )
 from backend.ledger.action import ActionSecurityRisk
 from backend.ledger.action.files import FileEditAction
@@ -42,7 +45,7 @@ from backend.orchestration.state.state import State
 
 
 def _mock_state(
-    history: list | None = None,
+    history: list[Any] | None = None,
     extra_data: dict[str, Any] | None = None,
 ) -> State:
     state = State(session_id='test-session')
@@ -50,6 +53,34 @@ def _mock_state(
     if extra_data:
         state.extra_data = extra_data
     return state
+
+
+def _circuit_breaker_error_rate(circuit_breaker: CircuitBreaker) -> float:
+    calculate_error_rate = cast(Any, circuit_breaker)._calculate_error_rate
+    return cast(float, calculate_error_rate())
+
+
+def _set_monitor_last_rss(
+    monitor: MemoryPressureMonitor, rss_mb: float | int
+) -> None:
+    object.__setattr__(monitor, '_last_rss_mb', rss_mb)
+
+
+def _set_monitor_baseline(monitor: MemoryPressureMonitor, baseline_mb: float) -> None:
+    object.__setattr__(monitor, '_baseline_rss_mb', baseline_mb)
+
+
+def _set_monitor_last_check(monitor: MemoryPressureMonitor, last_check: float) -> None:
+    object.__setattr__(monitor, '_last_check', last_check)
+
+
+def _set_monitor_process(monitor: MemoryPressureMonitor, process: Any) -> None:
+    object.__setattr__(monitor, '_process', process)
+
+
+def _memory_pressure_level(monitor: MemoryPressureMonitor) -> str:
+    level_str = cast(Any, monitor)._level_str
+    return cast(str, level_str())
 
 
 # ================================================================== #
@@ -72,7 +103,7 @@ class TestCircuitBreakerDeque:
         config = CircuitBreakerConfig(error_rate_window=3)
         cb = CircuitBreaker(config)
         # maxlen = 6 → push 8 items, oldest two should be evicted
-        for i in range(8):
+        for _ in range(8):
             cb.record_success()
         assert len(cb.recent_actions_success) == 6
 
@@ -95,7 +126,7 @@ class TestCircuitBreakerDeque:
         for _ in range(4):
             cb.record_error(Exception('fail'))
         # Window of last 4 should be all failures → rate == 1.0
-        assert cb._calculate_error_rate() == 1.0
+        assert _circuit_breaker_error_rate(cb) == 1.0
 
     def test_reset_clears_deques(self):
         config = CircuitBreakerConfig(error_rate_window=5)
@@ -179,6 +210,7 @@ class TestMemoryPressureMonitor:
 
     def test_defaults_without_psutil(self):
         monitor = MemoryPressureMonitor(warn_mb=512, crit_mb=1024, check_interval_s=0)
+        _set_monitor_baseline(monitor, 0.0)
         snap = monitor.snapshot()
         assert snap['warn_threshold_mb'] == 512
         assert snap['crit_threshold_mb'] == 1024
@@ -186,18 +218,21 @@ class TestMemoryPressureMonitor:
 
     def test_normal_level(self):
         monitor = MemoryPressureMonitor(warn_mb=512, crit_mb=1024, check_interval_s=0)
-        monitor._last_rss_mb = 100
-        assert monitor._level_str() == 'normal'
+        _set_monitor_baseline(monitor, 0.0)
+        _set_monitor_last_rss(monitor, 100)
+        assert _memory_pressure_level(monitor) == 'normal'
 
     def test_warning_level(self):
         monitor = MemoryPressureMonitor(warn_mb=512, crit_mb=1024, check_interval_s=0)
-        monitor._last_rss_mb = 600
-        assert monitor._level_str() == 'warning'
+        _set_monitor_baseline(monitor, 0.0)
+        _set_monitor_last_rss(monitor, 600)
+        assert _memory_pressure_level(monitor) == 'warning'
 
     def test_critical_level(self):
         monitor = MemoryPressureMonitor(warn_mb=512, crit_mb=1024, check_interval_s=0)
-        monitor._last_rss_mb = 1200
-        assert monitor._level_str() == 'critical'
+        _set_monitor_baseline(monitor, 0.0)
+        _set_monitor_last_rss(monitor, 1200)
+        assert _memory_pressure_level(monitor) == 'critical'
         # is_critical() calls _sample_rss() which may return None without psutil
         object.__setattr__(monitor, '_sample_rss', lambda: 1200.0)
         assert monitor.is_critical() is True
@@ -210,11 +245,12 @@ class TestMemoryPressureMonitor:
 
     def test_should_condense_above_warn(self):
         monitor = MemoryPressureMonitor(warn_mb=256, crit_mb=1024, check_interval_s=0)
-        monitor._last_rss_mb = 300
-        monitor._last_check = 0  # force re-check
+        _set_monitor_baseline(monitor, 0.0)
+        _set_monitor_last_rss(monitor, 300)
+        _set_monitor_last_check(monitor, 0)  # force re-check
         # should_condense reads from _sample_rss which may use cache
         # Set process to None to use cached value
-        monitor._process = None
+        _set_monitor_process(monitor, None)
         # With no psutil process, _sample_rss returns None → should_condense False
         # So let's mock _sample_rss directly
         object.__setattr__(monitor, '_sample_rss', lambda: 300.0)
@@ -288,7 +324,7 @@ class TestMemoryPressureCompactorWiring:
         fake_compactor.get_compaction.return_value = fake_condensation
         mgr.compactor = fake_compactor
 
-        state = _mock_state()
+        state = _mock_state(history=[f'event-{index}' for index in range(30)])
         state.turn_signals.memory_pressure = 'CRITICAL'
         result = mgr.condense_history(state)
 
@@ -362,11 +398,15 @@ class TestMemoryPressureCompactorWiring:
 
 class TestLongSessionCompactionInvariants:
     def test_repeated_compaction_preserves_task_roots_and_recovery_artifacts(
-        self, monkeypatch, tmp_path
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ):
+        def fake_workspace_agent_state_dir(project_root: str | None = None) -> Path:
+            del project_root
+            return tmp_path
+
         monkeypatch.setattr(
             'backend.core.workspace_resolution.workspace_agent_state_dir',
-            lambda project_root=None: tmp_path,
+            fake_workspace_agent_state_dir,
         )
 
         build_working_memory_action(
@@ -463,7 +503,7 @@ class TestLongSessionCompactionInvariants:
 class TestHealthSnapshot:
     """Test collect_orchestration_health assembles a complete snapshot."""
 
-    def _make_controller(self, **overrides):
+    def _make_controller(self, **overrides: Any) -> MagicMock:
         """Build a minimal mock controller for health collection."""
         ctrl = MagicMock()
         ctrl.sid = 'test-session-123'
@@ -493,8 +533,8 @@ class TestHealthSnapshot:
         ctrl.event_stream._subscribers = {}
         ctrl.event_stream.get_events.return_value = []
 
-        for k, v in overrides.items():
-            setattr(ctrl, k, v)
+        for key, value in overrides.items():
+            setattr(ctrl, key, value)
         return ctrl
 
     def test_snapshot_has_required_keys(self):
