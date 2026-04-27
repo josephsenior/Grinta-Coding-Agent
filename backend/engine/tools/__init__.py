@@ -18,10 +18,10 @@ from .meta_cognition import (
     create_communicate_tool,
 )
 from .search_code import create_search_code_tool
-from .text_editor import create_text_editor_tool
 from .symbol_editor_tool import create_symbol_editor_tool
 from .task_tracker import create_task_tracker_tool
 from .terminal_manager import create_terminal_manager_tool
+from .text_editor import create_text_editor_tool
 from .think import create_think_tool
 
 __all__ = [

@@ -241,8 +241,8 @@ class OrchestratorPlanner:
     def _add_editor_tools(self, tools: list) -> None:
         if getattr(self._config, 'enable_editor', True):
             from backend.engine.tools import (
-                create_text_editor_tool,
                 create_symbol_editor_tool,
+                create_text_editor_tool,
             )
 
             # Primary editor: text_editor for targeted line-level edits
