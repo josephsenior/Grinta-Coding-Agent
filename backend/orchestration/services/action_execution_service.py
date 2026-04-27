@@ -258,7 +258,11 @@ class ActionExecutionService:
                 if isinstance(action, NullAction):
                     return await self._handle_consecutive_null_action(action)
                 self._reset_consecutive_null_actions()
-                self._reset_null_recovery_rounds()
+                # A single non-null action can be part of the recovery path itself
+                # (for example, a rollback or a quick read) without meaning the
+                # agent has actually resumed normal forward progress. Preserve the
+                # broader recovery-round budget until the loop either pauses or a
+                # fresh service instance is created for a new run.
                 return action
 
             except (

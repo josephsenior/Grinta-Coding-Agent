@@ -263,6 +263,39 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(fourth, NullAction)
         self.mock_context.event_stream.add_event.assert_not_called()
 
+    async def test_get_next_action_preserves_recovery_round_after_real_action(self):
+        """A single real action should not buy an extra null-loop recovery round."""
+        from backend.core.schemas import AgentState
+
+        real_action = MagicMock(spec=Action)
+        self.mock_context.agent.astep = AsyncMock(
+            side_effect=[
+                *[NullAction() for _ in range(5)],
+                real_action,
+                *[NullAction() for _ in range(5)],
+            ]
+        )
+        mock_controller = MagicMock()
+        mock_controller.get_agent_state.return_value = AgentState.RUNNING
+        mock_controller.set_agent_state_to = AsyncMock()
+        self.mock_context.get_controller.return_value = mock_controller
+
+        results: list[Any] = []
+        for _ in range(11):
+            results.append(await self.service.get_next_action())
+
+        self.assertEqual(results[5], real_action)
+        self.assertIsNone(results[-1])
+        self.assertEqual(self.mock_context.event_stream.add_event.call_count, 2)
+
+        first_obs = self.mock_context.event_stream.add_event.call_args_list[0][0][0]
+        second_obs = self.mock_context.event_stream.add_event.call_args_list[1][0][0]
+        self.assertEqual(first_obs.error_id, 'NULL_ACTION_LOOP_RECOVERY')
+        self.assertEqual(second_obs.error_id, 'NULL_ACTION_LOOP')
+        mock_controller.set_agent_state_to.assert_awaited_once_with(
+            AgentState.AWAITING_USER_INPUT
+        )
+
     async def test_execute_action_runnable_with_pipeline(self):
         """Test execute_action processes runnable action through pipeline."""
         mock_action = MagicMock(spec=Action)
