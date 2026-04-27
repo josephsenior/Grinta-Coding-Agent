@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from backend.context.pre_condensation_snapshot import save_snapshot
 from backend.context.observation_processors import (
     _get_observation_content,
     _handle_simple_observation,
@@ -128,3 +129,32 @@ class TestConvertObservation:
         assert 'summary' in text
         assert 'SCRATCHPAD' in text
         assert 'WORKING_MEMORY' in text
+
+    def test_condensation_observation_restores_snapshot_once(
+        self, monkeypatch, tmp_path
+    ):
+        monkeypatch.setattr(
+            'backend.core.workspace_resolution.workspace_agent_state_dir',
+            lambda project_root=None: tmp_path,
+        )
+        save_snapshot(
+            {
+                'events_condensed': 7,
+                'files_touched': {'src/main.py': {'action': 'edit'}},
+                'recent_errors': ['failure'],
+                'decisions': [],
+                'recent_commands': [],
+                'attempted_approaches': [],
+            }
+        )
+        obs = AgentCondensationObservation(content='summary')
+
+        first = convert_observation_to_message(obs, max_message_chars=None)
+        first_text = first.content[0].text
+        assert '<RESTORED_CONTEXT>' in first_text
+        assert 'src/main.py' in first_text
+        assert 'failure' in first_text
+
+        second = convert_observation_to_message(obs, max_message_chars=None)
+        second_text = second.content[0].text
+        assert '<RESTORED_CONTEXT>' not in second_text

@@ -206,16 +206,38 @@ def _load_working_memory_snapshot() -> str:
         return ''
 
 
+def _load_restored_context_snapshot() -> str:
+    """Load and consume the pre-condensation snapshot for one-time recovery."""
+    try:
+        from backend.context.pre_condensation_snapshot import (
+            delete_snapshot,
+            format_snapshot_for_injection,
+            load_snapshot,
+        )
+
+        snapshot = load_snapshot()
+        if not snapshot:
+            return ''
+
+        block = format_snapshot_for_injection(snapshot)
+        delete_snapshot()
+        return '\n' + '─' * 60 + '\n' + f'{_sanitize_memory_content(block)}\n'
+    except Exception:
+        return ''
+
+
 def _handle_condensation_observation(
     obs: AgentCondensationObservation, max_message_chars: int | None
 ) -> Message:
     """Handle AgentCondensationObservation with an explicit visibility banner."""
     summary = obs.content or '(no summary provided)'
+    restored_context = _load_restored_context_snapshot()
     scratchpad = _load_scratchpad_snapshot()
     working_memory = _load_working_memory_snapshot()
     text = truncate_content(
         _CONDENSATION_BANNER
         + summary
+        + restored_context
         + scratchpad
         + working_memory
         + _POST_CONDENSATION_RECOVERY,
