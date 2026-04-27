@@ -154,7 +154,8 @@ def create_runtime(
         The created Runtime instance (not yet connected or initialized).
 
     """
-    if event_stream is None:
+    owns_event_stream = event_stream is None
+    if owns_event_stream:
         session_id = sid or generate_sid(config)
         file_store = get_file_store(config.file_store, get_local_data_root(config))
         # worker_count=0 enables inline delivery: no thread pool, no races.
@@ -187,19 +188,30 @@ def create_runtime(
 
     runtime_cls = get_runtime_cls(config.runtime)
     logger.debug('Initializing runtime: %s', runtime_cls.__name__)
-    runtime = _instantiate_runtime(
-        runtime_cls,
-        config=config,
-        event_stream=event_stream,
-        sid=session_id,
-        plugins=plugins,
-        headless_mode=headless_mode,
-        llm_registry=llm_registry or LLMRegistry(config),
-        vcs_provider_tokens=vcs_provider_tokens,
-        env_vars=env_vars,
-        user_id=user_id,
-        project_root=resolved_ws,
-    )
+    try:
+        runtime = _instantiate_runtime(
+            runtime_cls,
+            config=config,
+            event_stream=event_stream,
+            sid=session_id,
+            plugins=plugins,
+            headless_mode=headless_mode,
+            llm_registry=llm_registry or LLMRegistry(config),
+            vcs_provider_tokens=vcs_provider_tokens,
+            env_vars=env_vars,
+            user_id=user_id,
+            project_root=resolved_ws,
+        )
+    except Exception:
+        if owns_event_stream and event_stream is not None:
+            try:
+                event_stream.close()
+            except Exception:
+                logger.debug(
+                    'Failed to close event stream after runtime init error',
+                    exc_info=True,
+                )
+        raise
     logger.debug(
         'Runtime created with plugins: %s', [plugin.name for plugin in runtime.plugins]
     )
