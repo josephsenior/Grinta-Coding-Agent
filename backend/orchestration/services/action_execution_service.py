@@ -41,8 +41,8 @@ from backend.ledger.action import (
     TerminalReadAction,
     TerminalRunAction,
 )
-from backend.ledger.action.empty import NullActionReason
 from backend.ledger.action.agent import CondensationRequestAction
+from backend.ledger.action.empty import NullActionReason
 from backend.ledger.observation import ErrorObservation
 from backend.orchestration.agent_circuit_breaker import (
     classify_text_editor_error_bucket,

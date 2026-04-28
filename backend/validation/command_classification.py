@@ -9,6 +9,8 @@ import os
 import shlex
 from typing import TYPE_CHECKING
 
+from backend.core.os_capabilities import OS_CAPS
+
 if TYPE_CHECKING:
     from backend.ledger.action.commands import CmdRunAction
     from backend.ledger.observation.commands import CmdOutputObservation
@@ -22,7 +24,7 @@ def argv_tokens(command: str) -> list[str]:
     if not raw:
         return []
     try:
-        return shlex.split(raw, posix=os.name != 'nt')
+        return shlex.split(raw, posix=not OS_CAPS.is_windows)
     except ValueError:
         return raw.split()
 

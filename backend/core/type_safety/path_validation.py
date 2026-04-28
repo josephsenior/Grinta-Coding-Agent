@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 from backend.core.constants import MAX_PATH_LENGTH
+from backend.core.os_capabilities import OS_CAPS
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
 
 # Security constants
@@ -255,7 +256,7 @@ def _is_windows_junction(p: Path) -> bool:
     """
     import os
 
-    if os.name != 'nt':
+    if not OS_CAPS.is_windows:
         return False
     try:
         st = os.lstat(p)
@@ -337,7 +338,7 @@ def _resolve_path(
             except ValueError:
                 import os
 
-                if os.name == 'nt':
+                if OS_CAPS.is_windows:
                     full_str = str(full_path).lower()
                     work_str = str(workspace).lower()
                     if not work_str.endswith(os.sep):

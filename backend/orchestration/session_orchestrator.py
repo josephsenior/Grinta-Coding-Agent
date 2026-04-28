@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 import time
 from collections.abc import Callable, Coroutine
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 from backend.utils.async_utils import run_or_schedule, set_main_event_loop
 
@@ -123,46 +123,45 @@ class SessionOrchestrator:
         return self.id
 
     # ------------------------------------------------------------------
-    # Service forwarding — maps legacy *_service property names to
-    # OrchestrationServices attribute names.  Keeps the public API stable
-    # with zero boilerplate.
+    # Service forwarding — explicit ``@property`` accessors so static
+    # analysis, IDE completion, and refactor tools can see every service
+    # the orchestrator exposes. The previous ``__getattr__`` + alias-dict
+    # implementation was equivalent at runtime but invisible to tooling,
+    # which made it easy to leave dangling references when services were
+    # renamed.
     # ------------------------------------------------------------------
 
-    _SERVICE_ALIASES: ClassVar[dict[str, str]] = {
-        'action_service': 'action',
-        'pending_action_service': 'pending_action',
-        'autonomy_service': 'autonomy',
-        'iteration_service': 'iteration',
-        'lifecycle_service': 'lifecycle',
-        'state_service': 'state',
-        'retry_service': 'retry',
-        'recovery_service': 'recovery',
-        'stuck_service': 'stuck',
-        'circuit_breaker_service': 'circuit_breaker',
-        'observation_service': 'observation',
-        'task_validation_service': 'task_validation',
-        # Attributes whose names already match the OrchestrationServices field:
-        'iteration_guard': 'iteration_guard',
-        'step_guard': 'step_guard',
-        'step_prerequisites': 'step_prerequisites',
-        'exception_handler': 'exception_handler',
-        'event_router': 'event_router',
-        'step_decision': 'step_decision',
-        'action_execution': 'action_execution',
-    }
+    @property
+    def action_service(self):
+        return self.services.action
 
-    def __getattr__(self, name: str) -> Any:
-        """Delegate *_service / guard / handler lookups to ``self.services``."""
-        svc_attr = self._SERVICE_ALIASES.get(name)
-        if svc_attr is not None:
-            # ``self.services`` is set in __init__; access via __dict__
-            # to avoid infinite recursion if called before __init__ finishes.
-            services = self.__dict__.get('services')
-            if services is not None:
-                return getattr(services, svc_attr)
-        raise AttributeError(
-            f'{type(self).__name__!r} object has no attribute {name!r}'
-        )
+    @property
+    def pending_action_service(self):
+        return self.services.pending_action
+
+    @property
+    def autonomy_service(self):
+        return self.services.autonomy
+
+    @property
+    def iteration_service(self):
+        return self.services.iteration
+
+    @property
+    def lifecycle_service(self):
+        return self.services.lifecycle
+
+    @property
+    def state_service(self):
+        return self.services.state
+
+    @property
+    def retry_service(self):
+        return self.services.retry
+
+    @property
+    def recovery_service(self):
+        return self.services.recovery
 
     @property
     def stuck_service(self):
@@ -179,6 +178,34 @@ class SessionOrchestrator:
     @property
     def task_validation_service(self):
         return self.services.task_validation
+
+    @property
+    def iteration_guard(self):
+        return self.services.iteration_guard
+
+    @property
+    def step_guard(self):
+        return self.services.step_guard
+
+    @property
+    def step_prerequisites(self):
+        return self.services.step_prerequisites
+
+    @property
+    def exception_handler(self):
+        return self.services.exception_handler
+
+    @property
+    def event_router(self):
+        return self.services.event_router
+
+    @property
+    def step_decision(self):
+        return self.services.step_decision
+
+    @property
+    def action_execution(self):
+        return self.services.action_execution
 
     def __init__(self, config: OrchestrationConfig) -> None:
         """Initializes a new instance of the SessionOrchestrator class."""

@@ -24,7 +24,6 @@ abstractions (``UnifiedShellSession``, agent tools, REPL UI).
 from __future__ import annotations
 
 import errno
-import os
 import shlex
 import threading
 import time
@@ -33,8 +32,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 
-IS_WINDOWS = os.name == 'nt'
+IS_WINDOWS = OS_CAPS.is_windows
 
 DEFAULT_BUFFER_CHARS = 1_048_576
 DEFAULT_READ_CHUNK = 4096

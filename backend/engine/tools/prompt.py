@@ -8,6 +8,8 @@ import sys
 from contextvars import ContextVar
 from typing import Any
 
+from backend.core.os_capabilities import OS_CAPS
+
 _active_tool_registry: ContextVar[Any | None] = ContextVar(
     'active_tool_registry', default=None
 )
@@ -86,7 +88,7 @@ def get_shell_name() -> str:
 
 def is_windows_with_bash() -> bool:
     """True when running on Windows but using Git Bash as the active shell."""
-    return sys.platform == 'win32' and not uses_powershell_terminal()
+    return OS_CAPS.is_windows and not uses_powershell_terminal()
 
 
 def get_python_shell_command() -> str:

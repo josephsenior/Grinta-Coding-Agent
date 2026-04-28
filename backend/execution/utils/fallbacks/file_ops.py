@@ -7,10 +7,10 @@ from __future__ import annotations
 
 import os
 import stat
-import sys
 from pathlib import Path
 
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 
 
 class PythonFileOps:
@@ -43,7 +43,7 @@ class PythonFileOps:
         """
         path = Path(path)
 
-        if sys.platform == 'win32':
+        if OS_CAPS.is_windows:
             # Windows: check FILE_ATTRIBUTE_HIDDEN
             try:
                 attrs = os.stat(path).st_file_attributes  # type: ignore
@@ -187,7 +187,7 @@ class PythonFileOps:
         """
         file_path = Path(file_path)
 
-        if os.name == 'nt':
+        if OS_CAPS.is_windows:
             # Windows: check extension
             return file_path.suffix.lower() in ('.exe', '.bat', '.cmd', '.ps1')
         return bool(os.access(file_path, os.X_OK))

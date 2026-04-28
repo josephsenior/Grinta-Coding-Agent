@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from backend.inference.llm_registry import LLMRegistry
     from backend.ledger.action import Action
     from backend.ledger.event import Event
-    from backend.orchestration.state.state import State
+    from backend.core.contracts.state import State
     from backend.utils.prompt import PromptManager
 
 

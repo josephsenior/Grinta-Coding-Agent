@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import logging
-import sys
 from typing import TYPE_CHECKING, Any
 
 import httpx
 
+from backend.core.os_capabilities import OS_CAPS
 from backend.execution.base import Runtime
 from backend.execution.utils.request import send_request
 from backend.execution.utils.system_stats import update_last_execution_time
@@ -106,7 +106,7 @@ class ActionExecutionClient(Runtime):
         pass
 
     def get_mcp_config(self, extra_servers: list[Any] | None = None) -> Any:
-        if sys.platform == 'win32':
+        if OS_CAPS.is_windows:
             from backend.core.config.mcp_config import MCPConfig
 
             return MCPConfig()
@@ -214,7 +214,7 @@ class ActionExecutionClient(Runtime):
 
     async def call_tool_mcp(self, action: Any) -> Any:
         """Call an MCP tool.  Not available on Windows."""
-        if sys.platform == 'win32':
+        if OS_CAPS.is_windows:
             from backend.ledger.observation import ErrorObservation
 
             return ErrorObservation(

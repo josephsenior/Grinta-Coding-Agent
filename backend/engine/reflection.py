@@ -1,6 +1,6 @@
 from typing import Any
 
-from backend.orchestration.state.state import State
+from backend.core.contracts.state import State
 
 
 def format_reflection_progress(state: State) -> str:

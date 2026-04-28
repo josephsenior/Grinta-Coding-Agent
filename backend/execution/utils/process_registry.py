@@ -7,6 +7,7 @@ import threading
 from collections.abc import Callable, Mapping
 
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 
 
 class TaskCancellationService:
@@ -116,7 +117,7 @@ class TaskCancellationService:
                 )
 
         # 1) Try to kill the tree directly on Windows first
-        if os.name == 'nt':
+        if OS_CAPS.is_windows:
             for pid in pids:
                 try:
                     self._kill_pid_best_effort(pid)
@@ -134,7 +135,7 @@ class TaskCancellationService:
                 logger.warning('[TaskCancellationService] Terminating pid=%s', pid)
                 process.terminate()
                 try:
-                    process.wait(timeout=1.0 if os.name != 'nt' else 0.1)
+                    process.wait(timeout=1.0 if not OS_CAPS.is_windows else 0.1)
                 except subprocess.TimeoutExpired:
                     logger.warning(
                         '[TaskCancellationService] Force killing pid=%s', pid
@@ -149,7 +150,7 @@ class TaskCancellationService:
                 )
 
         # 3) Kill remaining raw PIDs (on Non-Windows)
-        if os.name != 'nt':
+        if not OS_CAPS.is_windows:
             for pid in pids:
                 if pid in processes:
                     continue
@@ -159,7 +160,7 @@ class TaskCancellationService:
 
     def _kill_pid_best_effort(self, pid: int) -> None:
         try:
-            if os.name == 'nt':
+            if OS_CAPS.is_windows:
                 # /T kills the process tree; /F forces termination.
                 subprocess.run(
                     ['taskkill', '/PID', str(pid), '/T', '/F'],

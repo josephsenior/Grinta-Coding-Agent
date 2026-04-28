@@ -19,6 +19,8 @@ import uuid
 from ctypes import wintypes
 from pathlib import Path
 
+from backend.core.os_capabilities import OS_CAPS
+
 HRESULT = ctypes.c_long
 
 
@@ -386,7 +388,7 @@ def _launch(argv: list[str], *, cwd: str, workspace: Path, allow_network: bool) 
 
 
 def main(argv: list[str] | None = None) -> int:
-    if os.name != 'nt':
+    if not OS_CAPS.is_windows:
         sys.stderr.write('AppContainer runner is only supported on Windows.\n')
         return 2
 

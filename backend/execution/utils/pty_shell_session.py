@@ -26,6 +26,7 @@ import time
 from typing import TYPE_CHECKING
 
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.pty_session import (
     CONTROL_SEQUENCES,
     InteractiveSession,
@@ -46,7 +47,7 @@ if TYPE_CHECKING:
     from backend.ledger.observation import Observation
 
 
-IS_WINDOWS = os.name == 'nt'
+IS_WINDOWS = OS_CAPS.is_windows
 
 # Small pause after writes to let the PTY drain into the reader buffer before
 # the caller grabs output. Not a correctness requirement — just a usability

@@ -11,7 +11,7 @@ ChatCompletionToolParam = Any
 
 if TYPE_CHECKING:
     from backend.inference.llm import LLM
-    from backend.orchestration.state.state import State
+    from backend.core.contracts.state import State
 
     from .safety import OrchestratorSafetyManager
 

@@ -52,7 +52,7 @@ class TaskTracker:
         if not isinstance(data, list):
             return []
 
-        from backend.orchestration.state.state import normalize_plan_step_payload
+        from backend.core.contracts.state import normalize_plan_step_payload
 
         try:
             return [
@@ -63,7 +63,7 @@ class TaskTracker:
 
     def save_to_file(self, task_list: list[dict[str, Any]]) -> None:
         """Save the task list to disk."""
-        from backend.orchestration.state.state import normalize_plan_step_payload
+        from backend.core.contracts.state import normalize_plan_step_payload
 
         normalized = [
             normalize_plan_step_payload(task, i + 1) for i, task in enumerate(task_list)

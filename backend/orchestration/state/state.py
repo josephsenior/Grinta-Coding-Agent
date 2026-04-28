@@ -13,7 +13,11 @@ import backend
 from backend.context.view import View
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
-from backend.core.task_status import TASK_STATUS_DONE, TASK_STATUS_TODO, normalize_task_status
+from backend.core.task_status import (
+    TASK_STATUS_DONE,
+    TASK_STATUS_TODO,
+    normalize_task_status,
+)
 from backend.inference.metrics import Metrics
 from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import PlaybookFinishAction

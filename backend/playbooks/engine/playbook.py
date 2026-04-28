@@ -14,6 +14,7 @@ from pydantic import BaseModel, ValidationError
 
 from backend.core.errors import PlaybookValidationError
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.playbooks.engine.types import InputMetadata, PlaybookMetadata, PlaybookType
 
 AUTO_TRIGGER_ENV_VAR = 'GRINTA_ENABLE_PLAYBOOK_AUTO_TRIGGER'
@@ -144,7 +145,7 @@ class BasePlaybook(BaseModel):
             # Windows NamedTemporaryFile defaults to exclusive access which prevents a second
             # open(, encoding="utf-8") call while the handle is still alive. Tests keep the temporary file open,
             # so we fall back to the Win32 CreateFile API that allows shared reads.
-            if os.name == 'nt':
+            if OS_CAPS.is_windows:
                 return cls._read_locked_file_windows(path)
             raise
 

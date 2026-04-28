@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
+from backend.core.os_capabilities import OS_CAPS
+
 SandboxBackend = Literal['bubblewrap', 'sandbox-exec', 'appcontainer']
 _SANDBOX_TMP_DIR = Path('/').joinpath('tmp').as_posix()
 
@@ -190,7 +192,7 @@ def resolve_execution_sandbox_policy(
     workspace = str(Path(workspace_root).resolve())
     allow_network = bool(getattr(security_config, 'allow_network_commands', False))
 
-    if sys.platform == 'linux':
+    if OS_CAPS.is_linux:
         if not (shutil.which('bwrap') or shutil.which('bubblewrap')):
             raise RuntimeError(
                 "execution_profile='sandboxed_local' requires bubblewrap (`bwrap`) on Linux."
@@ -201,7 +203,7 @@ def resolve_execution_sandbox_policy(
             allow_network=allow_network,
         )
 
-    if sys.platform == 'darwin':
+    if OS_CAPS.is_macos:
         if not shutil.which('sandbox-exec'):
             raise RuntimeError(
                 "execution_profile='sandboxed_local' requires sandbox-exec on macOS."
@@ -212,7 +214,7 @@ def resolve_execution_sandbox_policy(
             allow_network=allow_network,
         )
 
-    if sys.platform == 'win32':
+    if OS_CAPS.is_windows:
         return ExecutionSandboxPolicy(
             backend='appcontainer',
             workspace_root=workspace,

@@ -21,6 +21,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
+from backend.core.os_capabilities import OS_CAPS
+
 # Suppress third-party DeprecationWarnings (same default as entry.py / backend pkg).
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 # google-genai subclasses aiohttp.ClientSession (emits noise on import in some envs).
@@ -48,7 +50,7 @@ def _normalize_project_arg_early(value: str) -> str:
     if normalized.lower().startswith('file:'):
         parsed = urlparse(normalized)
         path = unquote(parsed.path or '')
-        if sys.platform == 'win32' and len(path) >= 3 and path[0] == '/' and path[2] == ':':
+        if OS_CAPS.is_windows and len(path) >= 3 and path[0] == '/' and path[2] == ':':
             path = path[1:]
         normalized = path
     return normalized

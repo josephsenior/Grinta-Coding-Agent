@@ -60,7 +60,7 @@ from backend.ledger.action import AgentThinkAction, MessageAction, PlaybookFinis
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import EventSource
 from backend.orchestration.agent import Agent
-from backend.orchestration.state.state import State
+from backend.core.contracts.state import State
 from backend.utils.prompt import OrchestratorPromptManager, PromptManager
 
 if TYPE_CHECKING:

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import sys
 from dataclasses import dataclass, field
 from itertools import islice
 from typing import TYPE_CHECKING, cast
 
 from backend.core.message import Message, TextContent
+from backend.core.os_capabilities import OS_CAPS
 
 if TYPE_CHECKING:
     from backend.ledger.observation.agent import PlaybookKnowledge
@@ -86,7 +86,7 @@ class PromptManager:
             is_windows_with_bash,
         )
 
-        _on_windows = sys.platform == 'win32'
+        _on_windows = OS_CAPS.is_windows
 
         # Drive prompt environment flags from the exact logic the executor uses
         context.setdefault('is_windows', _on_windows)
@@ -266,7 +266,7 @@ class OrchestratorPromptManager(PromptManager):
             is_windows_with_bash,
         )
 
-        _on_windows = sys.platform == 'win32'
+        _on_windows = OS_CAPS.is_windows
         terminal_tool = get_terminal_tool_name()
         context.setdefault('is_windows', _on_windows)
         context.setdefault(

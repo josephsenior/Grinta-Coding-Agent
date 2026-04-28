@@ -11,7 +11,6 @@ import argparse
 import asyncio
 import os
 import re
-import sys
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -25,6 +24,7 @@ from uvicorn import Config, Server
 
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.execution.debugger import DAPDebugManager
 from backend.execution.file_operations import (
     ensure_directory_exists,
@@ -112,7 +112,7 @@ _POWERSHELL_BUILTIN_COMMANDS = frozenset(
 )
 
 # Note: Import is deferred to avoid executing windows_bash.py on non-Windows platforms
-if sys.platform == 'win32':
+if OS_CAPS.is_windows:
     pass
 
 
@@ -326,7 +326,7 @@ class RuntimeExecutor:
 
     def _uses_powershell_shell_contract(self) -> bool:
         """Return True only when the active Windows terminal contract is PowerShell."""
-        if sys.platform != 'win32':
+        if not OS_CAPS.is_windows:
             return False
 
         tool_registry = getattr(self.session_manager, 'tool_registry', None)
@@ -2018,7 +2018,7 @@ if __name__ == '__main__':
                 initialization_error = RuntimeError(error_msg)
                 raise initialization_error from exc
 
-            is_windows = sys.platform == 'win32'
+            is_windows = OS_CAPS.is_windows
             if is_windows:
                 logger.info('Skipping MCP Proxy initialization on Windows')
                 mcp_proxy_manager = None

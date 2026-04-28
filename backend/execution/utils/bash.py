@@ -15,6 +15,7 @@ import bashlex  # pyright: ignore[reportMissingTypeStubs]
 import libtmux
 
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.bash_constants import TIMEOUT_MESSAGE_TEMPLATE
 from backend.execution.utils.prompt_detector import detect_interactive_prompt
 from backend.execution.utils.unified_shell import BaseShellSession, UnifiedShellSession
@@ -409,7 +410,7 @@ class BashSession(BaseShellSession):
         username = self.username
         if not username:
             return False
-        if os.name == 'nt':
+        if OS_CAPS.is_windows:
             return False
         try:
             uid_getter = os.__dict__.get('geteuid')

@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import sys
 import tempfile
 import time
 from pathlib import Path
@@ -25,6 +24,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.core.config.mcp_config import MCPServerConfig
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.system_stats import (
     get_system_stats,
     update_last_execution_time,
@@ -161,7 +161,7 @@ def register_routes(
 
     @app.post('/update_mcp_server')
     async def update_mcp_server(request: Request):
-        is_windows = sys.platform == 'win32'
+        is_windows = OS_CAPS.is_windows
         mcp_proxy_manager = get_mcp_proxy()
         if is_windows:
             logger.info('MCP server update skipped on Windows')

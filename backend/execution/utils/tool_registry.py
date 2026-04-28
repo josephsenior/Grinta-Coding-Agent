@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 
 
 def resolve_windows_powershell_preference(
@@ -27,7 +28,7 @@ def resolve_windows_powershell_preference(
     - ``bash``: prefer Git Bash when available
     - ``auto``: currently equivalent to ``powershell``
     """
-    if sys.platform != 'win32':
+    if not OS_CAPS.is_windows:
         return False
 
     raw_pref = os.getenv('APP_WINDOWS_SHELL_PREFERENCE', 'powershell').strip().lower()
@@ -121,7 +122,7 @@ class ToolRegistry:
 
     def _detect_shell(self) -> None:
         """Detect the best available shell."""
-        if sys.platform == 'win32':
+        if OS_CAPS.is_windows:
             # Windows: try pwsh -> powershell -> cmd
             if self._check_command(
                 'pwsh', ['-NoProfile', '-Command', '$PSVersionTable.PSVersion']
@@ -194,7 +195,7 @@ class ToolRegistry:
                 fallback='python',  # Can fall back to pure Python
             )
         # Windows findstr
-        elif sys.platform == 'win32' and self._check_command(
+        elif OS_CAPS.is_windows and self._check_command(
             'findstr', ['/?'], check_stderr=True
         ):
             self._tools['search'] = ToolInfo(
@@ -228,7 +229,7 @@ class ToolRegistry:
 
     def _detect_tmux(self) -> None:
         """Detect tmux (Unix only, optional)."""
-        if sys.platform == 'win32':
+        if OS_CAPS.is_windows:
             # tmux not available on Windows
             self._tools['tmux'] = ToolInfo(
                 name='tmux',
@@ -348,7 +349,7 @@ class ToolRegistry:
                         tool_name.capitalize(),
                         fallback_str,
                     )
-                elif tool_name == 'tmux' and sys.platform == 'win32':
+                elif tool_name == 'tmux' and OS_CAPS.is_windows:
                     logger.debug(
                         '⚠️  %s: Not available on Windows (expected)',
                         tool_name.capitalize(),

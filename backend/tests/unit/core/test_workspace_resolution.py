@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from backend.core.os_capabilities import OSCapabilities, override_os_capabilities
 from backend.core.workspace_resolution import (
     WORKSPACE_NOT_OPEN_ERROR_ID,
     WORKSPACE_NOT_OPEN_MESSAGE,
@@ -36,9 +37,24 @@ def test_normalize_user_workspace_path_strips_quotes() -> None:
 
 def test_normalize_user_workspace_path_file_url_windows(monkeypatch) -> None:
     monkeypatch.setattr('sys.platform', 'win32')
-    assert (
-        normalize_user_workspace_path('file:///C:/Users/me/repo') == 'C:/Users/me/repo'
+    windows_caps = OSCapabilities(
+        is_windows=True,
+        is_posix=False,
+        is_linux=False,
+        is_macos=False,
+        shell_kind='powershell',
+        supports_pty=False,
+        signal_strategy='windows',
+        path_sep='\\',
+        default_python_exec='python',
+        sys_platform='win32',
+        os_name='nt',
     )
+    with override_os_capabilities(windows_caps):
+        assert (
+            normalize_user_workspace_path('file:///C:/Users/me/repo')
+            == 'C:/Users/me/repo'
+        )
 
 
 def test_resolve_existing_directory_after_normalization(tmp_path) -> None:

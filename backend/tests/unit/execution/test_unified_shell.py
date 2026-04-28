@@ -13,7 +13,28 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from backend.core.os_capabilities import OSCapabilities, override_os_capabilities
 from backend.execution.utils.unified_shell import BaseShellSession, create_shell_session
+
+
+def _force_os(request, *, windows: bool) -> None:
+    """Override the global OS_CAPS for the duration of the calling test."""
+    caps = OSCapabilities(
+        is_windows=windows,
+        is_posix=not windows,
+        is_linux=not windows,
+        is_macos=False,
+        shell_kind='powershell' if windows else 'bash',
+        supports_pty=not windows,
+        signal_strategy='windows' if windows else 'posix',
+        path_sep='\\' if windows else '/',
+        default_python_exec='python' if windows else 'python3',
+        sys_platform='win32' if windows else 'linux',
+        os_name='nt' if windows else 'posix',
+    )
+    cm = override_os_capabilities(caps)
+    cm.__enter__()
+    request.addfinalizer(lambda: cm.__exit__(None, None, None))
 
 # -----------------------------------------------------------
 # Concrete stub
@@ -192,8 +213,8 @@ class _DummyTools:
 
 
 class TestCreateShellSession:
-    def test_unix_prefers_tmux_bash_session(self, tmp_path, monkeypatch):
-        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'posix')
+    def test_unix_prefers_tmux_bash_session(self, tmp_path, monkeypatch, request):
+        _force_os(request, windows=False)
         monkeypatch.setitem(
             sys.modules,
             'backend.execution.utils.bash',
@@ -209,9 +230,9 @@ class TestCreateShellSession:
         assert isinstance(session, _DummySession)
 
     def test_sandboxed_local_non_interactive_avoids_tmux_session(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, request
     ):
-        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'posix')
+        _force_os(request, windows=False)
         monkeypatch.setitem(
             sys.modules,
             'backend.execution.utils.simple_bash',
@@ -254,7 +275,7 @@ class TestCreateShellSession:
         assert isinstance(session, _DummySession)
 
     def test_sandboxed_local_interactive_falls_back_to_tmux_when_pty_unavailable(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, request
     ):
         class _FakePtyUnavailableError(RuntimeError):
             pass
@@ -263,7 +284,7 @@ class TestCreateShellSession:
             def __init__(self, **kwargs):
                 raise _FakePtyUnavailableError('pty unavailable')
 
-        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'posix')
+        _force_os(request, windows=False)
         monkeypatch.setitem(
             sys.modules,
             'backend.execution.utils.pty_session',
@@ -291,8 +312,8 @@ class TestCreateShellSession:
 
         assert isinstance(session, _DummySession)
 
-    def test_unix_falls_back_to_simple_bash_without_tmux(self, tmp_path, monkeypatch):
-        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'posix')
+    def test_unix_falls_back_to_simple_bash_without_tmux(self, tmp_path, monkeypatch, request):
+        _force_os(request, windows=False)
         monkeypatch.setitem(
             sys.modules,
             'backend.execution.utils.simple_bash',
@@ -307,8 +328,8 @@ class TestCreateShellSession:
         )
         assert isinstance(session, _DummySession)
 
-    def test_windows_prefers_powershell_when_available(self, tmp_path, monkeypatch):
-        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'nt')
+    def test_windows_prefers_powershell_when_available(self, tmp_path, monkeypatch, request):
+        _force_os(request, windows=True)
         monkeypatch.setitem(
             sys.modules,
             'backend.execution.utils.windows_bash',
@@ -329,9 +350,9 @@ class TestCreateShellSession:
         assert isinstance(session, _DummySession)
 
     def test_windows_falls_back_to_bash_when_powershell_unavailable(
-        self, tmp_path, monkeypatch
+        self, tmp_path, monkeypatch, request
     ):
-        monkeypatch.setattr('backend.execution.utils.unified_shell.os.name', 'nt')
+        _force_os(request, windows=True)
         monkeypatch.setitem(
             sys.modules,
             'backend.execution.utils.simple_bash',

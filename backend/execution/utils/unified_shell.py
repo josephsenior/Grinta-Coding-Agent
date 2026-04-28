@@ -14,6 +14,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.execution.sandboxing import (
     is_sandboxed_local_profile,
     resolve_execution_sandbox_policy,
@@ -516,7 +517,7 @@ def create_shell_session(
 
     # Windows: Prefer PowerShell by default for native compatibility.
     # Users can force bash with APP_WINDOWS_SHELL_PREFERENCE=bash.
-    if os.name == 'nt':
+    if OS_CAPS.is_windows:
         prefer_powershell = resolve_windows_powershell_preference(
             has_bash=resolved_tools.has_bash,
             has_powershell=resolved_tools.has_powershell,

@@ -543,7 +543,7 @@ def _handle_summarize_context_tool(
 
 def _normalize_task_tracker_step(s: Mapping[str, Any], idx: int) -> dict[str, Any]:
     """Normalize a single task step dict. Raises FunctionCallValidationError on invalid input."""
-    from backend.orchestration.state.state import normalize_plan_step_payload
+    from backend.core.contracts.state import normalize_plan_step_payload
 
     if not isinstance(s, dict):
         raise FunctionCallValidationError(

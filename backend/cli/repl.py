@@ -42,6 +42,7 @@ from backend.cli.theme import (
 )
 from backend.core.config import AppConfig, load_app_config
 from backend.core.enums import AgentState, EventSource
+from backend.core.os_capabilities import OS_CAPS
 from backend.ledger.action import MessageAction
 
 logger = logging.getLogger(__name__)
@@ -379,9 +380,9 @@ def _copy_to_system_clipboard(text: str) -> tuple[bool, str]:
         pass
 
     candidates: list[list[str]] = []
-    if sys.platform.startswith('win'):
+    if OS_CAPS.is_windows:
         candidates = [['clip']]
-    elif sys.platform == 'darwin':
+    elif OS_CAPS.is_macos:
         candidates = [['pbcopy']]
     else:
         candidates = [

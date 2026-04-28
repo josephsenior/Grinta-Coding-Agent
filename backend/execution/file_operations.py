@@ -11,11 +11,11 @@ import base64
 import mimetypes
 import os
 import re
-import sys
 from typing import TYPE_CHECKING, Any
 
 from backend.core.enums import FileEditSource
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.files import insert_lines, read_lines
 from backend.execution.utils.test_output_summary import extract_test_summary
 from backend.ledger.action import FileReadAction, FileWriteAction
@@ -555,7 +555,7 @@ def set_file_permissions(
     file_stat: os.stat_result | None,
 ) -> None:
     """Set file permissions and ownership with preservation for existing files."""
-    if os.name == 'nt':
+    if OS_CAPS.is_windows:
         return  # Windows doesn't support chmod/chown
 
     if file_exists and file_stat is not None:
@@ -673,6 +673,6 @@ def _format_directory_listing(
 
 def _hidden_items_command_hint(display_path_normalized: str) -> str:
     """Return a platform-aware hint for viewing hidden directory entries."""
-    if sys.platform == 'win32':
+    if OS_CAPS.is_windows:
         return f'Use `Get-ChildItem -Force {display_path_normalized}` to see them.'
     return f"You can use 'ls -la {display_path_normalized}' to see them."  # type: ignore

@@ -23,9 +23,10 @@ import hashlib
 import json
 import logging
 import os
-import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+
+from backend.core.os_capabilities import OS_CAPS
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,7 @@ def normalize_user_workspace_path(path_str: str) -> str:
         parsed = urlparse(s)
         path = unquote(parsed.path or '')
         if (
-            sys.platform == 'win32'
+            OS_CAPS.is_windows
             and len(path) >= 3
             and path[0] == '/'
             and path[2] == ':'

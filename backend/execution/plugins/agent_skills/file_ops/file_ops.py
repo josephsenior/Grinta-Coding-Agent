@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 
+from backend.core.os_capabilities import OS_CAPS
 from backend.validation.code_quality import DefaultLinter, LintResult
 
 CURRENT_FILE: str | None = None
@@ -41,9 +42,9 @@ def _is_valid_filename(file_name: str) -> bool:
     if not file_name or not isinstance(file_name, str) or (not file_name.strip()):
         return False
     invalid_chars = '<>:"/\\|?*'
-    if os.name == 'nt':
+    if OS_CAPS.is_windows:
         invalid_chars = '<>:"/\\|?*'
-    elif os.name == 'posix':
+    elif OS_CAPS.is_posix:
         invalid_chars = '\x00'
     return all(char not in file_name for char in invalid_chars)
 

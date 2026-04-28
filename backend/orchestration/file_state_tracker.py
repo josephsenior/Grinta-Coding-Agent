@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.orchestration.tool_pipeline import ToolInvocationMiddleware
 
 if TYPE_CHECKING:
@@ -60,7 +61,7 @@ def _normalize_path_key(path_str: str) -> str | None:
             p = Path.cwd() / p
         resolved = p.resolve()
         s = os.path.normpath(str(resolved))
-        if os.name == 'nt':
+        if OS_CAPS.is_windows:
             s = os.path.normcase(s)
         return s
     except OSError:

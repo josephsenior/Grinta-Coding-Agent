@@ -311,16 +311,21 @@ def _resolve_transport_profile(
 ) -> TransportProfile:
     """Resolve transport capabilities for an OpenAI-compatible client.
 
-    The decision is based on whether the **model family** (the provider that
-    created the model, e.g. ``"google"``) matches the **transport protocol**
-    (OpenAI-compatible).  Native SDK clients (AnthropicClient, GeminiClient)
+    The decision combines the **model family** (queried via
+    :func:`backend.inference.provider_capabilities.get_provider_capabilities`
+    so adding a new provider quirk only touches the registry) with the
+    transport URL. Native SDK clients (``AnthropicClient``, ``GeminiClient``)
     don't need this — they speak their own protocol natively.
 
     Args:
-        model_family: Provider that owns the model (e.g. "openai", "google",
-            "anthropic", "deepseek"). Comes from ``resolve_provider()``.
-        base_url: The endpoint URL being used.  ``None`` means the SDK default.
+        model_family: Provider that owns the model (e.g. ``"openai"``,
+            ``"google"``, ``"anthropic"``, ``"deepseek"``). Comes from
+            ``resolve_provider()``.
+        base_url: The endpoint URL being used. ``None`` means the SDK
+            default.
     """
+    from backend.inference.provider_capabilities import get_provider_capabilities
+
     # Metadata: only the real OpenAI API accepts the `metadata` request field.
     is_native_openai = model_family == 'openai' and (
         not base_url
@@ -331,15 +336,15 @@ def _resolve_transport_profile(
         .startswith('https://api.openai.com')
     )
 
-    # Tool replay: Google-family models require proprietary thought_signature
-    # data on replayed function-call blocks.  That data is lost when routed
-    # through OpenAI-compatible proxies, causing INVALID_ARGUMENT errors on
-    # later turns.  All other families translate cleanly.
-    is_google_family = model_family == 'google'
+    # Tool replay correctness comes from the provider capability registry:
+    # providers like Google require proprietary fields (e.g. thought_signature)
+    # that get lost when routed through OpenAI-compatible proxies, causing
+    # INVALID_ARGUMENT errors on later turns.
+    caps = get_provider_capabilities(model_family)
 
     return TransportProfile(
         supports_request_metadata=is_native_openai,
-        supports_tool_replay=not is_google_family,
+        supports_tool_replay=caps.supports_tool_replay,
     )
 
 
@@ -1057,12 +1062,13 @@ class GeminiClient(DirectLLMClient):
         """Get cache name if caching requested and there is content to cache."""
         if not caching_requested:
             return None
-        from backend.inference.gemini_cache import gemini_cache_manager
+        from backend.inference.prompt_cache import get_prompt_cache
 
         history_to_cache = history_messages if history_messages else []
         if not history_to_cache and not system_instruction:
             return None
-        return gemini_cache_manager.get_or_create_cache(
+        backend = get_prompt_cache('google')
+        return backend.get_or_create_cache_handle(
             client=self.client,
             model=model_name,
             system_instruction=system_instruction,
