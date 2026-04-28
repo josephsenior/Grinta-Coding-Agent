@@ -10,8 +10,8 @@ from backend.inference.llm_utils import check_tools
 ChatCompletionToolParam = Any
 
 if TYPE_CHECKING:
-    from backend.inference.llm import LLM
     from backend.core.contracts.state import State
+    from backend.inference.llm import LLM
 
     from .safety import OrchestratorSafetyManager
 

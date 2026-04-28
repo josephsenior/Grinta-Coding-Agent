@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from backend.ledger.action import Action
     from backend.core.contracts.state import State
+    from backend.ledger.action import Action
 
 
 class OrchestratorSafetyManager:

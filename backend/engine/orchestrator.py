@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 
 import backend.engine.function_calling as orchestrator_function_calling
 from backend.core.config import AgentConfig
+from backend.core.contracts.state import State
 from backend.core.errors import (
     AgentRuntimeError,
     ContextLimitError,
@@ -60,7 +61,6 @@ from backend.ledger.action import AgentThinkAction, MessageAction, PlaybookFinis
 from backend.ledger.action.agent import CondensationAction
 from backend.ledger.event import EventSource
 from backend.orchestration.agent import Agent
-from backend.core.contracts.state import State
 from backend.utils.prompt import OrchestratorPromptManager, PromptManager
 
 if TYPE_CHECKING:

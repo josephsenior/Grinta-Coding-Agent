@@ -22,10 +22,10 @@ from backend.ledger.action.agent import CondensationAction
 
 if TYPE_CHECKING:
     from backend.core.config import AgentConfig
+    from backend.core.contracts.state import State
     from backend.inference.llm_registry import LLMRegistry
     from backend.ledger.action import Action
     from backend.ledger.event import Event
-    from backend.core.contracts.state import State
     from backend.utils.prompt import PromptManager
 
 

@@ -1438,11 +1438,12 @@ class TestStepDispatch(unittest.TestCase):
 
     def test_pending_action_no_service(self):
         """Line 538-541 and 549-551 fallback paths."""
-        # We need to bypass the properties that look up services
+        # The *_service properties forward to ``self.services`` attributes,
+        # so patching those underlying fields is sufficient to exercise
+        # the no-service fallback paths.
         with (
             patch.object(self.ctrl.services, 'pending_action', None),
-            patch.object(self.ctrl, 'pending_action_service', None),
-            patch.object(self.ctrl, 'action_service', None),
+            patch.object(self.ctrl.services, 'action', None),
         ):
             # Setter
             act = MagicMock()
