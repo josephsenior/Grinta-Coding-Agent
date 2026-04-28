@@ -3,9 +3,9 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^(docs/|modules/|python/|third_party/)
+        exclude: ^(docs/|modules/|python/)
       - id: end-of-file-fixer
-        exclude: ^(docs/|modules/|python/|third_party/)
+        exclude: ^(docs/|modules/|python/)
       - id: check-yaml
         args: ['--allow-multiple-documents']
       - id: check-added-large-files
@@ -64,7 +64,10 @@ repos:
     rev: 1.8.3
     hooks:
       - id: bandit
-        args: ["-c", "pyproject.toml", "-r", "--skip", "B101,B110,B404,B603,B607"]
+        # B101: assert statements (test-only, benign)
+        # B110: try/except/pass (low signal for this codebase)
+        # B404: import subprocess (informational only, not a vulnerability)
+        args: ["-c", "pyproject.toml", "-r", "--skip", "B101,B110,B404"]
         exclude: ^(tests/|backend/tests/)
 
   # - repo: https://github.com/Lucas-C/pre-commit-hooks-safety

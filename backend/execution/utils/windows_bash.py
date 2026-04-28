@@ -6,10 +6,10 @@ This is simpler and more reliable than using the .NET SDK via pythonnet.
 
 from __future__ import annotations
 
-import sys
+from backend.core.os_capabilities import OS_CAPS
 
 # CRITICAL: Platform check MUST be the very first thing after imports
-if sys.platform != 'win32':
+if not OS_CAPS.is_windows:
 
     class WindowsOnlyModuleError(RuntimeError):
         """Raised when Windows-specific module functionality is accessed on unsupported platforms."""
@@ -17,7 +17,7 @@ if sys.platform != 'win32':
         def __init__(self, module: str):
             super().__init__(
                 f'FATAL ERROR: This module ({module}) requires Windows platform, '
-                f'but is running on {sys.platform}. This should never happen and indicates a '
+                f'but is running on {OS_CAPS.sys_platform}. This should never happen and indicates a '
                 f'serious configuration issue. Please use the appropriate platform-specific runtime.'
             )
 

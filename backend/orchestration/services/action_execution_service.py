@@ -642,7 +642,16 @@ class ActionExecutionService:
             if ctx is not None:
                 self._context.register_action_context(action, ctx)
                 await self._context.iteration_service.apply_dynamic_iterations(ctx)
-        await self._context.run_action(action, ctx)
+        try:
+            await self._context.run_action(action, ctx)
+        except Exception:
+            # If run_action raises before _bind_action_context moves the entry
+            # from the object-keyed dict to the event-id-keyed dict, the
+            # object-keyed entry would leak until the next _reset().  Clean up
+            # eagerly so there is no dangling reference.
+            if ctx is not None:
+                self._context.cleanup_action_context(ctx, action=action)
+            raise
 
     async def _handle_context_window_error(self, exc: Exception) -> Action | None:
         error_str = str(exc).lower()

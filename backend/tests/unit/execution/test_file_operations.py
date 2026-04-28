@@ -319,7 +319,8 @@ class TestDirectoryViewing:
 
     def test_format_directory_listing_windows_hidden_hint(self):
         files = ['subdir/', 'file1.txt']
-        with patch('backend.execution.file_operations.sys.platform', 'win32'):
+        with patch('backend.execution.file_operations.OS_CAPS') as mock_caps:
+            mock_caps.is_windows = True
             result = _format_directory_listing('/workspace', files, 1)
 
         assert 'Get-ChildItem -Force /workspace' in result

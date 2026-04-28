@@ -268,18 +268,18 @@ class TestLlmFileHandler:
 class TestTraceContextErrors:
     def test_set_context_exception_handled(self):
         with patch(
-            'backend.core.logger._TRACE_LOCAL', spec=[]
+            'backend.core.logger.TRACE_LOCAL', spec=[]
         ):  # Triggers AttributeError/Exception
             # Should not raise
             set_trace_context({'a': 1})
 
     def test_clear_context_exception_handled(self):
-        with patch('backend.core.logger._TRACE_LOCAL', spec=[]):
+        with patch('backend.core.logger.TRACE_LOCAL', spec=[]):
             # Should not raise
             clear_trace_context()
 
     def test_get_context_exception_handled(self):
-        with patch('backend.core.logger._TRACE_LOCAL', spec=[]):
+        with patch('backend.core.logger.TRACE_LOCAL', spec=[]):
             # Should return empty dict
             assert get_trace_context() == {}
 

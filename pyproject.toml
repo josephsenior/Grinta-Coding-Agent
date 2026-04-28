@@ -193,7 +193,7 @@ exclude_lines = [
 ]
 precision = 2
 show_missing = true
-skip_covered = false
+skip_covered = true
 fail_under = 95
 
 [tool.bandit]
@@ -201,9 +201,7 @@ fail_under = 95
 # B101: assert used — acceptable in tests and internal assertions
 # B110: try/except/pass — used intentionally for graceful degradation
 # B404: import subprocess — needed for runtime command execution
-# B603: subprocess call — controlled by SecurityAnalyzer
-# B607: partial path — acceptable for tool invocations
-skips = ["B101", "B110", "B404", "B603", "B607"]
+skips = ["B101", "B110", "B404"]
 exclude_dirs = ["backend/tests"]
 
 # Use a project-local environment only: run `uv sync` in this repo, then `uv run …`.

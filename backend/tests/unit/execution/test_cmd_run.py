@@ -228,7 +228,8 @@ def test_init_shell_commands_uses_powershell_helpers_on_windows(mock_executor):
         has_powershell=True,
     )
 
-    with patch('backend.execution.action_execution_server.sys.platform', 'win32'):
+    with patch('backend.execution.action_execution_server.OS_CAPS') as mock_caps:
+        mock_caps.is_windows = True
         mock_executor._init_shell_commands()
 
     first_command = mock_session.execute.call_args_list[0][0][0].command
@@ -249,7 +250,8 @@ def test_init_shell_commands_keeps_bash_helpers_when_not_powershell(mock_executo
         has_powershell=False,
     )
 
-    with patch('backend.execution.action_execution_server.sys.platform', 'win32'):
+    with patch('backend.execution.action_execution_server.OS_CAPS') as mock_caps:
+        mock_caps.is_windows = False
         mock_executor._init_shell_commands()
 
     first_command = mock_session.execute.call_args_list[0][0][0].command

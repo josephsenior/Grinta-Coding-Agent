@@ -1,44 +1,19 @@
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Callable
 from types import SimpleNamespace
+from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
 
 from backend.core.errors import LLMNoActionError
 from backend.engine.orchestrator import Orchestrator
-from backend.ledger.action import MessageAction
-from backend.ledger.action.empty import NullAction
+from backend.ledger.action import Action, MessageAction
 
 
-class _Safety:
-    def apply(self, response_text, actions):
-        return True, actions
-
-
-class _LLMStub:
-    def __init__(self, response_content: str):
-        self._response_content = response_content
-        self.last_kwargs: dict | None = None
-
-        # Provide a minimal features object
-        self.features = SimpleNamespace(supports_stop_words=True)
-
-    def is_function_calling_active(self) -> bool:
-        return False
-
-    def completion(self, **kwargs):
-        self.last_kwargs = kwargs
-        return SimpleNamespace(
-            id='r1',
-            choices=[
-                SimpleNamespace(message=SimpleNamespace(content=self._response_content))
-            ],
-        )
-
-
-def _make_result(content: str):
+def _make_result(content: str) -> SimpleNamespace:
     """Build a minimal LLM-result stub with no actions."""
     return SimpleNamespace(
         actions=[],
@@ -53,7 +28,7 @@ def _make_result(content: str):
     )
 
 
-def _make_orchestrator(tmp_path) -> Orchestrator:
+def _make_orchestrator() -> Orchestrator:
     """Construct an Orchestrator with all heavy dependencies mocked out."""
     orch = object.__new__(Orchestrator)
     orch.llm = MagicMock()
@@ -67,27 +42,32 @@ def _make_orchestrator(tmp_path) -> Orchestrator:
     return orch
 
 
+def _build_fallback_action(orch: Orchestrator, result: object) -> Action:
+    method = cast(Callable[[object], Action], getattr(orch, '_build_fallback_action'))
+    return method(result)
+
+
 class TestBuildFallbackAction:
     """Integration-level tests for _build_fallback_action."""
 
-    def test_empty_content_raises_llm_no_action_error(self, tmp_path) -> None:
+    def test_empty_content_raises_llm_no_action_error(self) -> None:
         """Empty LLM response must raise LLMNoActionError, not silently produce NullAction."""
-        orch = _make_orchestrator(tmp_path)
+        orch = _make_orchestrator()
         with pytest.raises(LLMNoActionError):
-            orch._build_fallback_action(_make_result(''))
+            _build_fallback_action(orch, _make_result(''))
 
-    def test_whitespace_only_raises_llm_no_action_error(self, tmp_path) -> None:
+    def test_whitespace_only_raises_llm_no_action_error(self) -> None:
         """Whitespace-only LLM response must raise LLMNoActionError."""
-        orch = _make_orchestrator(tmp_path)
+        orch = _make_orchestrator()
         with pytest.raises(LLMNoActionError):
-            orch._build_fallback_action(_make_result('   \n  '))
+            _build_fallback_action(orch, _make_result('   \n  '))
 
-    def test_no_response_raises_llm_no_action_error(self, tmp_path) -> None:
+    def test_no_response_raises_llm_no_action_error(self) -> None:
         """No response object at all must raise LLMNoActionError."""
-        orch = _make_orchestrator(tmp_path)
+        orch = _make_orchestrator()
         result = SimpleNamespace(actions=[], response=None, execution_time=0.0)
         with pytest.raises(LLMNoActionError):
-            orch._build_fallback_action(result)
+            _build_fallback_action(orch, result)
 
     @pytest.mark.parametrize(
         'text',
@@ -102,9 +82,9 @@ class TestBuildFallbackAction:
             'Which Python version should I target?',
         ],
     )
-    def test_any_non_empty_text_does_not_pause_loop(self, text: str, tmp_path) -> None:
-        orch = _make_orchestrator(tmp_path)
-        action = orch._build_fallback_action(_make_result(text))
+    def test_any_non_empty_text_does_not_pause_loop(self, text: str) -> None:
+        orch = _make_orchestrator()
+        action = _build_fallback_action(orch, _make_result(text))
         assert isinstance(action, MessageAction)
         assert action.wait_for_response is False, (
             'Any text-only LLM response must continue the loop; '

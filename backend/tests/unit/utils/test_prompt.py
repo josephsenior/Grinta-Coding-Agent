@@ -264,11 +264,12 @@ def test_terminal_helpers_prefer_powershell_when_available_on_windows():
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()
     with (
-        patch('backend.engine.tools.prompt.sys.platform', 'win32'),
+        patch('backend.engine.tools.prompt.OS_CAPS') as mock_caps,
         patch(
             'backend.engine.tools.prompt._runtime_prefers_powershell', return_value=True
         ),
     ):
+        mock_caps.is_windows = True
         assert uses_powershell_terminal() is True
         assert get_shell_name() == 'powershell'
         assert get_terminal_tool_name() == 'execute_powershell'
@@ -282,12 +283,13 @@ def test_terminal_helpers_fall_back_to_bash_when_powershell_unavailable_on_windo
     prompt_mod.set_active_tool_registry(None)
     prompt_mod._get_global_tool_registry.cache_clear()
     with (
-        patch('backend.engine.tools.prompt.sys.platform', 'win32'),
+        patch('backend.engine.tools.prompt.OS_CAPS') as mock_caps,
         patch(
             'backend.engine.tools.prompt._runtime_prefers_powershell',
             return_value=False,
         ),
     ):
+        mock_caps.is_windows = True
         assert uses_powershell_terminal() is False
         assert get_shell_name() == 'bash'
         assert get_terminal_tool_name() == 'execute_bash'
@@ -394,7 +396,8 @@ def test_build_python_exec_command_matches_active_registry_git_bash_on_windows()
     mock_reg.has_powershell = False
     prompt_mod.set_active_tool_registry(mock_reg)
     try:
-        with patch('backend.engine.tools.prompt.sys.platform', 'win32'):
+        with patch('backend.engine.tools.prompt.OS_CAPS') as mock_caps:
+            mock_caps.is_windows = True
             command = build_python_exec_command('print("hello")')
         assert 'command -v python3' in command
         assert 'Get-Command' not in command

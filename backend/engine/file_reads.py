@@ -1,3 +1,4 @@
+import shlex
 from collections import deque
 
 from backend.engine.tools.prompt import uses_powershell_terminal
@@ -19,7 +20,8 @@ def _build_full_file_read_command(path: str, use_powershell: bool) -> str:
         return (
             f'Write-Output "=== FILE: {safe} ===" ; Get-Content "{safe}" -Encoding UTF8'
         )
-    return f'echo "=== FILE: {path} ===" && cat "{path}"'
+    safe = shlex.quote(path)
+    return f'echo {shlex.quote("=== FILE: " + path + " ===")} && cat {safe}'
 
 
 def _build_partial_file_read_command(
@@ -41,10 +43,11 @@ def _build_partial_file_read_command(
             + f'Get-Content "{safe}" -Encoding UTF8 | Select-Object -Skip {start} -First {count}'
         )
 
-    unix_header = f'echo "=== FILE: {path} ({header}) ===" && '
+    safe = shlex.quote(path)
+    unix_header = f'echo {shlex.quote("=== FILE: " + path + " (" + header + ") ===")} && '
     if end == -1:
-        return unix_header + f'tail -n +{start + 1} "{path}"'
-    return unix_header + f'sed -n "{start + 1},{end}p" "{path}"'
+        return unix_header + f'tail -n +{start + 1} {safe}'
+    return unix_header + f'sed -n "{start + 1},{end}p" {safe}'
 
 
 def _build_file_read_command(fr: FileReadAction, use_powershell: bool) -> str:

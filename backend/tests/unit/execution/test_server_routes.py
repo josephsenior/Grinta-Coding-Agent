@@ -268,8 +268,9 @@ def test_upload_file_recursive_requires_zip(tmp_path: Path) -> None:
     assert 'zip' in r.json()['detail'].lower()
 
 
-@patch('backend.execution.server_routes.sys.platform', 'win32')
-def test_update_mcp_server_skipped_on_windows(tmp_path: Path) -> None:
+@patch('backend.execution.server_routes.OS_CAPS')
+def test_update_mcp_server_skipped_on_windows(mock_caps, tmp_path: Path) -> None:
+    mock_caps.is_windows = True
     workspace = tmp_path / 'workspace'
     workspace.mkdir()
     client = _make_app(workspace)

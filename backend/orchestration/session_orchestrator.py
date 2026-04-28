@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import time
 from collections.abc import Callable, Coroutine
 from typing import TYPE_CHECKING, Any
@@ -658,8 +659,18 @@ class SessionOrchestrator:
             self.event_stream.add_event(obs, EventSource.AGENT)
 
     async def stop(self) -> None:
-        """Stop the agent and perform a hard kill on running processes."""
+        """Stop the agent, best-effort kill runtime processes, and clear pending actions."""
         logger.info('Stopping agent...')
+        runtime = getattr(self, 'runtime', None)
+        hard_kill = getattr(runtime, 'hard_kill', None)
+        if callable(hard_kill):
+            try:
+                hard_kill_result = hard_kill()
+                if inspect.isawaitable(hard_kill_result):
+                    await hard_kill_result
+            except Exception:
+                logger.warning('Runtime hard_kill failed during stop()', exc_info=True)
+
         # 2. Update state to STOPPED
         await self.set_agent_state_to(AgentState.STOPPED)
 
@@ -828,6 +839,12 @@ class SessionOrchestrator:
         if not pending:
             return False
 
+        if any(
+            getattr(action, '_retry_serial_after_parallel_failure', False)
+            for action in pending
+        ):
+            return False
+
         scheduler = getattr(self, 'action_scheduler', None)
         if scheduler is None:
             return False
@@ -853,8 +870,12 @@ class SessionOrchestrator:
             *(self.action_execution.execute_action(a) for a in batch),
             return_exceptions=True,
         )
+        failed_actions: list[Action] = []
         for i, result in enumerate(results):
             if isinstance(result, BaseException):
+                failed_action = batch[i]
+                setattr(failed_action, '_retry_serial_after_parallel_failure', True)
+                failed_actions.append(failed_action)
                 action_type = getattr(batch[i], 'action', type(batch[i]).__name__)
                 logger.warning(
                     '[P2-B] Parallel batch action %d (%s) failed: %s',
@@ -862,6 +883,20 @@ class SessionOrchestrator:
                     action_type,
                     result,
                 )
+                error_obs = ErrorObservation(
+                    content=f'Parallel batch action {action_type} failed: {result}',
+                    error_id='PARALLEL_BATCH_FAILURE',
+                )
+                attach_observation_cause(
+                    error_obs,
+                    failed_action,
+                    context='session_orchestrator._try_parallel_read_batch',
+                )
+                self.event_stream.add_event(error_obs, EventSource.ENVIRONMENT)
+
+        for index, action in enumerate(failed_actions):
+            pending.insert(index, action)
+
         await self._handle_post_execution()
         return True
 

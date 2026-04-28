@@ -57,7 +57,7 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
-          uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc || true
+          uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc
           curl -s https://codecov.io/bash | bash -s -- -t $CODECOV_TOKEN || true
 
   gates-on-windows:
@@ -95,9 +95,15 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
-          uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc; if ($LASTEXITCODE -ne 0) { Write-Host "Tests failed, continuing" }
-          Invoke-WebRequest -Uri "https://codecov.io/bash" -OutFile codecov.ps1
-          powershell -ExecutionPolicy Bypass -File codecov.ps1 -t $env:CODECOV_TOKEN
+          uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          try {
+            Invoke-WebRequest -Uri "https://codecov.io/bash" -OutFile codecov.ps1
+            powershell -ExecutionPolicy Bypass -File codecov.ps1 -t $env:CODECOV_TOKEN
+          } catch {
+            Write-Host "Codecov upload failed, continuing"
+          }
 
   heavy-tests:
     name: Heavy / Integration Tests

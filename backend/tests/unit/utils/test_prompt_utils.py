@@ -478,7 +478,7 @@ class TestOrchestratorPromptManager:
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=mock_config)
 
         with (
-            patch('backend.utils.prompt.sys.platform', 'win32'),
+            patch('backend.utils.prompt.OS_CAPS') as mock_caps,
             patch(
                 'backend.engine.tools.prompt.get_terminal_tool_name',
                 return_value='execute_powershell',
@@ -488,6 +488,7 @@ class TestOrchestratorPromptManager:
                 return_value=True,
             ),
         ):
+            mock_caps.is_windows = True
             result = opm.get_system_message()
 
         assert 'Your terminal is **PowerShell** on Windows.' in result

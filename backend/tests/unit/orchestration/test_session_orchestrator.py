@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from backend.core.enums import LifecyclePhase
 from backend.core.schemas import AgentState
 from backend.ledger import EventSource
+from backend.orchestration.action_scheduler import ActionScheduler
 from backend.orchestration.orchestration_config import OrchestrationConfig
 from backend.orchestration.session_orchestrator import (
     ERROR_ACTION_NOT_EXECUTED_ERROR,
@@ -268,7 +269,7 @@ class TestServiceAliasing(unittest.TestCase):
 
     def test_unknown_attribute_raises(self):
         with self.assertRaises(AttributeError):
-            _ = self.ctrl.nonexistent_attr_12345
+            getattr(self.ctrl, 'nonexistent_attr_12345')
 
     def test_alias_before_services_set(self):
         """Covers the edge case where services hasn't been set yet."""
@@ -588,6 +589,34 @@ class TestLifecycle(unittest.IsolatedAsyncioTestCase):
 
         await self.ctrl.stop()
 
+        self.ctrl.services.state.set_agent_state.assert_awaited_once_with(
+            AgentState.STOPPED
+        )
+
+    async def test_stop_hard_kills_async_runtime_when_available(self):
+        self.ctrl.services.state.set_agent_state = AsyncMock()
+        self.ctrl.services.pending_action.set = MagicMock()
+        runtime = MagicMock()
+        runtime.hard_kill = AsyncMock()
+        self.ctrl.runtime = runtime
+
+        await self.ctrl.stop()
+
+        runtime.hard_kill.assert_awaited_once_with()
+        self.ctrl.services.state.set_agent_state.assert_awaited_once_with(
+            AgentState.STOPPED
+        )
+
+    async def test_stop_hard_kills_sync_runtime_when_available(self):
+        self.ctrl.services.state.set_agent_state = AsyncMock()
+        self.ctrl.services.pending_action.set = MagicMock()
+        runtime = MagicMock()
+        runtime.hard_kill = MagicMock()
+        self.ctrl.runtime = runtime
+
+        await self.ctrl.stop()
+
+        runtime.hard_kill.assert_called_once_with()
         self.ctrl.services.state.set_agent_state.assert_awaited_once_with(
             AgentState.STOPPED
         )
@@ -1121,6 +1150,63 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
             await self.ctrl._step()
 
         self.ctrl.step.assert_not_called()
+
+    async def test_parallel_batch_failure_requeues_failed_actions_for_serial_retry(
+        self,
+    ):
+        success_action = SimpleNamespace(
+            action='read_file',
+            id=101,
+            tool_call_metadata=MagicMock(),
+        )
+        failed_action = SimpleNamespace(
+            action='read_file',
+            id=102,
+            tool_call_metadata=MagicMock(),
+        )
+        overflow_action = SimpleNamespace(
+            action='read_file',
+            id=103,
+            tool_call_metadata=MagicMock(),
+        )
+        self.ctrl.config.agent.pending_actions = [
+            success_action,
+            failed_action,
+            overflow_action,
+        ]
+        self.ctrl.action_scheduler = ActionScheduler(enabled=True, max_parallel_batch_size=2)
+        self.ctrl.config.event_stream.add_event = MagicMock()
+
+        async def _execute(action):
+            if action is failed_action:
+                raise RuntimeError('boom')
+            return None
+
+        self.ctrl.services.action_execution.execute_action = AsyncMock(side_effect=_execute)
+
+        with patch.object(self.ctrl, '_handle_post_execution', new_callable=AsyncMock) as mock_post:
+            executed = await self.ctrl._try_parallel_read_batch()
+
+            self.assertTrue(executed)
+            self.assertEqual(
+                self.ctrl.config.agent.pending_actions,
+                [failed_action, overflow_action],
+            )
+            self.assertTrue(
+                getattr(failed_action, '_retry_serial_after_parallel_failure', False)
+            )
+            self.ctrl.config.event_stream.add_event.assert_called_once()
+            error_obs, source = self.ctrl.config.event_stream.add_event.call_args.args
+            self.assertEqual(error_obs.error_id, 'PARALLEL_BATCH_FAILURE')
+            self.assertEqual(error_obs.cause, failed_action.id)
+            self.assertEqual(source, EventSource.ENVIRONMENT)
+            self.assertEqual(mock_post.await_count, 1)
+
+            self.ctrl.services.action_execution.execute_action.reset_mock()
+            second_attempt = await self.ctrl._try_parallel_read_batch()
+
+        self.assertFalse(second_attempt)
+        self.ctrl.services.action_execution.execute_action.assert_not_called()
 
     def test_cleanup_action_context_no_action(self):
         """Line 213-228 coverage for action=None path."""

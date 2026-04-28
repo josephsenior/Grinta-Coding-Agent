@@ -168,14 +168,14 @@ update-openapi:
 # Start backend
 start-backend:
 	@echo "$(YELLOW)Starting backend...$(RESET)"
-	@uv run uvicorn backend.gateway.socketio_asgi_app:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) --reload --reload-exclude "./workspace"
+	@uv run uvicorn backend.execution.action_execution_server:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) --reload --reload-exclude "./workspace"
 
 # Run the app
 run:
 	@echo "$(YELLOW)Running the app...$(RESET)"
 	@mkdir -p logs
 	@echo "$(YELLOW)Starting backend server...$(RESET)"
-	@uv run uvicorn backend.gateway.socketio_asgi_app:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) &
+	@uv run uvicorn backend.execution.action_execution_server:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) &
 	@echo "$(YELLOW)Waiting for the backend to start...$(RESET)"
 	@until nc -z localhost $(BACKEND_PORT); do sleep 0.1; done
 	@echo "$(GREEN)Backend started successfully on $(BACKEND_HOST_PORT).$(RESET)"

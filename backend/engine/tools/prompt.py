@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import functools
-import sys
 from contextvars import ContextVar
 from typing import Any
 
@@ -76,7 +75,7 @@ def uses_powershell_terminal() -> bool:
     based question the runtime uses on Windows: prefer PowerShell by default,
     with bash fallback or explicit override.
     """
-    if not sys.platform.lower().startswith('win'):
+    if not OS_CAPS.is_windows:
         return False
     return _runtime_prefers_powershell()
 
