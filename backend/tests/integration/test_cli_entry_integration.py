@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from rich.console import Console
 
+import backend.cli.repl as cli_repl
 from backend.core.config import AppConfig
 from backend.persistence.locations import get_project_local_data_root
 
@@ -54,7 +55,7 @@ def test_entry_main_launches_cli_repl_with_project_and_piped_input(
                             with patch(
                                 'backend.cli.main.Console', return_value=_make_console()
                             ):
-                                with patch('backend.cli.repl.Repl', return_value=repl):
+                                with patch.object(cli_repl, 'Repl', return_value=repl):
                                     with patch(
                                         'backend.cli.config_manager.needs_onboarding',
                                         return_value=False,

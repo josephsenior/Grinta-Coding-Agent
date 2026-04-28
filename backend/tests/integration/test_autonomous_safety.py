@@ -185,7 +185,7 @@ class TestCircuitBreaker:
         breaker.record_error(Exception('Error 2'))
         breaker.record_success()
 
-        assert breaker.consecutive_errors == 0
+        assert breaker.consecutive_errors == 1
 
     def test_trips_on_high_risk_actions(self):
         """Test that circuit breaker trips on too many high-risk actions."""

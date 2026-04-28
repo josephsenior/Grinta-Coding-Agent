@@ -50,6 +50,7 @@ temp_*.py
 test_*.txt
 debug_*.txt
 debug_*.py
+!backend/inference/debug_mixin.py
 
 diag_*.txt
 

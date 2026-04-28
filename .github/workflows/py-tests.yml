@@ -10,6 +10,10 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+  id-token: write
+
 # If triggered by a PR, it will be in the same group. However, each commit on main will be in its own unique group
 concurrency:
   group: ${{ github.workflow }}-${{ (github.head_ref && github.ref) || github.run_id }}
@@ -52,13 +56,20 @@ jobs:
           backend/tests/unit/utils/test_prompt_utils.py \
           backend/tests/unit/engine/orchestrator/test_tool_registry.py
 
-      - name: Run coverage and upload to Codecov
+      - name: Run coverage for Codecov
         if: always()
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: |
-          uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc
-          curl -s https://codecov.io/bash | bash -s -- -t $CODECOV_TOKEN || true
+        run: uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc --cov-report=xml:coverage.xml
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v6
+        with:
+          use_oidc: true
+          files: ./coverage.xml
+          flags: python-linux
+          name: python-linux
+          fail_ci_if_error: false
+          verbose: true
 
   gates-on-windows:
     name: Python Gates on Windows
@@ -89,21 +100,21 @@ jobs:
         env:
           PYTHONPATH: ".;$env:PYTHONPATH"
 
-      - name: Run coverage and upload to Codecov
+      - name: Run coverage for Codecov
         if: always()
         shell: pwsh
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        run: |
-          uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        run: uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc --cov-report=xml:coverage.xml
 
-          try {
-            Invoke-WebRequest -Uri "https://codecov.io/bash" -OutFile codecov.ps1
-            powershell -ExecutionPolicy Bypass -File codecov.ps1 -t $env:CODECOV_TOKEN
-          } catch {
-            Write-Host "Codecov upload failed, continuing"
-          }
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v6
+        with:
+          use_oidc: true
+          files: ./coverage.xml
+          flags: python-windows
+          name: python-windows
+          fail_ci_if_error: false
+          verbose: true
 
   heavy-tests:
     name: Heavy / Integration Tests

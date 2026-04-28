@@ -136,9 +136,9 @@ class TestReliabilityGuardrailsIntegration:
         # Success (Mocking some other observation like CmdOutputObservation)
         circuit_breaker.record_success()
 
-        # Validation: Should clear to 0
-        assert circuit_breaker.consecutive_errors == 0, (
-            "Circuit breaker didn't clear consecutive error count."
+        # Validation: Default hysteresis decays the error count by one.
+        assert circuit_breaker.consecutive_errors == 1, (
+            'Circuit breaker did not decay consecutive error count by one.'
         )
 
         # A new error shouldn't trip it
