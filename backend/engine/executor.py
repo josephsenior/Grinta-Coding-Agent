@@ -75,6 +75,15 @@ class ExecutionResult:
     error: str | None = None
 
 
+@dataclass(slots=True)
+class _AsyncStreamingState:
+    content_accumulate: str = ''
+    thinking_accumulate: str = ''
+    tool_calls_dict: dict[int, dict[str, Any]] = field(default_factory=dict)
+    streamed_usage: dict[str, int] | None = None
+    in_inline_think_block: bool = False
+
+
 class _FunctionCallingProxy:
     """Proxy that forwards attribute access to the live function_calling module.
 
@@ -197,6 +206,604 @@ class OrchestratorExecutor:
     # ------------------------------------------------------------------ #
     # Async streaming execution
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _timeout_from_env(
+        env_var: str,
+        default: float,
+        *,
+        allow_disable: bool = False,
+    ) -> float | None:
+        raw = os.getenv(env_var, str(default)).strip()
+        try:
+            parsed = float(raw)
+        except (TypeError, ValueError):
+            return default
+        if parsed > 0:
+            return parsed
+        return None if allow_disable else default
+
+    @staticmethod
+    def _llm_model_name(llm: Any) -> str | None:
+        return getattr(getattr(llm, 'config', None), 'model', None)
+
+    @staticmethod
+    def _merge_stream_fragment(existing: str, incoming: str) -> str:
+        r"""Merge streamed fragments with safe append-only defaults."""
+        if not incoming:
+            return existing
+        if not existing:
+            return incoming
+        if incoming == existing:
+            return existing
+        if len(incoming) > len(existing) and incoming.startswith(existing):
+            return incoming
+        if (
+            len(existing) >= 2
+            and existing[-1:] in ('}', ']')
+            and len(incoming) > len(existing)
+            and incoming.startswith(existing[:-1])
+        ):
+            return incoming
+        return existing + incoming
+
+    async def _emit_stream_text_piece(
+        self,
+        state: _AsyncStreamingState,
+        text_piece: str,
+        event_stream: EventStream | None,
+    ) -> None:
+        if not text_piece:
+            return
+
+        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+        from backend.ledger.action.message import StreamingChunkAction
+        from backend.ledger.event import EventSource
+
+        state.content_accumulate = self._merge_stream_fragment(
+            state.content_accumulate,
+            text_piece,
+        )
+        if event_stream:
+            display_acc = redact_streamed_tool_call_markers(state.content_accumulate)
+            ev = StreamingChunkAction(
+                chunk=text_piece,
+                accumulated=display_acc,
+                is_final=False,
+                thinking_accumulated=state.thinking_accumulate,
+            )
+            ev.source = EventSource.AGENT
+            event_stream.add_event(ev, EventSource.AGENT)
+            await asyncio.sleep(0)
+
+    async def _emit_stream_thinking_piece(
+        self,
+        state: _AsyncStreamingState,
+        text_piece: str,
+        event_stream: EventStream | None,
+    ) -> None:
+        if not text_piece:
+            return
+
+        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+        from backend.ledger.action.message import StreamingChunkAction
+        from backend.ledger.event import EventSource
+
+        state.thinking_accumulate = self._merge_stream_fragment(
+            state.thinking_accumulate,
+            text_piece,
+        )
+        if event_stream:
+            ev = StreamingChunkAction(
+                chunk='',
+                accumulated=redact_streamed_tool_call_markers(
+                    state.content_accumulate
+                ),
+                is_final=False,
+                thinking_chunk=text_piece,
+                thinking_accumulated=state.thinking_accumulate,
+            )
+            ev.source = EventSource.AGENT
+            event_stream.add_event(ev, EventSource.AGENT)
+            await asyncio.sleep(0)
+
+    @staticmethod
+    def _extract_delta_text(delta: dict[str, Any]) -> str:
+        delta_content = delta.get('content')
+        if isinstance(delta_content, str):
+            return delta_content
+        if not isinstance(delta_content, list):
+            return ''
+
+        parts: list[str] = []
+        for part in delta_content:
+            if isinstance(part, str):
+                parts.append(part)
+                continue
+            if not isinstance(part, dict):
+                continue
+            maybe_text = part.get('text')
+            if isinstance(maybe_text, str):
+                parts.append(maybe_text)
+        return ''.join(parts)
+
+    @staticmethod
+    def _extract_delta_reasoning(delta: dict[str, Any]) -> str:
+        for alt_key in ('reasoning_content', 'reasoning'):
+            alt_val = delta.get(alt_key)
+            if isinstance(alt_val, str) and alt_val:
+                return alt_val
+        return ''
+
+    async def _process_stream_text_delta(
+        self,
+        delta: dict[str, Any],
+        state: _AsyncStreamingState,
+        event_stream: EventStream | None,
+    ) -> None:
+        reasoning_chunk = self._extract_delta_reasoning(delta)
+        if reasoning_chunk:
+            await self._emit_stream_thinking_piece(
+                state,
+                reasoning_chunk,
+                event_stream,
+            )
+
+        remaining = self._extract_delta_text(delta)
+        while remaining:
+            if state.in_inline_think_block:
+                close_match = _INLINE_CLOSE_THINK_RE.search(remaining)
+                if close_match:
+                    await self._emit_stream_thinking_piece(
+                        state,
+                        remaining[: close_match.start()],
+                        event_stream,
+                    )
+                    state.in_inline_think_block = False
+                    remaining = remaining[close_match.end() :]
+                    continue
+                await self._emit_stream_thinking_piece(state, remaining, event_stream)
+                return
+
+            open_match = _INLINE_OPEN_THINK_RE.search(remaining)
+            if open_match:
+                before = remaining[: open_match.start()]
+                if before:
+                    await self._emit_stream_text_piece(state, before, event_stream)
+                state.in_inline_think_block = True
+                remaining = remaining[open_match.end() :]
+                continue
+            await self._emit_stream_text_piece(state, remaining, event_stream)
+            return
+
+    async def _process_stream_tool_calls(
+        self,
+        delta: dict[str, Any],
+        state: _AsyncStreamingState,
+        event_stream: EventStream | None,
+    ) -> None:
+        from backend.ledger.action.message import StreamingChunkAction
+        from backend.ledger.event import EventSource
+
+        tool_call_chunks = delta.get('tool_calls')
+        if not tool_call_chunks:
+            return
+
+        for tool_call_chunk in tool_call_chunks:
+            idx = tool_call_chunk['index']
+            if idx not in state.tool_calls_dict:
+                state.tool_calls_dict[idx] = {
+                    'id': tool_call_chunk.get('id'),
+                    'type': 'function',
+                    'function': {'name': '', 'arguments': ''},
+                }
+
+            function = tool_call_chunk.get('function', {})
+            raw_name = function.get('name') if isinstance(function, dict) else None
+            if isinstance(raw_name, str) and raw_name:
+                current_name = state.tool_calls_dict[idx]['function']['name']
+                state.tool_calls_dict[idx]['function']['name'] = (
+                    self._merge_stream_fragment(current_name, raw_name)
+                )
+
+            raw_args = function.get('arguments') if isinstance(function, dict) else None
+            if not isinstance(raw_args, str) or not raw_args:
+                continue
+
+            current_args = state.tool_calls_dict[idx]['function']['arguments']
+            state.tool_calls_dict[idx]['function']['arguments'] = (
+                self._merge_stream_fragment(current_args, raw_args)
+            )
+            if event_stream:
+                logger.debug(
+                    'DEBUG: Emitting tool argument chunk of len %d',
+                    len(raw_args),
+                )
+                ev = StreamingChunkAction(
+                    chunk=raw_args,
+                    accumulated=state.tool_calls_dict[idx]['function']['arguments'],
+                    is_final=False,
+                    is_tool_call=True,
+                    tool_call_name=state.tool_calls_dict[idx]['function']['name'],
+                )
+                ev.source = EventSource.AGENT
+                event_stream.add_event(ev, EventSource.AGENT)
+                await asyncio.sleep(0)
+
+    async def _process_stream_delta(
+        self,
+        delta: dict[str, Any],
+        state: _AsyncStreamingState,
+        event_stream: EventStream | None,
+    ) -> None:
+        await self._process_stream_text_delta(delta, state, event_stream)
+        await self._process_stream_tool_calls(delta, state, event_stream)
+
+    @staticmethod
+    def _extract_fallback_message(fallback: Any) -> Any | None:
+        choices = getattr(fallback, 'choices', None)
+        if not isinstance(choices, list) or not choices:
+            return None
+        first_choice = choices[0]
+        if isinstance(first_choice, dict):
+            return first_choice.get('message')
+        return getattr(first_choice, 'message', None)
+
+    def _extract_fallback_content(self, fallback: Any, fallback_message: Any | None) -> str:
+        fallback_content_raw = getattr(fallback, 'content', None)
+        fallback_content = (
+            self._content_to_str(fallback_content_raw)
+            if fallback_content_raw is not None
+            else ''
+        )
+        if fallback_content or fallback_message is None:
+            return fallback_content
+        if isinstance(fallback_message, dict):
+            return self._content_to_str(fallback_message.get('content'))
+        return self._content_to_str(getattr(fallback_message, 'content', None))
+
+    @staticmethod
+    def _extract_fallback_tool_calls(
+        fallback: Any,
+        fallback_message: Any | None,
+    ) -> list[dict[str, Any]]:
+        fallback_tool_calls = getattr(fallback, 'tool_calls', None)
+        if not isinstance(fallback_tool_calls, list) and fallback_message is not None:
+            if isinstance(fallback_message, dict):
+                maybe_tool_calls = fallback_message.get('tool_calls')
+            else:
+                maybe_tool_calls = getattr(fallback_message, 'tool_calls', None)
+            if isinstance(maybe_tool_calls, list):
+                fallback_tool_calls = maybe_tool_calls
+        return fallback_tool_calls if isinstance(fallback_tool_calls, list) else []
+
+    async def _apply_fallback_completion(
+        self,
+        fallback: Any,
+        state: _AsyncStreamingState,
+        event_stream: EventStream | None,
+    ) -> None:
+        fallback_message = self._extract_fallback_message(fallback)
+        fallback_content = self._extract_fallback_content(fallback, fallback_message)
+        if fallback_content:
+            await self._emit_stream_text_piece(
+                state,
+                fallback_content,
+                event_stream,
+            )
+
+        for index, tool_call in enumerate(
+            self._extract_fallback_tool_calls(fallback, fallback_message)
+        ):
+            if not isinstance(tool_call, dict):
+                continue
+            function = tool_call.get('function') or {}
+            name = function.get('name') if isinstance(function, dict) else ''
+            arguments = function.get('arguments') if isinstance(function, dict) else ''
+            state.tool_calls_dict[index] = {
+                'id': tool_call.get('id'),
+                'type': tool_call.get('type', 'function'),
+                'function': {
+                    'name': name if isinstance(name, str) else '',
+                    'arguments': arguments if isinstance(arguments, str) else '',
+                },
+            }
+
+    async def _handle_first_chunk_timeout_fallback(
+        self,
+        call_params: dict[str, Any],
+        event_stream: EventStream | None,
+        state: _AsyncStreamingState,
+        first_chunk_timeout: float,
+    ) -> None:
+        from backend.inference.exceptions import Timeout as LLMTimeout
+
+        logger.warning(
+            'LLM stream produced no first chunk after %.1fs; falling back to non-stream completion',
+            first_chunk_timeout,
+        )
+
+        if event_stream:
+            from backend.ledger.event import EventSource
+            from backend.ledger.observation import StatusObservation
+
+            status_ev = StatusObservation(
+                content='Stream timed out — retrying without streaming…'
+            )
+            event_stream.add_event(status_ev, EventSource.ENVIRONMENT)
+
+        fallback_params = dict(call_params)
+        fallback_params['stream'] = False
+        fallback_timeout = self._timeout_from_env(
+            'APP_LLM_FALLBACK_TIMEOUT_SECONDS',
+            60.0,
+        ) or 60.0
+        logger.warning(
+            'Attempting non-streaming fallback with %.1fs timeout',
+            fallback_timeout,
+        )
+
+        try:
+            fallback = await asyncio.wait_for(
+                self._llm.acompletion(**fallback_params),
+                timeout=fallback_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                'Fallback non-streaming completion timed out after %.1fs',
+                fallback_timeout,
+            )
+            raise LLMTimeout(
+                f'Fallback completion timed out after {fallback_timeout} seconds',
+                model=self._llm_model_name(self._llm),
+            ) from None
+
+        await self._apply_fallback_completion(fallback, state, event_stream)
+
+    async def _consume_first_stream_chunk(
+        self,
+        stream_aiter: Any,
+        call_params: dict[str, Any],
+        event_stream: EventStream | None,
+        state: _AsyncStreamingState,
+        first_chunk_timeout: float | None,
+    ) -> bool:
+        if first_chunk_timeout is None:
+            return True
+
+        try:
+            first_chunk = await asyncio.wait_for(
+                stream_aiter.__anext__(),
+                timeout=first_chunk_timeout,
+            )
+        except StopAsyncIteration:
+            return False
+        except asyncio.TimeoutError:
+            await self._handle_first_chunk_timeout_fallback(
+                call_params,
+                event_stream,
+                state,
+                first_chunk_timeout,
+            )
+            return False
+
+        choices = first_chunk.get('choices', [])
+        if choices:
+            await self._process_stream_delta(
+                choices[0].get('delta', {}),
+                state,
+                event_stream,
+            )
+            return True
+
+        first_chunk_usage = first_chunk.get('usage')
+        if isinstance(first_chunk_usage, dict):
+            state.streamed_usage = first_chunk_usage
+        return True
+
+    async def _consume_remaining_stream_chunks(
+        self,
+        stream_aiter: Any,
+        event_stream: EventStream | None,
+        state: _AsyncStreamingState,
+        stream_chunk_timeout: float,
+    ) -> None:
+        from backend.inference.exceptions import Timeout as LLMTimeout
+
+        while True:
+            try:
+                chunk = await asyncio.wait_for(
+                    anext(stream_aiter),
+                    timeout=stream_chunk_timeout,
+                )
+            except StopAsyncIteration:
+                return
+            except asyncio.TimeoutError:
+                logger.warning(
+                    'LLM stream chunk timed out mid-generation after %.1fs. Streaming stalled.',
+                    stream_chunk_timeout,
+                )
+                raise LLMTimeout(
+                    f'LLM stream chunk timed out mid-generation after {stream_chunk_timeout} seconds',
+                    model=self._llm_model_name(self._llm),
+                ) from None
+
+            choices = chunk.get('choices', [])
+            if not choices:
+                chunk_usage = chunk.get('usage')
+                if isinstance(chunk_usage, dict):
+                    state.streamed_usage = chunk_usage
+                continue
+            await self._process_stream_delta(
+                choices[0].get('delta', {}),
+                state,
+                event_stream,
+            )
+
+    async def _consume_async_stream(
+        self,
+        stream_iter: Any,
+        call_params: dict[str, Any],
+        event_stream: EventStream | None,
+        state: _AsyncStreamingState,
+    ) -> None:
+        stream_aiter = stream_iter.__aiter__()
+        first_chunk_timeout = self._timeout_from_env(
+            'APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS',
+            45.0,
+            allow_disable=True,
+        )
+        should_continue = await self._consume_first_stream_chunk(
+            stream_aiter,
+            call_params,
+            event_stream,
+            state,
+            first_chunk_timeout,
+        )
+        if not should_continue:
+            return
+
+        stream_chunk_timeout = self._timeout_from_env(
+            'APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS',
+            90.0,
+        ) or 90.0
+        await self._consume_remaining_stream_chunks(
+            stream_aiter,
+            event_stream,
+            state,
+            stream_chunk_timeout,
+        )
+
+    def _finalize_stream_tool_calls(
+        self,
+        state: _AsyncStreamingState,
+    ) -> list[dict[str, Any]] | None:
+        if not state.tool_calls_dict and state.content_accumulate:
+            from backend.cli.tool_call_display import (
+                extract_tool_calls_from_text_markers,
+            )
+
+            text_tool_calls = extract_tool_calls_from_text_markers(
+                state.content_accumulate
+            )
+            if text_tool_calls:
+                logger.info(
+                    'Extracted %d text-format tool call(s) from streaming content; treating as structured tool calls.',
+                    len(text_tool_calls),
+                )
+                for index, tool_call in enumerate(text_tool_calls):
+                    state.tool_calls_dict[index] = tool_call
+
+        tool_calls_list = [
+            state.tool_calls_dict[idx] for idx in sorted(state.tool_calls_dict.keys())
+        ]
+        return tool_calls_list or None
+
+    @staticmethod
+    def _visible_stream_content(content_accumulate: str) -> str:
+        from backend.cli.tool_call_display import redact_streamed_tool_call_markers
+
+        return redact_streamed_tool_call_markers(content_accumulate).strip()
+
+    def _emit_final_stream_event(
+        self,
+        event_stream: EventStream | None,
+        content_accumulate: str,
+        visible_accum: str,
+        tool_calls_list: list[dict[str, Any]] | None,
+    ) -> None:
+        if not event_stream or not content_accumulate:
+            return
+
+        from backend.ledger.action.message import StreamingChunkAction
+        from backend.ledger.event import EventSource
+
+        draft_reply_accum = '' if tool_calls_list else visible_accum
+        ev = StreamingChunkAction(
+            chunk='',
+            accumulated=draft_reply_accum,
+            is_final=True,
+        )
+        ev.source = EventSource.AGENT
+        event_stream.add_event(ev, EventSource.AGENT)
+
+    def _resolve_stream_usage(
+        self,
+        call_params: dict[str, Any],
+        visible_accum: str,
+        tool_calls_list: list[dict[str, Any]] | None,
+        streamed_usage: dict[str, int] | None,
+    ) -> dict[str, Any]:
+        if streamed_usage:
+            return streamed_usage
+
+        from backend.inference.llm_utils import get_token_count
+
+        estimated_prompt = get_token_count(call_params.get('messages') or [])
+        estimated_completion = get_token_count(
+            [{'role': 'assistant', 'content': visible_accum or ''}]
+        )
+        if tool_calls_list:
+            tool_payload: list[dict[str, Any]] = []
+            for tool_call in tool_calls_list:
+                function = tool_call.get('function', {})
+                tool_payload.append(
+                    {
+                        'role': 'assistant',
+                        'content': '',
+                        'tool_calls': [
+                            {
+                                'function': {
+                                    'name': function.get('name', ''),
+                                    'arguments': function.get('arguments', ''),
+                                }
+                            }
+                        ],
+                    }
+                )
+            estimated_completion += get_token_count(tool_payload)
+        return {
+            'prompt_tokens': estimated_prompt,
+            'completion_tokens': estimated_completion,
+            'total_tokens': estimated_prompt + estimated_completion,
+            'is_estimated': True,
+        }
+
+    def _build_streaming_response(
+        self,
+        call_params: dict[str, Any],
+        visible_accum: str,
+        tool_calls_list: list[dict[str, Any]] | None,
+        streamed_usage: dict[str, int] | None,
+    ) -> Any:
+        from backend.inference.direct_clients import LLMResponse
+
+        model_name = self._llm_model_name(self._llm) or 'unknown'
+        resolved_usage = self._resolve_stream_usage(
+            call_params,
+            visible_accum,
+            tool_calls_list,
+            streamed_usage,
+        )
+        return LLMResponse(
+            content=visible_accum,
+            model=model_name,
+            usage=resolved_usage,
+            response_id='',
+            finish_reason='stop',
+            tool_calls=tool_calls_list,
+        )
+
+    def _record_streaming_metrics(self, response: Any, start_time: float) -> None:
+        prompt_tokens = int(response.usage.get('prompt_tokens', 0) or 0)
+        completion_tokens = int(response.usage.get('completion_tokens', 0) or 0)
+        if prompt_tokens <= 0 and completion_tokens <= 0:
+            return
+        try:
+            stream_latency = time.time() - start_time
+            self._llm._record_response_metrics(response, stream_latency)  # type: ignore[attr-defined]
+        except Exception as metrics_error:
+            logger.debug('Failed to record streaming metrics: %s', metrics_error)
+
     async def async_execute(
         self,
         params: dict,
@@ -205,9 +812,6 @@ class OrchestratorExecutor:
         """Execute LLM call with async interface natively streaming tokens."""
         checkpoint = self._get_checkpoint(event_stream)
         self._raise_if_recovery_blocked(event_stream)
-        from backend.inference.direct_clients import LLMResponse
-        from backend.ledger.action.message import StreamingChunkAction
-        from backend.ledger.event import EventSource
 
         start_time = time.time()
         error_message: str | None = None
@@ -227,535 +831,38 @@ class OrchestratorExecutor:
 
         response = None
         loop = asyncio.get_running_loop()
-
-        content_accumulate = ''
-        tool_calls_dict = {}
-        # Captured from the provider's usage chunk (e.g. OpenAI with
-        # stream_options={include_usage:True}, Anthropic, Gemini).  None until
-        # a usage chunk arrives; used to record real metrics after streaming.
-        streamed_usage: dict[str, int] | None = None
+        state = _AsyncStreamingState()
 
         try:
-            from backend.cli.tool_call_display import redact_streamed_tool_call_markers
-
             logger.info('OrchestratorExecutor.async_execute: calling LLM.astream')
             stream_iter = self._llm.astream(**call_params)
-
-            first_chunk_timeout: float | None = 45.0
-            first_chunk_timeout_raw = os.getenv(
-                'APP_LLM_FIRST_CHUNK_TIMEOUT_SECONDS', '45'
-            ).strip()
-            try:
-                parsed_first_chunk_timeout = float(first_chunk_timeout_raw)
-                first_chunk_timeout = (
-                    parsed_first_chunk_timeout
-                    if parsed_first_chunk_timeout > 0
-                    else None
+            consume_task = loop.create_task(
+                self._consume_async_stream(
+                    stream_iter,
+                    call_params,
+                    event_stream,
+                    state,
                 )
-            except ValueError:
-                first_chunk_timeout = 45.0
-
-            async def _consume_stream():
-                nonlocal content_accumulate, streamed_usage
-                thinking_accumulate = ''
-                # True while we are inside a <think> or <redacted_thinking> block
-                # that is still being streamed chunk by chunk.
-                _in_inline_think_block = False
-
-                def _merge_stream_fragment(existing: str, incoming: str) -> str:
-                    r"""Merge streamed fragments with safe append-only defaults.
-
-                    OpenAI-compatible providers emit *append-only* deltas on the
-                    content / tool-call fields. A small number of non-standard
-                    providers emit *cumulative snapshots* instead (each chunk
-                    restates the whole field). This helper accepts both, but its
-                    default — when in any doubt — is to concatenate.
-
-                    The earlier implementation tried to be clever by dropping
-                    incoming fragments that happened to be a substring of the
-                    already-accumulated text, or by trimming a suffix/prefix
-                    overlap. Both heuristics are unsafe against long append-only
-                    deltas because short fragments like ``"}"``, ``"\n    "``,
-                    or ``";\n    justify"`` are almost guaranteed to appear
-                    somewhere in a multi-kilobyte CSS / JS body, and would be
-                    silently erased — corrupting the file the model was writing.
-
-                    The rules here are deliberately narrow so that the default
-                    path is plain concatenation:
-
-                    * An empty side is a no-op.
-                    * An ``incoming`` that *exactly* equals ``existing`` is a
-                      provider retry for the same chunk; drop it.
-                    * An ``incoming`` that starts with the full ``existing``
-                      string and is strictly longer is a cumulative snapshot;
-                      replace with ``incoming``.
-                    * If ``existing`` ends in a structural closer (``}`` / ``]``)
-                      and ``incoming`` starts with ``existing`` up to that
-                      closer and is strictly longer, it is a cumulative
-                      snapshot that has reopened the object to add more
-                      fields; replace with ``incoming``.
-                    * Otherwise, treat as a genuine append-only delta and
-                      concatenate verbatim. Never silently drop or trim.
-                    """
-                    if not incoming:
-                        return existing
-                    if not existing:
-                        return incoming
-                    if incoming == existing:
-                        return existing
-                    if len(incoming) > len(existing) and incoming.startswith(existing):
-                        return incoming
-                    if (
-                        len(existing) >= 2
-                        and existing[-1:] in ('}', ']')
-                        and len(incoming) > len(existing)
-                        and incoming.startswith(existing[:-1])
-                    ):
-                        return incoming
-                    return existing + incoming
-
-                async def _emit_text_piece(text_piece: str) -> None:
-                    nonlocal content_accumulate
-                    if not text_piece:
-                        return
-
-                    content_accumulate = _merge_stream_fragment(
-                        content_accumulate, text_piece
-                    )
-                    display_acc = redact_streamed_tool_call_markers(content_accumulate)
-                    if event_stream:
-                        ev = StreamingChunkAction(
-                            chunk=text_piece,
-                            accumulated=display_acc,
-                            is_final=False,
-                            thinking_accumulated=thinking_accumulate,
-                        )
-                        ev.source = EventSource.AGENT
-                        event_stream.add_event(ev, EventSource.AGENT)
-                        # Yield so interactive transports and asyncio can flush between chunks.
-                        await asyncio.sleep(0)
-
-                async def _emit_thinking_piece(text_piece: str) -> None:
-                    nonlocal thinking_accumulate
-                    if not text_piece:
-                        return
-
-                    thinking_accumulate = _merge_stream_fragment(
-                        thinking_accumulate, text_piece
-                    )
-                    if event_stream:
-                        ev = StreamingChunkAction(
-                            chunk='',
-                            accumulated=redact_streamed_tool_call_markers(
-                                content_accumulate
-                            ),
-                            is_final=False,
-                            thinking_chunk=text_piece,
-                            thinking_accumulated=thinking_accumulate,
-                        )
-                        ev.source = EventSource.AGENT
-                        event_stream.add_event(ev, EventSource.AGENT)
-                        await asyncio.sleep(0)
-
-                async def _process_delta(delta: dict[str, Any]) -> None:
-                    nonlocal _in_inline_think_block
-                    text_chunk = ''
-                    delta_content = delta.get('content')
-                    if isinstance(delta_content, str):
-                        text_chunk = delta_content
-                    elif isinstance(delta_content, list):
-                        parts: list[str] = []
-                        for part in delta_content:
-                            if isinstance(part, str):
-                                parts.append(part)
-                                continue
-                            if not isinstance(part, dict):
-                                continue
-                            maybe_text = part.get('text')
-                            if isinstance(maybe_text, str):
-                                parts.append(maybe_text)
-                        text_chunk = ''.join(parts)
-
-                    # Some OpenAI-compatible providers stream reasoning under
-                    # alternate keys instead of delta.content.  Route these to
-                    # the dedicated thinking channel so the UI can display them
-                    # in the reasoning panel rather than as regular content.
-                    # Covered: OpenAI o1/o3/o4 (reasoning_content), DeepSeek/
-                    # Perplexity (reasoning), xAI Grok thinking, QwQ via compat.
-                    reasoning_chunk = ''
-                    for alt_key in ('reasoning_content', 'reasoning'):
-                        alt_val = delta.get(alt_key)
-                        if isinstance(alt_val, str) and alt_val:
-                            reasoning_chunk = alt_val
-                            break
-
-                    if reasoning_chunk:
-                        await _emit_thinking_piece(reasoning_chunk)
-
-                    if text_chunk:
-                        # Split <think>…</think> / <redacted_thinking>…</redacted_thinking>
-                        # inline blocks out of regular content so they stream to
-                        # the reasoning panel in real time (DeepSeek R1, QwQ,
-                        # Ollama reasoning models, early OpenAI o-series).
-                        # We track _in_inline_think_block across chunk boundaries
-                        # because a single tag can arrive split across many deltas.
-                        remaining = text_chunk
-                        while remaining:
-                            if _in_inline_think_block:
-                                close_m = _INLINE_CLOSE_THINK_RE.search(remaining)
-                                if close_m:
-                                    await _emit_thinking_piece(remaining[:close_m.start()])
-                                    _in_inline_think_block = False
-                                    remaining = remaining[close_m.end():]
-                                else:
-                                    await _emit_thinking_piece(remaining)
-                                    remaining = ''
-                            else:
-                                open_m = _INLINE_OPEN_THINK_RE.search(remaining)
-                                if open_m:
-                                    before = remaining[:open_m.start()]
-                                    if before:
-                                        await _emit_text_piece(before)
-                                    _in_inline_think_block = True
-                                    remaining = remaining[open_m.end():]
-                                else:
-                                    await _emit_text_piece(remaining)
-                                    remaining = ''
-
-                    if 'tool_calls' in delta and delta['tool_calls']:
-                        for tc_chunk in delta['tool_calls']:
-                            idx = tc_chunk['index']
-                            if idx not in tool_calls_dict:
-                                tool_calls_dict[idx] = {
-                                    'id': tc_chunk.get('id'),
-                                    'type': 'function',
-                                    'function': {'name': '', 'arguments': ''},
-                                }
-
-                            fn = tc_chunk.get('function', {})
-                            raw_name = fn.get('name')
-                            if isinstance(raw_name, str) and raw_name:
-                                current_name = tool_calls_dict[idx]['function']['name']
-                                tool_calls_dict[idx]['function']['name'] = (
-                                    _merge_stream_fragment(current_name, raw_name)
-                                )
-
-                            raw_args = fn.get('arguments')
-                            if isinstance(raw_args, str) and raw_args:
-                                chunk_args = raw_args
-                                current_args = tool_calls_dict[idx]['function'][
-                                    'arguments'
-                                ]
-                                tool_calls_dict[idx]['function']['arguments'] = (
-                                    _merge_stream_fragment(current_args, chunk_args)
-                                )
-                                if event_stream:
-                                    logger.debug(
-                                        'DEBUG: Emitting tool argument chunk of len %d',
-                                        len(chunk_args),
-                                    )
-                                    ev = StreamingChunkAction(
-                                        chunk=chunk_args,
-                                        accumulated=tool_calls_dict[idx]['function'][
-                                            'arguments'
-                                        ],
-                                        is_final=False,
-                                        is_tool_call=True,
-                                        tool_call_name=tool_calls_dict[idx]['function'][
-                                            'name'
-                                        ],
-                                    )
-                                    ev.source = EventSource.AGENT
-                                    event_stream.add_event(ev, EventSource.AGENT)
-                                    await asyncio.sleep(0)
-
-                stream_aiter = stream_iter.__aiter__()
-                if first_chunk_timeout is not None:
-                    try:
-                        first_chunk = await asyncio.wait_for(
-                            stream_aiter.__anext__(),
-                            timeout=first_chunk_timeout,
-                        )
-                    except StopAsyncIteration:
-                        return
-                    except asyncio.TimeoutError:
-                        logger.warning(
-                            'LLM stream produced no first chunk after %.1fs; '
-                            'falling back to non-stream completion',
-                            first_chunk_timeout,
-                        )
-
-                        # Notify the UI so the user doesn't think it's hung.
-                        if event_stream:
-                            from backend.ledger.observation import StatusObservation
-
-                            status_ev = StatusObservation(
-                                content='Stream timed out — retrying without streaming…'
-                            )
-                            event_stream.add_event(status_ev, EventSource.ENVIRONMENT)
-
-                        fallback_params = dict(call_params)
-                        fallback_params['stream'] = False
-
-                        fallback_timeout = 60.0
-                        try:
-                            _fb_raw = os.getenv(
-                                'APP_LLM_FALLBACK_TIMEOUT_SECONDS', '60'
-                            )
-                            _fb_parsed = float(_fb_raw)
-                            fallback_timeout = _fb_parsed if _fb_parsed > 0 else 60.0
-                        except (TypeError, ValueError):
-                            fallback_timeout = 60.0
-                        logger.warning(
-                            'Attempting non-streaming fallback with %.1fs timeout',
-                            fallback_timeout,
-                        )
-
-                        try:
-                            fallback = await asyncio.wait_for(
-                                self._llm.acompletion(**fallback_params),
-                                timeout=fallback_timeout,
-                            )
-                        except asyncio.TimeoutError:
-                            logger.error(
-                                'Fallback non-streaming completion timed out after %.1fs',
-                                fallback_timeout,
-                            )
-                            from backend.inference.exceptions import (
-                                Timeout as LLMTimeout,
-                            )
-
-                            model_name = getattr(
-                                getattr(self._llm, 'config', None), 'model', None
-                            )
-                            raise LLMTimeout(
-                                f'Fallback completion timed out after {fallback_timeout} seconds',
-                                model=model_name,
-                            ) from None
-
-                        fallback_content_raw = getattr(fallback, 'content', None)
-                        fallback_content = (
-                            self._content_to_str(fallback_content_raw)
-                            if fallback_content_raw is not None
-                            else ''
-                        )
-
-                        fallback_message: Any | None = None
-                        choices = getattr(fallback, 'choices', None)
-                        if isinstance(choices, list) and choices:
-                            first_choice = choices[0]
-                            if isinstance(first_choice, dict):
-                                fallback_message = first_choice.get('message')
-                            else:
-                                fallback_message = getattr(
-                                    first_choice, 'message', None
-                                )
-
-                        if not fallback_content and fallback_message is not None:
-                            if isinstance(fallback_message, dict):
-                                fallback_content = self._content_to_str(
-                                    fallback_message.get('content')
-                                )
-                            else:
-                                fallback_content = self._content_to_str(
-                                    getattr(fallback_message, 'content', None)
-                                )
-
-                        if fallback_content:
-                            await _emit_text_piece(fallback_content)
-
-                        fallback_tool_calls = getattr(fallback, 'tool_calls', None)
-                        if not isinstance(fallback_tool_calls, list):
-                            fallback_tool_calls = None
-                        if fallback_tool_calls is None and fallback_message is not None:
-                            if isinstance(fallback_message, dict):
-                                maybe_tool_calls = fallback_message.get('tool_calls')
-                            else:
-                                maybe_tool_calls = getattr(
-                                    fallback_message, 'tool_calls', None
-                                )
-                            if isinstance(maybe_tool_calls, list):
-                                fallback_tool_calls = maybe_tool_calls
-                        fallback_tool_calls = fallback_tool_calls or []
-
-                        if isinstance(fallback_tool_calls, list):
-                            for i, tc in enumerate(fallback_tool_calls):
-                                if not isinstance(tc, dict):
-                                    continue
-                                fn = tc.get('function') or {}
-                                name = fn.get('name') if isinstance(fn, dict) else ''
-                                arguments = (
-                                    fn.get('arguments') if isinstance(fn, dict) else ''
-                                )
-                                tool_calls_dict[i] = {
-                                    'id': tc.get('id'),
-                                    'type': tc.get('type', 'function'),
-                                    'function': {
-                                        'name': name if isinstance(name, str) else '',
-                                        'arguments': arguments
-                                        if isinstance(arguments, str)
-                                        else '',
-                                    },
-                                }
-                        return
-
-                    choices = first_chunk.get('choices', [])
-                    if choices:
-                        await _process_delta(choices[0].get('delta', {}))
-                    else:
-                        # First chunk might be a provider usage chunk (no choices).
-                        _fc_usage = first_chunk.get('usage')
-                        if _fc_usage and isinstance(_fc_usage, dict):
-                            streamed_usage = _fc_usage
-
-                stream_chunk_timeout = 90.0
-                try:
-                    _sc_raw = os.getenv(
-                        'APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS', '90'
-                    ).strip()
-                    _sc_parsed = float(_sc_raw)
-                    stream_chunk_timeout = _sc_parsed if _sc_parsed > 0 else 90.0
-                except (TypeError, ValueError):
-                    stream_chunk_timeout = 90.0
-
-                while True:
-                    try:
-                        chunk = await asyncio.wait_for(
-                            anext(stream_aiter),
-                            timeout=stream_chunk_timeout,
-                        )
-                    except StopAsyncIteration:
-                        break
-                    except asyncio.TimeoutError:
-                        logger.warning(
-                            'LLM stream chunk timed out mid-generation after %.1fs. Streaming stalled.',
-                            stream_chunk_timeout,
-                        )
-                        from backend.inference.exceptions import Timeout as LLMTimeout
-
-                        model_name = getattr(
-                            getattr(self._llm, 'config', None), 'model', None
-                        )
-                        raise LLMTimeout(
-                            f'LLM stream chunk timed out mid-generation after {stream_chunk_timeout} seconds',
-                            model=model_name,
-                        ) from None
-
-                    choices = chunk.get('choices', [])
-                    if not choices:
-                        # Capture provider usage chunks (OpenAI stream_options,
-                        # Anthropic message_usage, Gemini usage_metadata).
-                        _chunk_usage = chunk.get('usage')
-                        if _chunk_usage and isinstance(_chunk_usage, dict):
-                            streamed_usage = _chunk_usage
-                        continue
-                    await _process_delta(choices[0].get('delta', {}))
-
-            consume_task = loop.create_task(_consume_stream())
+            )
             if timeout_seconds is None:
                 await consume_task
             else:
                 await asyncio.wait_for(consume_task, timeout=timeout_seconds)
-
-            # If the provider did not stream structured tool calls but embedded them
-            # as text-format markers (``[Tool call] name({...})``), extract them now
-            # BEFORE emitting the final streaming event so the draft reply panel is
-            # cleared correctly (see below).
-            if not tool_calls_dict and content_accumulate:
-                from backend.cli.tool_call_display import (
-                    extract_tool_calls_from_text_markers,
-                )
-
-                text_tcs = extract_tool_calls_from_text_markers(content_accumulate)
-                if text_tcs:
-                    logger.info(
-                        'Extracted %d text-format tool call(s) from streaming content; '
-                        'treating as structured tool calls.',
-                        len(text_tcs),
-                    )
-                    for _idx, _tc in enumerate(text_tcs):
-                        tool_calls_dict[_idx] = _tc
-
-            # finalize streams
-            visible_accum = redact_streamed_tool_call_markers(
-                content_accumulate
-            ).strip()
-            # When the model is in "tool call mode" (structured delta.tool_calls OR
-            # text-format markers extracted above), suppress the preamble text from
-            # the Draft Reply panel.  Without this, any text the model emitted before
-            # the first tool call marker would flash in the panel and then disappear
-            # when the first tool action commits — confusing users into thinking a
-            # message was sent but silently discarded.
-            draft_reply_accum = '' if tool_calls_dict else visible_accum
-            if event_stream and content_accumulate:
-                ev = StreamingChunkAction(
-                    chunk='', accumulated=draft_reply_accum, is_final=True
-                )
-                ev.source = EventSource.AGENT
-                event_stream.add_event(ev, EventSource.AGENT)
-
-            tool_calls_list: list[dict[str, Any]] | None = [
-                tool_calls_dict[idx] for idx in sorted(tool_calls_dict.keys())
-            ]
-            if not tool_calls_list:
-                tool_calls_list = None
-
-            model_name = getattr(getattr(self._llm, 'config', None), 'model', 'unknown')
-            if streamed_usage:
-                _resolved_usage = streamed_usage
-            else:
-                # Provider didn't send usage data (e.g. Google Gemini via
-                # OpenAI-compat, OpenRouter, local models).  Estimate tokens
-                # so the HUD still shows meaningful numbers.
-                from backend.inference.llm_utils import get_token_count
-
-                _est_prompt = get_token_count(call_params.get('messages') or [])
-                _est_completion = get_token_count(
-                    [{'role': 'assistant', 'content': visible_accum or ''}]
-                )
-                # Include tool-call argument text in the estimate when present.
-                if tool_calls_list:
-                    _tool_payload: list[dict[str, Any]] = []
-                    for _tc in tool_calls_list:
-                        _fn = _tc.get('function', {})
-                        _tool_payload.append(
-                            {
-                                'role': 'assistant',
-                                'content': '',
-                                'tool_calls': [
-                                    {
-                                        'function': {
-                                            'name': _fn.get('name', ''),
-                                            'arguments': _fn.get('arguments', ''),
-                                        }
-                                    }
-                                ],
-                            }
-                        )
-                    _est_completion += get_token_count(_tool_payload)
-                _resolved_usage = {
-                    'prompt_tokens': _est_prompt,
-                    'completion_tokens': _est_completion,
-                    'total_tokens': _est_prompt + _est_completion,
-                    'is_estimated': True,
-                }
-            response = LLMResponse(
-                content=visible_accum,
-                model=model_name,
-                usage=_resolved_usage,
-                response_id='',
-                finish_reason='stop',
-                tool_calls=tool_calls_list,
+            tool_calls_list = self._finalize_stream_tool_calls(state)
+            visible_accum = self._visible_stream_content(state.content_accumulate)
+            self._emit_final_stream_event(
+                event_stream,
+                state.content_accumulate,
+                visible_accum,
+                tool_calls_list,
             )
-            # Record metrics on the LLM so HUD reflects real token/cost data.
-            _pt = int(_resolved_usage.get('prompt_tokens', 0) or 0)
-            _ct = int(_resolved_usage.get('completion_tokens', 0) or 0)
-            if _pt > 0 or _ct > 0:
-                try:
-                    _stream_latency = time.time() - start_time
-                    self._llm._record_response_metrics(response, _stream_latency)  # type: ignore[attr-defined]
-                except Exception as _me:
-                    logger.debug('Failed to record streaming metrics: %s', _me)
+            response = self._build_streaming_response(
+                call_params,
+                visible_accum,
+                tool_calls_list,
+                state.streamed_usage,
+            )
+            self._record_streaming_metrics(response, start_time)
 
         except asyncio.TimeoutError as exc:
             from backend.inference.exceptions import Timeout as LLMTimeout
