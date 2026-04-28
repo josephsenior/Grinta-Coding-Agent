@@ -3,6 +3,9 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
+from pydantic import SecretStr
+
+from backend.core.provider_types import ProviderToken, ProviderType
 from backend.execution.orchestrator import (
     RuntimeAcquireResult,
     RuntimeOrchestrator,
@@ -117,7 +120,11 @@ class TestRuntimeOrchestrator(unittest.TestCase):
             session_id='session-456',
             agent=mock_agent,
             headless_mode=True,
-            vcs_provider_tokens={'github': 'token'},
+            vcs_provider_tokens={
+                ProviderType.ENTERPRISE_SSO: ProviderToken(
+                    token=SecretStr('token')
+                )
+            },
             env_vars={'VAR': 'value'},
             user_id='user-123',
         )

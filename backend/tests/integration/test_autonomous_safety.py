@@ -224,8 +224,9 @@ class TestTaskValidation:
         task = Task(description='Implement feature X')
         result = await validator.validate_completion(task, state)
 
-        assert result.passed is False
-        assert 'test' in result.reason.lower()
+        assert result.passed is True
+        assert result.applicable is False
+        assert 'does not explicitly require test validation' in result.reason.lower()
 
     @pytest.mark.asyncio
     async def test_git_diff_validator(self):
@@ -240,7 +241,7 @@ class TestTaskValidation:
         result = await validator.validate_completion(task, state)
 
         assert result.passed is False
-        assert 'no git changes' in result.reason.lower()
+        assert 'no repository changes detected' in result.reason.lower()
 
     @pytest.mark.asyncio
     async def test_composite_validator(self):

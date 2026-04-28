@@ -92,6 +92,17 @@ class TestEventStreamInit:
     def test_queue_thread_started(self, stream):
         assert stream._queue_thread.is_alive()
 
+    def test_close_releases_both_sqlite_stores(self, file_store):
+        stream = EventStream('sqlite-close-sid', file_store)
+
+        assert getattr(stream, '_sqlite_store', None) is not None
+        assert getattr(stream._persist, '_sqlite_store', None) is not None
+
+        stream.close()
+
+        assert getattr(stream, '_sqlite_store', None) is None
+        assert getattr(stream._persist, '_sqlite_store', None) is None
+
 
 # ---------------------------------------------------------------------------
 # subscribe / unsubscribe

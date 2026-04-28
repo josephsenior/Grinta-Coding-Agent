@@ -158,8 +158,8 @@ def create_runtime(
         The created Runtime instance (not yet connected or initialized).
 
     """
-    owns_event_stream = event_stream is None
-    if owns_event_stream:
+    if event_stream is None:
+        owns_event_stream = True
         session_id = sid or generate_sid(config)
         file_store = get_file_store(config.file_store, get_local_data_root(config))
         # worker_count=0 enables inline delivery: no thread pool, no races.
@@ -169,6 +169,7 @@ def create_runtime(
             worker_count=0 if inline_event_delivery else None,
         )
     else:
+        owns_event_stream = False
         session_id = sid or event_stream.sid
     agent_cls = type(agent) if agent else Agent.get_cls(config.default_agent)
 

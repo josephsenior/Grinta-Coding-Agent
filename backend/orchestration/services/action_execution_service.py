@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import inspect
+from collections.abc import Awaitable, Callable
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import Mock
 
 from backend.core.errors import (
@@ -29,6 +31,7 @@ from backend.inference.exceptions import (
 )
 from backend.ledger import EventSource
 from backend.ledger.action import (
+    Action,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -49,11 +52,13 @@ from backend.orchestration.agent_circuit_breaker import (
 )
 
 if TYPE_CHECKING:
-    from backend.ledger.action import Action
     from backend.orchestration.services.orchestration_context import (
         OrchestrationContext,
     )
-    from backend.orchestration.tool_pipeline import ToolInvocationContext
+    from backend.orchestration.tool_pipeline import (
+        ToolInvocationContext,
+        ToolInvocationPipeline,
+    )
 
 
 # Substrings that appear in ``BadRequestError`` messages when the API
@@ -119,20 +124,33 @@ def _looks_like_bad_json_request(exc: Exception, error_str_lower: str) -> bool:
     return any(marker in error_str_lower for marker in _MALFORMED_JSON_MARKERS)
 
 
-def _resolve_operation_pipeline(context):
-    context_dict = getattr(context, '__dict__', {})
+def _resolve_operation_pipeline(
+    context: object,
+) -> ToolInvocationPipeline | None:
+    from backend.orchestration.tool_pipeline import ToolInvocationPipeline
+
+    def _is_pipeline_like(value: object) -> bool:
+        return callable(getattr(value, 'create_context', None))
+
+    raw_context_dict = getattr(context, '__dict__', None)
+    context_dict = raw_context_dict if isinstance(raw_context_dict, dict) else {}
     pipeline = context_dict.get('operation_pipeline')
+    if _is_pipeline_like(pipeline):
+        return cast(ToolInvocationPipeline, pipeline)
     if pipeline is None and not isinstance(context, Mock):
-        pipeline = getattr(context, 'operation_pipeline', None)
-    if pipeline is not None:
-        return pipeline
+        candidate = getattr(context, 'operation_pipeline', None)
+        if _is_pipeline_like(candidate):
+            return cast(ToolInvocationPipeline, candidate)
     pipeline = context_dict.get('tool_pipeline')
-    if pipeline is not None:
-        return pipeline
-    return getattr(context, 'tool_pipeline', None)
+    if _is_pipeline_like(pipeline):
+        return cast(ToolInvocationPipeline, pipeline)
+    candidate = getattr(context, 'tool_pipeline', None)
+    if _is_pipeline_like(candidate):
+        return cast(ToolInvocationPipeline, candidate)
+    return None
 
 
-def _resolve_llm_step_timeout_seconds(agent) -> float | None:
+def _resolve_llm_step_timeout_seconds(agent: object) -> float | None:
     """Per-LLM-step cap for ``astep`` only.
 
     ``None`` means no ``asyncio.wait_for`` limit (model may stream as long as needed).
@@ -165,6 +183,16 @@ class ActionExecutionService:
         self._consecutive_null_actions = 0
         self._null_recovery_rounds = 0
 
+    def _publish_agent_event(self, event: object) -> None:
+        event_stream = self._context.event_stream
+        if event_stream is None:
+            logger.warning(
+                'ActionExecutionService could not publish %s because event_stream is unavailable',
+                type(event).__name__,
+            )
+            return
+        event_stream.add_event(event, EventSource.AGENT)
+
     async def get_next_action(self) -> Action | None:
         """Get the next action from the agent, with automatic repair for validation errors."""
         max_repair_attempts = 3
@@ -175,6 +203,7 @@ class ActionExecutionService:
         identical_error_count = 0
         for attempt in range(max_repair_attempts + 1):
             try:
+                action: Action | None = None
                 confirmation = self._context.confirmation_service
                 controller = self._context.get_controller()
                 replay_mgr = getattr(controller, '_replay_manager', None)
@@ -186,16 +215,30 @@ class ActionExecutionService:
                     and replay_mgr is not None
                     and replay_mgr.should_replay() is True
                 )
-                if use_confirmation_replay:
-                    action = confirmation.get_next_action()
+                if use_confirmation_replay and confirmation is not None:
+                    get_next_action = getattr(confirmation, 'get_next_action', None)
+                    if not callable(get_next_action):
+                        logger.error(
+                            'ActionExecutionService.get_next_action: confirmation replay '
+                            'was requested but ConfirmationService.get_next_action is unavailable'
+                        )
+                        return None
+                    action = cast(Callable[[], Action], get_next_action)()
                 else:
                     # Prefer the async step path (real LLM streaming) when
                     # available; fall back to synchronous step() otherwise.
                     import asyncio as _asyncio
 
-                    agent = self._context.agent
+                    agent = cast(object | None, self._context.agent)
+                    if agent is None:
+                        logger.error(
+                            'ActionExecutionService.get_next_action: context agent is unavailable'
+                        )
+                        return None
+
                     astep = getattr(agent, 'astep', None)
-                    if astep is not None and _asyncio.iscoroutinefunction(astep):
+                    if callable(astep) and inspect.iscoroutinefunction(astep):
+                        async_step = cast(Callable[[object], Awaitable[Action]], astep)
                         logger.info(
                             'ActionExecutionService.get_next_action: invoking astep '
                             'for agent=%s (attempt=%d)',
@@ -204,13 +247,13 @@ class ActionExecutionService:
                         )
                         timeout = _resolve_llm_step_timeout_seconds(agent)
                         if timeout is None:
-                            action = await astep(self._context.state)
+                            action = await async_step(self._context.state)
                         else:
                             # Retry once on timeout before propagating
                             for _timeout_attempt in range(2):
                                 try:
                                     action = await _asyncio.wait_for(
-                                        astep(self._context.state),
+                                        async_step(self._context.state),
                                         timeout=timeout,
                                     )
                                     break  # success
@@ -222,14 +265,13 @@ class ActionExecutionService:
                                             timeout,
                                         )
                                         continue
-                                    model_name = None
-                                    try:
-                                        llm = getattr(agent, 'llm', None)
-                                        model_name = getattr(
-                                            getattr(llm, 'config', None), 'model', None
-                                        )
-                                    except Exception:
-                                        pass
+                                    llm = getattr(agent, 'llm', None)
+                                    llm_config = (
+                                        getattr(llm, 'config', None)
+                                        if llm is not None
+                                        else None
+                                    )
+                                    model_name = getattr(llm_config, 'model', None)
                                     logger.error(
                                         'ActionExecutionService.get_next_action: astep timed out '
                                         'after %s seconds for model=%s (after retry)',
@@ -241,7 +283,24 @@ class ActionExecutionService:
                                         model=model_name,
                                     ) from exc
                     else:
-                        action = agent.step(self._context.state)
+                        step = getattr(agent, 'step', None)
+                        if not callable(step):
+                            logger.error(
+                                'ActionExecutionService.get_next_action: agent=%s has no callable step()',
+                                getattr(agent, 'name', agent.__class__.__name__),
+                            )
+                            return None
+                        action = cast(Callable[[object], Action], step)(
+                            self._context.state
+                        )
+
+                if action is None:
+                    logger.error(
+                        'ActionExecutionService.get_next_action: agent produced no action object '
+                        'on attempt=%d',
+                        attempt,
+                    )
+                    return None
                 action.source = EventSource.AGENT
 
                 logger.info(
@@ -299,7 +358,7 @@ class ActionExecutionService:
                 obs = ErrorObservation(content=error_msg)
                 if not error_logged:
                     # Add to event stream so it's recorded in history
-                    self._context.event_stream.add_event(obs, EventSource.AGENT)
+                    self._publish_agent_event(obs)
                     error_logged = True
 
                 controller = self._context.get_controller()
@@ -400,7 +459,7 @@ class ActionExecutionService:
                 self._null_recovery_rounds,
                 self._MAX_NULL_RECOVERY_ROUNDS,
             )
-            self._context.event_stream.add_event(
+            self._publish_agent_event(
                 ErrorObservation(
                     content=(
                         'You have returned no executable action for several consecutive steps.\n\n'
@@ -409,8 +468,7 @@ class ActionExecutionService:
                         '(e.g. run a command, read a file, write code) and execute it immediately.'
                     ),
                     error_id='NULL_ACTION_LOOP_RECOVERY',
-                ),
-                EventSource.AGENT,
+                )
             )
             return action  # let the loop continue
 
@@ -420,15 +478,14 @@ class ActionExecutionService:
             self._MAX_NULL_RECOVERY_ROUNDS,
         )
         self._null_recovery_rounds = 0
-        self._context.event_stream.add_event(
+        self._publish_agent_event(
             ErrorObservation(
                 content=(
                     'The model returned no executable action for multiple consecutive '
                     'steps. Pausing to avoid a no-progress loop that burns model calls.'
                 ),
                 error_id='NULL_ACTION_LOOP',
-            ),
-            EventSource.AGENT,
+            )
         )
 
         # Set AWAITING_USER_INPUT directly on the controller instead of returning a
@@ -452,22 +509,25 @@ class ActionExecutionService:
         state = getattr(self._context, 'state', None)
         if state is None:
             return None
-        extra = getattr(state, 'extra_data', None)
-        if not isinstance(extra, dict):
+        extra_value = getattr(state, 'extra_data', None)
+        if not isinstance(extra_value, dict):
             return None
+        extra = cast(dict[str, object], extra_value)
         requirement = extra.get(_VERIFICATION_REQUIRED_KEY)
         if isinstance(requirement, dict) and requirement:
-            return requirement
+            return cast(dict[str, object], requirement)
         return None
 
     def _clear_verification_requirement(self) -> None:
         state = getattr(self._context, 'state', None)
         if state is None:
             return
-        extra = getattr(state, 'extra_data', None)
-        if not isinstance(extra, dict):
+        extra_value = getattr(state, 'extra_data', None)
+        if not isinstance(extra_value, dict):
             state.extra_data = {}
-            extra = state.extra_data
+            extra = cast(dict[str, object], state.extra_data)
+        else:
+            extra = cast(dict[str, object], extra_value)
         extra[_VERIFICATION_REQUIRED_KEY] = None
         if hasattr(state, 'set_extra'):
             state.set_extra(
@@ -480,10 +540,12 @@ class ActionExecutionService:
         state = getattr(self._context, 'state', None)
         if state is None:
             return
-        extra = getattr(state, 'extra_data', None)
-        if not isinstance(extra, dict):
+        extra_value = getattr(state, 'extra_data', None)
+        if not isinstance(extra_value, dict):
             state.extra_data = {}
-            extra = state.extra_data
+            extra = cast(dict[str, object], state.extra_data)
+        else:
+            extra = cast(dict[str, object], extra_value)
         extra[_VERIFICATION_REQUIRED_KEY] = requirement
         if hasattr(state, 'set_extra'):
             state.set_extra(
@@ -495,9 +557,12 @@ class ActionExecutionService:
     @staticmethod
     def _normalize_mcp_tool_name(action: MCPAction) -> str:
         name = str(getattr(action, 'name', '') or '').strip().lower()
-        arguments = getattr(action, 'arguments', None)
-        if not isinstance(arguments, dict):
-            arguments = {}
+        arguments_value = getattr(action, 'arguments', None)
+        arguments = (
+            cast(dict[str, object], arguments_value)
+            if isinstance(arguments_value, dict)
+            else {}
+        )
 
         if name in {'call_mcp_tool', 'execute_mcp_tool'}:
             inner = arguments.get('tool_name') or arguments.get('name')
@@ -536,11 +601,11 @@ class ActionExecutionService:
     def _format_verification_required_content(
         self, requirement: dict[str, object]
     ) -> str:
-        raw_paths = requirement.get('paths') or []
-        if isinstance(raw_paths, list):
-            paths = ', '.join(str(path) for path in raw_paths if str(path).strip())
-        else:
-            paths = ''
+        raw_paths_value = requirement.get('paths')
+        raw_paths: list[object] = raw_paths_value if isinstance(raw_paths_value, list) else []
+        paths = ', '.join(
+            str(path_value) for path_value in raw_paths if str(path_value).strip()
+        )
         failure = str(
             requirement.get('observed_failure')
             or 'Recent failing feedback still contradicts the last edit attempt.'
@@ -581,7 +646,13 @@ class ActionExecutionService:
                 StepGuardService,
             )
 
-            return StepGuardService._build_verification_requirement_from_history(history)
+            step_guard_service_cls = cast(Any, StepGuardService)
+            requirement = step_guard_service_cls._build_verification_requirement_from_history(
+                history
+            )
+            if isinstance(requirement, dict):
+                return cast(dict[str, object], requirement)
+            return None
         except Exception:
             return None
 
@@ -641,7 +712,9 @@ class ActionExecutionService:
             ctx = pipeline.create_context(action, self._context.state)
             if ctx is not None:
                 self._context.register_action_context(action, ctx)
-                await self._context.iteration_service.apply_dynamic_iterations(ctx)
+                iteration_service = self._context.iteration_service
+                if iteration_service is not None:
+                    await iteration_service.apply_dynamic_iterations(ctx)
         try:
             await self._context.run_action(action, ctx)
         except Exception:
@@ -659,11 +732,11 @@ class ActionExecutionService:
             return self._handle_malformed_request_error(exc)
         if not is_context_window_error(error_str, exc):
             raise exc
-        if not self._context.agent.config.enable_history_truncation:
+        agent = cast(object | None, self._context.agent)
+        agent_config = getattr(agent, 'config', None) if agent is not None else None
+        if not getattr(agent_config, 'enable_history_truncation', False):
             raise LLMContextWindowExceedError from exc
-        self._context.event_stream.add_event(
-            CondensationRequestAction(), EventSource.AGENT
-        )
+        self._publish_agent_event(CondensationRequestAction())
         return None
 
     def _handle_malformed_request_error(self, exc: Exception) -> Action | None:
@@ -695,5 +768,5 @@ class ActionExecutionService:
             )
         )
         think.source = EventSource.AGENT
-        self._context.event_stream.add_event(think, EventSource.AGENT)
+        self._publish_agent_event(think)
         return None

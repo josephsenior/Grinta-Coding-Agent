@@ -1,3 +1,5 @@
+# pyright: reportAttributeAccessIssue=false, reportMissingParameterType=false, reportPrivateUsage=false, reportUnknownArgumentType=false, reportUnknownLambdaType=false, reportUnknownMemberType=false, reportUnknownParameterType=false, reportUnknownVariableType=false
+# mypy: disable-error-code="assignment,attr-defined,method-assign,misc"
 """Tests for SessionOrchestrator — the main agent orchestration controller."""
 # pylint: disable=protected-access,too-many-lines
 
@@ -5,8 +7,9 @@ import asyncio
 import unittest
 from types import SimpleNamespace
 from typing import cast
-import pytest
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+
+import pytest
 
 from backend.core.enums import LifecyclePhase
 from backend.core.schemas import AgentState
@@ -22,9 +25,15 @@ from backend.orchestration.session_orchestrator import (
 )
 
 
-def _make_controller():
+def _noop_init(
+    self: SessionOrchestrator, *args: object, **kwargs: object
+) -> None:
+    del self, args, kwargs
+
+
+def _make_controller() -> SessionOrchestrator:
     """Create an SessionOrchestrator with fully mocked internals (no real __init__)."""
-    with patch.object(SessionOrchestrator, '__init__', lambda self, *a, **kw: None):
+    with patch.object(SessionOrchestrator, '__init__', _noop_init):
         ctrl = SessionOrchestrator.__new__(SessionOrchestrator)
 
     # Config
@@ -268,8 +277,9 @@ class TestServiceAliasing(unittest.TestCase):
         self.assertIs(self.ctrl.action_execution, self.ctrl.services.action_execution)
 
     def test_unknown_attribute_raises(self):
+        missing_attr = 'nonexistent_attr_12345'
         with self.assertRaises(AttributeError):
-            getattr(self.ctrl, 'nonexistent_attr_12345')
+            getattr(self.ctrl, missing_attr)
 
     def test_alias_before_services_set(self):
         """Covers the edge case where services hasn't been set yet."""

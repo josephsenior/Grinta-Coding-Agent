@@ -7,6 +7,13 @@ import httpx
 import pytest
 import socketio
 
+pytestmark = pytest.mark.skip(
+    reason=(
+        'Server/Web UI E2E is retired; Grinta now ships as a CLI-only coding agent. '
+        'This socket-based full trace is intentionally unsupported.'
+    )
+)
+
 BASE = 'http://127.0.0.1:3000'
 
 

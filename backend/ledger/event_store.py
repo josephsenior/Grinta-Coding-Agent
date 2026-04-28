@@ -110,6 +110,15 @@ class EventStore(EventStoreABC):
             except Exception as exc:
                 logger.warning('Failed to init SQLite store in EventStore: %s', exc)
 
+    def close(self) -> None:
+        """Release the optional SQLite accelerator, if it is open."""
+        if self._sqlite_store is not None:
+            try:
+                self._sqlite_store.close()
+            except Exception:
+                logger.debug('Error closing EventStore SQLite accelerator', exc_info=True)
+            self._sqlite_store = None
+
     @property
     def cur_id(self) -> int:
         """Lazy calculated property for the current event ID."""

@@ -298,24 +298,16 @@ def test_terminal_helpers_fall_back_to_bash_when_powershell_unavailable_on_windo
 
 
 def test_python_shell_command_prefers_python3_in_bash_mode():
-    with (
-        patch(
-            'backend.engine.tools.prompt.uses_powershell_terminal', return_value=False
-        ),
-        patch('backend.engine.tools.prompt.sys') as mock_sys,
+    with patch(
+        'backend.engine.tools.prompt.uses_powershell_terminal', return_value=False
     ):
-        mock_sys.platform = 'linux'
         assert get_python_shell_command() == 'python3'
 
 
 def test_python_shell_command_prefers_python_on_windows():
-    with (
-        patch(
-            'backend.engine.tools.prompt.uses_powershell_terminal', return_value=False
-        ),
-        patch('backend.engine.tools.prompt.sys') as mock_sys,
+    with patch(
+        'backend.engine.tools.prompt.uses_powershell_terminal', return_value=False
     ):
-        mock_sys.platform = 'win32'
         assert get_python_shell_command() == 'python3'
 
 

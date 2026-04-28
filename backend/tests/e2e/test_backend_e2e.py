@@ -1,7 +1,15 @@
 import json
 import time
 
+import pytest
 import requests
+
+pytestmark = pytest.mark.skip(
+    reason=(
+        'Server/Web UI E2E is retired; Grinta now ships as a CLI-only coding agent. '
+        'This HTTP completion trace is no longer a supported product surface.'
+    )
+)
 
 BASE_URL = 'http://127.0.0.1:3000/api/v1'
 

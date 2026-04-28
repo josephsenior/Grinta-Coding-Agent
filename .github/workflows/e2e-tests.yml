@@ -1,4 +1,4 @@
-﻿name: End-to-End Tests
+﻿name: CLI Regression Tests
 
 on:
   workflow_dispatch:
@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  agent-loop-e2e:
-    name: Agent Loop E2E (${{ matrix.os }})
+  cli-regressions:
+    name: CLI Regression (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -25,7 +25,6 @@ jobs:
         python-version: ['3.12']
 
     env:
-      APP_TEST_AGENT_TIMEOUT: '120'
       PYTHONPATH: '.'
 
     steps:
@@ -47,51 +46,11 @@ jobs:
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
 
-      - name: Start backend (Linux)
-        if: runner.os != 'Windows'
-        env:
-          APP_HOST: '127.0.0.1'
-          PORT: '3000'
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-        run: |
-          uv run uvicorn backend.execution.action_execution_server:app \
-            --host 127.0.0.1 --port 3000 &
-          for i in $(seq 1 30); do
-            curl -sf http://127.0.0.1:3000/server_info && break || sleep 1
-          done
-          echo "Backend started"
-
-      - name: Start backend (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        env:
-          APP_HOST: '127.0.0.1'
-          PORT: '3000'
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-        run: |
-          Start-Process -NoNewWindow -FilePath "uv" `
-            -ArgumentList "run","uvicorn","backend.execution.action_execution_server:app","--host","127.0.0.1","--port","3000"
-          for ($i = 0; $i -lt 30; $i++) {
-            try {
-              Invoke-WebRequest -Uri http://127.0.0.1:3000/server_info -UseBasicParsing -TimeoutSec 2 | Out-Null
-              Write-Output "Backend started"
-              break
-            } catch { Start-Sleep -Seconds 1 }
-          }
-
-      - name: Run agent loop E2E tests
-        env:
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL: ${{ secrets.LLM_MODEL }}
-        run: uv run pytest backend/tests/e2e/test_agent_loop_e2e.py -m integration -v --timeout=180
-
-      - name: Cleanup (Linux)
-        if: always() && runner.os != 'Windows'
-        run: pkill -f "uvicorn backend.execution.action_execution_server:app" || true
-
-      - name: Cleanup (Windows)
-        if: always() && runner.os == 'Windows'
-        shell: pwsh
-        run: Stop-Process -Name python -Force -ErrorAction SilentlyContinue
+      - name: Run CLI regression slice
+        run: >
+          uv run pytest
+          backend/tests/unit/cli/test_cli_frontend.py
+          backend/tests/unit/orchestration/test_session_orchestrator.py
+          backend/tests/unit/orchestration/services/test_action_execution_service.py
+          -k "wait_for_agent_idle or step_from_threadpool_uses_main_loop or parallel_batch_failure_requeues_failed_actions_for_serial_retry or preserves_recovery_round_after_real_action or recovers_first_round_then_pauses"
+          -q --tb=short

@@ -1,0 +1,21 @@
+{
+  "request": {
+    "model": "m",
+    "messages": [
+      {
+        "role": "user",
+        "content": "roundtrip"
+      }
+    ]
+  },
+  "response": {
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": "ok"
+        }
+      }
+    ]
+  }
+}

@@ -36,6 +36,13 @@ import httpx
 import pytest
 import socketio
 
+pytestmark = pytest.mark.skip(
+    reason=(
+        'Server/Web UI E2E is retired; Grinta now ships as a CLI-only coding agent. '
+        'Restore this test only if the conversation server/socket UI returns.'
+    )
+)
+
 BASE = os.environ.get('APP_TEST_BASE_URL', 'http://127.0.0.1:3000')
 
 # Maximum seconds to wait for the agent to produce activity.

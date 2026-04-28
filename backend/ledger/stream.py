@@ -302,6 +302,10 @@ class EventStream(EventStore):
             self._persist.close()
         except Exception as exc:  # pragma: no cover - defensive: already-closed path
             logger.debug('EventPersistence close raised during teardown: %s', exc)
+        try:
+            super().close()
+        except Exception as exc:  # pragma: no cover - defensive: already-closed path
+            logger.debug('EventStore close raised during teardown: %s', exc)
 
     def get_backpressure_snapshot(self) -> dict[str, int]:
         """Return a lightweight snapshot of enqueue/drop stats.

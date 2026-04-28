@@ -7,7 +7,7 @@ import contextlib
 import inspect
 import time
 from collections.abc import Callable, Coroutine
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from backend.utils.async_utils import run_or_schedule, set_main_event_loop
 
@@ -60,6 +60,14 @@ ERROR_ACTION_NOT_EXECUTED_ERROR = (
     'Any previously established system state, dependencies, or environment variables '
     'may have been lost.'
 )
+
+
+def _mark_retry_serial_after_parallel_failure(action: Action) -> None:
+    cast(Any, action)._retry_serial_after_parallel_failure = True
+
+
+def _invoke_zero_arg_callback(callback: Callable[[], object]) -> object:
+    return callback()
 
 
 class SessionOrchestrator:
@@ -665,7 +673,9 @@ class SessionOrchestrator:
         hard_kill = getattr(runtime, 'hard_kill', None)
         if callable(hard_kill):
             try:
-                hard_kill_result = hard_kill()
+                hard_kill_result = _invoke_zero_arg_callback(
+                    cast(Callable[[], object], hard_kill)
+                )
                 if inspect.isawaitable(hard_kill_result):
                     await hard_kill_result
             except Exception:
@@ -874,7 +884,7 @@ class SessionOrchestrator:
         for i, result in enumerate(results):
             if isinstance(result, BaseException):
                 failed_action = batch[i]
-                setattr(failed_action, '_retry_serial_after_parallel_failure', True)
+                _mark_retry_serial_after_parallel_failure(failed_action)
                 failed_actions.append(failed_action)
                 action_type = getattr(batch[i], 'action', type(batch[i]).__name__)
                 logger.warning(
