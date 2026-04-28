@@ -18,12 +18,12 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 
 from rich.console import Console
 
+from backend.cli._repl.session_lifecycle_mixin import SessionLifecycleMixin
+from backend.cli._repl.slash_commands_mixin import SlashCommandsMixin
 from backend.cli.config_manager import get_current_model
-from backend.cli.confirmation import build_confirmation_action, render_confirmation
 from backend.cli.event_renderer import CLIEventRenderer
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
-from backend.cli.settings_tui import open_settings
 from backend.cli.theme import (
     CLR_AUTONOMY_BALANCED,
     CLR_AUTONOMY_FULL,
@@ -40,7 +40,10 @@ from backend.cli.theme import (
     CLR_STATUS_WARN,
     CLR_THINKING_BORDER,
 )
-from backend.core.config import AppConfig, load_app_config
+from backend.core.config import (
+    AppConfig,
+    load_app_config as load_app_config,  # re-exported for tests/back-compat
+)
 from backend.core.enums import AgentState, EventSource
 from backend.core.os_capabilities import OS_CAPS
 from backend.ledger.action import MessageAction
@@ -292,30 +295,59 @@ def _find_command_spec(command_name: str) -> SlashCommandSpec | None:
     return None
 
 
+def _help_for_specific_command(command_name: str) -> str:
+    spec = _find_command_spec(command_name)
+    if spec is None:
+        suggestions = _closest_command_names(command_name)
+        suffix = ''
+        if suggestions:
+            suffix = (
+                '\n\nTry ' + ' or '.join(f'`{item}`' for item in suggestions) + '.'
+            )
+        return f'No help topic for `{command_name}`.{suffix}'
+    detail_lines = [
+        f'`{spec.usage}`',
+        '',
+        spec.description,
+    ]
+    if spec.aliases:
+        detail_lines.extend(
+            ['', 'Aliases: ' + ', '.join(f'`{alias}`' for alias in spec.aliases)]
+        )
+    return '\n'.join(detail_lines)
+
+
+def _help_section_lines(specs: list['SlashCommandSpec']) -> list[str]:
+    lines: list[str] = []
+    for spec in specs:
+        alias_text = (
+            ' _(aliases: '
+            + ', '.join(f'`{alias}`' for alias in spec.aliases)
+            + ')_'
+            if spec.aliases
+            else ''
+        )
+        lines.append(f'- `{spec.usage}` — {spec.description}{alias_text}')
+    return lines
+
+
+_HELP_INPUT_TIPS: tuple[str, ...] = (
+    '',
+    '**Input tips**',
+    '',
+    '- `Tab` autocomplete slash commands and common arguments',
+    '- `↑` / `↓` search prompt history',
+    '- `Alt+Enter` insert a newline',
+    '- `Ctrl+C` interrupt the current run',
+)
+
+
 def _build_help_markdown(command_name: str | None = None) -> str:
     """Build the slash-command help block from the shared command registry."""
     from collections import defaultdict
 
     if command_name:
-        spec = _find_command_spec(command_name)
-        if spec is None:
-            suggestions = _closest_command_names(command_name)
-            suffix = ''
-            if suggestions:
-                suffix = (
-                    '\n\nTry ' + ' or '.join(f'`{item}`' for item in suggestions) + '.'
-                )
-            return f'No help topic for `{command_name}`.{suffix}'
-        detail_lines = [
-            f'`{spec.usage}`',
-            '',
-            spec.description,
-        ]
-        if spec.aliases:
-            detail_lines.extend(
-                ['', 'Aliases: ' + ', '.join(f'`{alias}`' for alias in spec.aliases)]
-            )
-        return '\n'.join(detail_lines)
+        return _help_for_specific_command(command_name)
 
     by_section: dict[str, list[SlashCommandSpec]] = defaultdict(list)
     for spec in _SLASH_COMMANDS:
@@ -332,27 +364,9 @@ def _build_help_markdown(command_name: str | None = None) -> str:
         first_section = False
         lines.append(f'**{title}**')
         lines.append('')
-        for spec in specs:
-            alias_text = (
-                ' _(aliases: '
-                + ', '.join(f'`{alias}`' for alias in spec.aliases)
-                + ')_'
-                if spec.aliases
-                else ''
-            )
-            lines.append(f'- `{spec.usage}` — {spec.description}{alias_text}')
+        lines.extend(_help_section_lines(specs))
 
-    lines.extend(
-        [
-            '',
-            '**Input tips**',
-            '',
-            '- `Tab` autocomplete slash commands and common arguments',
-            '- `↑` / `↓` search prompt history',
-            '- `Alt+Enter` insert a newline',
-            '- `Ctrl+C` interrupt the current run',
-        ]
-    )
+    lines.extend(_HELP_INPUT_TIPS)
     return '\n'.join(lines)
 
 
@@ -624,7 +638,7 @@ def _supports_prompt_session(input_stream: Any, output_stream: Any) -> bool:
 # ---------------------------------------------------------------------------
 
 
-class Repl:
+class Repl(SlashCommandsMixin, SessionLifecycleMixin):
     """Interactive REPL that drives an in-process agent session."""
 
     def __init__(self, config: AppConfig, console: Console) -> None:
@@ -1201,10 +1215,6 @@ class Repl:
         from backend.core.bootstrap.agent_control_loop import run_agent_until_done
         from backend.core.bootstrap.main import (
             _create_early_status_callback,
-            _initialize_session_components,
-            _setup_mcp_tools,
-            _setup_memory,
-            _setup_runtime_for_controller,
         )
         from backend.core.bootstrap.setup import create_controller
 
@@ -1215,174 +1225,15 @@ class Repl:
             self._hud.update_workspace(getattr(config, 'project_root', None))
 
             # -- prompt session (fast, no I/O) --------------------------------
-            session: Any | None = None
-            if _supports_prompt_session(sys.stdin, sys.stdout):
-                session = self._create_prompt_session()
-                _attach_prompt_buffer_csi_sanitizer(session)
-            self._pt_session = session
+            session = self._build_prompt_session()
 
             # -- renderer (no event-stream subscription yet) ------------------
-            get_pt_session = (lambda: session) if session is not None else None
-            self._renderer = CLIEventRenderer(
-                self._console,
-                self._hud,
-                self._reasoning,
-                loop=loop,
-                max_budget=config.max_budget_per_task,
-                get_prompt_session=get_pt_session,
-                cli_tool_icons=config.cli_tool_icons,
-            )
-            renderer = self._renderer
-            if renderer is None:
-                raise RuntimeError('CLI renderer did not initialize.')
+            renderer = self._build_renderer(session, loop)
 
             # -- staged init runs in background while user sees the prompt -----
             chat_ready_done = asyncio.Event()
             engine_init_done = asyncio.Event()
             engine_init_exc: list[BaseException | None] = [None]
-
-            def _invalidate_prompt_session() -> None:
-                if session is None:
-                    return
-                app = getattr(session, 'app', None)
-                if app is not None:
-                    app.invalidate()
-
-            def _handle_bootstrap_failure(exc: BaseException) -> None:
-                engine_init_exc[0] = exc
-                self._set_footer_system_line('')
-                exc_name = type(exc).__name__
-                if 'AuthenticationError' in exc_name or 'api_key' in str(exc).lower():
-                    renderer.add_system_message(
-                        'No API key or model configured.\n'
-                        'Run grinta again and complete onboarding, '
-                        'or edit settings.json directly.\n'
-                        f'{exc}',
-                        title='error',
-                    )
-                else:
-                    renderer.add_system_message(
-                        f'Initialization failed: {exc}', title='error'
-                    )
-                self._running = False
-                _invalidate_prompt_session()
-
-            async def _engine_bootstrap() -> None:
-                """Prepare chat first, then finish optional tool warmup in the background."""
-                try:
-                    try:
-                        bootstrap_state = await asyncio.to_thread(
-                            _initialize_session_components,
-                            config,
-                            None,
-                        )
-                        session_id = bootstrap_state[0]
-                        llm_registry = bootstrap_state[1]
-                        conversation_stats = bootstrap_state[2]
-                        config_ = bootstrap_state[3]
-                        agent = bootstrap_state[4]
-
-                        self._agent = agent
-                        self._llm_registry = llm_registry
-                        self._conversation_stats = conversation_stats
-                        self._config = config_
-                        self._hud.update_workspace(
-                            getattr(config_, 'project_root', None)
-                        )
-                    except Exception as exc:
-                        _handle_bootstrap_failure(exc)
-                        return
-                    try:
-                        runtime_state = await asyncio.to_thread(
-                            _setup_runtime_for_controller,
-                            config_,
-                            llm_registry,
-                            session_id,
-                            True,
-                            agent,
-                            None,
-                            inline_event_delivery=True,
-                        )
-                        runtime = runtime_state[0]
-                        repo_directory = runtime_state[1]
-                        acquire_result = runtime_state[2]
-
-                        event_stream = runtime.event_stream
-                        if event_stream is None:
-                            raise RuntimeError(
-                                'Runtime did not produce an event stream.'
-                            )
-
-                        self._event_stream = event_stream
-                        self._runtime = runtime
-                        self._acquire_result = acquire_result
-
-                        memory = await _setup_memory(
-                            config_,
-                            runtime,
-                            session_id,
-                            repo_directory,
-                            None,
-                            None,
-                            agent,
-                        )
-                        self._memory = memory
-
-                        renderer.subscribe(event_stream, event_stream.sid)
-                        if agent.config.enable_mcp:
-                            if session is not None:
-                                self._set_footer_system_line(
-                                    'Chat ready. MCP tools warming in background.'
-                                )
-                            else:
-                                renderer.add_system_message(
-                                    'Chat ready. MCP tools warming in background.',
-                                    title='system',
-                                )
-                        else:
-                            self._hud.update_mcp_servers(0)
-                            if session is not None:
-                                self._set_footer_system_line('Ready.')
-                            else:
-                                renderer.add_system_message('Ready.', title='system')
-                        self._hud.update_ledger('Healthy')
-                        _invalidate_prompt_session()
-                        chat_ready_done.set()
-                    except Exception as exc:
-                        _handle_bootstrap_failure(exc)
-                        return
-
-                    if not agent.config.enable_mcp:
-                        return
-
-                    try:
-                        await _setup_mcp_tools(agent, runtime, memory)
-                    except Exception as exc:
-                        logger.warning(
-                            'MCP warmup failed after chat became ready', exc_info=True
-                        )
-                        self._hud.update_mcp_servers(0)
-                        msg = f'MCP warmup failed: {exc}'
-                        if session is not None:
-                            self._set_footer_system_line(msg, kind='warning')
-                        else:
-                            renderer.add_system_message(msg, title='warning')
-                    else:
-                        mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
-                        try:
-                            mcp_n = int(mcp_status.get('connected_client_count') or 0)
-                        except (TypeError, ValueError):
-                            mcp_n = 0
-                        self._hud.update_mcp_servers(mcp_n)
-                        if session is not None:
-                            self._set_footer_system_line('MCP tools loaded.')
-                        else:
-                            renderer.add_system_message(
-                                'MCP tools loaded.', title='system'
-                            )
-                finally:
-                    chat_ready_done.set()
-                    engine_init_done.set()
 
             # -- enter input loop ---------------------------------------------
             controller = None
@@ -1403,207 +1254,513 @@ class Repl:
             else:
                 renderer.add_system_message('Initializing engine...', title='system')
             bootstrap_task = asyncio.create_task(
-                _engine_bootstrap(), name='grinta-engine-bootstrap'
+                self._engine_bootstrap(
+                    session, renderer, chat_ready_done,
+                    engine_init_done, engine_init_exc,
+                ),
+                name='grinta-engine-bootstrap',
             )
 
             while self._running:
-                try:
-                    if session is None:
-                        user_input = await self._read_non_interactive_input()
-                        if user_input == '':
-                            raise EOFError
-                    else:
-                        user_input = await session.prompt_async()
-                except KeyboardInterrupt:
-                    if not self._prompt_ctrl_c_hint_shown:
-                        self._console.print(
-                            '[dim]Ctrl+C at the prompt does not exit the REPL; '
-                            'type /quit or exit. While the agent is running, '
-                            'Ctrl+C cancels the run (on some terminals you may need '
-                            'to press it more than once).[/dim]'
-                        )
-                        self._prompt_ctrl_c_hint_shown = True
-                    continue
-                except EOFError:
-                    self._console.print('EOF Error received in prompt loop.')
-                    break
-                except Exception as e:
-                    self._console.print(f'CRASH: {e}')
-                    import traceback
-
-                    traceback.print_exc()
-                    break
-
-                if not self._running:
-                    break  # type: ignore
-
-                text = user_input.strip()
-                if not text:
-                    continue
-                if _looks_like_terminal_selection_noise(text):
-                    if self._renderer is not None:
-                        self._renderer.add_system_message(
-                            'Ignored terminal control sequence noise from selection/copy input.',
-                            title='warning',
-                        )
-                    continue
-
-                if text.startswith('/'):
-                    try:
-                        parsed_command = _parse_slash_command(text)
-                    except SlashCommandParseError as exc:
-                        self._warn(str(exc))
-                        continue
-                    if parsed_command.name in ('/resume', '/compact', '/retry'):
-                        await engine_init_done.wait()
-                        if engine_init_exc[0] is not None:
-                            continue
-                    should_continue = self._handle_parsed_command(parsed_command)
-                    if not should_continue:
-                        break
-                    if self._pending_resume is not None:
-                        target = self._pending_resume
-                        self._pending_resume = None
-                        await self._cancel_agent(agent_task)
-                        controller = None
-                        agent_task = None
-                        result = await self._resume_session(
-                            target,
-                            self._config,
-                            create_controller,
-                            _create_early_status_callback,
-                            run_agent_until_done,
-                            end_states,
-                        )
-                        if result is not None:
-                            controller, agent_task = result
-                        continue
-                    if self._next_action is not None:
-                        # /compact or /retry: fall through to agent dispatch below
-                        pass
-                    else:
-                        continue
-
-                await chat_ready_done.wait()
-                if engine_init_exc[0] is not None:
-                    continue
-
-                config = self._config
-                agent = self._agent
-                llm_registry = self._llm_registry
-                conversation_stats = self._conversation_stats
-                runtime = self._runtime
-                memory = self._memory
-                event_stream = self._event_stream
-
-                if (
-                    agent is None
-                    or llm_registry is None
-                    or conversation_stats is None
-                    or runtime is None
-                    or memory is None
-                    or event_stream is None
-                ):
-                    self._renderer.add_system_message(
-                        'Initialization failed: engine components were not created.',
-                        title='error',
-                    )
-                    break
-
-                # -- user message: start Live for agent turn
-                self._set_footer_system_line('')
-                if self._next_action is not None:
-                    initial_action = self._next_action
-                    self._next_action = None
-                    msg_content = getattr(initial_action, 'content', None)
-                    if msg_content is not None:
-                        # Start Live before committing the user bubble to scrollback.
-                        # Printing first then starting Live can erase the bubble on some
-                        # terminals (Rich redraw vs prompt_toolkit run_in_terminal).
-                        self._renderer.start_live()
-                        await self._renderer.add_user_message(str(msg_content))
-                    else:
-                        if self._renderer is not None:
-                            self._renderer.add_system_message(
-                                'Condensing context\u2026', title='grinta'
-                            )
-                        self._renderer.start_live()
-                else:
-                    self._last_user_message = text
-                    self._renderer.start_live()
-                    await self._renderer.add_user_message(text)
-                    initial_action = MessageAction(content=text)
-                self._renderer.begin_turn()
-
-                controller, agent_task = await self._ensure_controller_loop(
-                    controller=controller,
-                    agent_task=agent_task,
-                    create_controller=create_controller,
-                    create_status_callback=_create_early_status_callback,
-                    run_agent_until_done=run_agent_until_done,
-                    agent=agent,
-                    runtime=runtime,
-                    config=config,
-                    conversation_stats=conversation_stats,
-                    memory=memory,
-                    end_states=end_states,
+                stop = await self._repl_iteration(
+                    session, controller, agent_task,
+                    chat_ready_done, engine_init_done, engine_init_exc,
+                    create_controller, _create_early_status_callback,
+                    run_agent_until_done, end_states,
                 )
-
-                event_stream.add_event(initial_action, EventSource.USER)
-                try:
-                    controller.step()
-                except Exception:
-                    logger.debug(
-                        'controller.step() failed, agent loop will retry',
-                        exc_info=True,
-                    )
-
-                try:
-                    await self._wait_for_agent_idle(controller, agent_task)
-                except (KeyboardInterrupt, asyncio.CancelledError):
-                    # Tear down Live *before* printing the interrupt line so Rich and
-                    # prompt_toolkit don't fight over the cursor; ``finally`` still
-                    # runs idempotent ``stop_live`` for safety.
-                    if self._renderer is not None:
-                        self._renderer.stop_live()
-                    await self._cancel_agent(agent_task)
-                finally:
-                    if self._renderer is not None:
-                        self._renderer.stop_live()
-                    # Restore cursor / scroll first so prompt_toolkit recomputes layout
-                    # against the final terminal state; then invalidate the app.
-                    self._sync_terminal_after_agent_turn(session)
-                    _invalidate_prompt_session()
-                    self._invalidate_pt()
+                if stop is None:
+                    break
+                controller, agent_task = stop
         finally:
-            self._pt_session = None
-            if bootstrap_task is not None and not bootstrap_task.done():
-                bootstrap_task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    await bootstrap_task
-            controller = self._controller
-            if controller is not None:
-                with contextlib.suppress(Exception):
-                    controller.save_state()
-            self._reasoning.stop()
-            if self._renderer is not None:
-                self._renderer.stop_live()
-            if agent_task and not agent_task.done():
-                agent_task.cancel()
-                try:
-                    await agent_task
-                except (asyncio.CancelledError, Exception):
-                    pass
-            if self._acquire_result is not None:
-                from backend.execution import runtime_orchestrator
+            await self._finalize_repl_run(bootstrap_task, agent_task)
 
-                runtime_orchestrator.release(self._acquire_result)
-            event_stream = self._event_stream
-            if event_stream is not None:
-                close = getattr(event_stream, 'close', None)
-                if callable(close):
-                    with contextlib.suppress(Exception):
-                        close()
+    async def _repl_iteration(
+        self,
+        session: Any | None,
+        controller: Any,
+        agent_task: asyncio.Task[Any] | None,
+        chat_ready_done: asyncio.Event,
+        engine_init_done: asyncio.Event,
+        engine_init_exc: list[BaseException | None],
+        create_controller: Any,
+        create_status_callback: Any,
+        run_agent_until_done: Any,
+        end_states: list[AgentState],
+    ) -> tuple[Any, asyncio.Task[Any] | None] | None:
+        """Run one iteration of the REPL input loop. Returns None to break."""
+        user_input = await self._read_repl_input(session)
+        if user_input is None:
+            return None
+        if not user_input:
+            return controller, agent_task
+        text = user_input.strip()
+        if not text or self._discard_terminal_noise(text):
+            return controller, agent_task
+
+        if text.startswith('/'):
+            handled = await self._process_slash_command(
+                text, agent_task, controller,
+                engine_init_done, engine_init_exc,
+                create_controller, create_status_callback,
+                run_agent_until_done, end_states,
+            )
+            if handled is None:
+                return None
+            keep, controller, agent_task = handled
+            if keep:
+                return controller, agent_task
+            # else fall through to dispatch (compact/retry)
+
+        await chat_ready_done.wait()
+        if engine_init_exc[0] is not None:
+            return controller, agent_task
+
+        if not self._validate_engine_components_ready():
+            return None
+
+        controller, agent_task = await self._dispatch_user_turn(
+            text, controller, agent_task,
+            create_controller, create_status_callback,
+            run_agent_until_done, end_states, session,
+        )
+        return controller, agent_task
+
+    # -- run() helpers -----------------------------------------------------
+
+    def _build_prompt_session(self) -> Any | None:
+        session: Any | None = None
+        if _supports_prompt_session(sys.stdin, sys.stdout):
+            session = self._create_prompt_session()
+            _attach_prompt_buffer_csi_sanitizer(session)
+        self._pt_session = session
+        return session
+
+    def _build_renderer(self, session: Any | None, loop: Any) -> Any:
+        config = self._config
+        get_pt_session = (lambda: session) if session is not None else None
+        self._renderer = CLIEventRenderer(
+            self._console,
+            self._hud,
+            self._reasoning,
+            loop=loop,
+            max_budget=config.max_budget_per_task,
+            get_prompt_session=get_pt_session,
+            cli_tool_icons=config.cli_tool_icons,
+        )
+        renderer = self._renderer
+        if renderer is None:
+            raise RuntimeError('CLI renderer did not initialize.')
+        return renderer
+
+    def _invalidate_prompt_session(self, session: Any | None) -> None:
+        if session is None:
+            return
+        app = getattr(session, 'app', None)
+        if app is not None:
+            app.invalidate()
+
+    def _handle_bootstrap_failure(
+        self,
+        exc: BaseException,
+        renderer: Any,
+        session: Any | None,
+        engine_init_exc: list[BaseException | None],
+    ) -> None:
+        engine_init_exc[0] = exc
+        self._set_footer_system_line('')
+        exc_name = type(exc).__name__
+        if 'AuthenticationError' in exc_name or 'api_key' in str(exc).lower():
+            renderer.add_system_message(
+                'No API key or model configured.\n'
+                'Run grinta again and complete onboarding, '
+                'or edit settings.json directly.\n'
+                f'{exc}',
+                title='error',
+            )
+        else:
+            renderer.add_system_message(
+                f'Initialization failed: {exc}', title='error'
+            )
+        self._running = False
+        self._invalidate_prompt_session(session)
+
+    async def _engine_bootstrap(
+        self,
+        session: Any | None,
+        renderer: Any,
+        chat_ready_done: asyncio.Event,
+        engine_init_done: asyncio.Event,
+        engine_init_exc: list[BaseException | None],
+    ) -> None:
+        """Prepare chat first, then finish optional tool warmup in the background."""
+        from backend.core.bootstrap.main import _setup_mcp_tools
+
+        try:
+            init_ok = await self._bootstrap_init_session(
+                renderer, session, engine_init_exc,
+            )
+            if not init_ok:
+                return
+            runtime_ok = await self._bootstrap_setup_runtime(
+                renderer, session, chat_ready_done, engine_init_exc,
+            )
+            if not runtime_ok:
+                return
+            agent = self._agent
+            if agent is None or not agent.config.enable_mcp:
+                return
+            try:
+                await _setup_mcp_tools(agent, self._runtime, self._memory)
+            except Exception as exc:
+                logger.warning(
+                    'MCP warmup failed after chat became ready', exc_info=True
+                )
+                self._hud.update_mcp_servers(0)
+                msg = f'MCP warmup failed: {exc}'
+                if session is not None:
+                    self._set_footer_system_line(msg, kind='warning')
+                else:
+                    renderer.add_system_message(msg, title='warning')
+            else:
+                self._update_mcp_count_from_agent(agent)
+                if session is not None:
+                    self._set_footer_system_line('MCP tools loaded.')
+                else:
+                    renderer.add_system_message(
+                        'MCP tools loaded.', title='system'
+                    )
+        finally:
+            chat_ready_done.set()
+            engine_init_done.set()
+
+    async def _bootstrap_init_session(
+        self,
+        renderer: Any,
+        session: Any | None,
+        engine_init_exc: list[BaseException | None],
+    ) -> bool:
+        from backend.core.bootstrap.main import _initialize_session_components
+
+        try:
+            bootstrap_state = await asyncio.to_thread(
+                _initialize_session_components, self._config, None,
+            )
+        except Exception as exc:
+            self._handle_bootstrap_failure(exc, renderer, session, engine_init_exc)
+            return False
+        session_id = bootstrap_state[0]
+        llm_registry = bootstrap_state[1]
+        conversation_stats = bootstrap_state[2]
+        config_ = bootstrap_state[3]
+        agent = bootstrap_state[4]
+
+        self._agent = agent
+        self._llm_registry = llm_registry
+        self._conversation_stats = conversation_stats
+        self._config = config_
+        self._hud.update_workspace(getattr(config_, 'project_root', None))
+        self._bootstrap_session_id = session_id
+        return True
+
+    async def _bootstrap_setup_runtime(
+        self,
+        renderer: Any,
+        session: Any | None,
+        chat_ready_done: asyncio.Event,
+        engine_init_exc: list[BaseException | None],
+    ) -> bool:
+        from backend.core.bootstrap.main import (
+            _setup_memory,
+            _setup_runtime_for_controller,
+        )
+
+        config_ = self._config
+        agent = self._agent
+        llm_registry = self._llm_registry
+        session_id = getattr(self, '_bootstrap_session_id', None)
+        try:
+            runtime_state = await asyncio.to_thread(
+                _setup_runtime_for_controller,
+                config_, llm_registry, session_id, True, agent, None,
+                inline_event_delivery=True,
+            )
+            runtime = runtime_state[0]
+            repo_directory = runtime_state[1]
+            acquire_result = runtime_state[2]
+
+            event_stream = runtime.event_stream
+            if event_stream is None:
+                raise RuntimeError('Runtime did not produce an event stream.')
+
+            self._event_stream = event_stream
+            self._runtime = runtime
+            self._acquire_result = acquire_result
+
+            memory = await _setup_memory(
+                config_, runtime, session_id, repo_directory, None, None, agent,
+            )
+            self._memory = memory
+
+            renderer.subscribe(event_stream, event_stream.sid)
+            self._announce_chat_ready(agent, session, renderer)
+            self._hud.update_ledger('Healthy')
+            self._invalidate_prompt_session(session)
+            chat_ready_done.set()
+            return True
+        except Exception as exc:
+            self._handle_bootstrap_failure(exc, renderer, session, engine_init_exc)
+            return False
+
+    def _announce_chat_ready(
+        self, agent: Any, session: Any | None, renderer: Any,
+    ) -> None:
+        if agent.config.enable_mcp:
+            msg = 'Chat ready. MCP tools warming in background.'
+        else:
+            self._hud.update_mcp_servers(0)
+            msg = 'Ready.'
+        if session is not None:
+            self._set_footer_system_line(msg)
+        else:
+            renderer.add_system_message(msg, title='system')
+
+    def _update_mcp_count_from_agent(self, agent: Any) -> None:
+        mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
+        try:
+            mcp_n = int(mcp_status.get('connected_client_count') or 0)
+        except (TypeError, ValueError):
+            mcp_n = 0
+        self._hud.update_mcp_servers(mcp_n)
+
+    async def _read_repl_input(self, session: Any | None) -> str | None:
+        """Read one line of input. Returns None to break the loop, '' to continue."""
+        try:
+            if session is None:
+                user_input = await self._read_non_interactive_input()
+                if user_input == '':
+                    raise EOFError
+            else:
+                user_input = await session.prompt_async()
+        except KeyboardInterrupt:
+            if not self._prompt_ctrl_c_hint_shown:
+                self._console.print(
+                    '[dim]Ctrl+C at the prompt does not exit the REPL; '
+                    'type /quit or exit. While the agent is running, '
+                    'Ctrl+C cancels the run (on some terminals you may need '
+                    'to press it more than once).[/dim]'
+                )
+                self._prompt_ctrl_c_hint_shown = True
+            return ''
+        except EOFError:
+            self._console.print('EOF Error received in prompt loop.')
+            return None
+        except Exception as e:
+            self._console.print(f'CRASH: {e}')
+            import traceback
+
+            traceback.print_exc()
+            return None
+
+        if not self._running:
+            return None
+        return user_input
+
+    def _discard_terminal_noise(self, text: str) -> bool:
+        if not _looks_like_terminal_selection_noise(text):
+            return False
+        if self._renderer is not None:
+            self._renderer.add_system_message(
+                'Ignored terminal control sequence noise from selection/copy input.',
+                title='warning',
+            )
+        return True
+
+    async def _process_slash_command(
+        self,
+        text: str,
+        agent_task: asyncio.Task[Any] | None,
+        controller: Any,
+        engine_init_done: asyncio.Event,
+        engine_init_exc: list[BaseException | None],
+        create_controller: Any,
+        create_status_callback: Any,
+        run_agent_until_done: Any,
+        end_states: list[AgentState],
+    ) -> tuple[bool, Any, asyncio.Task[Any] | None] | None:
+        """Handle /command. Returns (continue_loop, controller, agent_task) or None to break."""
+        try:
+            parsed_command = _parse_slash_command(text)
+        except SlashCommandParseError as exc:
+            self._warn(str(exc))
+            return True, controller, agent_task
+        if parsed_command.name in ('/resume', '/compact', '/retry'):
+            await engine_init_done.wait()
+            if engine_init_exc[0] is not None:
+                return True, controller, agent_task
+        should_continue = self._handle_parsed_command(parsed_command)
+        if not should_continue:
+            return None
+        if self._pending_resume is not None:
+            target = self._pending_resume
+            self._pending_resume = None
+            await self._cancel_agent(agent_task)
+            controller = None
+            agent_task = None
+            result = await self._resume_session(
+                target, self._config, create_controller,
+                create_status_callback, run_agent_until_done, end_states,
+            )
+            if result is not None:
+                controller, agent_task = result
+            return True, controller, agent_task
+        if self._next_action is not None:
+            # /compact or /retry: fall through to agent dispatch below
+            return False, controller, agent_task
+        return True, controller, agent_task
+
+    def _validate_engine_components_ready(self) -> bool:
+        if (
+            self._agent is None
+            or self._llm_registry is None
+            or self._conversation_stats is None
+            or self._runtime is None
+            or self._memory is None
+            or self._event_stream is None
+        ):
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    'Initialization failed: engine components were not created.',
+                    title='error',
+                )
+            return False
+        return True
+
+    async def _dispatch_user_turn(
+        self,
+        text: str,
+        controller: Any,
+        agent_task: asyncio.Task[Any] | None,
+        create_controller: Any,
+        create_status_callback: Any,
+        run_agent_until_done: Any,
+        end_states: list[AgentState],
+        session: Any | None,
+    ) -> tuple[Any, asyncio.Task[Any] | None]:
+        config = self._config
+        agent = self._agent
+        runtime = self._runtime
+        memory = self._memory
+        event_stream = self._event_stream
+        conversation_stats = self._conversation_stats
+        renderer = self._renderer
+        assert renderer is not None
+
+        # -- user message: start Live for agent turn
+        self._set_footer_system_line('')
+        initial_action = await self._prepare_initial_action(text, renderer)
+        renderer.begin_turn()
+
+        controller, agent_task = await self._ensure_controller_loop(
+            controller=controller,
+            agent_task=agent_task,
+            create_controller=create_controller,
+            create_status_callback=create_status_callback,
+            run_agent_until_done=run_agent_until_done,
+            agent=agent,
+            runtime=runtime,
+            config=config,
+            conversation_stats=conversation_stats,
+            memory=memory,
+            end_states=end_states,
+        )
+
+        event_stream.add_event(initial_action, EventSource.USER)
+        try:
+            controller.step()
+        except Exception:
+            logger.debug(
+                'controller.step() failed, agent loop will retry',
+                exc_info=True,
+            )
+
+        try:
+            await self._wait_for_agent_idle(controller, agent_task)
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            # Tear down Live *before* printing the interrupt line so Rich and
+            # prompt_toolkit don't fight over the cursor; ``finally`` still
+            # runs idempotent ``stop_live`` for safety.
+            renderer.stop_live()
+            await self._cancel_agent(agent_task)
+        finally:
+            renderer.stop_live()
+            # Restore cursor / scroll first so prompt_toolkit recomputes layout
+            # against the final terminal state; then invalidate the app.
+            self._sync_terminal_after_agent_turn(session)
+            self._invalidate_prompt_session(session)
+            self._invalidate_pt()
+        return controller, agent_task
+
+    async def _prepare_initial_action(
+        self, text: str, renderer: Any,
+    ) -> Any:
+        if self._next_action is not None:
+            initial_action = self._next_action
+            self._next_action = None
+            msg_content = getattr(initial_action, 'content', None)
+            if msg_content is not None:
+                # Start Live before committing the user bubble to scrollback.
+                # Printing first then starting Live can erase the bubble on some
+                # terminals (Rich redraw vs prompt_toolkit run_in_terminal).
+                renderer.start_live()
+                await renderer.add_user_message(str(msg_content))
+            else:
+                renderer.add_system_message(
+                    'Condensing context\u2026', title='grinta'
+                )
+                renderer.start_live()
+            return initial_action
+        self._last_user_message = text
+        renderer.start_live()
+        await renderer.add_user_message(text)
+        return MessageAction(content=text)
+
+    async def _finalize_repl_run(
+        self,
+        bootstrap_task: asyncio.Task[None] | None,
+        agent_task: asyncio.Task[Any] | None,
+    ) -> None:
+        self._pt_session = None
+        await self._cancel_task_silently(bootstrap_task)
+        controller = self._controller
+        if controller is not None:
+            with contextlib.suppress(Exception):
+                controller.save_state()
+        self._reasoning.stop()
+        if self._renderer is not None:
+            self._renderer.stop_live()
+        await self._cancel_task_silently(agent_task)
+        if self._acquire_result is not None:
+            from backend.execution import runtime_orchestrator
+
+            runtime_orchestrator.release(self._acquire_result)
+        self._close_event_stream()
+
+    @staticmethod
+    async def _cancel_task_silently(task: asyncio.Task[Any] | None) -> None:
+        if task is None or task.done():
+            return
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await task
+
+    def _close_event_stream(self) -> None:
+        event_stream = self._event_stream
+        if event_stream is None:
+            return
+        close = getattr(event_stream, 'close', None)
+        if callable(close):
+            with contextlib.suppress(Exception):
+                close()
 
     async def _ensure_controller_loop(
         self,
@@ -1650,825 +1807,3 @@ class Repl:
 
         return controller, agent_task
 
-    # -- wait for agent to be idle -----------------------------------------
-
-    async def _wait_for_agent_idle(
-        self, controller: Any, agent_task: asyncio.Task[Any] | None
-    ) -> None:
-        """Wait until agent is idle, handling confirmation prompts inline.
-
-        Events are now processed directly in the EventStream delivery thread
-        (no 3rd hop to the main loop), so the renderer state stays nearly in
-        sync with the agent.  A brief yield after task completion is enough to
-        let any in-flight deliveries finish.
-        """
-        # RATE_LIMITED is not idle: we wait here while RetryService backoff runs,
-        # then RUNNING resumes until the user-facing terminal states below.
-        idle_states = {
-            AgentState.AWAITING_USER_INPUT,
-            AgentState.FINISHED,
-            AgentState.ERROR,
-            AgentState.STOPPED,
-            AgentState.REJECTED,
-        }
-
-        # Disabled by default to avoid aborting long-running sessions.
-        # Set APP_AGENT_HARD_TIMEOUT_SECONDS / APP_AGENT_HARD_TIMEOUT_CMD_SECONDS
-        # to a positive value to re-enable limits.
-        _hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_SECONDS', '0')
-        try:
-            _HARD_TIMEOUT = max(0, int(_hard_timeout_raw))
-        except (ValueError, TypeError):
-            _HARD_TIMEOUT = 0
-
-        _cmd_hard_timeout_raw = os.getenv('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS', '0')
-        try:
-            _CMD_HARD_TIMEOUT = max(0, int(_cmd_hard_timeout_raw))
-        except (ValueError, TypeError):
-            _CMD_HARD_TIMEOUT = 0
-
-        # When both are enabled, command-specific timeout should never be lower.
-        if _HARD_TIMEOUT > 0 and _CMD_HARD_TIMEOUT > 0:
-            _CMD_HARD_TIMEOUT = max(_HARD_TIMEOUT, _CMD_HARD_TIMEOUT)
-        _start = time.monotonic()
-
-        while True:
-            renderer = cast(Any, self._renderer)
-
-            # Drain queued events and render — this is the ONLY place
-            # where Live.update() happens during agent execution.
-            if renderer is not None:
-                renderer.drain_events()
-                state = controller.get_agent_state()
-            else:
-                state = controller.get_agent_state()
-
-            if state in idle_states:
-                if renderer is not None:
-                    await self._drain_renderer_until_settled(renderer)
-                    state = controller.get_agent_state()
-                if state == AgentState.AWAITING_USER_CONFIRMATION:
-                    await self._handle_confirmation(controller)
-                    continue
-                if state not in idle_states:
-                    continue
-                break
-
-            if state == AgentState.AWAITING_USER_CONFIRMATION:
-                await self._handle_confirmation(controller)
-                continue
-
-            # Agent task finished — drain any remaining events, then break.
-            if agent_task and agent_task.done():
-                if renderer is not None:
-                    await asyncio.sleep(0.05)
-                    renderer.drain_events()
-                break
-
-            # Yield to the event loop.  wait_for_state_change will return
-            # early when the delivery thread sets _state_event.
-            if renderer is None:
-                await asyncio.sleep(0.1)
-            else:
-                await renderer.wait_for_state_change(wait_timeout_sec=0.1)
-
-            # Hard timeout — surface error and return to prompt instead of
-            # hanging forever (e.g. LLM API unresponsive). Allow a longer
-            # budget while a foreground command action is still pending.
-            active_timeout = _HARD_TIMEOUT
-            pending_action = getattr(controller, '_pending_action', None)
-            if pending_action is not None:
-                with contextlib.suppress(Exception):
-                    from backend.ledger.action import CmdRunAction
-
-                    if (
-                        isinstance(pending_action, CmdRunAction)
-                        and _CMD_HARD_TIMEOUT > 0
-                    ):
-                        active_timeout = _CMD_HARD_TIMEOUT
-
-            if active_timeout > 0 and time.monotonic() - _start > active_timeout:
-                logger.warning('Agent wait exceeded %ds hard timeout', active_timeout)
-                if renderer is not None:
-                    renderer.add_system_message(
-                        f'Agent timed out after {active_timeout} seconds. Returning to prompt.',
-                        title='⏱ Timeout',
-                    )
-                    renderer.drain_events()
-                # Cancel the stale task so it does not linger into the next turn.
-                if agent_task and not agent_task.done():
-                    agent_task.cancel()
-                    with contextlib.suppress(asyncio.CancelledError, Exception):
-                        await agent_task
-                break
-
-    async def _drain_renderer_until_settled(
-        self,
-        renderer: Any,
-        *,
-        settle_delay: float = 0.03,
-        max_passes: int = 3,
-    ) -> None:
-        """Drain queued CLI events until the delivery queue stays quiet briefly."""
-        for _ in range(max_passes):
-            renderer.drain_events()
-            if getattr(renderer, 'pending_event_count', 0) == 0:
-                await asyncio.sleep(settle_delay)
-                renderer.drain_events()
-                if getattr(renderer, 'pending_event_count', 0) == 0:
-                    return
-            else:
-                await asyncio.sleep(settle_delay)
-
-    # -- interrupt handler -------------------------------------------------
-
-    async def _cancel_agent(self, agent_task: asyncio.Task[Any] | None) -> None:
-        """Cancel a running agent task and return to the prompt."""
-        if agent_task and not agent_task.done():
-            agent_task.cancel()
-            try:
-                await agent_task
-            except (asyncio.CancelledError, Exception):
-                pass
-
-        # Hard kill underlying shells/processes
-        with contextlib.suppress(Exception):
-            from backend.execution.action_execution_server import (
-                client as runtime_client,
-            )
-
-            if runtime_client is not None:
-                await runtime_client.hard_kill()
-
-        # Stop orchestrator cleanly
-        if self._controller is not None:
-            with contextlib.suppress(Exception):
-                await self._controller.stop()
-
-        self._reasoning.stop()
-        if self._renderer is not None:
-            self._renderer.add_system_message(
-                'Interrupted. Ready for input.', title='grinta'
-            )
-
-    # -- session resume ----------------------------------------------------
-
-    async def _resume_session(
-        self,
-        target: str,
-        config: AppConfig,
-        create_controller,
-        create_status_callback,
-        run_agent_until_done,
-        end_states: list[AgentState],
-    ) -> tuple[Any, asyncio.Task[Any]] | None:
-        """Resume a previous session by index or ID.
-
-        Returns (controller, agent_task) on success, or None on failure.
-        """
-        from backend.cli.session_manager import resolve_session_id
-        from backend.core.bootstrap.main import (
-            _setup_memory_and_mcp,
-            _setup_runtime_for_controller,
-        )
-
-        llm_registry = self._llm_registry
-        agent = self._agent
-        conversation_stats = self._conversation_stats
-        if llm_registry is None or agent is None or conversation_stats is None:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    'Resume failed: session bootstrap state is incomplete.',
-                    title='error',
-                )
-            return None
-
-        resolved_id, resolve_error = resolve_session_id(target, config)
-        if resolve_error or resolved_id is None:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    resolve_error or f'No session matches: {target}', title='warning'
-                )
-            return None
-
-        if self._renderer is not None:
-            self._renderer.add_system_message(
-                f'Resuming session: {resolved_id}', title='grinta'
-            )
-
-        try:
-            runtime_state = _setup_runtime_for_controller(
-                config,
-                llm_registry,
-                resolved_id,
-                True,
-                agent,
-                None,
-                inline_event_delivery=True,
-            )
-            runtime = runtime_state[0]
-            repo_directory = runtime_state[1]
-            acquire_result = runtime_state[2]
-        except Exception as exc:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    f'Resume failed: {exc}', title='error'
-                )
-            return None
-
-        if self._acquire_result is not None:
-            from backend.execution import runtime_orchestrator
-
-            runtime_orchestrator.release(self._acquire_result)
-
-        event_stream = runtime.event_stream
-        if event_stream is None:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    'Resume failed: no event stream.', title='error'
-                )
-            return None
-
-        self._event_stream = event_stream
-        self._runtime = runtime
-        self._acquire_result = acquire_result
-
-        memory = await _setup_memory_and_mcp(
-            config,
-            runtime,
-            resolved_id,
-            repo_directory,
-            None,
-            None,
-            agent,
-        )
-        self._memory = memory
-        mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
-        try:
-            mcp_n = int(mcp_status.get('connected_client_count') or 0)
-        except (TypeError, ValueError):
-            mcp_n = 0
-        self._hud.update_mcp_servers(mcp_n)
-
-        # Subscribe renderer to the new event stream.
-        if self._renderer is not None:
-            renderer = cast(Any, self._renderer)
-            renderer.reset_subscription()
-            renderer.subscribe(event_stream, event_stream.sid)
-
-        controller, _ = create_controller(
-            agent,
-            runtime,
-            config,
-            conversation_stats,
-        )
-        runtime_for_controller = cast(Any, runtime)
-        runtime_for_controller.controller = controller
-        self._controller = controller
-
-        early_cb = create_status_callback(controller)
-        try:
-            memory.status_callback = early_cb
-        except Exception:
-            logger.debug('Could not set memory status callback', exc_info=True)
-
-        agent_task = asyncio.create_task(
-            run_agent_until_done(controller, runtime, memory, end_states),
-            name='grinta-agent-loop',
-        )
-
-        if self._renderer is not None:
-            self._renderer.add_system_message(
-                f'Session {resolved_id} resumed. Send a message to continue.',
-                title='grinta',
-            )
-
-        return controller, agent_task
-
-    # -- confirmation handler ----------------------------------------------
-
-    async def _handle_confirmation(self, controller) -> None:
-        """Prompt user for Y/N on a pending action, then resume the engine."""
-        pending = None
-        try:
-            pending = controller.get_pending_action()
-        except Exception:
-            logger.debug('get_pending_action() failed, trying fallback', exc_info=True)
-            pending = getattr(controller, '_pending_action', None)
-
-        if pending is not None:
-            if self._renderer is not None:
-                with self._renderer.suspend_live():
-                    approved = render_confirmation(self._console, pending)
-            else:
-                approved = render_confirmation(self._console, pending)
-        else:
-            # Fallback: generic prompt if we can't get the pending action.
-            from rich.prompt import Confirm
-
-            if self._renderer is not None:
-                with self._renderer.suspend_live():
-                    approved = Confirm.ask(
-                        '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
-                        console=self._console,
-                    )
-            else:
-                approved = Confirm.ask(
-                    '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
-                    console=self._console,
-                )
-
-        action = build_confirmation_action(approved)
-        if self._event_stream:
-            self._event_stream.add_event(action, EventSource.USER)
-
-    # -- checkpoint inspection --------------------------------------------
-
-    def _resolve_rollback_manager(self):
-        """Return the active RollbackManager for the current session.
-
-        The value is resolved via the controller's middleware, or ``None`` if
-        checkpoints are not available in this session.
-        """
-        try:
-            controller = getattr(self, '_controller', None) or getattr(
-                self, '_orchestrator', None
-            )
-            if controller is None:
-                return None
-            mw = getattr(controller, '_rollback_middleware', None)
-            if mw is None:
-                return None
-            return getattr(mw, '_manager', None)
-        except Exception:
-            return None
-
-    def _handle_checkpoint_list(self, args: list[str]) -> None:
-        """Render up to ``limit`` checkpoints (default 10, newest first)."""
-        limit = 10
-        if args:
-            try:
-                limit = max(1, int(args[0]))
-            except ValueError:
-                self._warn('Usage: /checkpoint list [limit]')
-                return
-        manager = self._resolve_rollback_manager()
-        if manager is None:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    'No active rollback manager (workspace may not be initialised yet).',
-                    title='checkpoint',
-                )
-            return
-        try:
-            entries = manager.list_checkpoints()
-        except Exception as exc:
-            self._warn(f'Failed to list checkpoints: {exc}')
-            return
-        if not entries:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    'No checkpoints recorded yet.', title='checkpoint'
-                )
-            return
-        # Newest first.
-        entries = sorted(entries, key=lambda e: e.get('timestamp', 0), reverse=True)[:limit]
-        from datetime import datetime as _dt
-
-        lines = []
-        for e in entries:
-            ts = e.get('timestamp', 0)
-            try:
-                ts_str = _dt.fromtimestamp(float(ts)).strftime('%Y-%m-%d %H:%M:%S')
-            except Exception:
-                ts_str = str(ts)
-            lines.append(
-                f"  {e.get('id', '?')[:12]:<12} {ts_str}  {e.get('checkpoint_type', '?'):<18} {e.get('description', '')[:60]}"
-            )
-        body = '\n'.join(lines)
-        if self._renderer is not None:
-            self._renderer.add_system_message(body, title='checkpoint list')
-
-    def _handle_checkpoint_diff(self, args: list[str]) -> None:
-        """Show a git diff (or directory diff fallback) since a checkpoint."""
-        if not args:
-            self._warn('Usage: /checkpoint diff <id>')
-            return
-        cp_id = args[0]
-        manager = self._resolve_rollback_manager()
-        if manager is None:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    'No active rollback manager.', title='checkpoint'
-                )
-            return
-        # Resolve full id from prefix.
-        try:
-            entries = manager.list_checkpoints()
-        except Exception as exc:
-            self._warn(f'Failed to list checkpoints: {exc}')
-            return
-        match = next(
-            (e for e in entries if str(e.get('id', '')).startswith(cp_id)),
-            None,
-        )
-        if match is None:
-            self._warn(f'Checkpoint not found: {cp_id}')
-            return
-        sha = match.get('git_commit_sha')
-        diff_text: str
-        if sha:
-            import subprocess as _sp
-
-            try:
-                proc = _sp.run(
-                    ['git', 'diff', str(sha)],
-                    cwd=str(manager.workspace_path),
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    check=False,
-                )
-                diff_text = proc.stdout or proc.stderr or '(empty diff)'
-            except Exception as exc:
-                diff_text = f'(git diff failed: {exc})'
-        else:
-            diff_text = (
-                '(checkpoint has no git commit; file-snapshot diff is not implemented '
-                'in the CLI — use checkpoint(revert) to roll back instead).'
-            )
-        if self._renderer is not None:
-            # Trim to keep the panel manageable.
-            if len(diff_text) > 8000:
-                diff_text = diff_text[:8000] + '\n[... diff truncated ...]\n'
-            self._renderer.add_markdown_block(
-                f"checkpoint diff {match.get('id', '?')[:12]}",
-                f'```diff\n{diff_text}\n```',
-            )
-
-    # -- autonomy control --------------------------------------------------
-
-    def _handle_autonomy_command(self, parsed: ParsedSlashCommand) -> None:
-        """View or change the autonomy level."""
-        valid_levels = tuple(_AUTONOMY_LEVEL_HINTS)
-
-        if not parsed.args:
-            # Show current level
-            level = self._get_current_autonomy()
-            if self._renderer is not None:
-                level_lines = '\n'.join(
-                    f'  {name:<10} — {_AUTONOMY_LEVEL_HINTS[name]}'
-                    for name in valid_levels
-                )
-                self._renderer.add_system_message(
-                    f'Autonomy: {level}\n'
-                    f'{level_lines}\n'
-                    f'Change with: /autonomy <{"|".join(valid_levels)}>',
-                    title='autonomy',
-                )
-            return
-
-        if len(parsed.args) > 1:
-            self._warn(f'Usage: {self._usage(parsed.name)}')
-            return
-
-        new_level = parsed.args[0].lower()
-        if new_level not in valid_levels:
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    f"Invalid level '{new_level}'. Use: {', '.join(valid_levels)}",
-                    title='warning',
-                )
-            return
-
-        controller = self._controller
-        if controller is not None:
-            ac = getattr(controller, 'autonomy_controller', None)
-            if ac is not None:
-                ac.autonomy_level = new_level
-                if self._renderer is not None:
-                    self._renderer.add_system_message(
-                        f'Autonomy set to: {new_level}', title='autonomy'
-                    )
-                return
-
-        if self._renderer is not None:
-            self._renderer.add_system_message(
-                'No active controller. Send a message first to initialize, then set autonomy.',
-                title='warning',
-            )
-
-    def _get_current_autonomy(self) -> str:
-        controller = self._controller
-        if controller is not None:
-            ac = getattr(controller, 'autonomy_controller', None)
-            if ac is not None:
-                return str(getattr(ac, 'autonomy_level', 'balanced'))
-        return 'balanced (default)'
-
-    # -- slash commands ----------------------------------------------------
-
-    def _handle_command(self, text: str) -> bool:
-        """Handle a /command. Returns True to continue REPL, False to exit."""
-        try:
-            parsed = _parse_slash_command(text)
-        except SlashCommandParseError as exc:
-            self._warn(str(exc))
-            return True
-        return self._handle_parsed_command(parsed)
-
-    def _handle_parsed_command(self, parsed: ParsedSlashCommand) -> bool:
-        """Handle a parsed /command. Returns True to continue, False to exit."""
-        raw_cmd = parsed.raw_name
-        cmd = parsed.name
-
-        if cmd in ('/exit', '/quit'):
-            if self._renderer is not None:
-                self._renderer.add_system_message('Goodbye.', title='grinta')
-            return False
-
-        if cmd == '/settings':
-            if self._renderer is not None:
-                with self._renderer.suspend_live():
-                    open_settings(self._console)
-            else:
-                open_settings(self._console)
-            self._config = load_app_config()
-            self._hud.update_model(get_current_model(self._config))
-            if self._renderer is not None:
-                self._renderer.set_cli_tool_icons(self._config.cli_tool_icons)
-            # Don't add_system_message — settings are navigational, not part of
-            # the agentic conversation and should not appear in chat history.
-            return True
-
-        if cmd == '/clear':
-            if self._reject_extra_args(parsed):
-                return True
-            if self._renderer is not None:
-                self._renderer.clear_history()
-                self._renderer.add_system_message(
-                    'Screen cleared. Type a task or press Tab after `/` for commands.',
-                    title='grinta',
-                )
-            return True
-
-        if cmd == '/status':
-            if self._reject_extra_args(parsed):
-                return True
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    self._hud.plain_text(), title='status'
-                )
-            return True
-
-        if cmd == '/cost':
-            if self._reject_extra_args(parsed):
-                return True
-            hud = self._hud.state
-            tokens = (
-                f'{hud.context_tokens:,} ctx · {hud.llm_calls} LLM calls'
-                if hud.llm_calls
-                else 'no LLM calls yet'
-            )
-            msg = (
-                f'Session cost: ${hud.cost_usd:.4f}  ·  {tokens}\n'
-                f'Model: {hud.model}'
-            )
-            if self._renderer is not None:
-                self._renderer.add_system_message(msg, title='cost')
-            return True
-
-        if cmd == '/diff':
-            mode = '--stat'
-            paths: list[str] = []
-            for arg in parsed.args:
-                if arg in {'--stat', '--name-only', '--patch'}:
-                    mode = arg
-                    continue
-                if arg.startswith('-'):
-                    self._warn(f'Usage: {self._usage(cmd)}')
-                    return True
-                paths.append(arg)
-            if len(paths) > 1:
-                self._warn(f'Usage: {self._usage(cmd)}')
-                return True
-            cwd = self._command_project_root()
-            git_args = ['git', 'diff']
-            if mode != '--patch':
-                git_args.append(mode)
-            if paths:
-                git_args.extend(['--', paths[0]])
-            try:
-                completed = subprocess.run(
-                    git_args,
-                    capture_output=True,
-                    text=True,
-                    cwd=cwd,
-                    check=False,
-                )
-                body = (completed.stdout or '').strip() or '(no changes)'
-                if completed.stderr and completed.returncode != 0:
-                    body = (
-                        f'git diff failed in {cwd}\n\n'
-                        f'{completed.stderr.strip() or body}'
-                    )
-                if self._renderer is not None:
-                    self._renderer.add_system_message(body, title='diff')
-            except FileNotFoundError:
-                if self._renderer is not None:
-                    self._renderer.add_system_message(
-                        '`git` not found on PATH; cannot show diff.',
-                        title='warning',
-                    )
-            return True
-
-        if cmd == '/think':
-            cur = bool(getattr(self._config, 'enable_think', False))
-            if len(parsed.args) > 1:
-                self._warn(f'Usage: {self._usage(cmd)}')
-                return True
-            if parsed.args:
-                target = parsed.args[0].lower()
-                if target in ('on', 'true', '1', 'yes'):
-                    new_val = True
-                elif target in ('off', 'false', '0', 'no'):
-                    new_val = False
-                else:
-                    if self._renderer is not None:
-                        self._renderer.add_system_message(
-                            'Usage: /think [on|off]', title='warning'
-                        )
-                    return True
-            else:
-                new_val = not cur
-            try:
-                self._config.enable_think = new_val  # type: ignore[attr-defined]
-            except Exception:
-                pass
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    f'`think` tool now {"ON" if new_val else "OFF"} (applies to next system-prompt build).',
-                    title='think',
-                )
-            return True
-
-        if cmd == '/checkpoint':
-            args = list(parsed.args)
-            sub = args[0].lower() if args else ''
-            if sub in {'list', 'ls'}:
-                self._handle_checkpoint_list(args[1:])
-                return True
-            if sub == 'diff':
-                self._handle_checkpoint_diff(args[1:])
-                return True
-            label = ' '.join(args).strip()
-            instruction = (
-                'Use the `checkpoint` tool now to snapshot the current workspace state.'
-            )
-            if label:
-                instruction += f' Use this label: {label}'
-            self._next_action = MessageAction(content=instruction)
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    f'Checkpoint queued{(" (" + label + ")") if label else ""}.',
-                    title='checkpoint',
-                )
-            return True
-
-        if cmd == '/copy':
-            if self._reject_extra_args(parsed):
-                return True
-            last_reply = (
-                self._renderer.last_assistant_message_text
-                if self._renderer is not None
-                else ''
-            )
-            ok, msg = _copy_to_system_clipboard(last_reply)
-            if self._renderer is not None:
-                self._renderer.add_system_message(
-                    msg, title='clipboard' if ok else 'warning'
-                )
-            return True
-
-        if cmd == '/sessions':
-            from backend.cli.session_manager import list_sessions
-
-            args = list(parsed.args)
-            if args and args[0].lower() == 'list':
-                args.pop(0)
-            if len(args) > 1:
-                self._warn('Usage: /sessions [list] [limit]')
-                return True
-            limit = 20
-            if args:
-                try:
-                    limit = int(args[0])
-                except ValueError:
-                    self._warn('Usage: /sessions [list] [limit]')
-                    return True
-                if limit < 1:
-                    self._warn('Session limit must be 1 or greater.')
-                    return True
-            if self._renderer is not None:
-                with self._renderer.suspend_live():
-                    list_sessions(self._console, limit=limit, config=self._config)
-            else:
-                list_sessions(self._console, limit=limit, config=self._config)
-            return True
-
-        if cmd == '/resume':
-            if len(parsed.args) != 1:
-                if self._renderer is not None:
-                    self._renderer.add_system_message(
-                        'Usage: /resume <N> or /resume <session_id>. Press Tab to autocomplete recent sessions.',
-                        title='warning',
-                    )
-                return True
-            self._pending_resume = parsed.args[0]
-            return True
-
-        if cmd == '/autonomy':
-            self._handle_autonomy_command(parsed)
-            return True
-
-        if cmd == '/help':
-            if len(parsed.args) > 1:
-                self._warn(f'Usage: {self._usage(cmd)}')
-                return True
-            if self._renderer is not None:
-                self._renderer.add_markdown_block(
-                    'Help',
-                    _build_help_markdown(parsed.args[0] if parsed.args else None),
-                )
-            return True
-
-        if cmd == '/model':
-            from backend.cli.config_manager import update_model
-
-            if not parsed.args:
-                current = get_current_model(self._config)
-                provider, model = HUDBar.describe_model(current)
-                if self._renderer is not None:
-                    self._renderer.add_system_message(
-                        f'Current provider: {provider}  model: {model}  (use `/model <provider/model>` to switch)',
-                        title='model',
-                    )
-            else:
-                if len(parsed.args) != 1:
-                    self._warn(f'Usage: {self._usage(cmd)}')
-                    return True
-                new_model = parsed.args[0].strip()
-                if (
-                    '/' not in new_model
-                    or new_model.startswith('/')
-                    or new_model.endswith('/')
-                ):
-                    self._warn(
-                        'Use a provider-qualified model, for example `openai/gpt-4.1`.'
-                    )
-                    return True
-                update_model(new_model)
-                self._config = load_app_config()
-                self._hud.update_model(get_current_model(self._config))
-                provider, model = HUDBar.describe_model(get_current_model(self._config))
-                if self._renderer is not None:
-                    self._renderer.add_system_message(
-                        f'Model switched to provider: {provider}  model: {model}. Changes apply to the next session.',
-                        title='model',
-                    )
-            return True
-
-        if cmd == '/compact':
-            if self._reject_extra_args(parsed):
-                return True
-            from backend.ledger.action.agent import CondensationRequestAction
-
-            self._next_action = CondensationRequestAction()
-            return True
-
-        if cmd == '/retry':
-            if self._reject_extra_args(parsed):
-                return True
-            if self._last_user_message:
-                self._next_action = MessageAction(content=self._last_user_message)
-            else:
-                if self._renderer is not None:
-                    self._renderer.add_system_message(
-                        'No previous message to retry.',
-                        title='warning',
-                    )
-            return True
-
-        if self._renderer is not None:
-            suggestion_text = _closest_command_names(raw_cmd)
-            suffix = ''
-            if suggestion_text:
-                rendered_suggestions = ' or '.join(
-                    f'`{item}`' for item in suggestion_text
-                )
-                suffix = f' Try {rendered_suggestions}.'
-            self._renderer.add_system_message(
-                f'Unknown command: {raw_cmd}.{suffix} Press Tab after `/` for autocomplete.',
-                title='warning',
-            )
-        return True

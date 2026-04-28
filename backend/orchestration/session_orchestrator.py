@@ -47,6 +47,9 @@ from backend.orchestration.orchestration_config import (
     OrchestrationServices,
 )
 from backend.orchestration.rate_governor import LLMRateGovernor
+from backend.orchestration.session_orchestrator_accessors import (
+    SessionOrchestratorAccessorsMixin,
+)
 from backend.orchestration.state.state import State
 from backend.orchestration.tool_pipeline import ToolInvocationContext
 
@@ -72,7 +75,7 @@ def _invoke_zero_arg_callback(callback: Callable[[], object]) -> object:
     return callback()
 
 
-class SessionOrchestrator:
+class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
     """Coordinates agent loop execution, event stream handling, and runtime interactions."""
 
     config: OrchestrationConfig
@@ -106,117 +109,6 @@ class SessionOrchestrator:
     runtime: Any
     tool_pipeline: Any
     _lifecycle: LifecyclePhase
-
-    @property
-    def id(self) -> str | None:
-        return self.config.sid or (
-            self.config.event_stream.sid if self.config.event_stream else None
-        )
-
-    @property
-    def agent(self) -> Agent:
-        return self.config.agent
-
-    @property
-    def event_stream(self) -> EventStream:
-        return self.config.event_stream
-
-    @property
-    def state(self) -> State:
-        return self.state_tracker.state
-
-    @property
-    def conversation_stats(self) -> ConversationStats:
-        return self.config.conversation_stats
-
-    @property
-    def task_id(self) -> str | None:
-        return self.id
-
-    # ------------------------------------------------------------------
-    # Service forwarding — explicit ``@property`` accessors so static
-    # analysis, IDE completion, and refactor tools can see every service
-    # the orchestrator exposes. The previous ``__getattr__`` + alias-dict
-    # implementation was equivalent at runtime but invisible to tooling,
-    # which made it easy to leave dangling references when services were
-    # renamed.
-    # ------------------------------------------------------------------
-
-    @property
-    def action_service(self):
-        return self.services.action
-
-    @property
-    def pending_action_service(self):
-        return self.services.pending_action
-
-    @property
-    def autonomy_service(self):
-        return self.services.autonomy
-
-    @property
-    def iteration_service(self):
-        return self.services.iteration
-
-    @property
-    def lifecycle_service(self):
-        return self.services.lifecycle
-
-    @property
-    def state_service(self):
-        return self.services.state
-
-    @property
-    def retry_service(self):
-        return self.services.retry
-
-    @property
-    def recovery_service(self):
-        return self.services.recovery
-
-    @property
-    def stuck_service(self):
-        return self.services.stuck
-
-    @property
-    def circuit_breaker_service(self):
-        return self.services.circuit_breaker
-
-    @property
-    def observation_service(self):
-        return self.services.observation
-
-    @property
-    def task_validation_service(self):
-        return self.services.task_validation
-
-    @property
-    def iteration_guard(self):
-        return self.services.iteration_guard
-
-    @property
-    def step_guard(self):
-        return self.services.step_guard
-
-    @property
-    def step_prerequisites(self):
-        return self.services.step_prerequisites
-
-    @property
-    def exception_handler(self):
-        return self.services.exception_handler
-
-    @property
-    def event_router(self):
-        return self.services.event_router
-
-    @property
-    def step_decision(self):
-        return self.services.step_decision
-
-    @property
-    def action_execution(self):
-        return self.services.action_execution
 
     def __init__(self, config: OrchestrationConfig) -> None:
         """Initializes a new instance of the SessionOrchestrator class."""

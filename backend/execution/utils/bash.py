@@ -6,19 +6,25 @@ import getpass
 import os
 import re
 import time
-import traceback
 import uuid
 from enum import Enum
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
 
-import bashlex  # pyright: ignore[reportMissingTypeStubs]
 import libtmux
 
 from backend.core.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.execution.utils.bash_constants import TIMEOUT_MESSAGE_TEMPLATE
+from backend.execution.utils.bash_support import (
+    BackgroundPaneSession as _BackgroundPaneSession,
+)
+from backend.execution.utils.bash_support import (
+    escape_bash_special_chars,
+    remove_command_prefix,
+    split_bash_commands,
+)
 from backend.execution.utils.prompt_detector import detect_interactive_prompt
-from backend.execution.utils.unified_shell import BaseShellSession, UnifiedShellSession
+from backend.execution.utils.unified_shell import BaseShellSession
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.commands import (
     CMD_OUTPUT_PS1_END,
@@ -38,140 +44,16 @@ if TYPE_CHECKING:
 
 
 Ps1Match = re.Match[str]
-BashlexNode = Any
+_remove_command_prefix = remove_command_prefix
+BackgroundPaneSession = _BackgroundPaneSession
 
 
-def _get_bashlex_parsing_errors() -> tuple[type[BaseException], ...]:
-    parsing_error = getattr(getattr(bashlex, 'errors', None), 'ParsingError', None)
-    if isinstance(parsing_error, type) and issubclass(parsing_error, BaseException):
-        return (parsing_error, NotImplementedError, TypeError, AttributeError)
-    return (NotImplementedError, TypeError, AttributeError)
+def _matches_ps1_metadata(pane_content: str) -> list[Ps1Match]:
+    return CmdOutputMetadata.matches_ps1_metadata(pane_content)
 
 
-_BASHLEX_PARSING_ERRORS = _get_bashlex_parsing_errors()
-
-
-def _parse_bash(command: str) -> list[BashlexNode]:
-    typed_bashlex = cast(Any, bashlex)
-    return cast(list[BashlexNode], typed_bashlex.parse(command))
-
-
-def split_bash_commands(commands: str) -> list[str]:
-    """Split bash commands string into individual commands.
-
-    Args:
-        commands: String containing multiple bash commands.
-
-    Returns:
-        list[str]: List of individual bash commands.
-
-    """
-    if not commands.strip():
-        return ['']
-    try:
-        parsed = _parse_bash(commands)
-    except _BASHLEX_PARSING_ERRORS:
-        logger.debug(
-            'Failed to parse bash commands\n[input]: %s\n[warning]: %s\nThe original command will be returned as is.',
-            commands,
-            traceback.format_exc(),
-        )
-        return [commands]
-    result: list[str] = []
-    last_end = 0
-    for node in parsed:
-        start, end = node.pos
-        if start > last_end:
-            between = commands[last_end:start]
-            logger.debug('BASH PARSING between: %s', between)
-            if result:
-                result[-1] += between.rstrip()
-            elif between.strip():
-                result.append(between.rstrip())
-        command = commands[start:end].rstrip()
-        logger.debug('BASH PARSING command: %s', command)
-        result.append(command)
-        last_end = end
-    remaining = commands[last_end:].rstrip()
-    logger.debug('BASH PARSING remaining: %s', remaining)
-    if last_end < len(commands):
-        if result:
-            result[-1] += remaining
-            logger.debug('BASH PARSING result[-1] += remaining: %s', result[-1])
-        elif remaining:
-            result.append(remaining)
-            logger.debug('BASH PARSING result.append(remaining): %s', result[-1])
-    return result
-
-
-def escape_bash_special_chars(command: str) -> str:
-    r"""Escapes characters that have different interpretations in bash vs python.
-
-    Specifically handles escape sequences like \\;, \\|, \\&, etc.
-    """
-    if not command.strip():
-        return ''
-    try:
-        parts: list[str] = []
-        last_pos = 0
-
-        def visit_node(node: Any) -> None:
-            """Visit AST node to extract heredoc content.
-
-            Args:
-                node: AST node to visit
-
-            """
-            nonlocal last_pos
-            if (
-                node.kind == 'redirect'
-                and hasattr(node, 'heredoc')
-                and (node.heredoc is not None)
-            ):
-                between = command[last_pos : node.pos[0]]
-                parts.append(between)
-                parts.append(command[node.pos[0] : node.heredoc.pos[0]])
-                parts.append(command[node.heredoc.pos[0] : node.heredoc.pos[1]])
-                last_pos = node.pos[1]
-                return
-            if node.kind == 'word':
-                between = command[last_pos : node.pos[0]]
-                word_text = command[node.pos[0] : node.pos[1]]
-                between = re.sub('\\\\([;&|><])', '\\\\\\\\\\1', between)
-                parts.append(between)
-                if (
-                    (word_text.startswith('"') and word_text.endswith('"'))
-                    or (word_text.startswith("'") and word_text.endswith("'"))
-                    or (word_text.startswith('$(') and word_text.endswith(')'))
-                    or (word_text.startswith('`') and word_text.endswith('`'))
-                ):
-                    parts.append(word_text)
-                else:
-                    word_text = re.sub('\\\\([;&|><])', '\\\\\\\\\\1', word_text)
-                    parts.append(word_text)
-                last_pos = node.pos[1]
-                return
-            if hasattr(node, 'parts'):
-                for part in node.parts:
-                    visit_node(part)
-
-        nodes = _parse_bash(command)
-        for node in nodes:
-            between = command[last_pos : node.pos[0]]
-            between = re.sub('\\\\([;&|><])', '\\\\\\\\\\1', between)
-            parts.append(between)
-            last_pos = node.pos[0]
-            visit_node(node)
-        remaining = command[last_pos:]
-        parts.append(remaining)
-        return ''.join(parts)
-    except _BASHLEX_PARSING_ERRORS:
-        logger.debug(
-            'Failed to parse bash commands for special characters escape\n[input]: %s\n[warning]: %s\nThe original command will be returned as is.',
-            command,
-            traceback.format_exc(),
-        )
-        return command
+def _call_uid_getter(uid_getter: Callable[[], int]) -> int:
+    return uid_getter()
 
 
 class BashCommandStatus(Enum):
@@ -181,80 +63,6 @@ class BashCommandStatus(Enum):
     COMPLETED = 'completed'
     NO_CHANGE_TIMEOUT = 'no_change_timeout'
     HARD_TIMEOUT = 'hard_timeout'
-
-
-def _remove_command_prefix(command_output: str, command: str) -> str:
-    """Remove command prefix from command output.
-
-    Args:
-        command_output: The output string from the command.
-        command: The original command that was executed.
-
-    Returns:
-        str: The output with the command prefix removed.
-
-    """
-    return command_output.lstrip().removeprefix(command.lstrip()).lstrip()
-
-
-class BackgroundPaneSession(UnifiedShellSession):
-    """Read-only view of a backgrounded tmux pane.
-
-    Created when a foreground command's idle-output timeout fires and the
-    pane is detached rather than killed.  The agent can poll it via
-    ``terminal_read(session_id=<bg_id>)`` while the process continues
-    running in the tmux window.
-    """
-
-    def __init__(self, pane: 'Pane', window: 'Window', cwd: str) -> None:
-        self._pane = pane
-        self._window = window
-        self._cwd = cwd
-
-    # --- UnifiedShellSession interface ----------------------------------------
-
-    def initialize(self) -> None:  # noqa: D401
-        pass
-
-    def execute(self, action: 'CmdRunAction') -> ErrorObservation:
-        return ErrorObservation(
-            'Cannot execute commands on a background-only pane session.'
-        )
-
-    def close(self) -> None:
-        try:
-            self._window.kill_window()
-        except Exception:
-            logger.debug('Failed to kill background pane window', exc_info=True)
-
-    @property
-    def cwd(self) -> str:
-        return self._cwd
-
-    def get_detected_server(self):
-        return None
-
-    def read_output(self) -> str:
-        """Capture the full pane content."""
-        try:
-            lines = self._pane.cmd('capture-pane', '-J', '-pS', '-').stdout
-            return '\n'.join(line.rstrip() for line in lines)
-        except Exception:
-            return ''
-
-    def read_output_since(self, offset: int) -> tuple[str, int, int | None]:
-        """Return (delta, next_offset, dropped_chars) for incremental reads."""
-        full = self.read_output()
-        total = len(full)
-        safe = max(0, offset)
-        delta = full[safe:] if safe < total else ''
-        return delta, total, None
-
-    def write_input(self, data: str, is_control: bool = False) -> None:
-        if is_control:
-            self._pane.send_keys(data, enter=False)
-        else:
-            self._pane.send_keys(data, enter=True)
 
 
 class BashSession(BaseShellSession):
@@ -413,10 +221,11 @@ class BashSession(BaseShellSession):
         if OS_CAPS.is_windows:
             return False
         try:
-            uid_getter = os.__dict__.get('geteuid')
+            uid_getter = getattr(os, 'geteuid', None)
             if uid_getter is None or not callable(uid_getter):
                 return False
-            uid = int(uid_getter())
+            typed_uid_getter: Callable[[], int] = cast(Callable[[], int], uid_getter)
+            uid = _call_uid_getter(typed_uid_getter)
         except (OSError, TypeError, ValueError):
             return False
         if uid != 0:
@@ -557,7 +366,7 @@ class BashSession(BaseShellSession):
         else:
             command_output = raw_command_output
         self.prev_output = raw_command_output
-        command_output = _remove_command_prefix(command_output, command)
+        command_output = remove_command_prefix(command_output, command)
         return command_output.rstrip()
 
     def _handle_completed_command(
@@ -936,7 +745,7 @@ class BashSession(BaseShellSession):
             and not is_input
             and command != ''
         ):
-            _ps1_matches = CmdOutputMetadata.matches_ps1_metadata(last_pane_output)
+            _ps1_matches = _matches_ps1_metadata(last_pane_output)
             current_matches_for_output = _ps1_matches or initial_ps1_matches
             raw_command_output = self._combine_outputs_between_matches(
                 last_pane_output, current_matches_for_output
@@ -1094,7 +903,7 @@ class BashSession(BaseShellSession):
             logger.debug('BEGIN OF PANE CONTENT: %s', cur_pane_output.split('\n')[:10])
             logger.debug('END OF PANE CONTENT: %s', cur_pane_output.split('\n')[-10:])
 
-            ps1_matches = CmdOutputMetadata.matches_ps1_metadata(cur_pane_output)
+            ps1_matches = _matches_ps1_metadata(cur_pane_output)
 
             if cur_pane_output != last_pane_output:
                 last_pane_output = cur_pane_output
@@ -1188,7 +997,7 @@ class BashSession(BaseShellSession):
 
         # Get initial state
         initial_pane_output = self._get_pane_content()
-        initial_ps1_matches = CmdOutputMetadata.matches_ps1_metadata(
+        initial_ps1_matches = _matches_ps1_metadata(
             initial_pane_output
         )
         initial_ps1_count = len(initial_ps1_matches)

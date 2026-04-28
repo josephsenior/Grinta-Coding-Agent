@@ -103,7 +103,7 @@ class StuckDetector:
                 or isinstance(event, NullAction | NullObservation)
                 or (
                     isinstance(event, ErrorObservation)
-                    and getattr(event, 'error_id', None)
+                    and event.error_id
                     in (
                         'STUCK_LOOP_RECOVERY',
                         'CIRCUIT_BREAKER_TRIPPED',
@@ -366,7 +366,7 @@ class StuckDetector:
         return False
 
     def _extract_intents_and_outcomes(
-        self, events: list[Event]
+        self, events: Sequence[Event]
     ) -> tuple[list[str], list[str]]:
         """Extract action intents and observation outcomes from events.
 
@@ -377,8 +377,8 @@ class StuckDetector:
             Tuple of (action_intents, observation_outcomes)
 
         """
-        action_intents = []
-        observation_outcomes = []
+        action_intents: list[str] = []
+        observation_outcomes: list[str] = []
 
         for event in events:
             if isinstance(event, Action) and not isinstance(
@@ -446,8 +446,8 @@ class StuckDetector:
         """
         if isinstance(action, CmdRunAction):
             return self._categorize_cmd_action(action.command)
-        if hasattr(action, 'path'):
-            return f'file_op_{getattr(action, "path")}'
+        if isinstance(action, (FileReadAction, FileWriteAction, FileEditAction)):
+            return f'file_op_{action.path}'
         return 'other_action'
 
     def _extract_observation_outcome(self, observation: Observation) -> str | None:
@@ -464,14 +464,14 @@ class StuckDetector:
             return 'error'
         if isinstance(observation, CmdOutputObservation):
             return self._categorize_cmd_output(observation)
-        content = getattr(observation, 'content', '') or ''
+        content = observation.content or ''
         if content.startswith('SKIPPED:'):
             return 'no_change'
         # Detect silent-success re-creation: old_content == new_content means
         # the file already existed and nothing was actually written.
         if isinstance(observation, FileEditObservation):
-            old = getattr(observation, 'old_content', None)
-            new = getattr(observation, 'new_content', None)
+            old = observation.old_content
+            new = observation.new_content
             if old is not None and old == new:
                 return 'no_change'
         return 'unknown'
@@ -479,19 +479,17 @@ class StuckDetector:
     def _categorize_cmd_output(self, observation: CmdOutputObservation) -> str:
         """Categorize command output from exit code and structured tool metadata only."""
         code = observation.exit_code
-        if code is not None and code != 0:
+        if code != 0:
             return 'error'
-        tr_raw = getattr(observation, 'tool_result', None)
-        tr = tr_raw if isinstance(tr_raw, dict) else None
-        if tr is not None and tr.get('ok') is False:
+        tool_result_raw: object = observation.tool_result
+        tool_result: dict[str, object] | None = (
+            tool_result_raw if isinstance(tool_result_raw, dict) else None
+        )
+        if tool_result is not None and tool_result.get('ok') is False:
             return 'error'
-        if code == 0:
-            if len((observation.content or '').strip()) == 0:
-                return 'no_output'
-            return 'success'
         if len((observation.content or '').strip()) == 0:
             return 'no_output'
-        return 'unknown'
+        return 'success'
 
     def _is_stuck_token_repetition(self, filtered_history: list[Event]) -> bool:
         """Detect exact token-level repetition in agent messages.
@@ -598,22 +596,19 @@ class StuckDetector:
     def _get_prompt_token_history(self, events_with_metrics: list[Event]) -> list[int]:
         """Extract prompt tokens for the last 10 steps."""
         prompt_tokens: list[int] = []
-        for e in events_with_metrics[-10:]:
-            llm_metrics = getattr(e, 'llm_metrics', None)
-            token_usages = getattr(llm_metrics, 'token_usages', None)
+        for event in events_with_metrics[-10:]:
+            llm_metrics = event.llm_metrics
+            if llm_metrics is None:
+                continue
+            token_usages = llm_metrics.token_usages
             if not token_usages:
                 continue
-            try:
-                candidate = token_usages[0].prompt_tokens
-                if isinstance(candidate, bool):
-                    continue
-                prompt_tokens.append(int(candidate))
-            except Exception:
-                # Defensive: ignore unexpected shapes (e.g., MagicMock)
-                continue
+            candidate = token_usages[0].prompt_tokens
+            if not isinstance(candidate, bool):
+                prompt_tokens.append(candidate)
         return prompt_tokens
 
-    def _score_action_repetition(self, last_actions: list) -> float:
+    def _score_action_repetition(self, last_actions: Sequence[Event]) -> float:
         """Score for identical action repetition (0.0-1.0)."""
         if len(last_actions) < 2:
             return 0.0
@@ -622,7 +617,9 @@ class StuckDetector:
         )
         return min(1.0, identical_count / 3.0)
 
-    def _score_observation_errors(self, last_observations: list) -> float:
+    def _score_observation_errors(
+        self, last_observations: Sequence[Event]
+    ) -> float:
         """Score for error rate in recent observations (0.0-1.0)."""
         if not last_observations:
             return 0.0
@@ -630,11 +627,11 @@ class StuckDetector:
             1
             for o in last_observations
             if isinstance(o, ErrorObservation)
-            or (isinstance(o, CmdOutputObservation) and getattr(o, 'exit_code', 0) != 0)
+            or (isinstance(o, CmdOutputObservation) and o.exit_code != 0)
         )
         return min(1.0, error_count / 3.0)
 
-    def _score_intent_diversity(self, filtered_history: list) -> float:
+    def _score_intent_diversity(self, filtered_history: Sequence[Event]) -> float:
         """Score for low semantic diversity (high = stuck)."""
         if len(filtered_history) < 10:
             return 0.0
@@ -735,7 +732,7 @@ class StuckDetector:
             if isinstance(e, CmdRunAction) and self._is_readonly_command(e.command):
                 readonly_commands.append(e.command.strip())
             elif isinstance(e, FileReadAction):
-                readonly_commands.append(f'__read__{getattr(e, "path", "")}')
+                readonly_commands.append(f'__read__{e.path}')
             elif isinstance(e, (FileWriteAction, FileEditAction)):
                 write_count += 1
 

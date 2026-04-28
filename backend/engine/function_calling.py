@@ -26,6 +26,12 @@ from backend.core.logger import app_logger as logger
 from backend.engine.common import (
     common_response_to_actions,
 )
+from backend.engine.function_calling_helpers import (
+    combine_thought,
+    parse_bool_argument,
+    require_tool_argument,
+    set_security_risk,
+)
 from backend.engine.tools import (
     create_cmd_run_tool,
     create_finish_tool,
@@ -138,52 +144,6 @@ if TYPE_CHECKING:
     ModelResponse = Any
 
 
-def combine_thought(action: Action, thought: str) -> Action:
-    """Combine a thought with an existing action's thought.
-
-    Args:
-        action: The action to combine the thought with.
-        thought: The thought to combine.
-
-    Returns:
-        Action: The action with the combined thought.
-
-    """
-    if thought:
-        existing = getattr(action, 'thought', None)
-        action.thought = f'{thought}\n{existing}' if existing else thought
-    return action
-
-
-def set_security_risk(action: Action, arguments: Mapping[str, Any]) -> None:
-    """Set the security risk level for the action."""
-    if 'security_risk' in arguments:
-        if arguments['security_risk'] in RISK_LEVELS:
-            action.security_risk = getattr(
-                ActionSecurityRisk, str(arguments['security_risk'])
-            )
-        else:
-            logger.warning(
-                'Invalid security_risk value: %s', arguments['security_risk']
-            )
-
-
-def _parse_bool_argument(raw: Any) -> bool:
-    """Parse bool-ish tool arguments consistently."""
-    return raw is True or (isinstance(raw, str) and raw.lower() == 'true')
-
-
-def _require_tool_argument(
-    arguments: Mapping[str, Any], key: str, tool_name: str
-) -> Any:
-    """Return a required argument value or raise a standardized validation error."""
-    if key not in arguments:
-        raise FunctionCallValidationError(
-            f'Missing required argument "{key}" in tool call {tool_name}'
-        )
-    return arguments[key]
-
-
 def _handle_browser_tool(arguments: Mapping[str, Any]) -> BrowserToolAction:
     """Handle native browser-use tool calls."""
     action = build_browser_tool_action(dict(arguments))
@@ -199,10 +159,10 @@ def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
     )
 
     tool_name = cast(str, create_cmd_run_tool().get('function', {}).get('name', ''))
-    command = _require_tool_argument(arguments, 'command', tool_name)
+    command = require_tool_argument(arguments, 'command', tool_name)
     raw_is_input = arguments.get('is_input', False)
-    is_input = _parse_bool_argument(raw_is_input)
-    is_background = _parse_bool_argument(arguments.get('is_background', False))
+    is_input = parse_bool_argument(raw_is_input)
+    is_background = parse_bool_argument(arguments.get('is_background', False))
     grep_pattern = arguments.get('grep_pattern')
 
     glue_hint = (
@@ -232,7 +192,7 @@ def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
 def _handle_finish_tool(arguments: Mapping[str, Any]) -> PlaybookFinishAction:
     """Handle FinishTool tool call."""
     tool_name = cast(str, create_finish_tool().get('function', {}).get('name', ''))
-    message = _require_tool_argument(arguments, 'message', tool_name)
+    message = require_tool_argument(arguments, 'message', tool_name)
     outputs: dict[str, Any] = {}
     if 'completed' in arguments:
         outputs['completed'] = arguments['completed']
@@ -338,7 +298,7 @@ def _validate_text_editor_args(
 ) -> tuple[str, str]:
     """Validate required arguments for text_editor tool."""
     tool_name = cast(str, create_text_editor_tool().get('function', {}).get('name', ''))
-    command = _require_tool_argument(arguments, 'command', tool_name)
+    command = require_tool_argument(arguments, 'command', tool_name)
     path = arguments.get('path')
     if not path:
         msg = f'Missing required argument "path" in tool call {tool_name}'
@@ -443,7 +403,7 @@ def _apply_confidence_preview_override(
 
 def _is_preview_enabled(raw: Any) -> bool:
     """Parse preview flag from tool arguments."""
-    return _parse_bool_argument(raw)
+    return parse_bool_argument(raw)
 
 
 def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
@@ -514,7 +474,7 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
 def _handle_think_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
     """Handle ThinkTool tool call."""
     tool_name = cast(str, create_think_tool().get('function', {}).get('name', ''))
-    thought = _require_tool_argument(arguments, 'thought', tool_name)
+    thought = require_tool_argument(arguments, 'thought', tool_name)
     return AgentThinkAction(thought=thought)
 
 
@@ -556,7 +516,7 @@ def _normalize_task_tracker_list(
 
 def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle TASK_TRACKER_TOOL tool call."""
-    command = _require_tool_argument(arguments, 'command', TASK_TRACKER_TOOL_NAME)
+    command = require_tool_argument(arguments, 'command', TASK_TRACKER_TOOL_NAME)
     if command not in {'view', 'update'}:
         raise FunctionCallValidationError(
             f'Unsupported command {command!r} for tool call {TASK_TRACKER_TOOL_NAME}'
@@ -670,7 +630,7 @@ def _apply_context7_resolve_library_defaults(inner: dict[str, Any]) -> None:
 
 def _handle_execute_mcp_tool_tool(arguments: dict[str, Any]) -> MCPAction:
     """Handle the call_mcp_tool gateway — route to the real MCP tool."""
-    tool_name = _require_tool_argument(arguments, 'tool_name', 'call_mcp_tool')
+    tool_name = require_tool_argument(arguments, 'tool_name', 'call_mcp_tool')
     inner_args = _merge_mcp_gateway_inner_arguments(arguments)
     if tool_name == 'resolve-library-id':
         _apply_context7_resolve_library_defaults(inner_args)
@@ -694,8 +654,8 @@ def _validate_symbol_editor_args(
         FunctionCallValidationError: If validation fails
 
     """
-    command = _require_tool_argument(arguments, 'command', tool_name)
-    path = _require_tool_argument(arguments, 'path', tool_name)
+    command = require_tool_argument(arguments, 'command', tool_name)
+    path = require_tool_argument(arguments, 'path', tool_name)
     return str(command), str(path)
 
 

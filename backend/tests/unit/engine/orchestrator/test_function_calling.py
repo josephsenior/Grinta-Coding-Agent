@@ -91,7 +91,7 @@ class TestSetSecurityRisk:
     def test_invalid_risk_level_logs_warning(self):
         action = CmdRunAction(command='ls')
         # Should not raise even with an invalid level
-        with patch('backend.engine.function_calling.logger') as mock_log:
+        with patch('backend.engine.function_calling_helpers.logger') as mock_log:
             set_security_risk(action, {'security_risk': 'NUCLEAR'})
         mock_log.warning.assert_called_once()
 

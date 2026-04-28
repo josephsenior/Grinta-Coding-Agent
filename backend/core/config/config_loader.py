@@ -129,6 +129,247 @@ def _to_posix_workspace_path(path: str) -> str:
     return p.rstrip('/') if p != '/' else p
 
 
+_JSON_LLM_KEYS = ('llm_model', 'llm_api_key', 'llm_base_url', 'llm_provider')
+
+
+def _load_json_settings(
+    json_file: str, *, strict_config: bool
+) -> dict[str, object] | None:
+    try:
+        with open(json_file, 'r', encoding='utf-8') as json_contents:
+            return cast(dict[str, object], json.load(json_contents))
+    except FileNotFoundError:
+        return None
+    except Exception as exc:
+        logger.app_logger.warning(
+            'Cannot parse config from json, json values have not been applied.\nError: %s',
+            exc,
+        )
+        if strict_config:
+            raise ValueError(f'Invalid JSON in {json_file}') from exc
+        return None
+
+
+def _json_has_llm_overrides(data: dict[str, object]) -> bool:
+    return any(key in data for key in _JSON_LLM_KEYS)
+
+
+def _apply_json_llm_model(llm_dict: dict[str, object], raw_model: object) -> None:
+    if raw_model is not None and str(raw_model).strip():
+        llm_dict['model'] = str(raw_model).strip()
+        return
+    llm_dict['model'] = None
+
+
+def _warn_on_literal_llm_api_key(raw_secret: object) -> None:
+    from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
+
+    if raw_secret is None:
+        return
+    secret = str(raw_secret).strip()
+    if not secret or secret == LLM_API_KEY_SETTINGS_PLACEHOLDER:
+        return
+    logger.app_logger.warning(
+        'settings.json has a literal llm_api_key; it is ignored. '
+        'Set LLM_API_KEY in .env and use "%s" for llm_api_key in settings.json.',
+        LLM_API_KEY_SETTINGS_PLACEHOLDER,
+    )
+
+
+def _sync_llm_api_key_from_env(llm_dict: dict[str, object]) -> None:
+    env_llm_key = (os.environ.get('LLM_API_KEY') or '').strip()
+    if env_llm_key:
+        llm_dict['api_key'] = env_llm_key
+        return
+    llm_dict.pop('api_key', None)
+
+
+def _should_skip_native_google_base_url(
+    llm_dict: dict[str, object], provider: object
+) -> bool:
+    model_str = str(llm_dict.get('model') or '').lower()
+    is_native_google = (
+        model_str.startswith('google/') or model_str.startswith('gemini-')
+    ) and not provider
+    return is_native_google
+
+
+def _apply_json_llm_base_url(
+    llm_dict: dict[str, object], data: dict[str, object]
+) -> None:
+    raw_base_url = data.get('llm_base_url')
+    if not raw_base_url:
+        return
+    provider = data.get('llm_provider') or llm_dict.get('provider')
+    if _should_skip_native_google_base_url(llm_dict, provider):
+        return
+    llm_dict['base_url'] = str(raw_base_url).strip()
+
+
+def _canonicalize_json_llm_selection(
+    llm_dict: dict[str, object], data: dict[str, object]
+) -> tuple[str | None, str | None]:
+    from backend.inference.provider_resolver import canonicalize_model_selection
+
+    provider = data.get('llm_provider') or llm_dict.get('provider')
+    return canonicalize_model_selection(
+        cast(str | None, llm_dict.get('model')),
+        str(provider) if provider is not None else None,
+    )
+
+
+def _maybe_set_provider_default_base_url(
+    llm_dict: dict[str, object], model_value: str | None, provider_value: str | None
+) -> None:
+    if not provider_value or llm_dict.get('base_url'):
+        return
+
+    from backend.inference.provider_resolver import (
+        _PROVIDER_DEFAULT_URLS,
+        extract_provider_prefix,
+    )
+
+    model_prefix = extract_provider_prefix(model_value or '')
+    if model_prefix == provider_value:
+        return
+    provider_url = _PROVIDER_DEFAULT_URLS.get(provider_value)
+    if provider_url:
+        llm_dict['base_url'] = provider_url
+
+
+def _handle_missing_json_llm_provider(
+    llm_dict: dict[str, object],
+    provider_value: str | None,
+    *,
+    json_file: str,
+    strict_config: bool,
+) -> bool:
+    if not llm_dict.get('model') or provider_value:
+        return False
+    msg = 'llm_provider is required when llm_model does not include a provider prefix'
+    if strict_config:
+        raise ValueError(msg)
+    logger.app_logger.warning('Skipping LLM config from %s: %s', json_file, msg)
+    return True
+
+
+def _build_json_llm_config(
+    cfg: AppConfig, data: dict[str, object]
+) -> dict[str, object]:
+    base = cfg.llms.get('llm')
+    llm_dict = base.model_dump(exclude_none=True) if base else {}
+    if 'llm_model' in data:
+        _apply_json_llm_model(llm_dict, data['llm_model'])
+    _warn_on_literal_llm_api_key(data.get('llm_api_key'))
+    _sync_llm_api_key_from_env(llm_dict)
+    _apply_json_llm_base_url(llm_dict, data)
+    return llm_dict
+
+
+def _apply_json_llm_config(
+    cfg: AppConfig,
+    data: dict[str, object],
+    *,
+    json_file: str,
+    strict_config: bool,
+) -> None:
+    if not _json_has_llm_overrides(data):
+        return
+
+    llm_dict = _build_json_llm_config(cfg, data)
+    model_value, provider_value = _canonicalize_json_llm_selection(llm_dict, data)
+    if model_value:
+        llm_dict['model'] = model_value
+    _maybe_set_provider_default_base_url(llm_dict, model_value, provider_value)
+    if _handle_missing_json_llm_provider(
+        llm_dict,
+        provider_value,
+        json_file=json_file,
+        strict_config=strict_config,
+    ):
+        return
+    cfg.set_llm_config(LLMConfig.model_validate(llm_dict))
+
+
+def _apply_json_top_level_fields(cfg: AppConfig, data: dict[str, object]) -> None:
+    if data.get('mcp_host'):
+        cfg.mcp_host = cast(str, data['mcp_host'])
+    if data.get('project_root'):
+        cfg.project_root = cast(str, data['project_root'])
+
+
+def _parse_mcp_server_entry(entry: object):
+    from backend.core.config.mcp_config import MCPServerConfig
+
+    if not isinstance(entry, dict):
+        return None
+    try:
+        return MCPServerConfig(**entry)
+    except Exception as exc:
+        logger.app_logger.debug('Skipping invalid mcp_config server %r: %s', entry, exc)
+        return None
+
+
+def _apply_json_mcp_servers(cfg: AppConfig, data: dict[str, object]) -> None:
+    mcp_config = data.get('mcp_config')
+    if not isinstance(mcp_config, dict):
+        return
+
+    raw_servers = mcp_config.get('servers') or []
+    parsed = [server for entry in raw_servers if (server := _parse_mcp_server_entry(entry))]
+    if not parsed:
+        return
+
+    existing_names = {server.name for server in cfg.mcp.servers}
+    cfg.mcp.servers = list(cfg.mcp.servers) + [
+        server for server in parsed if server.name not in existing_names
+    ]
+    cfg.mcp.enabled = True
+
+
+def _filter_agent_updates(raw_updates: object) -> dict[str, object] | None:
+    if not isinstance(raw_updates, dict):
+        return None
+    allowed_fields = set(AgentConfig.model_fields)
+    filtered = {key: value for key, value in raw_updates.items() if key in allowed_fields}
+    if not filtered:
+        return None
+    return filtered
+
+
+def _apply_json_agent_override(
+    cfg: AppConfig, agent_name: str, filtered: dict[str, object], json_file: str
+) -> None:
+    try:
+        agent_base = cfg.get_agent_config(agent_name)
+        merged = {**agent_base.model_dump(), **filtered}
+        agent_configs: dict[str, AgentConfig] = cfg.agents
+        agent_configs[agent_name] = AgentConfig.model_validate(merged)
+    except Exception as exc:
+        logger.app_logger.warning(
+            'Skipping invalid agent overrides for %r in %s: %s',
+            agent_name,
+            json_file,
+            exc,
+        )
+
+
+def _apply_json_agent_overrides(
+    cfg: AppConfig, data: dict[str, object], json_file: str
+) -> None:
+    agents = data.get('agent')
+    if not isinstance(agents, dict):
+        return
+
+    for agent_name, raw_updates in agents.items():
+        if not isinstance(agent_name, str):
+            continue
+        filtered = _filter_agent_updates(raw_updates)
+        if filtered is None:
+            continue
+        _apply_json_agent_override(cfg, agent_name, filtered, json_file)
+
+
 # ---------------------------------------------------------------------------
 # Config load
 # ---------------------------------------------------------------------------
@@ -143,144 +384,18 @@ def load_from_json(cfg: AppConfig, json_file: str = 'settings.json') -> None:
     )
     summary = ConfigLoadSummary(json_file)
     try:
-        try:
-            with open(json_file, 'r', encoding='utf-8') as json_contents:
-                data = json.load(json_contents)
-        except FileNotFoundError:
+        data = _load_json_settings(json_file, strict_config=strict_config)
+        if data is None:
             return
-        except Exception as e:
-            logger.app_logger.warning(
-                'Cannot parse config from json, json values have not been applied.\nError: %s',
-                e,
-            )
-            if strict_config:
-                raise ValueError(f'Invalid JSON in {json_file}') from e
-            return
-
-        # LLM — merge JSON over existing cfg (env/TOML). If llm_model appears in JSON,
-        # it overrides LLM_MODEL from the environment even when both are set.
-        llm_keys = ('llm_model', 'llm_api_key', 'llm_base_url', 'llm_provider')
-        if any(k in data for k in llm_keys):
-            from backend.inference.provider_resolver import canonicalize_model_selection
-
-            base = cfg.llms.get('llm')
-            llm_dict = base.model_dump(exclude_none=True) if base else {}
-            if 'llm_model' in data:
-                raw_m = data['llm_model']
-                if raw_m is not None and str(raw_m).strip():
-                    llm_dict['model'] = str(raw_m).strip()
-                else:
-                    llm_dict['model'] = None
-            from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
-
-            raw_sk = data.get('llm_api_key')
-            if raw_sk is not None:
-                s = str(raw_sk).strip()
-                if s and s != LLM_API_KEY_SETTINGS_PLACEHOLDER:
-                    logger.app_logger.warning(
-                        'settings.json has a literal llm_api_key; it is ignored. '
-                        'Set LLM_API_KEY in .env and use "%s" for llm_api_key in settings.json.',
-                        LLM_API_KEY_SETTINGS_PLACEHOLDER,
-                    )
-            env_llm_key = (os.environ.get('LLM_API_KEY') or '').strip()
-            if env_llm_key:
-                llm_dict['api_key'] = env_llm_key
-            else:
-                llm_dict.pop('api_key', None)
-            provider = data.get('llm_provider') or llm_dict.get('provider')
-            if 'llm_base_url' in data and data['llm_base_url']:
-                raw_url = str(data['llm_base_url']).strip()
-                model_str = str(llm_dict.get('model') or '').lower()
-                # Native Google Gemini routes through the Gemini SDK client and
-                # does not use a base_url.  Skip only when there is no explicit
-                # provider override (which would indicate a proxy like Lightning
-                # AI or OpenRouter is being used).
-                _native_google = (
-                    model_str.startswith('google/') or model_str.startswith('gemini-')
-                ) and not provider
-                if not _native_google:
-                    llm_dict['base_url'] = raw_url
-
-            model_value, provider_value = canonicalize_model_selection(
-                cast(str | None, llm_dict.get('model')),
-                str(provider) if provider is not None else None,
-            )
-            if model_value:
-                llm_dict['model'] = model_value
-            # When the explicit provider differs from the model's own namespace
-            # prefix (e.g. google/gemini-3-flash-preview routed through
-            # lightning), resolve and store the base_url from the explicit
-            # provider so the inference layer can route to the correct API.
-            if provider_value:
-                from backend.inference.provider_resolver import (
-                    _PROVIDER_DEFAULT_URLS,
-                    extract_provider_prefix,
-                )
-
-                model_prefix = extract_provider_prefix(model_value or '')
-                if model_prefix != provider_value and not llm_dict.get('base_url'):
-                    provider_url = _PROVIDER_DEFAULT_URLS.get(provider_value)
-                    if provider_url:
-                        llm_dict['base_url'] = provider_url
-            if llm_dict.get('model') and not provider_value:
-                msg = 'llm_provider is required when llm_model does not include a provider prefix'
-                if strict_config:
-                    raise ValueError(msg)
-                logger.app_logger.warning(
-                    'Skipping LLM config from %s: %s', json_file, msg
-                )
-            else:
-                cfg.set_llm_config(LLMConfig.model_validate(llm_dict))
-
-        # Top-level app config fields (mcp_host, project_root, etc.)
-        if 'mcp_host' in data and data['mcp_host']:
-            cfg.mcp_host = data['mcp_host']
-        if 'project_root' in data and data['project_root']:
-            cfg.project_root = data['project_root']
-
-        # MCP servers saved by add_mcp_server() / /settings UI
-        if 'mcp_config' in data and isinstance(data.get('mcp_config'), dict):
-            from backend.core.config.mcp_config import MCPServerConfig
-
-            raw_servers = data['mcp_config'].get('servers') or []
-            parsed: list[MCPServerConfig] = []
-            for entry in raw_servers:
-                if not isinstance(entry, dict):
-                    continue
-                try:
-                    parsed.append(MCPServerConfig(**entry))
-                except Exception as exc:
-                    logger.app_logger.debug(
-                        'Skipping invalid mcp_config server %r: %s', entry, exc
-                    )
-            if parsed:
-                existing_names = {s.name for s in cfg.mcp.servers}
-                cfg.mcp.servers = list(cfg.mcp.servers) + [
-                    s for s in parsed if s.name not in existing_names
-                ]
-                cfg.mcp.enabled = True
-
-        # Named agent profiles (`agent.<name>` in settings.json)
-        if 'agent' in data and isinstance(data.get('agent'), dict):
-            allowed_fields = set(AgentConfig.model_fields)
-            for agent_name, raw_updates in data['agent'].items():
-                if not isinstance(agent_name, str) or not isinstance(raw_updates, dict):
-                    continue
-                filtered = {k: v for k, v in raw_updates.items() if k in allowed_fields}
-                if not filtered:
-                    continue
-                try:
-                    agent_base = cfg.get_agent_config(agent_name)
-                    merged = {**agent_base.model_dump(), **filtered}
-                    agent_configs: dict[str, AgentConfig] = cfg.agents
-                    agent_configs[agent_name] = AgentConfig.model_validate(merged)
-                except Exception as exc:
-                    logger.app_logger.warning(
-                        'Skipping invalid agent overrides for %r in %s: %s',
-                        agent_name,
-                        json_file,
-                        exc,
-                    )
+        _apply_json_llm_config(
+            cfg,
+            data,
+            json_file=json_file,
+            strict_config=strict_config,
+        )
+        _apply_json_top_level_fields(cfg, data)
+        _apply_json_mcp_servers(cfg, data)
+        _apply_json_agent_overrides(cfg, data, json_file)
 
     finally:
         summary.emit()

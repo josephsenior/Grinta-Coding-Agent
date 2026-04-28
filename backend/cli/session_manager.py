@@ -172,16 +172,29 @@ def resolve_session_id(
         return None, 'No past sessions found for this project.'
 
     if cleaned.isdigit():
-        index = int(cleaned)
-        if 1 <= index <= len(sessions):
-            return sessions[index - 1][0], None
-        return None, f'No session at index {cleaned}.'
+        return _resolve_session_index(sessions, cleaned)
+    return _resolve_session_by_id_or_prefix(sessions, cleaned)
 
+
+def _resolve_session_index(
+    sessions: list[tuple[str, dict[str, Any], int]], cleaned: str,
+) -> tuple[str | None, str | None]:
+    index = int(cleaned)
+    if 1 <= index <= len(sessions):
+        return sessions[index - 1][0], None
+    return None, f'No session at index {cleaned}.'
+
+
+def _resolve_session_by_id_or_prefix(
+    sessions: list[tuple[str, dict[str, Any], int]], cleaned: str,
+) -> tuple[str | None, str | None]:
     exact = [sid for sid, _meta, _event_count in sessions if sid == cleaned]
     if exact:
         return exact[0], None
 
-    matches = [sid for sid, _meta, _event_count in sessions if sid.startswith(cleaned)]
+    matches = [
+        sid for sid, _meta, _event_count in sessions if sid.startswith(cleaned)
+    ]
     if len(matches) == 1:
         return matches[0], None
     if len(matches) > 1:

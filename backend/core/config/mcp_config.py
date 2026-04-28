@@ -425,6 +425,34 @@ def _matches_default_app_mcp_server(
     )
 
 
+def _remove_default_app_mcp_server(cfg: Any, default_server: MCPServerConfig) -> None:
+    cfg.mcp.servers = [
+        server
+        for server in cfg.mcp.servers
+        if not _matches_default_app_mcp_server(server, default_server)
+    ]
+
+
+def _has_named_app_mcp_server(cfg: Any) -> bool:
+    return any(server.name == 'app-mcp' for server in cfg.mcp.servers)
+
+
+def _has_default_server_url(cfg: Any, default_server: MCPServerConfig) -> bool:
+    if not default_server.url:
+        return False
+    return any(getattr(server, 'url', None) == default_server.url for server in cfg.mcp.servers)
+
+
+def _append_default_mcp_server(
+    cfg: Any,
+    default_server: MCPServerConfig,
+    stdio_extra: list[MCPServerConfig],
+) -> None:
+    cfg.mcp.servers.append(default_server)
+    if stdio_extra:
+        cfg.mcp.servers.extend(stdio_extra)
+
+
 def ensure_default_mcp_http_server(cfg: Any) -> None:
     """Ensure the default SHTTP MCP server exists once (single source of truth)."""
     dedupe_default_mcp_http_servers(cfg.mcp)
@@ -436,24 +464,16 @@ def ensure_default_mcp_http_server(cfg: Any) -> None:
     if default is None:
         return
     if _get_local_app_mcp_tool_count() <= 0:
-        cfg.mcp.servers = [
-            server
-            for server in cfg.mcp.servers
-            if not _matches_default_app_mcp_server(server, default)
-        ]
+        _remove_default_app_mcp_server(cfg, default)
         logger.debug(
             'Skipping default app-mcp server because no local MCP tools are registered'
         )
         return
-    if any(s.name == 'app-mcp' for s in cfg.mcp.servers):
+    if _has_named_app_mcp_server(cfg):
         return
-    if default.url and any(
-        getattr(s, 'url', None) == default.url for s in cfg.mcp.servers
-    ):
+    if _has_default_server_url(cfg, default):
         return
-    cfg.mcp.servers.append(default)
-    if stdio_extra:
-        cfg.mcp.servers.extend(stdio_extra)
+    _append_default_mcp_server(cfg, default, stdio_extra)
 
 
 def _filter_windows_stdio_servers(servers: list) -> list:

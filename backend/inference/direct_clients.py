@@ -27,16 +27,26 @@ from openai import AsyncOpenAI, OpenAI
 from backend.cli.tool_call_display import flatten_tool_call_for_history
 from backend.core import json_compat as json
 from backend.core.logger import app_logger as logger
+from backend.inference.direct_clients_anthropic_ops import (
+    acompletion as _anthropic_acompletion,
+    astream as _anthropic_astream,
+    completion as _anthropic_completion,
+    extract_anthropic_tool_calls as _extract_anthropic_tool_calls_impl,
+    map_anthropic_error as _map_anthropic_error_impl,
+    prepare_anthropic_kwargs as _prepare_anthropic_kwargs_impl,
+)
+from backend.inference.direct_clients_openai_ops import (
+    acompletion as _openai_acompletion,
+    astream as _openai_astream,
+    clean_messages as _clean_messages_impl,
+    completion as _openai_completion,
+    extract_openai_tool_calls as _extract_openai_tool_calls_impl,
+    map_openai_error as _map_openai_error_impl,
+    strip_unsupported_params as _strip_unsupported_params_impl,
+)
 
-# ---------------------------------------------------------------------------
-# Shared httpx connection pool
-# ---------------------------------------------------------------------------
-# LLM SDKs (OpenAI, Anthropic) use httpx internally. By default each SDK
-# client creates its own transport, wasting TCP connections when many
-# sessions hit the same provider.  We share httpx.Client / AsyncClient
-# instances keyed by (provider, base_url) so keep-alive connections are
-# reused across sessions.
-# ---------------------------------------------------------------------------
+# Shared httpx pool: reuse provider/base_url transports across sessions so the
+# direct SDK clients do not waste TCP connections on duplicate httpx clients.
 
 _POOL_LIMITS = httpx.Limits(
     max_connections=20,
@@ -493,289 +503,30 @@ class OpenAIClient(DirectLLMClient):
 
     @staticmethod
     def _extract_openai_tool_calls(message: Any) -> list[dict[str, Any]] | None:
-        from backend.inference.mappers.openai import extract_tool_calls
-
-        return extract_tool_calls(message)
+        return _extract_openai_tool_calls_impl(message)
 
     def _map_openai_error(self, exc: Exception) -> Exception:
-        """Map openai SDK exceptions to App LLM exceptions."""
-        import openai
-
-        from backend.inference.exceptions import (
-            APIConnectionError,
-            AuthenticationError,
-            BadRequestError,
-            ContextWindowExceededError,
-            InternalServerError,
-            NotFoundError,
-            RateLimitError,
-            Timeout,
-            format_html_api_error_response,
-            is_context_window_error,
-            is_html_api_body,
-        )
-        from backend.inference.exceptions import (
-            APIError as ProviderAPIError,
-        )
-
-        raw_msg = str(exc)
-        if is_html_api_body(raw_msg):
-            friendly = format_html_api_error_response(
-                raw_msg,
-                base_url=self._api_base_url,
-                model=self.model_name,
-            )
-            status_code = getattr(exc, 'status_code', None)
-            if status_code in (401, 403):
-                return AuthenticationError(
-                    friendly,
-                    llm_provider='openai',
-                    model=self.model_name,
-                    status_code=status_code,
-                )
-            return BadRequestError(
-                friendly,
-                llm_provider='openai',
-                model=self.model_name,
-            )
-
-        if isinstance(exc, (openai.APITimeoutError, httpx.TimeoutException)):
-            return Timeout(str(exc), llm_provider='openai', model=self.model_name)
-        if isinstance(exc, (openai.APIConnectionError, httpx.RequestError)):
-            return APIConnectionError(
-                str(exc), llm_provider='openai', model=self.model_name
-            )
-        if isinstance(exc, openai.RateLimitError):
-            # OpenAI uses HTTP 429 for both transient rate limits and non-transient
-            # "insufficient_quota" (billing/credits). The latter should NOT be retried.
-            code = getattr(exc, 'code', None)
-            message = str(exc)
-
-            # The OpenAI SDK may not surface the provider error code directly
-            # on the exception, but it typically includes a parsed response body.
-            body = getattr(exc, 'body', None)
-            if not code and isinstance(body, dict):
-                err = body.get('error')
-                if isinstance(err, dict):
-                    code = err.get('code') or err.get('type') or code
-                    body_msg = err.get('message')
-                    if isinstance(body_msg, str) and body_msg:
-                        message = body_msg
-
-            lowered = message.lower()
-            status_code = getattr(exc, 'status_code', None) or 429
-            if isinstance(code, str) and code and f'code={code}' not in message:
-                message = f'{message} (code={code})'
-
-            if code == 'insufficient_quota' or 'insufficient_quota' in lowered:
-                return AuthenticationError(
-                    message,
-                    llm_provider='openai',
-                    model=self.model_name,
-                    status_code=status_code,
-                    code=code,
-                    body=body,
-                )
-            return RateLimitError(
-                message,
-                llm_provider='openai',
-                model=self.model_name,
-                status_code=status_code,
-                code=code,
-                body=body,
-            )
-        if isinstance(exc, openai.AuthenticationError):
-            return AuthenticationError(
-                str(exc), llm_provider='openai', model=self.model_name
-            )
-        if isinstance(exc, openai.BadRequestError):
-            error_str = str(exc).lower()
-            if is_context_window_error(error_str, exc):
-                return ContextWindowExceededError(
-                    str(exc), llm_provider='openai', model=self.model_name
-                )
-            return BadRequestError(
-                str(exc), llm_provider='openai', model=self.model_name
-            )
-        if isinstance(exc, openai.NotFoundError):
-            return NotFoundError(str(exc), llm_provider='openai', model=self.model_name)
-        if isinstance(exc, openai.InternalServerError):
-            return InternalServerError(
-                str(exc), llm_provider='openai', model=self.model_name
-            )
-        if isinstance(exc, openai.APIStatusError):
-            return ProviderAPIError(
-                str(exc),
-                llm_provider='openai',
-                model=self.model_name,
-                status_code=exc.status_code,
-            )
-        return exc
+        return _map_openai_error_impl(self, exc)
 
     def _strip_unsupported_params(self, kwargs: dict[str, Any]) -> dict[str, Any]:
-        """Remove request parameters not supported by this provider."""
-        if not self._profile.supports_request_metadata:
-            extra_body = kwargs.get('extra_body')
-            if isinstance(extra_body, dict) and 'metadata' in extra_body:
-                extra_body = {k: v for k, v in extra_body.items() if k != 'metadata'}
-                if extra_body:
-                    kwargs = {**kwargs, 'extra_body': extra_body}
-                else:
-                    kwargs = {k: v for k, v in kwargs.items() if k != 'extra_body'}
-        return kwargs
+        return _strip_unsupported_params_impl(self._profile, kwargs)
 
     def _clean_messages(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Remove OpenAI-specific fields from messages for providers that don't support them."""
-        cleaned = []
-        for msg in messages:
-            if isinstance(msg, dict) and 'tool_ok' in msg:
-                msg = {k: v for k, v in msg.items() if k != 'tool_ok'}
-            cleaned.append(msg)
-        if not self._profile.supports_tool_replay or self._profile.flatten_tool_history:
-            return _normalize_cross_family_tool_messages(cleaned)
-        return cleaned
+        return _clean_messages_impl(self._profile, messages)
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
-        from backend.inference.mappers.openai import (
-            strip_prompt_cache_hints_from_messages,
-        )
-
-        messages = strip_prompt_cache_hints_from_messages(messages)
-        messages = self._clean_messages(messages)
-        kwargs = _sanitize_openai_compatible_kwargs(kwargs)
-        kwargs = self._strip_unsupported_params(kwargs)
-        kwargs['model'] = self.model_name
-        try:
-            response = self.client.chat.completions.create(
-                messages=messages,  # type: ignore[arg-type]
-                **kwargs,
-            )
-        except Exception as e:
-            raise self._map_openai_error(e) from e
-        if not getattr(response, 'choices', None) or len(response.choices) == 0:
-            from backend.inference.exceptions import BadRequestError
-
-            raise BadRequestError(
-                'OpenAI completion returned no choices',
-                llm_provider='openai',
-                model=self.model_name,
-            )
-        first = response.choices[0]
-        msg = first.message
-        tool_calls = self._extract_openai_tool_calls(msg)
-
-        # Some OpenAI-compatible APIs (or parameter combos) can yield a response
-        # where `content` is empty and no tool call is present. This is almost
-        # always a provider-side anomaly, so capture enough context to debug.
-        content_value = getattr(msg, 'content', None)
-        if (
-            content_value is None
-            or (isinstance(content_value, str) and not content_value.strip())
-        ) and not tool_calls:
-            try:
-                msg_dump = msg.model_dump() if hasattr(msg, 'model_dump') else str(msg)
-            except Exception:
-                msg_dump = str(msg)
-            logger.warning(
-                'OpenAI-compatible completion returned empty message (no tool calls). '
-                'model=%s finish_reason=%s msg=%s',
-                self.model_name,
-                getattr(first, 'finish_reason', None),
-                msg_dump,
-            )
-        return LLMResponse(
-            content=msg.content or '',
-            model=response.model,
-            usage={
-                'prompt_tokens': response.usage.prompt_tokens if response.usage else 0,
-                'completion_tokens': response.usage.completion_tokens
-                if response.usage
-                else 0,
-                'total_tokens': response.usage.total_tokens if response.usage else 0,
-            },
-            id=response.id,
-            finish_reason=getattr(first, 'finish_reason', None) or '',
-            tool_calls=tool_calls,
-        )
+        return _openai_completion(self, messages, **kwargs)
 
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
-        from backend.inference.mappers.openai import (
-            strip_prompt_cache_hints_from_messages,
-        )
-
-        messages = strip_prompt_cache_hints_from_messages(messages)
-        messages = self._clean_messages(messages)
-        kwargs = _sanitize_openai_compatible_kwargs(kwargs)
-        kwargs = self._strip_unsupported_params(kwargs)
-        kwargs.pop('model', None)
-        try:
-            response = await self.async_client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,  # type: ignore[arg-type]
-                **kwargs,
-            )
-        except Exception as e:
-            raise self._map_openai_error(e) from e
-        if not getattr(response, 'choices', None) or len(response.choices) == 0:
-            from backend.inference.exceptions import BadRequestError
-
-            raise BadRequestError(
-                'OpenAI completion returned no choices',
-                llm_provider='openai',
-                model=self.model_name,
-            )
-        first = response.choices[0]
-        msg = first.message
-        tool_calls = self._extract_openai_tool_calls(msg)
-        return LLMResponse(
-            content=msg.content or '',
-            model=response.model,
-            usage={
-                'prompt_tokens': response.usage.prompt_tokens if response.usage else 0,
-                'completion_tokens': response.usage.completion_tokens
-                if response.usage
-                else 0,
-                'total_tokens': response.usage.total_tokens if response.usage else 0,
-            },
-            id=response.id,
-            finish_reason=getattr(first, 'finish_reason', None) or '',
-            tool_calls=tool_calls,
-        )
+        return await _openai_acompletion(self, messages, **kwargs)
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
-        from backend.inference.mappers.openai import (
-            strip_prompt_cache_hints_from_messages,
-        )
-
-        messages = strip_prompt_cache_hints_from_messages(messages)
-        messages = self._clean_messages(messages)
-        kwargs = _sanitize_openai_compatible_kwargs(kwargs)
-        kwargs = self._strip_unsupported_params(kwargs)
-        # OpenAI-compatible APIs require stream=True for token streaming.
-        kwargs['stream'] = True
-        kwargs.pop('model', None)
-        # Request usage data in the final chunk so the HUD can display real
-        # token counts during streaming. Most OpenAI-compatible providers
-        # (xAI, LM Studio, vLLM, …) honour this option; those that don't
-        # simply ignore the field and we fall back to zero counts.
-        kwargs.setdefault('stream_options', {'include_usage': True})
-        try:
-            stream = await self.async_client.chat.completions.create(
-                model=self.model_name,
-                messages=messages,  # type: ignore[arg-type]
-                **kwargs,
-            )
-        except Exception as e:
-            raise self._map_openai_error(e) from e
-        try:
-            async for chunk in stream:  # type: ignore[attr-defined]
-                yield chunk.model_dump()
-        except Exception as e:
-            raise self._map_openai_error(e) from e
+        async for chunk in _openai_astream(self, messages, **kwargs):
+            yield chunk
 
 
 class AnthropicClient(DirectLLMClient):
@@ -796,259 +547,29 @@ class AnthropicClient(DirectLLMClient):
     def _extract_anthropic_tool_calls(
         content_blocks: list,
     ) -> tuple[str, list[dict[str, Any]] | None]:
-        from backend.inference.mappers.anthropic import extract_tool_calls
-
-        return extract_tool_calls(content_blocks)
+        return _extract_anthropic_tool_calls_impl(content_blocks)
 
     def _prepare_anthropic_kwargs(
         self, messages: list[dict[str, Any]], kwargs: dict[str, Any]
     ) -> tuple[list, dict[str, Any]]:
-        from backend.inference.mappers.anthropic import prepare_kwargs
-
-        return prepare_kwargs(messages, kwargs, self.model_name)
+        return _prepare_anthropic_kwargs_impl(self, messages, kwargs)
 
     def _map_anthropic_error(self, exc: Exception) -> Exception:
-        """Map anthropic SDK exceptions to App LLM exceptions."""
-        import anthropic
-
-        from backend.inference.exceptions import (
-            APIConnectionError,
-            AuthenticationError,
-            BadRequestError,
-            ContextWindowExceededError,
-            InternalServerError,
-            NotFoundError,
-            RateLimitError,
-            Timeout,
-            is_context_window_error,
-        )
-        from backend.inference.exceptions import (
-            APIError as ProviderAPIError,
-        )
-
-        if isinstance(exc, (anthropic.APITimeoutError, httpx.TimeoutException)):
-            return Timeout(str(exc), llm_provider='anthropic', model=self.model_name)
-        if isinstance(exc, (anthropic.APIConnectionError, httpx.RequestError)):
-            return APIConnectionError(
-                str(exc), llm_provider='anthropic', model=self.model_name
-            )
-        if isinstance(exc, anthropic.RateLimitError):
-            return RateLimitError(
-                str(exc), llm_provider='anthropic', model=self.model_name
-            )
-        if isinstance(exc, anthropic.AuthenticationError):
-            return AuthenticationError(
-                str(exc), llm_provider='anthropic', model=self.model_name
-            )
-        if isinstance(exc, anthropic.BadRequestError):
-            error_str = str(exc).lower()
-            if is_context_window_error(error_str, exc):
-                return ContextWindowExceededError(
-                    str(exc), llm_provider='anthropic', model=self.model_name
-                )
-            return BadRequestError(
-                str(exc), llm_provider='anthropic', model=self.model_name
-            )
-        if isinstance(exc, anthropic.NotFoundError):
-            return NotFoundError(
-                str(exc), llm_provider='anthropic', model=self.model_name
-            )
-        if isinstance(exc, anthropic.InternalServerError):
-            return InternalServerError(
-                str(exc), llm_provider='anthropic', model=self.model_name
-            )
-        if isinstance(exc, anthropic.APIStatusError):
-            return ProviderAPIError(
-                str(exc),
-                llm_provider='anthropic',
-                model=self.model_name,
-                status_code=exc.status_code,
-            )
-        return exc
+        return _map_anthropic_error_impl(self, exc)
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
-        filtered, kwargs = self._prepare_anthropic_kwargs(messages, kwargs)
-        model = kwargs.pop('model', self.model_name)
-        try:
-            response = self.client.messages.create(
-                model=model,
-                messages=filtered,  # type: ignore[arg-type]
-                **kwargs,
-            )
-        except Exception as e:
-            raise self._map_anthropic_error(e) from e
-        content, tool_calls = self._extract_anthropic_tool_calls(response.content)
-        return LLMResponse(
-            content=content,
-            model=response.model,
-            usage={
-                'prompt_tokens': response.usage.input_tokens,
-                'completion_tokens': response.usage.output_tokens,
-                'total_tokens': response.usage.input_tokens
-                + response.usage.output_tokens,
-            },
-            id=response.id,
-            finish_reason=response.stop_reason or 'stop',
-            tool_calls=tool_calls,
-        )
+        return _anthropic_completion(self, messages, **kwargs)
 
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
-        filtered, kwargs = self._prepare_anthropic_kwargs(messages, kwargs)
-        model = kwargs.pop('model', self.model_name)
-        try:
-            response = await self.async_client.messages.create(
-                model=model,
-                messages=filtered,  # type: ignore[arg-type]
-                **kwargs,
-            )
-        except Exception as e:
-            raise self._map_anthropic_error(e) from e
-        content, tool_calls = self._extract_anthropic_tool_calls(response.content)
-        return LLMResponse(
-            content=content,
-            model=response.model,
-            usage={
-                'prompt_tokens': response.usage.input_tokens,
-                'completion_tokens': response.usage.output_tokens,
-                'total_tokens': response.usage.input_tokens
-                + response.usage.output_tokens,
-            },
-            id=response.id,
-            finish_reason=response.stop_reason or 'stop',
-            tool_calls=tool_calls,
-        )
+        return await _anthropic_acompletion(self, messages, **kwargs)
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
-        from backend.inference.mappers.anthropic import _apply_system_cache_control
-
-        system_raw = next(
-            (m['content'] for m in messages if m['role'] == 'system'), None
-        )
-        filtered_messages = [m for m in messages if m['role'] != 'system']
-
-        if 'model' not in kwargs:
-            kwargs['model'] = self.model_name
-
-        system_msg = _apply_system_cache_control(
-            system_raw, kwargs.get('model', self.model_name), kwargs
-        )
-
-        try:
-            async with self.async_client.messages.stream(
-                messages=filtered_messages,  # type: ignore[arg-type]
-                system=system_msg,  # type: ignore[arg-type]
-                **kwargs,
-            ) as stream:
-                # Track usage from Anthropic usage events so we can yield a
-                # provider-normalised usage chunk at the end for the HUD.
-                _input_tokens: int = 0
-                _output_tokens: int = 0
-                async for event in stream:
-                    # Capture token counts for the final usage chunk.
-                    if event.type == 'message_start':
-                        _usage = getattr(getattr(event, 'message', None), 'usage', None)
-                        if _usage is not None:
-                            _input_tokens = int(getattr(_usage, 'input_tokens', 0) or 0)
-                    elif event.type == 'message_delta':
-                        _delta_usage = getattr(event, 'usage', None)
-                        if _delta_usage is not None:
-                            _output_tokens = int(
-                                getattr(_delta_usage, 'output_tokens', 0) or 0
-                            )
-                    # Convert Anthropic events to OpenAI-like chunks for compatibility
-                    if (
-                        event.type == 'content_block_start'
-                        and event.content_block.type == 'tool_use'
-                    ):
-                        yield {
-                            'choices': [
-                                {
-                                    'delta': {
-                                        'tool_calls': [
-                                            {
-                                                'index': event.index,
-                                                'id': event.content_block.id,
-                                                'type': 'function',
-                                                'function': {
-                                                    'name': event.content_block.name,
-                                                    'arguments': '',
-                                                },
-                                            }
-                                        ]
-                                    },
-                                    'finish_reason': None,
-                                }
-                            ]
-                        }
-                    elif (
-                        event.type == 'content_block_delta'
-                        and event.delta.type == 'input_json_delta'
-                    ):
-                        yield {
-                            'choices': [
-                                {
-                                    'delta': {
-                                        'tool_calls': [
-                                            {
-                                                'index': event.index,
-                                                'function': {
-                                                    'arguments': getattr(
-                                                        event.delta, 'partial_json', ''
-                                                    )
-                                                },
-                                            }
-                                        ]
-                                    },
-                                    'finish_reason': None,
-                                }
-                            ]
-                        }
-                    elif (
-                        event.type == 'content_block_delta'
-                        and event.delta.type == 'thinking_delta'
-                    ):
-                        yield {
-                            'choices': [
-                                {
-                                    'delta': {
-                                        'reasoning_content': getattr(
-                                            event.delta, 'thinking', ''
-                                        )
-                                    },
-                                    'finish_reason': None,
-                                }
-                            ]
-                        }
-                    elif event.type == 'content_block_delta':
-                        yield {
-                            'choices': [
-                                {
-                                    'delta': {
-                                        'content': getattr(event.delta, 'text', '')
-                                    },  # type: ignore[union-attr]
-                                    'finish_reason': None,
-                                }
-                            ]
-                        }
-                    elif event.type == 'message_stop':
-                        # Yield a normalised usage chunk before finish so the
-                        # executor can update HUD token/cost counters.
-                        if _input_tokens or _output_tokens:
-                            yield {
-                                'choices': [],
-                                'usage': {
-                                    'prompt_tokens': _input_tokens,
-                                    'completion_tokens': _output_tokens,
-                                    'total_tokens': _input_tokens + _output_tokens,
-                                },
-                            }
-                        yield {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}
-        except Exception as e:
-            raise self._map_anthropic_error(e) from e
+        async for chunk in _anthropic_astream(self, messages, **kwargs):
+            yield chunk
 
 
 class GeminiClient(DirectLLMClient):

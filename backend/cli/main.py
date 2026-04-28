@@ -200,6 +200,56 @@ def _configure_redirected_streams(*streams: object | None) -> None:
                 pass
 
 
+_GRINTA_LOGO_LINES: tuple[str, ...] = (
+    r'  [red]▄▄████████████████████████████████▄▄[/red]  ',
+    r'[red]▄██████████████████████████████████████▄[/red]',
+    r'[red]▀▀▀▀▀▀▀██████████████████████████▀▀▀▀▀▀▀[/red]',
+    r'       [red]███[/red][black]▄▄▄▄▄[/black][red]████████████[/red][black]▄▄▄▄▄[/black][red]███[/red]       ',
+    r'       [red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red][black]▄[/black][red]████[/red][black]▄[/black][red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red]       ',
+    r'       [red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red][black]▀▄▄▄▄▀[/black][red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red]       ',
+    r'       [red]███[/red][black]▀▀▀▀▀[/black][red]████████████[/red][black]▀▀▀▀▀[/black][red]███[/red]       ',
+    r'     [red]▄████████████████████████████▄[/red]     ',
+    r'   [red]▄████████████████████████████████▄[/red]   ',
+    r'                                        ',
+)
+
+_GRINTA_FALLBACK_BANNER: tuple[str, ...] = (
+    '  ____ ____  ___ _   _ _____  _',
+    ' / ___|  _ \\|_ _| \\ | |_   _|/ \\',
+    '| |  _| |_) || ||  \\| | | | / _ \\',
+    '| |_| |  _ < | || |\\  | | |/ ___ \\',
+    ' \\____|_| \\_\\___|_| \\_| |_/_/   \\_\\',
+)
+
+
+def _build_splash_lines() -> list[Any]:
+    from rich.text import Text
+
+    try:
+        import pyfiglet as _pyfiglet
+
+        raw = _pyfiglet.figlet_format('GRINTA', font='slant').splitlines()
+        while raw and not raw[-1].strip():
+            raw.pop()
+    except Exception:
+        raw = list(_GRINTA_FALLBACK_BANNER)
+
+    logo_width = 40
+    text_width = max((len(ln) for ln in raw), default=0)
+    width = max(logo_width, text_width)
+
+    lines: list[Any] = []
+    for ln in _GRINTA_LOGO_LINES:
+        t = Text.from_markup(ln.strip())
+        pad = max(0, width - len(t))
+        lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
+    for ln in raw:
+        t = Text(ln, style='bold red')
+        pad = max(0, width - len(t))
+        lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
+    return lines
+
+
 def show_grinta_splash(console: Any | None = None) -> None:
     """Render the GRINTA boot splash."""
     from rich.align import Align
@@ -209,75 +259,8 @@ def show_grinta_splash(console: Any | None = None) -> None:
     from rich.text import Text
 
     console = console or Console()
-
-    _R = 'bold red'
+    _figlet_lines = _build_splash_lines()
     _D = 'dim'
-
-    _logo = [
-        r'  [red]▄▄████████████████████████████████▄▄[/red]  ',
-        r'[red]▄██████████████████████████████████████▄[/red]',
-        r'[red]▀▀▀▀▀▀▀██████████████████████████▀▀▀▀▀▀▀[/red]',
-        r'       [red]███[/red][black]▄▄▄▄▄[/black][red]████████████[/red][black]▄▄▄▄▄[/black][red]███[/red]       ',
-        r'       [red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red][black]▄[/black][red]████[/red][black]▄[/black][red]███[/red][black]█[/black][black on white]  [/black on white][white on black]▝[/white on black][black]█[/black][red]███[/red]       ',
-        r'       [red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red][black]▀▄▄▄▄▀[/black][red]███[/red][black]█[/black][black on white]   [/black on white][black]█[/black][red]███[/red]       ',
-        r'       [red]███[/red][black]▀▀▀▀▀[/black][red]████████████[/red][black]▀▀▀▀▀[/black][red]███[/red]       ',
-        r'     [red]▄████████████████████████████▄[/red]     ',
-        r'   [red]▄████████████████████████████████▄[/red]   ',
-        r'                                        ',
-    ]
-
-    try:
-        import pyfiglet as _pyfiglet
-
-        _raw = _pyfiglet.figlet_format('GRINTA', font='slant').splitlines()
-        while _raw and not _raw[-1].strip():
-            _raw.pop()
-
-        # Calculate consistent width for alignment
-        logo_width = 40  # matches length of _logo lines
-        text_width = max((len(ln) for ln in _raw), default=0)
-        width = max(logo_width, text_width)
-
-        _figlet_lines: list[Text] = []
-        for ln in _logo:
-            t = Text.from_markup(ln.strip())
-            pad = max(0, width - len(t))
-            _figlet_lines.append(
-                Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2))
-            )
-        for ln in _raw:
-            t = Text(ln, style=_R)
-            pad = max(0, width - len(t))
-            _figlet_lines.append(
-                Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2))
-            )
-
-    except Exception:
-        _raw = [
-            '  ____ ____  ___ _   _ _____  _',
-            ' / ___|  _ \\|_ _| \\ | |_   _|/ \\',
-            '| |  _| |_) || ||  \\| | | | / _ \\',
-            '| |_| |  _ < | || |\\  | | |/ ___ \\',
-            ' \\____|_| \\_\\___|_| \\_| |_/_/   \\_\\',
-        ]
-
-        logo_width = 40
-        text_width = max((len(ln) for ln in _raw), default=0)
-        width = max(logo_width, text_width)
-
-        _figlet_lines = []
-        for ln in _logo:
-            t = Text.from_markup(ln.strip())
-            pad = max(0, width - len(t))
-            _figlet_lines.append(
-                Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2))
-            )
-        for ln in _raw:
-            t = Text(ln, style=_R)
-            pad = max(0, width - len(t))
-            _figlet_lines.append(
-                Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2))
-            )
 
     _TAGLINE = 'AI agent. Pure grit.'
     _HINT = (
@@ -438,12 +421,6 @@ async def _async_main(
     )
     os.environ['PROJECT_ROOT'] = resolved_project
 
-    from backend.cli.config_manager import (
-        auto_detect_api_keys,
-        ensure_default_model,
-        needs_onboarding,
-        run_onboarding,
-    )
     from backend.cli.repl import Repl
     from backend.core.config import load_app_config
     from backend.core.logger import configure_file_logging
@@ -453,6 +430,32 @@ async def _async_main(
     # Backend imports above trigger module-level logger setup — re-silence.
     _silence_all_loggers()
 
+    console = _build_async_console(show_splash)
+    initial_input = _read_piped_stdin()
+
+    # -- load config -------------------------------------------------------
+    config = load_app_config()
+
+    # -- apply CLI overrides (non-persistent) ------------------------------
+    _apply_cli_overrides(
+        config, model, resolved_project, get_project_local_data_root,
+    )
+
+    # -- onboarding if needed ----------------------------------------------
+    config = await _ensure_onboarded(
+        config, console, model, resolved_project, get_project_local_data_root,
+    )
+    if config is None:
+        return
+
+    # -- launch REPL -------------------------------------------------------
+    repl = Repl(config, console)
+    if initial_input:
+        repl.queue_initial_input(initial_input)
+    await repl.run()
+
+
+def _build_async_console(show_splash: bool) -> Console:
     try:
         term_cols = shutil.get_terminal_size().columns
     except OSError:
@@ -460,53 +463,61 @@ async def _async_main(
     console = Console(width=term_cols - 2)
     if show_splash and not _env_truthy('GRINTA_NO_SPLASH'):
         show_grinta_splash(console)
-    initial_input = _read_piped_stdin()
+    return console
 
-    # -- load config -------------------------------------------------------
-    config = load_app_config()
 
-    # -- apply CLI overrides (non-persistent) ------------------------------
+def _apply_cli_overrides(
+    config: Any,
+    model: str | None,
+    resolved_project: str,
+    get_project_local_data_root: Any,
+) -> None:
     if model:
         llm_cfg = config.get_llm_config()
         llm_cfg.model = model
     config.project_root = resolved_project
     config.local_data_root = get_project_local_data_root(resolved_project)
 
-    # -- onboarding if needed ----------------------------------------------
-    if needs_onboarding(config):
-        # Try auto-detecting API keys from environment first
-        detected_provider = auto_detect_api_keys(config)
-        if detected_provider and not needs_onboarding(config):
-            console.print(
-                f'  [green]✓[/green] Auto-detected API key from environment '
-                f'([cyan]{detected_provider}[/cyan])',
-            )
-            console.print(
-                '  [dim][bold]Next:[/bold] type [bold]/help[/bold] for commands, '
-                '[bold]/settings[/bold] for model and MCP, '
-                '[bold]grinta --help[/bold] for CLI flags.[/dim]',
-            )
-            ensure_default_model(config)
-        else:
-            config = run_onboarding()
-            ensure_default_model(config)
-            if model:
-                llm_cfg = config.get_llm_config()
-                llm_cfg.model = model
-            config.project_root = resolved_project
-            config.local_data_root = get_project_local_data_root(resolved_project)
-            # Re-check after onboarding.
-            if needs_onboarding(config):
-                console.print('[red]No API key configured. Exiting.[/red]')
-                return
-    else:
-        ensure_default_model(config)
 
-    # -- launch REPL -------------------------------------------------------
-    repl = Repl(config, console)
-    if initial_input:
-        repl.queue_initial_input(initial_input)
-    await repl.run()
+async def _ensure_onboarded(
+    config: Any,
+    console: Console,
+    model: str | None,
+    resolved_project: str,
+    get_project_local_data_root: Any,
+) -> Any | None:
+    from backend.cli.config_manager import (
+        auto_detect_api_keys,
+        ensure_default_model,
+        needs_onboarding,
+        run_onboarding,
+    )
+
+    if not needs_onboarding(config):
+        ensure_default_model(config)
+        return config
+
+    detected_provider = auto_detect_api_keys(config)
+    if detected_provider and not needs_onboarding(config):
+        console.print(
+            f'  [green]✓[/green] Auto-detected API key from environment '
+            f'([cyan]{detected_provider}[/cyan])',
+        )
+        console.print(
+            '  [dim][bold]Next:[/bold] type [bold]/help[/bold] for commands, '
+            '[bold]/settings[/bold] for model and MCP, '
+            '[bold]grinta --help[/bold] for CLI flags.[/dim]',
+        )
+        ensure_default_model(config)
+        return config
+
+    config = run_onboarding()
+    ensure_default_model(config)
+    _apply_cli_overrides(config, model, resolved_project, get_project_local_data_root)
+    if needs_onboarding(config):
+        console.print('[red]No API key configured. Exiting.[/red]')
+        return None
+    return config
 
 
 def main(

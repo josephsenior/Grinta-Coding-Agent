@@ -298,36 +298,7 @@ def run_onboarding() -> AppConfig:
 def _select_provider() -> tuple[str, str | None, str | None]:
     """Provider picker. Returns (provider_key, base_url, custom_name)."""
     _console.print('[bold]Choose your LLM provider[/bold]\n')
-
-    # Group by category
-    cloud = [(k, l) for k, l, c in _PROVIDERS if c == 'cloud']  # noqa: E741
-    aggregator = [(k, l) for k, l, c in _PROVIDERS if c == 'aggregator']  # noqa: E741
-    local = [(k, l) for k, l, c in _PROVIDERS if c == 'local']  # noqa: E741
-
-    idx = 1
-    provider_map: dict[int, tuple[str, str]] = {}
-
-    for key, label in cloud:
-        marker = ' [dim](recommended)[/dim]' if key in ('openai', 'anthropic') else ''
-        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {label}{marker}')
-        provider_map[idx] = (key, label)
-        idx += 1
-
-    _console.print()
-    for key, label in aggregator:
-        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  [dim]{label}[/dim]')
-        provider_map[idx] = (key, label)
-        idx += 1
-
-    _console.print()
-    for key, label in local:
-        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {label} [dim](local)[/dim]')
-        provider_map[idx] = (key, label)
-        idx += 1
-
-    custom_idx = idx
-    _console.print(f'\n  [{CLR_BRAND}]{custom_idx:>2}[/]  [dim]Custom endpoint[/dim]')
-    _console.print()
+    provider_map, custom_idx = _print_provider_categories()
 
     while True:
         choice = Prompt.ask('[bold]Provider[/bold]', console=_console).strip()
@@ -340,10 +311,61 @@ def _select_provider() -> tuple[str, str | None, str | None]:
         if num in provider_map:
             provider_key, _ = provider_map[num]
             return provider_key, None, None
-        elif num == custom_idx:
+        if num == custom_idx:
             return _collect_custom_provider()
-        else:
-            _console.print(f'[{CLR_STATUS_ERR}]  Enter a number from the list.[/]')
+        _console.print(f'[{CLR_STATUS_ERR}]  Enter a number from the list.[/]')
+
+
+def _print_provider_categories() -> tuple[dict[int, tuple[str, str]], int]:
+    cloud = [(k, l) for k, l, c in _PROVIDERS if c == 'cloud']  # noqa: E741
+    aggregator = [(k, l) for k, l, c in _PROVIDERS if c == 'aggregator']  # noqa: E741
+    local = [(k, l) for k, l, c in _PROVIDERS if c == 'local']  # noqa: E741
+
+    provider_map: dict[int, tuple[str, str]] = {}
+    idx = _print_cloud_providers(cloud, provider_map, start_idx=1)
+    _console.print()
+    idx = _print_simple_providers(aggregator, provider_map, idx, dim_label=True)
+    _console.print()
+    idx = _print_simple_providers(
+        local, provider_map, idx, suffix=' [dim](local)[/dim]'
+    )
+
+    custom_idx = idx
+    _console.print(f'\n  [{CLR_BRAND}]{custom_idx:>2}[/]  [dim]Custom endpoint[/dim]')
+    _console.print()
+    return provider_map, custom_idx
+
+
+def _print_cloud_providers(
+    items: list[tuple[str, str]],
+    provider_map: dict[int, tuple[str, str]],
+    *,
+    start_idx: int,
+) -> int:
+    idx = start_idx
+    for key, label in items:
+        marker = ' [dim](recommended)[/dim]' if key in ('openai', 'anthropic') else ''
+        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {label}{marker}')
+        provider_map[idx] = (key, label)
+        idx += 1
+    return idx
+
+
+def _print_simple_providers(
+    items: list[tuple[str, str]],
+    provider_map: dict[int, tuple[str, str]],
+    start_idx: int,
+    *,
+    dim_label: bool = False,
+    suffix: str = '',
+) -> int:
+    idx = start_idx
+    for key, label in items:
+        rendered = f'[dim]{label}[/dim]' if dim_label else label
+        _console.print(f'  [{CLR_BRAND}]{idx:>2}[/]  {rendered}{suffix}')
+        provider_map[idx] = (key, label)
+        idx += 1
+    return idx
 
 
 def _collect_custom_provider() -> tuple[str, str | None, str | None]:
@@ -459,25 +481,13 @@ async def _test_llm_call(model: str, api_key: str, base_url: str | None) -> bool
     url = base_url or _provider_base_url(provider)
     if not url:
         return 'Unknown provider — skipping validation'
-
-    # Normalize URL
-    url = url.rstrip('/')
-    if not url.endswith('/v1'):
-        url = f'{url}/v1'
+    url = _normalize_test_url(url)
 
     headers = {
         'Authorization': f'Bearer {api_key}',
         'Content-Type': 'application/json',
     }
-
-    # Strip provider prefix for the API call
-    api_model = model
-    if '/' in model:
-        parts = model.split('/', 1)
-        # Keep compound model names (e.g. meta-llama/Llama-3), strip simple provider prefix
-        if parts[0] in ('openai', 'anthropic', 'google', 'groq', 'xai', 'deepseek'):
-            api_model = parts[1]
-
+    api_model = _strip_provider_prefix(model)
     body: dict[str, Any] = {
         'model': api_model,
         'messages': [{'role': 'user', 'content': 'Say "ok" and nothing else.'}],
@@ -489,22 +499,42 @@ async def _test_llm_call(model: str, api_key: str, base_url: str | None) -> bool
             resp = await client.post(
                 f'{url}/chat/completions', json=body, headers=headers
             )
-            if resp.status_code == 200:
-                return True
-            elif resp.status_code == 401:
-                return 'Invalid API key (401 Unauthorized)'
-            elif resp.status_code == 404:
-                return f'Model not found: {api_model}'
-            elif resp.status_code == 429:
-                return 'Rate limited — but credentials look valid'
-            else:
-                return f'API returned {resp.status_code}'
+            return _interpret_test_response(resp.status_code, api_model)
     except httpx.TimeoutException:
         return 'Connection timed out — check your network'
     except httpx.ConnectError:
         return 'Could not connect — check the base URL'
     except Exception as e:
         return f'Connection error: {type(e).__name__}'
+
+
+def _normalize_test_url(url: str) -> str:
+    url = url.rstrip('/')
+    if not url.endswith('/v1'):
+        url = f'{url}/v1'
+    return url
+
+
+def _strip_provider_prefix(model: str) -> str:
+    if '/' not in model:
+        return model
+    parts = model.split('/', 1)
+    # Keep compound model names (e.g. meta-llama/Llama-3), strip simple provider prefix
+    if parts[0] in ('openai', 'anthropic', 'google', 'groq', 'xai', 'deepseek'):
+        return parts[1]
+    return model
+
+
+def _interpret_test_response(status_code: int, api_model: str) -> bool | str:
+    if status_code == 200:
+        return True
+    if status_code == 401:
+        return 'Invalid API key (401 Unauthorized)'
+    if status_code == 404:
+        return f'Model not found: {api_model}'
+    if status_code == 429:
+        return 'Rate limited — but credentials look valid'
+    return f'API returned {status_code}'
 
 
 def _provider_base_url(provider: str) -> str | None:
@@ -536,30 +566,42 @@ def get_current_model(config: AppConfig) -> str:
 
 def _resolve_api_key_value(config: AppConfig) -> str | None:
     llm_cfg = config.get_llm_config()
-    api_key: Any = getattr(llm_cfg, 'api_key', None)
-    if api_key is not None:
-        try:
-            raw = api_key.get_secret_value()
-        except AttributeError:
-            raw = str(api_key)
-        raw = raw.strip()
-        if raw:
-            return raw
+    raw = _api_key_from_llm_cfg(llm_cfg)
+    if raw:
+        return raw
 
     model = (getattr(llm_cfg, 'model', '') or '').strip()
-    if model:
-        try:
-            from backend.core.config.api_key_manager import api_key_manager
-
-            provider = api_key_manager.extract_provider(model)
-            env_key = api_key_manager.get_provider_key_from_env(provider)
-            if env_key and env_key.strip():
-                return env_key.strip()
-        except Exception:
-            logger.debug('Could not resolve env-backed API key', exc_info=True)
+    env_raw = _api_key_from_env_for_model(model) if model else None
+    if env_raw:
+        return env_raw
 
     fallback = (os.environ.get('LLM_API_KEY') or '').strip()
     return fallback or None
+
+
+def _api_key_from_llm_cfg(llm_cfg: Any) -> str | None:
+    api_key: Any = getattr(llm_cfg, 'api_key', None)
+    if api_key is None:
+        return None
+    try:
+        raw = api_key.get_secret_value()
+    except AttributeError:
+        raw = str(api_key)
+    raw = raw.strip()
+    return raw or None
+
+
+def _api_key_from_env_for_model(model: str) -> str | None:
+    try:
+        from backend.core.config.api_key_manager import api_key_manager
+
+        provider = api_key_manager.extract_provider(model)
+        env_key = api_key_manager.get_provider_key_from_env(provider)
+        if env_key and env_key.strip():
+            return env_key.strip()
+    except Exception:
+        logger.debug('Could not resolve env-backed API key', exc_info=True)
+    return None
 
 
 def _mask_secret(raw: str) -> str:

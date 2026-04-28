@@ -53,6 +53,76 @@ _SUMMARY_LINE_PATTERNS: tuple[str, ...] = (
 )
 
 
+def _looks_like_test_output(output: str) -> bool:
+    return any(
+        re.search(pattern, output, re.IGNORECASE | re.MULTILINE)
+        for pattern, _ in TEST_FRAMEWORK_PATTERNS
+    )
+
+
+def _is_summary_line(line: str) -> bool:
+    return any(re.search(pattern, line) for pattern in _SUMMARY_LINE_PATTERNS)
+
+
+def _has_failure_marker(line: str) -> bool:
+    return any(
+        re.search(pattern, line, re.IGNORECASE) for pattern in _FAILURE_LINE_PATTERNS
+    )
+
+
+def _is_actionable_failure_line(line: str) -> bool:
+    if not _has_failure_marker(line):
+        return False
+    return bool(
+        re.search(r'^FAILED\s+\S+', line) or re.search(r'^--- FAIL:', line)
+    )
+
+
+def _collect_summary_and_failure_lines(
+    lines: list[str],
+) -> tuple[list[str], list[str]]:
+    summary_lines: list[str] = []
+    failure_lines: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if _is_summary_line(stripped):
+            summary_lines.append(stripped)
+        if _is_actionable_failure_line(stripped):
+            failure_lines.append(stripped)
+
+    return summary_lines, failure_lines
+
+
+def _dedupe_preserving_order(lines: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for line in lines:
+        if line in seen:
+            continue
+        deduped.append(line)
+        seen.add(line)
+    return deduped
+
+
+def _build_test_summary_parts(
+    summary_lines: list[str],
+    failure_lines: list[str],
+    traceback_blocks: list[str],
+) -> list[str]:
+    parts = ['[TEST_SUMMARY]']
+    parts.extend(_dedupe_preserving_order(summary_lines))
+    if failure_lines:
+        parts.append('[FAILURES]')
+        parts.extend(f'  {line}' for line in failure_lines[:10])
+    if traceback_blocks:
+        parts.append('[TRACEBACKS]')
+        parts.extend(traceback_blocks)
+    return parts
+
+
 def extract_test_summary(output: str) -> str | None:
     """Build a ``[TEST_SUMMARY]`` block from pytest/jest/go/cargo-style stdout.
 
@@ -61,55 +131,21 @@ def extract_test_summary(output: str) -> str | None:
     """
     lines = output.splitlines()
 
-    # MULTILINE: patterns use ``^`` for line starts; search runs on the full blob.
-    is_test_output = any(
-        re.search(pat, output, re.IGNORECASE | re.MULTILINE)
-        for pat, _ in TEST_FRAMEWORK_PATTERNS
-    )
-    if not is_test_output:
+    if not _looks_like_test_output(output):
         return None
 
-    summary_lines: list[str] = []
-    failure_lines: list[str] = []
-
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-
-        if any(re.search(pat, stripped) for pat in _SUMMARY_LINE_PATTERNS):
-            summary_lines.append(stripped)
-
-        has_failure_marker = any(
-            re.search(pat, stripped, re.IGNORECASE) for pat in _FAILURE_LINE_PATTERNS
-        )
-        if has_failure_marker:
-            is_failed_pytest = re.search(r'^FAILED\s+\S+', stripped) is not None
-            is_failed_go = re.search(r'^--- FAIL:', stripped) is not None
-            if is_failed_pytest or is_failed_go:
-                failure_lines.append(stripped)
+    summary_lines, failure_lines = _collect_summary_and_failure_lines(lines)
 
     # Extract Python traceback blocks (up to 5 tracebacks, first 10 lines each).
     traceback_blocks = _extract_traceback_blocks(output, max_blocks=5, max_lines=10)
 
     if not summary_lines and not failure_lines and not traceback_blocks:
         return None
-
-    parts = ['[TEST_SUMMARY]']
-    if summary_lines:
-        seen: set[str] = set()
-        for sline in summary_lines:
-            if sline not in seen:
-                parts.append(sline)
-                seen.add(sline)
-    if failure_lines:
-        parts.append('[FAILURES]')
-        for fl in failure_lines[:10]:
-            parts.append(f'  {fl}')
-    if traceback_blocks:
-        parts.append('[TRACEBACKS]')
-        for tb in traceback_blocks:
-            parts.append(tb)
+    parts = _build_test_summary_parts(
+        summary_lines,
+        failure_lines,
+        traceback_blocks,
+    )
     return '\n'.join(parts)
 
 

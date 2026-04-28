@@ -35,9 +35,38 @@ from backend.core.config import load_app_config
 
 def _prompt_model_change(console: Console) -> bool:
     """Prompt user to change model via Provider → Model flow. Returns True if changed."""
+    provider_map, custom_idx = _print_provider_menu(console)
+
+    choice = Prompt.ask('  Provider number', default='', console=console).strip()
+    if not choice:
+        return False
+    try:
+        num = int(choice)
+    except ValueError:
+        console.print(f'[{CLR_STATUS_ERR}]  Invalid selection.[/]')
+        return False
+
+    selection = _resolve_provider_selection(console, num, provider_map, custom_idx)
+    if selection is None:
+        return False
+    provider_key, base_url = selection
+
+    new_model = Prompt.ask('  Model name', console=console).strip()
+    if not new_model:
+        return False
+    if '/' not in new_model and provider_key:
+        new_model = f'{provider_key}/{new_model}'
+
+    update_model(new_model, provider=provider_key, base_url=base_url)
+    console.print(f'[{CLR_STATUS_OK}]  Model updated.[/]')
+    return True
+
+
+def _print_provider_menu(
+    console: Console,
+) -> tuple[dict[int, tuple[str, str]], int]:
     console.print()
     console.print('[bold]Select provider:[/bold]')
-
     idx = 1
     provider_map: dict[int, tuple[str, str]] = {}
     for key, label, _ in _PROVIDERS:
@@ -49,49 +78,36 @@ def _prompt_model_change(console: Console) -> bool:
         f'  [{CLR_BRAND}]{custom_idx:>2}[/]  [dim]Custom (OpenAI-compatible)[/dim]'
     )
     console.print()
+    return provider_map, custom_idx
 
-    choice = Prompt.ask('  Provider number', default='', console=console).strip()
-    if not choice:
-        return False
-    try:
-        num = int(choice)
-    except ValueError:
-        console.print(f'[{CLR_STATUS_ERR}]  Invalid selection.[/]')
-        return False
 
-    base_url: str | None = None
-    provider_key: str | None = None
-
+def _resolve_provider_selection(
+    console: Console,
+    num: int,
+    provider_map: dict[int, tuple[str, str]],
+    custom_idx: int,
+) -> tuple[str | None, str | None] | None:
     if num in provider_map:
         provider_key, _ = provider_map[num]
-    elif num == custom_idx:
-        provider_key = Prompt.ask(
-            '  Provider name [dim](e.g. together)[/dim]', console=console
-        ).strip()
-        if not provider_key:
-            return False
-        base_url = Prompt.ask(
-            '  Base URL [dim](e.g. https://api.together.xyz/v1)[/dim]', console=console
-        ).strip()
-        if not base_url:
-            console.print(
-                f'[{CLR_STATUS_ERR}]  Base URL is required for custom providers.[/]'
-            )
-            return False
-    else:
+        return provider_key, None
+    if num != custom_idx:
         console.print(f'[{CLR_STATUS_ERR}]  Invalid selection.[/]')
-        return False
-
-    new_model = Prompt.ask('  Model name', console=console).strip()
-    if not new_model:
-        return False
-
-    if '/' not in new_model and provider_key:
-        new_model = f'{provider_key}/{new_model}'
-
-    update_model(new_model, provider=provider_key, base_url=base_url)
-    console.print(f'[{CLR_STATUS_OK}]  Model updated.[/]')
-    return True
+        return None
+    provider_key = Prompt.ask(
+        '  Provider name [dim](e.g. together)[/dim]', console=console
+    ).strip()
+    if not provider_key:
+        return None
+    base_url = Prompt.ask(
+        '  Base URL [dim](e.g. https://api.together.xyz/v1)[/dim]',
+        console=console,
+    ).strip()
+    if not base_url:
+        console.print(
+            f'[{CLR_STATUS_ERR}]  Base URL is required for custom providers.[/]'
+        )
+        return None
+    return provider_key, base_url
 
 
 def _render_tab_bar(active: int) -> Text:
@@ -258,79 +274,105 @@ def open_settings(console: Console) -> None:
         console.print()
 
         if active_tab == 0:
-            _render_ai_tab(console)
-            console.print()
-            cmd = (
-                Prompt.ask(
-                    '[bold]settings[/bold]',
-                    default='q',
-                    console=console,
-                )
-                .strip()
-                .lower()
-            )
-            if cmd == 'q':
-                break
-            if cmd == '2':
-                active_tab = 1
-                continue
-            if cmd == 'm':
-                _prompt_model_change(console)
-            elif cmd == 'k':
-                new_key = Prompt.ask('  New API key', console=console)
-                if new_key.strip():
-                    update_api_key(new_key.strip())
-                    console.print(f'[{CLR_STATUS_OK}]  API key updated.[/]')
-            elif cmd == 'b':
-                val = Prompt.ask(
-                    '  Budget per task in USD [dim](e.g. 5.0 — enter 0 for unlimited)[/dim]',
-                    console=console,
-                ).strip()
-                try:
-                    budget_val = float(val)
-                    update_budget(budget_val if budget_val > 0 else None)  # type: ignore[arg-type]
-                    console.print(f'[{CLR_STATUS_OK}]  Budget updated.[/]')
-                except ValueError:
-                    console.print(f'[{CLR_STATUS_ERR}]  Invalid number.[/]')
-            elif cmd == 'i':
-                cfg = load_app_config()
-                new_val = not get_cli_tool_icons_enabled(cfg)
-                update_cli_tool_icons(new_val)
-                state = 'on' if new_val else 'off'
-                console.print(f'[{CLR_STATUS_OK}]  Tool icons {state}.[/]')
+            next_tab = _run_ai_tab(console)
         else:
-            _render_mcp_tab(console)
-            console.print()
-            cmd = (
-                Prompt.ask(
-                    '[bold]settings[/bold]',
-                    default='q',
-                    console=console,
-                )
-                .strip()
-                .lower()
-            )
-            if cmd == 'q':
-                break
-            if cmd == '1':
-                active_tab = 0
-                continue
-            if cmd == 'a':
-                name = Prompt.ask('  Server name', console=console)
-                if not name.strip():
-                    continue
-                mode = Prompt.ask(
-                    '  Type', choices=['url', 'command'], default='url', console=console
-                )
-                if mode == 'url':
-                    url = Prompt.ask('  Server URL', console=console)
-                    if url.strip():
-                        add_mcp_server(name.strip(), url=url.strip())
-                        console.print(f'[{CLR_STATUS_OK}]  Server added.[/]')
-                else:
-                    command = Prompt.ask('  Command', console=console)
-                    if command.strip():
-                        add_mcp_server(name.strip(), command=command.strip())
-                        console.print(f'[{CLR_STATUS_OK}]  Server added.[/]')
+            next_tab = _run_mcp_tab(console)
+        if next_tab is None:
+            break
+        active_tab = next_tab
 
     console.print(f'[{CLR_META}]Settings closed.[/]')
+
+
+def _read_settings_command(console: Console) -> str:
+    return (
+        Prompt.ask('[bold]settings[/bold]', default='q', console=console)
+        .strip()
+        .lower()
+    )
+
+
+def _run_ai_tab(console: Console) -> int | None:
+    """Render AI tab and process one command. Returns next tab index, or None to quit."""
+    _render_ai_tab(console)
+    console.print()
+    cmd = _read_settings_command(console)
+    if cmd == 'q':
+        return None
+    if cmd == '2':
+        return 1
+    _dispatch_ai_command(console, cmd)
+    return 0
+
+
+def _dispatch_ai_command(console: Console, cmd: str) -> None:
+    if cmd == 'm':
+        _prompt_model_change(console)
+    elif cmd == 'k':
+        _prompt_api_key_change(console)
+    elif cmd == 'b':
+        _prompt_budget_change(console)
+    elif cmd == 'i':
+        _toggle_tool_icons(console)
+
+
+def _prompt_api_key_change(console: Console) -> None:
+    new_key = Prompt.ask('  New API key', console=console)
+    if new_key.strip():
+        update_api_key(new_key.strip())
+        console.print(f'[{CLR_STATUS_OK}]  API key updated.[/]')
+
+
+def _prompt_budget_change(console: Console) -> None:
+    val = Prompt.ask(
+        '  Budget per task in USD [dim](e.g. 5.0 — enter 0 for unlimited)[/dim]',
+        console=console,
+    ).strip()
+    try:
+        budget_val = float(val)
+    except ValueError:
+        console.print(f'[{CLR_STATUS_ERR}]  Invalid number.[/]')
+        return
+    update_budget(budget_val if budget_val > 0 else None)  # type: ignore[arg-type]
+    console.print(f'[{CLR_STATUS_OK}]  Budget updated.[/]')
+
+
+def _toggle_tool_icons(console: Console) -> None:
+    cfg = load_app_config()
+    new_val = not get_cli_tool_icons_enabled(cfg)
+    update_cli_tool_icons(new_val)
+    state = 'on' if new_val else 'off'
+    console.print(f'[{CLR_STATUS_OK}]  Tool icons {state}.[/]')
+
+
+def _run_mcp_tab(console: Console) -> int | None:
+    """Render MCP tab and process one command. Returns next tab index, or None to quit."""
+    _render_mcp_tab(console)
+    console.print()
+    cmd = _read_settings_command(console)
+    if cmd == 'q':
+        return None
+    if cmd == '1':
+        return 0
+    if cmd == 'a':
+        _prompt_add_mcp_server(console)
+    return 1
+
+
+def _prompt_add_mcp_server(console: Console) -> None:
+    name = Prompt.ask('  Server name', console=console)
+    if not name.strip():
+        return
+    mode = Prompt.ask(
+        '  Type', choices=['url', 'command'], default='url', console=console
+    )
+    if mode == 'url':
+        url = Prompt.ask('  Server URL', console=console)
+        if url.strip():
+            add_mcp_server(name.strip(), url=url.strip())
+            console.print(f'[{CLR_STATUS_OK}]  Server added.[/]')
+    else:
+        command = Prompt.ask('  Command', console=console)
+        if command.strip():
+            add_mcp_server(name.strip(), command=command.strip())
+            console.print(f'[{CLR_STATUS_OK}]  Server added.[/]')

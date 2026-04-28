@@ -82,8 +82,9 @@ class TaskCancellationService:
                 'process_handles': len(self._active_processes),
             }
 
-    def cancel_all(self) -> None:
-        """Hard kill all registered processes."""
+    def _drain_tracked_targets(
+        self,
+    ) -> tuple[list[int], dict[int, subprocess.Popen], dict[str, Callable[[], None]]]:
         with self._lock:
             pids = list(self._active_pids)
             processes = dict(self._active_processes)
@@ -91,15 +92,9 @@ class TaskCancellationService:
             self._active_pids.clear()
             self._active_processes.clear()
             self._kill_callbacks.clear()
+        return pids, processes, callbacks
 
-        logger.info(
-            '[TaskCancellationService:%s] HARD KILL: terminating %s tracked pids (%s handles)',
-            self._label,
-            len(pids),
-            len(processes),
-        )
-
-        # 0) Run any registered kill callbacks (best-effort).
+    def _run_kill_callbacks(self, callbacks: dict[str, Callable[[], None]]) -> None:
         for key, callback in callbacks.items():
             try:
                 logger.warning(
@@ -116,22 +111,24 @@ class TaskCancellationService:
                     exc,
                 )
 
-        # 1) Try to kill the tree directly on Windows first
-        if OS_CAPS.is_windows:
-            for pid in pids:
-                try:
-                    self._kill_pid_best_effort(pid)
-                except Exception as exc:
-                    logger.debug(
-                        'Failed to tree-kill %s on Windows: %s',
-                        pid,
-                        exc,
-                    )
+    def _kill_windows_pid_trees(self, pids: list[int]) -> None:
+        if not OS_CAPS.is_windows:
+            return
+        for pid in pids:
+            try:
+                self._kill_pid_best_effort(pid)
+            except Exception as exc:
+                logger.debug(
+                    'Failed to tree-kill %s on Windows: %s',
+                    pid,
+                    exc,
+                )
 
-        # 2) Standard kill logic for everything else
+    def _terminate_registered_processes(
+        self, processes: dict[int, subprocess.Popen]
+    ) -> None:
         for pid, process in processes.items():
             try:
-                # If we're on Windows, it should already be dead, but let's be safe
                 logger.warning('[TaskCancellationService] Terminating pid=%s', pid)
                 process.terminate()
                 try:
@@ -149,12 +146,31 @@ class TaskCancellationService:
                     exc,
                 )
 
-        # 3) Kill remaining raw PIDs (on Non-Windows)
-        if not OS_CAPS.is_windows:
-            for pid in pids:
-                if pid in processes:
-                    continue
-                self._kill_pid_best_effort(pid)
+    def _kill_remaining_raw_pids(
+        self, pids: list[int], processes: dict[int, subprocess.Popen]
+    ) -> None:
+        if OS_CAPS.is_windows:
+            return
+        for pid in pids:
+            if pid in processes:
+                continue
+            self._kill_pid_best_effort(pid)
+
+    def cancel_all(self) -> None:
+        """Hard kill all registered processes."""
+        pids, processes, callbacks = self._drain_tracked_targets()
+
+        logger.info(
+            '[TaskCancellationService:%s] HARD KILL: terminating %s tracked pids (%s handles)',
+            self._label,
+            len(pids),
+            len(processes),
+        )
+
+        self._run_kill_callbacks(callbacks)
+        self._kill_windows_pid_trees(pids)
+        self._terminate_registered_processes(processes)
+        self._kill_remaining_raw_pids(pids, processes)
 
         logger.info('[TaskCancellationService:%s] Hard kill complete', self._label)
 

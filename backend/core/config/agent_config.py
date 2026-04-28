@@ -379,6 +379,40 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             raise ValueError(f'autonomy_level must be one of: {allowed}')
         return normalized
 
+    def _warn_for_non_full_autonomy_knobs(self) -> None:
+        if self.max_autonomous_iterations > 0:
+            logger.warning(
+                'Agent config sets max_autonomous_iterations=%s while autonomy_level=%s; this limit only applies in full autonomy.',
+                self.max_autonomous_iterations,
+                self.autonomy_level,
+            )
+        if self.stuck_threshold_iterations > 0:
+            logger.warning(
+                'Agent config sets stuck_threshold_iterations=%s while autonomy_level=%s; stuck-threshold tuning only applies in full autonomy.',
+                self.stuck_threshold_iterations,
+                self.autonomy_level,
+            )
+
+    def _warn_for_disabled_dynamic_iterations(self) -> None:
+        if self.max_iterations_override is not None:
+            logger.warning(
+                'Agent config sets max_iterations_override=%s while enable_dynamic_iterations=False; the override is ignored until dynamic iterations are enabled.',
+                self.max_iterations_override,
+            )
+        if self.min_iterations != DEFAULT_AGENT_MIN_ITERATIONS:
+            logger.warning(
+                'Agent config sets min_iterations=%s while enable_dynamic_iterations=False; this value is only used by dynamic iteration adjustment.',
+                self.min_iterations,
+            )
+        if (
+            self.complexity_iteration_multiplier
+            != DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER
+        ):
+            logger.warning(
+                'Agent config sets complexity_iteration_multiplier=%s while enable_dynamic_iterations=False; this value is only used by dynamic iteration adjustment.',
+                self.complexity_iteration_multiplier,
+            )
+
     @model_validator(mode='after')
     def warn_on_finish_disable(self) -> AgentConfig:
         """Surface dangerous lifecycle toggles loudly without breaking legacy configs."""
@@ -398,37 +432,9 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 'Agent config sets streaming_checkpoint_discard_stale_on_recovery=False; stale streaming WAL recovery will block the next LLM call until the checkpoint is inspected or discarded.'
             )
         if self.autonomy_level != 'full':
-            if self.max_autonomous_iterations > 0:
-                logger.warning(
-                    'Agent config sets max_autonomous_iterations=%s while autonomy_level=%s; this limit only applies in full autonomy.',
-                    self.max_autonomous_iterations,
-                    self.autonomy_level,
-                )
-            if self.stuck_threshold_iterations > 0:
-                logger.warning(
-                    'Agent config sets stuck_threshold_iterations=%s while autonomy_level=%s; stuck-threshold tuning only applies in full autonomy.',
-                    self.stuck_threshold_iterations,
-                    self.autonomy_level,
-                )
+            self._warn_for_non_full_autonomy_knobs()
         if not self.enable_dynamic_iterations:
-            if self.max_iterations_override is not None:
-                logger.warning(
-                    'Agent config sets max_iterations_override=%s while enable_dynamic_iterations=False; the override is ignored until dynamic iterations are enabled.',
-                    self.max_iterations_override,
-                )
-            if self.min_iterations != DEFAULT_AGENT_MIN_ITERATIONS:
-                logger.warning(
-                    'Agent config sets min_iterations=%s while enable_dynamic_iterations=False; this value is only used by dynamic iteration adjustment.',
-                    self.min_iterations,
-                )
-            if (
-                self.complexity_iteration_multiplier
-                != DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER
-            ):
-                logger.warning(
-                    'Agent config sets complexity_iteration_multiplier=%s while enable_dynamic_iterations=False; this value is only used by dynamic iteration adjustment.',
-                    self.complexity_iteration_multiplier,
-                )
+            self._warn_for_disabled_dynamic_iterations()
         return self
 
     def get_llm_config(self) -> LLMConfig | None:

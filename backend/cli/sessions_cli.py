@@ -50,6 +50,14 @@ def cmd_list(console: Console, limit: int = 50) -> int:
     if not rows:
         console.print('[dim]No sessions found.[/dim]')
         return 0
+    table = _build_session_table()
+    for i, (sid, meta, count, _path) in enumerate(rows, 1):
+        table.add_row(*_format_session_row(i, sid, meta, count))
+    console.print(table)
+    return 0
+
+
+def _build_session_table() -> Table:
     table = Table(title='Sessions', border_style='dim')
     table.add_column('#', style='dim')
     table.add_column('ID')
@@ -58,15 +66,20 @@ def cmd_list(console: Console, limit: int = 50) -> int:
     table.add_column('Events', justify='right')
     table.add_column('Cost', justify='right')
     table.add_column('Updated', style='dim')
-    for i, (sid, meta, count, _path) in enumerate(rows, 1):
-        title = str(meta.get('title') or meta.get('name') or '—')
-        model = str(meta.get('llm_model') or '—')[:24]
-        cost = meta.get('accumulated_cost') or 0
-        cost_str = f'${cost:.4f}' if cost else '—'
-        updated = str(meta.get('last_updated_at') or meta.get('created_at') or '—')[:19]
-        table.add_row(str(i), sid[:12], title, model, str(count), cost_str, updated)
-    console.print(table)
-    return 0
+    return table
+
+
+def _format_session_row(
+    index: int, sid: str, meta: dict[str, Any], count: int,
+) -> tuple[str, str, str, str, str, str, str]:
+    title = str(meta.get('title') or meta.get('name') or '—')
+    model = str(meta.get('llm_model') or '—')[:24]
+    cost = meta.get('accumulated_cost') or 0
+    cost_str = f'${cost:.4f}' if cost else '—'
+    updated = str(
+        meta.get('last_updated_at') or meta.get('created_at') or '—'
+    )[:19]
+    return str(index), sid[:12], title, model, str(count), cost_str, updated
 
 
 def _resolve(
@@ -77,15 +90,25 @@ def _resolve(
         return None
     cleaned = (target or '').strip()
     if cleaned.isdigit():
-        index = int(cleaned)
-        if 1 <= index <= len(rows):
-            return rows[index - 1]
-        return None
+        return _resolve_by_index(rows, int(cleaned))
 
     exact = [row for row in rows if row[0] == cleaned]
     if exact:
         return exact[0]
+    return _resolve_by_prefix(rows, cleaned)
 
+
+def _resolve_by_index(
+    rows: list[tuple[str, dict[str, Any], int, Path]], index: int,
+) -> tuple[str, dict[str, Any], int, Path] | None:
+    if 1 <= index <= len(rows):
+        return rows[index - 1]
+    return None
+
+
+def _resolve_by_prefix(
+    rows: list[tuple[str, dict[str, Any], int, Path]], cleaned: str,
+) -> tuple[str, dict[str, Any], int, Path] | _SessionResolveFailure | None:
     matches = [row for row in rows if row[0].startswith(cleaned)]
     if len(matches) == 1:
         return matches[0]
@@ -169,24 +192,11 @@ def cmd_prune(console: Console, *, days: int = 30, yes: bool = False) -> int:
         console.print('[red]--days must be 0 or greater.[/red]')
         return 2
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    rows = _entries()
-    to_delete: list[tuple[str, Path]] = []
-    for sid, meta, _count, path in rows:
-        ts = meta.get('last_updated_at') or meta.get('created_at')
-        if not ts:
-            # No timestamp → fall back to mtime.
-            mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
-            if mtime < cutoff:
-                to_delete.append((sid, path))
-            continue
-        try:
-            parsed = datetime.fromisoformat(str(ts).replace('Z', '+00:00'))
-            if parsed.tzinfo is None:
-                parsed = parsed.replace(tzinfo=timezone.utc)
-            if parsed < cutoff:
-                to_delete.append((sid, path))
-        except Exception:
-            continue
+    to_delete = [
+        (sid, path)
+        for sid, meta, _count, path in _entries()
+        if _session_older_than_cutoff(meta, path, cutoff)
+    ]
 
     if not to_delete:
         console.print(f'[dim]No sessions older than {days} days.[/dim]')
@@ -205,6 +215,26 @@ def cmd_prune(console: Console, *, days: int = 30, yes: bool = False) -> int:
         shutil.rmtree(path, ignore_errors=True)
         console.print(f'  deleted {sid}')
     return 0
+
+
+def _session_older_than_cutoff(
+    meta: dict[str, Any], path: Path, cutoff: datetime,
+) -> bool:
+    ts = meta.get('last_updated_at') or meta.get('created_at')
+    if not ts:
+        # No timestamp → fall back to mtime.
+        try:
+            mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+        except OSError:
+            return False
+        return mtime < cutoff
+    try:
+        parsed = datetime.fromisoformat(str(ts).replace('Z', '+00:00'))
+    except Exception:
+        return False
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed < cutoff
 
 
 __all__ = ['cmd_list', 'cmd_show', 'cmd_export', 'cmd_delete', 'cmd_prune']

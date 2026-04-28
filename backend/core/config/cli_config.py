@@ -37,6 +37,45 @@ def _load_json_config(json_file: str) -> dict | None:
         return None
 
 
+_LLM_JSON_KEYS = ('llm_model', 'llm_api_key', 'llm_base_url')
+
+
+def _json_has_llm_keys(json_config: dict) -> bool:
+    return any(key in json_config for key in _LLM_JSON_KEYS)
+
+
+def _warn_on_literal_llm_api_key(raw_api_key: object, json_file: str) -> None:
+    secret = str(raw_api_key).strip() if raw_api_key is not None else ''
+    if not secret or secret == LLM_API_KEY_SETTINGS_PLACEHOLDER:
+        return
+    logger.app_logger.warning(
+        'Ignoring literal llm_api_key in %s; set LLM_API_KEY in .env and use %s in JSON.',
+        json_file,
+        LLM_API_KEY_SETTINGS_PLACEHOLDER,
+    )
+
+
+def _get_llm_api_key_from_env() -> SecretStr | None:
+    env_key = (os.environ.get('LLM_API_KEY') or '').strip()
+    if not env_key:
+        return None
+    return SecretStr(env_key)
+
+
+def _apply_llm_json_fields(llm: LLMConfig, json_config: dict, json_file: str) -> None:
+    if 'llm_model' in json_config:
+        llm.model = json_config['llm_model']
+    if 'llm_api_key' in json_config:
+        _warn_on_literal_llm_api_key(json_config['llm_api_key'], json_file)
+
+    env_api_key = _get_llm_api_key_from_env()
+    if env_api_key is not None:
+        llm.api_key = env_api_key
+
+    if 'llm_base_url' in json_config:
+        llm.base_url = json_config['llm_base_url']
+
+
 def get_llm_config_arg(
     llm_config_arg: str, json_file: str = 'settings.json'
 ) -> LLMConfig | None:
@@ -45,28 +84,11 @@ def get_llm_config_arg(
     if json_config is None:
         return None
 
-    # Check if there are any LLM keys present
-    llm_keys = ('llm_model', 'llm_api_key', 'llm_base_url')
-    if not any(k in json_config for k in llm_keys):
+    if not _json_has_llm_keys(json_config):
         return None
 
     llm = LLMConfig()
-    if 'llm_model' in json_config:
-        llm.model = json_config['llm_model']
-    if 'llm_api_key' in json_config:
-        raw = json_config['llm_api_key']
-        s = str(raw).strip() if raw is not None else ''
-        if s and s != LLM_API_KEY_SETTINGS_PLACEHOLDER:
-            logger.app_logger.warning(
-                'Ignoring literal llm_api_key in %s; set LLM_API_KEY in .env and use %s in JSON.',
-                json_file,
-                LLM_API_KEY_SETTINGS_PLACEHOLDER,
-            )
-    env_k = (os.environ.get('LLM_API_KEY') or '').strip()
-    if env_k:
-        llm.api_key = SecretStr(env_k)
-    if 'llm_base_url' in json_config:
-        llm.base_url = json_config['llm_base_url']
+    _apply_llm_json_fields(llm, json_config, json_file)
     return llm
 
 

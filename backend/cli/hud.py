@@ -357,110 +357,119 @@ class HUDBar:
     def update_from_llm_metrics(self, metrics: Any) -> None:
         if metrics is None:
             return
-
         if hasattr(metrics, 'accumulated_cost'):
-            accumulated_cost = float(getattr(metrics, 'accumulated_cost', 0.0) or 0.0)
-            self.state.cost_usd = accumulated_cost
-
-            usages = getattr(metrics, 'token_usages', []) or []
-            response_latencies = getattr(metrics, 'response_latencies', []) or []
-            costs = getattr(metrics, 'costs', []) or []
-            accumulated_usage = getattr(metrics, 'accumulated_token_usage', None)
-            resolved_calls = self._resolve_call_count(
-                usages=usages,
-                response_latencies=response_latencies,
-                costs=costs,
-                accumulated_usage=accumulated_usage,
-                accumulated_cost=accumulated_cost,
-            )
-            # Never let metrics with no usage data overwrite a call count that
-            # was already incremented (e.g. by _handle_streaming_chunk).
-            self.state.llm_calls = max(self.state.llm_calls, resolved_calls)
-
-            if self._has_usage_signal(accumulated_usage):
-                prompt_tokens = int(getattr(accumulated_usage, 'prompt_tokens', 0) or 0)
-                completion_tokens = int(
-                    getattr(accumulated_usage, 'completion_tokens', 0) or 0
-                )
-                cache_read_tokens = int(
-                    getattr(accumulated_usage, 'cache_read_tokens', 0) or 0
-                )
-                cache_write_tokens = int(
-                    getattr(accumulated_usage, 'cache_write_tokens', 0) or 0
-                )
-                self.state.context_tokens = (
-                    prompt_tokens
-                    + completion_tokens
-                    + cache_read_tokens
-                    + cache_write_tokens
-                )
-                self.state.context_limit = int(
-                    getattr(accumulated_usage, 'context_window', 0) or 0
-                )
-                self.state.token_usage_estimated = bool(
-                    getattr(accumulated_usage, 'usage_estimated', False)
-                )
-                return
-
-            if usages:
-                latest = usages[-1]
-                self.state.context_tokens = int(
-                    getattr(latest, 'prompt_tokens', 0) or 0
-                ) + int(getattr(latest, 'completion_tokens', 0) or 0)
-                self.state.context_limit = int(
-                    getattr(latest, 'context_window', 0) or 0
-                )
-                self.state.token_usage_estimated = bool(
-                    getattr(latest, 'usage_estimated', False)
-                )
+            self._update_from_object_metrics(metrics)
             return
-
         if isinstance(metrics, dict):
-            accumulated_cost = float(metrics.get('accumulated_cost') or 0.0)
-            self.state.cost_usd = accumulated_cost
-            usages = metrics.get('token_usages', [])
-            accumulated_usage = metrics.get('accumulated_token_usage')
-            resolved_calls = self._resolve_call_count(
-                usages=usages if isinstance(usages, list) else [],
-                response_latencies=metrics.get('response_latencies', []),
-                costs=metrics.get('costs', []),
-                accumulated_usage=accumulated_usage,
-                accumulated_cost=accumulated_cost,
-            )
-            self.state.llm_calls = max(self.state.llm_calls, resolved_calls)
+            self._update_from_dict_metrics(metrics)
 
-            if isinstance(accumulated_usage, dict):
-                total = (
-                    int(accumulated_usage.get('prompt_tokens', 0) or 0)
-                    + int(accumulated_usage.get('completion_tokens', 0) or 0)
-                    + int(accumulated_usage.get('cache_read_tokens', 0) or 0)
-                    + int(accumulated_usage.get('cache_write_tokens', 0) or 0)
-                )
-                if (
-                    total > 0
-                    or int(accumulated_usage.get('context_window', 0) or 0) > 0
-                ):
-                    self.state.context_tokens = total
-                    self.state.context_limit = int(
-                        accumulated_usage.get('context_window', 0) or 0
-                    )
-                    self.state.token_usage_estimated = bool(
-                        accumulated_usage.get('usage_estimated', False)
-                    )
-                    return
+    def _update_from_object_metrics(self, metrics: Any) -> None:
+        accumulated_cost = float(getattr(metrics, 'accumulated_cost', 0.0) or 0.0)
+        self.state.cost_usd = accumulated_cost
 
-            if usages:
-                latest = usages[-1] if isinstance(usages, list) else usages
-                if isinstance(latest, dict):
-                    total = int(latest.get('prompt_tokens', 0) or 0) + int(
-                        latest.get('completion_tokens', 0) or 0
-                    )
-                    self.state.context_tokens = total
-                    self.state.context_limit = int(latest.get('context_window', 0) or 0)
-                    self.state.token_usage_estimated = bool(
-                        latest.get('usage_estimated', False)
-                    )
+        usages = getattr(metrics, 'token_usages', []) or []
+        response_latencies = getattr(metrics, 'response_latencies', []) or []
+        costs = getattr(metrics, 'costs', []) or []
+        accumulated_usage = getattr(metrics, 'accumulated_token_usage', None)
+        resolved_calls = self._resolve_call_count(
+            usages=usages,
+            response_latencies=response_latencies,
+            costs=costs,
+            accumulated_usage=accumulated_usage,
+            accumulated_cost=accumulated_cost,
+        )
+        # Never let metrics with no usage data overwrite a call count that
+        # was already incremented (e.g. by _handle_streaming_chunk).
+        self.state.llm_calls = max(self.state.llm_calls, resolved_calls)
+
+        if self._has_usage_signal(accumulated_usage):
+            self._apply_object_accumulated_usage(accumulated_usage)
             return
+        if usages:
+            self._apply_object_latest_usage(usages[-1])
+
+    def _apply_object_accumulated_usage(self, accumulated_usage: Any) -> None:
+        prompt_tokens = int(getattr(accumulated_usage, 'prompt_tokens', 0) or 0)
+        completion_tokens = int(
+            getattr(accumulated_usage, 'completion_tokens', 0) or 0
+        )
+        cache_read_tokens = int(
+            getattr(accumulated_usage, 'cache_read_tokens', 0) or 0
+        )
+        cache_write_tokens = int(
+            getattr(accumulated_usage, 'cache_write_tokens', 0) or 0
+        )
+        self.state.context_tokens = (
+            prompt_tokens + completion_tokens + cache_read_tokens + cache_write_tokens
+        )
+        self.state.context_limit = int(
+            getattr(accumulated_usage, 'context_window', 0) or 0
+        )
+        self.state.token_usage_estimated = bool(
+            getattr(accumulated_usage, 'usage_estimated', False)
+        )
+
+    def _apply_object_latest_usage(self, latest: Any) -> None:
+        self.state.context_tokens = int(
+            getattr(latest, 'prompt_tokens', 0) or 0
+        ) + int(getattr(latest, 'completion_tokens', 0) or 0)
+        self.state.context_limit = int(getattr(latest, 'context_window', 0) or 0)
+        self.state.token_usage_estimated = bool(
+            getattr(latest, 'usage_estimated', False)
+        )
+
+    def _update_from_dict_metrics(self, metrics: dict[str, Any]) -> None:
+        accumulated_cost = float(metrics.get('accumulated_cost') or 0.0)
+        self.state.cost_usd = accumulated_cost
+        usages = metrics.get('token_usages', [])
+        accumulated_usage = metrics.get('accumulated_token_usage')
+        resolved_calls = self._resolve_call_count(
+            usages=usages if isinstance(usages, list) else [],
+            response_latencies=metrics.get('response_latencies', []),
+            costs=metrics.get('costs', []),
+            accumulated_usage=accumulated_usage,
+            accumulated_cost=accumulated_cost,
+        )
+        self.state.llm_calls = max(self.state.llm_calls, resolved_calls)
+
+        if isinstance(accumulated_usage, dict) and self._apply_dict_accumulated_usage(
+            accumulated_usage,
+        ):
+            return
+        if usages:
+            latest = usages[-1] if isinstance(usages, list) else usages
+            if isinstance(latest, dict):
+                self._apply_dict_latest_usage(latest)
+
+    def _apply_dict_accumulated_usage(
+        self, accumulated_usage: dict[str, Any],
+    ) -> bool:
+        total = (
+            int(accumulated_usage.get('prompt_tokens', 0) or 0)
+            + int(accumulated_usage.get('completion_tokens', 0) or 0)
+            + int(accumulated_usage.get('cache_read_tokens', 0) or 0)
+            + int(accumulated_usage.get('cache_write_tokens', 0) or 0)
+        )
+        if total <= 0 and int(accumulated_usage.get('context_window', 0) or 0) <= 0:
+            return False
+        self.state.context_tokens = total
+        self.state.context_limit = int(
+            accumulated_usage.get('context_window', 0) or 0
+        )
+        self.state.token_usage_estimated = bool(
+            accumulated_usage.get('usage_estimated', False)
+        )
+        return True
+
+    def _apply_dict_latest_usage(self, latest: dict[str, Any]) -> None:
+        total = int(latest.get('prompt_tokens', 0) or 0) + int(
+            latest.get('completion_tokens', 0) or 0
+        )
+        self.state.context_tokens = total
+        self.state.context_limit = int(latest.get('context_window', 0) or 0)
+        self.state.token_usage_estimated = bool(
+            latest.get('usage_estimated', False)
+        )
 
     def plain_text(self) -> str:
         return self._format().plain

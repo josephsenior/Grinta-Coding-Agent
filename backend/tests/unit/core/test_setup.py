@@ -143,6 +143,37 @@ def test_create_runtime(
     mock_runtime_cls.assert_called()
 
 
+@patch('backend.core.bootstrap.setup.get_file_store')
+@patch('backend.core.bootstrap.setup.EventStream')
+@patch('backend.execution.runtime_factory.get_runtime_cls')
+def test_create_runtime_closes_owned_event_stream_on_init_error(
+    mock_get_runtime_cls, mock_event_stream_cls, mock_get_file_store
+):
+    mock_config = MagicMock(spec=AppConfig)
+    mock_config.file_store = 'memory'
+    mock_config.runtime = 'docker'
+    mock_config.default_agent = 'agent'
+
+    mock_event_stream = MagicMock()
+    mock_event_stream_cls.return_value = mock_event_stream
+
+    mock_runtime_cls = MagicMock()
+    mock_runtime_cls.__name__ = 'BrokenRuntime'
+    mock_runtime_cls.side_effect = RuntimeError('boom')
+    mock_get_runtime_cls.return_value = mock_runtime_cls
+
+    with patch('backend.orchestration.agent.Agent.get_cls') as mock_get_agent_cls:
+        mock_agent_cls = MagicMock()
+        mock_agent_cls.runtime_plugins = []
+        mock_agent_cls.__name__ = 'Agent'
+        mock_get_agent_cls.return_value = mock_agent_cls
+
+        with pytest.raises(RuntimeError, match='boom'):
+            create_runtime(mock_config, llm_registry=MagicMock())
+
+    mock_event_stream.close.assert_called_once()
+
+
 @patch('backend.core.bootstrap.setup.State.restore_from_session')
 @patch('backend.core.bootstrap.setup.SessionOrchestrator')
 def test_create_controller(mock_controller_cls, mock_restore):

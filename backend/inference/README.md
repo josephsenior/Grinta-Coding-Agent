@@ -74,6 +74,7 @@ response = llm.completion(
 ```
 
 **Features:**
+
 - Retry logic with exponential backoff
 - Cost calculation and tracking
 - Streaming support
@@ -85,6 +86,7 @@ response = llm.completion(
 ### 1.5 Working with Local Models
 
 **Auto-Discovery:**
+
 ```python
 from backend.inference import LLM
 
@@ -99,6 +101,7 @@ llm = LLM(model="vllm/mistral-7b")
 ```
 
 **Discover Available Models:**
+
 ```bash
 # Find all local models
 python -m backend.inference.discover_models
@@ -111,6 +114,7 @@ python -m backend.inference.discover_models
 ```
 
 **Check Provider Status:**
+
 ```bash
 python -m backend.inference.discover_models status
 
@@ -141,6 +145,7 @@ api_key_manager.set_environment_variables(
 ```
 
 **Features:**
+
 - Provider auto-detection from model string
 - API key format validation (prefix matching)
 - Environment variable fallbacks
@@ -165,6 +170,7 @@ cleaned = provider_config_manager.validate_and_clean_params(
 ```
 
 **Each Provider Config Includes:**
+
 - Environment variable name
 - Required parameters
 - Optional parameters
@@ -192,6 +198,7 @@ if features.supports_reasoning_effort:
 ```
 
 **Supported Features:**
+
 - Function calling (tools/actions)
 - Reasoning effort (o1, o3, Gemini 2.5)
 - Prompt caching (Claude 3.5+, 4, 4.5)
@@ -240,6 +247,7 @@ llm = LLM(model="ollama/llama3.2")
 ```
 
 **Override auto-discovery:**
+
 ```bash
 # Custom Ollama location
 export OLLAMA_HOST="http://192.168.1.100:11434"
@@ -406,6 +414,7 @@ output_cost_per_token = 0.003
 ### Prompt Caching (Claude Models)
 
 **Supported:**
+
 - Claude 3.5 Sonnet
 - Claude 3.5 Haiku
 - Claude 4 Sonnet
@@ -413,6 +422,7 @@ output_cost_per_token = 0.003
 - Claude 4.5 Sonnet
 
 **How it works:**
+
 ```python
 # Enable caching
 config = LLMConfig(
@@ -428,6 +438,7 @@ response2 = llm.completion(messages=[...])  # Cost: $0.01 (80% savings!)
 ```
 
 **Benefits:**
+
 - 35-50% cost reduction
 - Faster responses (cached tokens processed faster)
 - Automatic provider-specific optimizations
@@ -602,6 +613,7 @@ print(f"Function calling: {features.supports_function_calling}")
 ### 0. Leverage Local Models for Development
 
 **Use local models to:**
+
 - Reduce API costs during development
 - Work offline
 - Increase iteration speed
@@ -622,16 +634,19 @@ ollama pull qwen2.5-coder
 ### 1. Choose the Right Model
 
 **For speed:**
+
 - `claude-haiku-4-5-20251001` - 2x faster than Sonnet
 - `gpt-4o-mini` - Fast and cheap
 - `openrouter/x-ai/grok-code-fast-1` - 2x faster, very cheap
 
 **For quality:**
+
 - `claude-sonnet-4-5-20250929` - Best for coding
 - `gpt-5-2025-08-07` - Frontier model
 - `o3-mini` - Best reasoning
 
 **For cost:**
+
 - `gpt-4o-mini` - $0.15/$0.60 per 1M tokens
 - `claude-haiku-4-5-20251001` - $1/$5 per 1M tokens
 - `openrouter/x-ai/grok-code-fast-1` - $0.20/$0.50 per 1M tokens
@@ -672,22 +687,26 @@ except APIConnectionError:
 ### Anthropic (Claude)
 
 **Prompt Caching:**
+
 - Automatically enabled for Claude 3.5+, 4, 4.5
 - Reduces costs significantly for long conversations
 - No code changes needed
 
 **Extended Thinking:**
+
 - Claude Opus 4.1 supports extended thinking
 - Automatically disabled in config
 
 ### OpenRouter
 
 **Access 200+ Models:**
+
 - Single API key for all models
 - Automatic fallback if model unavailable
 - Free models available (see `openrouter/meta-llama/llama-3.3-70b-instruct:free`)
 
 **Rate Limits:**
+
 - Vary by model
 - Free models: Lower limits
 - Paid models: Higher limits
@@ -695,12 +714,14 @@ except APIConnectionError:
 ### xAI (Grok)
 
 **Grok 4 Fast:**
+
 - 2M token context window
 - 98% cheaper than Grok 4
 - Optimized for tool use
 - Perfect for high-volume tasks
 
 **Access:**
+
 ```bash
 # Via OpenRouter
 LLM_MODEL=openrouter/x-ai/grok-code-fast-1
@@ -727,11 +748,13 @@ OLLAMA_BASE_URL=http://localhost:11434
 ```
 
 **Benefits:**
+
 - Free (no API costs)
 - Privacy (runs locally)
 - Fast (no network latency)
 
 **Trade-offs:**
+
 - Requires GPU for good performance
 - Limited to smaller models (70B max typically)
 - Lower quality than frontier models

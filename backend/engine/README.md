@@ -56,11 +56,13 @@ Action: PlaybookFinishAction("Fixed undefined variable bug")
 ### File Operations
 
 **FileReadAction** - Read file contents:
+
 ```python
 FileReadAction(path="src/main.py")
 ```
 
 **FileWriteAction** - Create new file:
+
 ```python
 FileWriteAction(
     path="src/utils.py",
@@ -69,6 +71,7 @@ FileWriteAction(
 ```
 
 **FileEditAction** - Edit existing file (structure-aware):
+
 ```python
 FileEditAction(
     path="src/main.py",
@@ -92,6 +95,7 @@ For non-code files, prefer document-oriented editing over raw substring replacem
 ### Command Execution
 
 **CmdRunAction** - Run shell commands:
+
 ```python
 CmdRunAction(
     command="pytest tests/",
@@ -111,6 +115,7 @@ CmdRunAction(
 ### Communication
 
 **MessageAction** - Communicate with user:
+
 ```python
 MessageAction(
     content="I've completed the changes. Please review the diff."
@@ -118,6 +123,7 @@ MessageAction(
 ```
 
 **PlaybookFinishAction** - Mark task complete:
+
 ```python
 PlaybookFinishAction(
     outputs={"files_modified": ["main.py", "tests.py"]}
@@ -185,6 +191,7 @@ The Orchestrator agent uses a carefully crafted prompt:
 ### 1. Circuit Breaker
 
 **Automatically pauses agent if:**
+
 - 3 consecutive failures
 - Same action repeated 5 times (stuck detection)
 - High-risk action without confirmation
@@ -194,6 +201,7 @@ The Orchestrator agent uses a carefully crafted prompt:
 ### 2. Confirmation Mode
 
 **User confirmation required for:**
+
 - Deleting files
 - Running destructive commands (`rm -rf`, `DROP TABLE`, etc.)
 - Installing packages
@@ -202,6 +210,7 @@ The Orchestrator agent uses a carefully crafted prompt:
 ### 3. Runtime Execution
 
 **All actions run in the local runtime environment:**
+
 - Isolated file system
 - Limited network access
 - Resource constraints (CPU, memory)
@@ -220,18 +229,21 @@ The Orchestrator agent uses a carefully crafted prompt:
 ### Optimization Tips
 
 **1. Use faster models:**
+
 ```toml
 [llm]
 model = "claude-haiku-4-5-20251001"  # 2x faster, 1/3 cost
 ```
 
 **2. Enable caching:**
+
 ```toml
 [llm]
 caching_prompt = true  # 35% cost reduction
 ```
 
 **3. Reduce context:**
+
 ```toml
 [llm]
 max_message_chars = 20000  # Less context = faster + cheaper
@@ -262,15 +274,18 @@ tail -f logs/App.log | grep "Orchestrator"
 ### Common Issues
 
 **Agent stuck in loop:**
+
 - Circuit breaker will auto-pause after 5 identical actions
 - Check `stuck_detector.py` logs
 
 **File edits failing:**
+
 - Verify file exists
 - Check file permissions
 - Review edit diff (might have syntax errors)
 
 **Commands not executing:**
+
 - Verify local runtime process is healthy
 - Check backend logs for runtime startup errors
 
@@ -318,12 +333,14 @@ You are a specialized agent for...
 ### 1. Be Specific in Prompts
 
 **Good:**
+
 ```
 Fix the TypeError on line 42 in src/utils.py where 'count' is
 used before definition. Initialize it to 0 at the start of the function.
 ```
 
 **Bad:**
+
 ```
 Fix the bug
 ```
@@ -331,12 +348,14 @@ Fix the bug
 ### 2. Provide Context
 
 **Good:**
+
 ```
 Add user authentication to this Flask app. We're using SQLAlchemy
 for the database. Follow the existing pattern in models/user.py.
 ```
 
 **Bad:**
+
 ```
 Add auth
 ```

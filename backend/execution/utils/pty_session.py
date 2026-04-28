@@ -24,6 +24,7 @@ abstractions (``UnifiedShellSession``, agent tools, REPL UI).
 from __future__ import annotations
 
 import errno
+import re
 import shlex
 import threading
 import time
@@ -90,35 +91,142 @@ def _is_token_boundary(text: str, idx: int) -> bool:
     return not text[idx - 1].isalnum()
 
 
+_ORPHAN_PARAM_TOKEN_RE = re.compile(r'\[?\d+(?:;\d+){2,}[OI]?_')
+_ORPHAN_PARAM_PREFIX_RE = re.compile(r'\[?\d+(?:;\d+){2,}[OI]?$')
+
+
 def _parse_orphan_param_token(text: str, start: int) -> int | None:
     """Parse one leaked ConPTY-ish token like ``[17;29;0;1;40;1_``."""
-    i = start
-    n = len(text)
-    if i < n and text[i] == '[':
-        i += 1
-    first = i
-    while i < n and text[i].isdigit():
-        i += 1
-    if i == first:
-        return None
-    groups = 0
-    while i < n and text[i] == ';':
-        i += 1
-        g_start = i
-        while i < n and text[i].isdigit():
-            i += 1
-        if i == g_start:
-            return None
-        groups += 1
-    if groups < 2:
-        return None
-    if i < n and text[i] in ('O', 'I'):
-        i += 1
-    if i >= n:
+    if match := _ORPHAN_PARAM_TOKEN_RE.match(text, start):
+        return match.end()
+    if _ORPHAN_PARAM_PREFIX_RE.fullmatch(text[start:]):
         return -1
-    if text[i] != '_':
+    return None
+
+
+def _consume_csi_escape(src: str, start: int) -> tuple[int, str | None]:
+    j = start + 2
+    n = len(src)
+    while j < n and 0x30 <= ord(src[j]) <= 0x3F:
+        j += 1
+    while j < n and 0x20 <= ord(src[j]) <= 0x2F:
+        j += 1
+    if j >= n:
+        return start, src[start:]
+    if 0x40 <= ord(src[j]) <= 0x7E:
+        return j + 1, None
+    return start + 1, None
+
+
+def _consume_osc_escape(src: str, start: int) -> tuple[int, str | None]:
+    j = start + 2
+    n = len(src)
+    while j < n:
+        if src[j] == '\x07':
+            return j + 1, None
+        if src[j] == '\x1b':
+            if j + 1 >= n:
+                return start, src[start:]
+            if src[j + 1] == '\\':
+                return j + 2, None
+        j += 1
+    return start, src[start:]
+
+
+def _consume_string_escape(src: str, start: int) -> tuple[int, str | None]:
+    j = start + 2
+    n = len(src)
+    while j < n:
+        if src[j] == '\x1b':
+            if j + 1 >= n:
+                return start, src[start:]
+            if src[j + 1] == '\\':
+                return j + 2, None
+        j += 1
+    return start, src[start:]
+
+
+def _consume_escape_sequence(src: str, start: int) -> tuple[int, str | None]:
+    if start + 1 >= len(src):
+        return start, src[start:]
+
+    nxt = src[start + 1]
+    if nxt == '[':
+        return _consume_csi_escape(src, start)
+    if nxt == ']':
+        return _consume_osc_escape(src, start)
+    if nxt in ('P', 'X', '^', '_'):
+        return _consume_string_escape(src, start)
+    if '@' <= nxt <= '_':
+        return start + 2, None
+    return start + 1, None
+
+
+def _should_drop_c0_control(ch: str, code: int) -> bool:
+    return code < 0x20 and ch not in ('\n', '\r', '\t')
+
+
+def _consume_orphan_param_chunks(src: str, start: int) -> tuple[int | None, str | None]:
+    ch = src[start]
+    if not (ch.isdigit() or ch == '[') or not _is_token_boundary(src, start):
+        return None, None
+
+    j = start
+    token_count = 0
+    while True:
+        end = _parse_orphan_param_token(src, j)
+        if end is None:
+            return (j, None) if token_count >= 2 else (None, None)
+        if end < 0:
+            if token_count > 0:
+                return None, src[start:]
+            return None, None
+        token_count += 1
+        j = end
+
+
+def _consume_escape_step(src: str, start: int) -> tuple[int, str | None] | None:
+    if src[start] != '\x1b':
         return None
-    return i + 1
+    return _consume_escape_sequence(src, start)
+
+
+def _consume_orphan_step(src: str, start: int) -> tuple[int, str | None] | None:
+    next_index, carry_out = _consume_orphan_param_chunks(src, start)
+    if next_index is None and carry_out is None:
+        return None
+    return start if next_index is None else next_index, carry_out
+
+
+def _consume_sanitizer_step(
+    src: str, start: int
+) -> tuple[int, str | None, str | None]:
+    escape_result = _consume_escape_step(src, start)
+    if escape_result is not None:
+        next_index, carry_out = escape_result
+        return next_index, carry_out, None
+
+    ch = src[start]
+    if _should_drop_c0_control(ch, ord(ch)):
+        return start + 1, None, None
+
+    orphan_result = _consume_orphan_step(src, start)
+    if orphan_result is not None:
+        next_index, carry_out = orphan_result
+        return next_index, carry_out, None
+
+    return start + 1, None, ch
+
+
+def _finalize_sanitized_chunk(src: str, out: list[str]) -> tuple[str, str]:
+    carry_out = ''
+    if src and src[-1] == '\x1b':
+        if out and out[-1] == '\x1b':
+            out.pop()
+        carry_out = '\x1b'
+    if len(carry_out) > _MAX_SANITIZE_CARRY:
+        carry_out = carry_out[-_MAX_SANITIZE_CARRY:]
+    return ''.join(out), carry_out
 
 
 def _sanitize_terminal_text_chunk(
@@ -138,102 +246,13 @@ def _sanitize_terminal_text_chunk(
     n = len(src)
 
     while i < n:
-        ch = src[i]
-        code = ord(ch)
+        i, carry_out, clean_char = _consume_sanitizer_step(src, i)
+        if carry_out is not None:
+            return ''.join(out), carry_out
+        if clean_char is not None:
+            out.append(clean_char)
 
-        # Escape-prefixed control sequence (must run before C0 filtering: ESC is 0x1b).
-        if ch == '\x1b':
-            if i + 1 >= n:
-                return ''.join(out), src[i:]
-            nxt = src[i + 1]
-            # CSI: ESC [ ... final-byte
-            if nxt == '[':
-                j = i + 2
-                while j < n and 0x30 <= ord(src[j]) <= 0x3F:
-                    j += 1
-                while j < n and 0x20 <= ord(src[j]) <= 0x2F:
-                    j += 1
-                if j >= n:
-                    return ''.join(out), src[i:]
-                if 0x40 <= ord(src[j]) <= 0x7E:
-                    i = j + 1
-                    continue
-                i += 1
-                continue
-            # OSC: ESC ] ... BEL or ESC \
-            if nxt == ']':
-                j = i + 2
-                while j < n:
-                    if src[j] == '\x07':
-                        i = j + 1
-                        break
-                    if src[j] == '\x1b':
-                        if j + 1 >= n:
-                            return ''.join(out), src[i:]
-                        if src[j + 1] == '\\':
-                            i = j + 2
-                            break
-                    j += 1
-                else:
-                    return ''.join(out), src[i:]
-                continue
-            # DCS/SOS/PM/APC string controls terminated by ESC \
-            if nxt in ('P', 'X', '^', '_'):
-                j = i + 2
-                while j < n:
-                    if src[j] == '\x1b':
-                        if j + 1 >= n:
-                            return ''.join(out), src[i:]
-                        if src[j + 1] == '\\':
-                            i = j + 2
-                            break
-                    j += 1
-                else:
-                    return ''.join(out), src[i:]
-                continue
-            # 2-byte escape forms.
-            if '@' <= nxt <= '_':
-                i += 2
-                continue
-            # Unknown escape shape: drop ESC only.
-            i += 1
-            continue
-
-        # Drop C0 controls except common layout controls.
-        if code < 0x20 and ch not in ('\n', '\r', '\t'):
-            i += 1
-            continue
-
-        # Bracketless/bare orphan parameter chunks (ConPTY leaks).
-        if (ch.isdigit() or ch == '[') and _is_token_boundary(src, i):
-            j = i
-            token_count = 0
-            while True:
-                end = _parse_orphan_param_token(src, j)
-                if end is None:
-                    break
-                if end < 0:
-                    if token_count > 0:
-                        return ''.join(out), src[i:]
-                    break
-                token_count += 1
-                j = end
-            if token_count >= 2:
-                i = j
-                continue
-
-        out.append(ch)
-        i += 1
-
-    carry_out = ''
-    if n and src[-1] == '\x1b':
-        # Preserve trailing ESC in case it prefixes next chunk.
-        if out and out[-1] == '\x1b':
-            out.pop()
-        carry_out = '\x1b'
-    if len(carry_out) > _MAX_SANITIZE_CARRY:
-        carry_out = carry_out[-_MAX_SANITIZE_CARRY:]
-    return ''.join(out), carry_out
+    return _finalize_sanitized_chunk(src, out)
 
 
 @dataclass
@@ -432,44 +451,54 @@ class InteractiveSession:
             self._config.cwd,
         )
 
+    def _read_backend_chunk(self, backend: Any, chunk_size: int) -> Any | None:
+        try:
+            return backend.read(chunk_size)
+        except EOFError:
+            self._eof = True
+            return None
+        except OSError as exc:
+            if exc.errno in (errno.EIO, errno.EBADF):
+                self._eof = True
+                return None
+            logger.warning('PTY reader OSError: %s', exc)
+            return None
+        except Exception as exc:
+            if self._stop_reader.is_set() or self._closed:
+                return None
+            logger.warning('PTY reader unexpected error: %s', exc)
+            return None
+
+    def _handle_empty_reader_chunk(self) -> bool:
+        if not self.is_alive():
+            self._eof = True
+            return False
+        time.sleep(0.01)
+        return True
+
+    def _decode_reader_chunk(self, chunk: Any) -> str:
+        if isinstance(chunk, bytes):
+            return chunk.decode(
+                self._config.encoding, errors=self._config.encoding_errors
+            )
+        return str(chunk)
+
     def _reader_loop(self) -> None:
         """Background reader: blocking reads from the PTY into the buffer."""
         backend = self._backend
         assert backend is not None
         chunk_size = self._config.read_chunk_bytes
         while not self._stop_reader.is_set():
-            try:
-                chunk = backend.read(chunk_size)
-            except EOFError:
-                self._eof = True
-                break
-            except OSError as exc:
-                if exc.errno in (errno.EIO, errno.EBADF):
-                    self._eof = True
-                    break
-                logger.warning('PTY reader OSError: %s', exc)
-                break
-            except Exception as exc:
-                if self._stop_reader.is_set() or self._closed:
-                    break
-                logger.warning('PTY reader unexpected error: %s', exc)
+            chunk = self._read_backend_chunk(backend, chunk_size)
+            if chunk is None:
                 break
 
             if not chunk:
-                if not self.is_alive():
-                    self._eof = True
+                if not self._handle_empty_reader_chunk():
                     break
-                time.sleep(0.01)
                 continue
 
-            if isinstance(chunk, bytes):
-                text = chunk.decode(
-                    self._config.encoding, errors=self._config.encoding_errors
-                )
-            else:
-                text = str(chunk)
-
-            self._append_to_buffer(text)
+            self._append_to_buffer(self._decode_reader_chunk(chunk))
 
         self._data_event.set()
 

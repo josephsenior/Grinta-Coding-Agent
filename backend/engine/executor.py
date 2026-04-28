@@ -21,6 +21,15 @@ from backend.core.constants import (
 )
 from backend.core.errors import ModelProviderError
 from backend.core.logger import app_logger as logger
+from backend.engine.executor_response_helpers import (
+    build_recoverable_tool_call_error_action as _build_recoverable_tool_call_error_action_impl,
+    content_to_str as _content_to_str_impl,
+    extract_last_user_text as _extract_last_user_text_impl,
+    extract_recent_user_text as _extract_recent_user_text_impl,
+    extract_response_text as _extract_response_text_impl,
+    is_recoverable_tool_call_error as _is_recoverable_tool_call_error_impl,
+    without_blank_agent_messages as _without_blank_agent_messages_impl,
+)
 from backend.engine import function_calling as _function_calling_module  # noqa: F401
 from backend.engine.streaming_checkpoint import (
     StreamingCheckpoint,
@@ -1032,86 +1041,15 @@ class OrchestratorExecutor:
 
     @staticmethod
     def _without_blank_agent_messages(actions: list[Action]) -> list[Action]:
-        """Drop agent ``MessageAction``s with nothing user-visible (no text, no thought)."""
-        from backend.ledger.action import MessageAction
-
-        out: list[Action] = []
-        for action in actions:
-            if isinstance(action, MessageAction):
-                content = str(getattr(action, 'content', '') or '').strip()
-                thought = str(getattr(action, 'thought', '') or '').strip()
-                if not content and not thought:
-                    continue
-            out.append(action)
-        return out
+        return _without_blank_agent_messages_impl(actions)
 
     @staticmethod
     def _is_recoverable_tool_call_error(exc: Exception) -> bool:
-        """Return True when error came from malformed/invalid LLM tool-call output."""
-        from backend.core.errors import (
-            FunctionCallConversionError,
-            LLMMalformedActionError,
-        )
-        from backend.core.errors import (
-            FunctionCallNotExistsError as CoreFunctionCallNotExistsError,
-        )
-        from backend.core.errors import (
-            FunctionCallValidationError as CoreFunctionCallValidationError,
-        )
-        from backend.core.tool_arguments_json import TruncatedToolArgumentsError
-        from backend.engine.common import (
-            FunctionCallNotExistsError as CommonFunctionCallNotExistsError,
-        )
-        from backend.engine.common import (
-            FunctionCallValidationError as CommonFunctionCallValidationError,
-        )
-
-        return isinstance(
-            exc,
-            (
-                CoreFunctionCallValidationError,
-                CoreFunctionCallNotExistsError,
-                FunctionCallConversionError,
-                LLMMalformedActionError,
-                CommonFunctionCallValidationError,
-                CommonFunctionCallNotExistsError,
-                TruncatedToolArgumentsError,
-            ),
-        )
+        return _is_recoverable_tool_call_error_impl(exc)
 
     @staticmethod
     def _build_recoverable_tool_call_error_action(exc: Exception) -> Action:
-        """Create a recovery action that feeds precise correction guidance back to the LLM."""
-        from backend.core.tool_arguments_json import TruncatedToolArgumentsError
-        from backend.ledger.action import AgentThinkAction
-
-        if isinstance(exc, TruncatedToolArgumentsError):
-            return AgentThinkAction(
-                thought=(
-                    '[TOOL_CALL_TRUNCATED] The previous tool call arguments were '
-                    'stream-truncated — the JSON object was never closed, meaning '
-                    'the model stopped generating before finishing the payload. '
-                    'This commonly happens with very large file bodies. '
-                    'Please re-issue the same tool call with the complete, valid '
-                    'JSON arguments. If the file body is very large, consider '
-                    'splitting it: create a minimal stub first, then extend with '
-                    'insert_text or edit_mode calls.'
-                )
-            )
-
-        detail = str(exc).strip() or exc.__class__.__name__
-        if len(detail) > 1200:
-            detail = f'{detail[:1200]}...'
-
-        return AgentThinkAction(
-            thought=(
-                '[TOOL_CALL_RECOVERABLE_ERROR] The previous tool call was invalid and was not executed. '
-                f'Details: {detail}\n'
-                'Recover by emitting one corrected tool call with strict JSON arguments: '
-                'use double-quoted keys/strings, escape embedded newlines/quotes, include required arguments, '
-                'and call an existing tool name only.'
-            )
-        )
+        return _build_recoverable_tool_call_error_action_impl(exc)
 
     def _response_to_actions(self, response: ModelResponse) -> list[Action]:
         mcp_tools = self._mcp_tools_provider()
@@ -1138,49 +1076,13 @@ class OrchestratorExecutor:
         return validated_actions
 
     def _extract_response_text(self, response: ModelResponse) -> str:
-        if not hasattr(response, 'choices') or not response.choices:
-            return ''
-        choice = response.choices[0]
-        if not hasattr(choice, 'message'):
-            return ''
-        content = getattr(choice.message, 'content', None)
-        return self._content_to_str(content)
+        return _extract_response_text_impl(response)
 
     def _content_to_str(self, content: Any) -> str:
-        """Convert message content (str, list of parts, etc.) to a plain string."""
-        if isinstance(content, str):
-            return content
-        if isinstance(content, dict):
-            text = content.get('text')
-            return text if isinstance(text, str) else ''
-        if isinstance(content, list):
-            parts: list[str] = []
-            for item in content:
-                if isinstance(item, str) and item:
-                    parts.append(item)
-                    continue
-                if isinstance(item, dict):
-                    text = item.get('text')
-                    if isinstance(text, str) and text:
-                        parts.append(text)
-            return ''.join(parts)
-        return str(content) if content else ''
+        return _content_to_str_impl(content)
 
     def _extract_last_user_text(self, messages: list[dict[str, Any]]) -> str:
-        for message in reversed(messages):
-            role = str(message.get('role', ''))
-            content = message.get('content', '')
-            if role != 'user':
-                continue
-            return self._content_to_str(content).strip()
-        return ''
+        return _extract_last_user_text_impl(messages)
 
     def _extract_recent_user_text(self, messages: list[dict[str, Any]]) -> str:
-        for message in reversed(messages):
-            role = str(message.get('role', ''))
-            content = message.get('content', '')
-            if role != 'user':
-                continue
-            if text := self._content_to_str(content).strip():
-                return text
-        return ''
+        return _extract_recent_user_text_impl(messages)

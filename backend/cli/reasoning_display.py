@@ -221,18 +221,40 @@ class ReasoningDisplay:
         max_width: int | None = None,
         max_lines: int | None = None,
     ) -> Any:
+        meta_right = self._format_meta_right()
+        action_label = self._format_action_label(meta_right, max_width)
+
+        rows: list[Any] = [self._build_header_row(action_label, meta_right)]
+
+        # Thought bodies are intentionally omitted from the live panel — they
+        # are flushed to the transcript (dim) so they are not mistaken for the
+        # assistant reply and do not compete with the draft-reply preview for
+        # vertical space. ``_thought_lines`` are still maintained for
+        # :meth:`snapshot_thoughts` / :meth:`CLIEventRenderer._flush_thinking_block`.
+        if self.live_panel_shows_thought_rows():
+            self._append_thought_rows(rows, max_width, max_lines)
+
+        return format_callout_panel(
+            'Thinking',
+            Group(*rows),
+            accent_style=LIVE_PANEL_ACCENT_STYLE,
+            padding=(0, 0),
+        )
+
+    def _format_meta_right(self) -> str:
         elapsed_bits: list[str] = []
         secs = self.elapsed_seconds
         if secs is not None:
             m, s = divmod(secs, 60)
             elapsed_bits.append(f'{m}m {s}s' if m > 0 else f'{s}s')
-
         turn_cost = max(0.0, self._current_cost - self._cost_at_start)
         if turn_cost > 0.0:
             elapsed_bits.append(f'+${turn_cost:.4f}')
+        return ' · '.join(elapsed_bits) if elapsed_bits else ''
 
-        meta_right = ' · '.join(elapsed_bits) if elapsed_bits else ''
-
+    def _format_action_label(
+        self, meta_right: str, max_width: int | None,
+    ) -> str:
         action_label = self._current_action or 'Thinking'
         # Reserve room for the right-side meta + separators when trimming.
         reserved = len(meta_right) + 6 if meta_right else 4
@@ -240,9 +262,10 @@ class ReasoningDisplay:
             action_label = _truncate_action_line(
                 action_label, max(12, max_width - reserved)
             )
+        return action_label
 
-        rows: list[Any] = []
-
+    @staticmethod
+    def _build_header_row(action_label: str, meta_right: str) -> Any:
         header = Table.grid(expand=True, padding=(0, 0))
         header.add_column(width=2, no_wrap=True)
         header.add_column(ratio=1)
@@ -252,39 +275,32 @@ class ReasoningDisplay:
             Text(action_label, style=CLR_ACTION),
             Text(meta_right, style=CLR_META) if meta_right else Text(''),
         )
-        rows.append(header)
+        return header
 
-        # Thought bodies are intentionally omitted from the live panel — they
-        # are flushed to the transcript (dim) so they are not mistaken for the
-        # assistant reply and do not compete with the draft-reply preview for
-        # vertical space. ``_thought_lines`` are still maintained for
-        # :meth:`snapshot_thoughts` / :meth:`CLIEventRenderer._flush_thinking_block`.
-        if self.live_panel_shows_thought_rows():
-            wrapped_rows: list[str] = []
-            for line in self._thought_lines:
-                wrapped_rows.extend(_thought_lines_for_display(line, max_width))
+    def _append_thought_rows(
+        self,
+        rows: list[Any],
+        max_width: int | None,
+        max_lines: int | None,
+    ) -> None:
+        wrapped_rows: list[str] = []
+        for line in self._thought_lines:
+            wrapped_rows.extend(_thought_lines_for_display(line, max_width))
 
-            clipped = False
-            if (
-                max_lines is not None
-                and max_lines >= 0
-                and len(wrapped_rows) > max_lines
-            ):
-                wrapped_rows = wrapped_rows[-max_lines:]
-                clipped = True
+        clipped = False
+        if (
+            max_lines is not None
+            and max_lines >= 0
+            and len(wrapped_rows) > max_lines
+        ):
+            wrapped_rows = wrapped_rows[-max_lines:]
+            clipped = True
 
-            if wrapped_rows and self._streaming:
-                wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
+        if wrapped_rows and self._streaming:
+            wrapped_rows = wrapped_rows[:-1] + [wrapped_rows[-1] + _STREAM_CURSOR]
 
-            for row in wrapped_rows:
-                rows.append(Text(row, style=CLR_THOUGHT_BODY))
+        for row in wrapped_rows:
+            rows.append(Text(row, style=CLR_THOUGHT_BODY))
 
-            if clipped:
-                rows.append(Text('… showing latest thoughts', style=f'{CLR_META} italic'))
-
-        return format_callout_panel(
-            'Thinking',
-            Group(*rows),
-            accent_style=LIVE_PANEL_ACCENT_STYLE,
-            padding=(0, 0),
-        )
+        if clipped:
+            rows.append(Text('… showing latest thoughts', style=f'{CLR_META} italic'))

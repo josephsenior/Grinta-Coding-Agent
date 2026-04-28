@@ -159,6 +159,68 @@ _LITERAL_ESCAPE_RE = re.compile(r'(?<!\\)\\([ntr"\'])')
 _STRICT_DOUBLE_ESCAPE_RE = re.compile(r'\\\\([ntr"\'])')
 
 
+def _strict_markup_has_residue(content: str, residue_count: int) -> bool:
+    if residue_count > 0:
+        return True
+    return bool(_STRICT_DOUBLE_ESCAPE_RE.search(content))
+
+
+def _heuristic_code_has_residue(content: str, residue_count: int) -> bool:
+    if residue_count < 2:
+        return False
+
+    real_newlines = content.count('\n')
+    if real_newlines == 0:
+        return True
+
+    literal_newlines = content.count('\\n')
+    if literal_newlines >= real_newlines:
+        return True
+    return literal_newlines == 0 and residue_count >= 4 and real_newlines < 2
+
+
+def _repair_argument_field(
+    arguments: dict[str, object],
+    field_name: str,
+    path: str | os.PathLike[str] | None,
+    changes: list[tuple[str, int]],
+    *,
+    record_name: str | None = None,
+) -> None:
+    value = arguments.get(field_name)
+    if not isinstance(value, str) or not value:
+        return
+
+    report = repair_literal_escapes(value, path)
+    if not report.changed:
+        return
+
+    arguments[field_name] = report.content
+    changes.append(((record_name or field_name), report.replacements))
+
+
+def _repair_batch_argument_entries(
+    arguments: dict[str, object],
+    batch_key: str,
+    path: str | os.PathLike[str] | None,
+    changes: list[tuple[str, int]],
+) -> None:
+    batch = arguments.get(batch_key)
+    if not isinstance(batch, list):
+        return
+
+    for index, item in enumerate(batch):
+        if not isinstance(item, dict):
+            continue
+        _repair_argument_field(
+            item,
+            'new_body',
+            path,
+            changes,
+            record_name=f'{batch_key}[{index}].new_body',
+        )
+
+
 def has_literal_escape_residue(
     content: str, path: str | os.PathLike[str] | None
 ) -> bool:
@@ -185,34 +247,11 @@ def has_literal_escape_residue(
     residue_count = len(_LITERAL_ESCAPE_RE.findall(content))
 
     if _is_strict_markup_path(path):
-        # Markup files — any literal escape (single- or double-backslash
-        # variant) is invalid by grammar. We detect both so the repair
-        # pass can neutralize models that over-escape twice.
-        if residue_count > 0:
-            return True
-        return bool(_STRICT_DOUBLE_ESCAPE_RE.search(content))
+        return _strict_markup_has_residue(content, residue_count)
 
     if residue_count == 0:
         return False
-
-    # Heuristic mode for code/data files.
-    if residue_count < 2:
-        return False
-
-    real_newlines = content.count('\n')
-    if real_newlines == 0:
-        # No real newlines but lots of ``\n`` literals → single-line blob
-        # that was double-escaped.
-        return True
-
-    # If more than half the "separators" in the file are literal ``\n`` pairs
-    # instead of actual newlines, treat the whole thing as over-escaped.
-    literal_newlines = content.count('\\n')
-    if literal_newlines >= real_newlines:
-        return True
-    # Fallback: lots of literal ``\"`` / ``\'`` residue (common in JSX / JSON
-    # blobs) with no real newlines at all still counts.
-    return literal_newlines == 0 and residue_count >= 4 and real_newlines < 2
+    return _heuristic_code_has_residue(content, residue_count)
 
 
 def repair_literal_escapes(
@@ -290,25 +329,7 @@ def repair_arguments_in_place(
         return []
     changes: list[tuple[str, int]] = []
     for name in CONTENT_ARG_NAMES:
-        value = arguments.get(name)
-        if not isinstance(value, str) or not value:
-            continue
-        report = repair_literal_escapes(value, path)
-        if report.changed:
-            arguments[name] = report.content
-            changes.append((name, report.replacements))
+        _repair_argument_field(arguments, name, path, changes)
     for batch_key in ('edits', 'symbol_edits'):
-        batch = arguments.get(batch_key)
-        if not isinstance(batch, list):
-            continue
-        for i, item in enumerate(batch):
-            if not isinstance(item, dict):
-                continue
-            nb = item.get('new_body')
-            if not isinstance(nb, str) or not nb:
-                continue
-            report = repair_literal_escapes(nb, path)
-            if report.changed:
-                item['new_body'] = report.content
-                changes.append((f'{batch_key}[{i}].new_body', report.replacements))
+        _repair_batch_argument_entries(arguments, batch_key, path, changes)
     return changes

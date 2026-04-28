@@ -109,6 +109,54 @@ def _load_existing(path: Path) -> dict[str, Any]:
         return {}
 
 
+def _confirm_overwrite_existing(
+    console: Console, existing: dict[str, Any],
+) -> bool:
+    cur_model = existing.get('llm_model', '(unset)')
+    cur_provider = existing.get('llm_provider', '(unset)')
+    console.print(
+        f'[dim]Existing config:[/dim] provider=[bold]{cur_provider}[/bold]  model=[bold]{cur_model}[/bold]'
+    )
+    if not Confirm.ask('Overwrite existing settings?', default=False):
+        console.print('[dim]No changes made.[/dim]')
+        return False
+    return True
+
+
+def _print_provider_table(console: Console, detected: list[str]) -> None:
+    table = Table(
+        title='Pick a provider',
+        title_style=CLR_CARD_TITLE,
+        border_style=CLR_CARD_BORDER,
+    )
+    table.add_column('Key', style=CLR_BRAND)
+    table.add_column('Description')
+    table.add_column('Detected', style=CLR_STATUS_OK)
+    for key, preset in _PROVIDER_PRESETS.items():
+        detected_marker = '✓' if key in detected else ''
+        table.add_row(key, preset['help'], detected_marker)
+    console.print(table)
+
+
+def _collect_api_key(console: Console, preset: dict[str, Any]) -> str:
+    env_var = preset['env']
+    if not env_var:
+        # Local providers: usually no key required.
+        return Prompt.ask('API key (optional)', password=True, default='')
+    env_value = os.environ.get(env_var, '')
+    if env_value:
+        console.print(
+            f'[dim]Found [bold]{env_var}[/bold] in environment — will reference it via [bold]${{{env_var}}}[/bold].[/dim]'
+        )
+        return f'${{{env_var}}}'
+    api_key = Prompt.ask(
+        f'API key (paste; or leave blank to set {env_var} later)',
+        password=True,
+        default='',
+    )
+    return api_key or f'${{{env_var}}}'
+
+
 def run_init(project_root: Path | None = None, console: Console | None = None) -> int:
     """Run the wizard. Returns shell-style exit code."""
     console = console or Console()
@@ -125,36 +173,16 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         )
     )
 
-    if existing:
-        cur_model = existing.get('llm_model', '(unset)')
-        cur_provider = existing.get('llm_provider', '(unset)')
-        console.print(
-            f'[dim]Existing config:[/dim] provider=[bold]{cur_provider}[/bold]  model=[bold]{cur_model}[/bold]'
-        )
-        if not Confirm.ask('Overwrite existing settings?', default=False):
-            console.print('[dim]No changes made.[/dim]')
-            return 0
+    if existing and not _confirm_overwrite_existing(console, existing):
+        return 0
 
-    # Detect local servers and surface them first.
     detected = _detect_local()
     if detected:
         console.print(
             f'[{CLR_STATUS_OK}]Detected local provider(s):[/] {", ".join(detected)}'
         )
 
-    # Render provider menu.
-    table = Table(
-        title='Pick a provider',
-        title_style=CLR_CARD_TITLE,
-        border_style=CLR_CARD_BORDER,
-    )
-    table.add_column('Key', style=CLR_BRAND)
-    table.add_column('Description')
-    table.add_column('Detected', style=CLR_STATUS_OK)
-    for key, preset in _PROVIDER_PRESETS.items():
-        detected_marker = '✓' if key in detected else ''
-        table.add_row(key, preset['help'], detected_marker)
-    console.print(table)
+    _print_provider_table(console, detected)
 
     provider = Prompt.ask(
         'Provider',
@@ -162,36 +190,12 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         default=detected[0] if detected else 'openai',
     )
     preset = _PROVIDER_PRESETS[provider]
-
     model = Prompt.ask(
-        'Model id (provider/model)',
-        default=preset['default_model'],
+        'Model id (provider/model)', default=preset['default_model'],
     )
-
-    api_key = ''
-    env_var = preset['env']
-    if env_var:
-        env_value = os.environ.get(env_var, '')
-        if env_value:
-            console.print(
-                f'[dim]Found [bold]{env_var}[/bold] in environment — will reference it via [bold]${{{env_var}}}[/bold].[/dim]'
-            )
-            api_key = f'${{{env_var}}}'
-        else:
-            api_key = Prompt.ask(
-                f'API key (paste; or leave blank to set {env_var} later)',
-                password=True,
-                default='',
-            )
-            if not api_key:
-                api_key = f'${{{env_var}}}'
-    else:
-        # Local providers: usually no key required.
-        api_key = Prompt.ask('API key (optional)', password=True, default='')
-
+    api_key = _collect_api_key(console, preset)
     base_url = Prompt.ask(
-        'Base URL (leave blank for default)',
-        default=preset['base_url'],
+        'Base URL (leave blank for default)', default=preset['base_url'],
     )
 
     settings = {
@@ -200,7 +204,6 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
         'llm_api_key': api_key,
         'llm_base_url': base_url,
     }
-
     settings_file.write_text(json.dumps(settings, indent=2) + '\n', encoding='utf-8')
     console.print(
         Panel.fit(

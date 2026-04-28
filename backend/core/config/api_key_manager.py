@@ -67,6 +67,164 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         finally:
             object.__setattr__(self, 'suppress_env_export', previous)
 
+    def _resolve_provided_api_key(
+        self, provider: str, provided_key: SecretStr | None
+    ) -> tuple[SecretStr | None, SecretStr | None]:
+        if not provided_key:
+            return None, None
+
+        key_value = provided_key.get_secret_value()
+        if self._is_correct_provider_key(provided_key, provider):
+            logger.debug('Using provided API key for %s', provider)
+            return provided_key, None
+
+        if key_value and len(key_value) > 10:
+            logger.warning(
+                'Provided API key does not match provider %s; will try env/stored keys first',
+                provider,
+            )
+            return None, provided_key
+
+        logger.warning(
+            'Provided API key appears to be for wrong provider. Expected %s',
+            provider,
+        )
+        return None, None
+
+    def _lookup_provider_api_key(self, provider: str) -> SecretStr | None:
+        env_key = self._get_provider_key_from_env(provider)
+        if env_key:
+            logger.debug('Loaded %s API key from environment', provider)
+            return SecretStr(env_key)
+
+        stored_key = self.provider_api_keys.get(provider)
+        if stored_key:
+            logger.debug('Using stored %s API key', provider)
+            return stored_key
+
+        return None
+
+    def _log_and_return_fallback_key(
+        self, provider: str, fallback_key: SecretStr
+    ) -> SecretStr:
+        key_value = fallback_key.get_secret_value()
+        logger.info(
+            'Using provided API key as last-resort fallback for %s (key length: %s)',
+            provider,
+            len(key_value) if key_value else 0,
+        )
+        return fallback_key
+
+    def _get_generic_llm_api_key(self) -> SecretStr | None:
+        env_llm = (os.environ.get('LLM_API_KEY') or '').strip()
+        if env_llm:
+            return SecretStr(env_llm)
+        return None
+
+    def _log_missing_provider_api_key(self, provider: str) -> None:
+        provider_config = provider_config_manager.get_provider_config(provider)
+        env_var = (
+            provider_config.env_var
+            if provider_config
+            else f'{provider.upper()}_API_KEY'
+        )
+
+        logger.error('No API key found for provider: %s', provider)
+        logger.info(
+            'To fix this, set the %s environment variable with your %s API key',
+            env_var,
+            provider,
+        )
+
+    def _resolve_environment_export_provider(self, model: str) -> str | None:
+        if not model or not str(model).strip():
+            logger.debug('Skipping environment variable export (no model set)')
+            return None
+
+        provider = self._extract_provider(model)
+        if provider == 'unknown':
+            logger.warning(
+                'Skipping environment export for ambiguous model %s; provider must be explicit',
+                model,
+            )
+            return None
+
+        logger.debug(
+            'Setting environment variables for model: %s, provider: %s', model, provider
+        )
+        return provider
+
+    def _validate_api_key_for_provider(
+        self, provider: str, api_key: SecretStr
+    ) -> SecretStr:
+        if api_key_value := api_key.get_secret_value():
+            provider_config_manager.validate_api_key_format(provider, api_key_value)
+            logger.debug('API key format validation completed for %s', provider)
+        return api_key
+
+    def _resolve_environment_export_key(
+        self,
+        model: str,
+        provider: str,
+        api_key: SecretStr | None,
+        provider_config: Any,
+    ) -> SecretStr | None:
+        if api_key:
+            logger.debug('Using provided API key for %s', provider)
+            return self._validate_api_key_for_provider(provider, api_key)
+
+        key_to_use = self.get_api_key_for_model(model)
+        if key_to_use:
+            logger.debug('Retrieved API key from manager for %s', provider)
+            return key_to_use
+
+        if 'api_key' not in provider_config.required_params:
+            logger.debug('API key not required for provider %s', provider)
+            return None
+
+        env_var = provider_config.env_var
+        logger.error('CRITICAL: No API key available for %s model %s', provider, model)
+        logger.info(
+            'Please set the %s environment variable with your %s API key',
+            env_var,
+            provider,
+        )
+        env_key = self._get_provider_key_from_env(provider)
+        if env_key:
+            logger.info('Found API key in environment for %s', provider)
+            return SecretStr(env_key)
+
+        logger.error('FAILED: No API key found anywhere for %s', provider)
+        logger.info(
+            'Set %s environment variable to use %s models',
+            env_var,
+            provider,
+        )
+        return None
+
+    def _set_provider_environment_variables(
+        self, provider: str, api_key_value: str
+    ) -> None:
+        env_var = provider_config_manager.get_environment_variable(provider)
+        if env_var:
+            os.environ[env_var] = api_key_value
+            logger.debug('Set %s environment variable for %s', env_var, provider)
+
+            if provider == 'google':
+                os.environ['GOOGLE_API_KEY'] = api_key_value
+                logger.debug(
+                    'Set GOOGLE_API_KEY environment variable for Google provider'
+                )
+            return
+
+        logger.debug('No environment variable specified for provider: %s', provider)
+
+    def _set_generic_llm_environment_fallback(self, api_key_value: str) -> None:
+        if 'LLM_API_KEY' in os.environ:
+            return
+        os.environ['LLM_API_KEY'] = api_key_value
+        logger.debug('Set LLM_API_KEY fallback environment variable')
+
     def get_api_key_for_model(
         self, model: str | None, provided_key: SecretStr | None = None
     ) -> SecretStr | None:
@@ -111,12 +269,6 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         if not model or not str(model).strip():
             return None
 
-        # If a key is provided and it matches the provider, trust it.
-        # If it does NOT match, prefer environment/stored provider keys first.
-        # This avoids misrouting when a user switches models/providers but their
-        # settings still contain an old provider key (e.g., OpenRouter -> Gemini).
-        fallback_key: SecretStr | None = None
-
         provider = self._extract_provider(model)
         if provider == 'unknown':
             logger.error(
@@ -125,66 +277,22 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             )
             return None
 
-        if provided_key:
-            key_value = provided_key.get_secret_value()
-            if self._is_correct_provider_key(provided_key, provider):
-                logger.debug('Using provided API key for %s', provider)
-                return provided_key
-            if key_value and len(key_value) > 10:
-                fallback_key = provided_key
-                logger.warning(
-                    'Provided API key does not match provider %s; will try env/stored keys first',
-                    provider,
-                )
-            else:
-                logger.warning(
-                    'Provided API key appears to be for wrong provider. Expected %s',
-                    provider,
-                )
+        matched_key, fallback_key = self._resolve_provided_api_key(provider, provided_key)
+        if matched_key:
+            return matched_key
 
-        # Try to get key from environment variables
-        env_key = self._get_provider_key_from_env(provider)
-        if env_key:
-            logger.debug('Loaded %s API key from environment', provider)
-            return SecretStr(env_key)
+        provider_key = self._lookup_provider_api_key(provider)
+        if provider_key:
+            return provider_key
 
-        # Try provider-specific mappings
-        if provider in self.provider_api_keys:
-            logger.debug('Using stored %s API key', provider)
-            return self.provider_api_keys[provider]
-
-        # If we still haven't found a provider-specific key, fall back to any
-        # substantial key that was provided, even if it didn't match expected
-        # format. This is a last resort and may still fail at the provider.
         if fallback_key:
-            key_value = fallback_key.get_secret_value()
-            logger.info(
-                'Using provided API key as last-resort fallback for %s (key length: %s)',
-                provider,
-                len(key_value) if key_value else 0,
-            )
-            return fallback_key
+            return self._log_and_return_fallback_key(provider, fallback_key)
 
-        # Last-resort before startup config load: unified LLM key from the environment
-        # only (secrets belong in .env as LLM_API_KEY, not in settings.json).
-        env_llm = (os.environ.get('LLM_API_KEY') or '').strip()
-        if env_llm:
-            return SecretStr(env_llm)
+        generic_key = self._get_generic_llm_api_key()
+        if generic_key:
+            return generic_key
 
-        # Provide helpful guidance for missing API keys
-        provider_config = provider_config_manager.get_provider_config(provider)
-        env_var = (
-            provider_config.env_var
-            if provider_config
-            else f'{provider.upper()}_API_KEY'
-        )
-
-        logger.error('No API key found for provider: %s', provider)
-        logger.info(
-            'To fix this, set the %s environment variable with your %s API key',
-            env_var,
-            provider,
-        )
+        self._log_missing_provider_api_key(provider)
         return None
 
     def set_api_key(self, model: str | None, api_key: SecretStr) -> None:
@@ -217,90 +325,27 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             )
             return
 
-        if not model or not str(model).strip():
-            logger.debug('Skipping environment variable export (no model set)')
+        provider = self._resolve_environment_export_provider(model)
+        if provider is None:
             return
-
-        provider = self._extract_provider(model)
-        if provider == 'unknown':
-            logger.warning(
-                'Skipping environment export for ambiguous model %s; provider must be explicit',
-                model,
-            )
-            return
-        logger.debug(
-            'Setting environment variables for model: %s, provider: %s', model, provider
-        )
 
         # Get provider configuration
         provider_config = provider_config_manager.get_provider_config(provider)
 
-        # Get the correct API key to use - prioritize the provided key
-        key_to_use: SecretStr | None = None
-        if api_key:
-            key_to_use = api_key
-            logger.debug('Using provided API key for %s', provider)
-
-            # Validate API key format using provider configuration (warn only, don't fail)
-            if api_key_value := api_key.get_secret_value():
-                provider_config_manager.validate_api_key_format(provider, api_key_value)
-                logger.debug('API key format validation completed for %s', provider)
-        else:
-            key_to_use = self.get_api_key_for_model(model)
-            if key_to_use:
-                logger.debug('Retrieved API key from manager for %s', provider)
-
+        key_to_use = self._resolve_environment_export_key(
+            model,
+            provider,
+            api_key,
+            provider_config,
+        )
         if not key_to_use:
-            # Check if API key is actually required for this provider
-            if 'api_key' in provider_config.required_params:
-                env_var = provider_config.env_var
-                logger.error(
-                    'CRITICAL: No API key available for %s model %s', provider, model
-                )
-                logger.info(
-                    'Please set the %s environment variable with your %s API key',
-                    env_var,
-                    provider,
-                )
-                # Try to get from environment as last resort
-                env_key = self._get_provider_key_from_env(provider)
-                if env_key:
-                    logger.info('Found API key in environment for %s', provider)
-                    key_to_use = SecretStr(env_key)
-                else:
-                    logger.error('FAILED: No API key found anywhere for %s', provider)
-                    logger.info(
-                        'Set %s environment variable to use %s models',
-                        env_var,
-                        provider,
-                    )
-                    return
-            else:
-                logger.debug('API key not required for provider %s', provider)
-                return
+            return
 
         api_key_value = key_to_use.get_secret_value()
         logger.debug('Using API key for %s (length: %d)', provider, len(api_key_value))
 
-        # Use provider configuration for environment variable mapping
-        env_var = provider_config_manager.get_environment_variable(provider)
-        if env_var:
-            os.environ[env_var] = api_key_value
-            logger.debug('Set %s environment variable for %s', env_var, provider)
-
-            # CRITICAL: For Google/Gemini, also set GOOGLE_API_KEY as some SDKs expect this too
-            if provider == 'google':
-                os.environ['GOOGLE_API_KEY'] = api_key_value
-                logger.debug(
-                    'Set GOOGLE_API_KEY environment variable for Google provider'
-                )
-        else:
-            logger.debug('No environment variable specified for provider: %s', provider)
-
-        # ALSO set generic fallback ONLY if not already set
-        if 'LLM_API_KEY' not in os.environ:
-            os.environ['LLM_API_KEY'] = api_key_value
-            logger.debug('Set LLM_API_KEY fallback environment variable')
+        self._set_provider_environment_variables(provider, api_key_value)
+        self._set_generic_llm_environment_fallback(api_key_value)
 
     def _check_prefix_match(self, model: str, model_lower: str) -> str | None:
         """Check for provider prefix matches.

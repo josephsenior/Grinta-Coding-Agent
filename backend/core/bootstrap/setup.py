@@ -123,6 +123,77 @@ def filter_plugins_by_config(
     return _apply_agent_disabled_plugins(filtered, agent_config)
 
 
+def _acquire_event_stream(
+    config: AppConfig,
+    sid: str | None,
+    event_stream: EventStream | None,
+    inline_event_delivery: bool,
+) -> tuple[EventStream, bool, str]:
+    if event_stream is not None:
+        return event_stream, False, sid or event_stream.sid
+
+    session_id = sid or generate_sid(config)
+    file_store = get_file_store(config.file_store, get_local_data_root(config))
+    created_event_stream = EventStream(
+        session_id,
+        file_store,
+        worker_count=0 if inline_event_delivery else None,
+    )
+    return created_event_stream, True, session_id
+
+
+def _resolve_runtime_project_root(
+    config: AppConfig, project_root: str | None
+) -> str | None:
+    if project_root is not None:
+        return project_root
+
+    from pathlib import Path
+
+    workspace_root = (getattr(config, 'project_root', None) or '').strip()
+    if not workspace_root:
+        return None
+    return str(Path(workspace_root).expanduser().resolve())
+
+
+def _build_runtime_plugins(
+    agent_cls: type[Agent],
+    agent: Agent | None,
+    config: AppConfig,
+) -> list[PluginRequirement]:
+    return filter_plugins_by_config(
+        plugins=list(agent_cls.runtime_plugins),
+        agent=agent,
+        config=config,
+        agent_cls_name=agent_cls.__name__,
+    )
+
+
+def _close_owned_event_stream_on_init_error(event_stream: EventStream) -> None:
+    try:
+        event_stream.close()
+    except Exception:
+        logger.debug(
+            'Failed to close event stream after runtime init error',
+            exc_info=True,
+        )
+
+
+def _instantiate_runtime_with_cleanup(
+    runtime_cls: type[object],
+    *,
+    owns_event_stream: bool,
+    event_stream: EventStream,
+    kwargs: dict[str, Any],
+) -> Runtime:
+    try:
+        return _instantiate_runtime(runtime_cls, **kwargs)
+    except Exception:
+        if owns_event_stream:
+            _close_owned_event_stream_on_init_error(event_stream)
+        raise
+
+
 def create_runtime(
     config: AppConfig,
     llm_registry: LLMRegistry | None = None,
@@ -158,65 +229,37 @@ def create_runtime(
         The created Runtime instance (not yet connected or initialized).
 
     """
-    if event_stream is None:
-        owns_event_stream = True
-        session_id = sid or generate_sid(config)
-        file_store = get_file_store(config.file_store, get_local_data_root(config))
-        # worker_count=0 enables inline delivery: no thread pool, no races.
-        event_stream = EventStream(
-            session_id,
-            file_store,
-            worker_count=0 if inline_event_delivery else None,
-        )
-    else:
-        owns_event_stream = False
-        session_id = sid or event_stream.sid
-    agent_cls = type(agent) if agent else Agent.get_cls(config.default_agent)
-
-    # Filter plugins based on config
-    plugins = filter_plugins_by_config(
-        plugins=list(agent_cls.runtime_plugins),
-        agent=agent,
-        config=config,
-        agent_cls_name=agent_cls.__name__,
+    event_stream, owns_event_stream, session_id = _acquire_event_stream(
+        config,
+        sid,
+        event_stream,
+        inline_event_delivery,
     )
-
-    from pathlib import Path
+    agent_cls = type(agent) if agent else Agent.get_cls(config.default_agent)
 
     from backend.execution.runtime_factory import get_runtime_cls
 
-    resolved_ws = project_root
-    if resolved_ws is None:
-        wb = (getattr(config, 'project_root', None) or '').strip()
-        if wb:
-            resolved_ws = str(Path(wb).expanduser().resolve())
-
+    plugins = _build_runtime_plugins(agent_cls, agent, config)
+    resolved_ws = _resolve_runtime_project_root(config, project_root)
     runtime_cls = get_runtime_cls(config.runtime)
     logger.debug('Initializing runtime: %s', runtime_cls.__name__)
-    try:
-        runtime = _instantiate_runtime(
-            runtime_cls,
-            config=config,
-            event_stream=event_stream,
-            sid=session_id,
-            plugins=plugins,
-            headless_mode=headless_mode,
-            llm_registry=llm_registry or LLMRegistry(config),
-            vcs_provider_tokens=vcs_provider_tokens,
-            env_vars=env_vars,
-            user_id=user_id,
-            project_root=resolved_ws,
-        )
-    except Exception:
-        if owns_event_stream and event_stream is not None:
-            try:
-                event_stream.close()
-            except Exception:
-                logger.debug(
-                    'Failed to close event stream after runtime init error',
-                    exc_info=True,
-                )
-        raise
+    runtime = _instantiate_runtime_with_cleanup(
+        runtime_cls,
+        owns_event_stream=owns_event_stream,
+        event_stream=event_stream,
+        kwargs={
+            'config': config,
+            'event_stream': event_stream,
+            'sid': session_id,
+            'plugins': plugins,
+            'headless_mode': headless_mode,
+            'llm_registry': llm_registry or LLMRegistry(config),
+            'vcs_provider_tokens': vcs_provider_tokens,
+            'env_vars': env_vars,
+            'user_id': user_id,
+            'project_root': resolved_ws,
+        },
+    )
     logger.debug(
         'Runtime created with plugins: %s', [plugin.name for plugin in runtime.plugins]
     )
