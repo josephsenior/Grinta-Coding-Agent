@@ -58,7 +58,16 @@ jobs:
 
       - name: Run coverage for Codecov
         if: always()
-        run: uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc --cov-report=xml:coverage.xml
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc --cov-report=xml:coverage.xml \
+          backend/tests/unit/core/test_launch_entry.py \
+          backend/tests/unit/core/test_runtime_config.py \
+          backend/tests/unit/core/test_agent_config.py \
+          backend/tests/unit/execution/test_command_timeout.py \
+          backend/tests/unit/engine/orchestrator/test_streaming_checkpoint.py \
+          backend/tests/unit/engine/orchestrator/test_executor_streaming.py \
+          backend/tests/unit/engine/orchestrator/test_planner.py \
+          backend/tests/unit/utils/test_prompt_utils.py \
+          backend/tests/unit/engine/orchestrator/test_tool_registry.py
 
       - name: Upload coverage to Codecov
         if: always()
@@ -103,7 +112,9 @@ jobs:
       - name: Run coverage for Codecov
         if: always()
         shell: pwsh
-        run: uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc --cov-report=xml:coverage.xml
+        run: uv run pytest --maxfail=1 -q --cov=backend --cov-config=.coveragerc --cov-report=xml:coverage.xml backend/tests/unit/core/test_launch_entry.py backend/tests/unit/core/test_runtime_config.py backend/tests/unit/core/test_agent_config.py backend/tests/unit/execution/test_command_timeout.py backend/tests/unit/engine/orchestrator/test_streaming_checkpoint.py backend/tests/unit/engine/orchestrator/test_executor_streaming.py backend/tests/unit/engine/orchestrator/test_planner.py backend/tests/unit/utils/test_prompt_utils.py backend/tests/unit/engine/orchestrator/test_tool_registry.py
+        env:
+          PYTHONPATH: ".;$env:PYTHONPATH"
 
       - name: Upload coverage to Codecov
         if: always()
