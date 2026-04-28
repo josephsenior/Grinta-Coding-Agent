@@ -622,9 +622,23 @@ class LLM(RetryMixin, DebugMixin):
         return max_a, min_w, max_w
 
     def _should_retry_astream(
-        self, is_retryable: bool, is_last: bool, yielded_any: bool
+        self,
+        is_retryable: bool,
+        is_last: bool,
+        yielded_any: bool,
+        exc: Exception | None = None,
     ) -> bool:
-        """Return True if we should sleep and retry (not re-raise)."""
+        """Return True if we should sleep and retry (not re-raise).
+
+        Rate-limit and service-unavailability errors are intentionally NOT
+        retried here.  They must propagate to the outer recovery service
+        (recovery_service.py) which handles them correctly by transitioning to
+        AgentState.RATE_LIMITED and scheduling exponential backoff.  Retrying
+        them inside astream() consumes the first-chunk timeout window and
+        prevents that outer machinery from ever seeing the rate-limit.
+        """
+        if exc is not None and isinstance(exc, (RateLimitError, ServiceUnavailableError)):
+            return False
         return is_retryable and not is_last and not yielded_any
 
     async def astream(self, *args, **kwargs) -> AsyncIterator[dict[str, Any]]:
@@ -662,7 +676,7 @@ class LLM(RetryMixin, DebugMixin):
             except Exception as e:
                 is_retryable = isinstance(e, LLM_RETRY_EXCEPTIONS)
                 is_last = attempt >= max_attempts
-                if not self._should_retry_astream(is_retryable, is_last, yielded_any):
+                if not self._should_retry_astream(is_retryable, is_last, yielded_any, exc=e):
                     logger.error('LLM astream error: %s', e)
                     mapped = _map_provider_exception(
                         e, (self.config.model or '').strip()
