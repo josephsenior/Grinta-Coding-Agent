@@ -256,6 +256,100 @@ class RuntimeExecutorIOAndTerminalMixin:
     async def debugger(self, action: DebuggerAction) -> Observation:
         return self.debug_manager.handle(action)
 
+    def _maybe_promote_blocking_action(self, action: CmdRunAction) -> None:
+        try:
+            from backend.execution.utils.blocking_heuristics import (
+                is_known_slow_command,
+            )
+
+            command = getattr(action, 'command', '') or ''
+            if not getattr(action, 'blocking', False) and is_known_slow_command(command):
+                action.blocking = True  # type: ignore[attr-defined]
+                logger.info(
+                    'Auto-promoted blocking=True for slow command: %s',
+                    command.splitlines()[0][:120],
+                )
+        except Exception:
+            logger.debug('blocking-heuristic check failed', exc_info=True)
+
+    @staticmethod
+    def _set_pending_background_id(bash_session: BaseShellSession, bg_id: str) -> None:
+        if hasattr(bash_session, '_pending_bg_id'):
+            bash_session._pending_bg_id = bg_id  # type: ignore[union-attr]
+
+    @staticmethod
+    def _clear_pending_background_id(bash_session: BaseShellSession) -> None:
+        if hasattr(bash_session, '_pending_bg_id'):
+            bash_session._pending_bg_id = None  # type: ignore[union-attr]
+
+    def _register_detached_pane_background(
+        self,
+        bash_session: BaseShellSession,
+        registered_bg_id: str | None,
+    ) -> Any:
+        detached_pane = getattr(bash_session, '_detached_pane', None)
+        detached_window = getattr(bash_session, '_detached_window', None)
+        if (
+            detached_pane is None
+            or detached_window is None
+            or registered_bg_id is None
+        ):
+            return detached_pane
+
+        from backend.execution.utils.bash import BackgroundPaneSession
+
+        bg_pane_session = BackgroundPaneSession(
+            pane=detached_pane,
+            window=detached_window,
+            cwd=str(getattr(bash_session, '_cwd', None) or self._initial_cwd),
+        )
+        self.session_manager.sessions[registered_bg_id] = bg_pane_session
+        logger.info(
+            'Registered background pane session %s after idle-timeout detach',
+            registered_bg_id,
+        )
+        bash_session._detached_pane = None
+        bash_session._detached_window = None
+        bash_session._bg_session_id = None
+        return detached_pane
+
+    def _register_detached_subprocess_background(
+        self,
+        bash_session: BaseShellSession,
+        registered_bg_id: str | None,
+        detached_pane: Any,
+    ) -> None:
+        bg_process = getattr(bash_session, '_bg_process', None)
+        bg_sub_id = getattr(bash_session, '_bg_session_id', None) or registered_bg_id
+        bg_stdout_cap = getattr(bash_session, '_bg_stdout_capture', None)
+        if (
+            bg_process is None
+            or bg_sub_id is None
+            or bg_stdout_cap is None
+            or detached_pane is not None
+        ):
+            return
+
+        from backend.execution.utils.subprocess_background import (
+            SubprocessBackgroundSession,
+        )
+
+        bg_sub_session = SubprocessBackgroundSession(
+            process=bg_process,
+            stdout_capture=bg_stdout_cap,
+            stderr_capture=getattr(bash_session, '_bg_stderr_capture', None),
+            cwd=str(getattr(bash_session, '_cwd', None) or self._initial_cwd),
+        )
+        self.session_manager.sessions[bg_sub_id] = bg_sub_session
+        logger.info(
+            'Registered subprocess background session %s after idle-timeout detach',
+            bg_sub_id,
+        )
+        bash_session._bg_process = None
+        bash_session._bg_session_id = None
+        bash_session._bg_stdout_capture = None
+        bash_session._bg_stderr_capture = None
+
     async def _run_foreground_cmd(
         self, action: CmdRunAction
     ) -> CmdOutputObservation | ErrorObservation:
@@ -271,86 +365,28 @@ class RuntimeExecutorIOAndTerminalMixin:
         if not isinstance(bash_session, BaseShellSession):
             return ErrorObservation('Default shell session is not a foreground shell')
 
-        try:
-            from backend.execution.utils.blocking_heuristics import (
-                is_known_slow_command,
-            )
-
-            if not getattr(action, 'blocking', False) and is_known_slow_command(
-                getattr(action, 'command', '') or ''
-            ):
-                action.blocking = True  # type: ignore[attr-defined]
-                logger.info(
-                    'Auto-promoted blocking=True for slow command: %s',
-                    (action.command or '').splitlines()[0][:120],
-                )
-        except Exception:
-            logger.debug('blocking-heuristic check failed', exc_info=True)
+        self._maybe_promote_blocking_action(action)
 
         bg_id = f'bg-{uuid.uuid4().hex[:8]}'
-        if hasattr(bash_session, '_pending_bg_id'):
-            bash_session._pending_bg_id = bg_id  # type: ignore[union-attr]
+        self._set_pending_background_id(bash_session, bg_id)
+        try:
+            observation = cast(
+                CmdOutputObservation,
+                await call_sync_from_async(bash_session.execute, action),
+            )
+        finally:
+            self._clear_pending_background_id(bash_session)
 
-        observation = cast(
-            CmdOutputObservation,
-            await call_sync_from_async(bash_session.execute, action),
-        )
-
-        detached_pane = getattr(bash_session, '_detached_pane', None)
-        detached_window = getattr(bash_session, '_detached_window', None)
         registered_bg_id = getattr(bash_session, '_bg_session_id', None)
-        if (
-            detached_pane is not None
-            and detached_window is not None
-            and registered_bg_id is not None
-        ):
-            from backend.execution.utils.bash import BackgroundPaneSession
-
-            bg_pane_session = BackgroundPaneSession(
-                pane=detached_pane,
-                window=detached_window,
-                cwd=str(getattr(bash_session, '_cwd', None) or self._initial_cwd),
-            )
-            self.session_manager.sessions[registered_bg_id] = bg_pane_session
-            logger.info(
-                'Registered background pane session %s after idle-timeout detach',
-                registered_bg_id,
-            )
-            bash_session._detached_pane = None
-            bash_session._detached_window = None
-            bash_session._bg_session_id = None
-
-        bg_process = getattr(bash_session, '_bg_process', None)
-        bg_sub_id = getattr(bash_session, '_bg_session_id', None) or registered_bg_id
-        bg_stdout_cap = getattr(bash_session, '_bg_stdout_capture', None)
-        if (
-            bg_process is not None
-            and bg_sub_id is not None
-            and bg_stdout_cap is not None
-            and detached_pane is None
-        ):
-            from backend.execution.utils.subprocess_background import (
-                SubprocessBackgroundSession,
-            )
-
-            bg_sub_session = SubprocessBackgroundSession(
-                process=bg_process,
-                stdout_capture=bg_stdout_cap,
-                stderr_capture=getattr(bash_session, '_bg_stderr_capture', None),
-                cwd=str(getattr(bash_session, '_cwd', None) or self._initial_cwd),
-            )
-            self.session_manager.sessions[bg_sub_id] = bg_sub_session
-            logger.info(
-                'Registered subprocess background session %s after idle-timeout detach',
-                bg_sub_id,
-            )
-            bash_session._bg_process = None
-            bash_session._bg_session_id = None
-            bash_session._bg_stdout_capture = None
-            bash_session._bg_stderr_capture = None
-
-        if hasattr(bash_session, '_pending_bg_id'):
-            bash_session._pending_bg_id = None  # type: ignore[union-attr]
+        detached_pane = self._register_detached_pane_background(
+            bash_session,
+            registered_bg_id,
+        )
+        self._register_detached_subprocess_background(
+            bash_session,
+            registered_bg_id,
+            detached_pane,
+        )
 
         return observation
 

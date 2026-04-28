@@ -26,6 +26,59 @@ if TYPE_CHECKING:
     )
 
 
+def _cmd_run_pending_timeout(base: float, action: Action) -> float:
+    action_timeout = getattr(action, 'timeout', None)
+    try:
+        parsed_action_timeout = (
+            float(action_timeout) if action_timeout is not None else None
+        )
+    except (TypeError, ValueError):
+        parsed_action_timeout = None
+
+    candidates = [float(base), CMD_PENDING_ACTION_TIMEOUT_FLOOR]
+    if parsed_action_timeout is not None and parsed_action_timeout > 0:
+        candidates.append(parsed_action_timeout)
+    return max(candidates)
+
+
+def _terminal_pending_timeout(base: float, _action: Action) -> float:
+    return max(float(base), float(TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR))
+
+
+def _debugger_pending_timeout(base: float, action: Action) -> float:
+    action_timeout = getattr(action, 'timeout', None)
+    try:
+        parsed_timeout = float(action_timeout) if action_timeout is not None else None
+    except (TypeError, ValueError):
+        parsed_timeout = None
+
+    if parsed_timeout is not None and parsed_timeout > 0:
+        return max(float(base), parsed_timeout + 5.0)
+    return max(float(base), 60.0)
+
+
+def _identity_pending_timeout(base: float, _action: Action) -> float:
+    return float(base)
+
+
+def _infinite_pending_timeout(_base: float, _action: Action) -> float:
+    return math.inf
+
+
+_TIMEOUT_POLICY_BY_ACTION_NAME = {
+    'DelegateTaskAction': _infinite_pending_timeout,
+    'CmdRunAction': _cmd_run_pending_timeout,
+    'MCPAction': lambda base, _action: max(float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR),
+    'BrowserToolAction': lambda base, _action: max(
+        float(base), float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS)
+    ),
+    'TerminalRunAction': _terminal_pending_timeout,
+    'TerminalInputAction': _terminal_pending_timeout,
+    'TerminalReadAction': _terminal_pending_timeout,
+    'DebuggerAction': _debugger_pending_timeout,
+}
+
+
 class PendingActionService:
     """Maintains pending action state and emits timeout events.
 
@@ -53,50 +106,10 @@ class PendingActionService:
         """
         if base <= 0:
             return math.inf
-        if type(action).__name__ == 'DelegateTaskAction':
-            return math.inf
-        if type(action).__name__ == 'CmdRunAction':
-            # Shell commands have their own runtime timeout model; keep the
-            # pending watchdog from clearing active installs/builds too early.
-            action_timeout = getattr(action, 'timeout', None)
-            try:
-                parsed_action_timeout = (
-                    float(action_timeout) if action_timeout is not None else None
-                )
-            except (TypeError, ValueError):
-                parsed_action_timeout = None
 
-            candidates = [float(base), CMD_PENDING_ACTION_TIMEOUT_FLOOR]
-            if parsed_action_timeout is not None and parsed_action_timeout > 0:
-                candidates.append(parsed_action_timeout)
-            return max(candidates)
-        if type(action).__name__ == 'MCPAction':
-            return max(float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR)
-        if type(action).__name__ == 'BrowserToolAction':
-            # Align with LocalRuntime browser_tool sync bridge (cold start + one operation budget).
-            return max(float(base), float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS))
-        if type(action).__name__ in (
-            'TerminalRunAction',
-            'TerminalInputAction',
-            'TerminalReadAction',
-        ):
-            # PTY / interactive work can be slow; align with shell pending floor.
-            return max(float(base), float(TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR))
-        if type(action).__name__ == 'DebuggerAction':
-            # DAP adapter startup (debugpy cold init, subprocess spawn) can exceed
-            # the default 120s watchdog on slow machines.  Use action.timeout when
-            # given (the agent can tune per-step), otherwise apply a 60s floor so
-            # normal debug steps (step/continue/variables) still have room.
-            action_timeout = getattr(action, 'timeout', None)
-            try:
-                parsed = float(action_timeout) if action_timeout is not None else None
-            except (TypeError, ValueError):
-                parsed = None
-            floor = 60.0
-            if parsed is not None and parsed > 0:
-                return max(float(base), parsed + 5.0)  # +5s grace above the DAP timeout
-            return max(float(base), floor)
-        return float(base)
+        action_name = type(action).__name__
+        policy = _TIMEOUT_POLICY_BY_ACTION_NAME.get(action_name, _identity_pending_timeout)
+        return policy(base, action)
 
     @staticmethod
     def _int_action_id(action: Action) -> int | None:

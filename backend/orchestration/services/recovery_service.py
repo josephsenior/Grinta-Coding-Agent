@@ -104,23 +104,23 @@ class RecoveryService:
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
 
-    async def react_to_exception(self, exc: Exception) -> None:
-        controller = self._context.get_controller()
-
-        self._apply_timeout_planning_routing(controller, exc)
-
+    def _record_circuit_breaker_error(self, controller, exc: Exception) -> None:
         try:
             controller.circuit_breaker_service.record_error(exc)
         except Exception:
             logger.debug('circuit_breaker record_error failed', exc_info=True)
 
+    def _clear_pending_action_context(self, controller) -> None:
         pending_svc = _resolve_pending_action_service(controller)
-        if pending_svc is not None:
-            pending = pending_svc.get()
-            if pending is not None:
-                self._context.discard_invocation_context_for_action(pending)
-                pending_svc.set(None)
+        if pending_svc is None:
+            return
+        pending = pending_svc.get()
+        if pending is None:
+            return
+        self._context.discard_invocation_context_for_action(pending)
+        pending_svc.set(None)
 
+    def _emit_exception_observation(self, exc: Exception) -> None:
         msg, err_id, notify_ui_only = self._format_exception(exc)
         self._context.emit_event(
             ErrorObservation(
@@ -130,6 +130,150 @@ class RecoveryService:
             ),
             EventSource.ENVIRONMENT,
         )
+
+    async def _set_awaiting_user_input_if_allowed(self, controller) -> None:
+        if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
+            await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
+
+    async def _handle_hard_stop_exception(
+        self, controller, exc: Exception
+    ) -> bool:
+        if not isinstance(exc, _HARD_STOP_EXCEPTIONS):
+            return False
+        await self._set_awaiting_user_input_if_allowed(controller)
+        return True
+
+    async def _handle_limit_exceeded_exception(
+        self, controller, exc: Exception
+    ) -> bool:
+        if not _is_limit_exceeded_error(exc):
+            return False
+        logger.warning(
+            'Agent limit exceeded (%s): stopping agent loop and returning to user',
+            exc,
+        )
+        await self._set_awaiting_user_input_if_allowed(controller)
+        return True
+
+    def _emit_rate_limit_think_observation(self, controller) -> None:
+        from backend.ledger.observation import AgentThinkObservation
+
+        controller.event_stream.add_event(
+            AgentThinkObservation(
+                content='⚠️ API Rate Limit hit. Pausing execution for exponential backoff...'
+            ),
+            EventSource.ENVIRONMENT,
+        )
+
+    async def _schedule_queued_retry(self, controller, exc: Exception) -> bool:
+        try:
+            if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
+                self._emit_rate_limit_think_observation(controller)
+            return await controller.retry_service.schedule_retry_after_failure(exc)
+        except Exception:
+            logger.debug('schedule_retry_after_failure failed', exc_info=True)
+            return False
+
+    async def _handle_queued_retry_exception(
+        self, controller, exc: Exception
+    ) -> bool:
+        if not isinstance(exc, _QUEUED_RETRY_EXCEPTIONS):
+            return False
+
+        if not _recovery_may_set_state(controller, AgentState.RATE_LIMITED):
+            logger.info(
+                'Skipping queued-retry recovery transition (state=%s); '
+                'error was still recorded.',
+                controller.get_agent_state(),
+            )
+            return True
+
+        scheduled = await self._schedule_queued_retry(controller, exc)
+        if scheduled:
+            await self._context.set_agent_state(AgentState.RATE_LIMITED)
+            return True
+
+        logger.warning(
+            'Queued retry unavailable for %s; returning to AWAITING_USER_INPUT',
+            type(exc).__name__,
+        )
+        await self._set_awaiting_user_input_if_allowed(controller)
+        return True
+
+    async def _continue_after_survivable_error(
+        self, controller, exc: Exception
+    ) -> None:
+        logger.warning(
+            'Agent-survivable error (%s): staying RUNNING so model can adapt',
+            type(exc).__name__,
+        )
+        self._inject_task_reconciliation_directive(controller, exc)
+        pause = 2.0 if isinstance(exc, (InternalServerError, Timeout)) else 1.0
+        await asyncio.sleep(pause)
+        if controller.get_agent_state() == AgentState.RUNNING:
+            controller.step()
+
+    async def _route_exception_recovery(self, controller, exc: Exception) -> bool:
+        if await self._handle_hard_stop_exception(controller, exc):
+            return True
+        if await self._handle_limit_exceeded_exception(controller, exc):
+            return True
+        return await self._handle_queued_retry_exception(controller, exc)
+
+    @staticmethod
+    def _state_has_planning_directive(state) -> bool:
+        turn_signals = getattr(state, 'turn_signals', None)
+        return bool(
+            getattr(turn_signals, 'planning_directive', None) if turn_signals else None
+        )
+
+    @staticmethod
+    def _recent_history_slice(state) -> list:
+        history = getattr(state, 'history', []) or []
+        return history[-3:] if isinstance(history, list) else []
+
+    @staticmethod
+    def _event_is_mcp_validation_failure(event) -> bool:
+        observation_type = str(getattr(event, 'observation', '')).lower()
+        content = getattr(event, 'content', '')
+        if observation_type != 'mcp' or not isinstance(content, str):
+            return False
+
+        try:
+            payload = json.loads(content)
+        except Exception:
+            return False
+        if not isinstance(payload, dict):
+            return False
+
+        error_code = str(payload.get('error_code') or '')
+        error_text = str(payload.get('error') or '')
+        return error_code == 'MCP_TOOL_VALIDATION_ERROR' or '-32602' in error_text
+
+    @staticmethod
+    def _inject_timeout_planning_directive(state) -> None:
+        directive = (
+            'Recent MCP call failed due to tool argument validation. '
+            'Before any broad reasoning, select exactly one MCP tool, '
+            'rebuild arguments to match its schema types, and retry once. '
+            'If still invalid, explain the exact required argument shape to the user.'
+        )
+        state.set_planning_directive(
+            directive,
+            source='RecoveryService.mcp_validation_timeout',
+        )
+        logger.warning(
+            'Injected planning directive after Timeout due to recent MCP validation error'
+        )
+
+    async def react_to_exception(self, exc: Exception) -> None:
+        controller = self._context.get_controller()
+
+        self._apply_timeout_planning_routing(controller, exc)
+
+        self._record_circuit_breaker_error(controller, exc)
+        self._clear_pending_action_context(controller)
+        self._emit_exception_observation(exc)
 
         # ------------------------------------------------------------------ #
         # State transition after an error.
@@ -152,73 +296,10 @@ class RecoveryService:
         #     breaker (default: 5 consecutive errors) acts as the safety net
         #     against infinite failure loops.
         # ------------------------------------------------------------------ #
-        if isinstance(exc, _HARD_STOP_EXCEPTIONS):
-            if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
-                await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
+        if await self._route_exception_recovery(controller, exc):
             return
 
-        # Budget or iteration limit exceeded: the agent cannot recover on its
-        # own.  Re-stepping immediately re-raises the same RuntimeError, which
-        # without this guard would create an infinite loop.
-        if _is_limit_exceeded_error(exc):
-            logger.warning(
-                'Agent limit exceeded (%s): stopping agent loop and returning to user',
-                exc,
-            )
-            if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
-                await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
-            return
-
-        if isinstance(exc, _QUEUED_RETRY_EXCEPTIONS):
-            if not _recovery_may_set_state(controller, AgentState.RATE_LIMITED):
-                logger.info(
-                    'Skipping queued-retry recovery transition (state=%s); '
-                    'error was still recorded.',
-                    controller.get_agent_state(),
-                )
-                return
-            try:
-                from backend.ledger.observation import AgentThinkObservation
-
-                if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
-                    controller.event_stream.add_event(
-                        AgentThinkObservation(
-                            content='⚠️ API Rate Limit hit. Pausing execution for exponential backoff...'
-                        ),
-                        EventSource.ENVIRONMENT,
-                    )
-
-                scheduled = await controller.retry_service.schedule_retry_after_failure(
-                    exc
-                )
-            except Exception:
-                logger.debug('schedule_retry_after_failure failed', exc_info=True)
-                scheduled = False
-
-            if scheduled:
-                await self._context.set_agent_state(AgentState.RATE_LIMITED)
-            elif _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
-                logger.warning(
-                    'Queued retry unavailable for %s; returning to AWAITING_USER_INPUT',
-                    type(exc).__name__,
-                )
-                await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
-            return
-
-        # Agent-survivable error: brief pause so we don't hammer the provider,
-        # then continue. The model sees the ErrorObservation and can try a
-        # different approach.
-        logger.warning(
-            'Agent-survivable error (%s): staying RUNNING so model can adapt',
-            type(exc).__name__,
-        )
-        self._inject_task_reconciliation_directive(controller, exc)
-        pause = 1.0
-        if isinstance(exc, (InternalServerError, Timeout)):
-            pause = 2.0
-        await asyncio.sleep(pause)
-        if controller.get_agent_state() == AgentState.RUNNING:
-            controller.step()
+        await self._continue_after_survivable_error(controller, exc)
 
     def _apply_timeout_planning_routing(self, controller, exc: Exception) -> None:
         """Route timeout recoveries based on recent MCP validation failures."""
@@ -229,49 +310,15 @@ class RecoveryService:
         if state is None or not hasattr(state, 'set_planning_directive'):
             return
 
-        # Avoid clobbering any directive that is already queued for this turn.
-        turn_signals = getattr(state, 'turn_signals', None)
-        existing = (
-            getattr(turn_signals, 'planning_directive', None) if turn_signals else None
-        )
-        if existing:
+        if self._state_has_planning_directive(state):
             return
 
-        history = getattr(state, 'history', []) or []
-        recent = history[-3:] if isinstance(history, list) else []
-
-        for event in reversed(recent):
-            observation_type = str(getattr(event, 'observation', '')).lower()
-            content = getattr(event, 'content', '')
-            if not isinstance(content, str):
-                continue
-            if observation_type != 'mcp':
-                continue
-
-            payload = None
-            try:
-                payload = json.loads(content)
-            except Exception:
-                payload = None
-
-            if isinstance(payload, dict):
-                error_code = str(payload.get('error_code') or '')
-                error_text = str(payload.get('error') or '')
-                if error_code == 'MCP_TOOL_VALIDATION_ERROR' or '-32602' in error_text:
-                    directive = (
-                        'Recent MCP call failed due to tool argument validation. '
-                        'Before any broad reasoning, select exactly one MCP tool, '
-                        'rebuild arguments to match its schema types, and retry once. '
-                        'If still invalid, explain the exact required argument shape to the user.'
-                    )
-                    state.set_planning_directive(
-                        directive,
-                        source='RecoveryService.mcp_validation_timeout',
-                    )
-                    logger.warning(
-                        'Injected planning directive after Timeout due to recent MCP validation error'
-                    )
-                    return
+        recent = self._recent_history_slice(state)
+        if any(
+            self._event_is_mcp_validation_failure(event)
+            for event in reversed(recent)
+        ):
+            self._inject_timeout_planning_directive(state)
 
     def _inject_task_reconciliation_directive(self, controller, exc: Exception) -> None:
         """Inject a directive requiring task_tracker reconciliation when ``doing`` steps exist.

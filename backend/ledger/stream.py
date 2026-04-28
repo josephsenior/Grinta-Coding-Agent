@@ -267,6 +267,36 @@ class EventStream(EventStore):
         if self._persist.stats.get('persist_failures', 0) == 0:
             self._cur_id = None
 
+    def _shutdown_async_queue(self) -> None:
+        if self._inline_delivery:
+            return
+        if self._queue_loop and self._stop_event:
+            future = asyncio.run_coroutine_threadsafe(
+                self._initiate_shutdown(), self._queue_loop
+            )
+            try:
+                future.result(timeout=5)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug('Error shutting down event queue: %s', exc)
+        if self._queue_thread.is_alive():
+            # Never block forever during teardown; the thread is daemonized.
+            self._queue_thread.join(timeout=5)
+            if self._queue_thread.is_alive():
+                logger.debug(
+                    "EventStream '%s' queue thread did not stop within timeout; continuing",
+                    self.sid,
+                )
+
+    def _close_persist_and_super(self) -> None:
+        try:
+            self._persist.close()
+        except Exception as exc:  # pragma: no cover - defensive: already-closed path
+            logger.debug('EventPersistence close raised during teardown: %s', exc)
+        try:
+            super().close()
+        except Exception as exc:  # pragma: no cover - defensive: already-closed path
+            logger.debug('EventStore close raised during teardown: %s', exc)
+
     def close(self) -> None:
         """Close event stream, stopping queue processing and cleaning up subscribers.
 
@@ -279,33 +309,10 @@ class EventStream(EventStore):
         if hasattr(self, '_finalizer'):
             self._finalizer.detach()
         self._stop_flag.set()
-        if not self._inline_delivery:
-            if self._queue_loop and self._stop_event:
-                future = asyncio.run_coroutine_threadsafe(
-                    self._initiate_shutdown(), self._queue_loop
-                )
-                try:
-                    future.result(timeout=5)
-                except Exception as exc:  # pragma: no cover - defensive
-                    logger.debug('Error shutting down event queue: %s', exc)
-            if self._queue_thread.is_alive():
-                # Never block forever during teardown; the thread is daemonized.
-                self._queue_thread.join(timeout=5)
-                if self._queue_thread.is_alive():
-                    logger.debug(
-                        "EventStream '%s' queue thread did not stop within timeout; continuing",
-                        self.sid,
-                    )
+        self._shutdown_async_queue()
         self._subscribers.clear()
         self._activity_listeners.clear()
-        try:
-            self._persist.close()
-        except Exception as exc:  # pragma: no cover - defensive: already-closed path
-            logger.debug('EventPersistence close raised during teardown: %s', exc)
-        try:
-            super().close()
-        except Exception as exc:  # pragma: no cover - defensive: already-closed path
-            logger.debug('EventStore close raised during teardown: %s', exc)
+        self._close_persist_and_super()
 
     def get_backpressure_snapshot(self) -> dict[str, int]:
         """Return a lightweight snapshot of enqueue/drop stats.
@@ -403,17 +410,38 @@ class EventStream(EventStore):
             return
         self._clean_up_subscriber(subscriber_id, callback_id)
 
+    def _maybe_merge_coalesced_event(self, event: Event) -> Event | None:
+        """Return event to process, or None if caller should return early."""
+        if not self._coalescer or not self._coalescer.should_coalesce(event):
+            return event
+        merged = self._coalescer.absorb(event)
+        if merged is None:
+            return None
+        return merged
+
+    def _run_pre_dispatch_hook_if_runnable(self, sanitized_event: Event) -> None:
+        hook = self.pre_runnable_action_dispatch
+        if not (callable(hook) and getattr(sanitized_event, 'runnable', False)):
+            return
+        try:
+            _invoke_pre_dispatch_hook(hook, sanitized_event)
+        except Exception as exc:  # pragma: no cover - hook must not break delivery
+            logger.error(
+                'pre_runnable_action_dispatch failed: %s',
+                exc,
+                exc_info=True,
+            )
+
     def add_event(self, event: Event, source: EventSource) -> None:
         """Add event to stream with automatic ID assignment and persistence."""
         if self._should_drop_due_to_shutdown(event, source):
             return
 
         # Optional event coalescing for high-frequency event types
-        if self._coalescer and self._coalescer.should_coalesce(event):
-            merged = self._coalescer.absorb(event)
-            if merged is None:
-                return  # Still accumulating; event deferred
-            event = merged  # Use the merged representative event
+        resolved = self._maybe_merge_coalesced_event(event)
+        if resolved is None:
+            return
+        event = resolved
 
         self._ensure_event_can_be_added(event)
         event.timestamp = datetime.now()
@@ -435,16 +463,7 @@ class EventStream(EventStore):
         # to subscribers (runtime, controller). A round-trip can diverge from the
         # original in-place ``event``; ``observation.cause`` is keyed to the
         # delivered action's id, so the pending map must use that id.
-        hook = self.pre_runnable_action_dispatch
-        if callable(hook) and getattr(sanitized_event, 'runnable', False):
-            try:
-                _invoke_pre_dispatch_hook(hook, sanitized_event)
-            except Exception as exc:  # pragma: no cover - hook must not break delivery
-                logger.error(
-                    'pre_runnable_action_dispatch failed: %s',
-                    exc,
-                    exc_info=True,
-                )
+        self._run_pre_dispatch_hook_if_runnable(sanitized_event)
 
         if source == EventSource.USER or self._inline_delivery:
             self._dispatch_event_inline(sanitized_event)

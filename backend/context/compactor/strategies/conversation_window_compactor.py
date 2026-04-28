@@ -47,39 +47,42 @@ class ConversationWindowCompactor(RollingCompactor):
             return True
         return len(view.events) > self._max_events
 
+    @staticmethod
+    def _file_action_ids(events: list[Any]) -> set[int]:
+        return {
+            event.id
+            for event in events
+            if isinstance(event, (FileWriteAction, FileEditAction))
+        }
+
+    @staticmethod
+    def _should_protect_event(event: Any, file_action_ids: set[int]) -> bool:
+        if isinstance(event, SystemMessageAction):
+            return True
+        if getattr(event, 'source', None) == EventSource.USER:
+            return True
+        if isinstance(event, (FileWriteAction, FileEditAction)):
+            return True
+        return isinstance(event, Observation) and getattr(event, 'cause', None) in file_action_ids
+
+    def _protected_ids(self, events: list[Any], file_action_ids: set[int]) -> set[int]:
+        return {
+            event.id
+            for event in events
+            if self._should_protect_event(event, file_action_ids)
+        }
+
+    def _recent_ids(self, events: list[Any]) -> set[int]:
+        return {event.id for event in events[-self._max_events :]}
+
     def get_compaction(self, view: View) -> Compaction:
         """Build a Compaction that prunes low-importance old events."""
         events = view.events
-
-        # --- collect file-action ids for paired-observation protection ---
-        file_action_ids: set[int] = {
-            ev.id for ev in events if isinstance(ev, (FileWriteAction, FileEditAction))
-        }
-
-        # --- build the protected set (must survive pruning) ---
-        protected_ids: set[int] = set()
-        for ev in events:
-            if isinstance(ev, SystemMessageAction):
-                protected_ids.add(ev.id)
-            elif (
-                not isinstance(ev, SystemMessageAction)
-                and getattr(ev, 'source', None) == EventSource.USER
-            ):
-                # Regular user messages
-                protected_ids.add(ev.id)
-            if isinstance(ev, (FileWriteAction, FileEditAction)):
-                protected_ids.add(ev.id)
-            elif (
-                isinstance(ev, Observation)
-                and getattr(ev, 'cause', None) in file_action_ids
-            ):
-                protected_ids.add(ev.id)
-
-        # --- recency window: last max_events events are always kept ---
-        recent_ids: set[int] = {ev.id for ev in events[-self._max_events :]}
-
+        file_action_ids = self._file_action_ids(events)
+        protected_ids = self._protected_ids(events, file_action_ids)
+        recent_ids = self._recent_ids(events)
         to_keep = protected_ids | recent_ids
-        pruned_ids = [ev.id for ev in events if ev.id not in to_keep]
+        pruned_ids = [event.id for event in events if event.id not in to_keep]
 
         return Compaction(action=self._create_condensation_action(pruned_ids))
 

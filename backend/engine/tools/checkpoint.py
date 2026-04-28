@@ -114,6 +114,89 @@ def build_checkpoint_action(arguments: dict) -> AgentThinkAction:
         return _view_checkpoints()
 
 
+def _normalized_checkpoint_files(files_modified: str) -> list[str]:
+    return [item.strip() for item in files_modified.split(',') if item.strip()]
+
+
+def _duplicate_checkpoint_save_result(
+    checkpoints: list[dict],
+    *,
+    label: str,
+) -> AgentThinkAction | None:
+    if not checkpoints:
+        return None
+
+    last = checkpoints[-1]
+    last_label = str(last.get('label', ''))
+    if last_label != label:
+        return None
+
+    last_files = last.get('files') or []
+    if not isinstance(last_files, list):
+        last_files = []
+    return _checkpoint_result(
+        command='save',
+        ok=True,
+        status='noop',
+        reason_code='DUPLICATE_CHECKPOINT',
+        reason='Latest checkpoint already has the same label.',
+        retryable=False,
+        changed_state=False,
+        data={
+            'checkpoint_id': last.get('id'),
+            'label': label,
+            'files': last_files,
+            'total_checkpoints': len(checkpoints),
+        },
+        next_best_action=(
+            'Continue with the next task step, or call checkpoint save only after new progress.'
+        ),
+        human_message=(
+            f"[CHECKPOINT] No-op: latest checkpoint already matches '{label}'."
+        ),
+    )
+
+
+def _checkpoint_entry(
+    checkpoints: list[dict],
+    *,
+    label: str,
+    normalized_files: list[str],
+) -> dict[str, Any]:
+    entry: dict[str, Any] = {
+        'id': len(checkpoints) + 1,
+        'label': label,
+        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    if normalized_files:
+        entry['files'] = normalized_files
+    return entry
+
+
+def _attach_rollback_snapshot(
+    entry: dict[str, Any],
+    *,
+    label: str,
+    normalized_files: list[str],
+) -> None:
+    try:
+        from backend.core.rollback.rollback_manager import RollbackManager
+        from backend.core.workspace_resolution import require_effective_workspace_root
+
+        manager = RollbackManager(
+            workspace_path=str(require_effective_workspace_root()),
+            max_checkpoints=30,
+            auto_cleanup=True,
+        )
+        entry['rollback_id'] = manager.create_checkpoint(
+            description=label,
+            checkpoint_type='manual',
+            metadata={'files': normalized_files, 'checkpoint_tool_id': entry['id']},
+        )
+    except Exception:
+        pass
+
+
 def _save_checkpoint(label: str, files_modified: str) -> AgentThinkAction:
     if not label:
         return _checkpoint_result(
@@ -129,65 +212,25 @@ def _save_checkpoint(label: str, files_modified: str) -> AgentThinkAction:
         )
 
     checkpoints = _load_checkpoints()
+    normalized_files = _normalized_checkpoint_files(files_modified)
 
-    normalized_files = [f.strip() for f in files_modified.split(',') if f.strip()]
-    if checkpoints:
-        last = checkpoints[-1]
-        last_label = str(last.get('label', ''))
-        last_files = last.get('files') or []
-        if not isinstance(last_files, list):
-            last_files = []
-        # Consecutive saves with the same label are treated as duplicate/no-op.
-        # This keeps lite models from repeatedly "saving" identical progress.
-        if last_label == label:
-            return _checkpoint_result(
-                command='save',
-                ok=True,
-                status='noop',
-                reason_code='DUPLICATE_CHECKPOINT',
-                reason='Latest checkpoint already has the same label.',
-                retryable=False,
-                changed_state=False,
-                data={
-                    'checkpoint_id': last.get('id'),
-                    'label': label,
-                    'files': last_files,
-                    'total_checkpoints': len(checkpoints),
-                },
-                next_best_action=(
-                    'Continue with the next task step, or call checkpoint save only after new progress.'
-                ),
-                human_message=(
-                    f"[CHECKPOINT] No-op: latest checkpoint already matches '{label}'."
-                ),
-            )
+    duplicate_result = _duplicate_checkpoint_save_result(
+        checkpoints,
+        label=label,
+    )
+    if duplicate_result is not None:
+        return duplicate_result
 
-    entry = {
-        'id': len(checkpoints) + 1,
-        'label': label,
-        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-    }
-    if normalized_files:
-        entry['files'] = normalized_files
-
-    # Create a RollbackManager file snapshot so checkpoint(revert) can actually
-    # restore files when given this integer ID.
-    try:
-        from backend.core.rollback.rollback_manager import RollbackManager
-        from backend.core.workspace_resolution import require_effective_workspace_root
-
-        _manager = RollbackManager(
-            workspace_path=str(require_effective_workspace_root()),
-            max_checkpoints=30,
-            auto_cleanup=True,
-        )
-        entry['rollback_id'] = _manager.create_checkpoint(
-            description=label,
-            checkpoint_type='manual',
-            metadata={'files': normalized_files, 'checkpoint_tool_id': entry['id']},
-        )
-    except Exception:
-        pass  # non-fatal — metadata checkpoint still saves cleanly
+    entry = _checkpoint_entry(
+        checkpoints,
+        label=label,
+        normalized_files=normalized_files,
+    )
+    _attach_rollback_snapshot(
+        entry,
+        label=label,
+        normalized_files=normalized_files,
+    )
 
     checkpoints.append(entry)
     try:

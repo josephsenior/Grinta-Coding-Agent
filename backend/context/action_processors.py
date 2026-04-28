@@ -124,7 +124,7 @@ def _handle_tool_based_action(
         return _build_meta_cognition_message(action)
 
     # Synthetic/injected actions (e.g. stale-read prevention) carry no LLM
-    # tool-call metadata.  They were handled transparently by the runtime and
+    # tool-call metadata. They were handled transparently by the runtime and
     # should not appear in the message history sent back to the LLM.
     if getattr(action, 'tool_call_metadata', None) is None:
         return []
@@ -362,68 +362,108 @@ def _role_from_source(
     return cast(Literal['user', 'system', 'assistant', 'tool'], role_value)
 
 
+def _assistant_message_content_from_tool_metadata(tool_metadata: Any) -> str | None:
+    response = _to_model_response_lite(tool_metadata.model_response)
+    if response is None or not response.choices:
+        return None
+    choice = response.choices[0]
+    if not hasattr(choice, 'message'):
+        return None
+    assistant_msg = cast(Any, choice).message
+    return getattr(assistant_msg, 'content', '') or ''
+
+
+def _thought_target_attr(action: PlaybookFinishAction) -> str:
+    return 'final_thought' if getattr(action, 'final_thought', '') else 'thought'
+
+
+def _merge_thought_content(current: str, content: str) -> str:
+    if not current:
+        return content
+    if current == content or not content:
+        return current
+    return current + '\n' + content
+
+
 def _merge_tool_metadata_thought(action: PlaybookFinishAction) -> None:
     tool_metadata = action.tool_call_metadata
     if tool_metadata is None:
         return
-    response = _to_model_response_lite(tool_metadata.model_response)
-    if response is None or not response.choices:
-        action.tool_call_metadata = None
-        return
-    choice = response.choices[0]
-    if not hasattr(choice, 'message'):
-        action.tool_call_metadata = None
-        return
-    assistant_msg = cast(Any, choice).message
-    content = getattr(assistant_msg, 'content', '') or ''
-    target_attr = 'final_thought' if getattr(action, 'final_thought', '') else 'thought'
-    current = getattr(action, target_attr, '') or ''
-    if current:
-        if current != content and content:
-            setattr(action, target_attr, current + '\n' + content)
-    else:
-        setattr(action, target_attr, content)
+    content = _assistant_message_content_from_tool_metadata(tool_metadata)
+    if content is not None:
+        target_attr = _thought_target_attr(action)
+        current = getattr(action, target_attr, '') or ''
+        setattr(action, target_attr, _merge_thought_content(current, content))
     action.tool_call_metadata = None
+
+
+def _message_role_from_source(
+    source: EventSource | str | None,
+) -> Literal['user', 'system', 'assistant', 'tool']:
+    src_value = source.value if isinstance(source, EventSource) else source or ''
+    if src_value not in {'user', 'system', 'assistant', 'tool'}:
+        src_value = 'assistant'
+    return cast(Literal['user', 'system', 'assistant', 'tool'], src_value)
+
+
+def _message_text_with_file_urls(action: MessageAction) -> str:
+    text = action.content or ''
+    if not action.file_urls:
+        return text
+    lines = '\n'.join(f'- {url}' for url in action.file_urls)
+    suffix = (
+        'Attached files (workspace paths; use your file-read tools as needed):\n'
+        f'{lines}'
+    )
+    return f'{text}\n\n{suffix}' if text.strip() else suffix
+
+
+def _append_message_images(
+    content: list[TextContent | ImageContent],
+    action: MessageAction,
+    role: Literal['user', 'system', 'assistant', 'tool'],
+    *,
+    vision_is_active: bool,
+) -> None:
+    if not action.image_urls:
+        return
+    if role != 'user':
+        content.append(ImageContent(image_urls=action.image_urls))
+        return
+    for idx, url in enumerate(action.image_urls):
+        if vision_is_active:
+            content.append(TextContent(text=f'Image {idx + 1}:'))
+        content.append(ImageContent(image_urls=[url]))
+
+
+def _build_message_content(
+    action: MessageAction,
+    *,
+    role: Literal['user', 'system', 'assistant', 'tool'],
+    vision_is_active: bool,
+) -> list[TextContent | ImageContent]:
+    content: list[TextContent | ImageContent] = [
+        TextContent(text=_message_text_with_file_urls(action))
+    ]
+    _append_message_images(
+        content,
+        action,
+        role,
+        vision_is_active=vision_is_active,
+    )
+    return content
 
 
 def _handle_message_action(
     action: MessageAction, vision_is_active: bool
 ) -> list[Message]:
     """Handle MessageAction with optional file paths and image content."""
-    src = getattr(action, 'source', None)
-    src_value: str
-    if isinstance(src, EventSource):
-        src_value = src.value
-    else:
-        src_value = src or ''
-    role_value = 'user' if src_value == 'user' else 'assistant'
-    if role_value not in {'user', 'system', 'assistant', 'tool'}:
-        role_value = 'assistant'
-    role = cast(Literal['user', 'system', 'assistant', 'tool'], role_value)
-
-    text = action.content or ''
-    if action.file_urls:
-        lines = '\n'.join(f'- {u}' for u in action.file_urls)
-        suffix = (
-            'Attached files (workspace paths; use your file-read tools as needed):\n'
-            f'{lines}'
-        )
-        text = f'{text}\n\n{suffix}' if text.strip() else suffix
-
-    content: list[TextContent | ImageContent] = [TextContent(text=text)]
-
-    if action.image_urls:
-        if role == 'user':
-            for idx, url in enumerate(action.image_urls):
-                if vision_is_active:
-                    content.append(TextContent(text=f'Image {idx + 1}:'))
-                content.append(ImageContent(image_urls=[url]))
-        else:
-            content.append(ImageContent(image_urls=action.image_urls))
-
-    if role not in ('user', 'system', 'assistant', 'tool'):
-        msg = f'Invalid role: {role}'
-        raise ValueError(msg)
+    role = _message_role_from_source(getattr(action, 'source', None))
+    content = _build_message_content(
+        action,
+        role=role,
+        vision_is_active=vision_is_active,
+    )
     return [Message(role=role, content=content)]
 
 

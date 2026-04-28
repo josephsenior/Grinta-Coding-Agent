@@ -69,6 +69,45 @@ def _drain(
             pass
 
 
+def _wait_for_bounded_process(
+    process: subprocess.Popen,
+    over: threading.Event,
+    *,
+    timeout: float | None,
+) -> tuple[int, bool]:
+    timed_out = False
+    slice_s = 0.25
+    elapsed = 0.0
+    while True:
+        try:
+            return process.wait(timeout=slice_s), timed_out
+        except subprocess.TimeoutExpired:
+            if over.is_set():
+                process.kill()
+                return process.wait(timeout=5), timed_out
+            if timeout is None:
+                continue
+            elapsed += slice_s
+            if elapsed < timeout:
+                continue
+            process.kill()
+            timed_out = True
+            return process.wait(timeout=5), timed_out
+
+
+def _decoded_bounded_stream_text(
+    buf: bytearray,
+    *,
+    cap: int,
+    encoding: str,
+    truncated: bool,
+) -> str:
+    text = buf.decode(encoding, errors='replace')
+    if not truncated or len(buf) < cap:
+        return text
+    return text + _TRUNCATION_MARKER.format(limit=cap)
+
+
 def bounded_communicate(
     process: subprocess.Popen,
     timeout: float | None = None,
@@ -101,46 +140,26 @@ def bounded_communicate(
     t_out.start()
     t_err.start()
 
-    timed_out = False
     try:
-        # Poll the overflow flag while waiting for the process.
-        # We wait in small slices so overflow can interrupt early.
-        slice_s = 0.25
-        elapsed = 0.0
-        while True:
-            try:
-                rc = process.wait(timeout=slice_s)
-                # Process exited; let drainers finish.
-                t_out.join(timeout=2.0)
-                t_err.join(timeout=2.0)
-                break
-            except subprocess.TimeoutExpired:
-                if over.is_set():
-                    process.kill()
-                    rc = process.wait(timeout=5)
-                    break
-                if timeout is not None:
-                    elapsed += slice_s
-                    if elapsed >= timeout:
-                        process.kill()
-                        timed_out = True
-                        rc = process.wait(timeout=5)
-                        break
+        rc, timed_out = _wait_for_bounded_process(process, over, timeout=timeout)
     finally:
         # Ensure threads exit even if something went wrong.
         t_out.join(timeout=1.0)
         t_err.join(timeout=1.0)
 
     truncated = over.is_set()
-    out_text = stdout_buf.decode(encoding, errors='replace')
-    err_text = stderr_buf.decode(encoding, errors='replace')
-    if truncated:
-        marker = _TRUNCATION_MARKER.format(limit=max_bytes_per_stream)
-        # Append the marker to whichever stream(s) hit the cap.
-        if len(stdout_buf) >= max_bytes_per_stream:
-            out_text += marker
-        if len(stderr_buf) >= max_bytes_per_stream:
-            err_text += marker
+    out_text = _decoded_bounded_stream_text(
+        stdout_buf,
+        cap=max_bytes_per_stream,
+        encoding=encoding,
+        truncated=truncated,
+    )
+    err_text = _decoded_bounded_stream_text(
+        stderr_buf,
+        cap=max_bytes_per_stream,
+        encoding=encoding,
+        truncated=truncated,
+    )
 
     return BoundedResult(
         stdout=out_text,

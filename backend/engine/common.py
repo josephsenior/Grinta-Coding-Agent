@@ -143,6 +143,23 @@ def extract_thought_from_message(assistant_msg: Any) -> str:
     return extract_redacted_thinking_inner(raw).strip()
 
 
+def _message_content_text_part(item: Any) -> str:
+    if isinstance(item, str):
+        return item
+    if not isinstance(item, dict):
+        return ''
+    text = item.get('text')
+    return text if isinstance(text, str) else ''
+
+
+def _join_message_content_text_parts(content: list[Any]) -> str:
+    parts: list[str] = []
+    for item in content:
+        if text := _message_content_text_part(item):
+            parts.append(text)
+    return ''.join(parts)
+
+
 def _raw_message_content_text(content: Any) -> str:
     """Like :func:`_coerce_message_content_text` but leaves tags intact."""
     if content is None:
@@ -150,20 +167,9 @@ def _raw_message_content_text(content: Any) -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, dict):
-        text = content.get('text')
-        return text if isinstance(text, str) else ''
+        return _message_content_text_part(content)
     if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, str):
-                if item:
-                    parts.append(item)
-                continue
-            if isinstance(item, dict):
-                text = item.get('text')
-                if isinstance(text, str) and text:
-                    parts.append(text)
-        return ''.join(parts)
+        return _join_message_content_text_parts(content)
     return ''
 
 

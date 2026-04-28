@@ -171,6 +171,84 @@ def _load(name: str) -> str:
     return (_DIR / name).read_text(encoding='utf-8').strip()
 
 
+def _shell_identity_sections(
+    *,
+    is_windows: bool,
+    windows_with_bash: bool,
+    shell_is_powershell: bool,
+) -> list[tuple[str, str]]:
+    if windows_with_bash:
+        return [
+            (
+                'shell_identity_git_bash_windows',
+                '<SHELL_IDENTITY>\n'
+                'Your terminal is **Git Bash** running on Windows. Use **bash syntax exclusively**.\n'
+                '- Allowed tools: `ls`, `cat`, `grep`, `find`, `echo`, `cd`, `mkdir`, `rm`, `pwd`, `which`.\n'
+                '  (Prefer native tools from the **TOOL_ROUTING_LADDER** first.)\n'
+                '- FORBIDDEN: `Get-ChildItem`, `Get-Process`, `Get-Content`, `Select-String`, '
+                '`$PSVersionTable`, `Write-Output`, `Set-Location`, or any other PowerShell cmdlet.\n'
+                '- Windows-style paths (`C:\\Users\\...`) in the working directory are normal.\n'
+                '- Use `which <tool>` to check if on PATH.\n'
+                '- Use `python` (not `python3`) to invoke Python.\n'
+                '</SHELL_IDENTITY>',
+            ),
+        ]
+    if shell_is_powershell:
+        return [
+            (
+                'shell_identity_powershell_windows',
+                '<SHELL_IDENTITY>\n'
+                'Your terminal is **PowerShell** on Windows. Use PowerShell syntax: chain with `;` (not `&&` / `||`); '
+                'prefer `-ErrorAction SilentlyContinue` or `try/catch` instead of `|| true`; use `Start-Process` / '
+                '`Start-Job` instead of a trailing `&`.\n\n'
+                '**Directory/Content listing:** You may use `Get-ChildItem` (or `ls`, `dir`) and `Select-String` if needed, '
+                'but prefer native tools from the **TOOL_ROUTING_LADDER** (`search_code`, editors, structure tools) first.\n\n'
+                '**Do not use Unix-only habits here:** `find`, `cat`, `grep`, `head`, `tail`, `touch`, `rm -rf`, '
+                '`pkill`, `timeout`, `which`, or `&&` / `||`.\n'
+                '</SHELL_IDENTITY>',
+            ),
+        ]
+    if not is_windows:
+        return [
+            (
+                'shell_identity_unix',
+                '<SHELL_IDENTITY>\n'
+                'Your terminal is **Bash / Zsh** running on a Unix-like system. Use standard bash syntax.\n'
+                'You may use shell tools (grep, cat, ls, find) if needed, but prefer native tools first.\n'
+                '</SHELL_IDENTITY>',
+            ),
+        ]
+    return []
+
+
+def _mcp_or_permissions_sections_for_collect(
+    *,
+    render_mcp_inline: bool,
+    config: Any,
+    mcp_tool_names: list[str] | None,
+    mcp_tool_descriptions: dict[str, str] | None,
+    mcp_server_hints: list[dict[str, str]] | None,
+) -> list[tuple[str, str]]:
+    """MCP catalogue inline, or permissions-only when MCP is delivered as user addendum."""
+    if render_mcp_inline:
+        return [
+            (
+                'mcp_permissions_partial_03_tail',
+                _render_mcp_and_permissions(
+                    mcp_tool_names or [],
+                    mcp_tool_descriptions or {},
+                    mcp_server_hints or [],
+                    config,
+                ),
+            ),
+        ]
+    if getattr(config, 'enable_permissions', False):
+        perm = getattr(config, 'permissions', None)
+        if perm is not None:
+            return [('permissions_partial', _render_permissions(config, perm))]
+    return []
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -225,53 +303,18 @@ def _collect_system_prompt_sections(
             f'Configured model id: `{model_id}`',
         ),
     ]
-
-    if windows_with_bash:
-        sections.append(
-            (
-                'shell_identity_git_bash_windows',
-                '<SHELL_IDENTITY>\n'
-                'Your terminal is **Git Bash** running on Windows. Use **bash syntax exclusively**.\n'
-                '- Allowed tools: `ls`, `cat`, `grep`, `find`, `echo`, `cd`, `mkdir`, `rm`, `pwd`, `which`.\n'
-                '  (Prefer native tools from the **TOOL_ROUTING_LADDER** first.)\n'
-                '- FORBIDDEN: `Get-ChildItem`, `Get-Process`, `Get-Content`, `Select-String`, '
-                '`$PSVersionTable`, `Write-Output`, `Set-Location`, or any other PowerShell cmdlet.\n'
-                '- Windows-style paths (`C:\\Users\\...`) in the working directory are normal.\n'
-                '- Use `which <tool>` to check if on PATH.\n'
-                '- Use `python` (not `python3`) to invoke Python.\n'
-                '</SHELL_IDENTITY>',
-            )
+    sections.extend(
+        _shell_identity_sections(
+            is_windows=is_windows,
+            windows_with_bash=windows_with_bash,
+            shell_is_powershell=shell_is_powershell,
         )
-    elif shell_is_powershell:
-        sections.append(
-            (
-                'shell_identity_powershell_windows',
-                '<SHELL_IDENTITY>\n'
-                'Your terminal is **PowerShell** on Windows. Use PowerShell syntax: chain with `;` (not `&&` / `||`); '
-                'prefer `-ErrorAction SilentlyContinue` or `try/catch` instead of `|| true`; use `Start-Process` / '
-                '`Start-Job` instead of a trailing `&`.\n\n'
-                '**Directory/Content listing:** You may use `Get-ChildItem` (or `ls`, `dir`) and `Select-String` if needed, '
-                'but prefer native tools from the **TOOL_ROUTING_LADDER** (`search_code`, editors, structure tools) first.\n\n'
-                '**Do not use Unix-only habits here:** `find`, `cat`, `grep`, `head`, `tail`, `touch`, `rm -rf`, '
-                '`pkill`, `timeout`, `which`, or `&&` / `||`.\n'
-                '</SHELL_IDENTITY>',
-            )
-        )
-    elif not is_windows:
-        sections.append(
-            (
-                'shell_identity_unix',
-                '<SHELL_IDENTITY>\n'
-                'Your terminal is **Bash / Zsh** running on a Unix-like system. Use standard bash syntax.\n'
-                'You may use shell tools (grep, cat, ls, find) if needed, but prefer native tools first.\n'
-                '</SHELL_IDENTITY>',
-            )
-        )
+    )
 
     sections += [
         (
             'system_partial_00_routing',
-            _render_routing(shell_is_powershell, config, function_calling_mode),
+            _render_routing(is_windows, config, function_calling_mode),
         ),
         ('security_risk_policy', _render_security(cli_mode)),
         ('system_partial_01_autonomy', _render_autonomy(config, shell_is_powershell)),
@@ -281,28 +324,15 @@ def _collect_system_prompt_sections(
         ),
     ]
 
-    # MCP block — only inline by default. When ``render_mcp_inline=False`` the
-    # caller is expected to deliver the MCP catalogue as a per-turn user-role
-    # addendum (see ``build_mcp_user_addendum``) so the system prompt stays
-    # stable for prefix caching.
-    if render_mcp_inline:
-        sections.append(
-            (
-                'mcp_permissions_partial_03_tail',
-                _render_mcp_and_permissions(
-                    mcp_tool_names or [],
-                    mcp_tool_descriptions or {},
-                    mcp_server_hints or [],
-                    config,
-                ),
-            )
+    sections.extend(
+        _mcp_or_permissions_sections_for_collect(
+            render_mcp_inline=render_mcp_inline,
+            config=config,
+            mcp_tool_names=mcp_tool_names,
+            mcp_tool_descriptions=mcp_tool_descriptions,
+            mcp_server_hints=mcp_server_hints,
         )
-    else:
-        # Still render permissions (they are stable per-session).
-        if getattr(config, 'enable_permissions', False):
-            perm = getattr(config, 'permissions', None)
-            if perm is not None:
-                sections.append(('permissions_partial', _render_permissions(config, perm)))
+    )
 
     # ``think`` is opt-in via config, but if the model has inherent reasoning
     # (o1/o3/r1/grok-4/gemini-thinking) we suppress the scaffolding regardless.
@@ -452,6 +482,118 @@ def build_system_prompt(
     return '\n\n'.join(body for _, body in sections)
 
 
+def _build_repository_info_block(repository_info: RepositoryInfo | None) -> str | None:
+    if not repository_info:
+        return None
+
+    repo_name = getattr(repository_info, 'repo_name', None) or ''
+    repo_dir = getattr(repository_info, 'repo_directory', None) or ''
+    branch = getattr(repository_info, 'branch_name', None) or ''
+    lines = [
+        '<REPOSITORY_INFO>',
+        f"At the user's request, repository {repo_name} has been cloned to {repo_dir} in the current working directory.",
+    ]
+    if branch:
+        lines.append(f'The repository has been checked out to branch "{branch}".')
+        lines.append('')
+        lines.append(
+            f'IMPORTANT: You should work within the current branch "{branch}" unless\n'
+            '    1. the user explicitly instructs otherwise\n'
+            '    2. if the current branch is "main", "master", or another default branch '
+            'where direct pushes may be unsafe'
+        )
+    lines.append('</REPOSITORY_INFO>')
+    return '\n'.join(lines)
+
+
+def _build_repo_instructions_block(repo_instructions: str) -> str | None:
+    if not repo_instructions:
+        return None
+    return (
+        f'<REPOSITORY_INSTRUCTIONS>\n{repo_instructions}\n</REPOSITORY_INSTRUCTIONS>'
+    )
+
+
+def _runtime_hosts_lines(hosts: dict[object, object]) -> list[str]:
+    if not hosts:
+        return []
+    lines = [
+        'The user has access to the following hosts for accessing a web application, '
+        'each of which has a corresponding port:'
+    ]
+    for host, port in hosts.items():
+        lines.append(f'* {host} (port {port})')
+    lines.append(
+        'When starting a web server, use the corresponding ports. You should also '
+        'set any options to allow iframes and CORS requests, and allow the server to '
+        'be accessed from any host (e.g. 0.0.0.0).\n'
+        'For example, if you are using vite.config.js, you should set server.host '
+        'and server.allowedHosts to true'
+    )
+    return lines
+
+
+def _runtime_secrets_lines(secrets: dict[object, object]) -> list[str]:
+    if not secrets:
+        return []
+    lines = [
+        '<CUSTOM_SECRETS>',
+        'You have access to the following environment variables',
+    ]
+    for name, desc in secrets.items():
+        lines.append(f'* $**{name}**: {desc}')
+    lines.append('</CUSTOM_SECRETS>')
+    return lines
+
+
+def _build_runtime_information_block(runtime_info: RuntimeInfo | None) -> str | None:
+    if not runtime_info:
+        return None
+
+    ri_lines: list[str] = ['<RUNTIME_INFORMATION>']
+    wd = getattr(runtime_info, 'working_dir', '') or ''
+    if wd:
+        ri_lines.append(f'The current working directory is {wd}')
+        ri_lines.append(
+            'The open project lives in that directory. Use file and shell paths relative to '
+            'it, or absolute paths on disk that stay under it.'
+        )
+        ri_lines.append(
+            'There is no `/workspace` virtual path — tools and shell commands use real paths only.'
+        )
+        ri_lines.append(
+            'This message does not list project files—do not assume paths like '
+            '`tailwind.config.*` exist. Use `search_code` to discover layout, '
+            'then read with editor/view tools.'
+        )
+
+    hosts = getattr(runtime_info, 'available_hosts', None) or {}
+    ri_lines.extend(_runtime_hosts_lines(hosts))
+
+    extra_instr = getattr(runtime_info, 'additional_agent_instructions', '') or ''
+    if extra_instr:
+        ri_lines.append(extra_instr)
+
+    secrets = getattr(runtime_info, 'custom_secrets_descriptions', None) or {}
+    ri_lines.extend(_runtime_secrets_lines(secrets))
+
+    date = getattr(runtime_info, 'date', '') or ''
+    if date:
+        ri_lines.append(f"Today's date is {date} (UTC).")
+
+    ri_lines.append('</RUNTIME_INFORMATION>')
+    return '\n'.join(ri_lines)
+
+
+def _build_conversation_instructions_block(
+    conversation_instructions: ConversationInstructions | None,
+) -> str | None:
+    conv = conversation_instructions
+    if conv is None or not conv.content:
+        return None
+    return f'<CONVERSATION_INSTRUCTIONS>\n{conv.content}\n</CONVERSATION_INSTRUCTIONS>'
+
+
 def build_workspace_context(
     repository_info: RepositoryInfo | None = None,
     runtime_info: RuntimeInfo | None = None,
@@ -461,89 +603,22 @@ def build_workspace_context(
     """Render the additional-info / workspace context block."""
     parts: list[str] = []
 
-    if repository_info:
-        repo_name = getattr(repository_info, 'repo_name', None) or ''
-        repo_dir = getattr(repository_info, 'repo_directory', None) or ''
-        branch = getattr(repository_info, 'branch_name', None) or ''
-        lines = [
-            '<REPOSITORY_INFO>',
-            f"At the user's request, repository {repo_name} has been cloned to {repo_dir} in the current working directory.",
-        ]
-        if branch:
-            lines.append(f'The repository has been checked out to branch "{branch}".')
-            lines.append('')
-            lines.append(
-                f'IMPORTANT: You should work within the current branch "{branch}" unless\n'
-                '    1. the user explicitly instructs otherwise\n'
-                '    2. if the current branch is "main", "master", or another default branch '
-                'where direct pushes may be unsafe'
-            )
-        lines.append('</REPOSITORY_INFO>')
-        parts.append('\n'.join(lines))
+    for block in (
+        _build_repository_info_block(repository_info),
+        _build_repo_instructions_block(repo_instructions),
+    ):
+        if block:
+            parts.append(block)
 
-    if repo_instructions:
-        parts.append(
-            f'<REPOSITORY_INSTRUCTIONS>\n{repo_instructions}\n</REPOSITORY_INSTRUCTIONS>'
+    runtime_block = _build_runtime_information_block(runtime_info)
+    if runtime_block:
+        parts.append(runtime_block)
+
+        conversation_block = _build_conversation_instructions_block(
+            conversation_instructions
         )
-
-    if runtime_info:
-        ri_lines: list[str] = ['<RUNTIME_INFORMATION>']
-        wd = getattr(runtime_info, 'working_dir', '') or ''
-        if wd:
-            ri_lines.append(f'The current working directory is {wd}')
-            ri_lines.append(
-                'The open project lives in that directory. Use file and shell paths relative to '
-                'it, or absolute paths on disk that stay under it.'
-            )
-            ri_lines.append(
-                'There is no `/workspace` virtual path — tools and shell commands use real paths only.'
-            )
-            ri_lines.append(
-                'This message does not list project files—do not assume paths like '
-                '`tailwind.config.*` exist. Use `search_code` to discover layout, '
-                'then read with editor/view tools.'
-            )
-
-        hosts = getattr(runtime_info, 'available_hosts', None) or {}
-        if hosts:
-            ri_lines.append(
-                'The user has access to the following hosts for accessing a web application, '
-                'each of which has a corresponding port:'
-            )
-            for host, port in hosts.items():
-                ri_lines.append(f'* {host} (port {port})')
-            ri_lines.append(
-                'When starting a web server, use the corresponding ports. You should also '
-                'set any options to allow iframes and CORS requests, and allow the server to '
-                'be accessed from any host (e.g. 0.0.0.0).\n'
-                'For example, if you are using vite.config.js, you should set server.host '
-                'and server.allowedHosts to true'
-            )
-
-        extra_instr = getattr(runtime_info, 'additional_agent_instructions', '') or ''
-        if extra_instr:
-            ri_lines.append(extra_instr)
-
-        secrets = getattr(runtime_info, 'custom_secrets_descriptions', None) or {}
-        if secrets:
-            ri_lines.append('<CUSTOM_SECRETS>')
-            ri_lines.append('You have access to the following environment variables')
-            for name, desc in secrets.items():
-                ri_lines.append(f'* $**{name}**: {desc}')
-            ri_lines.append('</CUSTOM_SECRETS>')
-
-        date = getattr(runtime_info, 'date', '') or ''
-        if date:
-            ri_lines.append(f"Today's date is {date} (UTC).")
-
-        ri_lines.append('</RUNTIME_INFORMATION>')
-        parts.append('\n'.join(ri_lines))
-
-        conv = conversation_instructions
-        if conv is not None and conv.content:
-            parts.append(
-                f'<CONVERSATION_INSTRUCTIONS>\n{conv.content}\n</CONVERSATION_INSTRUCTIONS>'
-            )
+        if conversation_block:
+            parts.append(conversation_block)
 
     return '\n'.join(parts).strip()
 

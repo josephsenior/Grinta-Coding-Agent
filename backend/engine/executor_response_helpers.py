@@ -100,24 +100,31 @@ def extract_response_text(response: Any) -> str:
     return content_to_str(content)
 
 
+def _content_text_part(item: Any) -> str:
+    if isinstance(item, str):
+        return item
+    if not isinstance(item, dict):
+        return ''
+    text = item.get('text')
+    return text if isinstance(text, str) else ''
+
+
+def _join_content_text_parts(content: list[Any]) -> str:
+    parts: list[str] = []
+    for item in content:
+        if text := _content_text_part(item):
+            parts.append(text)
+    return ''.join(parts)
+
+
 def content_to_str(content: Any) -> str:
     """Convert message content (str, list of parts, etc.) to a plain string."""
     if isinstance(content, str):
         return content
     if isinstance(content, dict):
-        text = content.get('text')
-        return text if isinstance(text, str) else ''
+        return _content_text_part(content)
     if isinstance(content, list):
-        parts: list[str] = []
-        for item in content:
-            if isinstance(item, str) and item:
-                parts.append(item)
-                continue
-            if isinstance(item, dict):
-                text = item.get('text')
-                if isinstance(text, str) and text:
-                    parts.append(text)
-        return ''.join(parts)
+        return _join_content_text_parts(content)
     return str(content) if content else ''
 
 

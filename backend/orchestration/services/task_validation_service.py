@@ -16,6 +16,22 @@ if TYPE_CHECKING:
     )
 
 
+def _step_field(step: Any, name: str, default: Any) -> Any:
+    if isinstance(step, dict):
+        return step.get(name, default)
+    return getattr(step, name, default)
+
+
+def _step_identity(step: Any) -> tuple[str, str, str, list[Any]]:
+    status = str(_step_field(step, 'status', '') or '').strip().lower()
+    step_id = str(_step_field(step, 'id', '?') or '?')
+    description = str(
+        _step_field(step, 'description', 'Untitled step') or 'Untitled step'
+    )
+    subtasks = _step_field(step, 'subtasks', None) or []
+    return step_id, description, status, subtasks
+
+
 class TaskValidationService:
     """Validates agent task completion using a pluggable validator.
 
@@ -134,20 +150,7 @@ class TaskValidationService:
         """Return visible plan steps that are still todo or doing."""
         active_steps: list[tuple[str, str, str]] = []
         for step in steps or []:
-            if isinstance(step, dict):
-                status = str(step.get('status', '') or '').strip().lower()
-                step_id = str(step.get('id', '?') or '?')
-                description = str(
-                    step.get('description', 'Untitled step') or 'Untitled step'
-                )
-                subtasks = step.get('subtasks', None) or []
-            else:
-                status = str(getattr(step, 'status', '') or '').strip().lower()
-                step_id = str(getattr(step, 'id', '?') or '?')
-                description = str(
-                    getattr(step, 'description', 'Untitled step') or 'Untitled step'
-                )
-                subtasks = getattr(step, 'subtasks', None) or []
+            step_id, description, status, subtasks = _step_identity(step)
             if status in ACTIVE_TASK_STATUSES:
                 active_steps.append(
                     (

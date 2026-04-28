@@ -72,6 +72,49 @@ if TYPE_CHECKING:
     from backend.ledger.stream import EventStream
 
 
+def _graceful_shrink_large_cmd_outputs(history: list[Any]) -> int:
+    """Truncate oversized command outputs; returns count mutated."""
+    from backend.ledger.observation import (
+        CmdOutputObservation,
+    )
+
+    shrunk = 0
+    for ev in history:
+        if not isinstance(ev, CmdOutputObservation):
+            continue
+        content = getattr(ev, 'content', '') or ''
+        if len(content) <= 2000:
+            continue
+        head = content[:800]
+        tail = content[-800:]
+        ev.content = (
+            f'{head}\n... [graceful-degradation truncated '
+            f'{len(content) - 1600} chars] ...\n{tail}'
+        )
+        shrunk += 1
+    return shrunk
+
+
+def _graceful_trim_old_error_observations(history: list[Any]) -> int:
+    """Replace oldest ErrorObservations beyond the last five; returns count mutated."""
+    from backend.ledger.observation.error import ErrorObservation
+
+    errors = [
+        i for i, ev in enumerate(history) if isinstance(ev, ErrorObservation)
+    ]
+    dropped = 0
+    if len(errors) <= 5:
+        return dropped
+    for idx in errors[:-5]:
+        ev = history[idx]
+        if not isinstance(ev, ErrorObservation):
+            continue
+        msg = (ev.content or '')[:200]
+        ev.content = f'[graceful-degradation: error trimmed] {msg}'
+        dropped += 1
+    return dropped
+
+
 class Orchestrator(Agent):
     """Production orchestrator agent with modular planner–executor–memory architecture."""
 
@@ -258,47 +301,11 @@ class Orchestrator(Agent):
         Returns the next Action on success, or ``None`` if degradation could
         not produce a usable response (caller should raise).
         """
-        try:
-            from backend.ledger.observation import (  # local import to avoid cycles
-                CmdOutputObservation,
-            )
-            from backend.ledger.observation.error import ErrorObservation
-        except Exception:
-            return None
         if not getattr(state, 'history', None):
             return None
         try:
-            # Step 1: shrink large CmdOutputObservations.
-            shrunk = 0
-            for ev in state.history:
-                if not isinstance(ev, CmdOutputObservation):
-                    continue
-                content = getattr(ev, 'content', '') or ''
-                if len(content) > 2000:
-                    head = content[:800]
-                    tail = content[-800:]
-                    ev.content = (
-                        f'{head}\n... [graceful-degradation truncated '
-                        f'{len(content) - 1600} chars] ...\n{tail}'
-                    )
-                    shrunk += 1
-            # Step 2: thin out oldest ErrorObservations beyond the last 5.
-            errors = [
-                i
-                for i, ev in enumerate(state.history)
-                if isinstance(ev, ErrorObservation)
-            ]
-            dropped = 0
-            if len(errors) > 5:
-                # mark for replacement by sentinel rather than mutate list
-                # length (history index integrity matters for subscribers).
-                for idx in errors[:-5]:
-                    ev = state.history[idx]
-                    if not isinstance(ev, ErrorObservation):
-                        continue
-                    msg = (ev.content or '')[:200]
-                    ev.content = f'[graceful-degradation: error trimmed] {msg}'
-                    dropped += 1
+            shrunk = _graceful_shrink_large_cmd_outputs(state.history)
+            dropped = _graceful_trim_old_error_observations(state.history)
             logger.warning(
                 'Graceful context degradation: shrunk %d cmd outputs, '
                 'trimmed %d error observations',
@@ -318,92 +325,132 @@ class Orchestrator(Agent):
             )
             return None
 
+    def _reset_step_recovery_counters(self) -> None:
+        """Clear context-limit and recoverable tool-call replay counters."""
+        self._consecutive_context_errors = 0
+        self._recoverable_tool_error_signature = ''
+        self._recoverable_tool_error_count = 0
+
+    async def _astep_normal_path(self, state: State) -> Action:
+        """Happy path: optional exit/deferred/pending handling then LLM step."""
+        if exit_action := self._check_exit_command(state):
+            self._reset_step_recovery_counters()
+            return exit_action
+
+        if not self.pending_actions and self.deferred_actions:
+            self._promote_deferred_actions()
+
+        if pending := self._consume_pending_action():
+            self._reset_step_recovery_counters()
+            return pending
+
+        condensed = self.memory_manager.condense_history(state)
+        action = await self._execute_llm_step_async(state, condensed)
+        self._reset_step_recovery_counters()
+        return action
+
+    async def _astep_handle_context_limit_error(self, state: State) -> Action:
+        """Condense/retry after ContextLimitError; may degrade or raise."""
+        self._consecutive_context_errors = (
+            getattr(self, '_consecutive_context_errors', 0) + 1
+        )
+        logger.warning(
+            'ContextLimitError encountered (%d/%d). Attempting condensation + retry.',
+            self._consecutive_context_errors,
+            DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS,
+        )
+
+        if self._consecutive_context_errors > DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS:
+            degraded = await self._attempt_graceful_context_degradation(state)
+            if degraded is not None:
+                self._consecutive_context_errors = 0
+                return degraded
+            raise AgentRuntimeError(
+                'Circuit breaker: continuous ContextLimitErrors'
+            ) from None
+
+        try:
+            condensed = self.memory_manager.condense_history(state)
+            action = await self._execute_llm_step_async(state, condensed)
+            self._consecutive_context_errors = 0
+            return action
+        except ContextLimitError:
+            raise
+        except Exception:
+            logger.warning(
+                'Auto-Healing retry failed after condensation. Falling back to think action.'
+            )
+            return AgentThinkAction(
+                thought='I have reached the context limit. I must condense my memory before proceeding.',
+            )
+
+    def _astep_handle_tool_execution_error(self, e: ToolExecutionError) -> Action:
+        self._consecutive_context_errors = 0
+        logger.warning('Auto-Healing: Tool Execution Error: %s', e)
+
+        removed = self.clear_queued_actions(
+            reason='Tool execution failed, aborting batched sequence'
+        )
+        if removed > 0:
+            logger.info(
+                'Batched sequence aborted! Dispelled %d blind follow-up actions.',
+                removed,
+            )
+
+        return AgentThinkAction(
+            thought=f'I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.',
+        )
+
+    def _astep_handle_recoverable_tool_call_shape_error(self, e: Exception) -> Action:
+        self._consecutive_context_errors = 0
+        logger.warning('Recoverable LLM tool-call error: %s', e)
+
+        error_signature = f'{type(e).__name__}:{str(e).strip()}'
+        if error_signature == self._recoverable_tool_error_signature:
+            self._recoverable_tool_error_count += 1
+        else:
+            self._recoverable_tool_error_signature = error_signature
+            self._recoverable_tool_error_count = 1
+
+        removed = self.clear_queued_actions(
+            reason='Invalid LLM tool call, aborting batched sequence'
+        )
+        if removed > 0:
+            logger.info(
+                'Batched sequence aborted! Dispelled %d blind follow-up actions.',
+                removed,
+            )
+
+        if (
+            self._recoverable_tool_error_count
+            >= DEFAULT_AGENT_RECOVERABLE_TOOL_ERROR_THRESHOLD
+        ):
+            return AgentThinkAction(
+                thought=(
+                    '[TOOL_CALL_RECOVERABLE_ERROR_ESCALATED] The same invalid tool call pattern '
+                    'repeated 3 times and was blocked. You must change strategy now: '
+                    're-read relevant file context and emit a different corrected action '
+                    '(or switch tool), not a near-identical retry.'
+                )
+            )
+
+        return AgentThinkAction(
+            thought=(
+                '[TOOL_CALL_RECOVERABLE_ERROR] The previous tool call was invalid and was not executed. '
+                f'Details: {str(e)}\n'
+                'I will emit one corrected tool call with valid JSON arguments '
+                '(double-quoted keys/strings, escaped newlines/quotes, required arguments present).'
+            )
+        )
+
     async def astep(self, state: State) -> Action:
         """Async version of step() with hard circuit breaker for consecutive ContextLimitErrors."""
         try:
-            if exit_action := self._check_exit_command(state):
-                self._consecutive_context_errors = 0
-                self._recoverable_tool_error_signature = ''
-                self._recoverable_tool_error_count = 0
-                return exit_action
-
-            if not self.pending_actions and self.deferred_actions:
-                self._promote_deferred_actions()
-
-            if pending := self._consume_pending_action():
-                self._consecutive_context_errors = 0
-                self._recoverable_tool_error_signature = ''
-                self._recoverable_tool_error_count = 0
-                return pending
-
-            condensed = self.memory_manager.condense_history(state)
-            action = await self._execute_llm_step_async(state, condensed)
-            # Successful step: reset the circuit breaker counter
-            self._consecutive_context_errors = 0
-            self._recoverable_tool_error_signature = ''
-            self._recoverable_tool_error_count = 0
-            return action
-
+            return await self._astep_normal_path(state)
         except ContextLimitError:
-            self._consecutive_context_errors = (
-                getattr(self, '_consecutive_context_errors', 0) + 1
-            )
-            logger.warning(
-                'ContextLimitError encountered (%d/%d). Attempting condensation + retry.',
-                self._consecutive_context_errors,
-                DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS,
-            )
-
-            # Circuit breaker: fail hard once consecutive ContextLimitErrors exceed
-            # the configured budget. Before raising, attempt structured graceful
-            # degradation (drop oldest tool outputs/errors, then trim system context)
-            # so that runaway-sized single observations don't kill the session.
-            if self._consecutive_context_errors > DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS:
-                degraded = await self._attempt_graceful_context_degradation(state)
-                if degraded is not None:
-                    # Reset counter on successful degradation so the agent gets
-                    # a fresh budget; if it overflows again we trip again.
-                    self._consecutive_context_errors = 0
-                    return degraded
-                raise AgentRuntimeError(
-                    'Circuit breaker: continuous ContextLimitErrors'
-                ) from None
-
-            # Try auto-heal: condense once and retry
-            try:
-                condensed = self.memory_manager.condense_history(state)
-                action = await self._execute_llm_step_async(state, condensed)
-                # Successful retry: reset the counter
-                self._consecutive_context_errors = 0
-                return action
-            except ContextLimitError:
-                # Re-raise to trigger circuit breaker check on next attempt
-                raise
-            except Exception:
-                logger.warning(
-                    'Auto-Healing retry failed after condensation. Falling back to think action.'
-                )
-                return AgentThinkAction(
-                    thought='I have reached the context limit. I must condense my memory before proceeding.',
-                )
-
+            return await self._astep_handle_context_limit_error(state)
         except ToolExecutionError as e:
-            self._consecutive_context_errors = 0
-            logger.warning('Auto-Healing: Tool Execution Error: %s', e)
-
-            removed = self.clear_queued_actions(
-                reason='Tool execution failed, aborting batched sequence'
-            )
-            if removed > 0:
-                logger.info(
-                    'Batched sequence aborted! Dispelled %d blind follow-up actions.',
-                    removed,
-                )
-
-            return AgentThinkAction(
-                thought=f'I encountered a tool error: {str(e)}. I will analyze the last tool call and retry.',
-            )
-
+            return self._astep_handle_tool_execution_error(e)
         except (
             FunctionCallValidationError,
             FunctionCallNotExistsError,
@@ -412,43 +459,7 @@ class Orchestrator(Agent):
             FunctionCallConversionError,
             LLMMalformedActionError,
         ) as e:
-            self._consecutive_context_errors = 0
-            logger.warning('Recoverable LLM tool-call error: %s', e)
-
-            error_signature = f'{type(e).__name__}:{str(e).strip()}'
-            if error_signature == self._recoverable_tool_error_signature:
-                self._recoverable_tool_error_count += 1
-            else:
-                self._recoverable_tool_error_signature = error_signature
-                self._recoverable_tool_error_count = 1
-
-            removed = self.clear_queued_actions(
-                reason='Invalid LLM tool call, aborting batched sequence'
-            )
-            if removed > 0:
-                logger.info(
-                    'Batched sequence aborted! Dispelled %d blind follow-up actions.',
-                    removed,
-                )
-
-            if self._recoverable_tool_error_count >= DEFAULT_AGENT_RECOVERABLE_TOOL_ERROR_THRESHOLD:
-                return AgentThinkAction(
-                    thought=(
-                        '[TOOL_CALL_RECOVERABLE_ERROR_ESCALATED] The same invalid tool call pattern '
-                        'repeated 3 times and was blocked. You must change strategy now: '
-                        're-read relevant file context and emit a different corrected action '
-                        '(or switch tool), not a near-identical retry.'
-                    )
-                )
-
-            return AgentThinkAction(
-                thought=(
-                    '[TOOL_CALL_RECOVERABLE_ERROR] The previous tool call was invalid and was not executed. '
-                    f'Details: {str(e)}\n'
-                    'I will emit one corrected tool call with valid JSON arguments '
-                    '(double-quoted keys/strings, escaped newlines/quotes, required arguments present).'
-                )
-            )
+            return self._astep_handle_recoverable_tool_call_shape_error(e)
 
         except (ModelProviderError, LLMError, LLMNoActionError):
             self._consecutive_context_errors = 0
@@ -758,6 +769,17 @@ class Orchestrator(Agent):
         except Exception:
             return []
 
+    @staticmethod
+    def _mcp_tool_descriptions_from_specs(mcp_tools: list[dict]) -> dict[str, str]:
+        descriptions: dict[str, str] = {}
+        for tool_dict in mcp_tools:
+            fn = tool_dict.get('function') or {}
+            name = fn.get('name') or tool_dict.get('name', '')
+            desc = fn.get('description') or tool_dict.get('description', '')
+            if name and desc:
+                descriptions[name] = desc.split('\n')[0][:120]
+        return descriptions
+
     def set_mcp_tools(self, mcp_tools: list[dict]) -> None:
         """Set MCP tools and sync names to prompt manager for dynamic discovery."""
         super().set_mcp_tools(mcp_tools)
@@ -776,14 +798,7 @@ class Orchestrator(Agent):
         pm = getattr(self, '_prompt_manager', None)
         if pm and hasattr(pm, 'mcp_tool_names'):
             pm.mcp_tool_names = list(self.mcp_tools.keys())
-            descriptions: dict[str, str] = {}
-            for tool_dict in mcp_tools:
-                fn = tool_dict.get('function') or {}
-                name = fn.get('name') or tool_dict.get('name', '')
-                desc = fn.get('description') or tool_dict.get('description', '')
-                if name and desc:
-                    first_line = desc.split('\n')[0][:120]
-                    descriptions[name] = first_line
+            descriptions = self._mcp_tool_descriptions_from_specs(mcp_tools)
             if hasattr(pm, 'mcp_tool_descriptions'):
                 pm.mcp_tool_descriptions = descriptions
             if hasattr(pm, 'mcp_server_hints'):

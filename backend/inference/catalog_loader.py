@@ -307,6 +307,20 @@ def sanitize_call_kwargs_for_provider(model: str, call_kwargs: dict) -> dict:
     return sanitized
 
 
+def _apply_catalog_token_and_penalty_strips(
+    entry: ModelEntry, call_kwargs: dict
+) -> None:
+    if entry.strip_top_p:
+        call_kwargs.pop('top_p', None)
+    if entry.strip_temperature:
+        call_kwargs.pop('temperature', None)
+    if entry.strip_penalties:
+        call_kwargs.pop('presence_penalty', None)
+        call_kwargs.pop('frequency_penalty', None)
+    if entry.use_max_completion_tokens and 'max_tokens' in call_kwargs:
+        call_kwargs['max_completion_tokens'] = call_kwargs.pop('max_tokens')
+
+
 def apply_model_param_overrides(
     model: str,
     call_kwargs: dict,
@@ -346,17 +360,7 @@ def apply_model_param_overrides(
     elif reasoning_effort is not None and not entry.strip_reasoning_effort:
         call_kwargs['reasoning_effort'] = reasoning_effort
 
-    # Conditional param stripping
-    if entry.strip_top_p:
-        call_kwargs.pop('top_p', None)
-    if entry.strip_temperature:
-        call_kwargs.pop('temperature', None)
-    if entry.strip_penalties:
-        call_kwargs.pop('presence_penalty', None)
-        call_kwargs.pop('frequency_penalty', None)
-
-    if entry.use_max_completion_tokens and 'max_tokens' in call_kwargs:
-        call_kwargs['max_completion_tokens'] = call_kwargs.pop('max_tokens')
+    _apply_catalog_token_and_penalty_strips(entry, call_kwargs)
 
     return call_kwargs
 

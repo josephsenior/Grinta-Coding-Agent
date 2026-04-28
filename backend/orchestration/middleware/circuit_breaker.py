@@ -40,6 +40,45 @@ _TOOL_FALLBACK_MAP: dict[str, list[str]] = {
 }
 
 
+def _tool_name_for_action(action: object) -> str:
+    tcm = getattr(action, 'tool_call_metadata', None)
+    if tcm is None:
+        return ''
+    return getattr(tcm, 'function_name', '') or ''
+
+
+def _effective_error_tool_name(tool_name: str, content: str) -> str:
+    if tool_name != TEXT_EDITOR_TOOL_NAME:
+        return tool_name
+    return classify_text_editor_error_bucket(content)
+
+
+def _fallback_hint(tool_name: str) -> str | None:
+    if tool_name not in _TOOL_FALLBACK_MAP:
+        return None
+    fallbacks = _TOOL_FALLBACK_MAP[tool_name]
+    return (
+        f'\n\n[TOOL_FALLBACK] `{tool_name}` failed. Try: '
+        f'{", ".join(f"`{tool}`" for tool in fallbacks)} instead — pivot immediately.'
+    )
+
+
+def _append_tool_fallback_hint(observation: Observation, tool_name: str) -> None:
+    hint = _fallback_hint(tool_name)
+    if hint is None:
+        return
+    base_content = observation.content or ''
+    observation.content = base_content + hint
+
+
+def _record_success_progress(service: object, tool_name: str, observation: Observation) -> None:
+    record_success = getattr(service, 'record_success')
+    record_success(tool_name=tool_name)
+    obs_type = type(observation).__name__
+    if obs_type in _PROGRESS_OBSERVATION_TYPES:
+        service.record_progress_signal(obs_type)
+
+
 class CircuitBreakerMiddleware(ToolInvocationMiddleware):
     """Records circuit breaker telemetry across execute/observe stages."""
 
@@ -60,28 +99,15 @@ class CircuitBreakerMiddleware(ToolInvocationMiddleware):
             return
         from backend.ledger.observation import ErrorObservation
 
-        # Extract tool name from the action's metadata for per-tool tracking
-        tool_name = ''
-        tcm = getattr(ctx.action, 'tool_call_metadata', None)
-        if tcm is not None:
-            tool_name = getattr(tcm, 'function_name', '') or ''
+        tool_name = _tool_name_for_action(ctx.action)
 
         if isinstance(observation, ErrorObservation):
             base_content = observation.content or ''
-            effective_tool = tool_name
-            if tool_name == TEXT_EDITOR_TOOL_NAME:
-                effective_tool = classify_text_editor_error_bucket(base_content)
-            # Inject fallback hint so the model knows which tool to try next
-            if tool_name and tool_name in _TOOL_FALLBACK_MAP:
-                fallbacks = _TOOL_FALLBACK_MAP[tool_name]
-                hint = f'\n\n[TOOL_FALLBACK] `{tool_name}` failed. Try: {", ".join(f"`{t}`" for t in fallbacks)} instead — pivot immediately.'
-                observation.content = base_content + hint
+            effective_tool = _effective_error_tool_name(tool_name, base_content)
+            _append_tool_fallback_hint(observation, tool_name)
             service.record_error(
                 RuntimeError(observation.content), tool_name=effective_tool
             )
-        else:
-            service.record_success(tool_name=tool_name)
-            # Meaningful progress actions reduce stuck-detection pressure
-            obs_type = type(observation).__name__
-            if obs_type in _PROGRESS_OBSERVATION_TYPES:
-                service.record_progress_signal(obs_type)
+            return
+
+        _record_success_progress(service, tool_name, observation)

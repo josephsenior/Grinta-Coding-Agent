@@ -263,21 +263,8 @@ class OrchestratorPlanner:
 
             tools.append(create_execute_mcp_tool_tool())
 
-    def build_llm_params(
-        self,
-        messages: list,
-        state: State,
-        tools: list[ChatCompletionToolParam],
-    ) -> dict:
-        tool_choice = self._determine_tool_choice(messages, state)
-
-        # NOTE: We inject control/status messages *after* tool selection so
-        # tool selection heuristics see the original user/assistant content.
-
-        # Cache check_tools output — only recompute when tools or model changes
-        # Invalidate cache when tool selection changes the list
+    def _refresh_checked_tools_cache(self, tools: list[ChatCompletionToolParam]) -> None:
         current_model = self._llm.config.model if self._llm else ''
-        # Stringify names so cache keys work with MagicMock-based tests and odd payloads.
         tool_fingerprint = ','.join(
             str(
                 (t.get('function') or {}).get('name', '') if isinstance(t, dict) else ''
@@ -289,19 +276,38 @@ class OrchestratorPlanner:
             self._checked_tools_cache = check_tools(tools, self._llm.config)
             self._checked_tools_model = cache_key
 
+    @staticmethod
+    def _warn_if_degraded_emergency_prompt(messages: list) -> None:
+        if not messages:
+            return
+        first = messages[0]
+        role = getattr(first, 'role', '')
+        if role != 'system':
+            return
+        for content in getattr(first, 'content', []):
+            text = getattr(content, 'text', '')
+            if '[DEGRADED_MODE_SYSTEM_PROMPT]' in text:
+                logger.error(
+                    'Planner detected degraded emergency system prompt. Tool guidance fidelity may be reduced.'
+                )
+                break
+
+    def build_llm_params(
+        self,
+        messages: list,
+        state: State,
+        tools: list[ChatCompletionToolParam],
+    ) -> dict:
+        tool_choice = self._determine_tool_choice(messages, state)
+
+        # NOTE: We inject control/status messages *after* tool selection so
+        # tool selection heuristics see the original user/assistant content.
+
+        self._refresh_checked_tools_cache(tools)
+
         messages = self._inject_turn_status(messages, state)
         _maybe_log_prompt_metrics(messages)
-        if messages:
-            first = messages[0]
-            role = getattr(first, 'role', '')
-            if role == 'system':
-                for content in getattr(first, 'content', []):
-                    text = getattr(content, 'text', '')
-                    if '[DEGRADED_MODE_SYSTEM_PROMPT]' in text:
-                        logger.error(
-                            'Planner detected degraded emergency system prompt. Tool guidance fidelity may be reduced.'
-                        )
-                        break
+        self._warn_if_degraded_emergency_prompt(messages)
 
         params: dict[str, Any] = {
             'messages': messages,

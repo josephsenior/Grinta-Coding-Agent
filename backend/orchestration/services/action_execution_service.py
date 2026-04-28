@@ -201,6 +201,294 @@ class ActionExecutionService:
             return
         event_stream.add_event(event, EventSource.AGENT)
 
+    @staticmethod
+    def _agent_name(agent: object) -> str:
+        return str(getattr(agent, 'name', agent.__class__.__name__))
+
+    @staticmethod
+    def _agent_model_name(agent: object) -> object | None:
+        llm = getattr(agent, 'llm', None)
+        llm_config = getattr(llm, 'config', None) if llm is not None else None
+        return getattr(llm_config, 'model', None)
+
+    def _should_use_confirmation_replay(self, controller: object) -> bool:
+        confirmation = self._context.confirmation_service
+        replay_mgr = getattr(controller, '_replay_manager', None)
+        return (
+            confirmation is not None
+            and replay_mgr is not None
+            and replay_mgr.should_replay() is True
+        )
+
+    def _get_confirmation_action(self) -> Action | None:
+        confirmation = self._context.confirmation_service
+        get_next_action = (
+            getattr(confirmation, 'get_next_action', None)
+            if confirmation is not None
+            else None
+        )
+        if callable(get_next_action):
+            return cast(Callable[[], Action], get_next_action)()
+        logger.error(
+            'ActionExecutionService.get_next_action: confirmation replay '
+            'was requested but ConfirmationService.get_next_action is unavailable'
+        )
+        return None
+
+    async def _get_agent_step_action(self, attempt: int) -> Action | None:
+        agent = cast(object | None, self._context.agent)
+        if agent is None:
+            logger.error(
+                'ActionExecutionService.get_next_action: context agent is unavailable'
+            )
+            return None
+
+        astep = getattr(agent, 'astep', None)
+        if callable(astep) and inspect.iscoroutinefunction(astep):
+            async_step = cast(Callable[[object], Awaitable[Action]], astep)
+            return await self._run_async_step(agent, async_step, attempt)
+
+        step = getattr(agent, 'step', None)
+        if not callable(step):
+            logger.error(
+                'ActionExecutionService.get_next_action: agent=%s has no callable step()',
+                self._agent_name(agent),
+            )
+            return None
+        return cast(Callable[[object], Action], step)(self._context.state)
+
+    async def _run_async_step(
+        self,
+        agent: object,
+        async_step: Callable[[object], Awaitable[Action]],
+        attempt: int,
+    ) -> Action:
+        logger.info(
+            'ActionExecutionService.get_next_action: invoking astep '
+            'for agent=%s (attempt=%d)',
+            self._agent_name(agent),
+            attempt,
+        )
+        timeout = _resolve_llm_step_timeout_seconds(agent)
+        if timeout is None:
+            return await async_step(self._context.state)
+        return await self._run_async_step_with_timeout(agent, async_step, timeout)
+
+    async def _run_async_step_with_timeout(
+        self,
+        agent: object,
+        async_step: Callable[[object], Awaitable[Action]],
+        timeout: float,
+    ) -> Action:
+        import asyncio as _asyncio
+
+        result: Action | None = None
+        for _timeout_attempt in range(2):
+            try:
+                result = await _asyncio.wait_for(
+                    async_step(self._context.state),
+                    timeout=timeout,
+                )
+                break  # success
+            except _asyncio.TimeoutError as exc:
+                if _timeout_attempt == 0:
+                    logger.warning(
+                        'ActionExecutionService.get_next_action: '
+                        'astep timed out after %s seconds, retrying once',
+                        timeout,
+                    )
+                    continue
+                model_name = self._agent_model_name(agent)
+                logger.error(
+                    'ActionExecutionService.get_next_action: astep timed out '
+                    'after %s seconds for model=%s (after retry)',
+                    timeout,
+                    model_name,
+                )
+                raise Timeout(
+                    f'LLM step timed out after {timeout} seconds',
+                    model=model_name,
+                ) from exc
+
+        if result is None:
+            raise RuntimeError('unreachable async-step timeout state')
+        return result
+
+    async def _acquire_next_action(self, attempt: int) -> tuple[Action | None, bool]:
+        controller = self._context.get_controller()
+        use_confirmation_replay = self._should_use_confirmation_replay(controller)
+        if use_confirmation_replay:
+            return self._get_confirmation_action(), True
+        return await self._get_agent_step_action(attempt), False
+
+    def _log_missing_action(self, attempt: int) -> None:
+        logger.error(
+            'ActionExecutionService.get_next_action: agent produced no action object '
+            'on attempt=%d',
+            attempt,
+        )
+
+    def _log_obtained_action(self, action: Action) -> None:
+        agent = self._context.agent
+        logger.info(
+            'ActionExecutionService.get_next_action: obtained action=%s '
+            'from agent=%s',
+            getattr(action, 'action', type(action).__name__),
+            self._agent_name(agent),
+        )
+
+    async def _finalize_acquired_action(
+        self,
+        action: Action | None,
+        *,
+        attempt: int,
+        use_confirmation_replay: bool,
+    ) -> Action | None:
+        if action is None:
+            self._log_missing_action(attempt)
+            return None
+
+        action.source = EventSource.AGENT
+        self._log_obtained_action(action)
+        if use_confirmation_replay:
+            return action
+        if isinstance(action, NullAction):
+            return await self._handle_consecutive_null_action(action)
+        self._reset_consecutive_null_actions()
+        return action
+
+    @staticmethod
+    def _next_error_retry_state(
+        exc: Exception,
+        last_error_signature: str,
+        identical_error_count: int,
+    ) -> tuple[str, int]:
+        error_signature = f'{type(exc).__name__}:{str(exc).strip()}'
+        if error_signature == last_error_signature:
+            return error_signature, identical_error_count + 1
+        return error_signature, 1
+
+    @staticmethod
+    def _format_repair_error_message(exc: Exception) -> str:
+        if isinstance(
+            exc,
+            (FunctionCallValidationError, CommonFunctionCallValidationError),
+        ):
+            return (
+                f'Tool validation failed: {exc}\n'
+                'Please correct the tool arguments and try again.'
+            )
+        if isinstance(
+            exc,
+            (FunctionCallNotExistsError, CommonFunctionCallNotExistsError),
+        ):
+            return (
+                f'Tool not found: {exc}\n'
+                'Please use an existing tool from the provided list.'
+            )
+        return str(exc)
+
+    def _publish_repair_error_observation(
+        self,
+        exc: Exception,
+        error_logged: bool,
+    ) -> bool:
+        if error_logged:
+            return True
+        self._publish_agent_event(
+            ErrorObservation(content=self._format_repair_error_message(exc))
+        )
+        return True
+
+    def _record_repair_error_for_circuit_breaker(
+        self,
+        controller: object,
+        exc: Exception,
+        error_signature: str,
+    ) -> None:
+        cb_service = getattr(controller, 'circuit_breaker_service', None)
+        if cb_service is None:
+            return
+        error_lower = error_signature.lower()
+        if 'text_editor' in error_lower or '[text_editor' in error_lower:
+            bucket = classify_text_editor_error_bucket(str(exc))
+            cb_service.record_error(exc, tool_name=bucket)
+
+    def _effective_retry_limit(
+        self,
+        error_signature: str,
+        max_identical_retries: int,
+    ) -> int:
+        if (
+            '[APPLY_PATCH_CLASS:malformed_patch]' in error_signature
+            or '[APPLY_PATCH_CLASS:context_mismatch]' in error_signature
+        ):
+            return self._APPLY_PATCH_MAX_RETRIES
+        return max_identical_retries
+
+    @staticmethod
+    async def _yield_for_repair_retry() -> None:
+        import asyncio
+
+        await asyncio.sleep(0.01)
+
+    @staticmethod
+    async def _set_controller_error_if_running(controller: object) -> None:
+        from backend.core.schemas import AgentState as _AgentState
+
+        if controller.get_agent_state() == _AgentState.RUNNING:
+            await controller.set_agent_state_to(_AgentState.ERROR)
+
+    async def _handle_repairable_action_error(
+        self,
+        exc: Exception,
+        *,
+        attempt: int,
+        max_repair_attempts: int,
+        max_identical_retries: int,
+        error_logged: bool,
+        last_error_signature: str,
+        identical_error_count: int,
+    ) -> tuple[bool, bool, str, int]:
+        self._reset_consecutive_null_actions()
+        error_signature, identical_error_count = self._next_error_retry_state(
+            exc,
+            last_error_signature,
+            identical_error_count,
+        )
+        error_logged = self._publish_repair_error_observation(exc, error_logged)
+
+        controller = self._context.get_controller()
+        self._record_repair_error_for_circuit_breaker(
+            controller,
+            exc,
+            error_signature,
+        )
+
+        effective_max_retries = self._effective_retry_limit(
+            error_signature,
+            max_identical_retries,
+        )
+        if identical_error_count > effective_max_retries:
+            logger.error(
+                'get_next_action blocked repeated identical recoverable error after %d attempts: %s',
+                identical_error_count,
+                error_signature,
+            )
+            await self._set_controller_error_if_running(controller)
+            return False, error_logged, error_signature, identical_error_count
+
+        if attempt < max_repair_attempts:
+            await self._yield_for_repair_retry()
+            return True, error_logged, error_signature, identical_error_count
+
+        logger.error(
+            'get_next_action exhausted %d repair attempts; transitioning to ERROR state',
+            max_repair_attempts,
+        )
+        await self._set_controller_error_if_running(controller)
+        return False, error_logged, error_signature, identical_error_count
+
     async def get_next_action(self) -> Action | None:
         """Get the next action from the agent, with automatic repair for validation errors."""
         max_repair_attempts = self._MAX_REPAIR_ATTEMPTS
@@ -211,127 +499,16 @@ class ActionExecutionService:
         identical_error_count = 0
         for attempt in range(max_repair_attempts + 1):
             try:
-                action: Action | None = None
-                confirmation = self._context.confirmation_service
-                controller = self._context.get_controller()
-                replay_mgr = getattr(controller, '_replay_manager', None)
-                # ConfirmationService.get_next_action() uses synchronous agent.step()
-                # for live runs, which disables real token streaming (astep/async_execute).
-                # Only delegate there during trajectory replay; otherwise prefer astep.
-                use_confirmation_replay = (
-                    confirmation is not None
-                    and replay_mgr is not None
-                    and replay_mgr.should_replay() is True
+                action, use_confirmation_replay = await self._acquire_next_action(
+                    attempt
                 )
-                if use_confirmation_replay and confirmation is not None:
-                    get_next_action = getattr(confirmation, 'get_next_action', None)
-                    if not callable(get_next_action):
-                        logger.error(
-                            'ActionExecutionService.get_next_action: confirmation replay '
-                            'was requested but ConfirmationService.get_next_action is unavailable'
-                        )
-                        return None
-                    action = cast(Callable[[], Action], get_next_action)()
-                else:
-                    # Prefer the async step path (real LLM streaming) when
-                    # available; fall back to synchronous step() otherwise.
-                    import asyncio as _asyncio
-
-                    agent = cast(object | None, self._context.agent)
-                    if agent is None:
-                        logger.error(
-                            'ActionExecutionService.get_next_action: context agent is unavailable'
-                        )
-                        return None
-
-                    astep = getattr(agent, 'astep', None)
-                    if callable(astep) and inspect.iscoroutinefunction(astep):
-                        async_step = cast(Callable[[object], Awaitable[Action]], astep)
-                        logger.info(
-                            'ActionExecutionService.get_next_action: invoking astep '
-                            'for agent=%s (attempt=%d)',
-                            getattr(agent, 'name', agent.__class__.__name__),
-                            attempt,
-                        )
-                        timeout = _resolve_llm_step_timeout_seconds(agent)
-                        if timeout is None:
-                            action = await async_step(self._context.state)
-                        else:
-                            # Retry once on timeout before propagating
-                            for _timeout_attempt in range(2):
-                                try:
-                                    action = await _asyncio.wait_for(
-                                        async_step(self._context.state),
-                                        timeout=timeout,
-                                    )
-                                    break  # success
-                                except _asyncio.TimeoutError as exc:
-                                    if _timeout_attempt == 0:
-                                        logger.warning(
-                                            'ActionExecutionService.get_next_action: '
-                                            'astep timed out after %s seconds, retrying once',
-                                            timeout,
-                                        )
-                                        continue
-                                    llm = getattr(agent, 'llm', None)
-                                    llm_config = (
-                                        getattr(llm, 'config', None)
-                                        if llm is not None
-                                        else None
-                                    )
-                                    model_name = getattr(llm_config, 'model', None)
-                                    logger.error(
-                                        'ActionExecutionService.get_next_action: astep timed out '
-                                        'after %s seconds for model=%s (after retry)',
-                                        timeout,
-                                        model_name,
-                                    )
-                                    raise Timeout(
-                                        f'LLM step timed out after {timeout} seconds',
-                                        model=model_name,
-                                    ) from exc
-                    else:
-                        step = getattr(agent, 'step', None)
-                        if not callable(step):
-                            logger.error(
-                                'ActionExecutionService.get_next_action: agent=%s has no callable step()',
-                                getattr(agent, 'name', agent.__class__.__name__),
-                            )
-                            return None
-                        action = cast(Callable[[object], Action], step)(
-                            self._context.state
-                        )
-
-                if action is None:
-                    logger.error(
-                        'ActionExecutionService.get_next_action: agent produced no action object '
-                        'on attempt=%d',
-                        attempt,
-                    )
+                if use_confirmation_replay and action is None:
                     return None
-                action.source = EventSource.AGENT
-
-                logger.info(
-                    'ActionExecutionService.get_next_action: obtained action=%s '
-                    'from agent=%s',
-                    getattr(action, 'action', type(action).__name__),
-                    getattr(
-                        self._context.agent,
-                        'name',
-                        self._context.agent.__class__.__name__,
-                    ),
+                return await self._finalize_acquired_action(
+                    action,
+                    attempt=attempt,
+                    use_confirmation_replay=use_confirmation_replay,
                 )
-                if use_confirmation_replay:
-                    return action
-                if isinstance(action, NullAction):
-                    return await self._handle_consecutive_null_action(action)
-                self._reset_consecutive_null_actions()
-                # A single non-null action can be part of the recovery path itself
-                # (for example, a rollback or a quick read) without meaning the
-                # agent has actually resumed normal forward progress. Preserve the
-                # broader recovery-round budget until the loop either pauses or a
-                # fresh service instance is created for a new run.
-                return action
 
             except (
                 LLMMalformedActionError,
@@ -342,87 +519,19 @@ class ActionExecutionService:
                 CommonFunctionCallValidationError,
                 CommonFunctionCallNotExistsError,
             ) as exc:
-                self._reset_consecutive_null_actions()
-                error_signature = f'{type(exc).__name__}:{str(exc).strip()}'
-                if error_signature == last_error_signature:
-                    identical_error_count += 1
-                else:
-                    last_error_signature = error_signature
-                    identical_error_count = 1
-
-                # Create detailed error observation
-                error_msg = str(exc)
-                if isinstance(
-                    exc,
-                    (FunctionCallValidationError, CommonFunctionCallValidationError),
-                ):
-                    error_msg = f'Tool validation failed: {exc}\nPlease correct the tool arguments and try again.'
-                if isinstance(
-                    exc,
-                    (FunctionCallNotExistsError, CommonFunctionCallNotExistsError),
-                ):
-                    error_msg = f'Tool not found: {exc}\nPlease use an existing tool from the provided list.'
-
-                obs = ErrorObservation(content=error_msg)
-                if not error_logged:
-                    # Add to event stream so it's recorded in history
-                    self._publish_agent_event(obs)
-                    error_logged = True
-
-                controller = self._context.get_controller()
-                cb_service = getattr(controller, 'circuit_breaker_service', None)
-                if cb_service is not None:
-                    error_lower = error_signature.lower()
-                    if (
-                        'text_editor' in error_lower
-                        or '[text_editor' in error_lower
-                    ):
-                        bucket = classify_text_editor_error_bucket(str(exc))
-                        cb_service.record_error(exc, tool_name=bucket)
-
-                effective_max_retries = max_identical_retries
-                if (
-                    '[APPLY_PATCH_CLASS:malformed_patch]' in error_signature
-                    or '[APPLY_PATCH_CLASS:context_mismatch]' in error_signature
-                ):
-                    effective_max_retries = self._APPLY_PATCH_MAX_RETRIES
-
-                if identical_error_count > effective_max_retries:
-                    logger.error(
-                        'get_next_action blocked repeated identical recoverable error after %d attempts: %s',
-                        identical_error_count,
-                        error_signature,
+                should_continue, error_logged, last_error_signature, identical_error_count = (
+                    await self._handle_repairable_action_error(
+                        exc,
+                        attempt=attempt,
+                        max_repair_attempts=max_repair_attempts,
+                        max_identical_retries=max_identical_retries,
+                        error_logged=error_logged,
+                        last_error_signature=last_error_signature,
+                        identical_error_count=identical_error_count,
                     )
-                    from backend.core.schemas import AgentState as _AgentState
-
-                    if controller.get_agent_state() == _AgentState.RUNNING:
-                        await controller.set_agent_state_to(_AgentState.ERROR)
-                    return None
-
-                # If we have retries left, continue loop to let agent see error and try again
-                if attempt < max_repair_attempts:
-                    # We need to ensure the state is updated with this new observation
-                    # before the next step. The state tracker updates via event subscription,
-                    # but we can also manually ensure it's in the current view if needed.
-                    # Typically, event_stream.add_event triggers the subscribers.
-                    # We yield control briefly to allow state update to propagate if async.
-                    import asyncio
-
-                    await asyncio.sleep(0.01)
+                )
+                if should_continue:
                     continue
-
-                # If out of retries, transition to ERROR so the agent doesn't
-                # stay stuck in RUNNING state indefinitely.
-                from backend.core.schemas import AgentState as _AgentState
-
-                controller = self._context.get_controller()
-                if controller.get_agent_state() == _AgentState.RUNNING:
-                    logger.error(
-                        'get_next_action exhausted %d repair attempts; '
-                        'transitioning to ERROR state',
-                        max_repair_attempts,
-                    )
-                    await controller.set_agent_state_to(_AgentState.ERROR)
                 return None
 
             except (ContextWindowExceededError, BadRequestError, OpenAIError) as exc:

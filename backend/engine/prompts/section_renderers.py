@@ -70,48 +70,31 @@ def _explore_hint(_config: Any = None) -> str:
     )
 
 
-def _render_routing(
-    render_partial: Callable[..., str],
-    is_windows: bool,
-    config: Any = None,
-    function_calling_mode: str | None = None,
-) -> str:
-    explore = _explore_hint(config)
-    code_intelligence_available = _code_intelligence_available(config)
-    meta_cognition_on = getattr(config, 'enable_meta_cognition', False)
-    working_memory_on = getattr(config, 'enable_working_memory', True)
-    condensation_on = getattr(config, 'enable_condensation_request', False)
-    tracker_on = getattr(config, 'enable_internal_task_tracker', False)
-    batch_cmds = _choose(
-        is_windows,
-        f'Use **PowerShell** only for environment actions (install, build, test, git, processes). '
-        f'For repo layout and file content, use **{explore}** '
-        'and **`text_editor` (`read_file`)**—not `Get-Content`/`Select-String` pipelines for source trees.',
-        f'Use **bash** only for environment actions (install, build, test, git, processes). '
-        f'For repo layout and file content, use **{explore}** '
-        'and **`text_editor` (`read_file`)**—not `ls && cat && grep` chains for project files.',
-    )
-    code_intelligence_routing = (
-        '- **Known file + symbol position, precise definition/references/hover** → `code_intelligence`'
-        if code_intelligence_available
-        else ''
-    )
+def _routing_tool_batching_paragraph(function_calling_mode: str | None) -> str:
     mode = (function_calling_mode or 'unknown').strip().lower()
     if mode == 'native':
-        tool_call_batching_mode = (
+        return (
             'Native function-calling mode is active. You may batch independent tool calls '
             'in one assistant turn when it improves latency; keep dependent calls sequential.'
         )
-    elif mode == 'string':
-        tool_call_batching_mode = (
+    if mode == 'string':
+        return (
             'Fallback string-parsing mode is active. Emit exactly one tool call per assistant '
             'message and continue step-by-step.'
         )
-    else:
-        tool_call_batching_mode = (
-            'Mode is unknown. Use conservative single tool-call turns unless runtime capability '
-            'signals explicitly confirm native multi-call support.'
-        )
+    return (
+        'Mode is unknown. Use conservative single tool-call turns unless runtime capability '
+        'signals explicitly confirm native multi-call support.'
+    )
+
+
+def _routing_memory_tool_placeholders(
+    *,
+    working_memory_on: bool,
+    tracker_on: bool,
+    condensation_on: bool,
+    meta_cognition_on: bool,
+) -> dict[str, str]:
     ambiguous_intent_instruction = (
         'Use `communicate_with_user` to offer options rather than guessing.'
         if meta_cognition_on
@@ -160,19 +143,64 @@ def _render_routing(
         if tracker_on
         else 'Use restored working memory and recent verified observations as the source of truth for what remains.'
     )
+    return {
+        'ambiguous_intent_instruction': ambiguous_intent_instruction,
+        'memory_and_context_section': memory_and_context_section,
+        'post_condensation_retrieval': post_condensation_retrieval,
+        'surviving_state_facts': surviving_state_facts,
+        'context_budget_sync_clause': context_budget_sync_clause,
+        'context_budget_next_step': context_budget_next_step,
+        'repetition_recovery_options': repetition_recovery_options,
+        'remaining_work_source_of_truth': remaining_work_source_of_truth,
+    }
+
+
+def _render_routing(
+    render_partial: Callable[..., str],
+    is_windows: bool,
+    config: Any = None,
+    function_calling_mode: str | None = None,
+) -> str:
+    explore = _explore_hint(config)
+    code_intelligence_available = _code_intelligence_available(config)
+    meta_cognition_on = getattr(config, 'enable_meta_cognition', False)
+    working_memory_on = getattr(config, 'enable_working_memory', True)
+    condensation_on = getattr(config, 'enable_condensation_request', False)
+    tracker_on = getattr(config, 'enable_internal_task_tracker', False)
+    batch_cmds = _choose(
+        is_windows,
+        f'Use **PowerShell** only for environment actions (install, build, test, git, processes). '
+        f'For repo layout and file content, use **{explore}** '
+        'and **`text_editor` (`read_file`)**—not `Get-Content`/`Select-String` pipelines for source trees.',
+        f'Use **bash** only for environment actions (install, build, test, git, processes). '
+        f'For repo layout and file content, use **{explore}** '
+        'and **`text_editor` (`read_file`)**—not `ls && cat && grep` chains for project files.',
+    )
+    code_intelligence_routing = (
+        '- **Known file + symbol position, precise definition/references/hover** → `code_intelligence`'
+        if code_intelligence_available
+        else ''
+    )
+    tool_call_batching_mode = _routing_tool_batching_paragraph(function_calling_mode)
+    memory_kw = _routing_memory_tool_placeholders(
+        working_memory_on=working_memory_on,
+        tracker_on=tracker_on,
+        condensation_on=condensation_on,
+        meta_cognition_on=meta_cognition_on,
+    )
     return render_partial(
         'system_partial_00_routing.md',
-        ambiguous_intent_instruction=ambiguous_intent_instruction,
+        ambiguous_intent_instruction=memory_kw['ambiguous_intent_instruction'],
         batch_commands=batch_cmds,
         code_intelligence_routing=code_intelligence_routing,
-        context_budget_sync_clause=context_budget_sync_clause,
-        context_budget_next_step=context_budget_next_step,
+        context_budget_sync_clause=memory_kw['context_budget_sync_clause'],
+        context_budget_next_step=memory_kw['context_budget_next_step'],
         explore_layout_hint=explore,
-        memory_and_context_section=memory_and_context_section,
-        post_condensation_retrieval=post_condensation_retrieval,
-        remaining_work_source_of_truth=remaining_work_source_of_truth,
-        repetition_recovery_options=repetition_recovery_options,
-        surviving_state_facts=surviving_state_facts,
+        memory_and_context_section=memory_kw['memory_and_context_section'],
+        post_condensation_retrieval=memory_kw['post_condensation_retrieval'],
+        remaining_work_source_of_truth=memory_kw['remaining_work_source_of_truth'],
+        repetition_recovery_options=memory_kw['repetition_recovery_options'],
+        surviving_state_facts=memory_kw['surviving_state_facts'],
         tool_call_batching_mode=tool_call_batching_mode,
     )
 
@@ -389,74 +417,134 @@ def _render_examples(
     )
 
 
-def _render_mcp_and_permissions(
-    render_partial: Callable[..., str],
+def _permission_git_summary(perm: Any) -> tuple[str, str]:
+    git_parts: list[str] = []
+    if getattr(perm, 'git_enabled', False):
+        if getattr(perm, 'git_allow_commit', False):
+            git_parts.append('COMMIT')
+        if getattr(perm, 'git_allow_push', False):
+            git_parts.append('PUSH')
+        if getattr(perm, 'git_allow_force_push', False):
+            git_parts.append('FORCE')
+        if getattr(perm, 'git_allow_branch_delete', False):
+            git_parts.append('DELETE-BRANCH')
+        git_str = ' '.join(git_parts) or 'ENABLED'
+    else:
+        git_str = 'DISABLED'
+    git_protected = ', '.join(getattr(perm, 'git_protected_branches', []))
+    return git_str, git_protected
+
+
+def _permission_shell_network_limits(perm: Any) -> tuple[str, str, str, str]:
+    shell_str = 'ENABLED' if getattr(perm, 'shell_enabled', False) else 'DISABLED'
+    if getattr(perm, 'shell_enabled', False) and getattr(perm, 'shell_allow_sudo', False):
+        shell_str += ' + SUDO'
+    shell_blocked = ', '.join(getattr(perm, 'shell_blocked_commands', []))
+
+    net_str = 'DISABLED'
+    if getattr(perm, 'network_enabled', False):
+        net_str = f'{getattr(perm, "network_max_requests_per_minute", "?")}/min'
+        domains = getattr(perm, 'network_allowed_domains', [])
+        if domains:
+            net_str += f' | Only: {", ".join(domains)}'
+
+    max_writes = getattr(perm, 'max_file_writes_per_task', '?')
+    max_cmds = getattr(perm, 'max_shell_commands_per_task', '?')
+    cost = getattr(perm, 'max_cost_per_task', None)
+    limits = f'{max_writes} files, {max_cmds} commands'
+    if cost:
+        limits += f', ${cost} cost'
+
+    return shell_str, shell_blocked, net_str, limits
+
+
+def _render_permissions(config: Any, perm: Any) -> str:
+    """Render the <PERMISSIONS> block from config.permissions."""
+    file_w = 'WRITE' if getattr(perm, 'file_write_enabled', False) else 'READ-ONLY'
+    if getattr(perm, 'file_write_enabled', False):
+        file_w += f' (max {getattr(perm, "file_operations_max_size_mb", "?")}MB)'
+    file_d = 'DELETE' if getattr(perm, 'file_delete_enabled', False) else 'NO DELETE'
+    blocked = ', '.join(getattr(perm, 'file_operations_blocked_paths', []))
+
+    git_str, git_protected = _permission_git_summary(perm)
+    shell_str, shell_blocked, net_str, limits = _permission_shell_network_limits(perm)
+
+    return (
+        '<PERMISSIONS>\n'
+        f'**File:** {file_w} | {file_d}\n'
+        f'Blocked: {blocked}\n\n'
+        f'**Git:** {git_str}\n'
+        f'Protected: {git_protected}\n\n'
+        f'**Shell:** {shell_str}\n'
+        f'Blocked: {shell_blocked}\n\n'
+        f'**Network:** {net_str}\n\n'
+        f'**Limits:** {limits}/task\n\n'
+        'Exceeding permissions → Error. Work within limits or request permission.\n'
+        '</PERMISSIONS>'
+    )
+
+
+def _append_mcp_connected_catalog_sections(
+    parts: list[str],
     mcp_tool_names: list[str],
     mcp_tool_descriptions: dict[str, str],
     mcp_server_hints: list[dict[str, str]],
-    config: Any,
-) -> str:
-    parts: list[str] = ['<MCP_TOOLS>']
-
-    if mcp_tool_names:
-        total = len(mcp_tool_names)
-
-        parts.append(
+) -> None:
+    total = len(mcp_tool_names)
+    parts.extend(
+        (
             f'🔌 **External MCP tools** ({total}): use **`call_mcp_tool(tool_name="...", arguments={{...}})`** '
-            f'— argument shapes match the registered tool schema.'
-        )
-        parts.append(
+            f'— argument shapes match the registered tool schema.',
             '**Tool-name discipline (critical):** Pass each tool name to '
             '`call_mcp_tool(tool_name=...)` **exactly as listed below** — the names '
             'are already flat. Do **not** add `server:`, `server/`, `server.`, '
             '`server__` or any other prefix; those are not part of the name and '
             'will fail. If a name you want is not in this list, that tool is '
             'not available in this session — pick a different tool or an '
-            'alternative approach. Do not guess.'
+            'alternative approach. Do not guess.',
         )
-        for name in mcp_tool_names:
-            parts.append(f'- `{name}`: {mcp_tool_descriptions[name]}')
+    )
+    for name in mcp_tool_names:
+        parts.append(f'- `{name}`: {mcp_tool_descriptions[name]}')
 
-        if mcp_server_hints:
-            parts.append('')
-            parts.append('<MCP_SERVER_HINTS>')
-            parts.append(
-                '**Configured MCP servers (when to use each — from your MCP settings):**'
+    if mcp_server_hints:
+        parts.extend(
+            (
+                '',
+                '<MCP_SERVER_HINTS>',
+                '**Configured MCP servers (when to use each — from your MCP settings):**',
             )
-            for row in mcp_server_hints:
-                parts.append(f'- **`{row["server"]}`:** {row["hint"]}')
-            parts.append('</MCP_SERVER_HINTS>')
+        )
+        for row in mcp_server_hints:
+            parts.append(f'- **`{row["server"]}`:** {row["hint"]}')
+        parts.append('</MCP_SERVER_HINTS>')
 
-        parts.append('')
-        parts.append('<MCP_WHEN_TO_USE>')
-        parts.append('**Discipline (MCP):**')
-        if mcp_server_hints:
-            parts.append(
-                "Follow **Configured MCP servers** above for *when* to prefer each server; "
-                "match the user's task to those hints, then pick the concrete tool name from the list "
-                "and each tool's description."
-            )
-        else:
-            parts.append(
-                "Infer *when* to call MCP from each tool's **name** and **description** in the list above "
-                "(and avoid training-memory guesses for vendor-specific or version-specific facts—use a tool when one fits)."
-            )
+    parts.extend(('', '<MCP_WHEN_TO_USE>', '**Discipline (MCP):**'))
+    if mcp_server_hints:
         parts.append(
+            "Follow **Configured MCP servers** above for *when* to prefer each server; "
+            "match the user's task to those hints, then pick the concrete tool name from the list "
+            "and each tool's description."
+        )
+    else:
+        parts.append(
+            "Infer *when* to call MCP from each tool's **name** and **description** in the list above "
+            "(and avoid training-memory guesses for vendor-specific or version-specific facts—use a tool when one fits)."
+        )
+    parts.extend(
+        (
             'Prefer **`call_mcp_tool`** over shell one-offs when an MCP tool covers the need. '
             'If asked what you can do or which models/tools you have, answer from **this** tool list, '
-            '**MCP server hints** (if any), and your configured model id—**not** generic "no web / no docs" tropes.'
+            '**MCP server hints** (if any), and your configured model id—**not** generic "no web / no docs" tropes.',
+            '</MCP_WHEN_TO_USE>',
         )
-        parts.append('</MCP_WHEN_TO_USE>')
-    else:
-        parts.append('No external MCP tools connected.')
-    parts.append('</MCP_TOOLS>')
+    )
 
-    if getattr(config, 'enable_permissions', False):
-        perm = getattr(config, 'permissions', None)
-        if perm is not None:
-            parts.append('')
-            parts.append(_render_permissions(config, perm))
 
+def _mcp_tail_render_kwargs(
+    render_partial: Callable[..., str],
+    config: Any,
+) -> str:
     meta_cognition = getattr(config, 'enable_meta_cognition', False)
     enable_think = bool(getattr(config, 'enable_think', False))
     communicate_tool_section = (
@@ -475,7 +563,6 @@ def _render_mcp_and_permissions(
         uncertainty_state_1_discover_line = (
             '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**, not shell repo search/read. Do NOT ask first.'
         )
-    parts.append('')
     thinking_tool_section = (
         '<THINKING_TOOL>\n'
         'Use `think` for multi-step planning, complex debugging, or architecture trade-offs. It records reasoning only; it does not execute actions.\n'
@@ -483,87 +570,54 @@ def _render_mcp_and_permissions(
         if enable_think
         else ''
     )
-    parts.append(
-        render_partial(
-            'system_partial_03_tail.md',
-            communicate_tool_section=communicate_tool_section,
-            interaction_guidance=(
-                'If a request is vague, inspect nearby docs/config first; use `communicate_with_user` only if you are still blocked or the scope is still ambiguous.'
-                if meta_cognition
-                else 'If a request is vague, inspect nearby docs/config first; ask the user directly in natural language only if you are still blocked or the scope is still ambiguous.'
-            ),
-            uncertainty_state_1_discover_line=uncertainty_state_1_discover_line,
-            uncertainty_state_2_ambiguous_line=(
-                '**Ambiguous intent** (multiple valid implementations, destructive action, unclear scope) → `communicate_with_user` with `options`. Do NOT guess.'
-                if meta_cognition
-                else '**Ambiguous intent** (multiple valid implementations, destructive action, unclear scope) → ask the user a short clarifying question in natural language. Do NOT guess.'
-            ),
-            uncertainty_state_3_unknowable_line=(
-                "**Needs user input** (user preference, external credential, business policy) → `communicate_with_user` with `intent='clarification'`."
-                if meta_cognition
-                else '**Needs user input** (user preference, external credential, business policy) → ask the user directly in natural language.'
-            ),
-            thinking_tool_section=thinking_tool_section,
-        )
+    return render_partial(
+        'system_partial_03_tail.md',
+        communicate_tool_section=communicate_tool_section,
+        interaction_guidance=(
+            'If a request is vague, inspect nearby docs/config first; use `communicate_with_user` only if you are still blocked or the scope is still ambiguous.'
+            if meta_cognition
+            else 'If a request is vague, inspect nearby docs/config first; ask the user directly in natural language only if you are still blocked or the scope is still ambiguous.'
+        ),
+        uncertainty_state_1_discover_line=uncertainty_state_1_discover_line,
+        uncertainty_state_2_ambiguous_line=(
+            '**Ambiguous intent** (multiple valid implementations, destructive action, unclear scope) → `communicate_with_user` with `options`. Do NOT guess.'
+            if meta_cognition
+            else '**Ambiguous intent** (multiple valid implementations, destructive action, unclear scope) → ask the user a short clarifying question in natural language. Do NOT guess.'
+        ),
+        uncertainty_state_3_unknowable_line=(
+            "**Needs user input** (user preference, external credential, business policy) → `communicate_with_user` with `intent='clarification'`."
+            if meta_cognition
+            else '**Needs user input** (user preference, external credential, business policy) → ask the user directly in natural language.'
+        ),
+        thinking_tool_section=thinking_tool_section,
     )
+
+
+def _render_mcp_and_permissions(
+    render_partial: Callable[..., str],
+    mcp_tool_names: list[str],
+    mcp_tool_descriptions: dict[str, str],
+    mcp_server_hints: list[dict[str, str]],
+    config: Any,
+) -> str:
+    parts: list[str] = ['<MCP_TOOLS>']
+
+    if mcp_tool_names:
+        _append_mcp_connected_catalog_sections(
+            parts,
+            mcp_tool_names,
+            mcp_tool_descriptions,
+            mcp_server_hints,
+        )
+    else:
+        parts.append('No external MCP tools connected.')
+    parts.append('</MCP_TOOLS>')
+
+    if getattr(config, 'enable_permissions', False):
+        perm = getattr(config, 'permissions', None)
+        if perm is not None:
+            parts.extend(('', _render_permissions(config, perm)))
+
+    parts.extend(('', _mcp_tail_render_kwargs(render_partial, config)))
 
     return '\n'.join(parts)
-
-
-def _render_permissions(config: Any, perm: Any) -> str:
-    """Render the <PERMISSIONS> block from config.permissions."""
-    file_w = 'WRITE' if getattr(perm, 'file_write_enabled', False) else 'READ-ONLY'
-    if getattr(perm, 'file_write_enabled', False):
-        file_w += f' (max {getattr(perm, "file_operations_max_size_mb", "?")}MB)'
-    file_d = 'DELETE' if getattr(perm, 'file_delete_enabled', False) else 'NO DELETE'
-    blocked = ', '.join(getattr(perm, 'file_operations_blocked_paths', []))
-
-    git_parts: list[str] = []
-    if getattr(perm, 'git_enabled', False):
-        if getattr(perm, 'git_allow_commit', False):
-            git_parts.append('COMMIT')
-        if getattr(perm, 'git_allow_push', False):
-            git_parts.append('PUSH')
-        if getattr(perm, 'git_allow_force_push', False):
-            git_parts.append('FORCE')
-        if getattr(perm, 'git_allow_branch_delete', False):
-            git_parts.append('DELETE-BRANCH')
-        git_str = ' '.join(git_parts) or 'ENABLED'
-    else:
-        git_str = 'DISABLED'
-    git_protected = ', '.join(getattr(perm, 'git_protected_branches', []))
-
-    shell_str = 'ENABLED' if getattr(perm, 'shell_enabled', False) else 'DISABLED'
-    if getattr(perm, 'shell_enabled', False) and getattr(
-        perm, 'shell_allow_sudo', False
-    ):
-        shell_str += ' + SUDO'
-    shell_blocked = ', '.join(getattr(perm, 'shell_blocked_commands', []))
-
-    net_str = 'DISABLED'
-    if getattr(perm, 'network_enabled', False):
-        net_str = f'{getattr(perm, "network_max_requests_per_minute", "?")}/min'
-        domains = getattr(perm, 'network_allowed_domains', [])
-        if domains:
-            net_str += f' | Only: {", ".join(domains)}'
-
-    max_writes = getattr(perm, 'max_file_writes_per_task', '?')
-    max_cmds = getattr(perm, 'max_shell_commands_per_task', '?')
-    cost = getattr(perm, 'max_cost_per_task', None)
-    limits = f'{max_writes} files, {max_cmds} commands'
-    if cost:
-        limits += f', ${cost} cost'
-
-    return (
-        '<PERMISSIONS>\n'
-        f'**File:** {file_w} | {file_d}\n'
-        f'Blocked: {blocked}\n\n'
-        f'**Git:** {git_str}\n'
-        f'Protected: {git_protected}\n\n'
-        f'**Shell:** {shell_str}\n'
-        f'Blocked: {shell_blocked}\n\n'
-        f'**Network:** {net_str}\n\n'
-        f'**Limits:** {limits}/task\n\n'
-        'Exceeding permissions → Error. Work within limits or request permission.\n'
-        '</PERMISSIONS>'
-    )

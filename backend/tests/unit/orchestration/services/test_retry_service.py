@@ -392,6 +392,35 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         # Should not change state
         self.mock_controller.set_agent_state_to.assert_not_called()
 
+    async def test_resume_agent_after_retry_aborts_when_budget_limit_reached(self):
+        """Test _resume_agent_after_retry returns control to the user on limit exhaustion."""
+        budget_flag = MagicMock()
+        budget_flag.reached_limit.return_value = True
+
+        self.mock_controller.state.budget_flag = budget_flag
+        self.mock_controller.state.iteration_flag = None
+        self.service._retry_pending = True
+        self.service._retry_count = 3
+
+        mock_task = MagicMock()
+        mock_task.id = 'retry-123'
+        mock_task.reason = 'Timeout'
+        mock_task.attempts = 1
+        mock_task.max_attempts = 3
+        mock_task.metadata = {'retry_reason': 'Timeout'}
+
+        with patch.object(
+            self.service, '_transition_to_awaiting_user', new_callable=AsyncMock
+        ) as mock_transition:
+            await self.service._resume_agent_after_retry(mock_task)
+
+        self.mock_controller.circuit_breaker_service.record_success.assert_not_called()
+        self.mock_controller.step.assert_not_called()
+        self.mock_controller.set_agent_state_to.assert_not_called()
+        self.assertFalse(self.service._retry_pending)
+        self.assertEqual(self.service._retry_count, 0)
+        mock_transition.assert_called_once_with()
+
     async def test_stop_if_idle_delegates_to_shutdown(self):
         """Test stop_if_idle delegates to shutdown."""
         with patch.object(

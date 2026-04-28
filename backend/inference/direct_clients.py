@@ -697,6 +697,105 @@ class GeminiClient(DirectLLMClient):
             cache_name,
         )
 
+    @staticmethod
+    def _build_gemini_request_config(
+        gen_cfg: dict[str, Any],
+        tools: list | None,
+        system_instruction: str | None,
+        cache_name: str | None,
+    ) -> dict[str, Any]:
+        config: dict[str, Any] = {
+            **gen_cfg,
+            'tools': tools,
+        }
+        if cache_name:
+            config['cached_content'] = cache_name
+        else:
+            config['system_instruction'] = system_instruction
+        return config
+
+    @staticmethod
+    def _log_gemini_exception(exc: Exception) -> None:
+        logger.error('=' * 80)
+        logger.error('GOOGLE GENAI EXCEPTION: %s %s', type(exc), exc)
+        if hasattr(exc, 'code'):
+            logger.error('CODE: %s', exc.code)
+        if hasattr(exc, 'message'):
+            logger.error('MESSAGE: %s', exc.message)
+        if hasattr(exc, 'details'):
+            logger.error('DETAILS: %s', exc.details)
+        logger.error('=' * 80)
+
+    @staticmethod
+    def _is_gemini_api_key_error(error_str: str) -> bool:
+        return 'api key' in error_str and (
+            'not found' in error_str
+            or 'invalid api key' in error_str
+            or 'api_key_invalid' in error_str
+        )
+
+    def _map_gemini_api_error(self, exc: Any, error_str: str) -> Exception:
+        from backend.inference.exceptions import (
+            BadRequestError,
+            ContextWindowExceededError,
+            InternalServerError,
+            NotFoundError,
+            RateLimitError,
+            ServiceUnavailableError,
+            is_context_window_error,
+        )
+        from backend.inference.exceptions import (
+            APIError as ProviderAPIError,
+        )
+
+        if self._is_gemini_api_key_error(error_str):
+            from backend.inference.exceptions import AuthenticationError
+
+            return AuthenticationError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
+        if exc.code == 429 or 'quota' in error_str or 'rate limit' in error_str:
+            return RateLimitError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
+        if (
+            exc.code == 401
+            or 'unauthorized' in error_str
+            or 'invalid api key' in error_str
+        ):
+            from backend.inference.exceptions import AuthenticationError
+
+            return AuthenticationError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
+        if exc.code == 404 or 'not found' in error_str:
+            return NotFoundError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
+        if (
+            exc.code in (500, 502, 503, 504)
+            or 'unavailable' in error_str
+            or 'overloaded' in error_str
+        ):
+            return ServiceUnavailableError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
+        if exc.code == 400:
+            if is_context_window_error(error_str, exc):
+                return ContextWindowExceededError(
+                    str(exc), llm_provider='google', model=self.model_name
+                )
+            return BadRequestError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
+        if exc.code and exc.code >= 500:
+            return InternalServerError(
+                str(exc), llm_provider='google', model=self.model_name
+            )
+        return ProviderAPIError(
+            str(exc), llm_provider='google', model=self.model_name
+        )
+
     def _map_gemini_error(self, exc: Exception) -> Exception:
         """Map google.genai exceptions to App LLM exceptions."""
         import asyncio
@@ -720,15 +819,7 @@ class GeminiClient(DirectLLMClient):
             APIError as ProviderAPIError,
         )
 
-        logger.error('=' * 80)
-        logger.error('GOOGLE GENAI EXCEPTION: %s %s', type(exc), exc)
-        if hasattr(exc, 'code'):
-            logger.error('CODE: %s', exc.code)
-        if hasattr(exc, 'message'):
-            logger.error('MESSAGE: %s', exc.message)
-        if hasattr(exc, 'details'):
-            logger.error('DETAILS: %s', exc.details)
-        logger.error('=' * 80)
+        self._log_gemini_exception(exc)
 
         if isinstance(exc, (asyncio.TimeoutError, httpx.TimeoutException)):
             return Timeout(str(exc), llm_provider='google', model=self.model_name)
@@ -738,60 +829,129 @@ class GeminiClient(DirectLLMClient):
             )
 
         if isinstance(exc, APIError):
-            error_str = str(exc).lower()
-
-            # Google Gemini sometimes returns 400 INVALID_ARGUMENT for invalid/unknown keys
-            # (e.g., "API Key not found"), and the message can contain "not found" which
-            # would otherwise be misclassified as a 404.
-            if 'api key' in error_str and (
-                'not found' in error_str
-                or 'invalid api key' in error_str
-                or 'api_key_invalid' in error_str
-            ):
-                return AuthenticationError(
-                    str(exc), llm_provider='google', model=self.model_name
-                )
-
-            if exc.code == 429 or 'quota' in error_str or 'rate limit' in error_str:
-                return RateLimitError(
-                    str(exc), llm_provider='google', model=self.model_name
-                )
-            if (
-                exc.code == 401
-                or 'unauthorized' in error_str
-                or 'invalid api key' in error_str
-            ):
-                return AuthenticationError(
-                    str(exc), llm_provider='google', model=self.model_name
-                )
-            if exc.code == 404 or 'not found' in error_str:
-                return NotFoundError(
-                    str(exc), llm_provider='google', model=self.model_name
-                )
-            if (
-                exc.code in (500, 502, 503, 504)
-                or 'unavailable' in error_str
-                or 'overloaded' in error_str
-            ):
-                return ServiceUnavailableError(
-                    str(exc), llm_provider='google', model=self.model_name
-                )
-            if exc.code == 400:
-                if is_context_window_error(error_str, exc):
-                    return ContextWindowExceededError(
-                        str(exc), llm_provider='google', model=self.model_name
-                    )
-                return BadRequestError(
-                    str(exc), llm_provider='google', model=self.model_name
-                )
-            if exc.code and exc.code >= 500:
-                return InternalServerError(
-                    str(exc), llm_provider='google', model=self.model_name
-                )
-            return ProviderAPIError(
-                str(exc), llm_provider='google', model=self.model_name
-            )
+            return self._map_gemini_api_error(exc, str(exc).lower())
         return exc
+
+    @staticmethod
+    def _update_gemini_stream_usage(
+        chunk: Any,
+        *,
+        input_tokens: int,
+        output_tokens: int,
+    ) -> tuple[int, int]:
+        usage_metadata = getattr(chunk, 'usage_metadata', None)
+        if usage_metadata is None:
+            return input_tokens, output_tokens
+        return (
+            int(getattr(usage_metadata, 'prompt_token_count', 0) or 0),
+            int(getattr(usage_metadata, 'candidates_token_count', 0) or 0),
+        )
+
+    @staticmethod
+    def _serialize_gemini_function_args(function_call: Any) -> str:
+        try:
+            raw_args = getattr(function_call, 'args', {})
+            if hasattr(type(function_call), 'to_dict') and raw_args:
+                to_dict = getattr(type(function_call), 'to_dict')
+                args_dict = to_dict(raw_args) if callable(to_dict) else raw_args
+            elif hasattr(raw_args, 'items'):
+                args_dict = dict(raw_args.items())  # type: ignore[union-attr]
+            elif hasattr(raw_args, '__dict__'):
+                args_dict = raw_args.__dict__
+            else:
+                args_dict = raw_args
+
+            if hasattr(args_dict, 'pb') and hasattr(args_dict, 'items'):
+                args_dict = dict(args_dict.items())  # type: ignore[union-attr]
+
+            payload = args_dict if isinstance(args_dict, dict) else raw_args
+            return json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
+        except Exception:
+            return '{}'
+
+    def _gemini_tool_call_chunks(
+        self, chunk: Any, start_index: int
+    ) -> tuple[list[dict[str, Any]], int]:
+        function_calls = getattr(chunk, 'function_calls', None) or []
+        chunks: list[dict[str, Any]] = []
+        next_index = start_index
+        for function_call in function_calls:
+            chunks.append(
+                {
+                    'choices': [
+                        {
+                            'delta': {
+                                'tool_calls': [
+                                    {
+                                        'index': next_index,
+                                        'id': f'call_{function_call.name}_{next_index}',
+                                        'type': 'function',
+                                        'function': {
+                                            'name': function_call.name,
+                                            'arguments': self._serialize_gemini_function_args(
+                                                function_call
+                                            ),
+                                        },
+                                    }
+                                ]
+                            },
+                            'finish_reason': None,
+                        }
+                    ]
+                }
+            )
+            next_index += 1
+        return chunks, next_index
+
+    @staticmethod
+    def _gemini_text_chunk(text: str) -> dict[str, Any]:
+        return {
+            'choices': [{'delta': {'content': text}, 'finish_reason': None}]
+        }
+
+    @staticmethod
+    def _gemini_reasoning_chunks(chunk: Any) -> list[dict[str, Any]]:
+        candidates = getattr(chunk, 'candidates', None) or []
+        chunks: list[dict[str, Any]] = []
+        for candidate in candidates:
+            candidate_content = getattr(candidate, 'content', None)
+            if candidate_content is None:
+                continue
+            for part in getattr(candidate_content, 'parts', []):
+                if not getattr(part, 'thought', False):
+                    continue
+                thought_text = getattr(part, 'text', '') or ''
+                if thought_text:
+                    chunks.append(
+                        {
+                            'choices': [
+                                {
+                                    'delta': {'reasoning_content': thought_text},
+                                    'finish_reason': None,
+                                }
+                            ]
+                        }
+                    )
+        return chunks
+
+    @staticmethod
+    def _gemini_finish_chunks(
+        input_tokens: int, output_tokens: int
+    ) -> list[dict[str, Any]]:
+        chunks: list[dict[str, Any]] = []
+        if input_tokens or output_tokens:
+            chunks.append(
+                {
+                    'choices': [],
+                    'usage': {
+                        'prompt_tokens': input_tokens,
+                        'completion_tokens': output_tokens,
+                        'total_tokens': input_tokens + output_tokens,
+                    },
+                }
+            )
+        chunks.append({'choices': [{'delta': {}, 'finish_reason': 'stop'}]})
+        return chunks
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
         from backend.inference.mappers.gemini import (
@@ -806,14 +966,12 @@ class GeminiClient(DirectLLMClient):
             self._build_gemini_chat(messages, kwargs)
         )
 
-        config: Any = {
-            **gen_cfg,
-            'tools': tools,
-        }
-        if cache_name:
-            config['cached_content'] = cache_name
-        else:
-            config['system_instruction'] = system_instruction
+        config: Any = self._build_gemini_request_config(
+            gen_cfg,
+            tools,
+            system_instruction,
+            cache_name,
+        )
 
         logger.debug('Gemini config: %s', config)
         logger.info(
@@ -871,14 +1029,12 @@ class GeminiClient(DirectLLMClient):
             self._build_gemini_chat(messages, kwargs)
         )
 
-        config: Any = {
-            **gen_cfg,
-            'tools': tools,
-        }
-        if cache_name:
-            config['cached_content'] = cache_name
-        else:
-            config['system_instruction'] = system_instruction
+        config: Any = self._build_gemini_request_config(
+            gen_cfg,
+            tools,
+            system_instruction,
+            cache_name,
+        )
 
         logger.debug('Gemini config: %s', config)
 
@@ -913,14 +1069,12 @@ class GeminiClient(DirectLLMClient):
             self._build_gemini_chat(messages, kwargs)
         )
 
-        config: Any = {
-            **gen_cfg,
-            'tools': tools,
-        }
-        if cache_name:
-            config['cached_content'] = cache_name
-        else:
-            config['system_instruction'] = system_instruction
+        config: Any = self._build_gemini_request_config(
+            gen_cfg,
+            tools,
+            system_instruction,
+            cache_name,
+        )
 
         logger.debug('Gemini config: %s', config)
 
@@ -932,121 +1086,37 @@ class GeminiClient(DirectLLMClient):
 
         try:
             stream = await chat.send_message_stream(prompt, **kwargs)
-            # Use a global counter across all chunks so that function calls
-            # arriving in separate streaming chunks (one call per chunk) get
-            # unique indices rather than all defaulting to 0 via enumerate().
             fc_idx_counter = 0
-            # Track the latest cumulative usage_metadata across chunks so we
-            # can emit a normalised usage chunk at the end for the HUD.
             _gemini_input_tokens: int = 0
             _gemini_output_tokens: int = 0
             async for chunk in stream:
-                _um = getattr(chunk, 'usage_metadata', None)
-                if _um is not None:
-                    _gemini_input_tokens = int(
-                        getattr(_um, 'prompt_token_count', 0) or 0
+                _gemini_input_tokens, _gemini_output_tokens = (
+                    self._update_gemini_stream_usage(
+                        chunk,
+                        input_tokens=_gemini_input_tokens,
+                        output_tokens=_gemini_output_tokens,
                     )
-                    _gemini_output_tokens = int(
-                        getattr(_um, 'candidates_token_count', 0) or 0
-                    )
-                fcs = getattr(chunk, 'function_calls', None)
-                if fcs:
-                    for fc in fcs:
-                        try:
-                            _args = getattr(fc, 'args', {})
-                            if hasattr(type(fc), 'to_dict') and _args:
-                                _to_dict = getattr(type(fc), 'to_dict')
-                                if callable(_to_dict):
-                                    args_dict = _to_dict(_args)
-                                else:
-                                    args_dict = _args
-                            elif hasattr(_args, 'items'):
-                                args_dict = dict(_args.items())  # type: ignore[union-attr]
-                            elif hasattr(_args, '__dict__'):
-                                args_dict = _args.__dict__
-                            else:
-                                args_dict = _args
+                )
+                tool_chunks, fc_idx_counter = self._gemini_tool_call_chunks(
+                    chunk,
+                    fc_idx_counter,
+                )
+                for tool_chunk in tool_chunks:
+                    yield tool_chunk
 
-                            if hasattr(args_dict, 'pb') and hasattr(args_dict, 'items'):
-                                args_dict = dict(args_dict.items())  # type: ignore[union-attr]
-
-                            if isinstance(args_dict, dict):
-                                args_str = json.dumps(
-                                    args_dict,
-                                    ensure_ascii=False,
-                                    separators=(',', ':'),
-                                )
-                            else:
-                                args_str = json.dumps(
-                                    getattr(fc, 'args', {}),
-                                    ensure_ascii=False,
-                                    separators=(',', ':'),
-                                )
-                        except Exception:
-                            args_str = '{}'
-                        yield {
-                            'choices': [
-                                {
-                                    'delta': {
-                                        'tool_calls': [
-                                            {
-                                                'index': fc_idx_counter,
-                                                'id': f'call_{fc.name}_{fc_idx_counter}',
-                                                'type': 'function',
-                                                'function': {
-                                                    'name': fc.name,
-                                                    'arguments': args_str,
-                                                },
-                                            }
-                                        ]
-                                    },
-                                    'finish_reason': None,
-                                }
-                            ]
-                        }
-                        fc_idx_counter += 1
                 text = chunk.text or ''
                 if text:
-                    yield {
-                        'choices': [{'delta': {'content': text}, 'finish_reason': None}]
-                    }
-                # Extract thinking/thought content from Gemini models that
-                # support it.  The SDK exposes thought text on individual
-                # ``Part`` objects via a boolean ``thought`` flag.
-                _candidates = getattr(chunk, 'candidates', None)
-                if _candidates:
-                    for _cand in _candidates:
-                        _cand_content = getattr(_cand, 'content', None)
-                        if _cand_content is None:
-                            continue
-                        for _part in getattr(_cand_content, 'parts', []):
-                            if getattr(_part, 'thought', False):
-                                _thought_text = getattr(_part, 'text', '') or ''
-                                if _thought_text:
-                                    yield {
-                                        'choices': [
-                                            {
-                                                'delta': {
-                                                    'reasoning_content': _thought_text
-                                                },
-                                                'finish_reason': None,
-                                            }
-                                        ]
-                                    }
+                    yield self._gemini_text_chunk(text)
+
+                for reasoning_chunk in self._gemini_reasoning_chunks(chunk):
+                    yield reasoning_chunk
         except Exception as e:
             raise self._map_gemini_error(e) from e
-        # Yield a normalised usage chunk before finish so the executor can
-        # update the HUD token/cost counters for Gemini streaming calls.
-        if _gemini_input_tokens or _gemini_output_tokens:
-            yield {
-                'choices': [],
-                'usage': {
-                    'prompt_tokens': _gemini_input_tokens,
-                    'completion_tokens': _gemini_output_tokens,
-                    'total_tokens': _gemini_input_tokens + _gemini_output_tokens,
-                },
-            }
-        yield {'choices': [{'delta': {}, 'finish_reason': 'stop'}]}
+        for finish_chunk in self._gemini_finish_chunks(
+            _gemini_input_tokens,
+            _gemini_output_tokens,
+        ):
+            yield finish_chunk
 
 
 def get_direct_client(

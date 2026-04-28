@@ -61,58 +61,111 @@ def _truncate_delegate_progress(text: str, limit: int = 120) -> str:
     return collapsed[: max(limit - 1, 0)].rstrip() + '…'
 
 
-def _summarize_delegate_worker_event(
+def _summarize_delegate_file_action(
     event: Action | Observation,
 ) -> tuple[str, str] | None:
-    """Return a compact worker-progress summary for parent-side swarm UI."""
     if isinstance(event, FileReadAction):
         return 'running', f'Viewed {event.path}'
 
     if isinstance(event, FileWriteAction):
         return 'running', f'Created {event.path}'
 
-    if isinstance(event, FileEditAction):
-        command = getattr(event, 'command', '') or ''
-        if command == 'create_file':
-            return 'running', f'Created {event.path}'
-        if command == 'read_file':
-            return 'running', f'Read {event.path}'
-        return 'running', f'Edited {event.path}'
+    if not isinstance(event, FileEditAction):
+        return None
 
-    if isinstance(event, CmdRunAction):
-        label = getattr(event, 'display_label', '') or getattr(event, 'command', '')
-        label = _truncate_delegate_progress(label, limit=96)
-        return 'running', f'Ran {label}' if label else 'Ran command'
+    command = getattr(event, 'command', '') or ''
+    if command == 'create_file':
+        return 'running', f'Created {event.path}'
+    if command == 'read_file':
+        return 'running', f'Read {event.path}'
+    return 'running', f'Edited {event.path}'
 
-    if isinstance(event, MCPAction):
-        tool_name = getattr(event, 'name', '') or 'MCP tool'
-        return 'running', f'Called {tool_name}'
 
-    if isinstance(event, PlaybookFinishAction):
-        summary = _truncate_delegate_progress(
-            (event.message or '').splitlines()[0], 140
-        )
-        return 'done', summary or 'Completed'
+def _summarize_delegate_command_action(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if not isinstance(event, CmdRunAction):
+        return None
+    label = getattr(event, 'display_label', '') or getattr(event, 'command', '')
+    label = _truncate_delegate_progress(label, limit=96)
+    return 'running', f'Ran {label}' if label else 'Ran command'
 
-    if isinstance(event, AgentRejectAction):
-        reason = _truncate_delegate_progress(
-            str(event.outputs.get('reason', '') or ''), 140
-        )
-        return 'failed', reason or 'Rejected delegated task'
 
-    if isinstance(event, ErrorObservation):
-        first_line = _truncate_delegate_progress(
-            (event.content or '').splitlines()[0], 140
-        )
-        return 'failed', first_line or 'Worker error'
+def _summarize_delegate_mcp_action(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if not isinstance(event, MCPAction):
+        return None
+    tool_name = getattr(event, 'name', '') or 'MCP tool'
+    return 'running', f'Called {tool_name}'
 
-    if isinstance(event, AgentStateChangedObservation):
-        state = str(getattr(event, 'agent_state', '') or '').lower()
-        if state == AgentState.ERROR.value:
-            return 'failed', 'Worker entered error state'
-        if state == AgentState.FINISHED.value:
-            return 'done', 'Completed'
 
+def _summarize_delegate_finish_event(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if not isinstance(event, PlaybookFinishAction):
+        return None
+    summary = _truncate_delegate_progress((event.message or '').splitlines()[0], 140)
+    return 'done', summary or 'Completed'
+
+
+def _summarize_delegate_reject_event(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if not isinstance(event, AgentRejectAction):
+        return None
+    reason = _truncate_delegate_progress(str(event.outputs.get('reason', '') or ''), 140)
+    return 'failed', reason or 'Rejected delegated task'
+
+
+def _summarize_delegate_error_event(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if not isinstance(event, ErrorObservation):
+        return None
+    first_line = _truncate_delegate_progress((event.content or '').splitlines()[0], 140)
+    return 'failed', first_line or 'Worker error'
+
+
+def _summarize_delegate_state_event(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    if not isinstance(event, AgentStateChangedObservation):
+        return None
+    state = str(getattr(event, 'agent_state', '') or '').lower()
+    if state == AgentState.ERROR.value:
+        return 'failed', 'Worker entered error state'
+    if state == AgentState.FINISHED.value:
+        return 'done', 'Completed'
+    return None
+
+
+def _summarize_delegate_terminal_event(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    for summarizer in (
+        _summarize_delegate_finish_event,
+        _summarize_delegate_reject_event,
+        _summarize_delegate_error_event,
+        _summarize_delegate_state_event,
+    ):
+        if result := summarizer(event):
+            return result
+    return None
+
+
+def _summarize_delegate_worker_event(
+    event: Action | Observation,
+) -> tuple[str, str] | None:
+    """Return a compact worker-progress summary for parent-side swarm UI."""
+    for summarizer in (
+        _summarize_delegate_file_action,
+        _summarize_delegate_command_action,
+        _summarize_delegate_mcp_action,
+        _summarize_delegate_terminal_event,
+    ):
+        if result := summarizer(event):
+            return result
     return None
 
 
@@ -157,6 +210,99 @@ class EventRouterService:
     def __init__(self, controller: SessionOrchestrator) -> None:
         self._ctrl = controller
 
+    async def _handle_change_state_action(
+        self, action: ChangeAgentStateAction
+    ) -> None:
+        try:
+            target_state = AgentState(action.agent_state)
+        except ValueError:
+            self._ctrl.log(
+                'warning',
+                "Received unknown agent state '%s', ignoring.",
+                extra={'agent_state': action.agent_state},
+            )
+            return
+
+        if (
+            target_state == AgentState.AWAITING_USER_INPUT
+            and action.source == EventSource.ENVIRONMENT
+            and self._ctrl.get_agent_state() == AgentState.RUNNING
+        ):
+            self._ctrl.log(
+                'debug',
+                'Discarding stale startup ChangeAgentStateAction(AWAITING_USER_INPUT) '
+                '— agent is already RUNNING',
+            )
+            return
+
+        await self._ctrl.set_agent_state_to(target_state)
+
+    @staticmethod
+    def _is_meta_cognition_action(action: Action) -> bool:
+        return isinstance(
+            action,
+            (
+                ClarificationRequestAction,
+                ProposalAction,
+                UncertaintyAction,
+                EscalateToHumanAction,
+            ),
+        )
+
+    def _first_user_message(self) -> MessageAction | None:
+        return next(
+            (
+                event
+                for event in self._ctrl.event_stream.search_events(
+                    start_id=self._ctrl.state.start_id
+                )
+                if isinstance(event, MessageAction) and event.source == EventSource.USER
+            ),
+            None,
+        )
+
+    def _recall_type_for_user_message(self, action: MessageAction) -> RecallType:
+        first_user_message = self._first_user_message()
+        is_first = action.id == first_user_message.id if first_user_message else False
+        return RecallType.WORKSPACE_CONTEXT if is_first else RecallType.KNOWLEDGE
+
+    def _set_pending_recall(self, recall_action: RecallAction, recall_type: RecallType) -> None:
+        pending_service = getattr(self._ctrl, 'pending_action_service', None)
+        if recall_type == RecallType.WORKSPACE_CONTEXT:
+            if pending_service is not None:
+                pending_service.set(recall_action)
+                return
+
+            action_service = getattr(self._ctrl, 'action_service', None)
+            if action_service is not None:
+                action_service.set_pending_action(recall_action)
+            return
+
+        if pending_service is not None:
+            pending_service.set(None)
+
+        cb_svc = getattr(self._ctrl, 'circuit_breaker_service', None)
+        if cb_svc is not None:
+            cb_svc.reset_for_new_turn()
+
+        state = getattr(self._ctrl, 'state', None)
+        if state is not None:
+            state.extra_data.pop('__step_guard_warning_trip_counts', None)
+
+    async def _ensure_running_for_user_message(self) -> None:
+        if self._ctrl.get_agent_state() != AgentState.RUNNING:
+            await self._ctrl.set_agent_state_to(AgentState.RUNNING)
+
+    @staticmethod
+    def _checkpoint_tool_result_from_event(event: Event) -> dict[str, object] | None:
+        tool_result = getattr(event, 'tool_result', None)
+        if not isinstance(tool_result, dict):
+            return None
+        tool_name = str(tool_result.get('tool') or '').strip()
+        if tool_name in _CHECKPOINT_INTERMEDIATE_TOOLS:
+            return tool_result
+        return None
+
     # ── public entry point ────────────────────────────────────────────
 
     async def route_event(self, event: Event) -> None:
@@ -195,52 +341,21 @@ class EventRouterService:
     async def _handle_action(self, action: Action) -> None:
         """Route an Action to its specific handler."""
         if isinstance(action, ChangeAgentStateAction):
-            try:
-                target_state = AgentState(action.agent_state)
-            except ValueError:
-                self._ctrl.log(
-                    'warning',
-                    "Received unknown agent state '%s', ignoring.",
-                    extra={'agent_state': action.agent_state},
-                )
-            else:
-                # Guard: discard a stale startup AWAITING_USER_INPUT signal that
-                # was queued on the ENVIRONMENT background queue before the user
-                # message arrived.  If the agent is already RUNNING (meaning a
-                # user message was processed inline), an ENVIRONMENT-sourced
-                # AWAITING_USER_INPUT would race to override the active RUNNING
-                # state and permanently freeze the agent loop.
-                if (
-                    target_state == AgentState.AWAITING_USER_INPUT
-                    and action.source == EventSource.ENVIRONMENT
-                    and self._ctrl.get_agent_state() == AgentState.RUNNING
-                ):
-                    self._ctrl.log(
-                        'debug',
-                        'Discarding stale startup ChangeAgentStateAction(AWAITING_USER_INPUT) '
-                        '— agent is already RUNNING',
-                    )
-                    return
-                await self._ctrl.set_agent_state_to(target_state)
-        elif isinstance(action, MessageAction):
-            await self._handle_message_action(action)
-        elif isinstance(action, PlaybookFinishAction):
-            await self._handle_finish_action(action)
-        elif isinstance(action, AgentRejectAction):
-            await self._handle_reject_action(action)
-        elif isinstance(action, TaskTrackingAction):
-            await self._handle_task_tracking_action(action)
-        elif isinstance(action, DelegateTaskAction):
-            await self._handle_delegate_task_action(action)
-        elif isinstance(
-            action,
-            (
-                ClarificationRequestAction,
-                ProposalAction,
-                UncertaintyAction,
-                EscalateToHumanAction,
-            ),
+            await self._handle_change_state_action(action)
+            return
+
+        for action_type, handler in (
+            (MessageAction, self._handle_message_action),
+            (PlaybookFinishAction, self._handle_finish_action),
+            (AgentRejectAction, self._handle_reject_action),
+            (TaskTrackingAction, self._handle_task_tracking_action),
+            (DelegateTaskAction, self._handle_delegate_task_action),
         ):
+            if isinstance(action, action_type):
+                await handler(action)
+                return
+
+        if self._is_meta_cognition_action(action):
             await self._handle_meta_cognition_action(action)
 
     async def _handle_task_tracking_action(self, action: TaskTrackingAction) -> None:
@@ -341,11 +456,7 @@ class EventRouterService:
         for event in reversed(prior_events):
             if isinstance(event, MessageAction) and event.source == EventSource.USER:
                 break
-            tool_result = getattr(event, 'tool_result', None)
-            if not isinstance(tool_result, dict):
-                continue
-            tool_name = str(tool_result.get('tool') or '').strip()
-            if tool_name in _CHECKPOINT_INTERMEDIATE_TOOLS:
+            if tool_result := self._checkpoint_tool_result_from_event(event):
                 return tool_result
         return None
 
@@ -357,59 +468,13 @@ class EventRouterService:
             str(action),
             extra={'msg_type': 'ACTION', 'event_source': EventSource.USER},
         )
-        first_user_message = next(
-            (
-                e
-                for e in self._ctrl.event_stream.search_events(
-                    start_id=self._ctrl.state.start_id
-                )
-                if isinstance(e, MessageAction) and e.source == EventSource.USER
-            ),
-            None,
-        )
-        is_first = action.id == first_user_message.id if first_user_message else False
-        recall_type = RecallType.WORKSPACE_CONTEXT if is_first else RecallType.KNOWLEDGE
+        recall_type = self._recall_type_for_user_message(action)
         recall_action = RecallAction(query=action.content, recall_type=recall_type)
 
         # Assign stream id before pending so pending always references a stable id.
         self._ctrl.event_stream.add_event(recall_action, EventSource.USER)
-
-        # Only block the agent loop on WORKSPACE_CONTEXT recall (first message).
-        # KNOWLEDGE recalls (follow-up messages) run in the background while the
-        # agent steps — can_step() already returns True for them. Setting them as
-        # pending causes an ID mismatch when the next real action gets a new ID
-        # before the RecallObservation arrives.
-        pending_service = getattr(self._ctrl, 'pending_action_service', None)
-        if recall_type == RecallType.WORKSPACE_CONTEXT:
-            if pending_service is not None:
-                pending_service.set(recall_action)
-            else:
-                action_service = getattr(self._ctrl, 'action_service', None)
-                if action_service is not None:
-                    action_service.set_pending_action(recall_action)
-        else:
-            # KNOWLEDGE recall (second+ messages): the previous turn's MessageAction
-            # is still pending (it was set in _finalize_action but never cleared by
-            # an observation because AGENT_LEVEL_ACTIONS skip runtime execution).
-            # Clear it now so can_step() returns True for this new turn.
-            if pending_service is not None:
-                pending_service.set(None)
-
-            # Reset circuit breaker counters accumulated during the previous turn.
-            # Without this, a tripped CB (e.g. "too many high-risk actions") would
-            # re-emit the same TRIPPED observation on the very first step of the new
-            # turn, even though no new high-risk action has been taken.
-            cb_svc = getattr(self._ctrl, 'circuit_breaker_service', None)
-            if cb_svc is not None:
-                cb_svc.reset_for_new_turn()
-            # Also clear the per-trip warning counts stored in state so warnings
-            # restart from 1/N if the agent hits the limit again this turn.
-            _state = getattr(self._ctrl, 'state', None)
-            if _state is not None:
-                _state.extra_data.pop('__step_guard_warning_trip_counts', None)
-
-        if self._ctrl.get_agent_state() != AgentState.RUNNING:
-            await self._ctrl.set_agent_state_to(AgentState.RUNNING)
+        self._set_pending_recall(recall_action, recall_type)
+        await self._ensure_running_for_user_message()
 
     async def _handle_delegate_task_action(self, action: DelegateTaskAction) -> None:
         """Handle delegating a subtask to a worker agent."""

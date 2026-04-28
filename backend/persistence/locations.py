@@ -229,6 +229,68 @@ def _is_same_or_subpath(path: Path, parent: Path) -> bool:
         return False
 
 
+def _default_local_data_root(
+    ws: Path | None,
+    *,
+    default_local_data_root: str,
+) -> str:
+    if ws is not None:
+        return get_project_local_data_root(ws)
+    return str(Path(os.path.expanduser(default_local_data_root)).resolve())
+
+
+def _workspace_local_data_root(resolved: Path, ws: Path) -> str:
+    wsp = ws.resolve()
+    canonical = Path(get_project_local_data_root(ws)).resolve()
+    legacy_anchor = (wsp / '.grinta' / 'storage').resolve()
+    if resolved == wsp:
+        return str(canonical)
+    try:
+        resolved.relative_to(wsp)
+    except ValueError:
+        return str(resolved)
+    if _is_same_or_subpath(resolved, canonical) or _is_same_or_subpath(
+        resolved, legacy_anchor
+    ):
+        return str(resolved)
+    return str(canonical)
+
+
+def _current_working_directory() -> Path | None:
+    try:
+        return Path.cwd().resolve()
+    except OSError:
+        return None
+
+
+def _cwd_relative_local_data_root(resolved: Path, cwd: Path) -> str:
+    canonical_cw = Path(get_project_local_data_root(cwd)).resolve()
+    legacy_anchor_cw = (cwd / '.grinta' / 'storage').resolve()
+    if resolved == cwd or resolved in (cwd / 'sessions', cwd / 'storage'):
+        return str(canonical_cw)
+    if _is_same_or_subpath(resolved, canonical_cw) or _is_same_or_subpath(
+        resolved, legacy_anchor_cw
+    ):
+        return str(resolved)
+    return str(canonical_cw)
+
+
+def _normalize_cwd_local_data_root(resolved: Path) -> str:
+    cwd = _current_working_directory()
+    if cwd is None:
+        return str(resolved)
+
+    from backend.core.workspace_resolution import is_reserved_user_app_data_dir
+
+    if is_reserved_user_app_data_dir(cwd):
+        return str(resolved)
+    try:
+        resolved.relative_to(cwd)
+    except ValueError:
+        return str(resolved)
+    return _cwd_relative_local_data_root(resolved, cwd)
+
+
 def get_local_data_root(config: AppConfig | None = None) -> str:
     """Return the LocalFileStore root (``~/.grinta/workspaces/<id>/storage`` for the workspace).
 
@@ -250,52 +312,21 @@ def get_local_data_root(config: AppConfig | None = None) -> str:
     ws = resolve_cli_workspace_directory(cfg)
 
     if not raw:
-        if ws is not None:
-            return get_project_local_data_root(ws)
-        return str(Path(os.path.expanduser(DEFAULT_LOCAL_DATA_ROOT)).resolve())
+        return _default_local_data_root(
+            ws,
+            default_local_data_root=DEFAULT_LOCAL_DATA_ROOT,
+        )
 
     resolved = Path(os.path.expanduser(raw)).resolve()
     if ws is not None:
-        wsp = ws.resolve()
-        canonical = Path(get_project_local_data_root(ws)).resolve()
-        legacy_anchor = (wsp / '.grinta' / 'storage').resolve()
-        if resolved == wsp:
-            return str(canonical)
-        try:
-            resolved.relative_to(wsp)
-        except ValueError:
-            return str(resolved)
-        if not _is_same_or_subpath(resolved, canonical) and not _is_same_or_subpath(
-            resolved, legacy_anchor
-        ):
-            return str(canonical)
+        return _workspace_local_data_root(resolved, ws)
 
     # Workspace could not be resolved (reserved cwd, invalid project_root, etc.) but
     # settings may still point local_data_root at "." / "sessions" / "storage"
     # relative to cwd — that used to become the LocalFileStore root and created a
     # top-level ``sessions/`` tree in the repo. Anchor those paths to the
     # workspace-keyed canonical storage when cwd is a normal project directory.
-    try:
-        cw = Path.cwd().resolve()
-    except OSError:
-        return str(resolved)
-    from backend.core.workspace_resolution import is_reserved_user_app_data_dir
-
-    if is_reserved_user_app_data_dir(cw):
-        return str(resolved)
-    try:
-        resolved.relative_to(cw)
-    except ValueError:
-        return str(resolved)
-    canonical_cw = Path(get_project_local_data_root(cw)).resolve()
-    legacy_anchor_cw = (cw / '.grinta' / 'storage').resolve()
-    if resolved == cw or resolved in (cw / 'sessions', cw / 'storage'):
-        return str(canonical_cw)
-    if not _is_same_or_subpath(resolved, canonical_cw) and not _is_same_or_subpath(
-        resolved, legacy_anchor_cw
-    ):
-        return str(canonical_cw)
-    return str(resolved)
+    return _normalize_cwd_local_data_root(resolved)
 
 
 def get_active_local_data_root() -> str:

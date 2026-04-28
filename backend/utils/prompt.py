@@ -218,6 +218,23 @@ class OrchestratorPromptManager(PromptManager):
                 pass
         return ''
 
+    @staticmethod
+    def _function_calling_mode_from_resolved(resolved: object) -> str:
+        native_pref = getattr(resolved, 'native_tool_calling', None)
+        if native_pref is True:
+            return 'native'
+        if native_pref is False:
+            return 'string'
+
+        model_id = str(getattr(resolved, 'model', '') or '').strip()
+        if not model_id:
+            return 'unknown'
+
+        from backend.inference.model_features import get_features
+
+        features = get_features(model_id)
+        return 'native' if features.supports_function_calling else 'string'
+
     def _resolve_function_calling_mode(self) -> str:
         """Return prompt-facing function-calling mode: native, string, or unknown."""
         if self._app_config is None or self._config is None:
@@ -236,20 +253,7 @@ class OrchestratorPromptManager(PromptManager):
             if not resolved:
                 return 'unknown'
 
-            native_pref = getattr(resolved, 'native_tool_calling', None)
-            if native_pref is True:
-                return 'native'
-            if native_pref is False:
-                return 'string'
-
-            model_id = str(getattr(resolved, 'model', '') or '').strip()
-            if not model_id:
-                return 'unknown'
-
-            from backend.inference.model_features import get_features
-
-            features = get_features(model_id)
-            return 'native' if features.supports_function_calling else 'string'
+            return self._function_calling_mode_from_resolved(resolved)
         except Exception:
             return 'unknown'
 

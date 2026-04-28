@@ -170,6 +170,62 @@ class CircuitBreaker:
             config.adaptive,
         )
 
+    def _trip_if_text_editor_syntax(
+        self, str_replace_syntax: int
+    ) -> CircuitBreakerResult | None:
+        if str_replace_syntax < DEFAULT_TEXT_EDITOR_SYNTAX_SWITCH:
+            return None
+        recommendation = (
+            'Repeated syntax validation failures on edited files. '
+            'Prefer minimal parsing-safe stubs and smaller surgical edits; '
+            'refresh file context with read_file before reattempting.'
+        )
+        if str_replace_syntax >= DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE:
+            recommendation = (
+                recommendation
+                + ' Syntax-validation retries are now blocked until strategy changes.'
+            )
+        return CircuitBreakerResult(
+            tripped=True,
+            reason=(
+                'Repeated text_editor syntax validation failures '
+                f'({str_replace_syntax})'
+            ),
+            action='pause'
+            if str_replace_syntax >= DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE
+            else 'switch_context',
+            recommendation=recommendation,
+            system_message=recommendation,
+        )
+
+    def _trip_if_text_editor_hard(
+        self, str_replace_hard: int
+    ) -> CircuitBreakerResult | None:
+        if str_replace_hard < DEFAULT_TEXT_EDITOR_HARD_SWITCH:
+            return None
+        recommendation = (
+            'Repeated deterministic text_editor failures detected. '
+            'Refresh file context with read_file before reattempting. '
+            'If this persists, switch to a different edit strategy.'
+        )
+        if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE:
+            recommendation = (
+                recommendation
+                + ' text_editor retries are now blocked until strategy changes.'
+            )
+        return CircuitBreakerResult(
+            tripped=True,
+            reason=(
+                'Repeated text_editor deterministic failures '
+                f'({str_replace_hard})'
+            ),
+            action='pause'
+            if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE
+            else 'switch_context',
+            recommendation=recommendation,
+            system_message=recommendation,
+        )
+
     def check(self, state: State | None = None) -> CircuitBreakerResult:
         """Check if circuit breaker should trip.
 
@@ -224,49 +280,11 @@ class CircuitBreaker:
         # ``GRINTA_STRICT_WRITE_VALIDATION=1``. We therefore pick thresholds
         # that are generous enough to let the agent iterate on a genuinely
         # hard file rather than trigger a pause on minor churn.
-        if str_replace_syntax >= DEFAULT_TEXT_EDITOR_SYNTAX_SWITCH:
-            recommendation = (
-                'Repeated syntax validation failures on edited files. '
-                'Prefer minimal parsing-safe stubs and smaller surgical edits; '
-                'refresh file context with read_file before reattempting.'
-            )
-            if str_replace_syntax >= DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE:
-                recommendation = (
-                    recommendation
-                    + ' Syntax-validation retries are now blocked until strategy changes.'
-                )
-            return CircuitBreakerResult(
-                tripped=True,
-                reason=(
-                    'Repeated text_editor syntax validation failures '
-                    f'({str_replace_syntax})'
-                ),
-                action='pause' if str_replace_syntax >= DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE else 'switch_context',
-                recommendation=recommendation,
-                system_message=recommendation,
-            )
+        if trip := self._trip_if_text_editor_syntax(str_replace_syntax):
+            return trip
 
-        if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_SWITCH:
-            recommendation = (
-                'Repeated deterministic text_editor failures detected. '
-                'Refresh file context with read_file before reattempting. '
-                'If this persists, switch to a different edit strategy.'
-            )
-            if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE:
-                recommendation = (
-                    recommendation
-                    + ' text_editor retries are now blocked until strategy changes.'
-                )
-            return CircuitBreakerResult(
-                tripped=True,
-                reason=(
-                    'Repeated text_editor deterministic failures '
-                    f'({str_replace_hard})'
-                ),
-                action='pause' if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE else 'switch_context',
-                recommendation=recommendation,
-                system_message=recommendation,
-            )
+        if trip := self._trip_if_text_editor_hard(str_replace_hard):
+            return trip
 
         # 3. Stuck detections
         # The step_guard_service already emits targeted recovery messages.

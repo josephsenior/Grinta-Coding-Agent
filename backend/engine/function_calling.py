@@ -514,44 +514,23 @@ def _normalize_task_tracker_list(
         raise FunctionCallValidationError(f'Invalid task list structure: {e}') from e
 
 
-def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
-    """Handle TASK_TRACKER_TOOL tool call."""
-    command = require_tool_argument(arguments, 'command', TASK_TRACKER_TOOL_NAME)
-    if command not in {'view', 'update'}:
-        raise FunctionCallValidationError(
-            f'Unsupported command {command!r} for tool call {TASK_TRACKER_TOOL_NAME}'
+def _task_tracker_existing_normalized(
+    tracker: TaskTracker,
+) -> list[dict[str, Any]]:
+    existing_raw = tracker.load_from_file()
+    try:
+        return _normalize_task_tracker_list(
+            cast(list[Mapping[str, Any]], existing_raw)
         )
+    except FunctionCallValidationError:
+        return []
 
-    if command == 'update' and 'task_list' not in arguments:
-        raise FunctionCallValidationError(
-            f'Missing required argument "task_list" for "update" command in tool call {TASK_TRACKER_TOOL_NAME}'
-        )
 
-    tracker = TaskTracker()
-    raw_task_list: Sequence[Mapping[str, Any]]
-
-    existing_normalized_task_list: list[dict[str, Any]] = []
-    if command == 'view':
-        raw_task_list = cast(list[Mapping[str, Any]], tracker.load_from_file())
-    else:
-        # Capture the current persisted plan so we can detect no-op updates
-        # that otherwise create tool-call loops without advancing execution.
-        existing_raw = tracker.load_from_file()
-        try:
-            existing_normalized_task_list = _normalize_task_tracker_list(
-                cast(list[Mapping[str, Any]], existing_raw)
-            )
-        except FunctionCallValidationError:
-            existing_normalized_task_list = []
-        raw_task_list_any = arguments.get('task_list', [])
-        if not isinstance(raw_task_list_any, Sequence):
-            raise FunctionCallValidationError(
-                f'Invalid format for "task_list". Expected a list but got {type(raw_task_list_any)}.'
-            )
-        raw_task_list = cast(Sequence[Mapping[str, Any]], raw_task_list_any)
-
-    normalized_task_list = _normalize_task_tracker_list(list(raw_task_list))
-
+def _maybe_noop_task_tracker_action(
+    command: str,
+    normalized_task_list: list[dict[str, Any]],
+    existing_normalized_task_list: list[dict[str, Any]],
+) -> TaskTrackingAction | None:
     if (
         command == 'update'
         and normalized_task_list
@@ -567,6 +546,44 @@ def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
                 'and refresh tracking only after status/result changes.'
             ),
         )
+    return None
+
+
+def _handle_task_tracker_tool(arguments: Mapping[str, Any]) -> Action:
+    """Handle TASK_TRACKER_TOOL tool call."""
+    command = require_tool_argument(arguments, 'command', TASK_TRACKER_TOOL_NAME)
+    if command not in {'view', 'update'}:
+        raise FunctionCallValidationError(
+            f'Unsupported command {command!r} for tool call {TASK_TRACKER_TOOL_NAME}'
+        )
+
+    if command == 'update' and 'task_list' not in arguments:
+        raise FunctionCallValidationError(
+            f'Missing required argument "task_list" for "update" command in tool call {TASK_TRACKER_TOOL_NAME}'
+        )
+
+    tracker = TaskTracker()
+    raw_task_list: Sequence[Mapping[str, Any]]
+    existing_normalized_task_list: list[dict[str, Any]] = []
+
+    if command == 'view':
+        raw_task_list = cast(list[Mapping[str, Any]], tracker.load_from_file())
+    else:
+        existing_normalized_task_list = _task_tracker_existing_normalized(tracker)
+        raw_task_list_any = arguments.get('task_list', [])
+        if not isinstance(raw_task_list_any, Sequence):
+            raise FunctionCallValidationError(
+                f'Invalid format for "task_list". Expected a list but got {type(raw_task_list_any)}.'
+            )
+        raw_task_list = cast(Sequence[Mapping[str, Any]], raw_task_list_any)
+
+    normalized_task_list = _normalize_task_tracker_list(list(raw_task_list))
+
+    noop = _maybe_noop_task_tracker_action(
+        command, normalized_task_list, existing_normalized_task_list
+    )
+    if noop is not None:
+        return noop
 
     if command == 'update':
         tracker.save_to_file(normalized_task_list)
@@ -696,18 +713,40 @@ def _handle_edit_symbol_body_command(
     return MessageAction(content=f'❌ Edit failed: {result.message}')
 
 
-def _handle_edit_symbols_command(
-    editor: Any, path: str, arguments: Mapping[str, Any]
-) -> Action:
-    """Apply multiple ``edit_symbol_body``-style replacements in one call.
+def _normalized_edit_symbols_tuple(
+    i: int,
+    item_any: Any,
+    seen: set[str],
+) -> tuple[str, str]:
+    if not isinstance(item_any, Mapping):
+        raise FunctionCallValidationError(
+            f'edit_symbols edits[{i}] must be an object'
+        )
+    item: Mapping[str, Any] = cast(Mapping[str, Any], item_any)
+    fn = cast(str | None, item.get('symbol_name'))
+    nb = cast(str | None, item.get('new_body'))
+    if not fn:
+        raise FunctionCallValidationError(
+            f'edit_symbols edits[{i}] requires symbol_name and new_body'
+        )
+    if not isinstance(nb, str):
+        raise FunctionCallValidationError(
+            f'edit_symbols edits[{i}] requires new_body (string)'
+        )
+    key = fn.strip()
+    if key in seen:
+        raise FunctionCallValidationError(
+            f'edit_symbols: duplicate symbol {key!r} in batch'
+        )
+    seen.add(key)
+    return key, nb
 
-    On any failure after the file was modified, restores the file from a
-    pre-batch snapshot so the workspace does not stay half-refactored.
-    """
-    import os
 
+def _parse_edit_symbols_edits(arguments: Mapping[str, Any]) -> list[tuple[str, str]]:
     raw_edits_any = arguments.get('edits') or arguments.get('symbol_edits')
-    if not isinstance(raw_edits_any, Sequence) or isinstance(raw_edits_any, (str, bytes)):
+    if not isinstance(raw_edits_any, Sequence) or isinstance(
+        raw_edits_any, (str, bytes)
+    ):
         raise FunctionCallValidationError(
             "edit_symbols requires a non-empty 'edits' array "
             "(objects with function_name or symbol, and new_body)"
@@ -723,66 +762,63 @@ def _handle_edit_symbols_command(
             f'edit_symbols supports at most {_MAX_EDIT_SYMBOLS_PER_BATCH} edits per call'
         )
 
-    normalized: list[tuple[str, str]] = []
     seen: set[str] = set()
+    normalized: list[tuple[str, str]] = []
     for i, item_any in enumerate(raw_edits):
-        if not isinstance(item_any, Mapping):
-            raise FunctionCallValidationError(
-                f'edit_symbols edits[{i}] must be an object'
-            )
-        item: Mapping[str, Any] = cast(Mapping[str, Any], item_any)
-        fn = cast(str | None, item.get('symbol_name'))
-        nb = cast(str | None, item.get('new_body'))
-        if not fn:
-            raise FunctionCallValidationError(
-                f'edit_symbols edits[{i}] requires symbol_name and new_body'
-            )
-        if not isinstance(nb, str):
-            raise FunctionCallValidationError(
-                f'edit_symbols edits[{i}] requires new_body (string)'
-            )
-        key = fn.strip()
-        if key in seen:
-            raise FunctionCallValidationError(
-                f'edit_symbols: duplicate symbol {key!r} in batch'
-            )
-        seen.add(key)
-        normalized.append((key, nb))
+        normalized.append(_normalized_edit_symbols_tuple(i, item_any, seen))
+    return normalized
 
-    backup: str | None = None
-    if os.path.isfile(path):
-        try:
-            with open(path, encoding='utf-8') as f:
-                backup = f.read()
-        except OSError as e:
-            return MessageAction(
-                content=f'❌ edit_symbols: could not read {path} for backup: {e}'
-            )
 
+def _read_utf8_backup_or_message(path: str) -> tuple[str | None, MessageAction | None]:
+    import os
+
+    if not os.path.isfile(path):
+        return None, None
+    try:
+        with open(path, encoding='utf-8') as f:
+            return f.read(), None
+    except OSError as e:
+        return None, MessageAction(
+            content=f'❌ edit_symbols: could not read {path} for backup: {e}'
+        )
+
+
+def _edit_symbols_failure_content(
+    idx: int, fn: str, result_msg: str, backup: str | None
+) -> str:
+    step = idx + 1
+    base = f'❌ edit_symbols failed at step {step} ({fn}): {result_msg}'
+    if backup is not None:
+        return f'{base} (file restored to pre-batch state)'
+    return base
+
+
+def _run_edit_symbols_sequence(
+    editor: Any,
+    path: str,
+    normalized: list[tuple[str, str]],
+    backup: str | None,
+) -> Action:
     messages: list[str] = []
     for idx, (fn, nb) in enumerate(normalized):
         result = editor.edit_function(path, fn, nb)
-        if not result.success:
-            if backup is not None:
-                try:
-                    with open(path, 'w', encoding='utf-8') as f:
-                        f.write(backup)
-                except OSError as restore_err:
-                    return MessageAction(
-                        content=(
-                            f'❌ edit_symbols failed at step {idx + 1} ({fn}): {result.message}. '
-                            f'Could not restore file: {restore_err}'
-                        )
+        if result.success:
+            messages.append(result.message)
+            continue
+        if backup is not None:
+            try:
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(backup)
+            except OSError as restore_err:
+                return MessageAction(
+                    content=(
+                        f'❌ edit_symbols failed at step {idx + 1} ({fn}): {result.message}. '
+                        f'Could not restore file: {restore_err}'
                     )
-            return MessageAction(
-                content=(
-                    f'❌ edit_symbols failed at step {idx + 1} ({fn}): {result.message} '
-                    '(file restored to pre-batch state)'
-                    if backup is not None
-                    else f'❌ edit_symbols failed at step {idx + 1} ({fn}): {result.message}'
                 )
-            )
-        messages.append(result.message)
+        return MessageAction(
+            content=_edit_symbols_failure_content(idx, fn, result.message, backup)
+        )
 
     summary = (
         f'✓ edit_symbols applied {len(normalized)} replacement(s) in {path}:\n'
@@ -791,6 +827,21 @@ def _handle_edit_symbols_command(
     return FileReadAction(
         path=path, impl_source=FileReadSource.DEFAULT, thought=summary
     )
+
+
+def _handle_edit_symbols_command(
+    editor: Any, path: str, arguments: Mapping[str, Any]
+) -> Action:
+    """Apply multiple ``edit_symbol_body``-style replacements in one call.
+
+    On any failure after the file was modified, restores the file from a
+    pre-batch snapshot so the workspace does not stay half-refactored.
+    """
+    normalized = _parse_edit_symbols_edits(arguments)
+    backup, backup_err = _read_utf8_backup_or_message(path)
+    if backup_err is not None:
+        return backup_err
+    return _run_edit_symbols_sequence(editor, path, normalized, backup)
 
 
 def _handle_rename_symbol_command(
@@ -920,13 +971,103 @@ def _handle_undo_last_edit_command(
     )
 
 
+_SYMBOL_EDITOR_TEXT_EDITOR_COMMANDS = frozenset({
+    'create_file',
+    'read_file',
+    'insert_text',
+    'undo_last_edit',
+})
+
+_SYMBOL_EDITOR_BRIDGE_KEYS = (
+    'file_text',
+    'new_str',
+    'insert_line',
+    'start_line',
+    'end_line',
+    'view_range',
+    'normalize_ws',
+    'match_mode',
+    'preview',
+    'confidence',
+    'edit_mode',
+    'format_kind',
+    'format_op',
+    'format_path',
+    'format_value',
+    'anchor_type',
+    'anchor_value',
+    'anchor_occurrence',
+    'section_action',
+    'section_content',
+    'patch_text',
+    'expected_hash',
+    'expected_file_hash',
+    'security_risk',
+)
+
+
+def _symbol_editor_bridge_to_text_editor(
+    command: str, path: str, normalized_args: dict[str, Any]
+) -> Action | None:
+    if command not in _SYMBOL_EDITOR_TEXT_EDITOR_COMMANDS:
+        return None
+    passthrough_args: dict[str, Any] = {'command': command, 'path': path}
+    for key in _SYMBOL_EDITOR_BRIDGE_KEYS:
+        if key in normalized_args:
+            passthrough_args[key] = normalized_args[key]
+    return _handle_text_editor_tool(passthrough_args)
+
+
+def _dispatch_structure_editor_commands(
+    editor: Any,
+    command: str,
+    path: str,
+    normalized_args: dict[str, Any],
+) -> Action:
+    editor_command_handlers: dict[
+        str, Callable[[Any, str, Mapping[str, Any]], Action]
+    ] = {
+        'edit_symbol_body': _handle_edit_symbol_body_command,
+        'edit_symbols': _handle_edit_symbols_command,
+        'rename_symbol': _handle_rename_symbol_command,
+        'find_symbol': _handle_find_symbol_command,
+        'replace_range': _handle_replace_range_command,
+        'normalize_indent': _handle_normalize_indent_command,
+    }
+    simple_command_handlers: dict[
+        str, Callable[[str, Mapping[str, Any]], Action]
+    ] = {
+        'create_file': _handle_create_file_command,
+        'read_file': _handle_read_file_command,
+        'insert_text': _handle_insert_text_command,
+        'undo_last_edit': _handle_undo_last_edit_command,
+    }
+    try:
+        if command in editor_command_handlers:
+            handler = editor_command_handlers[command]
+            return handler(editor, path, normalized_args)
+        if command in simple_command_handlers:
+            simple_handler = simple_command_handlers[command]
+            return simple_handler(path, normalized_args)
+        all_cmds = list(editor_command_handlers.keys()) + list(
+            simple_command_handlers.keys()
+        )
+        raise FunctionCallValidationError(
+            f"Unknown command '{command}' for symbol_editor tool. "
+            f"Valid commands: {all_cmds}"
+        )
+    except FunctionCallValidationError:
+        raise
+    except Exception as e:
+        return MessageAction(content=f'❌ Structure Editor error: {str(e)}')
+
+
 def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
     """Handle StructureEditor tool call."""
     tool_name = cast(
         str, create_symbol_editor_tool().get('function', {}).get('name', '')
     )
 
-    # Validate arguments
     command, path = _validate_symbol_editor_args(dict(arguments), tool_name)
     command, normalized_args = _normalize_symbol_editor_alias(command, dict(arguments))
 
@@ -944,50 +1085,10 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
             ', '.join(f'{name}(x{count})' for name, count in repair_changes),
         )
 
-    file_editor_commands = {
-        'create_file',
-        'read_file',
-        'insert_text',
-        'undo_last_edit',
-    }
-    if command in file_editor_commands:
-        passthrough_args: dict[str, Any] = {
-            'command': command,
-            'path': path,
-        }
-        for key in (
-            'file_text',
-            'new_str',
-            'insert_line',
-            'start_line',
-            'end_line',
-            'view_range',
-            'normalize_ws',
-            'match_mode',
-            'preview',
-            'confidence',
-            'edit_mode',
-            'format_kind',
-            'format_op',
-            'format_path',
-            'format_value',
-            'anchor_type',
-            'anchor_value',
-            'anchor_occurrence',
-            'section_action',
-            'section_content',
-            'patch_text',
-            'expected_hash',
-            'expected_file_hash',
-            'start_line',
-            'end_line',
-            'security_risk',
-        ):
-            if key in normalized_args:
-                passthrough_args[key] = normalized_args[key]
-        return _handle_text_editor_tool(passthrough_args)
+    bridged = _symbol_editor_bridge_to_text_editor(command, path, normalized_args)
+    if bridged is not None:
+        return bridged
 
-    # Initialize editor
     try:
         from backend.engine.tools.structure_editor import StructureEditor
 
@@ -997,45 +1098,7 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
             f'Failed to initialize Structure Editor: {e}'
         ) from e
 
-    # Command dispatch map — editor-powered commands use the StructureEditor instance
-    editor_command_handlers = {
-        'edit_symbol_body': _handle_edit_symbol_body_command,
-        'edit_symbols': _handle_edit_symbols_command,
-        'rename_symbol': _handle_rename_symbol_command,
-        'find_symbol': _handle_find_symbol_command,
-        'replace_range': _handle_replace_range_command,
-        'normalize_indent': _handle_normalize_indent_command,
-    }
-    # File I/O commands delegate directly to runtime actions (no StructureEditor needed)
-    # Simple command handlers for standard file operations
-    simple_command_handlers: dict[str, Callable[[str, Mapping[str, Any]], Action]] = {
-        'create_file': _handle_create_file_command,
-        'read_file': _handle_read_file_command,
-        'insert_text': _handle_insert_text_command,
-        'undo_last_edit': _handle_undo_last_edit_command,
-    }
-
-    # Execute command
-    try:
-        if command in editor_command_handlers:
-            handler = editor_command_handlers[command]
-            return handler(editor, path, normalized_args)
-        elif command in simple_command_handlers:
-            simple_handler = simple_command_handlers[command]
-            return simple_handler(path, normalized_args)
-        else:
-            all_cmds = list(editor_command_handlers.keys()) + list(
-                simple_command_handlers.keys()
-            )
-            raise FunctionCallValidationError(
-                f"Unknown command '{command}' for symbol_editor tool. "
-                f"Valid commands: {all_cmds}"
-            )
-
-    except FunctionCallValidationError:
-        raise
-    except Exception as e:
-        return MessageAction(content=f'❌ Structure Editor error: {str(e)}')
+    return _dispatch_structure_editor_commands(editor, command, path, normalized_args)
 
 
 def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:

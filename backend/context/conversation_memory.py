@@ -409,80 +409,108 @@ class ContextMemory:
         self.store_in_memory(event_id, role, content, metadata)
         self._indexed_event_ids.add(event_id)
 
+    def _memory_record_user_message(
+        self, event: Event
+    ) -> tuple[str, str, str, dict[str, Any]] | None:
+        if not (
+            isinstance(event, MessageAction) and event.source == EventSource.USER
+        ):
+            return None
+        content = (event.content or '').strip()
+        if not content:
+            return None
+        return (
+            self._semantic_event_id(event, content),
+            'user',
+            content[:2000],
+            {'event_type': type(event).__name__},
+        )
+
+    def _memory_record_agent_think(
+        self, event: Event
+    ) -> tuple[str, str, str, dict[str, Any]] | None:
+        if type(event).__name__ != 'AgentThinkAction':
+            return None
+        thought = str(getattr(event, 'thought', '') or '').strip()
+        if not thought:
+            return None
+        return (
+            self._semantic_event_id(event, thought),
+            'assistant',
+            thought[:2000],
+            {'event_type': type(event).__name__},
+        )
+
+    def _memory_record_error_observation(
+        self, event: Event
+    ) -> tuple[str, str, str, dict[str, Any]] | None:
+        if not isinstance(event, ErrorObservation):
+            return None
+        content = (event.content or '').strip()
+        if not content:
+            return None
+        return (
+            self._semantic_event_id(event, content),
+            'observation',
+            content[:2000],
+            {
+                'event_type': type(event).__name__,
+                'error_id': getattr(event, 'error_id', None),
+            },
+        )
+
+    def _memory_record_cmd_output(
+        self, event: Event
+    ) -> tuple[str, str, str, dict[str, Any]] | None:
+        if not isinstance(event, CmdOutputObservation):
+            return None
+        content = (event.content or '').strip()
+        if not content:
+            return None
+        return (
+            self._semantic_event_id(event, content),
+            'observation',
+            f'Command: {getattr(event, "command", "")}\n{content[:1800]}',
+            {
+                'event_type': type(event).__name__,
+                'exit_code': getattr(event, 'exit_code', None),
+            },
+        )
+
+    def _memory_record_mcp_observation(
+        self, event: Event
+    ) -> tuple[str, str, str, dict[str, Any]] | None:
+        if not isinstance(event, Observation) or type(event).__name__ != 'MCPObservation':
+            return None
+        content = (getattr(event, 'content', '') or '').strip()
+        if not content:
+            return None
+        metadata: dict[str, Any] = {
+            'event_type': type(event).__name__,
+            'tool_name': getattr(event, 'name', None),
+        }
+        tool_result = getattr(event, 'tool_result', None)
+        if isinstance(tool_result, dict):
+            metadata['tool_ok'] = tool_result.get('ok')
+            metadata['error_code'] = tool_result.get('error_code')
+        return (
+            self._semantic_event_id(event, content),
+            'tool',
+            content[:2000],
+            metadata,
+        )
+
     def _memory_record_for_event(
         self, event: Event
     ) -> tuple[str, str, str, dict[str, Any]] | None:
         """Return an indexable memory record for high-value conversation events."""
-        if isinstance(event, MessageAction) and event.source == EventSource.USER:
-            content = (event.content or '').strip()
-            if not content:
-                return None
-            return (
-                self._semantic_event_id(event, content),
-                'user',
-                content[:2000],
-                {'event_type': type(event).__name__},
-            )
-
-        if type(event).__name__ == 'AgentThinkAction':
-            thought = str(getattr(event, 'thought', '') or '').strip()
-            if not thought:
-                return None
-            return (
-                self._semantic_event_id(event, thought),
-                'assistant',
-                thought[:2000],
-                {'event_type': type(event).__name__},
-            )
-
-        if isinstance(event, ErrorObservation):
-            content = (event.content or '').strip()
-            if not content:
-                return None
-            return (
-                self._semantic_event_id(event, content),
-                'observation',
-                content[:2000],
-                {
-                    'event_type': type(event).__name__,
-                    'error_id': getattr(event, 'error_id', None),
-                },
-            )
-
-        if isinstance(event, CmdOutputObservation):
-            content = (event.content or '').strip()
-            if not content:
-                return None
-            return (
-                self._semantic_event_id(event, content),
-                'observation',
-                f'Command: {getattr(event, "command", "")}\n{content[:1800]}',
-                {
-                    'event_type': type(event).__name__,
-                    'exit_code': getattr(event, 'exit_code', None),
-                },
-            )
-
-        if isinstance(event, Observation) and type(event).__name__ == 'MCPObservation':
-            content = (getattr(event, 'content', '') or '').strip()
-            if not content:
-                return None
-            metadata: dict[str, Any] = {
-                'event_type': type(event).__name__,
-                'tool_name': getattr(event, 'name', None),
-            }
-            tool_result = getattr(event, 'tool_result', None)
-            if isinstance(tool_result, dict):
-                metadata['tool_ok'] = tool_result.get('ok')
-                metadata['error_code'] = tool_result.get('error_code')
-            return (
-                self._semantic_event_id(event, content),
-                'tool',
-                content[:2000],
-                metadata,
-            )
-
-        return None
+        return (
+            self._memory_record_user_message(event)
+            or self._memory_record_agent_think(event)
+            or self._memory_record_error_observation(event)
+            or self._memory_record_cmd_output(event)
+            or self._memory_record_mcp_observation(event)
+        )
 
     @staticmethod
     def _semantic_event_id(event: Event, content: str) -> str:
@@ -590,15 +618,22 @@ class ContextMemory:
                 content.text += f'\n\n{summary}'
                 break
 
-    def _ensure_mcp_user_addendum(self, messages: list[Message]) -> None:
-        """Insert the MCP catalogue as a leading user message when configured."""
-        if not messages or messages[0].role != 'system':
-            return
+    @staticmethod
+    def _first_user_message_leading_text(messages: list[Message]) -> str | None:
+        existing = messages[1] if len(messages) > 1 else None
+        if existing is None or existing.role != 'user':
+            return None
+        text_parts = [
+            content.text for content in existing.content if is_text_content(content)
+        ]
+        if not text_parts:
+            return None
+        return text_parts[0].strip()
 
+    def _build_mcp_user_addendum_text(self) -> str | None:
         builder = getattr(self.prompt_manager, 'get_mcp_user_addendum', None)
         if not callable(builder):
-            return
-
+            return None
         try:
             addendum = str(
                 builder(
@@ -609,20 +644,21 @@ class ContextMemory:
             ).strip()
         except Exception:
             logger.debug('Failed to build MCP user addendum', exc_info=True)
+            return None
+        return addendum or None
+
+    def _ensure_mcp_user_addendum(self, messages: list[Message]) -> None:
+        """Insert the MCP catalogue as a leading user message when configured."""
+        if not messages or messages[0].role != 'system':
             return
 
+        addendum = self._build_mcp_user_addendum_text()
         if not addendum:
             return
 
-        existing = messages[1] if len(messages) > 1 else None
-        if existing is not None and existing.role == 'user':
-            text_parts = [
-                content.text
-                for content in existing.content
-                if is_text_content(content)
-            ]
-            if text_parts and text_parts[0].strip() == addendum:
-                return
+        leading = self._first_user_message_leading_text(messages)
+        if leading == addendum:
+            return
 
         messages.insert(1, message_with_text('user', addendum))
 

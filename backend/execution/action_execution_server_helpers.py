@@ -298,35 +298,58 @@ def annotate_environment_errors(executor: Any, observation: Any) -> None:
         observation.content += f'\n\n[SCAFFOLD_SETUP_FAILED] {scaffold_failure}'
 
 
-def detect_powershell_in_bash_mismatch(command: str, content: str) -> str | None:
-    aes = _aes_module()
-    if not command or not content:
-        return None
-
+def _looks_like_bash_command_failure(content: str) -> bool:
     lower_content = content.lower()
-    if '/bin/bash' not in lower_content and 'bash:' not in lower_content:
-        return None
-    if 'command not found' not in lower_content and 'not recognized as' not in lower_content:
-        return None
+    return (
+        ('/bin/bash' in lower_content or 'bash:' in lower_content)
+        and (
+            'command not found' in lower_content
+            or 'not recognized as' in lower_content
+        )
+    )
 
+
+def _powershell_cmdlet_hint(cmdlet: str) -> str:
     bash_fix = (
         'This terminal is Git Bash — rewrite the command using bash syntax only '
         '(ls, cat, grep, find, echo, cd, mkdir, rm, pwd). '
         'Do NOT use any PowerShell cmdlets.'
     )
+    return f'`{cmdlet}` is a PowerShell cmdlet, not available in bash. {bash_fix}'
 
+
+def _missing_bash_command_name(content: str) -> str | None:
     missing_match = re.search(
         r'([A-Za-z][A-Za-z0-9-]*)\s*:\s*command not found', content
     )
-    if missing_match:
-        missing_cmd = missing_match.group(1)
-        if missing_cmd in aes._POWERSHELL_BUILTIN_COMMANDS:
-            return f'`{missing_cmd}` is a PowerShell cmdlet, not available in bash. {bash_fix}'
+    if not missing_match:
+        return None
+    return missing_match.group(1)
 
+
+def _powershell_cmdlet_in_command(aes: Any, command: str) -> str | None:
     command_tokens = set(re.findall(r'\b[A-Za-z][A-Za-z0-9-]*\b', command))
     for token in aes._POWERSHELL_BUILTIN_COMMANDS:
         if token in command_tokens:
-            return f'`{token}` is a PowerShell cmdlet, not available in bash. {bash_fix}'
+            return token
+    return None
+
+
+def detect_powershell_in_bash_mismatch(command: str, content: str) -> str | None:
+    aes = _aes_module()
+    if not command or not content:
+        return None
+
+    if not _looks_like_bash_command_failure(content):
+        return None
+
+    missing_cmd = _missing_bash_command_name(content)
+    if missing_cmd in aes._POWERSHELL_BUILTIN_COMMANDS:
+        return _powershell_cmdlet_hint(missing_cmd)
+
+    command_cmdlet = _powershell_cmdlet_in_command(aes, command)
+    if command_cmdlet is not None:
+        return _powershell_cmdlet_hint(command_cmdlet)
 
     return None
 
@@ -509,6 +532,37 @@ def terminal_read_empty_hints(*, mode: str, has_new_output: bool) -> dict[str, A
     }
 
 
+def _snapshot_terminal_read(session: Any) -> tuple[str, int | None, bool, int | None]:
+    content = session.read_output()
+    has_new_output = bool((content or '').strip())
+    return content, None, has_new_output, None
+
+
+def _fallback_terminal_delta_read(session: Any) -> tuple[str, int, int | None]:
+    content = session.read_output()
+    return content, len(content or ''), None
+
+
+def _delta_terminal_read(
+    session: Any,
+    *,
+    offset: int | None,
+) -> tuple[str, int | None, bool, int | None]:
+    safe_offset = max(0, int(offset or 0))
+    read_since = getattr(session, 'read_output_since', None)
+    if callable(read_since):
+        try:
+            result = read_since(safe_offset)
+            if isinstance(result, tuple) and len(result) == 3 and isinstance(result[0], str):
+                content, next_offset, dropped_chars = result
+                return content, int(next_offset), bool(content), dropped_chars
+            raise ValueError('invalid read_output_since result shape')
+        except Exception:
+            pass
+    content, next_offset, dropped_chars = _fallback_terminal_delta_read(session)
+    return content, int(next_offset), bool(content), dropped_chars
+
+
 def read_terminal_with_mode(
     executor: Any,
     *,
@@ -517,29 +571,8 @@ def read_terminal_with_mode(
     offset: int | None,
 ) -> tuple[str, int | None, bool, int | None]:
     if mode == 'snapshot':
-        content = session.read_output()
-        has_new_output = bool((content or '').strip())
-        return content, None, has_new_output, None
-
-    safe_offset = max(0, int(offset or 0))
-    read_since = getattr(session, 'read_output_since', None)
-    if callable(read_since):
-        try:
-            result = read_since(safe_offset)
-            if isinstance(result, tuple) and len(result) == 3 and isinstance(result[0], str):
-                content, next_offset, dropped_chars = result
-            else:
-                raise ValueError('invalid read_output_since result shape')
-        except Exception:
-            content = session.read_output()
-            next_offset = len(content or '')
-            dropped_chars = None
-    else:
-        content = session.read_output()
-        next_offset = len(content or '')
-        dropped_chars = None
-    has_new_output = bool(content)
-    return content, int(next_offset), has_new_output, dropped_chars
+        return _snapshot_terminal_read(session)
+    return _delta_terminal_read(session, offset=offset)
 
 
 def get_terminal_read_cursor(executor: Any, session_id: str) -> int:

@@ -90,6 +90,32 @@ def _collect_syntax_errors(node: Any, source: bytes, max_errors: int = 5) -> lis
     return errors
 
 
+def _extract_syntax_check_payload(action: object) -> tuple[str, bytes | None] | None:
+    from backend.ledger.action import FileEditAction, FileWriteAction
+
+    if isinstance(action, FileEditAction):
+        raw = action.file_text or action.content
+        return action.path, raw.encode('utf-8') if raw else None
+    if isinstance(action, FileWriteAction):
+        raw = action.content
+        return action.path, raw.encode('utf-8') if raw else None
+    return None
+
+
+def _append_syntax_check_result(
+    observation: Observation,
+    result: tuple[bool, str],
+) -> None:
+    current = getattr(observation, 'content', '') or ''
+    is_valid, detail = result
+    if is_valid:
+        observation.content = current + '\n<SYNTAX_CHECK_PASSED />'
+        return
+    observation.content = (
+        current + f'\n<SYNTAX_CHECK_FAILED>\n{detail}\n</SYNTAX_CHECK_FAILED>'
+    )
+
+
 class AutoCheckMiddleware(ToolInvocationMiddleware):
     """Automatically checks syntax of files after editing.
 
@@ -102,38 +128,18 @@ class AutoCheckMiddleware(ToolInvocationMiddleware):
     ) -> None:
         if observation is None:
             return
-        from backend.ledger.action import FileEditAction, FileWriteAction
         from backend.ledger.observation import ErrorObservation
 
         if isinstance(observation, ErrorObservation):
             return
-        if not isinstance(ctx.action, (FileEditAction, FileWriteAction)):
+
+        payload = _extract_syntax_check_payload(ctx.action)
+        if payload is None:
             return
-        path = getattr(ctx.action, 'path', None)
-        if not path:
-            return
 
-        # Extract content from the action so we don't need filesystem access
-        # (the file may only exist inside a sandbox/container).
-        raw = None
-        if isinstance(ctx.action, FileEditAction):
-            raw = getattr(ctx.action, 'file_text', None) or getattr(
-                ctx.action, 'content', None
-            )
-        elif isinstance(ctx.action, FileWriteAction):
-            raw = getattr(ctx.action, 'content', None)
-
-        content = raw.encode('utf-8') if raw else None
-
+        path, content = payload
         result = _treesitter_syntax_check(path, content)
         if result is None:
             return  # unsupported language or tree-sitter unavailable
 
-        current = getattr(observation, 'content', '') or ''
-        is_valid, detail = result
-        if is_valid:
-            observation.content = current + '\n<SYNTAX_CHECK_PASSED />'
-        else:
-            observation.content = (
-                current + f'\n<SYNTAX_CHECK_FAILED>\n{detail}\n</SYNTAX_CHECK_FAILED>'
-            )
+        _append_syntax_check_result(observation, result)

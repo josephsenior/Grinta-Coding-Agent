@@ -31,6 +31,43 @@ def _resolve_operation_pipeline(controller):
     return getattr(controller, 'tool_pipeline', None)
 
 
+async def _run_execute_pipeline_if_present(
+    controller,
+    action: Action,
+    ctx: ToolInvocationContext | None,
+) -> bool:
+    pipeline = _resolve_operation_pipeline(controller)
+    if not ctx or not pipeline:
+        return False
+    await pipeline.run_execute(ctx)
+    if not ctx.blocked:
+        return False
+    controller.handle_blocked_invocation(action, ctx)
+    return True
+
+
+async def _set_waiting_message_state_if_needed(controller, action: Action) -> None:
+    if not isinstance(action, MessageAction):
+        return
+    if action.source != EventSource.AGENT or not action.wait_for_response:
+        return
+    await controller.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+
+
+def _event_stream_has_pre_dispatch_hook(event_stream) -> bool:
+    return (
+        isinstance(event_stream, EventStream)
+        and event_stream.pre_runnable_action_dispatch is not None
+    )
+
+
+def _bind_action_context_if_present(controller, action: Action, ctx: ToolInvocationContext | None) -> None:
+    if ctx is None:
+        return
+    ctx.action_id = action.id
+    controller._bind_action_context(action, ctx)
+
+
 class ActionService:
     """Coordinates tool pipeline execute/observe and pending action lifecycle."""
 
@@ -71,13 +108,8 @@ class ActionService:
         controller = self._context.get_controller()
 
         await self._confirmation_service.handle_pending_confirmation(action)
-
-        pipeline = _resolve_operation_pipeline(controller)
-        if ctx and pipeline:
-            await pipeline.run_execute(ctx)
-            if ctx.blocked:
-                controller.handle_blocked_invocation(action, ctx)
-                return
+        if await _run_execute_pipeline_if_present(controller, action, ctx):
+            return
 
         self._prepare_metrics_for_action(action)
 
@@ -87,12 +119,7 @@ class ActionService:
         # callback that normally sets AWAITING_USER_INPUT runs on a background
         # thread and may not execute before the drain loop re-enters
         # _step_inner, causing a duplicate LLM call and double response.
-        if (
-            isinstance(action, MessageAction)
-            and action.source == EventSource.AGENT
-            and action.wait_for_response
-        ):
-            await controller.set_agent_state_to(AgentState.AWAITING_USER_INPUT)
+        await _set_waiting_message_state_if_needed(controller, action)
 
         es = controller.event_stream
         controller.event_stream.add_event(action, action.source or EventSource.AGENT)
@@ -104,17 +131,10 @@ class ActionService:
         # arrives before the pending map. Use ``isinstance(..., EventStream)`` so
         # unit tests with ``MagicMock`` event streams are not mis-detected as having
         # a hook (MagicMock attributes are truthy).
-        if action.runnable:
-            hooked = (
-                isinstance(es, EventStream)
-                and es.pre_runnable_action_dispatch is not None
-            )
-            if not hooked:
-                self.set_pending_action(action)
+        if action.runnable and not _event_stream_has_pre_dispatch_hook(es):
+            self.set_pending_action(action)
 
-        if ctx:
-            ctx.action_id = action.id
-            controller._bind_action_context(action, ctx)
+        _bind_action_context_if_present(controller, action, ctx)
 
         log_level = 'info' if LOG_ALL_EVENTS else 'debug'
         controller.log(log_level, str(action), extra={'msg_type': 'ACTION'})

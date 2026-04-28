@@ -273,332 +273,423 @@ class GrintaNativeBrowser:
             logger.debug('browser close: %s', exc)
         self._session = None
 
-    async def execute(self, command: str, params: dict[str, Any]) -> Observation:
-        cmd = (command or '').strip().lower()
+    async def _execute_start(
+        self, cmd: str, params: dict[str, Any]
+    ) -> Observation:
+        del params
+        await self._ensure_session()
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content='Browser started.',
+                command='browser start',
+                exit_code=0,
+            ),
+        )
+
+    async def _execute_close(
+        self, cmd: str, params: dict[str, Any]
+    ) -> Observation:
+        del params
+        await self.shutdown()
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content='Browser closed.',
+                command='browser close',
+                exit_code=0,
+            ),
+        )
+
+    async def _run_navigation(
+        self,
+        browser: Any,
+        *,
+        url: str,
+        new_tab: bool,
+        nav_budget: float,
+    ) -> None:
+        if not new_tab:
+            await asyncio.wait_for(_navigate_direct_cdp(browser, url), timeout=nav_budget)
+            return
+
+        from browser_use.browser.events import NavigateToUrlEvent
+
+        nav = browser.event_bus.dispatch(
+            NavigateToUrlEvent(
+                url=url,
+                new_tab=True,
+                wait_until='commit',
+            )
+        )
+        await asyncio.wait_for(_await_nav_event(nav), timeout=nav_budget)
+
+    async def _execute_navigate(
+        self, cmd: str, params: dict[str, Any]
+    ) -> Observation:
+        url = str(params.get('url') or '').strip()
+        err = _validate_http_url(url)
+        if err:
+            return _finalize_observation(cmd, ErrorObservation(content=f'ERROR: {err}'))
+
+        t_nav = time.monotonic()
+        browser = await self._ensure_session()
+        new_tab = bool(params.get('new_tab', False))
+        _browser_trace(
+            f'navigate begin (new_tab={new_tab}) budget {BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC:.0f}s → {url[:120]}'
+        )
         try:
-            if cmd == 'start':
-                await self._ensure_session()
-                return _finalize_observation(
-                    cmd,
-                    CmdOutputObservation(
-                        content='Browser started.',
-                        command='browser start',
-                        exit_code=0,
-                    ),
-                )
-            if cmd == 'close':
-                await self.shutdown()
-                return _finalize_observation(
-                    cmd,
-                    CmdOutputObservation(
-                        content='Browser closed.',
-                        command='browser close',
-                        exit_code=0,
-                    ),
-                )
-            if cmd == 'navigate':
-                url = str(params.get('url') or '').strip()
-                err = _validate_http_url(url)
-                if err:
-                    return _finalize_observation(
-                        cmd, ErrorObservation(content=f'ERROR: {err}')
-                    )
-                t_nav = time.monotonic()
-                b = await self._ensure_session()
-                new_tab = bool(params.get('new_tab', False))
-                _browser_trace(
-                    f'navigate begin (new_tab={new_tab}) budget {BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC:.0f}s → {url[:120]}'
-                )
-                # Avoid NavigateToUrlEvent: it chains SwitchTabEvent, extension cleanup, etc., which
-                # can block for minutes on Windows Chrome while the tab already shows the URL.
-                # Direct CDP Page.navigate matches commit semantics; use snapshot for DOM text.
-                nav_budget = float(BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC)
-                try:
-                    if not new_tab:
-                        await asyncio.wait_for(
-                            _navigate_direct_cdp(b, url),
-                            timeout=nav_budget,
-                        )
-                    else:
-                        from browser_use.browser.events import NavigateToUrlEvent
-
-                        nav = b.event_bus.dispatch(
-                            NavigateToUrlEvent(
-                                url=url,
-                                new_tab=True,
-                                wait_until='commit',
-                            )
-                        )
-                        await asyncio.wait_for(
-                            _await_nav_event(nav),
-                            timeout=nav_budget,
-                        )
-                except TimeoutError:
-                    _browser_trace(
-                        f'navigate timed out after {nav_budget:.0f}s (CDP session + Page.navigate)'
-                    )
-                    return _finalize_observation(
-                        cmd,
-                        ErrorObservation(
-                            content=(
-                                f'ERROR: Navigation to {url} timed out after {nav_budget:.0f}s '
-                                '(CDP session + Page.navigate). Retry or restart the CLI; '
-                                'close other Chrome instances if the profile is wedged.'
-                            )
-                        ),
-                    )
-                _browser_trace(
-                    f'navigate done in {(time.monotonic() - t_nav) * 1000:.0f}ms'
-                )
-                logger.info(
-                    'browser navigate done in %.0fms',
-                    (time.monotonic() - t_nav) * 1000,
-                )
-                return _finalize_observation(
-                    cmd,
-                    CmdOutputObservation(
-                        content=f'Navigated to {url}.',
-                        command='browser navigate',
-                        exit_code=0,
-                    ),
-                )
-            if cmd == 'snapshot':
-                b = await self._ensure_session()
-                t_snap = time.monotonic()
-                _browser_trace(
-                    f'snapshot chain begin (budget {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s)'
-                )
-                try:
-                    text = await asyncio.wait_for(
-                        _snapshot_text_chain(b),
-                        timeout=BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC,
-                    )
-                except TimeoutError:
-                    _browser_trace(
-                        f'snapshot timed out after {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s'
-                    )
-                    return _finalize_observation(
-                        cmd,
-                        ErrorObservation(
-                            content=(
-                                f'ERROR: Snapshot timed out after {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s. '
-                                'The page may be hung; try navigate again or restart the browser session.'
-                            )
-                        ),
-                    )
-                _browser_trace(
-                    f'snapshot done in {(time.monotonic() - t_snap) * 1000:.0f}ms'
-                )
-                logger.info(
-                    'browser snapshot chain in %.0fms',
-                    (time.monotonic() - t_snap) * 1000,
-                )
-                if len(text) > _MAX_SNAPSHOT_CHARS:
-                    text = text[:_MAX_SNAPSHOT_CHARS] + '\n… (truncated)'
-                return _finalize_observation(
-                    cmd,
-                    CmdOutputObservation(
-                        content=text,
-                        command='browser snapshot',
-                        exit_code=0,
-                    ),
-                )
-            if cmd == 'screenshot':
-                b = await self._ensure_session()
-                full_page = bool(params.get('full_page', False))
-                jpeg_quality = 80
-                # Two attempts share the user-visible budget. The first uses
-                # the default GPU-compositor path (``fromSurface=True``) which
-                # matches Linux's fast path; the second retries with window
-                # capture (``fromSurface=False``) which is the Windows-reliable
-                # path when compositor capture is wedged.
-                primary_budget = max(8.0, BROWSER_SCREENSHOT_TIMEOUT_SEC * 0.55)
-                retry_budget = max(8.0, BROWSER_SCREENSHOT_TIMEOUT_SEC * 0.45)
-
-                t_shot = time.monotonic()
-                target_id = _resolve_page_target_id(b)
-                _browser_trace(
-                    f'screenshot begin target={str(target_id)[:8]} full_page={full_page} '
-                    f'budget={primary_budget:.0f}+{retry_budget:.0f}s'
-                )
-                # Preflight: dismiss any blocking JS dialog and bring the
-                # target to the foreground. Without this, pages that show
-                # ``alert()`` / ``confirm()`` (common in game/demo pages)
-                # freeze captureScreenshot until the dialog is closed.
-                cdp = await _prepare_target_for_screenshot(b, target_id)
-                if cdp is None:
-                    return _finalize_observation(
-                        cmd,
-                        ErrorObservation(
-                            content=(
-                                'ERROR: Browser screenshot could not attach a CDP '
-                                'session to a page target. Run ``browser navigate`` '
-                                'to open/refresh a tab, then retry.'
-                            )
-                        ),
-                    )
-
-                raw: bytes | None = None
-                last_exc: Exception | None = None
-                # Attempt 1: GPU-compositor path (Linux-fast).
-                try:
-                    raw = await _capture_via_cdp(
-                        cdp,
-                        full_page=full_page,
-                        jpeg_quality=jpeg_quality,
-                        from_surface=True,
-                        timeout_sec=primary_budget,
-                    )
-                    _browser_trace(
-                        f'screenshot done via compositor in '
-                        f'{(time.monotonic() - t_shot) * 1000:.0f}ms'
-                    )
-                except (TimeoutError, Exception) as exc:  # noqa: BLE001
-                    last_exc = exc
-                    _browser_trace(
-                        f'screenshot: compositor path failed ({type(exc).__name__}); '
-                        'retrying with fromSurface=False'
-                    )
-                # Attempt 2: window capture (Windows-reliable).
-                if raw is None:
-                    try:
-                        # Re-run preflight in case another dialog opened while we waited.
-                        cdp = await _prepare_target_for_screenshot(b, target_id) or cdp
-                        raw = await _capture_via_cdp(
-                            cdp,
-                            full_page=full_page,
-                            jpeg_quality=jpeg_quality,
-                            from_surface=False,
-                            timeout_sec=retry_budget,
-                        )
-                        _browser_trace(
-                            f'screenshot done via fromSurface=False in '
-                            f'{(time.monotonic() - t_shot) * 1000:.0f}ms'
-                        )
-                    except (TimeoutError, Exception) as exc:  # noqa: BLE001
-                        total = time.monotonic() - t_shot
-                        first = type(last_exc).__name__ if last_exc else 'TimeoutError'
-                        reason = (
-                            'The browser stayed busy or blocked on the page. '
-                            'Most common causes: a JavaScript alert/confirm/prompt '
-                            'dialog is still open (we tried to auto-dismiss it), '
-                            'a long CSS animation, or the tab lost rendering focus. '
-                            'Try ``browser snapshot`` to probe the DOM, or '
-                            '``browser navigate`` to the same URL to reset.'
-                        )
-                        _browser_trace(
-                            f'screenshot: both paths failed after {total:.1f}s '
-                            f'(primary={first}, retry={type(exc).__name__})'
-                        )
-                        return _finalize_observation(
-                            cmd,
-                            ErrorObservation(
-                                content=(
-                                    f'ERROR: Browser screenshot failed after {total:.0f}s '
-                                    '(tried compositor and window capture). '
-                                    f'First error: {first}. Retry error: '
-                                    f'{type(exc).__name__}. {reason}'
-                                )
-                            ),
-                        )
-
-                name = f'browser_{uuid.uuid4().hex[:12]}.jpg'
-                path = self._downloads / name
-                path.write_bytes(raw)
-                body = f'Screenshot saved to: {path} ({len(raw)} bytes)'
-                return _finalize_observation(
-                    cmd,
-                    CmdOutputObservation(
-                        content=body,
-                        command='browser screenshot',
-                        exit_code=0,
-                    ),
-                )
-            if cmd == 'click':
-                index = params.get('index')
-                if not isinstance(index, int):
-                    try:
-                        index = int(index)  # type: ignore[arg-type]
-                    except (TypeError, ValueError):
-                        return _finalize_observation(
-                            cmd,
-                            ErrorObservation(
-                                content='ERROR: click requires integer index (from snapshot).'
-                            ),
-                        )
-                b = await self._ensure_session()
-                await b.get_browser_state_summary(include_screenshot=False)
-                node = await b.get_element_by_index(index)
-                if node is None:
-                    return _finalize_observation(
-                        cmd,
-                        ErrorObservation(
-                            content=f'ERROR: No element at index {index}. Run snapshot first.'
-                        ),
-                    )
-                from browser_use.browser.events import ClickElementEvent
-
-                evt = b.event_bus.dispatch(ClickElementEvent(node=node))
-                await evt
-                await evt.event_result(raise_if_any=True, raise_if_none=False)
-                return _finalize_observation(
-                    cmd,
-                    CmdOutputObservation(
-                        content=f'Clicked element index {index}.',
-                        command='browser click',
-                        exit_code=0,
-                    ),
-                )
-            if cmd == 'type':
-                index = params.get('index')
-                text = str(params.get('text') or '')
-                if len(text) > _MAX_TYPE_LEN:
-                    return _finalize_observation(
-                        cmd, ErrorObservation(content='ERROR: text too long.')
-                    )
-                if not isinstance(index, int):
-                    try:
-                        index = int(index)  # type: ignore[arg-type]
-                    except (TypeError, ValueError):
-                        return _finalize_observation(
-                            cmd,
-                            ErrorObservation(
-                                content='ERROR: type requires integer index (from snapshot).'
-                            ),
-                        )
-                b = await self._ensure_session()
-                await b.get_browser_state_summary(include_screenshot=False)
-                node = await b.get_element_by_index(index)
-                if node is None:
-                    return _finalize_observation(
-                        cmd,
-                        ErrorObservation(
-                            content=f'ERROR: No element at index {index}. Run snapshot first.'
-                        ),
-                    )
-                clear = bool(params.get('clear', True))
-                from browser_use.browser.events import TypeTextEvent
-
-                evt = b.event_bus.dispatch(
-                    TypeTextEvent(node=node, text=text, clear=clear)
-                )
-                await evt
-                await evt.event_result(raise_if_any=True, raise_if_none=False)
-                return _finalize_observation(
-                    cmd,
-                    CmdOutputObservation(
-                        content=f'Typed into element index {index}.',
-                        command='browser type',
-                        exit_code=0,
-                    ),
-                )
+            await self._run_navigation(
+                browser,
+                url=url,
+                new_tab=new_tab,
+                nav_budget=float(BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC),
+            )
+        except TimeoutError:
+            _browser_trace(
+                f'navigate timed out after {BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC:.0f}s (CDP session + Page.navigate)'
+            )
             return _finalize_observation(
                 cmd,
                 ErrorObservation(
-                    content=f'ERROR: Unknown browser command {cmd!r}. '
-                    f'Use: start, close, navigate, snapshot, screenshot, click, type.'
+                    content=(
+                        f'ERROR: Navigation to {url} timed out after {BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC:.0f}s '
+                        '(CDP session + Page.navigate). Retry or restart the CLI; '
+                        'close other Chrome instances if the profile is wedged.'
+                    )
                 ),
             )
+
+        elapsed_ms = (time.monotonic() - t_nav) * 1000
+        _browser_trace(f'navigate done in {elapsed_ms:.0f}ms')
+        logger.info('browser navigate done in %.0fms', elapsed_ms)
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=f'Navigated to {url}.',
+                command='browser navigate',
+                exit_code=0,
+            ),
+        )
+
+    async def _execute_snapshot(
+        self, cmd: str, params: dict[str, Any]
+    ) -> Observation:
+        del params
+        browser = await self._ensure_session()
+        t_snap = time.monotonic()
+        _browser_trace(
+            f'snapshot chain begin (budget {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s)'
+        )
+        try:
+            text = await asyncio.wait_for(
+                _snapshot_text_chain(browser),
+                timeout=BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC,
+            )
+        except TimeoutError:
+            _browser_trace(
+                f'snapshot timed out after {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s'
+            )
+            return _finalize_observation(
+                cmd,
+                ErrorObservation(
+                    content=(
+                        f'ERROR: Snapshot timed out after {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s. '
+                        'The page may be hung; try navigate again or restart the browser session.'
+                    )
+                ),
+            )
+
+        elapsed_ms = (time.monotonic() - t_snap) * 1000
+        _browser_trace(f'snapshot done in {elapsed_ms:.0f}ms')
+        logger.info('browser snapshot chain in %.0fms', elapsed_ms)
+        if len(text) > _MAX_SNAPSHOT_CHARS:
+            text = text[:_MAX_SNAPSHOT_CHARS] + '\n… (truncated)'
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=text,
+                command='browser snapshot',
+                exit_code=0,
+            ),
+        )
+
+    @staticmethod
+    def _screenshot_attach_error(cmd: str) -> Observation:
+        return _finalize_observation(
+            cmd,
+            ErrorObservation(
+                content=(
+                    'ERROR: Browser screenshot could not attach a CDP '
+                    'session to a page target. Run ``browser navigate`` '
+                    'to open/refresh a tab, then retry.'
+                )
+            ),
+        )
+
+    @staticmethod
+    def _screenshot_failure_error(
+        cmd: str,
+        *,
+        started_at: float,
+        first_error: Exception | None,
+        retry_error: Exception,
+    ) -> Observation:
+        total = time.monotonic() - started_at
+        first = type(first_error).__name__ if first_error else 'TimeoutError'
+        reason = (
+            'The browser stayed busy or blocked on the page. '
+            'Most common causes: a JavaScript alert/confirm/prompt '
+            'dialog is still open (we tried to auto-dismiss it), '
+            'a long CSS animation, or the tab lost rendering focus. '
+            'Try ``browser snapshot`` to probe the DOM, or '
+            '``browser navigate`` to the same URL to reset.'
+        )
+        _browser_trace(
+            f'screenshot: both paths failed after {total:.1f}s '
+            f'(primary={first}, retry={type(retry_error).__name__})'
+        )
+        return _finalize_observation(
+            cmd,
+            ErrorObservation(
+                content=(
+                    f'ERROR: Browser screenshot failed after {total:.0f}s '
+                    '(tried compositor and window capture). '
+                    f'First error: {first}. Retry error: '
+                    f'{type(retry_error).__name__}. {reason}'
+                )
+            ),
+        )
+
+    async def _capture_screenshot_with_retry(
+        self,
+        browser: Any,
+        *,
+        cmd: str,
+        target_id: Any,
+        cdp: Any,
+        full_page: bool,
+        jpeg_quality: int,
+        primary_budget: float,
+        retry_budget: float,
+        started_at: float,
+    ) -> tuple[bytes | None, Observation | None]:
+        try:
+            raw = await _capture_via_cdp(
+                cdp,
+                full_page=full_page,
+                jpeg_quality=jpeg_quality,
+                from_surface=True,
+                timeout_sec=primary_budget,
+            )
+            _browser_trace(
+                f'screenshot done via compositor in {(time.monotonic() - started_at) * 1000:.0f}ms'
+            )
+            return raw, None
+        except (TimeoutError, Exception) as exc:  # noqa: BLE001
+            first_error = exc
+            _browser_trace(
+                f'screenshot: compositor path failed ({type(exc).__name__}); retrying with fromSurface=False'
+            )
+
+        try:
+            retry_cdp = await _prepare_target_for_screenshot(browser, target_id) or cdp
+            raw = await _capture_via_cdp(
+                retry_cdp,
+                full_page=full_page,
+                jpeg_quality=jpeg_quality,
+                from_surface=False,
+                timeout_sec=retry_budget,
+            )
+            _browser_trace(
+                f'screenshot done via fromSurface=False in {(time.monotonic() - started_at) * 1000:.0f}ms'
+            )
+            return raw, None
+        except (TimeoutError, Exception) as exc:  # noqa: BLE001
+            return None, self._screenshot_failure_error(
+                cmd,
+                started_at=started_at,
+                first_error=first_error,
+                retry_error=exc,
+            )
+
+    async def _execute_screenshot(
+        self, cmd: str, params: dict[str, Any]
+    ) -> Observation:
+        browser = await self._ensure_session()
+        full_page = bool(params.get('full_page', False))
+        jpeg_quality = 80
+        primary_budget = max(8.0, BROWSER_SCREENSHOT_TIMEOUT_SEC * 0.55)
+        retry_budget = max(8.0, BROWSER_SCREENSHOT_TIMEOUT_SEC * 0.45)
+
+        started_at = time.monotonic()
+        target_id = _resolve_page_target_id(browser)
+        _browser_trace(
+            f'screenshot begin target={str(target_id)[:8]} full_page={full_page} budget={primary_budget:.0f}+{retry_budget:.0f}s'
+        )
+        cdp = await _prepare_target_for_screenshot(browser, target_id)
+        if cdp is None:
+            return self._screenshot_attach_error(cmd)
+
+        raw, error_observation = await self._capture_screenshot_with_retry(
+            browser,
+            cmd=cmd,
+            target_id=target_id,
+            cdp=cdp,
+            full_page=full_page,
+            jpeg_quality=jpeg_quality,
+            primary_budget=primary_budget,
+            retry_budget=retry_budget,
+            started_at=started_at,
+        )
+        if error_observation is not None:
+            return error_observation
+
+        name = f'browser_{uuid.uuid4().hex[:12]}.jpg'
+        path = self._downloads / name
+        path.write_bytes(raw or b'')
+        body = f'Screenshot saved to: {path} ({len(raw or b"")} bytes)'
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=body,
+                command='browser screenshot',
+                exit_code=0,
+            ),
+        )
+
+    @staticmethod
+    def _parse_browser_index(
+        cmd: str, value: Any, *, action_name: str
+    ) -> tuple[int | None, Observation | None]:
+        if isinstance(value, int):
+            return value, None
+        try:
+            return int(value), None
+        except (TypeError, ValueError):
+            return None, _finalize_observation(
+                cmd,
+                ErrorObservation(
+                    content=f'ERROR: {action_name} requires integer index (from snapshot).'
+                ),
+            )
+
+    async def _get_browser_node(
+        self, browser: Any, *, cmd: str, index: int
+    ) -> tuple[Any | None, Observation | None]:
+        await browser.get_browser_state_summary(include_screenshot=False)
+        node = await browser.get_element_by_index(index)
+        if node is None:
+            return None, _finalize_observation(
+                cmd,
+                ErrorObservation(
+                    content=f'ERROR: No element at index {index}. Run snapshot first.'
+                ),
+            )
+        return node, None
+
+    async def _execute_click(
+        self, cmd: str, params: dict[str, Any]
+    ) -> Observation:
+        index, error_observation = self._parse_browser_index(
+            cmd,
+            params.get('index'),
+            action_name='click',
+        )
+        if error_observation is not None:
+            return error_observation
+
+        browser = await self._ensure_session()
+        node, error_observation = await self._get_browser_node(
+            browser,
+            cmd=cmd,
+            index=index or 0,
+        )
+        if error_observation is not None:
+            return error_observation
+
+        from browser_use.browser.events import ClickElementEvent
+
+        evt = browser.event_bus.dispatch(ClickElementEvent(node=node))
+        await evt
+        await evt.event_result(raise_if_any=True, raise_if_none=False)
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=f'Clicked element index {index}.',
+                command='browser click',
+                exit_code=0,
+            ),
+        )
+
+    async def _execute_type(
+        self, cmd: str, params: dict[str, Any]
+    ) -> Observation:
+        text = str(params.get('text') or '')
+        if len(text) > _MAX_TYPE_LEN:
+            return _finalize_observation(
+                cmd,
+                ErrorObservation(content='ERROR: text too long.'),
+            )
+
+        index, error_observation = self._parse_browser_index(
+            cmd,
+            params.get('index'),
+            action_name='type',
+        )
+        if error_observation is not None:
+            return error_observation
+
+        browser = await self._ensure_session()
+        node, error_observation = await self._get_browser_node(
+            browser,
+            cmd=cmd,
+            index=index or 0,
+        )
+        if error_observation is not None:
+            return error_observation
+
+        clear = bool(params.get('clear', True))
+        from browser_use.browser.events import TypeTextEvent
+
+        evt = browser.event_bus.dispatch(TypeTextEvent(node=node, text=text, clear=clear))
+        await evt
+        await evt.event_result(raise_if_any=True, raise_if_none=False)
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=f'Typed into element index {index}.',
+                command='browser type',
+                exit_code=0,
+            ),
+        )
+
+    @staticmethod
+    def _unknown_browser_command(cmd: str) -> Observation:
+        return _finalize_observation(
+            cmd,
+            ErrorObservation(
+                content=f'ERROR: Unknown browser command {cmd!r}. '
+                'Use: start, close, navigate, snapshot, screenshot, click, type.'
+            ),
+        )
+
+    async def execute(self, command: str, params: dict[str, Any]) -> Observation:
+        cmd = (command or '').strip().lower()
+        try:
+            handlers = {
+                'start': self._execute_start,
+                'close': self._execute_close,
+                'navigate': self._execute_navigate,
+                'snapshot': self._execute_snapshot,
+                'screenshot': self._execute_screenshot,
+                'click': self._execute_click,
+                'type': self._execute_type,
+            }
+            handler = handlers.get(cmd)
+            if handler is None:
+                return self._unknown_browser_command(cmd)
+            return await handler(cmd, params)
         except RuntimeError as e:
             return _finalize_observation(cmd, ErrorObservation(content=f'ERROR: {e}'))
         except Exception as e:

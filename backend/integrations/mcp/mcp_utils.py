@@ -362,6 +362,94 @@ def _log_successful_connection(
     )
 
 
+def _set_mcp_bootstrap(
+    *,
+    state: str,
+    mcp_enabled: bool,
+    configured_server_count: int,
+    attempted_server_count: int | None = None,
+    connected_client_count: int | None = None,
+    remote_tool_param_count: int | None = None,
+    conversion_errors: list[str] | None = None,
+    last_error: str | None = None,
+) -> None:
+    set_mcp_bootstrap_status(
+        MCPBootstrapStatus(
+            state=state,
+            mcp_enabled=mcp_enabled,
+            configured_server_count=configured_server_count,
+            attempted_server_count=attempted_server_count,
+            connected_client_count=connected_client_count,
+            remote_tool_param_count=remote_tool_param_count,
+            conversion_errors=conversion_errors,
+            last_error=last_error,
+        )
+    )
+
+
+def _resolve_mcp_bootstrap_state(
+    remote_tool_count: int, conversion_errors: list[str]
+) -> str:
+    if remote_tool_count == 0:
+        return 'connected_no_remote_tools'
+    if conversion_errors:
+        return 'partial_tool_conversion'
+    return 'healthy'
+
+
+def _prepare_connected_mcp_tools(
+    mcps: list[MCPClient],
+    mcp_config: MCPConfig,
+    reserved_tool_names: frozenset[str] | None,
+    *,
+    configured_n: int,
+    attempted_n: int,
+) -> list[dict]:
+    from backend.integrations.mcp.mcp_tool_aliases import (
+        prepare_mcp_tool_exposed_names,
+    )
+
+    reserved = set(reserved_tool_names or ()) | set(
+        getattr(mcp_config, 'mcp_exposed_name_reserved', frozenset()) or frozenset()
+    )
+    prepare_mcp_tool_exposed_names(mcps, reserved)
+
+    mcp_tools = convert_mcps_to_tools(mcps)
+    remote_tool_count = sum(len(getattr(client, 'tools', ()) or ()) for client in mcps)
+    conversion_errors = list(_last_mcp_conversion_errors)
+
+    _set_mcp_bootstrap(
+        state=_resolve_mcp_bootstrap_state(remote_tool_count, conversion_errors),
+        mcp_enabled=True,
+        configured_server_count=configured_n,
+        attempted_server_count=attempted_n,
+        connected_client_count=len(mcps),
+        remote_tool_param_count=remote_tool_count,
+        conversion_errors=conversion_errors,
+        last_error=conversion_errors[-1] if conversion_errors else None,
+    )
+    return mcp_tools
+
+
+async def _disconnect_probe_mcps(mcps: list[MCPClient]) -> None:
+    if not mcps:
+        return
+
+    for client in mcps:
+        try:
+            await client.disconnect()
+        except asyncio.CancelledError:
+            raise
+        except (
+            BaseExceptionGroup
+        ) as error_group:  # noqa: F821  # pylint: disable=undefined-variable
+            logger.debug('MCP probe disconnect (exception group): %s', error_group)
+        except Exception as error:
+            logger.debug('MCP probe disconnect: %s', error, exc_info=True)
+        await asyncio.sleep(0)
+    await asyncio.sleep(0.05)
+
+
 async def fetch_mcp_tools_from_config(
     mcp_config: MCPConfig,
     conversation_id: str | None = None,
@@ -384,12 +472,10 @@ async def fetch_mcp_tools_from_config(
     _last_mcp_conversion_errors = []
 
     if not getattr(mcp_config, 'enabled', False):
-        set_mcp_bootstrap_status(
-            MCPBootstrapStatus(
-                state='mcp_disabled',
-                mcp_enabled=False,
-                configured_server_count=len(mcp_config.servers or []),
-            )
+        _set_mcp_bootstrap(
+            state='mcp_disabled',
+            mcp_enabled=False,
+            configured_server_count=len(mcp_config.servers or []),
         )
         return []
 
@@ -403,13 +489,11 @@ async def fetch_mcp_tools_from_config(
     attempted_n = len(servers_to_connect)
 
     if configured_n == 0:
-        set_mcp_bootstrap_status(
-            MCPBootstrapStatus(
-                state='no_servers_configured',
-                mcp_enabled=True,
-                configured_server_count=0,
-                attempted_server_count=0,
-            )
+        _set_mcp_bootstrap(
+            state='no_servers_configured',
+            mcp_enabled=True,
+            configured_server_count=0,
+            attempted_server_count=0,
         )
         return []
 
@@ -423,50 +507,21 @@ async def fetch_mcp_tools_from_config(
             logger.warning(
                 'No MCP clients were successfully connected; exposing degraded capability status tool only'
             )
-            set_mcp_bootstrap_status(
-                MCPBootstrapStatus(
-                    state='no_clients_connected',
-                    mcp_enabled=True,
-                    configured_server_count=configured_n,
-                    attempted_server_count=attempted_n,
-                    connected_client_count=0,
-                    remote_tool_param_count=0,
-                )
-            )
-            return wrapper_tool_params([])
-
-        from backend.integrations.mcp.mcp_bootstrap_status import (
-            MCPBootstrapState,
-        )
-        from backend.integrations.mcp.mcp_tool_aliases import (
-            prepare_mcp_tool_exposed_names,
-        )
-
-        reserved = set(reserved_tool_names or ()) | set(
-            getattr(mcp_config, 'mcp_exposed_name_reserved', frozenset()) or frozenset()
-        )
-        prepare_mcp_tool_exposed_names(mcps, reserved)
-        mcp_tools = convert_mcps_to_tools(mcps)
-        remote_tool_count = sum(len(getattr(c, 'tools', ()) or ()) for c in mcps)
-        conv_errs = list(_last_mcp_conversion_errors)
-        boot_state: MCPBootstrapState
-        if remote_tool_count == 0:
-            boot_state = 'connected_no_remote_tools'
-        elif conv_errs:
-            boot_state = 'partial_tool_conversion'
-        else:
-            boot_state = 'healthy'
-        set_mcp_bootstrap_status(
-            MCPBootstrapStatus(
-                state=boot_state,
+            _set_mcp_bootstrap(
+                state='no_clients_connected',
                 mcp_enabled=True,
                 configured_server_count=configured_n,
                 attempted_server_count=attempted_n,
-                connected_client_count=len(mcps),
-                remote_tool_param_count=remote_tool_count,
-                conversion_errors=conv_errs,
-                last_error=conv_errs[-1] if conv_errs else None,
+                connected_client_count=0,
+                remote_tool_param_count=0,
             )
+            return wrapper_tool_params([])
+        mcp_tools = _prepare_connected_mcp_tools(
+            mcps,
+            mcp_config,
+            reserved_tool_names,
+            configured_n=configured_n,
+            attempted_n=attempted_n,
         )
     except Exception as e:
         error_msg = f'Error fetching MCP tools: {e!s}'
@@ -477,15 +532,13 @@ async def fetch_mcp_tools_from_config(
             error_message=error_msg,
             exception_details=str(e),
         )
-        set_mcp_bootstrap_status(
-            MCPBootstrapStatus(
-                state='fetch_failed',
-                mcp_enabled=True,
-                configured_server_count=configured_n,
-                attempted_server_count=attempted_n,
-                connected_client_count=0,
-                last_error=str(e),
-            )
+        _set_mcp_bootstrap(
+            state='fetch_failed',
+            mcp_enabled=True,
+            configured_server_count=configured_n,
+            attempted_server_count=attempted_n,
+            connected_client_count=0,
+            last_error=str(e),
         )
         # Degraded but explicit: keep diagnostics wrapper tools so the agent/UI can see state.
         return wrapper_tool_params([])
@@ -495,20 +548,7 @@ async def fetch_mcp_tools_from_config(
         # Sequential teardown: parallel gather races stdio subprocess shutdown on Windows
         # and can leave _stdio_transport_connect_task to finish later with
         # "Task exception was never retrieved".
-        if mcps:
-            for c in mcps:
-                try:
-                    await c.disconnect()
-                except asyncio.CancelledError:
-                    raise
-                except (
-                    BaseExceptionGroup
-                ) as eg:  # noqa: F821  # pylint: disable=undefined-variable
-                    logger.debug('MCP probe disconnect (exception group): %s', eg)
-                except Exception as e:
-                    logger.debug('MCP probe disconnect: %s', e, exc_info=True)
-                await asyncio.sleep(0)
-            await asyncio.sleep(0.05)
+        await _disconnect_probe_mcps(mcps)
     logger.debug('MCP tools: %s', mcp_tools)
     return mcp_tools
 
@@ -568,79 +608,97 @@ def _looks_like_mcp_validation_error(message: str) -> bool:
     )
 
 
+def _coerce_string_value(value: Any) -> tuple[Any, bool]:
+    if isinstance(value, str):
+        return value, False
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False), True
+    return str(value), True
+
+
+def _coerce_array_value(value: Any) -> tuple[Any, bool]:
+    if isinstance(value, list):
+        return value, False
+    if isinstance(value, (tuple, set)):
+        return list(value), True
+    return [value], True
+
+
+def _coerce_object_value(value: Any) -> tuple[Any, bool]:
+    if isinstance(value, dict):
+        return value, False
+    if not isinstance(value, str):
+        return value, False
+    try:
+        parsed = json.loads(value)
+    except Exception:
+        return value, False
+    if isinstance(parsed, dict):
+        return parsed, True
+    return value, False
+
+
+def _coerce_integer_value(value: Any) -> tuple[Any, bool]:
+    if isinstance(value, bool):
+        return int(value), True
+    if isinstance(value, int):
+        return value, False
+    if isinstance(value, float):
+        return (int(value), True) if value.is_integer() else (value, False)
+    if not isinstance(value, str):
+        return value, False
+    try:
+        return int(value.strip()), True
+    except Exception:
+        return value, False
+
+
+def _coerce_number_value(value: Any) -> tuple[Any, bool]:
+    if isinstance(value, bool):
+        return float(int(value)), True
+    if isinstance(value, float):
+        return value, False
+    if isinstance(value, int):
+        return float(value), True
+    if not isinstance(value, str):
+        return value, False
+    try:
+        return float(value.strip()), True
+    except Exception:
+        return value, False
+
+
+def _coerce_boolean_value(value: Any) -> tuple[Any, bool]:
+    if isinstance(value, bool):
+        return value, False
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {'true', '1', 'yes', 'y', 'on'}:
+            return True, True
+        if normalized in {'false', '0', 'no', 'n', 'off'}:
+            return False, True
+        return value, False
+    if isinstance(value, (int, float)):
+        return bool(value), True
+    return value, False
+
+
+_SCHEMA_COERCERS = {
+    'string': _coerce_string_value,
+    'array': _coerce_array_value,
+    'object': _coerce_object_value,
+    'integer': _coerce_integer_value,
+    'number': _coerce_number_value,
+    'boolean': _coerce_boolean_value,
+}
+
+
 def _coerce_value_to_schema(value: Any, schema: dict[str, Any]) -> tuple[Any, bool]:
     """Best-effort coercion for common JSON schema field types."""
-    expected = schema.get('type')
-
-    if expected == 'string':
-        if isinstance(value, str):
-            return value, False
-        if isinstance(value, (dict, list)):
-            return json.dumps(value, ensure_ascii=False), True
-        return str(value), True
-
-    if expected == 'array':
-        if isinstance(value, list):
-            return value, False
-        if isinstance(value, (tuple, set)):
-            return list(value), True
-        return [value], True
-
-    if expected == 'object':
-        if isinstance(value, dict):
-            return value, False
-        if isinstance(value, str):
-            try:
-                parsed = json.loads(value)
-                if isinstance(parsed, dict):
-                    return parsed, True
-            except Exception:
-                pass
+    coercer = _SCHEMA_COERCERS.get(schema.get('type'))
+    if coercer is None:
         return value, False
-
-    if expected == 'integer':
-        if isinstance(value, bool):
-            return int(value), True
-        if isinstance(value, int):
-            return value, False
-        if isinstance(value, float):
-            return (int(value), True) if value.is_integer() else (value, False)
-        if isinstance(value, str):
-            try:
-                return int(value.strip()), True
-            except Exception:
-                return value, False
-        return value, False
-
-    if expected == 'number':
-        if isinstance(value, bool):
-            return float(int(value)), True
-        if isinstance(value, float):
-            return value, False
-        if isinstance(value, int):
-            return float(value), True
-        if isinstance(value, str):
-            try:
-                return float(value.strip()), True
-            except Exception:
-                return value, False
-        return value, False
-
-    if expected == 'boolean':
-        if isinstance(value, bool):
-            return value, False
-        if isinstance(value, str):
-            s = value.strip().lower()
-            if s in {'true', '1', 'yes', 'y', 'on'}:
-                return True, True
-            if s in {'false', '0', 'no', 'n', 'off'}:
-                return False, True
-            return value, False
-        if isinstance(value, (int, float)):
-            return bool(value), True
-        return value, False
-
-    return value, False
+    return coercer(value)
 
 
 def _repair_args_with_schema(

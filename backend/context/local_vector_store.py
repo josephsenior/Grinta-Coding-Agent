@@ -382,6 +382,44 @@ class SQLiteBM25Backend(VectorBackend):
                 (step_id, role, text[:2000], json.dumps(doc_metadata)),
             )
 
+    @staticmethod
+    def _metadata_matches_filter(
+        meta: dict[str, Any], filter_metadata: dict[str, Any]
+    ) -> bool:
+        return all(meta.get(fk) == fv for fk, fv in filter_metadata.items())
+
+    @staticmethod
+    def _load_row_metadata(meta_json: str) -> dict[str, Any]:
+        try:
+            loaded = json.loads(meta_json)
+            return loaded if isinstance(loaded, dict) else {}
+        except Exception:
+            return {}
+
+    def _append_fts_row(
+        self,
+        results: list[dict[str, Any]],
+        *,
+        step_id: str,
+        content: str,
+        meta_json: str,
+        score: float,
+        filter_metadata: dict[str, Any] | None,
+        k: int,
+    ) -> bool:
+        meta = self._load_row_metadata(meta_json)
+        if filter_metadata and not self._metadata_matches_filter(meta, filter_metadata):
+            return False
+        results.append(
+            {
+                'step_id': step_id,
+                'score': -score,
+                'excerpt': content,
+                **meta,
+            }
+        )
+        return len(results) >= k
+
     def search(
         self, query: str, k: int = 5, filter_metadata: dict[str, Any] | None = None
     ) -> list[dict[str, Any]]:
@@ -405,33 +443,17 @@ class SQLiteBM25Backend(VectorBackend):
                     (match_query, k * 2),
                 )
 
-                results = []
+                results: list[dict[str, Any]] = []
                 for step_id, content, meta_json, score in cursor:
-                    meta = {}
-                    try:
-                        meta = json.loads(meta_json)
-                    except Exception:
-                        pass
-
-                    if filter_metadata:
-                        match = True
-                        for fk, fv in filter_metadata.items():
-                            if meta.get(fk) != fv:
-                                match = False
-                                break
-                        if not match:
-                            continue
-
-                    results.append(
-                        {
-                            'step_id': step_id,
-                            'score': -score,
-                            'excerpt': content,
-                            **meta,
-                        }
-                    )
-
-                    if len(results) >= k:
+                    if self._append_fts_row(
+                        results,
+                        step_id=step_id,
+                        content=content,
+                        meta_json=meta_json,
+                        score=score,
+                        filter_metadata=filter_metadata,
+                        k=k,
+                    ):
                         break
 
                 return results

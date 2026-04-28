@@ -292,6 +292,55 @@ class EnhancedVectorStore:
             self.add, step_id, role, artifact_hash, rationale, content_text, metadata
         )
 
+    def _effective_initial_k(self, k: int) -> int:
+        initial_k_raw = self.config.get('initial_k', 20)
+        if isinstance(initial_k_raw, bool):
+            initial_k_raw = 20
+        elif not isinstance(initial_k_raw, int):
+            initial_k_raw = int(initial_k_raw)
+        return max(initial_k_raw, k * 2)
+
+    @staticmethod
+    def _dedupe_candidates_by_step_id(
+        semantic_candidates: list[dict[str, Any]],
+        lexical_candidates: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        seen_ids: set[str] = set()
+        candidates: list[dict[str, Any]] = []
+        for doc in semantic_candidates + lexical_candidates:
+            step_id = doc['step_id']
+            if step_id in seen_ids:
+                continue
+            seen_ids.add(step_id)
+            candidates.append(doc)
+        return candidates
+
+    def _finalize_hybrid_results(
+        self, query: str, k: int, candidates: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        if self.reranker and self.reranker.enabled:
+            return self.reranker.rerank(query, candidates, top_k=k)
+        return candidates[:k]
+
+    def _try_cached_search(
+        self,
+        query: str,
+        k: int,
+        filter_metadata: dict[str, Any] | None,
+        start_time: float,
+    ) -> list[dict[str, Any]] | None:
+        if not self.cache:
+            return None
+        cached_results = self.cache.get(query)
+        if cached_results is None:
+            return None
+        filtered_results = self._apply_filters(
+            cached_results, k, filter_metadata
+        )
+        elapsed_ms = (time.time() - start_time) * 1000
+        logger.debug('Cache hit! Returned in %.1fms', elapsed_ms)
+        return filtered_results
+
     def search(
         self,
         query: str,
@@ -318,25 +367,11 @@ class EnhancedVectorStore:
         """
         start_time = time.time()
 
-        # Check cache first
-        if self.cache:
-            cached_results = self.cache.get(query)
-            if cached_results is not None:
-                # Apply k and filter if needed
-                filtered_results = self._apply_filters(
-                    cached_results, k, filter_metadata
-                )
-                elapsed_ms = (time.time() - start_time) * 1000
-                logger.debug('Cache hit! Returned in %.1fms', elapsed_ms)
-                return filtered_results
+        cached = self._try_cached_search(query, k, filter_metadata, start_time)
+        if cached is not None:
+            return cached
 
-        # Retrieve more candidates for re-ranking (higher recall)
-        initial_k_raw = self.config.get('initial_k', 20)
-        if isinstance(initial_k_raw, bool):
-            initial_k_raw = 20
-        elif not isinstance(initial_k_raw, int):
-            initial_k_raw = int(initial_k_raw)
-        initial_k = max(initial_k_raw, k * 2)
+        initial_k = self._effective_initial_k(k)
         semantic_candidates = self.backend.search(
             query, k=initial_k, filter_metadata=filter_metadata
         )
@@ -344,21 +379,14 @@ class EnhancedVectorStore:
             query, k=initial_k, filter_metadata=filter_metadata
         )
 
-        seen_ids = set()
-        candidates = []
-        for doc in semantic_candidates + lexical_candidates:
-            if doc['step_id'] not in seen_ids:
-                seen_ids.add(doc['step_id'])
-                candidates.append(doc)
+        candidates = self._dedupe_candidates_by_step_id(
+            semantic_candidates, lexical_candidates
+        )
 
         if not candidates:
             return []
 
-        # Re-rank for better precision
-        if self.reranker and self.reranker.enabled:
-            results = self.reranker.rerank(query, candidates, top_k=k)
-        else:
-            results = candidates[:k]
+        results = self._finalize_hybrid_results(query, k, candidates)
 
         # Cache the results
         if self.cache:

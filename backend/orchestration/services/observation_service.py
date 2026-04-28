@@ -72,69 +72,101 @@ class ObservationService:
         self, observation: Observation
     ) -> None:
         controller = self._context.get_controller()
-        cause = getattr(observation, 'cause', None)
-        # Prefer cause-keyed peek so an older observation still pairs with its action
-        # even when a newer tool already registered as the "primary" pending row.
-        pending_action = self._pending_service.peek_for_cause(cause)
-        if pending_action is None and cause is not None:
-            # Integer stream ids are keyed in ``_outstanding``. If *cause* is int-like
-            # but that id is no longer outstanding, do not fall back to ``get()`` (max
-            # id) — that produced false OBSERVATION_PENDING_MISMATCH for late/duplicate
-            # observations. Non-int causes keep the legacy primary-pending path.
-            if self._cause_coerces_to_stream_id(cause):
-                if not self._pending_service.has_outstanding_for_cause(cause):
-                    logger.debug(
-                        'Dropping %s (cause=%r): no outstanding pending for that stream id '
-                        '(stale or duplicate observation)',
-                        type(observation).__name__,
-                        cause,
-                    )
-                    return
-                pending_action = self._pending_service.peek_for_cause(cause)
-                if pending_action is None:
-                    logger.warning(
-                        'cause=%r is outstanding but peek_for_cause returned None; '
-                        'dropping %s',
-                        cause,
-                        type(observation).__name__,
-                    )
-                    return
-
+        pending_action = await self._resolve_pending_action_for_observation(
+            controller, observation
+        )
         if pending_action is None:
-            pending_action = self._pending_service.get()
-            if pending_action is None:
-                return
-            if not self._matches_pending_action(pending_action, observation):
-                if observation.cause is not None:
-                    # Background observations (e.g. RecallObservation for a KNOWLEDGE
-                    # recall that was intentionally not tracked as pending) may arrive
-                    # after pending has already advanced.  These are not errors — just
-                    # drop them silently so the agent loop stays clean.
-                    if type(observation).__name__ in _BACKGROUND_OBSERVATION_NAMES:
-                        logger.debug(
-                            'Silently dropping background observation %s (cause=%r) '
-                            'that arrived after pending advanced to id=%r',
-                            type(observation).__name__,
-                            getattr(observation, 'cause', None),
-                            getattr(pending_action, 'id', None),
-                        )
-                        return
-                    self._report_pending_action_mismatch(
-                        controller,
-                        pending_action=pending_action,
-                        observation=observation,
-                    )
-                    await self._recover_from_pending_observation_mismatch(
-                        observation, pending_action
-                    )
-                return
+            return
 
         # Plugin hook: action_post
         assert pending_action is not None  # _matches_pending_action requires this
+        observation = await self._dispatch_action_post_hook(pending_action, observation)
+
+        if controller.state.agent_state == AgentState.AWAITING_USER_CONFIRMATION:
+            return
+
+        await self._handle_resolved_pending_observation(
+            controller, pending_action, observation
+        )
+        self._trigger_post_resolution_step()
+
+    def _pending_action_from_cause(
+        self, observation: Observation
+    ) -> tuple[Any | None, bool]:
+        cause = getattr(observation, 'cause', None)
+        pending_action = self._pending_service.peek_for_cause(cause)
+        if pending_action is not None:
+            return pending_action, False
+        if cause is None or not self._cause_coerces_to_stream_id(cause):
+            return None, True
+        if not self._pending_service.has_outstanding_for_cause(cause):
+            logger.debug(
+                'Dropping %s (cause=%r): no outstanding pending for that stream id '
+                '(stale or duplicate observation)',
+                type(observation).__name__,
+                cause,
+            )
+            return None, False
+        pending_action = self._pending_service.peek_for_cause(cause)
+        if pending_action is not None:
+            return pending_action, False
+        logger.warning(
+            'cause=%r is outstanding but peek_for_cause returned None; dropping %s',
+            cause,
+            type(observation).__name__,
+        )
+        return None, False
+
+    async def _resolve_pending_action_for_observation(
+        self, controller: Any, observation: Observation
+    ) -> Any | None:
+        pending_action, allow_primary_fallback = self._pending_action_from_cause(
+            observation
+        )
+        if pending_action is not None or not allow_primary_fallback:
+            return pending_action
+        return await self._resolve_primary_pending_action(controller, observation)
+
+    async def _resolve_primary_pending_action(
+        self, controller: Any, observation: Observation
+    ) -> Any | None:
+        pending_action = self._pending_service.get()
+        if pending_action is None:
+            return None
+        if self._matches_pending_action(pending_action, observation):
+            return pending_action
+        if getattr(observation, 'cause', None) is None:
+            return None
+        if self._is_background_observation(observation):
+            logger.debug(
+                'Silently dropping background observation %s (cause=%r) '
+                'that arrived after pending advanced to id=%r',
+                type(observation).__name__,
+                getattr(observation, 'cause', None),
+                getattr(pending_action, 'id', None),
+            )
+            return None
+        self._report_pending_action_mismatch(
+            controller,
+            pending_action=pending_action,
+            observation=observation,
+        )
+        await self._recover_from_pending_observation_mismatch(
+            observation, pending_action
+        )
+        return None
+
+    @staticmethod
+    def _is_background_observation(observation: Observation) -> bool:
+        return type(observation).__name__ in _BACKGROUND_OBSERVATION_NAMES
+
+    async def _dispatch_action_post_hook(
+        self, pending_action, observation: Observation
+    ) -> Observation:
         try:
             from backend.core.plugin import get_plugin_registry
 
-            observation = await get_plugin_registry().dispatch_action_post(
+            return await get_plugin_registry().dispatch_action_post(
                 pending_action, observation
             )
         except Exception as exc:
@@ -144,35 +176,37 @@ class ObservationService:
                 exc,
                 exc_info=True,
             )
+            return observation
 
-        if controller.state.agent_state == AgentState.AWAITING_USER_CONFIRMATION:
-            return
+    def _pop_action_context_for_observation(
+        self, observation: Observation
+    ) -> ToolInvocationContext | None:
+        cause = getattr(observation, 'cause', None)
+        if cause is None:
+            return None
+        return self._context.pop_action_context(cause)
 
-        ctx: ToolInvocationContext | None = None
-        if observation.cause is not None:
-            ctx = self._context.pop_action_context(observation.cause)
-
-        # Consume the matched pending row only after we commit to handling (not when
-        # returning early for confirmation above). Always key off the action's stream
-        # id so int/string ``cause`` quirks cannot leave a stuck row.
+    def _consume_pending_action(self, pending_action) -> None:
         aid = getattr(pending_action, 'id', None)
         if aid is not None:
             self._pending_service.pop_for_cause(aid)
 
-        # Inform the hallucination detector that this file operation actually happened.
-        # This feeds the state-based verification layer so it can distinguish real
-        # file edits from hallucinated ones in subsequent turns.
+    async def _handle_resolved_pending_observation(
+        self,
+        controller: Any,
+        pending_action,
+        observation: Observation,
+    ) -> None:
+        ctx = self._pop_action_context_for_observation(observation)
+        self._consume_pending_action(pending_action)
 
-        # Delegate confirmation state transitions to confirmation service
         confirmation_service = getattr(controller, 'confirmation_service', None)
         if confirmation_service:
             await confirmation_service.handle_observation_for_pending_action(
                 observation, ctx
             )
-        else:
-            await transition_agent_state_logic(controller, ctx, observation)
-
-        self._trigger_post_resolution_step()
+            return
+        await transition_agent_state_logic(controller, ctx, observation)
 
     @staticmethod
     def _cause_coerces_to_stream_id(cause: object) -> bool:

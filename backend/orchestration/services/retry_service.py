@@ -387,6 +387,63 @@ class RetryService:
         except Exception:
             logger.debug('Failed to transition to AWAITING_USER_INPUT', exc_info=True)
 
+    @staticmethod
+    def _retry_resume_reason(task: RetryTask) -> str:
+        metadata = getattr(task, 'metadata', None)
+        if isinstance(metadata, dict):
+            retry_reason = str(metadata.get('retry_reason') or '').strip()
+            if retry_reason:
+                return retry_reason
+        return str(getattr(task, 'reason', '') or 'transient failure')
+
+    @staticmethod
+    def _retry_resume_attempt(task: RetryTask) -> int:
+        return max(1, int(getattr(task, 'attempts', 0) or 0))
+
+    @staticmethod
+    def _retry_resume_limit_exceeded(controller) -> bool:
+        state = getattr(controller, 'state', None)
+        if state is None:
+            return False
+        budget_flag = getattr(state, 'budget_flag', None)
+        iteration_flag = getattr(state, 'iteration_flag', None)
+        return (budget_flag is not None and budget_flag.reached_limit()) or (
+            iteration_flag is not None and iteration_flag.reached_limit()
+        )
+
+    async def _abort_retry_resume_for_limits(
+        self, controller, task: RetryTask
+    ) -> bool:
+        if not self._retry_resume_limit_exceeded(controller):
+            return False
+
+        logger.warning(
+            'Budget/iteration limit already reached on controller %s; '
+            'aborting retry task %s and returning to AWAITING_USER_INPUT.',
+            controller.id,
+            task.id,
+        )
+        self.reset_retry_metrics()
+        await self._transition_to_awaiting_user()
+        return True
+
+    def _emit_retry_resume_status(
+        self, task: RetryTask, *, retry_reason: str, attempt: int
+    ) -> None:
+        message = (
+            f'Autonomous recovery attempt {attempt}/{task.max_attempts} '
+            f'starting after {retry_reason}.'
+        )
+        self._emit_retry_status(
+            status_type='retry_resuming',
+            content=message,
+            extras={
+                'attempt': attempt,
+                'max_attempts': task.max_attempts,
+                'reason': retry_reason,
+            },
+        )
+
     async def _process_retry_task(self, task: RetryTask) -> None:
         """Process an individual retry queue task."""
         controller = self.controller
@@ -439,58 +496,22 @@ class RetryService:
         from backend.orchestration.state.state import AgentState
 
         controller = self.controller
-        metadata = getattr(task, 'metadata', None)
-        retry_reason = ''
-        if isinstance(metadata, dict):
-            retry_reason = str(metadata.get('retry_reason') or '').strip()
-        if not retry_reason:
-            retry_reason = str(getattr(task, 'reason', '') or 'transient failure')
-        attempt = max(1, int(getattr(task, 'attempts', 0) or 0))
+        retry_reason = self._retry_resume_reason(task)
+        attempt = self._retry_resume_attempt(task)
 
         # Guard: if budget or iteration limit is already exceeded, resuming the
         # agent would immediately raise the same RuntimeError in _run_control_flags
         # and loop forever.  Abort the retry and return control to the user.
-        state = getattr(controller, 'state', None)
-        if state is not None:
-            budget_flag = getattr(state, 'budget_flag', None)
-            iteration_flag = getattr(state, 'iteration_flag', None)
-            limit_exceeded = (
-                budget_flag is not None and budget_flag.reached_limit()
-            ) or (
-                iteration_flag is not None and iteration_flag.reached_limit()
-            )
-            if limit_exceeded:
-                logger.warning(
-                    'Budget/iteration limit already reached on controller %s; '
-                    'aborting retry task %s and returning to AWAITING_USER_INPUT.',
-                    controller.id,
-                    task.id,
-                )
-                self._retry_pending = False
-                self._retry_count = 0
-                await self._transition_to_awaiting_user()
-                return
+        if await self._abort_retry_resume_for_limits(controller, task):
+            return
 
-        message = (
-            f'Autonomous recovery attempt {attempt}/{task.max_attempts} '
-            f'starting after {retry_reason}.'
-        )
-        self._emit_retry_status(
-            status_type='retry_resuming',
-            content=message,
-            extras={
-                'attempt': attempt,
-                'max_attempts': task.max_attempts,
-                'reason': retry_reason,
-            },
-        )
+        self._emit_retry_resume_status(task, retry_reason=retry_reason, attempt=attempt)
 
         controller.circuit_breaker_service.record_success()
 
         if controller.state.agent_state != AgentState.RUNNING:
             await controller.set_agent_state_to(AgentState.RUNNING)
-        self._retry_pending = False
-        self._retry_count = 0
+        self.reset_retry_metrics()
         controller.step()
 
     async def stop_if_idle(self) -> None:

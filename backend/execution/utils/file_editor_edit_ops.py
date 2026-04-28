@@ -572,6 +572,85 @@ def mutate_structured_data(data: Any, op: str, path_expr: str, value: Any) -> An
     return data
 
 
+def _find_markdown_section_range(
+    lines: list[str], anchor_value: str, occurrence: int
+) -> tuple[int, int] | None:
+    heading_re = re.compile(r'^(#{1,6})\s+(.*)$')
+    heading_matches: list[tuple[int, int]] = []
+    for idx, line in enumerate(lines):
+        match = heading_re.match(line.strip('\r\n'))
+        if match and match.group(2).strip() == anchor_value.strip():
+            heading_matches.append((idx, len(match.group(1))))
+
+    if len(heading_matches) < occurrence or occurrence < 1:
+        return None
+
+    start_idx, level = heading_matches[occurrence - 1]
+    end_idx = len(lines)
+    for pos in range(start_idx + 1, len(lines)):
+        match = heading_re.match(lines[pos].strip('\r\n'))
+        if match and len(match.group(1)) <= level:
+            end_idx = pos
+            break
+    return start_idx, end_idx
+
+
+def _find_pattern_section_range(
+    content: str,
+    lines: list[str],
+    *,
+    kind: str,
+    anchor_value: str,
+    occurrence: int,
+) -> tuple[int, int] | None:
+    pattern = anchor_value if kind == 'regex' else re.escape(anchor_value)
+    pattern_matches = list(re.finditer(pattern, content, re.MULTILINE))
+    if len(pattern_matches) < occurrence or occurrence < 1:
+        return None
+
+    target = pattern_matches[occurrence - 1]
+    start_idx = content[: target.start()].count('\n')
+    return start_idx, len(lines)
+
+
+def _resolve_section_range(
+    content: str,
+    lines: list[str],
+    *,
+    kind: str,
+    anchor_value: str,
+    occurrence: int,
+) -> tuple[int, int] | None:
+    if kind == 'markdown_heading':
+        return _find_markdown_section_range(lines, anchor_value, occurrence)
+    return _find_pattern_section_range(
+        content,
+        lines,
+        kind=kind,
+        anchor_value=anchor_value,
+        occurrence=occurrence,
+    )
+
+
+def _apply_section_action(
+    lines: list[str],
+    repl_lines: list[str],
+    *,
+    start_idx: int,
+    end_idx: int,
+    action: str,
+) -> list[str] | None:
+    if action == 'replace':
+        return lines[:start_idx] + repl_lines + lines[end_idx:]
+    if action == 'insert_before':
+        return lines[:start_idx] + repl_lines + lines[start_idx:]
+    if action == 'insert_after':
+        return lines[:end_idx] + repl_lines + lines[end_idx:]
+    if action == 'delete':
+        return lines[:start_idx] + lines[end_idx:]
+    return None
+
+
 def apply_section_edit(
     editor: Any,
     content: str,
@@ -592,46 +671,29 @@ def apply_section_edit(
     occurrence = anchor_occurrence or 1
     action = (section_action or 'replace').lower()
     lines = content.splitlines(keepends=True)
-    if kind == 'markdown_heading':
-        heading_re = re.compile(r'^(#{1,6})\s+(.*)$')
-        heading_matches: list[tuple[int, int]] = []
-        for idx, line in enumerate(lines):
-            match = heading_re.match(line.strip('\r\n'))
-            if match and match.group(2).strip() == anchor_value.strip():
-                heading_matches.append((idx, len(match.group(1))))
-        if len(heading_matches) < occurrence or occurrence < 1:
-            return _tool_result(
-                output='', error='Section anchor not found.', new_content=content
-            )
-        start_idx, level = heading_matches[occurrence - 1]
-        end_idx = len(lines)
-        for pos in range(start_idx + 1, len(lines)):
-            match = heading_re.match(lines[pos].strip('\r\n'))
-            if match and len(match.group(1)) <= level:
-                end_idx = pos
-                break
-    else:
-        pattern = anchor_value if kind == 'regex' else re.escape(anchor_value)
-        pattern_matches = list(re.finditer(pattern, content, re.MULTILINE))
-        if len(pattern_matches) < occurrence or occurrence < 1:
-            return _tool_result(
-                output='', error='Section anchor not found.', new_content=content
-            )
-        target = pattern_matches[occurrence - 1]
-        start_idx = content[: target.start()].count('\n')
-        end_idx = len(lines)
+    section_range = _resolve_section_range(
+        content,
+        lines,
+        kind=kind,
+        anchor_value=anchor_value,
+        occurrence=occurrence,
+    )
+    if section_range is None:
+        return _tool_result(
+            output='', error='Section anchor not found.', new_content=content
+        )
+    start_idx, end_idx = section_range
 
     replacement = section_content or ''
     repl_lines = replacement.splitlines(keepends=True)
-    if action == 'replace':
-        result_lines = lines[:start_idx] + repl_lines + lines[end_idx:]
-    elif action == 'insert_before':
-        result_lines = lines[:start_idx] + repl_lines + lines[start_idx:]
-    elif action == 'insert_after':
-        result_lines = lines[:end_idx] + repl_lines + lines[end_idx:]
-    elif action == 'delete':
-        result_lines = lines[:start_idx] + lines[end_idx:]
-    else:
+    result_lines = _apply_section_action(
+        lines,
+        repl_lines,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        action=action,
+    )
+    if result_lines is None:
         return _tool_result(
             output='',
             error=f'Unsupported section_action: {action!r}',

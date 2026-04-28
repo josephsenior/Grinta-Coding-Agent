@@ -433,84 +433,97 @@ class BashSession(BaseShellSession):
         - ``self.prev_status`` is reset to ``COMPLETED`` so the next command runs
           normally on the fresh window.
         """
+        session = self._set_detached_target(bg_session_id)
+        live_cwd = self._live_cwd_for_detach()
+        new_window, new_pane = self._create_detached_foreground_window(
+            session,
+            live_cwd,
+        )
+        self._initialize_detached_foreground(new_window, new_pane)
+        logger.info(
+            'Detached timed-out process to background session %s', bg_session_id
+        )
+
+    def _set_detached_target(self, bg_session_id: str) -> 'Session':
         session = self.session
         if session is None:
             raise RuntimeError('Cannot detach: tmux session is not initialized')
 
-        # Preserve the current (still-running) pane/window.
         self._detached_pane = self.pane
         self._detached_window = self.window
         self._bg_session_id = bg_session_id
+        return session
 
-        # T-P0-2: query the live pane's current cwd BEFORE creating the new
-        # window so a `cd $foo && long-cmd` background-detach doesn't leave
-        # the new foreground window in the stale parent directory.
+    def _clear_detached_target(self) -> None:
+        self._detached_pane = None
+        self._detached_window = None
+        self._bg_session_id = None
+
+    def _live_cwd_for_detach(self) -> str:
         live_cwd = self._cwd
         try:
             pane_for_query = self._detached_pane
-            if pane_for_query is not None:
-                result = pane_for_query.cmd(
-                    'display-message', '-p', '#{pane_current_path}'
+            if pane_for_query is None:
+                return live_cwd
+            result = pane_for_query.cmd('display-message', '-p', '#{pane_current_path}')
+            stdout_raw = getattr(result, 'stdout', None)
+            stdout: list[str] = []
+            if isinstance(stdout_raw, list):
+                stdout_items = cast(list[object], stdout_raw)
+                stdout = [item for item in stdout_items if isinstance(item, str)]
+            if not stdout:
+                return live_cwd
+            candidate = stdout[0].strip()
+            if not candidate or not os.path.isdir(candidate):
+                return live_cwd
+            if candidate != self._cwd:
+                logger.info(
+                    'Detach CWD updated from %s -> %s via tmux query',
+                    self._cwd,
+                    candidate,
                 )
-                stdout_raw = getattr(result, 'stdout', None)
-                stdout: list[str] = []
-                if isinstance(stdout_raw, list):
-                    stdout_items = cast(list[object], stdout_raw)
-                    stdout = [item for item in stdout_items if isinstance(item, str)]
-                if stdout:
-                    candidate = stdout[0].strip()
-                    if candidate and os.path.isdir(candidate):
-                        live_cwd = candidate
-                        if candidate != self._cwd:
-                            logger.info(
-                                'Detach CWD updated from %s -> %s via tmux query',
-                                self._cwd,
-                                candidate,
-                            )
-                            self._cwd = candidate
+                self._cwd = candidate
+            return candidate
         except Exception:
             logger.debug(
                 'pane_current_path query failed before detach; using cached cwd',
                 exc_info=True,
             )
+            return live_cwd
 
-        # Create a new window in the same tmux session for future default commands.
+    def _create_detached_foreground_window(
+        self,
+        session: 'Session',
+        live_cwd: str,
+    ) -> tuple['Window', 'Pane']:
         new_window = session.new_window(
             window_name='bash',
             start_directory=live_cwd,  # type: ignore[arg-type]
             attach=False,
         )
-        # Wait for the pane to become available (libtmux may lag slightly).
         new_pane: Pane | None = None
         for _ in range(10):
             new_pane = cast('Pane | None', getattr(new_window, 'active_pane', None))
             if new_pane is not None:
-                break
+                return new_window, new_pane
             time.sleep(0.1)
 
-        if new_pane is None:
-            # Failed to get the pane — roll back and let the caller kill instead.
-            self._detached_pane = None
-            self._detached_window = None
-            self._bg_session_id = None
-            raise RuntimeError('New tmux window has no active pane after retries')
+        self._clear_detached_target()
+        raise RuntimeError('New tmux window has no active pane after retries')
 
-        # Point self at the new window so all future commands run there.
+    def _initialize_detached_foreground(
+        self,
+        new_window: 'Window',
+        new_pane: 'Pane',
+    ) -> None:
         self.window = new_window
         self.pane = new_pane
-
-        # Set up PS1 on the new pane (matches what initialize() does).
         new_pane.send_keys(
             f'''export PROMPT_COMMAND='export PS1="{self.PS1}"'; export PS2=""'''
         )
         time.sleep(0.1)
         self._clear_screen()
-
-        # Mark the session as ready for a fresh command.
         self.prev_status = BashCommandStatus.COMPLETED
-        logger.info(
-            'Detached timed-out process to background session %s', bg_session_id
-        )
 
     def _kill_hung_process(self) -> None:
         r"""Escalate kill signals to terminate a hung foreground process.

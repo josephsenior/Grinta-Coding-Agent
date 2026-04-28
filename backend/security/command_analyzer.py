@@ -52,6 +52,34 @@ _DOLLAR_PAREN_RE = re.compile(r'\$\(([^()`$]*)\)')
 _BACKTICK_RE = re.compile(r'`([^`$]*)`')
 
 
+def _split_substitution_tokens(inner: str) -> list[str] | None:
+    inner = inner.strip()
+    if not inner:
+        return []
+    try:
+        return shlex.split(inner, posix=True)
+    except ValueError:
+        return None
+
+
+def _reduce_echo_substitution(tokens: list[str]) -> str:
+    rest = tokens[1:]
+    while rest and rest[0] in {'-n', '-e', '-E', '-ne', '-en'}:
+        rest = rest[1:]
+    return ' '.join(rest)
+
+
+def _reduce_printf_substitution(tokens: list[str]) -> str | None:
+    rest = tokens[1:]
+    if not rest:
+        return ''
+    fmt = rest[0]
+    args = rest[1:]
+    if fmt in {'%s', '%s\\n', '%s\\\\n'}:
+        return ' '.join(args)
+    return None
+
+
 def _reduce_trivial_substitution(inner: str) -> str | None:
     """If ``inner`` is a trivial echo/printf, return its literal output.
 
@@ -64,34 +92,20 @@ def _reduce_trivial_substitution(inner: str) -> str | None:
     None so the substitution is left intact and the original command is
     treated with appropriate suspicion by the caller.
     """
-    inner = inner.strip()
-    if not inner:
-        return ''
-    try:
-        tokens = shlex.split(inner, posix=True)
-    except ValueError:
+    tokens = _split_substitution_tokens(inner)
+    if tokens is None:
         return None
     if not tokens:
         return ''
+
     head = tokens[0].lower()
     if head not in _TRIVIAL_EMITTERS:
         return None
-    rest = tokens[1:]
+
     if head == 'echo':
-        # Strip leading -n/-e/-E flags.
-        while rest and rest[0] in {'-n', '-e', '-E', '-ne', '-en'}:
-            rest = rest[1:]
-        return ' '.join(rest)
+        return _reduce_echo_substitution(tokens)
     if head == 'printf':
-        if not rest:
-            return ''
-        # printf '%s' arg... or printf %s arg...
-        fmt = rest[0]
-        args = rest[1:]
-        if fmt in {'%s', '%s\\n', '%s\\\\n'}:
-            return ' '.join(args)
-        # Unsupported printf format \u2014 leave intact.
-        return None
+        return _reduce_printf_substitution(tokens)
     return None
 
 

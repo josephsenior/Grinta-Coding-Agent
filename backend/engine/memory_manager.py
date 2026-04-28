@@ -99,6 +99,38 @@ class ContextMemoryManager:
             return False
         return len(action.pruned) == 0
 
+    def _maybe_force_compaction_under_memory_pressure(
+        self,
+        state: State,
+        history: list,
+        condensation_result: View | object,
+    ) -> object:
+        """When memory pressure is active and compaction returned a plain View, try forced compaction."""
+        memory_pressure = self._memory_pressure_signal(state)
+        if not memory_pressure or not isinstance(condensation_result, View):
+            return condensation_result
+
+        from backend.context.compactor.compactor import RollingCompactor
+
+        if len(history) < _MIN_HISTORY_EVENTS_FOR_FORCED_COMPACTION:
+            logger.info(
+                'Memory pressure %s: skipping forced compaction for short history (%d events)',
+                memory_pressure,
+                len(history),
+            )
+        elif isinstance(self.compactor, RollingCompactor):
+            logger.info(
+                'Memory pressure %s: forcing compaction',
+                memory_pressure,
+            )
+            try:
+                forced = self.compactor.get_compaction(condensation_result)
+                condensation_result = forced
+            except Exception as exc:
+                logger.warning('Forced compaction failed: %s', exc)
+        state.ack_memory_pressure(source='ContextMemoryManager')
+        return condensation_result
+
     def condense_history(self, state: State) -> CondensedHistory:
         history = getattr(state, 'history', [])
         if not self.compactor:
@@ -108,32 +140,10 @@ class ContextMemoryManager:
         self._extract_pre_condensation_snapshot(list(history))
 
         condensation_result = self.compactor.compacted_history(state)
-
-        # If memory pressure is active and the compactor chose NOT to
-        # compact (returned a plain View), force compaction so the
-        # agent loop can recover from high-memory situations.
+        condensation_result = self._maybe_force_compaction_under_memory_pressure(
+            state, list(history), condensation_result
+        )
         memory_pressure = self._memory_pressure_signal(state)
-        if memory_pressure and isinstance(condensation_result, View):
-            from backend.context.compactor.compactor import RollingCompactor
-
-            if len(history) < _MIN_HISTORY_EVENTS_FOR_FORCED_COMPACTION:
-                logger.info(
-                    'Memory pressure %s: skipping forced compaction for short history (%d events)',
-                    memory_pressure,
-                    len(history),
-                )
-            elif isinstance(self.compactor, RollingCompactor):
-                logger.info(
-                    'Memory pressure %s: forcing compaction',
-                    memory_pressure,
-                )
-                try:
-                    forced = self.compactor.get_compaction(condensation_result)
-                    condensation_result = forced
-                except Exception as exc:
-                    logger.warning('Forced compaction failed: %s', exc)
-            # Clear the flag after consuming it
-            state.ack_memory_pressure(source='ContextMemoryManager')
 
         if isinstance(condensation_result, View):
             # Compaction did not fire — remove the snapshot we eagerly wrote
@@ -238,24 +248,30 @@ class ContextMemoryManager:
         if not messages:
             return messages
 
+        self._apply_prompt_cache_hints(messages, llm_config)
+        return messages
+
+    @staticmethod
+    def _apply_prompt_cache_hints(messages: list[Message], llm_config: object) -> None:
         model = getattr(llm_config, 'model', None) or ''
         caching_on = bool(getattr(llm_config, 'caching_prompt', True))
-        if caching_on and model_supports_prompt_cache_hints(str(model)):
-            first_message = messages[0]
-            for item in first_message.content:
+        if not caching_on or not model_supports_prompt_cache_hints(str(model)):
+            return
+
+        first_message = messages[0]
+        for item in first_message.content:
+            if isinstance(item, TextContent):
+                item.cache_prompt = True
+                break
+
+        for message in reversed(messages):
+            if message.role != 'user':
+                continue
+            for item in message.content:
                 if isinstance(item, TextContent):
                     item.cache_prompt = True
                     break
-
-            for message in reversed(messages):
-                if message.role == 'user':
-                    for item in message.content:
-                        if isinstance(item, TextContent):
-                            item.cache_prompt = True
-                            break
-                    break
-
-        return messages
+            break
 
 
 __all__ = [
