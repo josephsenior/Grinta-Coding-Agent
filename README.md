@@ -7,17 +7,13 @@
 [![Install: pipx](https://img.shields.io/badge/install-pipx-brightgreen)](docs/INSTALL.md)
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
 [![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Tests](https://github.com/josephsenior/Grinta-Agent/actions/workflows/py-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Agent/actions/workflows/py-tests.yml)
-[![Lint](https://github.com/josephsenior/Grinta-Agent/actions/workflows/lint.yml/badge.svg)](https://github.com/josephsenior/Grinta-Agent/actions/workflows/lint.yml)
-[![E2E](https://github.com/josephsenior/Grinta-Agent/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Agent/actions/workflows/e2e-tests.yml)
-[![Codecov](https://codecov.io/gh/josephsenior/Grinta-Agent/branch/main/graph/badge.svg)](https://codecov.io/gh/josephsenior/Grinta-Agent)
+[![Tests](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/py-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/py-tests.yml)
+[![Lint](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/lint.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/lint.yml)
+[![CLI Regression](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml)
 
 > Local-first autonomous coding agent. Plan → execute → validate → finish.
 
-<!-- trunk-ignore(markdownlint/MD033) -->
-<p align="center">
-  <img alt="Grinta in action" src="docs/grinta-demo.gif" width="720">
-</p>
+![Grinta in action](docs/grinta-demo.gif)
 
 ## Install in 30 seconds
 
@@ -110,25 +106,6 @@ uv run python -m backend.cli.entry
 
 If you previously installed `grinta-ai` with `pip` into a **global** interpreter, remove it (`pip uninstall grinta-ai`) and use `uv run` from this repository so dependencies stay isolated.
 
-### Optional raw HTTP backend (API/OpenAPI tooling)
-
-Windows:
-
-```powershell
-.\start_backend.ps1
-```
-
-Cross-platform:
-
-```bash
-uv run python -m backend.execution.action_execution_server 3000 --working-dir .
-```
-
-Main endpoints:
-
-- [http://localhost:3000/openapi.json](http://localhost:3000/openapi.json)
-- [http://localhost:3000/server_info](http://localhost:3000/server_info)
-
 ### Docker (optional)
 
 ```bash
@@ -188,7 +165,6 @@ Task validation can block finish calls when tracked work is incomplete.
 - [Developer Guide](docs/DEVELOPER.md)
 - [Vocabulary](docs/VOCABULARY.md)
 - [The Book of Grinta](docs/journey/README.md)
-- [API Reference](openapi.json)
 - [Contributing](CONTRIBUTING.md)
 
 ## Contributing

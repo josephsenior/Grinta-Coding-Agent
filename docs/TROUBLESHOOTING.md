@@ -4,7 +4,6 @@ This guide targets the current Grinta runtime:
 
 - CLI-first local execution
 - `settings.json` for default local config
-- Optional raw HTTP backend only when needed
 
 ## Table of Contents
 
@@ -12,9 +11,8 @@ This guide targets the current Grinta runtime:
 2. Startup Issues
 3. LLM Provider Issues
 4. Runtime and Policy Issues
-5. Raw HTTP Backend Issues
-6. Windows-Specific Issues
-7. Diagnostics
+5. Windows-Specific Issues
+6. Diagnostics
 
 ---
 
@@ -167,40 +165,6 @@ If strict local policy is active, risky commands may be blocked. This is expecte
 
 ---
 
-## Raw HTTP Backend Issues
-
-### Port already in use
-
-Symptom:
-
-- bind error on `:3000`
-
-Fix:
-
-```powershell
-netstat -ano | findstr :3000
-taskkill /PID <pid> /F
-```
-
-Or start a different port:
-
-```bash
-uv run python -m backend.execution.action_execution_server 3001 --working-dir .
-```
-
-### Verify backend is running
-
-```bash
-curl http://localhost:3000/openapi.json
-curl http://localhost:3000/server_info
-```
-
-### Wrong workspace directory
-
-Always set `--working-dir` to the project you want the runtime to operate on.
-
----
-
 ## Windows-Specific Issues
 
 ### Long path problems
@@ -213,10 +177,9 @@ New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name
 
 ### Shell behavior differences
 
-Use PowerShell for bootstrap and backend scripts:
+Use PowerShell for bootstrap and CLI scripts:
 
 - `./START_HERE.ps1`
-- `./start_backend.ps1`
 
 ---
 
@@ -227,7 +190,6 @@ python --version
 uv --version
 git --version
 uv run python -m backend.cli.entry --help
-uv run python -m backend.execution.action_execution_server --help
 ```
 
 Quick local checks:

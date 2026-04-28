@@ -14,8 +14,8 @@ Thank you for your interest in contributing to Grinta! This guide will help you 
 
 ```bash
 # Clone
-git clone https://github.com/josephsenior/Grinta-Agent.git Grinta
-cd Grinta
+git clone https://github.com/josephsenior/Grinta-Coding-Agent.git
+cd Grinta-Coding-Agent
 
 # Install dependencies
 uv sync
@@ -56,11 +56,6 @@ uv run python -m backend.cli.entry
 - Use `app_logger` for logging (not `print()`)
 - Follow existing service decomposition patterns
 
-**Python API client (`client`):**
-
-- Keep `GrintaClient` as the single place for httpx + Socket.IO to the backend
-- Prefer extending `GrintaClient` over ad hoc httpx/socketio in scripts or tests
-
 ### Commit Convention
 
 ```text
@@ -75,14 +70,14 @@ types: feat, fix, refactor, docs, test, chore, perf
 | --- | --- |
 | `backend/orchestration/` | Session orchestration (22 decomposed services) |
 | `backend/orchestration/services/` | Service classes composing the orchestrator |
+| `backend/cli/` | CLI entrypoint, REPL, init wizard, and session commands |
 | `backend/ledger/` | Event sourcing, backpressure-aware stream, durable writer |
 | `backend/persistence/` | File & DB storage implementations |
-| `backend/gateway/` | FastAPI app, routes, middleware, Socket.IO |
+| `backend/gateway/` | Internal transport and integration boundaries; not a supported public product surface |
 | `backend/engine/` | Production agent engine package |
 | `backend/context/` | Context memory, compactors, RAG, vector store |
 | `backend/core/` | Config (Pydantic), exceptions, schemas, logging |
 | `backend/security/` | Security analyzer, input validation |
-| `client/` | Python HTTP + Socket.IO client for tests and scripts |
 
 ### Orchestration Service Map
 
@@ -123,4 +118,4 @@ The `SessionOrchestrator` (~770 LOC) delegates work to these services:
 
 ## Questions?
 
-Open a [Discussion](https://github.com/josephsenior/Grinta-Agent/discussions) or file an issue.
+Open an issue with the relevant template if you need help or want to discuss a change.

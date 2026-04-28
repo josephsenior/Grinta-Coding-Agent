@@ -20,7 +20,10 @@ if TYPE_CHECKING:
     from backend.persistence.files import FileStore
     from backend.security.analyzer import SecurityAnalyzer
 
-from backend.core.constants import DEFAULT_PENDING_ACTION_TIMEOUT
+from backend.core.constants import (
+    DEFAULT_AGENT_STEP_DRAIN_LIMIT,
+    DEFAULT_PENDING_ACTION_TIMEOUT,
+)
 from backend.core.enums import LifecyclePhase
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
@@ -740,7 +743,7 @@ class SessionOrchestrator:
             # a pending action exists), do NOT lose the request — keep
             # _step_pending True so the next trigger retries correctly.
             drain_attempts = 0
-            while self._step_pending and drain_attempts < 10:
+            while self._step_pending and drain_attempts < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
                 drain_attempts += 1
                 self._step_pending = False
                 if not self.step_prerequisites.can_step():

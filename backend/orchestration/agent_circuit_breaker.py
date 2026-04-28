@@ -17,11 +17,17 @@ if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
 from backend.core.constants import (
+    DEFAULT_AGENT_ERROR_DECAY_PER_SUCCESS,
     DEFAULT_AGENT_ERROR_RATE_WINDOW,
     DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS,
     DEFAULT_AGENT_MAX_ERROR_RATE,
     DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS,
     DEFAULT_AGENT_MAX_STUCK_DETECTIONS,
+    DEFAULT_STUCK_PROGRESS_SIGNAL_DECREMENT,
+    DEFAULT_TEXT_EDITOR_HARD_PAUSE,
+    DEFAULT_TEXT_EDITOR_HARD_SWITCH,
+    DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE,
+    DEFAULT_TEXT_EDITOR_SYNTAX_SWITCH,
 )
 from backend.core.logger import app_logger as logger
 from backend.ledger.action import ActionSecurityRisk
@@ -55,6 +61,12 @@ class CircuitBreakerConfig:
     max_stuck_detections: int = DEFAULT_AGENT_MAX_STUCK_DETECTIONS
     max_error_rate: float = DEFAULT_AGENT_MAX_ERROR_RATE
     error_rate_window: int = DEFAULT_AGENT_ERROR_RATE_WINDOW
+
+    # Hysteresis: how much one success decays the error counters. The
+    # historic behaviour was a hard zero-reset, which let one housekeeping
+    # success mask a still-failing tool. Default is now ``1`` (decay one
+    # step per success). Set ``0`` to restore the legacy zero-reset.
+    error_decay_per_success: int = DEFAULT_AGENT_ERROR_DECAY_PER_SUCCESS
 
     # Adaptive scaling — when enabled, thresholds scale with task complexity
     # and iteration budget so that complex tasks get more breathing room.
@@ -102,6 +114,7 @@ class CircuitBreakerConfig:
             error_rate_window=max(
                 self.error_rate_window, int(self.error_rate_window * scale)
             ),
+            error_decay_per_success=self.error_decay_per_success,
             adaptive=False,  # prevent re-scaling
         )
 
@@ -211,13 +224,13 @@ class CircuitBreaker:
         # ``GRINTA_STRICT_WRITE_VALIDATION=1``. We therefore pick thresholds
         # that are generous enough to let the agent iterate on a genuinely
         # hard file rather than trigger a pause on minor churn.
-        if str_replace_syntax >= 10:
+        if str_replace_syntax >= DEFAULT_TEXT_EDITOR_SYNTAX_SWITCH:
             recommendation = (
                 'Repeated syntax validation failures on edited files. '
                 'Prefer minimal parsing-safe stubs and smaller surgical edits; '
                 'refresh file context with read_file before reattempting.'
             )
-            if str_replace_syntax >= 15:
+            if str_replace_syntax >= DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE:
                 recommendation = (
                     recommendation
                     + ' Syntax-validation retries are now blocked until strategy changes.'
@@ -228,18 +241,18 @@ class CircuitBreaker:
                     'Repeated text_editor syntax validation failures '
                     f'({str_replace_syntax})'
                 ),
-                action='pause' if str_replace_syntax >= 15 else 'switch_context',
+                action='pause' if str_replace_syntax >= DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE else 'switch_context',
                 recommendation=recommendation,
                 system_message=recommendation,
             )
 
-        if str_replace_hard >= 2:
+        if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_SWITCH:
             recommendation = (
                 'Repeated deterministic text_editor failures detected. '
                 'Refresh file context with read_file before reattempting. '
                 'If this persists, switch to a different edit strategy.'
             )
-            if str_replace_hard >= 3:
+            if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE:
                 recommendation = (
                     recommendation
                     + ' text_editor retries are now blocked until strategy changes.'
@@ -250,7 +263,7 @@ class CircuitBreaker:
                     'Repeated text_editor deterministic failures '
                     f'({str_replace_hard})'
                 ),
-                action='pause' if str_replace_hard >= 3 else 'switch_context',
+                action='pause' if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE else 'switch_context',
                 recommendation=recommendation,
                 system_message=recommendation,
             )
@@ -312,17 +325,44 @@ class CircuitBreaker:
             )
 
     def record_success(self, tool_name: str = '') -> None:
-        """Record a successful action."""
-        self.consecutive_errors = 0  # Reset consecutive error counter
+        """Record a successful action.
+
+        With hysteresis (``error_decay_per_success > 0``), the global
+        ``consecutive_errors`` counter and the per-tool counters are
+        decayed by that amount instead of being zeroed. This prevents a
+        single housekeeping success from masking a still-failing tool.
+        Set ``error_decay_per_success = 0`` in the config to restore the
+        legacy zero-reset behaviour.
+        """
+        decay = max(0, getattr(self.config, 'error_decay_per_success', 0))
+        if decay <= 0:
+            self.consecutive_errors = 0
+        else:
+            self.consecutive_errors = max(0, self.consecutive_errors - decay)
         self.recent_actions_success.append(True)
         if tool_name in (
             TEXT_EDITOR_TOOL_NAME,
             TEXT_EDITOR_SYNTAX_TOOL_NAME,
         ):
-            self._per_tool_errors.pop(TEXT_EDITOR_TOOL_NAME, None)
-            self._per_tool_errors.pop(TEXT_EDITOR_SYNTAX_TOOL_NAME, None)
+            if decay <= 0:
+                self._per_tool_errors.pop(TEXT_EDITOR_TOOL_NAME, None)
+                self._per_tool_errors.pop(TEXT_EDITOR_SYNTAX_TOOL_NAME, None)
+            else:
+                for key in (TEXT_EDITOR_TOOL_NAME, TEXT_EDITOR_SYNTAX_TOOL_NAME):
+                    cur = self._per_tool_errors.get(key, 0)
+                    if cur <= decay:
+                        self._per_tool_errors.pop(key, None)
+                    else:
+                        self._per_tool_errors[key] = cur - decay
         elif tool_name:
-            self._per_tool_errors.pop(tool_name, None)
+            if decay <= 0:
+                self._per_tool_errors.pop(tool_name, None)
+            else:
+                cur = self._per_tool_errors.get(tool_name, 0)
+                if cur <= decay:
+                    self._per_tool_errors.pop(tool_name, None)
+                else:
+                    self._per_tool_errors[tool_name] = cur - decay
 
     def get_tool_error_count(self, tool_name: str) -> int:
         """Return consecutive error count for a specific tool type."""
@@ -346,7 +386,9 @@ class CircuitBreaker:
     def record_progress_signal(self, note: str) -> None:
         """Proactively decrement the stuck loop detection count when LLM signals progress."""
         old_count = self.stuck_detection_count
-        self.stuck_detection_count = max(0, self.stuck_detection_count - 2)
+        self.stuck_detection_count = max(
+            0, self.stuck_detection_count - DEFAULT_STUCK_PROGRESS_SIGNAL_DECREMENT
+        )
         logger.info(
             'Progress signal received: %r. Reduced stuck_detection_count from %d to %d.',
             note,

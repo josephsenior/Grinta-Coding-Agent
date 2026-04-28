@@ -14,7 +14,7 @@ Related docs:
 1. Repository Layout
 2. Request Lifecycle
 3. Orchestration Services
-4. Execution and API Surface
+4. Execution Surface
 5. Config and Environment
 6. Testing and Validation
 7. Adding Features Safely
@@ -29,7 +29,7 @@ backend/
   context/        Conversation memory and compaction
   core/           Config, constants, app paths, logging
   engine/         Prompt assembly and model interaction flow
-  execution/      Runtime executor and raw HTTP action server
+  execution/      Runtime executor, shell/session plumbing, policy enforcement
   inference/      Provider resolver and direct LLM clients
   integrations/   External integrations (including MCP plumbing)
   knowledge/      Retrieval and knowledge-related modules
@@ -42,8 +42,6 @@ backend/
   tools/          Tool interfaces and implementations
   validation/     Validation and completion guards
   tests/          Unit and integration tests
-client/
-  client.py       Python client helper for API/runtime interactions
 ```
 
 ---
@@ -60,15 +58,6 @@ CLI input
         -> observation emitted
           -> orchestrator updates state
             -> task validation gate controls completion
-```
-
-Optional API flow:
-
-```text
-HTTP request
-  -> backend.execution.action_execution_server
-    -> RuntimeExecutor.run_action
-      -> observation response
 ```
 
 ---
@@ -105,23 +94,14 @@ When adding new behavior, prefer extending an existing focused service first bef
 
 ---
 
-## Execution and API Surface
+## Execution Surface
 
 Execution internals live under `backend/execution/`.
 
 Important entrypoints:
 
 - CLI runtime usage through orchestrator
-- raw HTTP backend via `backend.execution.action_execution_server`
-
-Raw backend endpoints are currently defined in `backend/execution/server_routes.py`:
-
-- `GET /server_info`
-- `POST /execute_action`
-- `POST /update_mcp_server`
-- `POST /upload_file`
-- `GET /download_files`
-- `POST /list_files`
+- runtime executor implementation in `backend.execution.action_execution_server`
 
 ---
 
@@ -172,8 +152,8 @@ uv run pytest backend/tests/unit/inference -q
 ### Static quality
 
 ```bash
-uv run ruff check backend client
-uv run mypy backend client
+uv run ruff check backend launch scripts
+uv run mypy --config-file mypy.ini
 ```
 
 If a change touches orchestration, run at least one focused orchestration suite and one end-to-end style test path when available.

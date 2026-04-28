@@ -1833,6 +1833,7 @@ class RuntimeExecutor:
 # Initialize global variables for client and proxies
 client: RuntimeExecutor | None = None
 mcp_proxy_manager: MCPProxyManager | None = None
+initialization_task: asyncio.Task[None] | None = None
 
 
 # Initializers for routes
@@ -1954,111 +1955,7 @@ def get_uvicorn_json_log_config() -> dict[str, Any]:
 
 
 if __name__ == '__main__':
-    logger.warning('Starting Action Execution Server')
-    parser = argparse.ArgumentParser()
-    parser.add_argument('port', type=int, help='Port to listen on')
-    parser.add_argument('--working-dir', type=str, help='Working directory')
-    parser.add_argument('--plugins', type=str, help='Plugins to initialize', nargs='+')
-    parser.add_argument('--username', type=str, help='User to run as', default='app')
-    parser.add_argument('--user-id', type=int, help='User ID to run as', default=1000)
-    parser.add_argument(
-        '--enable-browser',
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help='Enable the browser environment',
+    raise SystemExit(
+        'CLI-only product: direct HTTP/OpenAPI launch via '
+        'backend.execution.action_execution_server is retired.'
     )
-    args = parser.parse_args()
-
-    logger.info('Starting file viewer server')
-    _file_viewer_port = find_available_tcp_port(
-        min_port=args.port + 1, max_port=min(args.port + 1024, 65535)
-    )
-    server_url, _ = start_file_viewer_server(port=_file_viewer_port)
-    logger.info('File viewer server started at %s', server_url)
-
-    plugins_to_load: list[Plugin] = []
-    if args.plugins:
-        for plugin in args.plugins:
-            if plugin not in ALL_PLUGINS:
-                msg = f'Plugin {plugin} not found'
-                raise ValueError(msg)
-            plugins_to_load.append(ALL_PLUGINS[plugin]())
-
-    client: RuntimeExecutor | None = None  # type: ignore[no-redef]
-    mcp_proxy_manager: MCPProxyManager | None = None  # type: ignore[no-redef]
-    initialization_task: asyncio.Task | None = None
-    initialization_error: Exception | None = None
-
-    async def _initialize_background(app: FastAPI):
-        """Initialize RuntimeExecutor and MCP Proxy Manager in the background."""
-        global client, mcp_proxy_manager, initialization_error
-        try:
-            logger.info('Initializing RuntimeExecutor...')
-            from backend.core.config.config_loader import load_app_config
-
-            client = RuntimeExecutor(
-                plugins_to_load,
-                work_dir=args.working_dir,
-                username=args.username,
-                user_id=args.user_id,
-                enable_browser=args.enable_browser,
-                security_config=load_app_config().security,
-            )
-            logger.info(
-                'RuntimeExecutor instance created. Starting async initialization...'
-            )
-
-            init_timeout = int(os.environ.get('ACTION_EXECUTOR_INIT_TIMEOUT', '300'))
-            try:
-                await asyncio.wait_for(client.ainit(), timeout=init_timeout)
-                logger.info('RuntimeExecutor initialized successfully.')
-            except TimeoutError as exc:
-                error_msg = f'RuntimeExecutor initialization timed out after {init_timeout} seconds.'
-                logger.error(error_msg)
-                initialization_error = RuntimeError(error_msg)
-                raise initialization_error from exc
-
-            is_windows = OS_CAPS.is_windows
-            if is_windows:
-                logger.info('Skipping MCP Proxy initialization on Windows')
-                mcp_proxy_manager = None
-            else:
-                logger.info('Initializing MCP Proxy Manager...')
-                mcp_proxy_manager = MCPProxyManager(
-                    auth_enabled=False,
-                    api_key=None,
-                    logger_level=logger.getEffectiveLevel(),
-                )
-                app_config = load_app_config()
-                mcp_proxy_manager.initialize(app_config.mcp.servers)
-                allowed_origins = ['*']
-                try:
-                    await mcp_proxy_manager.mount_to_app(app, allowed_origins)
-                    logger.info('MCP Proxy Manager mounted to app successfully')
-                except Exception as e:
-                    logger.error('Error mounting MCP Proxy: %s', e, exc_info=True)
-                    logger.warning('Continuing without MCP Proxy mounting')
-
-        except Exception as e:
-            logger.error(
-                'Failed to initialize RuntimeExecutor: %s',
-                e,
-                exc_info=True,
-            )
-            initialization_error = e
-
-    logger.debug('Starting action execution API on port %d', args.port)
-    log_config = None
-    if os.getenv('LOG_JSON', '0') in ('1', 'true', 'True'):
-        log_config = get_uvicorn_json_log_config()
-    server_host = os.getenv('ACTION_EXECUTION_HOST', '127.0.0.1')
-    server = Server(
-        Config(
-            app,
-            host=server_host,
-            port=args.port,
-            log_config=log_config,
-            use_colors=False,
-        )
-    )
-    server.run()

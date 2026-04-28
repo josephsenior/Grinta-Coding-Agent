@@ -382,9 +382,6 @@ def __getattr__(name: str) -> Any:
 LOQUACIOUS_LOGGERS = [
     'engineio',
     'engineio.server',
-    'socketio',
-    'socketio.client',
-    'socketio.server',
 ]
 for logger_name in LOQUACIOUS_LOGGERS:
     logging.getLogger(logger_name).setLevel('WARNING')

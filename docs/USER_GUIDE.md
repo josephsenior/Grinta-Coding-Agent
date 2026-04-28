@@ -5,17 +5,15 @@ This guide reflects the current CLI-first Grinta workflow.
 Canonical startup:
 
 - CLI: `uv run python -m backend.cli.entry`
-- Optional raw HTTP backend: `uv run python -m backend.execution.action_execution_server 3000 --working-dir .`
 
 ## Table of Contents
 
 1. Installation
 2. Configuration (incl. pending actions, terminal, Stop/Cancel, Ctrl+C)
 3. First Task
-4. Optional Raw HTTP Backend
-5. LLM Provider Setup
-6. Safety and Runtime Model
-7. Useful Commands
+4. LLM Provider Setup
+5. Safety and Runtime Model
+6. Useful Commands
 
 ---
 
@@ -133,41 +131,6 @@ Session and runtime state are stored under:
 
 ---
 
-## Optional Raw HTTP Backend
-
-Only start this when you need API/OpenAPI tooling.
-
-### Start backend
-
-Windows:
-
-```powershell
-.\start_backend.ps1
-```
-
-Cross-platform:
-
-```bash
-uv run python -m backend.execution.action_execution_server 3000 --working-dir .
-```
-
-### Useful endpoints
-
-- `GET /openapi.json`
-- `GET /server_info`
-- `POST /execute_action`
-- `POST /list_files`
-- `POST /upload_file`
-- `GET /download_files`
-
-Example:
-
-```bash
-curl http://localhost:3000/server_info
-```
-
----
-
 ## LLM Provider Setup
 
 Grinta supports direct SDK routing plus OpenAI-compatible endpoints.
@@ -233,12 +196,6 @@ Install + run:
 ```bash
 uv sync
 uv run python -m backend.cli.entry
-```
-
-Backend help:
-
-```bash
-uv run python -m backend.execution.action_execution_server --help
 ```
 
 CLI help:

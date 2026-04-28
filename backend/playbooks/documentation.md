@@ -31,6 +31,6 @@ Obvious line-by-line narration, redundant `(str): a string`, generated files.
 
 Update docs in the **same** change as code. If temporarily wrong, `TODO(docs): …` beats silent drift.
 
-## OpenAPI (when this repo exposes HTTP APIs)
+## Public API docs
 
-Regenerate or hand-update **`openapi.json`** when routes/schemas change — follow existing project scripts.
+This repo currently has no supported public HTTP/OpenAPI surface. Do not add `openapi.json` guidance unless that product surface is intentionally restored.

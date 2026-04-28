@@ -41,7 +41,6 @@ dependencies = [
   "python-frontmatter>=1.1,<2",
   "python-json-logger>=3.2.1,<4",
   "python-multipart>=0.0.20,<1",
-  "python-socketio>=5.14,<6",
   "rapidfuzz>=3.9,<4",
   "starlette>=0.49.1,<0.50",
   "tenacity>=8.5,<10",
@@ -72,7 +71,7 @@ dependencies = [
   "pywinpty>=2.0,<3; sys_platform == 'win32'",
 ]
 
-urls = { Repository = "https://github.com/josephsenior/Grinta-Agent", Issues = "https://github.com/josephsenior/Grinta-Agent/issues", Discussions = "https://github.com/josephsenior/Grinta-Agent/discussions" }
+urls = { Repository = "https://github.com/josephsenior/Grinta-Coding-Agent", Issues = "https://github.com/josephsenior/Grinta-Coding-Agent/issues", Documentation = "https://github.com/josephsenior/Grinta-Coding-Agent/tree/main/docs" }
 # Console script disabled — Windows Application Control blocks pip-generated
 # .exe launchers.  Use the grinta.cmd wrapper in Scripts/ instead, or run
 # directly: python -m backend.cli.entry
@@ -80,12 +79,8 @@ urls = { Repository = "https://github.com/josephsenior/Grinta-Agent", Issues = "
 [tool.hatch.build.targets.wheel]
 packages = [
   "backend",
-  "client",
   "launch",
 ]
-
-[tool.hatch.build.targets.wheel.force-include]
-"backend/playbooks" = "backend/playbooks"
 
 [dependency-groups]
 dev = [
@@ -173,7 +168,6 @@ lint.pydocstyle.convention = "google"
 [tool.coverage.run]
 source = [
   "backend",
-  "client",
 ]
 omit = [
   "*/tests/*",

@@ -332,6 +332,88 @@ class TestRecordSuccess:
         assert breaker.recent_actions_success[0] is True
 
 
+class TestHysteresis:
+    """Behavioural tests for the error_decay_per_success hysteresis fix."""
+
+    def test_decay_decrements_not_zeros(self):
+        """With error_decay_per_success=1, one success decays by 1, not reset to 0."""
+        config = CircuitBreakerConfig(error_decay_per_success=1)
+        breaker = CircuitBreaker(config)
+
+        for _ in range(5):
+            breaker.record_error(RuntimeError('boom'))
+        assert breaker.consecutive_errors == 5
+
+        breaker.record_success()
+        # Must be 4, not 0 — prevents a single housekeeping success masking
+        # a still-failing tool.
+        assert breaker.consecutive_errors == 4
+
+    def test_decay_multiple_successes_reaches_zero(self):
+        """Enough successes eventually drain the counter to 0."""
+        config = CircuitBreakerConfig(error_decay_per_success=1)
+        breaker = CircuitBreaker(config)
+
+        for _ in range(3):
+            breaker.record_error(RuntimeError('boom'))
+        assert breaker.consecutive_errors == 3
+
+        for _ in range(3):
+            breaker.record_success()
+        assert breaker.consecutive_errors == 0
+
+    def test_zero_decay_is_legacy_zero_reset(self):
+        """error_decay_per_success=0 restores legacy instant-zero behaviour."""
+        config = CircuitBreakerConfig(error_decay_per_success=0)
+        breaker = CircuitBreaker(config)
+
+        for _ in range(5):
+            breaker.record_error(RuntimeError('boom'))
+        assert breaker.consecutive_errors == 5
+
+        breaker.record_success()
+        assert breaker.consecutive_errors == 0
+
+    def test_per_tool_errors_decayed_not_zeroed(self):
+        """Per-tool error counter should also decay, not zero-reset."""
+        config = CircuitBreakerConfig(error_decay_per_success=1)
+        breaker = CircuitBreaker(config)
+
+        for _ in range(3):
+            breaker.record_error(RuntimeError('bad edit'), tool_name=TEXT_EDITOR_TOOL_NAME)
+        assert breaker.get_tool_error_count(TEXT_EDITOR_TOOL_NAME) == 3
+
+        breaker.record_success(tool_name=TEXT_EDITOR_TOOL_NAME)
+        # Must decay to 2, not 0.
+        assert breaker.get_tool_error_count(TEXT_EDITOR_TOOL_NAME) == 2
+
+    def test_per_tool_removed_when_decayed_to_zero(self):
+        """Per-tool entry is cleaned up when decayed fully to zero."""
+        config = CircuitBreakerConfig(error_decay_per_success=1)
+        breaker = CircuitBreaker(config)
+
+        breaker.record_error(RuntimeError('bad'), tool_name='my_tool')
+        assert breaker.get_tool_error_count('my_tool') == 1
+
+        breaker.record_success(tool_name='my_tool')
+        assert breaker.get_tool_error_count('my_tool') == 0
+        assert 'my_tool' not in breaker._per_tool_errors
+
+    def test_scaled_preserves_error_decay_per_success(self):
+        """scaled() must propagate error_decay_per_success to the returned config."""
+        config = CircuitBreakerConfig(
+            adaptive=True,
+            error_decay_per_success=3,
+        )
+        scaled = config.scaled(complexity=7, max_iterations=200)
+        assert scaled.error_decay_per_success == 3
+
+    def test_default_decay_is_one(self):
+        """The default error_decay_per_success should be 1 (hysteresis on by default)."""
+        config = CircuitBreakerConfig()
+        assert config.error_decay_per_success == 1
+
+
 class TestRecordHighRiskAction:
     """Test record_high_risk_action method."""
 

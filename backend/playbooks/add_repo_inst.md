@@ -10,6 +10,8 @@ inputs:
     description: 'Folder name of the repository to document (relative to the working directory)'
 ---
 
+# Add Repo Instructions
+
 Please browse the current repository under `./{{ REPO_FOLDER_NAME }}` (relative to the working directory), look at the documentation and relevant code, and understand the purpose of this repository.
 
 Specifically, I want you to create a `.grinta/playbooks/repo.md` file. This file should contain succinct information that summarizes (1) the purpose of this repository, (2) the general setup of this repo, and (3) a brief description of the structure of this repo.
@@ -24,7 +26,8 @@ agent: Orchestrator
 ---
 
 This repository contains the code for App, an automated AI software engineer. It has a Python backend
-(in the `backend` directory) and a React web UI, plus a small `client` package for HTTP/Socket.IO from Python.
+(in the `backend` directory) and ships primarily as a terminal CLI. Optional raw HTTP/OpenAPI tooling may
+still exist for compatibility or export workflows, but the supported interactive product surface is the CLI.
 
 ## General Setup:
 
@@ -48,15 +51,14 @@ Backend:
   - To test new code, run `uv run pytest backend/tests/unit/test_xxx.py` where `xxx` is the appropriate file for the current functionality
   - Write all tests with pytest
 
-Web UI:
+CLI:
 
-- Served with the backend (default http://localhost:3000)
-- Launch CLI: `uv run python -m backend.cli.entry`
-- Launch raw HTTP backend only when you need API/OpenAPI tooling: `./start_backend.ps1` or `uv run python -m backend.execution.action_execution_server 3000 --working-dir .`
+- Launch the supported interactive product surface with `uv run python -m backend.cli.entry`
+- Session commands, init flow, and the REPL live under `backend/cli`
 
-Python API client:
+Public server/OpenAPI surface:
 
-- Package `client` — use `AppClient` in tests and scripts
+- None. The supported product surface is the terminal CLI.
 ```
 
 Now, please write a similar markdown for the current repository.

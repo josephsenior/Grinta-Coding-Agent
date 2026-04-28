@@ -203,6 +203,74 @@ DEFAULT_AGENT_WARNING_FIRST_TRIP_ENABLED = True
 DEFAULT_AGENT_WARNING_FIRST_TRIP_LIMIT = 3
 DEFAULT_AGENT_PARALLEL_TOOL_SCHEDULING_ENABLED = False
 
+# ── Agent Recovery Heuristics ───────────────────────────────────────
+# Threshold knobs for the action-execution repair loop and null-action
+# recovery (action_execution_service.py). All counts are inclusive limits.
+DEFAULT_AGENT_MAX_CONSECUTIVE_NULL_ACTIONS = 5
+# Round 1 injects a directive; round 2+ pauses for user input.
+DEFAULT_AGENT_MAX_NULL_RECOVERY_ROUNDS = 2
+# Number of LLM repair attempts when get_next_action() raises a recoverable
+# parsing/validation error before transitioning to ERROR state.
+DEFAULT_AGENT_MAX_REPAIR_ATTEMPTS = 3
+# Identical-error escalation: same error N+1 times -> ERROR state.
+DEFAULT_AGENT_MAX_IDENTICAL_RETRIES = 2
+# apply_patch malformed/context-mismatch errors get a tighter budget because
+# they almost never recover by simple retry.
+DEFAULT_AGENT_APPLY_PATCH_MAX_RETRIES = 1
+# Engine-level circuit breaker for ContextLimitError loops. > this -> raise.
+DEFAULT_AGENT_MAX_CONTEXT_LIMIT_ERRORS = 4
+# Engine-level escalation for repeated identical recoverable tool-call errors.
+DEFAULT_AGENT_RECOVERABLE_TOOL_ERROR_THRESHOLD = 3
+# How many _step_pending requeues SessionOrchestrator._step() will drain.
+DEFAULT_AGENT_STEP_DRAIN_LIMIT = 10
+# Safe-action parallel batch size cap (parallel reads/searches/thinks).
+DEFAULT_AGENT_PARALLEL_BATCH_SIZE = 10
+
+# Hysteresis: when set, record_success() decrements counters by N instead of
+# resetting to 0. Keeps memory of past errors so a single housekeeping success
+# can't mask a still-failing tool. Set to 0 to restore legacy zero-reset.
+DEFAULT_AGENT_ERROR_DECAY_PER_SUCCESS = 1
+
+# ── text_editor Per-Tool Circuit Breaker Thresholds ─────────────────
+# Hard (deterministic match/path/guard) failures: switch then pause.
+DEFAULT_TEXT_EDITOR_HARD_SWITCH = 2
+DEFAULT_TEXT_EDITOR_HARD_PAUSE = 3
+# Syntax-validation failures: more generous because models iterate.
+DEFAULT_TEXT_EDITOR_SYNTAX_SWITCH = 10
+DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE = 15
+
+# ── Stuck Detector Thresholds ───────────────────────────────────────
+# Window sizes for fast pattern detection on recent actions/observations.
+DEFAULT_STUCK_RECENT_WINDOW = 4
+# A-B-A-B alternating-pattern window (must match in pairs).
+DEFAULT_STUCK_AB_PATTERN_WINDOW = 6
+# Min consecutive condensation events to declare context-window loop.
+DEFAULT_STUCK_CONDENSATION_LOOP_MIN = 10
+# Sliding window for semantic loop / cost acceleration analysis.
+DEFAULT_STUCK_SEMANTIC_WINDOW = 20
+DEFAULT_STUCK_SEMANTIC_MIN_EVENTS = 10
+# Intent diversity below this AND failure rate above the next constant trips.
+DEFAULT_STUCK_SEMANTIC_DIVERSITY = 0.3
+DEFAULT_STUCK_SEMANTIC_FAILURE_RATE = 0.75
+# Token-level repetition: 3 identical agent messages above this length trip.
+DEFAULT_STUCK_TOKEN_REPETITION_MIN_CHARS = 50
+# Cost acceleration: > N tokens added in 5 steps is suspicious.
+DEFAULT_STUCK_COST_ACCEL_TOKENS_PER_5_STEPS = 50000
+# Absolute prompt-token threshold considered "high context" warning floor.
+# NOTE: scaled at runtime against the model's context window when known.
+DEFAULT_STUCK_CONTEXT_HIGH_THRESHOLD = 100000
+# Continued growth needed alongside high-context to actually trip.
+DEFAULT_STUCK_CONTEXT_HIGH_GROWTH = 1000
+# N consecutive AgentThinkActions with no real tool use trips think-only.
+DEFAULT_STUCK_THINK_LOOP_DEPTH = 10
+# Read-only inspection loop: extreme cases only (true degenerate poll loop).
+DEFAULT_STUCK_READONLY_MIN_COUNT = 20
+DEFAULT_STUCK_READONLY_DIVERSITY_THRESHOLD = 0.10
+
+# Stuck-detection recovery: how much one progress signal decrements the
+# counter (game-able if too high; ignored if too low).
+DEFAULT_STUCK_PROGRESS_SIGNAL_DECREMENT = 2
+
 # ── Knowledge Base Defaults ─────────────────────────────────────────
 DEFAULT_KB_ENABLED = True
 DEFAULT_KB_ACTIVE_COLLECTION_IDS: list[str] = []

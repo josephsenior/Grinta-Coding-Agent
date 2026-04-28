@@ -11,8 +11,6 @@ Grinta is a local-first autonomous coding agent with three core layers:
 2. Execution: local runtime actions (commands, file ops, tool interaction).
 3. Durability: event stream and persisted state for recovery/replay.
 
-Optional raw HTTP backend exists for API/OpenAPI workflows, but CLI remains the canonical interface.
-
 ## Runtime Boundary
 
 Grinta executes on the local host.
@@ -45,7 +43,7 @@ backend/
   context/        Memory and compaction
   core/           Config, constants, logging, shared utilities
   engine/         Agent reasoning and prompt assembly
-  execution/      Local runtime and optional raw HTTP action server
+  execution/      Local runtime, shell/session plumbing, and executor internals
   inference/      Provider routing and direct LLM clients
   integrations/   External integration adapters
   knowledge/      Optional retrieval and knowledge features
@@ -99,8 +97,7 @@ Execution is implemented in `backend/execution/`.
 
 Important components:
 
-- `action_execution_server.py`: runtime executor and FastAPI app bootstrap
-- `server_routes.py`: raw HTTP routes (`/execute_action`, `/list_files`, etc.)
+- `action_execution_server.py`: runtime executor implementation used by the local runtime
 - `security_enforcement.py`: policy checks for command/path behavior
 - `utils/`: command helpers, diffing, session handling, monitoring
 
@@ -128,26 +125,6 @@ Minimal fields in `settings.template.json`:
 - `llm_model`
 - `llm_api_key`
 - `llm_base_url`
-
-## Optional Raw HTTP Backend
-
-The raw action backend is available for automation and OpenAPI tooling.
-
-Start:
-
-```bash
-uv run python -m backend.execution.action_execution_server 3000 --working-dir .
-```
-
-Main endpoints:
-
-- `GET /openapi.json`
-- `GET /server_info`
-- `POST /execute_action`
-- `POST /update_mcp_server`
-- `POST /upload_file`
-- `GET /download_files`
-- `POST /list_files`
 
 ## Reliability and Safety
 

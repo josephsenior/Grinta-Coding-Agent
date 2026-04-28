@@ -19,7 +19,6 @@ from backend.core.errors import (
     SessionError,
     SessionInvariantError,
     SessionStartupError,
-    SocketConnectionError,
     ToolExecutionError,
     UserActionRequiredError,
     classify_error,
@@ -127,9 +126,6 @@ class TestErrorHierarchy:
 
     def test_replay_is_session(self):
         assert issubclass(ReplayError, SessionError)
-
-    def test_socket_connection_is_app(self):
-        assert issubclass(SocketConnectionError, AppError)
 
     def test_event_stream_is_app(self):
         assert issubclass(EventStreamError, AppError)

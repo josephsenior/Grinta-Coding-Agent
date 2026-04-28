@@ -37,20 +37,6 @@ uv run python -m backend.cli.entry
 
 This is the canonical local startup path.
 
-If you need the raw HTTP backend for API/OpenAPI tooling, use [start_backend.ps1](../start_backend.ps1)
-on Windows or run:
-
-```powershell
-uv run python -m backend.execution.action_execution_server 3000 --working-dir .
-```
-
-## Optional HTTP Backend
-
-If you start the raw backend, the OpenAPI spec is exposed at:
-
-- OpenAPI JSON: [http://localhost:3000/openapi.json](http://localhost:3000/openapi.json)
-- Server info: [http://localhost:3000/server_info](http://localhost:3000/server_info)
-
 ## Common issues
 
 ### uv not found
@@ -67,6 +53,4 @@ Ensure **Ollama** or **LM Studio** is running. Grinta auto-discovers them on sta
 
 ### Port already in use
 
-This only applies to the raw HTTP backend. Use `-Port` with [start_backend.ps1](../start_backend.ps1)
-or change the positional port argument when launching
-`backend.execution.action_execution_server` directly.
+For the CLI itself, this usually points to another local tool, not Grinta.

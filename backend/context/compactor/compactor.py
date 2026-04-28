@@ -456,13 +456,12 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         """
         model: str = ''
         try:
-            model = (getattr(getattr(self, 'llm', None), 'config', None) or object()).__class__.__name__
             model = str(getattr(getattr(getattr(self, 'llm', None), 'config', None), 'model', '') or '')
         except Exception:
             pass
-        if model and ('claude' in model.lower() or 'anthropic' in model.lower()):
-            return 1.05
-        return 1.0
+        from backend.inference.provider_capabilities import model_token_correction
+        factor, _ = model_token_correction(model)
+        return factor
 
     def _exceeds_token_budget(self, view: View) -> bool:
         """Return True when a token_budget is set and the view exceeds it."""

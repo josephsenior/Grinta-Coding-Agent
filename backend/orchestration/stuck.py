@@ -4,6 +4,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Sequence
 
+from backend.core.constants import (
+    DEFAULT_STUCK_AB_PATTERN_WINDOW,
+    DEFAULT_STUCK_CONDENSATION_LOOP_MIN,
+    DEFAULT_STUCK_CONTEXT_HIGH_GROWTH,
+    DEFAULT_STUCK_CONTEXT_HIGH_THRESHOLD,
+    DEFAULT_STUCK_COST_ACCEL_TOKENS_PER_5_STEPS,
+    DEFAULT_STUCK_RECENT_WINDOW,
+    DEFAULT_STUCK_SEMANTIC_DIVERSITY,
+    DEFAULT_STUCK_SEMANTIC_FAILURE_RATE,
+    DEFAULT_STUCK_SEMANTIC_MIN_EVENTS,
+    DEFAULT_STUCK_SEMANTIC_WINDOW,
+    DEFAULT_STUCK_THINK_LOOP_DEPTH,
+    DEFAULT_STUCK_TOKEN_REPETITION_MIN_CHARS,
+)
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.action import Action
 from backend.ledger.action.agent import AgentThinkAction
@@ -103,16 +117,17 @@ class StuckDetector:
     def _collect_recent_events(
         self, filtered_history: list[Event]
     ) -> tuple[list[Event], list[Event]]:
-        """Collect the last 4 actions and 4 observations from filtered history."""
+        """Collect the last N actions and N observations from filtered history."""
         last_actions: list[Event] = []
         last_observations: list[Event] = []
+        window = DEFAULT_STUCK_RECENT_WINDOW
 
         for event in reversed(filtered_history):
-            if isinstance(event, Action) and len(last_actions) < 4:
+            if isinstance(event, Action) and len(last_actions) < window:
                 last_actions.append(event)
-            elif isinstance(event, Observation) and len(last_observations) < 4:
+            elif isinstance(event, Observation) and len(last_observations) < window:
                 last_observations.append(event)
-            if len(last_actions) == 4 and len(last_observations) == 4:
+            if len(last_actions) == window and len(last_observations) == window:
                 break
 
         return last_actions, last_observations
@@ -132,12 +147,12 @@ class StuckDetector:
 
     def _check_advanced_stuck_patterns(self, filtered_history: list[Event]) -> bool:
         """Check for advanced stuck patterns."""
-        if len(filtered_history) >= 6 and self._is_stuck_action_observation_pattern(
+        if len(filtered_history) >= DEFAULT_STUCK_AB_PATTERN_WINDOW and self._is_stuck_action_observation_pattern(
             filtered_history
         ):
             return True
         return bool(
-            len(filtered_history) >= 10
+            len(filtered_history) >= DEFAULT_STUCK_CONDENSATION_LOOP_MIN
             and self._is_stuck_context_window_error(filtered_history)
         )
 
@@ -172,7 +187,7 @@ class StuckDetector:
             return True
 
         # NEW: Check semantic stuck patterns (different actions, same no-progress result)
-        if len(filtered_history) >= 10:
+        if len(filtered_history) >= DEFAULT_STUCK_SEMANTIC_MIN_EVENTS:
             if self._is_stuck_semantic_loop(filtered_history):
                 return True
 
@@ -310,10 +325,10 @@ class StuckDetector:
 
         """
         condensation_events = self._get_condensation_events(filtered_history)
-        if len(condensation_events) < 10:
+        if len(condensation_events) < DEFAULT_STUCK_CONDENSATION_LOOP_MIN:
             return False
 
-        last_condensation_events = condensation_events[-10:]
+        last_condensation_events = condensation_events[-DEFAULT_STUCK_CONDENSATION_LOOP_MIN:]
         return self._check_consecutive_condensation_events(
             last_condensation_events, filtered_history
         )
@@ -333,12 +348,15 @@ class StuckDetector:
             True if semantic loop detected
 
         """
-        recent_window = filtered_history[-20:]
+        recent_window = filtered_history[-DEFAULT_STUCK_SEMANTIC_WINDOW:]
         action_intents, observation_outcomes = self._extract_intents_and_outcomes(
             recent_window
         )
 
-        if len(action_intents) < 10 or len(observation_outcomes) < 10:
+        if (
+            len(action_intents) < DEFAULT_STUCK_SEMANTIC_MIN_EVENTS
+            or len(observation_outcomes) < DEFAULT_STUCK_SEMANTIC_MIN_EVENTS
+        ):
             return False
 
         intent_diversity = self._calculate_intent_diversity(action_intents)
@@ -346,7 +364,10 @@ class StuckDetector:
 
         # Detect semantic loop: very low diversity + very high failure rate
         # Raised thresholds to reduce false positives on legitimate diagnostic retries
-        if intent_diversity < 0.3 and failure_rate > 0.75:
+        if (
+            intent_diversity < DEFAULT_STUCK_SEMANTIC_DIVERSITY
+            and failure_rate > DEFAULT_STUCK_SEMANTIC_FAILURE_RATE
+        ):
             logger.warning(
                 'Semantic loop detected: intent_diversity=%.2f, '
                 'failure_rate=%.2f, unique_intents=%s/%s',
@@ -507,8 +528,8 @@ class StuckDetector:
 
         # If all three have identical content
         if all(msg.content == last_three[0].content for msg in last_three[1:]):
-            # Require non-trivial length (50+ chars) to ignore short planning phrases
-            if len(last_three[0].content) > 50:
+            # Require non-trivial length to ignore short planning phrases
+            if len(last_three[0].content) > DEFAULT_STUCK_TOKEN_REPETITION_MIN_CHARS:
                 logger.warning(
                     'Token-level repetition detected (identical agent messages)'
                 )
@@ -539,9 +560,9 @@ class StuckDetector:
             prompt_tokens[-1] - prompt_tokens[-5] if len(prompt_tokens) >= 5 else 0
         )
 
-        # If we added more than 50k tokens in 5 steps, that's suspicious of a runaway loop
-        # (Average 10k per step is high sustained output indicative of un-truncated runaway commands)
-        if recent_growth > 50000:
+        # If we added more than the configured threshold in 5 steps, that's
+        # suspicious of a runaway loop (default 50k = avg 10k/step sustained).
+        if recent_growth > DEFAULT_STUCK_COST_ACCEL_TOKENS_PER_5_STEPS:
             logger.warning(
                 'Cost acceleration detected: %s tokens added in last 5 steps',
                 recent_growth,
@@ -550,9 +571,9 @@ class StuckDetector:
 
         # Check specific cost spikes?
         # Maybe just raw context window check
-        if prompt_tokens[-1] > 100000:  # 100k context warning
+        if prompt_tokens[-1] > DEFAULT_STUCK_CONTEXT_HIGH_THRESHOLD:
             # Check if we are still growing
-            if recent_growth > 1000:
+            if recent_growth > DEFAULT_STUCK_CONTEXT_HIGH_GROWTH:
                 logger.warning('High context window with continued growth detected')
                 return True
 
@@ -573,11 +594,14 @@ class StuckDetector:
             if isinstance(e, Action) and not isinstance(e, NullAction)
         ]
 
-        if len(recent_actions) < 10:
+        if len(recent_actions) < DEFAULT_STUCK_THINK_LOOP_DEPTH:
             return False
 
-        # Check if the last 10 actions are ALL AgentThinkAction
-        if all(isinstance(a, AgentThinkAction) for a in recent_actions[-10:]):
+        # Check if the last N actions are ALL AgentThinkAction
+        if all(
+            isinstance(a, AgentThinkAction)
+            for a in recent_actions[-DEFAULT_STUCK_THINK_LOOP_DEPTH:]
+        ):
             logger.warning(
                 'Think-only loop detected: last 6+ actions are all AgentThinkAction '
                 'with no real tool use.'

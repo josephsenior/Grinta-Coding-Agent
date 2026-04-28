@@ -108,10 +108,6 @@ class ReplayError(SessionError):
     """Raised when trajectory replay/export fails."""
 
 
-class SocketConnectionError(AppError):
-    """Raised when Socket.IO connection validation fails."""
-
-
 class EventStreamError(AppError):
     """Raised when event-stream operations fail."""
 
@@ -135,7 +131,6 @@ __all__ = [
     'SessionInvariantError',
     'PersistenceError',
     'ReplayError',
-    'SocketConnectionError',
     'EventStreamError',
 ]
 

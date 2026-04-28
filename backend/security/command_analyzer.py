@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import re
+import shlex
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -25,6 +26,103 @@ class RiskCategory(str, Enum):
     MEDIUM = 'medium'
     HIGH = 'high'
     CRITICAL = 'critical'
+
+
+# Numeric ordering used for picking the worst-case risk between raw and
+# de-obfuscated forms of the same command.
+_RISK_ORDER: dict[RiskCategory, int] = {
+    RiskCategory.NONE: 0,
+    RiskCategory.LOW: 1,
+    RiskCategory.MEDIUM: 2,
+    RiskCategory.HIGH: 3,
+    RiskCategory.CRITICAL: 4,
+}
+
+
+# Recognised trivial command-substitution wrappers that simply emit their
+# argument unchanged. Used by ``_normalize_command`` to defeat shell
+# obfuscation like ``$(printf %s rm) -rf /`` or ``$(echo rm) -rf /``.
+_TRIVIAL_EMITTERS: frozenset[str] = frozenset({'echo', 'printf'})
+
+# Match a single ``$(...)`` substitution with no nested ``$( ``. We resolve
+# innermost-first by repeatedly applying this regex until no further
+# substitutions are reduced.
+_DOLLAR_PAREN_RE = re.compile(r'\$\(([^()`$]*)\)')
+# Match `...` style backtick substitution (single layer, no nesting).
+_BACKTICK_RE = re.compile(r'`([^`$]*)`')
+
+
+def _reduce_trivial_substitution(inner: str) -> str | None:
+    """If ``inner`` is a trivial echo/printf, return its literal output.
+
+    Recognises the narrow set of forms an obfuscator typically uses:
+        ``echo rm``         -> ``rm``
+        ``echo -n rm``      -> ``rm``
+        ``printf %s rm``    -> ``rm``
+        ``printf '%s' rm``  -> ``rm``
+    Anything more complex (pipes, redirections, glob expansion) returns
+    None so the substitution is left intact and the original command is
+    treated with appropriate suspicion by the caller.
+    """
+    inner = inner.strip()
+    if not inner:
+        return ''
+    try:
+        tokens = shlex.split(inner, posix=True)
+    except ValueError:
+        return None
+    if not tokens:
+        return ''
+    head = tokens[0].lower()
+    if head not in _TRIVIAL_EMITTERS:
+        return None
+    rest = tokens[1:]
+    if head == 'echo':
+        # Strip leading -n/-e/-E flags.
+        while rest and rest[0] in {'-n', '-e', '-E', '-ne', '-en'}:
+            rest = rest[1:]
+        return ' '.join(rest)
+    if head == 'printf':
+        if not rest:
+            return ''
+        # printf '%s' arg... or printf %s arg...
+        fmt = rest[0]
+        args = rest[1:]
+        if fmt in {'%s', '%s\\n', '%s\\\\n'}:
+            return ' '.join(args)
+        # Unsupported printf format \u2014 leave intact.
+        return None
+    return None
+
+
+def _normalize_command(cmd: str, *, max_iterations: int = 5) -> str:
+    """Best-effort de-obfuscation of trivial shell substitutions.
+
+    Iteratively replaces ``$(echo X)``/``$(printf %s X)`` and the
+    equivalent backtick form with their literal output. Stops after
+    ``max_iterations`` to bound work on adversarial inputs. Anything we
+    can't safely reduce is left alone — the caller still classifies the
+    raw command, so this is purely additive.
+    """
+    if '$(' not in cmd and '`' not in cmd:
+        return cmd
+    out = cmd
+    for _ in range(max_iterations):
+        prev = out
+
+        def _sub_dollar(match: re.Match[str]) -> str:
+            replacement = _reduce_trivial_substitution(match.group(1))
+            return replacement if replacement is not None else match.group(0)
+
+        def _sub_backtick(match: re.Match[str]) -> str:
+            replacement = _reduce_trivial_substitution(match.group(1))
+            return replacement if replacement is not None else match.group(0)
+
+        out = _DOLLAR_PAREN_RE.sub(_sub_dollar, out)
+        out = _BACKTICK_RE.sub(_sub_backtick, out)
+        if out == prev:
+            break
+    return out
 
 
 # Map from RiskCategory to ActionSecurityRisk for convenience.
@@ -77,7 +175,12 @@ _CRITICAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     ),
     (re.compile(r'\bmkfs\b', re.I), 'filesystem format'),
     (re.compile(r'\bdd\s+.*\bof=/dev/', re.I), 'raw device write'),
-    (re.compile(r'\b:(){ :\|:& };:', re.I), 'fork bomb'),
+    # Fork bomb — match the canonical ``:(){:|:&};:`` glyph sequence with or
+    # without internal whitespace.
+    (re.compile(r':\(\)\s*\{[^}]*:\s*\|\s*:\s*&[^}]*\}\s*;\s*:'), 'fork bomb'),
+    # Shell redirect into a raw device node — corrupts disks/partitions.
+    (re.compile(r'>\s*/dev/(sd[a-z]|nvme|hd[a-z]|vd[a-z]|xvd[a-z])', re.I),
+     'redirect into raw block device'),
     # Remote code execution / supply-chain attacks
     (re.compile(r'\bcurl\b.*\|\s*(ba)?sh\b', re.I), 'pipe remote script to shell'),
     (re.compile(r'\bwget\b.*\|\s*(ba)?sh\b', re.I), 'pipe remote download to shell'),
@@ -117,6 +220,10 @@ _HIGH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r'\bchmod\s+777\b', re.I), 'world-writable permissions'),
     (re.compile(r'\bchmod\s+[0-7]*7[0-7]*\b', re.I), 'overly permissive chmod'),
     (
+        re.compile(r'\bchmod\s+-[a-zA-Z]*[rR][a-zA-Z]*\b', re.I),
+        'recursive chmod',
+    ),
+    (
         re.compile(r'\bchmod\s+(\+s|[ugoa]+\+s)\b', re.I),
         'setuid/setgid permission change',
     ),
@@ -141,6 +248,18 @@ _HIGH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r'\bscp\b|\brsync\b.*@', re.I), 'remote file transfer'),
     # System modification
     (re.compile(r'\bsystemctl\s+(stop|disable|mask)\b', re.I), 'service disruption'),
+    (
+        re.compile(r'\bsystemctl\s+(start|restart|reload|enable|reboot|poweroff|halt)\b', re.I),
+        'systemctl service control',
+    ),
+    (
+        re.compile(r'(?:^|[\s;&|`])(reboot|shutdown|halt|poweroff)\b', re.I),
+        'host power-state change',
+    ),
+    (
+        re.compile(r'\binit\s+[06]\b', re.I),
+        'host runlevel change',
+    ),
     (re.compile(r'\biptables\b|\bnft\b', re.I), 'firewall modification'),
     (re.compile(r'\bcrontab\s+-[er]\b', re.I), 'cron modification'),
     # Windows
@@ -228,6 +347,31 @@ class CommandAnalyzer:
 
         cmd = command.strip()
 
+        # Obfuscation pre-pass: collapse trivial command substitutions like
+        # ``$(printf %s rm) -rf /`` or ``$(echo rm) -rf /`` to their literal
+        # form so downstream regex patterns can match. We classify both the
+        # original and the normalized form and keep whichever risk is higher.
+        normalized = _normalize_command(cmd)
+        if normalized != cmd:
+            norm_risk, norm_reason, norm_recs = self._classify_unnormalized(
+                normalized
+            )
+            raw_risk, raw_reason, raw_recs = self._classify_unnormalized(cmd)
+            if _RISK_ORDER.get(norm_risk, 0) > _RISK_ORDER.get(raw_risk, 0):
+                return (
+                    norm_risk,
+                    f'{norm_reason} (after de-obfuscating substitution: {normalized!r})',
+                    norm_recs
+                    + ['Reject commands that hide intent behind shell substitution.'],
+                )
+            return raw_risk, raw_reason, raw_recs
+
+        return self._classify_unnormalized(cmd)
+
+    def _classify_unnormalized(
+        self, cmd: str
+    ) -> tuple[RiskCategory, str, list[str]]:
+        """Pattern classification on a (possibly already normalized) command."""
         blocked = _check_blocklist_allowlist(
             cmd, self._blocked_regex, self._blocked, self._allowed
         )

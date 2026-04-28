@@ -3,25 +3,35 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+import backend.core.workspace_context as workspace_context
 from backend.core.workspace_context import (
     _CHANGELOG_FILE,
     _CONTEXT_FILE,
     _FINGERPRINTS,
+    _TAGS_FILE,
+    _workspace_anchor,
     append_changelog,
     detect_project_type,
     detect_test_runner,
     ensure_project_state_dir,
+    get_conversation_meta,
     get_project_state_dir,
+    list_all_tags,
+    list_projects,
     read_all_changelog,
+    read_month_changelog,
     read_project_memory,
     read_today_changelog,
+    read_week_changelog,
+    set_conversation_tags,
     today_stats,
+    today_total_cost,
     write_context_template,
 )
 
@@ -40,6 +50,17 @@ def _project_context(ws: Path) -> Path:
     from backend.core.workspace_resolution import workspace_grinta_root
 
     return workspace_grinta_root(ws) / 'project_context'
+
+
+def _write_changelog_entries(ws: Path, entries: list[dict[str, object]]) -> None:
+    ensure_project_state_dir(ws)
+    changelog = _project_context(ws) / _CHANGELOG_FILE
+    lines = [json.dumps(entry) for entry in entries]
+    changelog.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+
+
+def _tags_path(ws: Path) -> Path:
+    return _project_context(ws) / _TAGS_FILE
 
 
 # ── get_project_state_dir ────────────────────────────────────────────
@@ -538,3 +559,183 @@ class TestTodayStats:
             'tasks_error',
         }
         assert expected_keys.issubset(stats.keys())
+
+
+class TestWorkspaceAnchorFallbacks:
+    def test_returns_unresolved_provided_cwd_when_resolution_fails(
+        self, tmp_path: Path
+    ) -> None:
+        with patch.object(workspace_context.Path, 'resolve', side_effect=OSError('boom')):
+            assert _workspace_anchor(tmp_path) == tmp_path
+
+    def test_returns_unresolved_workspace_root_when_resolution_fails(
+        self, tmp_path: Path
+    ) -> None:
+        with patch(
+            'backend.core.workspace_resolution.get_effective_workspace_root',
+            return_value=tmp_path,
+        ):
+            with patch.object(
+                workspace_context.Path,
+                'resolve',
+                side_effect=OSError('boom'),
+            ):
+                assert _workspace_anchor(None) == tmp_path
+
+    def test_falls_back_to_process_cwd_when_workspace_root_missing_and_unresolvable(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        with patch(
+            'backend.core.workspace_resolution.get_effective_workspace_root',
+            return_value=None,
+        ):
+            with patch.object(
+                workspace_context.Path,
+                'resolve',
+                side_effect=OSError('boom'),
+            ):
+                assert _workspace_anchor(None) == tmp_path
+
+
+class TestAdditionalChangelogViews:
+    def test_read_week_changelog_filters_to_last_seven_days(
+        self, tmp_path: Path, grinta_home: None
+    ) -> None:
+        today = datetime.now(UTC)
+        cutoff = (today - timedelta(days=6)).strftime('%Y-%m-%d')
+        too_old = (today - timedelta(days=7)).strftime('%Y-%m-%d')
+        _write_changelog_entries(
+            tmp_path,
+            [
+                {'event': 'today', 'date': today.strftime('%Y-%m-%d')},
+                {'event': 'cutoff', 'date': cutoff},
+                {'event': 'old', 'date': too_old},
+            ],
+        )
+
+        events = {entry['event'] for entry in read_week_changelog(tmp_path)}
+
+        assert events == {'today', 'cutoff'}
+
+    def test_read_month_changelog_filters_to_current_month(
+        self, tmp_path: Path, grinta_home: None
+    ) -> None:
+        today = datetime.now(UTC)
+        if today.month == 1:
+            previous_month = f'{today.year - 1}-12-15'
+        else:
+            previous_month = f'{today.year}-{today.month - 1:02d}-15'
+        _write_changelog_entries(
+            tmp_path,
+            [
+                {'event': 'current', 'date': today.strftime('%Y-%m-01')},
+                {'event': 'previous', 'date': previous_month},
+            ],
+        )
+
+        entries = read_month_changelog(tmp_path)
+
+        assert [entry['event'] for entry in entries] == ['current']
+
+
+class TestTodayTotalCost:
+    def test_sums_max_cost_per_session(self, tmp_path: Path, grinta_home: None) -> None:
+        today = datetime.now(UTC).strftime('%Y-%m-%d')
+        _write_changelog_entries(
+            tmp_path,
+            [
+                {'event': 'cost_update', 'conversation_id': 'a', 'cost': 1.25, 'date': today},
+                {'event': 'cost_update', 'conversation_id': 'a', 'cost': 2.5, 'date': today},
+                {'event': 'cost_update', 'conversation_id': 'b', 'cost': 3.75, 'date': today},
+                {'event': 'file_edit', 'conversation_id': 'a', 'path': '/tmp/x.py', 'date': today},
+            ],
+        )
+
+        assert today_total_cost(tmp_path) == pytest.approx(6.25)
+
+    def test_uses_single_anonymous_bucket_for_missing_conversation_id(
+        self, tmp_path: Path, grinta_home: None
+    ) -> None:
+        today = datetime.now(UTC).strftime('%Y-%m-%d')
+        _write_changelog_entries(
+            tmp_path,
+            [
+                {'event': 'cost_update', 'cost': 1.0, 'date': today},
+                {'event': 'cost_update', 'cost': 2.5, 'date': today},
+                {'event': 'cost_update', 'conversation_id': 'named', 'cost': 4.0, 'date': today},
+            ],
+        )
+
+        assert today_total_cost(tmp_path) == pytest.approx(6.5)
+
+
+class TestConversationTags:
+    def test_get_conversation_meta_defaults_when_store_missing(
+        self, tmp_path: Path, grinta_home: None
+    ) -> None:
+        assert get_conversation_meta('missing', cwd=tmp_path) == {
+            'tags': [],
+            'project': '',
+        }
+
+    def test_get_conversation_meta_defaults_when_store_is_invalid_json(
+        self, tmp_path: Path, grinta_home: None
+    ) -> None:
+        ensure_project_state_dir(tmp_path)
+        _tags_path(tmp_path).write_text('{bad json', encoding='utf-8')
+
+        assert get_conversation_meta('missing', cwd=tmp_path) == {
+            'tags': [],
+            'project': '',
+        }
+
+    def test_set_conversation_tags_normalizes_deduplicates_and_preserves_project(
+        self, tmp_path: Path, grinta_home: None
+    ) -> None:
+        ensure_project_state_dir(tmp_path)
+        _tags_path(tmp_path).write_text(
+            json.dumps(
+                {
+                    'conv-1': {'tags': ['legacy'], 'project': 'Alpha'},
+                }
+            ),
+            encoding='utf-8',
+        )
+
+        set_conversation_tags(
+            'conv-1',
+            [' Bug ', '#bug', 'Feature', '  '],
+            cwd=tmp_path,
+        )
+
+        assert get_conversation_meta('conv-1', cwd=tmp_path) == {
+            'tags': ['bug', 'feature'],
+            'project': 'Alpha',
+        }
+
+    def test_set_conversation_tags_updates_project_and_lists_unique_values(
+        self, tmp_path: Path, grinta_home: None
+    ) -> None:
+        set_conversation_tags('conv-a', ['#beta', 'alpha'], project=' Zebra ', cwd=tmp_path)
+        set_conversation_tags('conv-b', ['alpha', 'gamma'], project='Alpha', cwd=tmp_path)
+        set_conversation_tags('conv-c', ['gamma'], project='Alpha', cwd=tmp_path)
+
+        assert get_conversation_meta('conv-a', cwd=tmp_path) == {
+            'tags': ['alpha', 'beta'],
+            'project': 'Zebra',
+        }
+        assert list_projects(tmp_path) == ['Alpha', 'Zebra']
+        assert list_all_tags(tmp_path) == ['alpha', 'beta', 'gamma']
+
+    def test_save_tags_store_swallows_errors(self, tmp_path: Path) -> None:
+        with patch(
+            'backend.core.workspace_context.ensure_project_state_dir',
+            side_effect=OSError('boom'),
+        ):
+            workspace_context._save_tags_store(
+                {'conv': {'tags': ['alpha'], 'project': 'proj'}},
+                cwd=tmp_path,
+            )

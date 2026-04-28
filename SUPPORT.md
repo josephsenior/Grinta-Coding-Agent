@@ -6,15 +6,14 @@
   - docs/QUICK_START.md
   - docs/USER_GUIDE.md
   - docs/TROUBLESHOOTING.md
-- Ask usage questions in GitHub Discussions:
-  - [Grinta Discussions](https://github.com/josephsenior/Grinta-Agent/discussions)
-- Report reproducible product issues with GitHub Issue Templates.
+- If the docs do not answer it, open an issue with the appropriate GitHub Issue Template:
+  - [Open an issue](https://github.com/josephsenior/Grinta-Coding-Agent/issues/new/choose)
 
 ## Reporting Security Issues
 
 Do not open public issues for vulnerabilities.
 
-- Preferred: open a private advisory at [Create advisory](https://github.com/josephsenior/Grinta-Agent/security/advisories/new)
+- Preferred: open a private advisory at [Create advisory](https://github.com/josephsenior/Grinta-Coding-Agent/security/advisories/new)
 - Alternative: email [security@app.ai](mailto:security@app.ai)
 
 ## What to Include in Support Requests

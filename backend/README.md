@@ -4,7 +4,7 @@ This folder contains all backend-related code and resources for the Grinta proje
 
 ## Structure
 
-```
+```text
 backend/
 ├── core/            # Shared config, schemas, logging, and bootstrap
 ├── orchestration/   # Session orchestration loop and services
@@ -25,16 +25,18 @@ backend/
 
 ## Package Structure
 
-Most application code lives under `backend/`. The CLI entry point is `backend/cli/`. The Python API client used by tests and scripts is in `client/`. The `app` console script is configured in `pyproject.toml`.
+Most application code lives under `backend/`. The supported interactive surface is the terminal CLI in `backend/cli/`, launched through `launch.entry` or `python -m backend.cli.entry`.
 
 ## Running Tests
 
 From the project root:
+
 ```bash
 uv run pytest backend/tests
 ```
 
 Or use the Makefile:
+
 ```bash
 make test-unit
 ```
@@ -50,10 +52,11 @@ Backend scripts are organized in `backend/scripts/` subdirectories:
 - **`mcp/`** - MCP-related scripts
 
 Run them from the project root:
+
 ```bash
 python backend/scripts/build/compile_protos.py
 ```
 
 ## Development
 
-Backend code imports from `backend.*`. The automation client imports from `client.*` or the package root `client`.
+Backend code imports from `backend.*`. The supported entrypoints are the CLI under `backend/cli/` and the portable launcher in `launch/`.

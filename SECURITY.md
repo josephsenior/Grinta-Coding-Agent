@@ -9,7 +9,7 @@ If you discover a security vulnerability in Grinta, please report it responsibly
 ### How to Report
 
 1. Email: [security@app.ai](mailto:security@app.ai)
-2. Open a private GitHub Security Advisory: [Create advisory](https://github.com/josephsenior/Grinta-Agent/security/advisories/new)
+2. Open a private GitHub Security Advisory: [Create advisory](https://github.com/josephsenior/Grinta-Coding-Agent/security/advisories/new)
 3. Include:
    - Description of the vulnerability
    - Steps to reproduce

@@ -18,6 +18,7 @@ from backend.ledger.action import (
     FileEditAction,
     FileWriteAction,
 )
+from backend.security.command_analyzer import CommandAnalyzer, RiskCategory
 
 if TYPE_CHECKING:
     from backend.core.config.agent_config import AgentConfig
@@ -83,42 +84,35 @@ class AutonomyController:
     def _is_high_risk_action(self, action: Action) -> bool:
         """Determine if an action is high-risk.
 
-        High-risk actions include:
-        - Commands that modify system state destructively (rm -rf, dd, etc.)
-        - File operations that could lose data
-        - Network operations to external services
+        Delegates command classification to
+        :class:`backend.security.command_analyzer.CommandAnalyzer` so that
+        autonomy decisions stay aligned with the security pipeline (which
+        already handles PowerShell, fork bombs, base64 obfuscation,
+        ``$(printf %s rm)`` style substitution, etc.). File-write/edit
+        actions are still treated as not-high-risk here — the safety
+        validator and tool-level checks gate sensitive paths.
 
         Args:
             action: The action to evaluate
 
         Returns:
             True if the action is high-risk
-
         """
-        # Check for destructive command patterns
         if isinstance(action, CmdRunAction):
-            command = action.command.lower()
-
-            # Destructive commands
-            destructive_patterns = [
-                'rm -rf',
-                'dd if=',
-                'mkfs',
-                'fdisk',
-                ':(){:|:&};:',  # Fork bomb
-                '> /dev/',
-                'chmod -r 777',
-                'chown -r',
-            ]
-
-            if any(pattern in command for pattern in destructive_patterns):
-                logger.warning('High-risk command detected: %s', command)
-                return True
-
-            # System modification commands
-            system_commands = ['reboot', 'shutdown', 'init', 'systemctl']
-            if any(cmd in command for cmd in system_commands):
-                logger.warning('System modification command detected: %s', command)
+            analyzer = getattr(self, '_command_analyzer', None)
+            if analyzer is None:
+                analyzer = CommandAnalyzer({})
+                self._command_analyzer = analyzer
+            assessment = analyzer.analyze_command(action.command)
+            if assessment.risk_category in (
+                RiskCategory.HIGH,
+                RiskCategory.CRITICAL,
+            ):
+                logger.warning(
+                    'High-risk command detected (%s): %s',
+                    assessment.risk_category.value,
+                    action.command,
+                )
                 return True
 
         # File operations are generally safe in isolated environments

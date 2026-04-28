@@ -19,7 +19,6 @@ from backend.core.errors import (
     SessionError,
     SessionInvariantError,
     SessionStartupError,
-    SocketConnectionError,
     ToolExecutionError,
     UserActionRequiredError,
     classify_error,
@@ -339,19 +338,6 @@ class TestReplayError:
         assert 'replay' in str(error)
 
 
-class TestSocketConnectionError:
-    """Tests for SocketConnectionError."""
-
-    def test_inherits_from_app_error(self):
-        """Test SocketConnectionError inherits from AppError."""
-        assert issubclass(SocketConnectionError, AppError)
-
-    def test_create_socket_connection_error(self):
-        """Test creating SocketConnectionError."""
-        error = SocketConnectionError('Connection failed')
-        assert 'Connection' in str(error)
-
-
 class TestEventStreamError:
     """Tests for EventStreamError."""
 
@@ -404,7 +390,6 @@ class TestErrorHierarchy:
             InvariantBrokenError,
             AgentRuntimeError,
             SessionError,
-            SocketConnectionError,
             EventStreamError,
         ]
         for error_cls in errors:

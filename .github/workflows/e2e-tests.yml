@@ -46,7 +46,15 @@ jobs:
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
 
-      - name: Run CLI regression slice
+      - name: Run CLI startup integration smoke
+        run: >
+          uv run pytest
+          -m integration
+          backend/tests/integration/test_cli_entry_integration.py
+          backend/tests/integration/test_cli_task_e2e.py
+          -q --tb=short
+
+      - name: Run CLI unit regression slice
         run: >
           uv run pytest
           backend/tests/unit/cli/test_cli_frontend.py

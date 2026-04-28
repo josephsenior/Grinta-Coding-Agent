@@ -11,15 +11,15 @@ The key classes in Grinta are:
 - LLM: brokers all interactions with large language models. Works with any underlying completion model using direct SDK clients.
 - Agent: responsible for looking at the current State and producing an Action that moves one step closer toward the end-goal.
 - SessionOrchestrator: initializes the Agent, manages State, and drives the main loop that pushes the Agent forward, step by step.
+- Repl: terminal frontend that accepts prompts, slash commands, and queued stdin, then renders streamed updates back to the user.
 - State: represents the current state of the Agent's task. Includes things like the current step, a history of recent events, the Agent's long-term plan, etc.
 - EventStream: a central hub for events, where any component can publish events or listen for events published by other components.
   - Action: represents a request to e.g. edit a file, run a command, or send a message
   - Observation: represents information collected from the environment, e.g. file contents or command output
 - Runtime: responsible for performing Actions and sending back Observations
   - Runtime Environment: the part of the runtime responsible for running commands in a local workspace with optional policy hardening
-- Server: brokers Grinta runs over HTTP/WebSocket (web UI and API clients)
-  - Session: holds a single EventStream, a single SessionOrchestrator, and a single Runtime.
-  - ConversationManager: keeps a list of active sessions and ensures requests are routed to the correct Session
+
+Grinta now ships as a CLI-first coding agent. The repository still carries optional raw HTTP tooling for API/OpenAPI workflows, but the supported interactive product surface is the terminal CLI rather than a web UI.
 
 ## Control Flow
 
@@ -39,13 +39,14 @@ The `EventStream` serves as the backbone for all communication in Grinta.
 
 ```mermaid
 flowchart LR
+  User--Prompts-->Repl
+  Repl--Tasks-->SessionOrchestrator
   Agent--Actions-->SessionOrchestrator
   SessionOrchestrator--State-->Agent
   SessionOrchestrator--Actions-->EventStream
   EventStream--Observations-->SessionOrchestrator
   Runtime--Observations-->EventStream
   EventStream--Actions-->Runtime
-  Clients--Actions-->EventStream
 ```
 
 ## Runtime

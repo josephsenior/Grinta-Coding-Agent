@@ -304,6 +304,22 @@ class TransportProfile:
     in the OpenAI translation.
     """
 
+    flatten_tool_history: bool = False
+    """True when tool-call history must be flattened to plain text.
+
+    Distinct from ``supports_tool_replay``: a provider may accept tool
+    messages in the wire format but still need history flattened for
+    correctness on a foreign-protocol proxy.
+    """
+
+    requires_thought_signature: bool = False
+    """True when the backend requires a ``thought_signature`` field.
+
+    Currently Google-native only.  When this profile is used via an
+    OpenAI-compatible proxy the signature is lost and responses will
+    degrade silently — callers should warn.
+    """
+
 
 def _resolve_transport_profile(
     model_family: str | None,
@@ -345,6 +361,8 @@ def _resolve_transport_profile(
     return TransportProfile(
         supports_request_metadata=is_native_openai,
         supports_tool_replay=caps.supports_tool_replay,
+        flatten_tool_history=caps.flatten_tool_history,
+        requires_thought_signature=caps.requires_thought_signature,
     )
 
 
@@ -608,7 +626,7 @@ class OpenAIClient(DirectLLMClient):
             if isinstance(msg, dict) and 'tool_ok' in msg:
                 msg = {k: v for k, v in msg.items() if k != 'tool_ok'}
             cleaned.append(msg)
-        if not self._profile.supports_tool_replay:
+        if not self._profile.supports_tool_replay or self._profile.flatten_tool_history:
             return _normalize_cross_family_tool_messages(cleaned)
         return cleaned
 

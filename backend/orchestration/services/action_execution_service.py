@@ -7,6 +7,13 @@ from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import Mock
 
+from backend.core.constants import (
+    DEFAULT_AGENT_APPLY_PATCH_MAX_RETRIES,
+    DEFAULT_AGENT_MAX_CONSECUTIVE_NULL_ACTIONS,
+    DEFAULT_AGENT_MAX_IDENTICAL_RETRIES,
+    DEFAULT_AGENT_MAX_NULL_RECOVERY_ROUNDS,
+    DEFAULT_AGENT_MAX_REPAIR_ATTEMPTS,
+)
 from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
@@ -172,11 +179,12 @@ def _resolve_llm_step_timeout_seconds(agent: object) -> float | None:
 class ActionExecutionService:
     """Encapsulates action acquisition, planning, and execution orchestration."""
 
-    _MAX_CONSECUTIVE_NULL_ACTIONS = 5
-    # How many full rounds of null-action recovery to attempt before pausing.
-    # Round 1: inject a directive and keep going.
-    # Round 2+: pause for user input (model is truly stuck).
-    _MAX_NULL_RECOVERY_ROUNDS = 2
+    # Centralized in backend.core.constants — see DEFAULT_AGENT_* knobs.
+    _MAX_CONSECUTIVE_NULL_ACTIONS = DEFAULT_AGENT_MAX_CONSECUTIVE_NULL_ACTIONS
+    _MAX_NULL_RECOVERY_ROUNDS = DEFAULT_AGENT_MAX_NULL_RECOVERY_ROUNDS
+    _MAX_REPAIR_ATTEMPTS = DEFAULT_AGENT_MAX_REPAIR_ATTEMPTS
+    _MAX_IDENTICAL_RETRIES = DEFAULT_AGENT_MAX_IDENTICAL_RETRIES
+    _APPLY_PATCH_MAX_RETRIES = DEFAULT_AGENT_APPLY_PATCH_MAX_RETRIES
 
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
@@ -195,8 +203,8 @@ class ActionExecutionService:
 
     async def get_next_action(self) -> Action | None:
         """Get the next action from the agent, with automatic repair for validation errors."""
-        max_repair_attempts = 3
-        max_identical_retries = 2
+        max_repair_attempts = self._MAX_REPAIR_ATTEMPTS
+        max_identical_retries = self._MAX_IDENTICAL_RETRIES
 
         error_logged = False
         last_error_signature = ''
@@ -377,7 +385,7 @@ class ActionExecutionService:
                     '[APPLY_PATCH_CLASS:malformed_patch]' in error_signature
                     or '[APPLY_PATCH_CLASS:context_mismatch]' in error_signature
                 ):
-                    effective_max_retries = 1
+                    effective_max_retries = self._APPLY_PATCH_MAX_RETRIES
 
                 if identical_error_count > effective_max_retries:
                     logger.error(

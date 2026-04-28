@@ -21,6 +21,19 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+# Per-model capability classification (capability adaptation, not provider tuning).
+# Model-class fingerprints live in ``backend.inference.provider_capabilities``;
+# adding a new model is a one-line entry there — no edits needed in this file.
+from backend.inference.provider_capabilities import (
+    model_has_inherent_reasoning as _model_has_inherent_reasoning,
+)
+from backend.inference.provider_capabilities import (
+    model_is_small as _model_is_small,
+)
+from backend.inference.provider_capabilities import (
+    model_token_correction as _model_token_correction,
+)
+
 if TYPE_CHECKING:
     from backend.utils.prompt import (
         ConversationInstructions,
@@ -81,41 +94,9 @@ def _render_partial(partial_name: str, **kwargs: Any) -> str:
 # Per-model capability classification (capability adaptation, not provider tuning)
 # ---------------------------------------------------------------------------
 
-# Models with strong inherent reasoning — they don't need a `think` scaffold and
-# the XML thinking sections waste tokens / occasionally suppress their own CoT.
-_INHERENT_REASONING_PATTERNS = (
-    'o1', 'o3', 'o4',
-    'deepseek-reasoner', 'deepseek-r1',
-    'gemini-2.0-flash-thinking', 'gemini-2.5-pro',
-    'grok-4',
-)
-
-# Small / weak models where the full prompt + 45 tools overwhelms behaviour.
-# They get the "short mode" rendering (no examples partial, terse rules).
-_SMALL_MODEL_PATTERNS = (
-    'llama3.2', 'llama-3.2', 'llama3-8b', 'llama-3-8b',
-    'mistral-7b', 'qwen2.5-7b', 'qwen-7b', 'phi-3', 'phi3',
-    'gemma-7b', 'gemma2-9b', 'codellama-7b',
-    'gpt-4o-mini', 'gemini-2.5-flash-lite', 'haiku',
-)
-
-
-def _model_has_inherent_reasoning(model_id: str) -> bool:
-    mid = (model_id or '').strip().lower()
-    if not mid:
-        return False
-    # Strip provider prefix for matching (e.g. "openai/o1" → "o1").
-    bare = mid.split('/')[-1]
-    return any(bare.startswith(p) or p in bare for p in _INHERENT_REASONING_PATTERNS)
-
-
-def _model_is_small(model_id: str) -> bool:
-    mid = (model_id or '').strip().lower()
-    if not mid:
-        return False
-    bare = mid.split('/')[-1]
-    return any(p in bare for p in _SMALL_MODEL_PATTERNS)
-
+# Helpers ``_model_has_inherent_reasoning``, ``_model_is_small``, and
+# ``_model_token_correction`` are imported from
+# ``backend.inference.provider_capabilities`` at the top of this module.
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -125,12 +106,10 @@ def _model_is_small(model_id: str) -> bool:
 def _count_section_tokens(text: str, model_id: str) -> tuple[int, str]:
     """Best-effort token count for budgeting. Returns (tokens, encoding_label).
 
-    Model-family awareness:
-    - Known tiktoken models: resolved directly via ``encoding_for_model``.
-    - Claude (claude-*): uses o200k_base + 1.05x correction factor (Claude's
-      tokenizer encodes ~5% more tokens than GPT-4o on typical code/text).
-    - Gemini (gemini-*): uses o200k_base (similar vocabulary to GPT-4o).
-    - All others: falls back to o200k_base (safer than cl100k_base for modern models).
+    Model-family awareness is delegated to
+    :func:`backend.inference.provider_capabilities.model_token_correction`,
+    so adding a new tokenizer-correction factor is a one-line entry in the
+    provider registry.
     """
     try:
         import tiktoken  # type: ignore
@@ -146,16 +125,12 @@ def _count_section_tokens(text: str, model_id: str) -> tuple[int, str]:
             except Exception:
                 pass
 
-        # Model-family fallback
+        # Provider-family fallback via registry.
         enc = tiktoken.get_encoding('o200k_base')
         tokens = len(enc.encode(text))
-
-        if mid.startswith('claude-'):
-            # Claude tokenizer produces ~5% more tokens on average
-            tokens = int(tokens * 1.05)
-            return tokens, 'o200k_base+claude_correction'
-
-        label = 'o200k_base' if mid else 'o200k_base_default'
+        factor, label = _model_token_correction(model_id)
+        if factor != 1.0:
+            tokens = int(tokens * factor)
         return tokens, label
     except Exception:
         est = max(0, len(text) // 4)

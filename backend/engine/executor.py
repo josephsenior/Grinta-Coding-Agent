@@ -323,7 +323,7 @@ class OrchestratorExecutor:
                         )
                         ev.source = EventSource.AGENT
                         event_stream.add_event(ev, EventSource.AGENT)
-                        # Yield so Socket.IO / asyncio can flush between chunks.
+                        # Yield so interactive transports and asyncio can flush between chunks.
                         await asyncio.sleep(0)
 
                 async def _emit_thinking_piece(text_piece: str) -> None:

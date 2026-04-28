@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from backend.core.constants import DEFAULT_AGENT_PARALLEL_BATCH_SIZE
+
 DEFAULT_PARALLEL_SAFE_ACTION_PREFIXES: tuple[str, ...] = (
     'read',
     'think',
@@ -16,7 +18,7 @@ DEFAULT_PARALLEL_SAFE_ACTION_PREFIXES: tuple[str, ...] = (
     'explore_tree',
     'get_entity',
 )
-DEFAULT_MAX_PARALLEL_BATCH_SIZE = 10
+DEFAULT_MAX_PARALLEL_BATCH_SIZE = DEFAULT_AGENT_PARALLEL_BATCH_SIZE
 
 
 @dataclass(frozen=True, slots=True)

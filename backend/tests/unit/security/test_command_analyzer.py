@@ -274,3 +274,65 @@ class TestReflectionPrecheck:
     def test_empty_command(self) -> None:
         assert reflection_precheck_should_block('') == (False, '')
         assert reflection_precheck_should_block('   ') == (False, '')
+
+
+# ---------------------------------------------------------------------------
+# Obfuscation normalization
+# ---------------------------------------------------------------------------
+
+
+class TestObfuscationNormalization:
+    """Behavioural tests for the _normalize_command de-obfuscation pre-pass.
+
+    Trivial ``$(echo X)`` / ``$(printf %s X)`` / backtick substitutions that
+    hide a dangerous command from naive regex must still be classified at the
+    correct risk level.
+    """
+
+    @pytest.mark.parametrize(
+        'cmd',
+        [
+            # Command-substitution wrappers hiding "rm -rf /"
+            '$(printf %s rm) -rf /',
+            '$(echo rm) -rf /',
+            '`echo rm` -rf /',
+            # Multi-word obfuscation
+            "$(printf '%s' 'rm') -rf /",
+            # "-n" echo flag strip
+            '$(echo -n rm) -rf /',
+            # Nested trivial substitution
+            '$(echo $(echo rm)) -rf /tmp',
+        ],
+    )
+    def test_obfuscated_rm_rf_is_critical(self, analyzer: CommandAnalyzer, cmd: str):
+        result = analyzer.analyze_command(cmd)
+        assert result.risk_category == RiskCategory.CRITICAL, (
+            f'{cmd!r} should be CRITICAL after de-obfuscation, '
+            f'got {result.risk_category} ({result.reason})'
+        )
+
+    def test_reason_mentions_deobfuscation(self, analyzer: CommandAnalyzer):
+        """Reason string should mention that de-obfuscation occurred."""
+        result = analyzer.analyze_command('$(echo rm) -rf /')
+        # The reason should either mention 'de-obfuscat' or the normalized form.
+        lowered = result.reason.lower()
+        assert 'de-obfuscat' in lowered or 'after' in lowered or 'substitution' in lowered
+
+    def test_safe_echo_unaffected(self, analyzer: CommandAnalyzer):
+        """A trivial ``echo hello`` must not be escalated."""
+        result = analyzer.analyze_command('$(echo hello) world')
+        # echoing 'hello world' is low risk — should not trip CRITICAL.
+        assert result.risk_category not in (RiskCategory.CRITICAL, RiskCategory.HIGH), (
+            f'$(echo hello) world escalated unexpectedly to {result.risk_category}'
+        )
+
+    def test_non_trivial_substitution_left_intact(self, analyzer: CommandAnalyzer):
+        """Complex substitutions (pipes inside $(...)) are left un-reduced."""
+        # The original command contains a pipe inside the substitution, so we
+        # can't safely reduce it — it must still be classified.
+        cmd = '$(cat /etc/passwd | head -1) --flag'
+        result = analyzer.analyze_command(cmd)
+        # We can't assert the exact risk level since cat /etc/passwd is HIGH,
+        # but the key property is: it didn't raise an exception and returned a
+        # valid risk category.
+        assert result.risk_category in RiskCategory
