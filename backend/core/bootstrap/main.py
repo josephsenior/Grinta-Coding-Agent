@@ -669,7 +669,8 @@ if __name__ == '__main__':
     args = parse_arguments()
     config_main: AppConfig = setup_config_from_args(args)
     task_str = read_task(args, config_main.cli_multiline_input)
-    initial_action_main: Action = NullAction()
+    from backend.ledger.action.empty import NullActionReason
+    initial_action_main: Action = NullAction(reason=NullActionReason.SENTINEL)
     if config_main.replay_trajectory_path:
         if task_str:
             error_msg = (

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from backend.core.errors import LLMNoActionError
 from backend.engine.orchestrator import Orchestrator
 from backend.ledger.action import MessageAction
 from backend.ledger.action.empty import NullAction
@@ -69,15 +70,24 @@ def _make_orchestrator(tmp_path) -> Orchestrator:
 class TestBuildFallbackAction:
     """Integration-level tests for _build_fallback_action."""
 
-    def test_empty_content_returns_null_action(self, tmp_path) -> None:
+    def test_empty_content_raises_llm_no_action_error(self, tmp_path) -> None:
+        """Empty LLM response must raise LLMNoActionError, not silently produce NullAction."""
         orch = _make_orchestrator(tmp_path)
-        obs = orch._build_fallback_action(_make_result(''))
-        assert isinstance(obs, NullAction)
+        with pytest.raises(LLMNoActionError):
+            orch._build_fallback_action(_make_result(''))
 
-    def test_whitespace_only_returns_null_action(self, tmp_path) -> None:
+    def test_whitespace_only_raises_llm_no_action_error(self, tmp_path) -> None:
+        """Whitespace-only LLM response must raise LLMNoActionError."""
         orch = _make_orchestrator(tmp_path)
-        obs = orch._build_fallback_action(_make_result('   \n  '))
-        assert isinstance(obs, NullAction)
+        with pytest.raises(LLMNoActionError):
+            orch._build_fallback_action(_make_result('   \n  '))
+
+    def test_no_response_raises_llm_no_action_error(self, tmp_path) -> None:
+        """No response object at all must raise LLMNoActionError."""
+        orch = _make_orchestrator(tmp_path)
+        result = SimpleNamespace(actions=[], response=None, execution_time=0.0)
+        with pytest.raises(LLMNoActionError):
+            orch._build_fallback_action(result)
 
     @pytest.mark.parametrize(
         'text',
@@ -101,9 +111,4 @@ class TestBuildFallbackAction:
             'use communicate_with_user to pause for real user input'
         )
 
-    def test_no_choices_returns_null_action(self, tmp_path) -> None:
-        orch = _make_orchestrator(tmp_path)
-        result = SimpleNamespace(actions=[], response=None, execution_time=0.0)
-        obs = orch._build_fallback_action(result)
-        assert isinstance(obs, NullAction)
 

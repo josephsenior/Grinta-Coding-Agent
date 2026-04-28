@@ -539,6 +539,102 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(BadRequestError):
             await self.service._handle_context_window_error(exc)  # type: ignore[reportPrivateUsage]
 
+    # ------------------------------------------------------------------ #
+    # NullActionReason / sentinel bypass tests
+    # ------------------------------------------------------------------ #
+
+    async def test_null_action_reason_field_defaults_to_empty(self):
+        """NullAction() must have reason='' by default (backward-compatible)."""
+        action = NullAction()
+        self.assertEqual(action.reason, '')
+
+    async def test_null_action_reason_field_stores_value(self):
+        """NullAction(reason=...) stores the provided reason."""
+        from backend.ledger.action.empty import NullActionReason
+
+        action = NullAction(reason=NullActionReason.SENTINEL)
+        self.assertEqual(action.reason, NullActionReason.SENTINEL)
+
+    async def test_sentinel_null_action_bypasses_consecutive_counter(self):
+        """SENTINEL NullActions must never increment the consecutive-null counter.
+
+        20 consecutive SENTINEL NullActions must pass through without triggering
+        the NULL_ACTION_LOOP_RECOVERY circuit breaker.
+        """
+        from backend.ledger.action.empty import NullActionReason
+
+        sentinel = NullAction(reason=NullActionReason.SENTINEL)
+        self.mock_context.agent.astep = AsyncMock(return_value=sentinel)
+
+        for _ in range(20):
+            result = await self.service.get_next_action()
+            self.assertIsNotNone(result)
+
+        # No error observations should have been emitted
+        self.mock_context.event_stream.add_event.assert_not_called()
+
+    async def test_sentinel_null_action_counter_stays_zero(self):
+        """The _consecutive_null_actions counter stays at 0 for SENTINEL actions."""
+        from backend.ledger.action.empty import NullActionReason
+
+        sentinel = NullAction(reason=NullActionReason.SENTINEL)
+        self.mock_context.agent.astep = AsyncMock(return_value=sentinel)
+
+        for _ in range(10):
+            await self.service.get_next_action()
+
+        self.assertEqual(self.service._consecutive_null_actions, 0)
+
+    async def test_untagged_null_action_still_counts_toward_breaker(self):
+        """NullAction with no reason tag behaves as before: triggers recovery at count 5."""
+        from backend.core.schemas import AgentState
+
+        mock_controller = MagicMock()
+        mock_controller.get_agent_state.return_value = AgentState.RUNNING
+        mock_controller.set_agent_state_to = AsyncMock()
+        self.mock_context.get_controller.return_value = mock_controller
+
+        self.mock_context.agent.astep = AsyncMock(
+            side_effect=[NullAction() for _ in range(5)]
+        )
+
+        for _ in range(5):
+            await self.service.get_next_action()
+
+        # Exactly one recovery observation after 5 untagged NullActions
+        self.assertEqual(self.mock_context.event_stream.add_event.call_count, 1)
+        obs = self.mock_context.event_stream.add_event.call_args[0][0]
+        self.assertEqual(obs.error_id, 'NULL_ACTION_LOOP_RECOVERY')
+
+    async def test_mixed_sentinel_and_real_null_actions(self):
+        """SENTINEL NullActions interleaved with untagged ones must not dilute the counter.
+
+        5 untagged NullActions should trigger recovery regardless of how many
+        SENTINEL NullActions appear between them.
+        """
+        from backend.core.schemas import AgentState
+        from backend.ledger.action.empty import NullActionReason
+
+        mock_controller = MagicMock()
+        mock_controller.get_agent_state.return_value = AgentState.RUNNING
+        mock_controller.set_agent_state_to = AsyncMock()
+        self.mock_context.get_controller.return_value = mock_controller
+
+        sentinel = NullAction(reason=NullActionReason.SENTINEL)
+        untagged = NullAction()
+        # 5 untagged with SENTINEL noise between them
+        actions = [untagged, sentinel, untagged, sentinel, untagged, sentinel, untagged, untagged]
+        self.mock_context.agent.astep = AsyncMock(side_effect=actions)
+
+        results = []
+        for _ in range(len(actions)):
+            results.append(await self.service.get_next_action())
+
+        # Recovery fires after the 5th untagged NullAction
+        self.assertEqual(self.mock_context.event_stream.add_event.call_count, 1)
+        obs = self.mock_context.event_stream.add_event.call_args[0][0]
+        self.assertEqual(obs.error_id, 'NULL_ACTION_LOOP_RECOVERY')
+
 
 if __name__ == '__main__':
     unittest.main()

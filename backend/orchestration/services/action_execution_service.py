@@ -41,6 +41,7 @@ from backend.ledger.action import (
     TerminalReadAction,
     TerminalRunAction,
 )
+from backend.ledger.action.empty import NullActionReason
 from backend.ledger.action.agent import CondensationRequestAction
 from backend.ledger.observation import ErrorObservation
 from backend.orchestration.agent_circuit_breaker import (
@@ -366,6 +367,11 @@ class ActionExecutionService:
         return None
 
     async def _handle_consecutive_null_action(self, action: Action) -> Action | None:
+        # Sentinel NullActions (bootstrap init, orphaned-observation pairing) are
+        # legitimate no-ops and must never contribute to the consecutive-null counter.
+        if getattr(action, 'reason', '') == NullActionReason.SENTINEL:
+            return action
+
         self._consecutive_null_actions += 1
         logger.warning(
             'ActionExecutionService.get_next_action: consecutive NullAction %d/%d '

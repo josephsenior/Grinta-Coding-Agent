@@ -27,6 +27,7 @@ from backend.core.errors import (
     FunctionCallNotExistsError,
     FunctionCallValidationError,
     LLMMalformedActionError,
+    LLMNoActionError,
     ModelProviderError,
     ToolExecutionError,
 )
@@ -330,7 +331,7 @@ class Orchestrator(Agent):
                 )
             )
 
-        except (ModelProviderError, LLMError):
+        except (ModelProviderError, LLMError, LLMNoActionError):
             self._consecutive_context_errors = 0
             raise
 
@@ -533,10 +534,10 @@ class Orchestrator(Agent):
         If the model genuinely wants to pause for user input it must call an
         explicit tool (``communicate_with_user``) — not rely on this path.
 
-        Empty text → ``NullAction`` (no CLI noise, no hard-fail).
+        Empty text → raises :class:`LLMNoActionError` so the recovery machinery
+        in :class:`ActionExecutionService` can issue corrective feedback and retry.
+        Text-only → wraps in :class:`MessageAction` (loop continues).
         """
-        from backend.ledger.action import NullAction
-
         message_text = ''
         if result.response and getattr(result.response, 'choices', None):
             first_choice = result.response.choices[0]
@@ -546,9 +547,10 @@ class Orchestrator(Agent):
                 message_text = raw if isinstance(raw, str) else str(raw)
 
         if not message_text.strip():
-            silent = NullAction()
-            silent.source = EventSource.AGENT
-            return silent
+            raise LLMNoActionError(
+                'LLM returned no tool calls and no content. '
+                'The model must emit at least one tool call per step.'
+            )
 
         logger.warning(
             'LLM returned text-only response with no tool calls — continuing loop. '

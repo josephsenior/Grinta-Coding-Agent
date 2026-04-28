@@ -59,7 +59,8 @@ def _add_orphaned_observations(
                 continue
             if not isinstance(observation, CmdOutputObservation):
                 logger.debug('Observation %s has no cause', observation)
-            tuples.append((NullAction(), observation))
+            from backend.ledger.action.empty import NullActionReason
+            tuples.append((NullAction(reason=NullActionReason.SENTINEL), observation))
 
 
 def get_pairs_from_events(events: list[Event]) -> list[tuple[Action, Observation]]:
