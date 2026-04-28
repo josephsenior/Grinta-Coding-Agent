@@ -12,7 +12,6 @@ from .explore_code import (
     create_read_symbol_definition_tool,
 )
 from .finish import create_finish_tool
-from .llm_based_edit import create_llm_based_edit_tool
 from .lsp_query import create_lsp_query_tool
 from .memory_manager import create_memory_manager_tool
 from .meta_cognition import (
@@ -32,7 +31,6 @@ __all__ = [
     'create_explore_tree_structure_tool',
     'create_read_symbol_definition_tool',
     'create_finish_tool',
-    'create_llm_based_edit_tool',
     'create_lsp_query_tool',
     'create_memory_manager_tool',
     'create_debugger_tool',

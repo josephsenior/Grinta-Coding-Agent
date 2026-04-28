@@ -2,10 +2,32 @@
 
 from __future__ import annotations
 
+import builtins
+import os
+import sys
 import unittest
+from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 import backend.core.tracing as tracing_mod
+
+
+def _package(name: str) -> ModuleType:
+    module = ModuleType(name)
+    module.__path__ = []
+    return module
+
+
+def _import_with_missing(*names: str):
+    original_import = builtins.__import__
+    missing = set(names)
+
+    def _fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name in missing:
+            raise ImportError(f'missing {name}')
+        return original_import(name, globals, locals, fromlist, level)
+
+    return _fake_import
 
 
 class _TracingTestBase(unittest.TestCase):
@@ -159,6 +181,208 @@ class TestConfigureExporter(_TracingTestBase):
         self.assertEqual(etype, 'console')
 
 
+class TestExporterHelpers(_TracingTestBase):
+    @patch('backend.core.tracing.logger')
+    def test_try_jaeger_otlp_returns_none_on_import_error(self, mock_logger):
+        with patch('builtins.__import__', side_effect=_import_with_missing(
+            'opentelemetry.exporter.otlp.proto.http.trace_exporter'
+        )):
+            self.assertIsNone(tracing_mod._try_jaeger_otlp(None))
+
+        mock_logger.warning.assert_called_once()
+
+    @patch.dict(os.environ, {}, clear=False)
+    def test_try_jaeger_otlp_normalizes_endpoint_suffix(self):
+        exporter_module = ModuleType(
+            'opentelemetry.exporter.otlp.proto.http.trace_exporter'
+        )
+        exporter_ctor = MagicMock(return_value='otlp_exporter')
+        exporter_module.OTLPSpanExporter = exporter_ctor
+
+        with patch.dict(
+            sys.modules,
+            {
+                'opentelemetry': _package('opentelemetry'),
+                'opentelemetry.exporter': _package('opentelemetry.exporter'),
+                'opentelemetry.exporter.otlp': _package(
+                    'opentelemetry.exporter.otlp'
+                ),
+                'opentelemetry.exporter.otlp.proto': _package(
+                    'opentelemetry.exporter.otlp.proto'
+                ),
+                'opentelemetry.exporter.otlp.proto.http': _package(
+                    'opentelemetry.exporter.otlp.proto.http'
+                ),
+                'opentelemetry.exporter.otlp.proto.http.trace_exporter': (
+                    exporter_module
+                ),
+            },
+            clear=False,
+        ):
+            result = tracing_mod._try_jaeger_otlp('http://collector:4318')
+
+        self.assertEqual(result, 'otlp_exporter')
+        exporter_ctor.assert_called_once_with(
+            endpoint='http://collector:4318/v1/traces'
+        )
+
+    @patch('backend.core.tracing.logger')
+    def test_try_jaeger_thrift_returns_none_on_import_error(self, mock_logger):
+        with patch('builtins.__import__', side_effect=_import_with_missing(
+            'opentelemetry.exporter.jaeger.thrift'
+        )):
+            self.assertIsNone(tracing_mod._try_jaeger_thrift(None))
+
+        mock_logger.warning.assert_called_once()
+
+    @patch.dict(
+        os.environ,
+        {'JAEGER_AGENT_HOST': 'jaeger-host', 'JAEGER_AGENT_PORT': '7000'},
+        clear=False,
+    )
+    def test_try_jaeger_thrift_uses_endpoint_and_agent_settings(self):
+        thrift_module = ModuleType('opentelemetry.exporter.jaeger.thrift')
+        exporter_ctor = MagicMock(return_value='jaeger_exporter')
+        thrift_module.JaegerExporter = exporter_ctor
+
+        with patch.dict(
+            sys.modules,
+            {
+                'opentelemetry': _package('opentelemetry'),
+                'opentelemetry.exporter': _package('opentelemetry.exporter'),
+                'opentelemetry.exporter.jaeger': _package(
+                    'opentelemetry.exporter.jaeger'
+                ),
+                'opentelemetry.exporter.jaeger.thrift': thrift_module,
+            },
+            clear=False,
+        ):
+            result = tracing_mod._try_jaeger_thrift('http://jaeger/api/traces')
+
+        self.assertEqual(result, 'jaeger_exporter')
+        exporter_ctor.assert_called_once_with(
+            agent_host_name='jaeger-host',
+            agent_port=7000,
+            endpoint='http://jaeger/api/traces',
+        )
+
+    @patch('backend.core.tracing._try_jaeger_otlp', return_value='otlp_exporter')
+    @patch('backend.core.tracing._try_jaeger_thrift')
+    def test_configure_jaeger_prefers_otlp_when_endpoint_requests_it(
+        self, mock_thrift, mock_otlp
+    ):
+        result = tracing_mod._configure_jaeger('http://collector:4318')
+
+        self.assertEqual(result, 'otlp_exporter')
+        mock_otlp.assert_called_once_with('http://collector:4318')
+        mock_thrift.assert_not_called()
+
+    @patch('backend.core.tracing._configure_console', return_value='console_exporter')
+    @patch('backend.core.tracing._try_jaeger_thrift', return_value=None)
+    @patch('backend.core.tracing._try_jaeger_otlp', return_value=None)
+    def test_configure_jaeger_falls_back_to_console_when_exporters_missing(
+        self, mock_otlp, mock_thrift, mock_console
+    ):
+        with patch.dict(
+            os.environ,
+            {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://collector:4318'},
+            clear=False,
+        ):
+            result = tracing_mod._configure_jaeger(None)
+
+        self.assertEqual(result, 'console_exporter')
+        mock_otlp.assert_called_once_with('http://collector:4318')
+        mock_thrift.assert_called_once_with(None)
+        mock_console.assert_called_once()
+
+    @patch('backend.core.tracing._configure_console', return_value='console_exporter')
+    @patch('backend.core.tracing._try_jaeger_otlp', side_effect=RuntimeError('boom'))
+    def test_configure_jaeger_handles_unexpected_errors(
+        self, mock_otlp, mock_console
+    ):
+        result = tracing_mod._configure_jaeger('http://collector:4318')
+
+        self.assertEqual(result, 'console_exporter')
+        mock_otlp.assert_called_once_with('http://collector:4318')
+        mock_console.assert_called_once()
+
+    def test_configure_zipkin_uses_endpoint(self):
+        zipkin_module = ModuleType('opentelemetry.exporter.zipkin.json')
+        exporter_ctor = MagicMock(return_value='zipkin_exporter')
+        zipkin_module.ZipkinExporter = exporter_ctor
+
+        with patch.dict(
+            sys.modules,
+            {
+                'opentelemetry': _package('opentelemetry'),
+                'opentelemetry.exporter': _package('opentelemetry.exporter'),
+                'opentelemetry.exporter.zipkin': _package(
+                    'opentelemetry.exporter.zipkin'
+                ),
+                'opentelemetry.exporter.zipkin.json': zipkin_module,
+            },
+            clear=False,
+        ):
+            result = tracing_mod._configure_zipkin('http://zipkin/api/v2/spans')
+
+        self.assertEqual(result, 'zipkin_exporter')
+        exporter_ctor.assert_called_once_with(endpoint='http://zipkin/api/v2/spans')
+
+    @patch('backend.core.tracing._configure_console', return_value='console_exporter')
+    def test_configure_zipkin_falls_back_to_console_on_import_error(
+        self, mock_console
+    ):
+        with patch('builtins.__import__', side_effect=_import_with_missing(
+            'opentelemetry.exporter.zipkin.json'
+        )):
+            result = tracing_mod._configure_zipkin(None)
+
+        self.assertEqual(result, 'console_exporter')
+        mock_console.assert_called_once()
+
+    def test_configure_otlp_uses_endpoint(self):
+        otlp_module = ModuleType('opentelemetry.exporter.otlp.proto.grpc.trace_exporter')
+        exporter_ctor = MagicMock(return_value='grpc_exporter')
+        otlp_module.OTLPSpanExporter = exporter_ctor
+
+        with patch.dict(
+            sys.modules,
+            {
+                'opentelemetry': _package('opentelemetry'),
+                'opentelemetry.exporter': _package('opentelemetry.exporter'),
+                'opentelemetry.exporter.otlp': _package(
+                    'opentelemetry.exporter.otlp'
+                ),
+                'opentelemetry.exporter.otlp.proto': _package(
+                    'opentelemetry.exporter.otlp.proto'
+                ),
+                'opentelemetry.exporter.otlp.proto.grpc': _package(
+                    'opentelemetry.exporter.otlp.proto.grpc'
+                ),
+                'opentelemetry.exporter.otlp.proto.grpc.trace_exporter': (
+                    otlp_module
+                ),
+            },
+            clear=False,
+        ):
+            result = tracing_mod._configure_otlp('http://collector:4317')
+
+        self.assertEqual(result, 'grpc_exporter')
+        exporter_ctor.assert_called_once_with(endpoint='http://collector:4317')
+
+    @patch('backend.core.tracing._configure_console', return_value='console_exporter')
+    def test_configure_otlp_falls_back_to_console_on_import_error(
+        self, mock_console
+    ):
+        with patch('builtins.__import__', side_effect=_import_with_missing(
+            'opentelemetry.exporter.otlp.proto.grpc.trace_exporter'
+        )):
+            result = tracing_mod._configure_otlp(None)
+
+        self.assertEqual(result, 'console_exporter')
+        mock_console.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # get_tracer
 # ---------------------------------------------------------------------------
@@ -175,6 +399,38 @@ class TestGetTracer(_TracingTestBase):
         result = tracing_mod.get_tracer()
         mock_init.assert_called_once()
         self.assertEqual(result, 'auto_tracer')
+
+    def test_get_tracer_imports_trace_module_when_state_is_empty(self):
+        trace_module = ModuleType('opentelemetry.trace')
+        trace_module.get_tracer = MagicMock(return_value='imported_tracer')
+        otel_module = _package('opentelemetry')
+        otel_module.trace = trace_module
+
+        tracing_mod._state.initialized = True
+        tracing_mod._state.tracer = None
+
+        with patch.dict(
+            sys.modules,
+            {
+                'opentelemetry': otel_module,
+                'opentelemetry.trace': trace_module,
+            },
+            clear=False,
+        ):
+            result = tracing_mod.get_tracer('custom-name')
+
+        self.assertEqual(result, 'imported_tracer')
+        trace_module.get_tracer.assert_called_once_with('custom-name')
+
+    @patch('backend.core.tracing.logger')
+    def test_get_tracer_returns_none_on_import_error(self, mock_logger):
+        tracing_mod._state.initialized = True
+        tracing_mod._state.tracer = None
+
+        with patch('builtins.__import__', side_effect=_import_with_missing('opentelemetry')):
+            self.assertIsNone(tracing_mod.get_tracer())
+
+        mock_logger.warning.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

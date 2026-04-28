@@ -7,12 +7,29 @@ coverage.
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from backend.core.content_escape_repair import (
     CONTENT_ARG_NAMES,
+    RepairReport,
+    _ext,
     has_literal_escape_residue,
     repair_arguments_in_place,
     repair_literal_escapes,
 )
+
+
+class TestRepairReport:
+    def test_should_warn_tracks_changed(self) -> None:
+        assert RepairReport('x', True, 1, 'repaired').should_warn is True
+        assert RepairReport('x', False, 0, 'no_residue').should_warn is False
+
+
+class TestExt:
+    def test_handles_empty_and_bad_path(self) -> None:
+        assert _ext(None) == ''
+        assert _ext('') == ''
+        assert _ext(123) == ''  # type: ignore[arg-type]
 
 
 class TestHasLiteralEscapeResidue:
@@ -70,6 +87,14 @@ class TestHasLiteralEscapeResidue:
         content = 'def f():\n    """Use \\n for newlines."""\n    return 1\n'
         assert not has_literal_escape_residue(content, 'f.py')
 
+    def test_ratio_gate_triggers_when_literal_newlines_dominate(self) -> None:
+        content = 'const a = "x\\n";\nconst b = "y\\n";\n'
+        assert has_literal_escape_residue(content, 'demo.ts')
+
+    def test_fallback_gate_triggers_on_many_escaped_quotes(self) -> None:
+        content = 'const view = \\"a\\" + \\"b\\";\n'
+        assert has_literal_escape_residue(content, 'demo.tsx')
+
     def test_empty_and_non_string(self) -> None:
         assert not has_literal_escape_residue('', 'x.html')
         assert not has_literal_escape_residue(None, 'x.html')  # type: ignore[arg-type]
@@ -122,8 +147,25 @@ class TestRepairLiteralEscapes:
         assert report.changed
         assert report.content == 'x\ty\rz\na'
 
+    def test_noop_when_substitution_does_not_change_content(self) -> None:
+        class _RegexNoOp:
+            def sub(self, repl, content: str) -> str:
+                return content
+
+        with patch(
+            'backend.core.content_escape_repair.has_literal_escape_residue',
+            return_value=True,
+        ), patch('backend.core.content_escape_repair._LITERAL_ESCAPE_RE', _RegexNoOp()):
+            report = repair_literal_escapes('keep me', 'demo.py')
+
+        assert not report.changed
+        assert report.reason == 'no_residue'
+
 
 class TestRepairArgumentsInPlace:
+    def test_non_dict_arguments_return_empty_changes(self) -> None:
+        assert repair_arguments_in_place('not-a-dict', 'index.html') == []
+
     def test_repairs_new_str_and_file_text(self) -> None:
         args = {
             'command': 'create_file',
@@ -157,3 +199,22 @@ class TestRepairArgumentsInPlace:
         # file-editor tool schema.
         for expected in ('file_text', 'new_str', 'section_content', 'patch_text'):
             assert expected in CONTENT_ARG_NAMES
+
+    def test_repairs_batch_edit_bodies(self) -> None:
+        args = {
+            'edits': [
+                {'new_body': '<div class=\\"foo\\">\\n  hi\\n</div>'},
+                'skip-me',
+            ],
+            'symbol_edits': [
+                {'new_body': '<span>\\n  hi\\n</span>'},
+                {'new_body': ''},
+            ],
+        }
+
+        changes = repair_arguments_in_place(args, 'index.html')
+
+        assert ('edits[0].new_body', 4) in changes
+        assert ('symbol_edits[0].new_body', 2) in changes
+        assert args['edits'][0]['new_body'] == '<div class="foo">\n  hi\n</div>'
+        assert args['symbol_edits'][0]['new_body'] == '<span>\n  hi\n</span>'

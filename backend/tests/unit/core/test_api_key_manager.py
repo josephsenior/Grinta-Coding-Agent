@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import builtins
+import importlib
 import os
 from unittest.mock import MagicMock, patch
 
+import pytest
 from pydantic import SecretStr
 
+from backend.core.config import api_key_manager as api_key_manager_module
 from backend.core.config.api_key_manager import APIKeyManager
 
 # ===================================================================
@@ -143,6 +147,10 @@ class TestCheckKeywordMatch:
 
 
 class TestGetApiKeyForModel:
+    def test_blank_model_returns_none(self):
+        mgr = APIKeyManager()
+        assert mgr.get_api_key_for_model('   ') is None
+
     def test_returns_correct_provided_key(self):
         mgr = APIKeyManager()
         key = SecretStr('sk-correct123456789')
@@ -173,6 +181,16 @@ class TestGetApiKeyForModel:
             result = mgr.get_api_key_for_model('openai/gpt-4')
             assert result is not None
             assert result.get_secret_value() == 'stored-key'
+
+    def test_generic_llm_api_key_fallback(self):
+        mgr = APIKeyManager()
+        mgr.provider_api_keys.clear()
+        with patch.object(mgr, '_get_provider_key_from_env', return_value=None), patch.dict(
+            os.environ, {'LLM_API_KEY': 'generic-fallback-key'}, clear=True
+        ):
+            result = mgr.get_api_key_for_model('openai/gpt-4')
+            assert result is not None
+            assert result.get_secret_value() == 'generic-fallback-key'
 
     def test_no_key_found(self):
         mgr = APIKeyManager()
@@ -213,6 +231,16 @@ class TestSetApiKey:
         mgr.set_api_key('openai/gpt-4', key)
         assert 'openai' in mgr.provider_api_keys
         assert mgr.provider_api_keys['openai'].get_secret_value() == 'sk-test'
+
+    def test_set_api_key_ignores_blank_model(self):
+        mgr = APIKeyManager()
+        mgr.set_api_key('   ', SecretStr('sk-test'))
+        assert mgr.provider_api_keys == {}
+
+    def test_set_api_key_ignores_ambiguous_model(self):
+        mgr = APIKeyManager()
+        mgr.set_api_key('ambiguous-model', SecretStr('sk-test'))
+        assert mgr.provider_api_keys == {}
 
 
 # ===================================================================
@@ -289,6 +317,24 @@ class TestSetEnvironmentVariables:
                 assert os.environ.get('OPENAI_API_KEY') == 'env-fallback-key'
                 assert os.environ.get('LLM_API_KEY') == 'env-fallback-key'
 
+    def test_missing_api_key_uses_last_resort_provider_env_lookup(self):
+        mgr = APIKeyManager()
+        with patch(
+            'backend.core.config.api_key_manager.provider_config_manager'
+        ) as pcm:
+            pcm.get_provider_config.return_value = MagicMock(
+                required_params=['api_key'],
+                env_var='OPENAI_API_KEY',
+            )
+            pcm.get_environment_variable.return_value = 'OPENAI_API_KEY'
+            pcm.validate_api_key_format.return_value = None
+            with patch.object(APIKeyManager, 'get_api_key_for_model', return_value=None), patch.object(
+                APIKeyManager, '_get_provider_key_from_env', return_value='late-env-key'
+            ), patch.dict(os.environ, {}, clear=True):
+                mgr.set_environment_variables('openai/gpt-4', None)
+                assert os.environ.get('OPENAI_API_KEY') == 'late-env-key'
+                assert os.environ.get('LLM_API_KEY') == 'late-env-key'
+
     def test_missing_api_key_no_fallback(self):
         """Test behavior when no API key found anywhere (returns early)."""
         APIKeyManager()
@@ -354,6 +400,50 @@ class TestSetEnvironmentVariables:
                 # Verify no env vars were set
                 assert not os.environ
 
+    def test_blank_model_skips_environment_export(self):
+        mgr = APIKeyManager()
+        with patch.dict(os.environ, {}, clear=True):
+            mgr.set_environment_variables('   ', SecretStr('sk-test'))
+            assert not os.environ
+
+    def test_ambiguous_model_skips_environment_export(self):
+        mgr = APIKeyManager()
+        with patch.dict(os.environ, {}, clear=True):
+            mgr.set_environment_variables('ambiguous-model', SecretStr('sk-test'))
+            assert not os.environ
+
+    def test_missing_provider_env_mapping_sets_only_llm_fallback(self):
+        mgr = APIKeyManager()
+        with patch(
+            'backend.core.config.api_key_manager.provider_config_manager'
+        ) as pcm:
+            pcm.get_provider_config.return_value = MagicMock(
+                required_params=['api_key'],
+                env_var='OPENAI_API_KEY',
+            )
+            pcm.get_environment_variable.return_value = None
+            pcm.validate_api_key_format.return_value = None
+            with patch.dict(os.environ, {}, clear=True):
+                mgr.set_environment_variables('openai/gpt-4', SecretStr('sk-test-env-var'))
+                assert 'OPENAI_API_KEY' not in os.environ
+                assert os.environ.get('LLM_API_KEY') == 'sk-test-env-var'
+
+    def test_existing_llm_api_key_is_not_overwritten(self):
+        mgr = APIKeyManager()
+        with patch(
+            'backend.core.config.api_key_manager.provider_config_manager'
+        ) as pcm:
+            pcm.get_provider_config.return_value = MagicMock(
+                required_params=['api_key'],
+                env_var='OPENAI_API_KEY',
+            )
+            pcm.get_environment_variable.return_value = 'OPENAI_API_KEY'
+            pcm.validate_api_key_format.return_value = None
+            with patch.dict(os.environ, {'LLM_API_KEY': 'existing'}, clear=True):
+                mgr.set_environment_variables('openai/gpt-4', SecretStr('sk-test-env-var'))
+                assert os.environ.get('OPENAI_API_KEY') == 'sk-test-env-var'
+                assert os.environ.get('LLM_API_KEY') == 'existing'
+
 
 # ===================================================================
 # validate_and_clean_completion_params
@@ -379,6 +469,10 @@ class TestValidateAndClean:
 
 
 class TestGetProviderKeyFromEnv:
+    def test_unknown_provider_returns_none(self):
+        mgr = APIKeyManager()
+        assert mgr._get_provider_key_from_env('unknown') is None
+
     def test_get_key_from_provider_env_var(self):
         """Test getting API key from provider-specific environment variable."""
         mgr = APIKeyManager()
@@ -402,3 +496,64 @@ class TestGetProviderKeyFromEnv:
             with patch.dict(os.environ, {'LLM_API_KEY': 'fallback-key'}, clear=False):
                 result = mgr._get_provider_key_from_env('unknown_provider')
                 assert result == 'fallback-key'
+
+    def test_get_provider_key_from_env_wrapper(self):
+        mgr = APIKeyManager()
+        with patch.object(mgr, '_get_provider_key_from_env', return_value='wrapped-key') as mock_get:
+            assert mgr.get_provider_key_from_env('openai') == 'wrapped-key'
+        mock_get.assert_called_once_with('openai')
+
+
+class TestApiKeyManagerInternals:
+    def test_model_post_init_restores_missing_suppress_flag(self):
+        mgr = APIKeyManager()
+        delattr(mgr, 'suppress_env_export')
+
+        mgr.model_post_init(None)
+
+        assert mgr.suppress_env_export is False
+
+    def test_suppress_env_export_context_restores_previous_value(self):
+        mgr = APIKeyManager(suppress_env_export=False)
+
+        with pytest.raises(RuntimeError):
+            with mgr.suppress_env_export_context():
+                assert mgr.suppress_env_export is True
+                raise RuntimeError('boom')
+
+        assert mgr.suppress_env_export is False
+
+    def test_check_fallback_patterns_returns_unknown(self):
+        mgr = APIKeyManager()
+        assert mgr._check_fallback_patterns('anything') == 'unknown'
+
+    def test_extract_provider_delegates_to_private_helper(self):
+        mgr = APIKeyManager()
+        with patch.object(mgr, '_extract_provider', return_value='openai') as mock_extract:
+            assert mgr.extract_provider('openai/gpt-4') == 'openai'
+        mock_extract.assert_called_once_with('openai/gpt-4')
+
+    def test_is_correct_provider_key_handles_get_secret_value_failure(self):
+        mgr = APIKeyManager()
+
+        class _BrokenSecret:
+            def get_secret_value(self):
+                raise RuntimeError('cannot read')
+
+        assert mgr._is_correct_provider_key(_BrokenSecret(), 'openai') is False
+
+    def test_module_creates_global_instance_when_missing(self):
+        existing = getattr(builtins, 'app_api_key_manager_instance', None)
+        if hasattr(builtins, 'app_api_key_manager_instance'):
+            delattr(builtins, 'app_api_key_manager_instance')
+
+        try:
+            reloaded = importlib.reload(api_key_manager_module)
+            assert isinstance(reloaded.api_key_manager, APIKeyManager)
+            assert hasattr(builtins, 'app_api_key_manager_instance')
+        finally:
+            if existing is not None:
+                setattr(builtins, 'app_api_key_manager_instance', existing)
+            elif hasattr(builtins, 'app_api_key_manager_instance'):
+                delattr(builtins, 'app_api_key_manager_instance')
+            importlib.reload(api_key_manager_module)

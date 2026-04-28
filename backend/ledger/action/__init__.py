@@ -37,7 +37,6 @@ from backend.ledger.action.message import (
     StreamingChunkAction,
     SystemMessageAction,
 )
-from backend.ledger.action.signal import SignalProgressAction
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
@@ -71,7 +70,6 @@ __all__ = [
     'NullAction',
     'ProposalAction',
     'RecallAction',
-    'SignalProgressAction',
     'StreamingChunkAction',
     'SystemMessageAction',
     'TaskTrackingAction',

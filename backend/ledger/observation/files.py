@@ -54,16 +54,15 @@ class FileEditObservation(Observation):
     generate a diff visualization showing the changes. The diff is computed lazily
     and cached to improve performance.
 
-    The .content property can either be:
-      - Git diff in LLM-based editing mode
-      - the rendered message sent to the LLM in FILE_EDITOR mode (e.g., "The file /path/to/file.txt is created with the provided content.")
+        The .content property contains the rendered file-editor result and may include
+        an appended diff when the runtime can compute one.
     """
 
     path: str = ''
     prev_exist: bool = False
     old_content: str | None = None
     new_content: str | None = None
-    impl_source: FileEditSource = FileEditSource.LLM_BASED_EDIT
+    impl_source: FileEditSource = FileEditSource.FILE_EDITOR
     diff: str | None = None
     preview: bool = False
     _diff_cache: str | None = None

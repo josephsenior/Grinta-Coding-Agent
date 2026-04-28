@@ -95,7 +95,6 @@ class ActionType(str, Enum):
     DELEGATE_TASK = 'delegate_task'
     BLACKBOARD = 'blackboard'
     LSP_QUERY = 'lsp_query'
-    SIGNAL_PROGRESS = 'signal_progress'
 
 
 class LifecyclePhase(str, Enum):
@@ -161,7 +160,6 @@ class ObservationType(str, Enum):
     DEBUGGER = 'debugger'
     DELEGATE_TASK_RESULT = 'delegate_task_result'
     LSP_QUERY_RESULT = 'lsp_query_result'
-    SIGNAL_PROGRESS = 'signal_progress'
 
 
 class ExitReason(str, Enum):
@@ -217,7 +215,6 @@ class EventSource(str, Enum):
 class FileEditSource(str, Enum):
     """Enumerates subsystems that can perform file edit operations."""
 
-    LLM_BASED_EDIT = 'llm_based_edit'
     FILE_EDITOR = 'file_editor'
 
 

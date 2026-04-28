@@ -203,7 +203,7 @@ class TestConvertToolCallsProc:
         call.model_dump.return_value = {
             'id': 'call_2',
             'type': 'function',
-            'function': {'name': 'edit_file', 'arguments': '{}'},
+            'function': {'name': 'text_editor', 'arguments': '{}'},
         }
         result = _convert_tool_calls([call])
         assert result is not None

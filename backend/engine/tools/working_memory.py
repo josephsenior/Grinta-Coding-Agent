@@ -20,11 +20,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from backend.engine.contracts import ChatCompletionToolParam
-from backend.engine.tools.common import create_tool_definition
 from backend.ledger.action.agent import AgentThinkAction
-
-WORKING_MEMORY_TOOL_NAME = 'working_memory'
 
 _VALID_SECTIONS = (
     'hypothesis',
@@ -34,42 +30,6 @@ _VALID_SECTIONS = (
     'decisions',
     'plan',
 )
-
-_DESCRIPTION = (
-    'Structured cognitive workspace that survives context condensation. '
-    'Sections: hypothesis, findings, blockers, file_context, decisions, plan. '
-    "Commands: update (append/replace section content), get (retrieve section or 'all'), "
-    'clear_section (reset a section). Auto-restored after condensation.'
-)
-
-
-def create_working_memory_tool() -> ChatCompletionToolParam:
-    """Create the working memory tool definition."""
-    return create_tool_definition(
-        name=WORKING_MEMORY_TOOL_NAME,
-        description=_DESCRIPTION,
-        properties={
-            'command': {
-                'type': 'string',
-                'enum': ['update', 'get', 'clear_section'],
-                'description': (
-                    'update: set/append content to a section. '
-                    "get: retrieve a section (or 'all'). "
-                    'clear_section: reset a section.'
-                ),
-            },
-            'section': {
-                'type': 'string',
-                'enum': [*list(_VALID_SECTIONS), 'all'],
-                'description': "The working memory section to operate on (or 'all').",
-            },
-            'content': {
-                'type': 'string',
-                'description': "For 'update': the content to store. Replaces existing content in the section.",
-            },
-        },
-        required=['command', 'section'],
-    )
 
 
 # --- Persistence ---

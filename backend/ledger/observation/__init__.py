@@ -27,7 +27,6 @@ from backend.ledger.observation.mcp import MCPObservation
 from backend.ledger.observation.observation import Observation
 from backend.ledger.observation.reject import UserRejectObservation
 from backend.ledger.observation.server import ServerReadyObservation
-from backend.ledger.observation.signal import SignalProgressObservation
 from backend.ledger.observation.status import StatusObservation
 from backend.ledger.observation.success import SuccessObservation
 from backend.ledger.observation.task_tracking import TaskTrackingObservation
@@ -54,7 +53,6 @@ __all__ = [
     'RecallObservation',
     'RecallType',
     'ServerReadyObservation',
-    'SignalProgressObservation',
     'StatusObservation',
     'SuccessObservation',
     'TaskTrackingObservation',

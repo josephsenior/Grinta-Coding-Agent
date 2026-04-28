@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
+from backend.core.constants import DEFAULT_STUCK_COOLDOWN_TURNS
 from backend.ledger import EventSource
 from backend.ledger.action import (
     CmdRunAction,
@@ -59,6 +60,7 @@ class StepGuardService:
     _WARNING_TRIP_COUNTS_KEY = '__step_guard_warning_trip_counts'
     _REPLAN_REQUIRED_KEY = '__step_guard_replan_required'
     _VERIFICATION_REQUIRED_KEY = '__step_guard_verification_required'
+    _STUCK_COOLDOWN_KEY = '__step_guard_stuck_cooldown'
 
     def __init__(self, context: OrchestrationContext) -> None:
         self._context = context
@@ -255,9 +257,23 @@ class StepGuardService:
             self._set_replan_flag(controller, False)
             return True
 
+        # Cooldown: after a stuck detection the model needs N uninterrupted turns
+        # to act on the recovery directive.  Do not re-evaluate is_stuck() until
+        # the cooldown has elapsed.  This prevents the detector from firing on
+        # every turn while the model is already in the process of recovering.
+        state = getattr(controller, 'state', None)
+        if state is not None:
+            cooldown = int((getattr(state, 'extra_data', {}) or {}).get(self._STUCK_COOLDOWN_KEY, 0))
+            if cooldown > 0:
+                new_cooldown = cooldown - 1
+                state.extra_data[self._STUCK_COOLDOWN_KEY] = new_cooldown
+                if hasattr(state, 'set_extra'):
+                    state.set_extra(self._STUCK_COOLDOWN_KEY, new_cooldown, source='StepGuardService')
+                logger.debug('Stuck cooldown active: %d turns remaining', new_cooldown)
+                return True
+
         # Always compute and expose the repetition score for proactive self-correction
         rep_score = stuck_service.compute_repetition_score()
-        state = getattr(controller, 'state', None)
         if state and hasattr(state, 'turn_signals'):
             state.turn_signals.repetition_score = rep_score
 
@@ -269,6 +285,13 @@ class StepGuardService:
             # Record each stuck turn so the circuit breaker can escalate and
             # stop persistent loops instead of warning indefinitely.
             cb_service.record_stuck_detection()
+
+        # Arm the cooldown so the model gets DEFAULT_STUCK_COOLDOWN_TURNS uninterrupted
+        # turns to act on the recovery directive before being evaluated again.
+        if state is not None:
+            state.extra_data[self._STUCK_COOLDOWN_KEY] = DEFAULT_STUCK_COOLDOWN_TURNS
+            if hasattr(state, 'set_extra'):
+                state.set_extra(self._STUCK_COOLDOWN_KEY, DEFAULT_STUCK_COOLDOWN_TURNS, source='StepGuardService')
 
         # Inject a replan directive; let the circuit breaker handle
         # escalation and eventual stopping.

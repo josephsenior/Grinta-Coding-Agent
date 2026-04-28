@@ -52,7 +52,6 @@ from backend.core.errors import (
 from backend.core.tool_arguments_json import parse_tool_arguments_object
 from backend.inference.tool_names import (
     FINISH_TOOL_NAME,
-    LLM_BASED_EDIT_TOOL_NAME,
     TEXT_EDITOR_TOOL_NAME,
 )
 from backend.inference.tool_result_format import (
@@ -116,10 +115,6 @@ TOOL_EXAMPLES = {
     },
     'browser': {
         'view_page': "\nASSISTANT:\nLet me check how the page looks in the browser:\n<function=browser>\n<parameter=code>\ngoto('http://127.0.0.1:5000')\nnoop(1000)  # Wait for page to load\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [browser]:\n[Browser shows the numbers in a table format]\n",
-    },
-    'edit_file': {
-        'create_file': "\nASSISTANT: There is no `app.py` file in the current directory. Let me create a Python file `app.py`:\n<function=edit_file>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=start>1</parameter>\n<parameter=end>-1</parameter>\n<parameter=content>\nfrom flask import Flask\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    numbers = list(range(1, 11))\n    return str(numbers)\n\nif __name__ == '__main__':\n    app.run(port=5000)\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [edit_file]:\nFile created successfully at: /workspace/app.py\n",
-        'edit_file': "\nASSISTANT:\nNow let me display the numbers in a table format:\n<function=edit_file>\n<parameter=path>/workspace/app.py</parameter>\n<parameter=start>6</parameter>\n<parameter=end>9</parameter>\n<parameter=content>\n    numbers = list(range(1, 11))\n    return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'\n    # ... existing code ...\nif __name__ == '__main__':\n</parameter>\n</function>\n\nUSER: EXECUTION RESULT of [edit_file]:\nThe file /workspace/app.py has been edited. Here's the result of running `cat -n` on a snippet of /workspace/app.py:\n     3\n     4  @app.route('/')\n     5  def index():\n     6      numbers = list(range(1, 11))\n     7      return '<table>' + ''.join([f'<tr><td>{i}</td></tr>' for i in numbers]) + '</table>'\n     8\n     9  if __name__ == '__main__':\n    10      app.run(port=5000)\n",
     },
     'finish': {
         'example': '\nASSISTANT:\nThe server is running on port 5000 with PID 126. You can access the list of numbers in a table format by visiting http://127.0.0.1:5000. Let me know if you have any further requests!\n<function=finish>\n<parameter=message>The task has been completed. The web server is running and displaying numbers 1-10 in a table format at http://127.0.0.1:5000.</parameter>\n</function>\n',
@@ -199,7 +194,6 @@ def _get_tool_name_mapping() -> dict[str, str]:
         'execute_powershell': TERMINAL_EXAMPLE_KEY,
         TEXT_EDITOR_TOOL_NAME: 'text_editor',
         FINISH_TOOL_NAME: 'finish',
-        LLM_BASED_EDIT_TOOL_NAME: 'edit_file',
     }
 
 
@@ -272,8 +266,6 @@ class ExampleStepBuilder:
         """Add file creation step based on available editors."""
         if 'text_editor' in self.available_tools:
             self.example += TOOL_EXAMPLES['text_editor']['create_file']
-        elif 'edit_file' in self.available_tools:
-            self.example += TOOL_EXAMPLES['edit_file']['create_file']
 
     def _add_server_run_step(self) -> None:
         """Add server run step if terminal command tool is available."""
@@ -294,8 +286,6 @@ class ExampleStepBuilder:
         """Add file edit step based on available editors."""
         if 'text_editor' in self.available_tools:
             self.example += TOOL_EXAMPLES['text_editor']['edit_file']
-        elif 'edit_file' in self.available_tools:
-            self.example += TOOL_EXAMPLES['edit_file']['edit_file']
 
     def _add_server_rerun_step(self) -> None:
         """Add server rerun step if terminal command tool is available."""

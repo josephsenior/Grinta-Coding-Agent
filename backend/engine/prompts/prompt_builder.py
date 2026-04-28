@@ -409,7 +409,7 @@ def _render_tool_reference(is_windows: bool, config: Any = None) -> str:
     )
     checkpoints = getattr(config, 'enable_checkpoints', False)
     checkpoint_rollback_hint = (
-        '; use **checkpoint** / **revert_to_checkpoint** for coarse rollback'
+        '; use **checkpoint** for coarse rollback'
         if checkpoints
         else ''
     )

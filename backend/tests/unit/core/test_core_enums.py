@@ -160,7 +160,7 @@ class TestObservationType:
         assert ObservationType.MCP.value == 'mcp'
 
     def test_count(self):
-        assert len(ObservationType) == 26
+        assert len(ObservationType) == 25
 
 
 class TestExitReason:
@@ -224,8 +224,8 @@ class TestEventSource:
 
 class TestFileEditSource:
     def test_values(self):
-        assert FileEditSource.LLM_BASED_EDIT.value == 'llm_based_edit'
         assert FileEditSource.FILE_EDITOR.value == 'file_editor'
+        assert len(FileEditSource) == 1
 
 
 class TestFileReadSource:

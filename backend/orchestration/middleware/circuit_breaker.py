@@ -22,9 +22,9 @@ _PROGRESS_OBSERVATION_TYPES: tuple[str, ...] = (
     'FileWriteObservation',
     'AgentDelegateObservation',
     'LspQueryObservation',
-    # Updating the structured task plan counts as real progress; without
-    # this, long multi-step tasks spent in task_tracker(update) would trip
-    # stuck detection and force the model to call signal_progress defensively.
+    # Updating the structured task plan counts as real progress so long
+    # multi-step tasks do not trip stuck detection while they are still
+    # advancing through tracked work.
     'TaskTrackingObservation',
 )
 

@@ -165,7 +165,7 @@ The Orchestrator agent uses a carefully crafted prompt:
 
 ```
 1. Role definition ("You are a senior software engineer...")
-2. Available tools (edit_file, run_bash, browse, etc.)
+2. Available tools (text_editor, terminal tools, browse, etc.)
 3. Output format (ReAct style: Thought → Action → Observation)
 4. Best practices (read before edit, test changes, etc.)
 5. Examples (few-shot learning)

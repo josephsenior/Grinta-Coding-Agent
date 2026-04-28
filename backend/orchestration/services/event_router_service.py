@@ -23,7 +23,6 @@ from backend.ledger.action import (
     MCPAction,
     MessageAction,
     PlaybookFinishAction,
-    SignalProgressAction,
     TaskTrackingAction,
 )
 from backend.ledger.action.agent import (
@@ -51,7 +50,7 @@ if TYPE_CHECKING:
     from backend.orchestration.session_orchestrator import SessionOrchestrator
 
 
-_CHECKPOINT_INTERMEDIATE_TOOLS = frozenset({'checkpoint', 'revert_to_checkpoint'})
+_CHECKPOINT_INTERMEDIATE_TOOLS = frozenset({'checkpoint'})
 _DELEGATE_PROGRESS_STATUS = 'delegate_progress'
 
 
@@ -88,10 +87,6 @@ def _summarize_delegate_worker_event(
     if isinstance(event, MCPAction):
         tool_name = getattr(event, 'name', '') or 'MCP tool'
         return 'running', f'Called {tool_name}'
-
-    if isinstance(event, SignalProgressAction):
-        note = _truncate_delegate_progress(getattr(event, 'progress_note', '') or '')
-        return 'running', note or 'Reported progress'
 
     if isinstance(event, PlaybookFinishAction):
         summary = _truncate_delegate_progress(

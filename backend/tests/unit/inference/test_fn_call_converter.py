@@ -411,11 +411,6 @@ class TestExampleStepBuilder:
         result = builder.build_all_steps()
         assert 'text_editor' in result
 
-    def test_edit_file_fallback(self):
-        builder = ExampleStepBuilder({'edit_file'})
-        result = builder.build_all_steps()
-        assert 'edit_file' in result
-
 
 # ── convert_fncall_messages_to_non_fncall_messages ─────────────────────
 

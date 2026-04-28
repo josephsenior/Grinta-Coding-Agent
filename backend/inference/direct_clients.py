@@ -97,6 +97,7 @@ class LLMResponse:
         response_id: str = '',
         finish_reason: str = 'stop',
         tool_calls: list[dict[str, Any]] | None = None,
+        reasoning_content: str = '',
         **kwargs,
     ):
         self.content = content
@@ -105,6 +106,10 @@ class LLMResponse:
         self.id = kwargs.get('response_id', kwargs.get('id', response_id))
         self.finish_reason = self._normalize_finish_reason(finish_reason)
         self.tool_calls = self._normalize_tool_calls(tool_calls)
+        # Reasoning/thinking text from models that surface it separately
+        # (Gemini 2.5 thinking models, Claude extended thinking, o-series).
+        # Empty string when the model does not produce thinking content.
+        self.reasoning_content = reasoning_content
 
         # Build nested structure for attribute-style access
         class ToolCallFunction:
@@ -1271,6 +1276,7 @@ class GeminiClient(DirectLLMClient):
         from backend.inference.mappers.gemini import (
             ensure_non_empty_content,
             extract_text,
+            extract_thinking,
             extract_tool_calls,
             gemini_usage,
         )
@@ -1325,6 +1331,7 @@ class GeminiClient(DirectLLMClient):
             id='',
             finish_reason='stop',
             tool_calls=tool_calls,
+            reasoning_content=extract_thinking(response),
         )
 
     async def acompletion(
@@ -1334,6 +1341,7 @@ class GeminiClient(DirectLLMClient):
         from backend.inference.mappers.gemini import (
             ensure_non_empty_content,
             extract_text,
+            extract_thinking,
             extract_tool_calls,
             gemini_usage,
         )
@@ -1373,6 +1381,7 @@ class GeminiClient(DirectLLMClient):
             id='',
             finish_reason='stop',
             tool_calls=tool_calls,
+            reasoning_content=extract_thinking(response),
         )
 
     async def astream(

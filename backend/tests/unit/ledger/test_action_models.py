@@ -258,12 +258,11 @@ class TestFileEditAction(unittest.TestCase):
     def test_default_impl_source(self):
         self.assertEqual(FileEditAction().impl_source, FileEditSource.FILE_EDITOR)
 
-    def test_repr_llm_mode(self):
+    def test_repr_content_payload(self):
         f = FileEditAction(
             path='x.py',
             content='new code',
             thought='refactor',
-            impl_source=FileEditSource.LLM_BASED_EDIT,
         )
         r = repr(f)
         self.assertIn('FileEditAction', r)

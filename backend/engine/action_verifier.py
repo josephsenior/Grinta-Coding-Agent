@@ -104,7 +104,7 @@ class ActionVerifier:
                 )
                 return (
                     False,
-                    f'❌ CRITICAL: File {path} was NOT created despite edit_file tool call',
+                    f'❌ CRITICAL: File {path} was NOT created despite the file-edit action',
                     verify_obs,
                 )
 

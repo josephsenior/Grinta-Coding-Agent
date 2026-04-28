@@ -157,16 +157,31 @@ class StuckDetector:
         )
 
     def is_stuck(self, headless_mode: bool = True) -> bool:
-        """Check if the agent is stuck in a loop.
+        """Check if the agent is stuck in a deterministic repeat loop.
+
+        Only the two hard signals are active here:
+
+        1. **Exact action-observation repeat** (same action → same observation
+           ≥ 3 times, or same action → error ≥ 3 times).  These are provably
+           unproductive — there is no new information from retrying.
+        2. **Monologue** — the agent emits the same message text 3+ times with
+           no tool calls between them.
+
+        All soft/heuristic signals (semantic loop, A-B-A-B, intent diversity,
+        token repetition, cost acceleration, think-only, read-only loop) are
+        intentionally excluded.  They have high false-positive rates on normal
+        iterative work (TDD loops, exploration, refactoring sweeps) and their
+        presence causes the stuck counter to accumulate even when the agent is
+        making genuine progress.  Those helpers are still available for the
+        ``compute_repetition_score`` telemetry path which does not affect
+        control flow.
 
         Args:
-            headless_mode: Matches SessionOrchestrator's headless_mode.
-                          If True: Consider all history (automated/testing)
-                          If False: Consider only history after last user message (interactive)
+            headless_mode: If True, consider all history.  If False, consider
+                only history after the last user message (interactive mode).
 
         Returns:
-            bool: True if the agent is stuck in a loop, False otherwise.
-
+            True only when a provably-stuck exact-repeat pattern is detected.
         """
         history_to_check = self._get_history_to_check(headless_mode)
         filtered_history = self._filter_relevant_history(history_to_check)
@@ -175,39 +190,9 @@ class StuckDetector:
             return False
 
         last_actions, last_observations = self._collect_recent_events(filtered_history)
-
-        # Check basic stuck patterns
-        if self._check_basic_stuck_patterns(
+        return self._check_basic_stuck_patterns(
             last_actions, last_observations, filtered_history
-        ):
-            return True
-
-        # Check advanced stuck patterns
-        if self._check_advanced_stuck_patterns(filtered_history):
-            return True
-
-        # NEW: Check semantic stuck patterns (different actions, same no-progress result)
-        if len(filtered_history) >= DEFAULT_STUCK_SEMANTIC_MIN_EVENTS:
-            if self._is_stuck_semantic_loop(filtered_history):
-                return True
-
-        # NEW: Check for token-level repetition
-        if self._is_stuck_token_repetition(filtered_history):
-            return True
-
-        # NEW: Check for cost acceleration
-        if self._is_stuck_cost_acceleration(filtered_history):
-            return True
-
-        # Check for think-only loops (model calls think repeatedly, no real actions)
-        if self._is_stuck_think_only_loop(filtered_history):
-            return True
-
-        # Check for read-only verification loops (ls, cat, Get-Content with no writes)
-        if self._is_stuck_readonly_inspection_loop(filtered_history):
-            return True
-
-        return False
+        )
 
     def _is_stuck_action_observation_pattern(
         self, filtered_history: list[Event]

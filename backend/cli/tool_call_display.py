@@ -14,7 +14,6 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'execute_bash': ('', 'Shell'),
     'execute_powershell': ('', 'Shell'),
     'text_editor': ('', 'Files'),
-    'edit_file': ('', 'Edit file'),
     'symbol_editor': ('', 'Code edit'),
     'agent_think': ('', 'Think'),
     'think': ('', 'Think'),
@@ -80,7 +79,6 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
         if op == 'read':
             return 'Read'
     mapping = {
-        'edit_file': 'Edited',
         'symbol_editor': 'Refactored',
         'agent_think': 'Thinking',
         'think': 'Thinking',
@@ -99,7 +97,6 @@ def friendly_verb_for_tool(tool_name: str, args: dict[str, Any] | None = None) -
         'communicate_with_user': 'Messaged',
         'call_mcp_tool': 'Invoked',
         'checkpoint': 'Saved',
-        'session_diff': 'Compared',
     }
     if tn in mapping:
         return mapping[tn]
@@ -447,12 +444,6 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
             return _trunc(d, 120)
         return 'sub-task…'
 
-    if tn == 'signal_progress':
-        prog_text = args.get('progress_note') or args.get('note') or args.get('message')
-        if isinstance(prog_text, str) and prog_text.strip():
-            return _trunc(prog_text, 120)
-        return '…'
-
     if tn == 'communicate_with_user':
         for key in ('message', 'content', 'text'):
             v = args.get(key)
@@ -472,21 +463,8 @@ def summarize_tool_arguments(tool_name: str, args: dict[str, Any]) -> str:
             return _trunc(lbl, 80)
         return 'save state'
 
-    if tn == 'revert_to_checkpoint':
-        cid = args.get('checkpoint_id') or args.get('id')
-        return str(cid) if cid is not None else 'revert…'
-
-    if tn == 'session_diff':
-        return 'changes since checkpoint'
-
     if tn == 'summarize_context':
         return 'compress conversation'
-
-    if tn == 'edit_file':
-        ef_path = args.get('path')
-        if isinstance(ef_path, str) and ef_path.strip():
-            return ef_path
-        return 'edit…'
 
     if tn == 'symbol_editor':
         ast_path = args.get('path')

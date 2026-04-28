@@ -74,7 +74,6 @@ from backend.ledger.action import (
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.mcp import MCPAction
-from backend.ledger.action.signal import SignalProgressAction
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
@@ -89,7 +88,6 @@ from backend.ledger.observation import (
     LspQueryObservation,
     Observation,
 )
-from backend.ledger.observation.signal import SignalProgressObservation
 from backend.ledger.observation.terminal import TerminalObservation
 from backend.persistence.locations import get_workspace_downloads_dir
 from backend.utils.async_utils import call_sync_from_async
@@ -1542,55 +1540,6 @@ class RuntimeExecutor:
             impl_source=FileEditSource.FILE_EDITOR,
         )
 
-    def _edit_via_llm(self, action: FileEditAction) -> Observation:
-        """Execute LLM-based range edit and return observation."""
-        command = action.command or 'edit'
-        enable_lint = self._is_auto_lint_enabled()
-        result_str, (old_content, new_content) = execute_file_editor(
-            self.file_editor,
-            command=command,
-            path=action.path,
-            file_text=action.content,
-            start_line=action.start,
-            end_line=action.end,
-            enable_linting=enable_lint,
-        )
-        if result_str.startswith('ERROR:'):
-            return ErrorObservation(result_str)
-        if old_content and new_content:
-            diff = get_diff(old_content, new_content, action.path)
-
-            diff = self._append_blast_radius_warning(
-                diff,
-                command=command,
-                action_path=action.path,
-                new_content=new_content,
-            )
-
-            return FileEditObservation(
-                content=diff,
-                path=action.path,
-                prev_exist=old_content is not None,
-                old_content=old_content,
-                new_content=new_content,
-                impl_source=FileEditSource.LLM_BASED_EDIT,
-            )
-        result_str = self._append_blast_radius_warning(
-            result_str,
-            command=command,
-            action_path=action.path,
-            new_content=new_content,
-        )
-
-        return FileEditObservation(
-            content=result_str,
-            path=action.path,
-            prev_exist=old_content is not None,
-            old_content=old_content,
-            new_content=new_content,
-            impl_source=FileEditSource.LLM_BASED_EDIT,
-        )
-
     def _append_blast_radius_warning(
         self,
         base_content: str,
@@ -1621,7 +1570,7 @@ class RuntimeExecutor:
         }
 
     async def edit(self, action: FileEditAction) -> Observation:
-        """Edit a file (FILE_EDITOR or LLM-based) and return an observation."""
+        """Edit a file using structured file-editor commands."""
         bash_session = self.session_manager.get_session('default')
         if bash_session is None:
             return ErrorObservation('Default shell session not initialized')
@@ -1637,14 +1586,12 @@ class RuntimeExecutor:
         if dir_view is not None:
             return dir_view
 
-        if action.impl_source == FileEditSource.FILE_EDITOR or action.command:
-            return self._edit_via_file_editor(action)
+        if not action.command:
+            return ErrorObservation(
+                'Legacy edit_file actions are no longer supported. Use text_editor or symbol_editor instead.'
+            )
 
-        try:
-            return self._edit_via_llm(action)
-        except Exception as e:
-            logger.error('Error editing file %s: %s', action.path, e, exc_info=True)
-            return ErrorObservation(f'Failed to edit file {action.path}: {e}')
+        return self._edit_via_file_editor(action)
 
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
         """Execute an MCP tool call using App's MCP client integration."""
@@ -1753,11 +1700,6 @@ class RuntimeExecutor:
                 'has_error': True,
             }
             return err
-
-    async def signal_progress(self, action: SignalProgressAction) -> Observation:
-        """Handle a progress signal from the agent."""
-        # The actual decrementation happens in SessionOrchestrator. We just return ack here.
-        return SignalProgressObservation(acknowledged=True)
 
     async def browser_tool(self, action: BrowserToolAction) -> Observation:
         """Run native browser-use commands (in-process; optional dependency)."""

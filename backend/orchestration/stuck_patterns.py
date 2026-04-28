@@ -7,6 +7,8 @@ and use eq_no_pid for comparison.
 
 from __future__ import annotations
 
+import re
+
 from backend.core.logger import app_logger as logger
 from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.message import MessageAction
@@ -15,15 +17,50 @@ from backend.ledger.observation import CmdOutputObservation
 from backend.ledger.observation.error import ErrorObservation
 from backend.ledger.observation.observation import Observation
 
+# Patterns that represent dynamic/ephemeral values in observation content.
+# Stripping these before comparison lets us detect loops where the model
+# hits the same underlying error but the message varies in line numbers,
+# temp file paths, timestamps, memory addresses, or elapsed time.
+_DYNAMIC_CONTENT_RE = re.compile(
+    r'(?:'
+    r'\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?'  # ISO timestamps
+    r'|(?<!\w)\d{10,}(?!\w)'          # Unix epoch integers (10+ digits)
+    r'|0x[0-9a-fA-F]+'               # hex memory addresses
+    r'|/tmp/[^\s,;"\')]*'            # /tmp/... paths
+    r'|\\[Tt]emp\\[^\s,;"\')]*'      # Windows \Temp\... paths
+    r'|(?:line|col(?:umn)?)\s+\d+'   # "line N" / "column N"
+    r'|:\d+(?::\d+)?(?=\D|$)'        # :42 or :42:8 (file:line:col)
+    r'|in \d+\.\d+s'                 # "in 0.12s" timing
+    r')',
+    re.IGNORECASE,
+)
+
+
+def _normalize_obs_content(content: str) -> str:
+    """Strip dynamic values from observation content for comparison purposes.
+
+    Replaces timestamps, memory addresses, temp paths, line/column numbers,
+    and elapsed-time strings with a fixed placeholder so that two observations
+    that differ only in ephemeral details compare as equal.
+    """
+    return _DYNAMIC_CONTENT_RE.sub('<_>', content).strip()
+
 
 def eq_no_pid(obj1: Event, obj2: Event) -> bool:
-    """Compare two events ignoring process IDs (for loop detection)."""
+    """Compare two events ignoring process IDs and ephemeral dynamic values."""
     if isinstance(obj1, CmdRunAction) and isinstance(obj2, CmdRunAction):
         return obj1.command == obj2.command
     if isinstance(obj1, CmdOutputObservation) and isinstance(
         obj2, CmdOutputObservation
     ):
         return obj1.command == obj2.command and obj1.exit_code == obj2.exit_code
+    # For error observations, normalize dynamic content before comparing so
+    # that the same underlying error surfacing with slightly different line
+    # numbers or temp paths is correctly identified as a repeat.
+    if isinstance(obj1, ErrorObservation) and isinstance(obj2, ErrorObservation):
+        return _normalize_obs_content(
+            getattr(obj1, 'content', '')
+        ) == _normalize_obs_content(getattr(obj2, 'content', ''))
     return obj1 == obj2
 
 

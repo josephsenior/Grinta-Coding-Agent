@@ -88,7 +88,7 @@ class AgentThinkAction(Action):
         suppress_cli (bool): When True, the CLI transcript/reasoning UI skips this
             thought (still recorded for the agent / history).
         source_tool (str): When set, identifies the tool that produced this think action
-            (e.g. 'checkpoint', 'revert_to_checkpoint') so the CLI can render a proper
+            (e.g. 'checkpoint') so the CLI can render a proper
             activity row instead of generic reasoning text.
         action (str): The action type, namely ActionType.THINK.
 

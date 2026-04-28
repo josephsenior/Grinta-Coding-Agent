@@ -33,7 +33,6 @@ from backend.ledger.action import (
     MessageAction,
     SystemMessageAction,
 )
-from backend.ledger.action.signal import SignalProgressAction
 from backend.ledger.observation import (
     AgentStateChangedObservation,
     ErrorObservation,
@@ -784,11 +783,6 @@ class SessionOrchestrator:
                 self.services.retry.retry_count,
             )
             self.services.retry.reset_retry_metrics()
-
-        if isinstance(action, SignalProgressAction) and hasattr(
-            self.services.circuit_breaker, 'record_progress_signal'
-        ):
-            self.services.circuit_breaker.record_progress_signal(action.progress_note)
 
         await self.action_execution.execute_action(action)
         await self._handle_post_execution()

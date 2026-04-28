@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
+from backend.core.config import mcp_config as mcp_config_mod
+from backend.core.config.app_config import AppConfig
 from backend.core.config.mcp_config import (
     NO_BUNDLED_MCP_DEFAULTS_ENV,
+    AppMCPConfig,
     MCPConfig,
     MCPServerConfig,
+    _filter_windows_stdio_servers,
+    _get_local_app_mcp_tool_count,
+    _matches_default_app_mcp_server,
     _validate_mcp_url,
+    dedupe_default_mcp_http_servers,
+    ensure_default_mcp_http_server,
+    load_bundled_mcp_server_configs,
 )
 
 
@@ -202,6 +213,10 @@ class TestMCPServerConfigStdio:
         )
         assert len(cfg2.usage_hint or '') == 800
 
+    def test_strip_usage_hint_none_and_blank(self):
+        assert MCPServerConfig.strip_usage_hint(None) is None
+        assert MCPServerConfig.strip_usage_hint('   ') is None
+
     def test_equality_same(self):
         a = MCPServerConfig(
             name='s', type='stdio', command='npx', args=['a'], env={'K': 'V'}
@@ -360,6 +375,21 @@ class TestMCPConfig:
             with pytest.raises(ValueError, match='Invalid URL'):
                 cfg.validate_servers()
 
+    def test_validate_servers_invalid_url_shape(self):
+        from unittest.mock import patch
+
+        cfg = MCPConfig(
+            servers=[MCPServerConfig(name='t', type='sse', url='http://test.com')]
+        )
+
+        class _Parsed:
+            scheme = 'http'
+            netloc = ''
+
+        with patch('backend.core.config.mcp_config.urlparse', return_value=_Parsed()):
+            with pytest.raises(ValueError, match='Invalid URL http://test.com'):
+                cfg.validate_servers()
+
     def test_merge(self):
         a = MCPConfig(
             servers=[MCPServerConfig(name='a', type='sse', url='http://a.com')]
@@ -416,6 +446,16 @@ class TestMCPConfig:
         with pytest.raises(ValueError, match='Invalid MCP configuration'):
             MCPConfig.from_toml_section({'unknown_field': True})
 
+    def test_from_toml_section_wraps_validation_error(self, monkeypatch):
+        _disable_bundled_mcp_defaults(monkeypatch)
+        with pytest.raises(ValueError, match='Invalid MCP configuration'):
+            MCPConfig.from_toml_section(
+                {
+                    'enabled': True,
+                    'servers': [{'name': 'broken', 'type': 'stdio'}],
+                }
+            )
+
     def test_legacy_server_lists_are_rejected(self):
         with pytest.raises(Exception):
             MCPConfig(  # type: ignore
@@ -445,6 +485,193 @@ class TestMCPConfig:
         mapping = MCPConfig.from_toml_section({'enabled': True, 'servers': []})
         server_names = [s.name for s in mapping['mcp'].servers]
         assert 'json-server' in server_names
+
+
+class TestBundledHelpers:
+    def test_bundled_json_path_uses_cwd_fallback(self, monkeypatch):
+        resolved_path = Path('fallback/config.json').resolve()
+        original_is_file = Path.is_file
+        original_resolve = Path.resolve
+
+        def fake_is_file(self: Path) -> bool:
+            text = str(self).replace('\\', '/')
+            if 'backend/execution/mcp/config.json' in text:
+                return False
+            if text.startswith('backend/runtime/mcp/config.json'):
+                return True
+            return original_is_file(self)
+
+        def fake_resolve(self: Path, strict: bool = False) -> Path:
+            text = str(self).replace('\\', '/')
+            if text.startswith('backend/runtime/mcp/config.json'):
+                return resolved_path
+            return original_resolve(self)
+
+        monkeypatch.setattr(Path, 'is_file', fake_is_file)
+        monkeypatch.setattr(Path, 'resolve', fake_resolve)
+
+        assert mcp_config_mod._bundled_mcp_json_path() == resolved_path
+
+    def test_bundled_json_path_recovers_after_first_try_exception(self, monkeypatch):
+        resolved_path = Path('fallback/config.json').resolve()
+        original_is_file = Path.is_file
+        original_resolve = Path.resolve
+        module_file = str(Path(mcp_config_mod.__file__)).replace('\\', '/')
+
+        def fake_resolve(self: Path, strict: bool = False) -> Path:
+            text = str(self).replace('\\', '/')
+            if text == module_file:
+                raise RuntimeError('boom')
+            if text.startswith('backend/runtime/mcp/config.json'):
+                return resolved_path
+            return original_resolve(self)
+
+        def fake_is_file(self: Path) -> bool:
+            text = str(self).replace('\\', '/')
+            if text.startswith('backend/runtime/mcp/config.json'):
+                return True
+            return original_is_file(self)
+
+        monkeypatch.setattr(Path, 'resolve', fake_resolve)
+        monkeypatch.setattr(Path, 'is_file', fake_is_file)
+
+        assert mcp_config_mod._bundled_mcp_json_path() == resolved_path
+
+    def test_bundled_json_path_returns_none_after_second_try_exception(self, monkeypatch):
+        original_resolve = Path.resolve
+        module_file = str(Path(mcp_config_mod.__file__)).replace('\\', '/')
+
+        def fake_resolve(self: Path, strict: bool = False) -> Path:
+            text = str(self).replace('\\', '/')
+            if text == module_file:
+                raise RuntimeError('boom')
+            return original_resolve(self)
+
+        def fake_is_file(self: Path) -> bool:
+            text = str(self).replace('\\', '/')
+            if text.startswith('backend/'):
+                raise RuntimeError('cwd boom')
+            return False
+
+        monkeypatch.setattr(Path, 'resolve', fake_resolve)
+        monkeypatch.setattr(Path, 'is_file', fake_is_file)
+
+        assert mcp_config_mod._bundled_mcp_json_path() is None
+
+    def test_load_bundled_mcp_server_configs_returns_empty_when_path_missing(
+        self, monkeypatch
+    ):
+        _disable_bundled_mcp_defaults(monkeypatch)
+        monkeypatch.setattr(mcp_config_mod, '_bundled_mcp_defaults_disabled', lambda: False)
+        monkeypatch.setattr(mcp_config_mod, '_bundled_mcp_json_path', lambda: None)
+
+        assert load_bundled_mcp_server_configs() == []
+
+    def test_load_bundled_mcp_server_configs_skips_default_and_non_dict(
+        self, tmp_path, monkeypatch
+    ):
+        config_json = tmp_path / 'config.json'
+        config_json.write_text(
+            '{"mcpServers": {"default": {"command": "npx"}, "skip": "x", "keep": {"command": "npx"}}}',
+            encoding='utf-8',
+        )
+        monkeypatch.setattr(mcp_config_mod, '_bundled_mcp_defaults_disabled', lambda: False)
+        monkeypatch.setattr(mcp_config_mod, '_bundled_mcp_json_path', lambda: config_json)
+
+        servers = load_bundled_mcp_server_configs()
+
+        assert [server.name for server in servers] == ['keep']
+
+
+class TestDefaultServerHelpers:
+    def test_dedupe_default_mcp_http_servers_keeps_first(self):
+        cfg = MCPConfig(
+            servers=[
+                MCPServerConfig(name='app-mcp', type='shttp', url='http://a'),
+                MCPServerConfig(name='app-mcp', type='shttp', url='http://a'),
+                MCPServerConfig(name='other', type='sse', url='http://b'),
+            ]
+        )
+
+        dedupe_default_mcp_http_servers(cfg)
+
+        assert [server.name for server in cfg.servers] == ['app-mcp', 'other']
+
+    def test_get_local_app_mcp_tool_count_defaults_to_zero(self):
+        assert _get_local_app_mcp_tool_count() == 0
+
+    def test_matches_default_app_mcp_server(self):
+        default = MCPServerConfig(name='app-mcp', type='shttp', url='http://host/mcp')
+        same = MCPServerConfig(name='app-mcp', type='shttp', url='http://host/mcp')
+        different = MCPServerConfig(
+            name='app-mcp',
+            type='shttp',
+            url='http://host/mcp',
+            api_key='secret',
+        )
+
+        assert _matches_default_app_mcp_server(same, default) is True
+        assert _matches_default_app_mcp_server(different, default) is False
+
+    def test_filter_windows_stdio_servers_returns_same_list(self):
+        servers = [MCPServerConfig(name='s1', type='stdio', command='npx')]
+        assert _filter_windows_stdio_servers(servers) is servers
+
+    def test_ensure_default_mcp_http_server_returns_when_default_missing(self, monkeypatch):
+        config = AppConfig()
+        monkeypatch.setattr(
+            mcp_config_mod.AppMCPConfigImpl,
+            'create_default_mcp_server_config',
+            lambda *args: (None, []),
+        )
+
+        ensure_default_mcp_http_server(config)
+
+        assert config.mcp.servers == []
+
+    def test_ensure_default_mcp_http_server_returns_when_name_already_present(
+        self, monkeypatch
+    ):
+        config = AppConfig()
+        config.mcp_host = 'localhost:3000'
+        config.mcp.servers.append(
+            MCPServerConfig(name='app-mcp', type='shttp', url='http://existing/mcp')
+        )
+        monkeypatch.setattr(mcp_config_mod, '_get_local_app_mcp_tool_count', lambda: 2)
+
+        ensure_default_mcp_http_server(config)
+
+        assert len(config.mcp.servers) == 1
+        assert config.mcp.servers[0].url == 'http://existing/mcp'
+
+    def test_ensure_default_mcp_http_server_returns_when_url_already_present(
+        self, monkeypatch
+    ):
+        config = AppConfig()
+        config.mcp_host = 'localhost:3000'
+        config.mcp.servers.append(
+            MCPServerConfig(name='other', type='shttp', url='http://localhost:3000/mcp/mcp')
+        )
+        monkeypatch.setattr(mcp_config_mod, '_get_local_app_mcp_tool_count', lambda: 2)
+
+        ensure_default_mcp_http_server(config)
+
+        assert [server.name for server in config.mcp.servers] == ['other']
+
+    def test_ensure_default_mcp_http_server_appends_stdio_extra(self, monkeypatch):
+        config = AppConfig()
+        default = MCPServerConfig(name='app-mcp', type='shttp', url='http://localhost:3000/mcp/mcp')
+        extra = [MCPServerConfig(name='stdio-extra', type='stdio', command='npx')]
+        monkeypatch.setattr(mcp_config_mod, '_get_local_app_mcp_tool_count', lambda: 2)
+        monkeypatch.setattr(
+            mcp_config_mod.AppMCPConfigImpl,
+            'create_default_mcp_server_config',
+            lambda *args: (default, extra),
+        )
+
+        ensure_default_mcp_http_server(config)
+
+        assert [server.name for server in config.mcp.servers] == ['app-mcp', 'stdio-extra']
 
 
 # ── AppMCPConfig ─────────────────────────────────────────────────────

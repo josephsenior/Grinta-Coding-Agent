@@ -123,7 +123,6 @@ from backend.ledger.action import (
     PlaybookFinishAction,
     ProposalAction,
     RecallAction,
-    SignalProgressAction,
     StreamingChunkAction,
     TaskTrackingAction,
     TerminalInputAction,
@@ -149,7 +148,6 @@ from backend.ledger.observation import (
     RecallFailureObservation,
     RecallObservation,
     ServerReadyObservation,
-    SignalProgressObservation,
     StatusObservation,
     SuccessObservation,
     TaskTrackingObservation,
@@ -2255,9 +2253,6 @@ class CLIEventRenderer:
                     verb, title = 'Saved', ACTIVITY_CARD_TITLE_CHECKPOINT
                     # Use the tag's human message or a user-friendly default.
                     detail = human_msg or 'checkpoint'
-                elif source_tool == 'revert_to_checkpoint':
-                    verb, title = 'Reverted', ACTIVITY_CARD_TITLE_CHECKPOINT
-                    detail = human_msg or 'workspace reverted'
                 elif source_tool == 'search_code':
                     verb, title = 'Search Code', ACTIVITY_CARD_TITLE_SEARCH
                     lines = [
@@ -2528,15 +2523,6 @@ class CLIEventRenderer:
         if isinstance(action, CondensationAction):
             self._ensure_reasoning()
             self._reasoning.update_action('Compressing context…')
-            self.refresh()
-            return
-
-        # -- Progress signal --------------------------------------------------
-        if isinstance(action, SignalProgressAction):
-            note = getattr(action, 'progress_note', '')
-            if note:
-                self._ensure_reasoning()
-                self._reasoning.update_action(note)
             self.refresh()
             return
 
@@ -3353,14 +3339,6 @@ class CLIEventRenderer:
 
         # -- Context condensation result --------------------------------------
         if isinstance(obs, AgentCondensationObservation):
-            return
-
-        # -- Progress signal --------------------------------------------------
-        if isinstance(obs, SignalProgressObservation):
-            note = getattr(obs, 'progress_note', '')
-            if note:
-                self._ensure_reasoning()
-                self._reasoning.update_action(note)
             return
 
         self.refresh()

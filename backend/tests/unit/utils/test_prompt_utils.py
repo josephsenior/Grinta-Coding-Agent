@@ -173,7 +173,6 @@ class TestOrchestratorPromptManager:
             enable_checkpoints=False,
             enable_lsp_query=False,
             enable_internal_task_tracker=False,
-            enable_signal_progress=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -198,7 +197,6 @@ class TestOrchestratorPromptManager:
             enable_checkpoints=False,
             enable_lsp_query=False,
             enable_internal_task_tracker=False,
-            enable_signal_progress=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -220,7 +218,6 @@ class TestOrchestratorPromptManager:
             enable_checkpoints=False,
             enable_lsp_query=False,
             enable_internal_task_tracker=False,
-            enable_signal_progress=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -244,7 +241,6 @@ class TestOrchestratorPromptManager:
             enable_checkpoints=False,
             enable_lsp_query=False,
             enable_internal_task_tracker=False,
-            enable_signal_progress=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -272,7 +268,6 @@ class TestOrchestratorPromptManager:
             enable_checkpoints=False,
             enable_lsp_query=True,
             enable_internal_task_tracker=False,
-            enable_signal_progress=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -298,7 +293,6 @@ class TestOrchestratorPromptManager:
             enable_checkpoints=False,
             enable_lsp_query=True,
             enable_internal_task_tracker=False,
-            enable_signal_progress=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -324,7 +318,6 @@ class TestOrchestratorPromptManager:
             enable_checkpoints=False,
             enable_lsp_query=False,
             enable_internal_task_tracker=False,
-            enable_signal_progress=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -542,7 +535,6 @@ class TestPromptBuilderSectionTokens:
         cfg.enable_checkpoints = False
         cfg.enable_lsp_query = False
         cfg.enable_internal_task_tracker = False
-        cfg.enable_signal_progress = False
         cfg.enable_permissions = False
         cfg.enable_meta_cognition = False
 
@@ -572,7 +564,6 @@ def _make_budget_cfg(**overrides: object) -> MagicMock:
     cfg.enable_internal_task_tracker = bool(
         overrides.get('enable_internal_task_tracker', False)
     )
-    cfg.enable_signal_progress = False
     cfg.enable_permissions = False
     cfg.enable_meta_cognition = False
     cfg.enable_think = False
@@ -666,7 +657,6 @@ def _base_config(**overrides: object) -> SimpleNamespace:
         enable_internal_task_tracker=bool(
             overrides.get('enable_internal_task_tracker', False)
         ),
-        enable_signal_progress=False,
         enable_permissions=False,
         enable_meta_cognition=bool(overrides.get('enable_meta_cognition', False)),
         enable_think=bool(overrides.get('enable_think', False)),

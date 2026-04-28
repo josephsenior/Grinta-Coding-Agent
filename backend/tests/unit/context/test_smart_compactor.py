@@ -8,6 +8,8 @@ import pytest
 
 from backend.context.compactor.compactor import Compaction
 from backend.context.compactor.strategies.smart_compactor import SmartCompactor
+from backend.ledger.action.agent import TaskTrackingAction
+from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action import MessageAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import ErrorObservation
@@ -103,6 +105,84 @@ class TestIdentifyEssentialEvents:
         essential = sc._identify_essential_events(events)
         assert 55 not in essential
 
+    def test_keeps_task_tracking_actions(self):
+        sc = SmartCompactor(llm=None, keep_first=0)
+        tracker = TaskTrackingAction(task_list=[{'id': '1', 'status': 'doing'}])
+        tracker.id = 9
+        events = [_event(0), tracker]
+
+        essential = sc._identify_essential_events(events)
+
+        assert 9 in essential
+
+
+class TestPlanAnchors:
+    def test_anchor_active_plan_events_uses_doing_ids(self):
+        sc = SmartCompactor(llm=None)
+        events = [_event(1)]
+        essential: set[int] = set()
+
+        sc._load_doing_task_ids = MagicMock(return_value={'task-1'})  # type: ignore[method-assign]
+        sc._anchor_by_task_ids = MagicMock()  # type: ignore[method-assign]
+        sc._anchor_last_task_tracker = MagicMock()  # type: ignore[method-assign]
+
+        sc._anchor_active_plan_events(events, essential)
+
+        sc._anchor_by_task_ids.assert_called_once_with(events, essential, {'task-1'})
+        sc._anchor_last_task_tracker.assert_not_called()
+
+    def test_parse_tasks_from_plan_handles_missing_invalid_and_non_list(self, tmp_path):
+        sc = SmartCompactor(llm=None)
+        missing = tmp_path / 'missing.json'
+        assert sc._parse_tasks_from_plan(missing) == []
+
+        invalid = tmp_path / 'invalid.json'
+        invalid.write_text('{broken', encoding='utf-8')
+        assert sc._parse_tasks_from_plan(invalid) == []
+
+        non_list = tmp_path / 'object.json'
+        non_list.write_text('{"id": 1}', encoding='utf-8')
+        assert sc._parse_tasks_from_plan(non_list) == []
+
+    def test_extract_doing_ids_uses_id_or_description(self):
+        sc = SmartCompactor(llm=None)
+        tasks = [
+            {'id': 1, 'status': 'doing'},
+            {'description': 'fallback', 'status': 'doing'},
+            {'id': 2, 'status': 'done'},
+            'skip',
+        ]
+
+        assert sc._extract_doing_ids(tasks) == {'1', 'fallback'}
+
+    def test_anchor_last_task_tracker_adds_latest_tracker(self):
+        sc = SmartCompactor(llm=None)
+        tracker = TaskTrackingAction(task_list=[])
+        tracker.id = 12
+        essential: set[int] = set()
+
+        sc._anchor_last_task_tracker([_event(0), tracker], essential)
+
+        assert essential == {12}
+
+    def test_anchor_by_task_ids_matches_content_or_falls_back(self):
+        sc = SmartCompactor(llm=None)
+        older = TaskTrackingAction(task_list=[])
+        older.id = 2
+        older.content = 'task-1 in progress'  # type: ignore[attr-defined]
+        newer = TaskTrackingAction(task_list=[])
+        newer.id = 3
+        newer.content = 'other task'  # type: ignore[attr-defined]
+        essential: set[int] = set()
+
+        sc._anchor_by_task_ids([older, newer], essential, {'task-1'})
+        assert essential == {2}
+
+        fallback_sc = SmartCompactor(llm=None)
+        fallback_sc._anchor_last_task_tracker = MagicMock()  # type: ignore[method-assign]
+        fallback_sc._anchor_by_task_ids([older, newer], set(), {'absent'})
+        fallback_sc._anchor_last_task_tracker.assert_called_once()
+
 
 # ── _heuristic_scoring ───────────────────────────────────────────────
 
@@ -136,6 +216,16 @@ class TestHeuristicScoring:
         scores = sc._heuristic_scoring([obs])
         assert scores[3] == 0.6
 
+    def test_task_tracking_and_runnable_action_scores(self):
+        sc = SmartCompactor(llm=None)
+        tracker = TaskTrackingAction(task_list=[])
+        tracker.id = 4
+        cmd = CmdRunAction(command='pytest')
+        cmd.id = 5
+
+        assert sc._heuristic_score_single(tracker) == 1.0
+        assert sc._heuristic_score_single(cmd) == 0.7
+
 
 # ── _score_event_importance ──────────────────────────────────────────
 
@@ -158,6 +248,20 @@ class TestScoreEventImportance:
         essential: set[int] = {0}
         scores = sc._score_event_importance(events, essential)
         assert scores == {}
+
+    def test_batches_llm_scoring_for_non_essential_events(self):
+        sc = SmartCompactor(llm=MagicMock())
+        events = [_event(i) for i in range(25)]
+        sc._score_event_batch_with_llm = MagicMock(  # type: ignore[method-assign]
+            side_effect=lambda batch: {event.id: 0.9 for event in batch}
+        )
+
+        scores = sc._score_event_importance(events, {0})
+
+        assert 0 not in scores
+        assert scores[1] == 0.9
+        assert scores[24] == 0.9
+        assert sc._score_event_batch_with_llm.call_count == 2
 
 
 # ── _select_events_to_keep ───────────────────────────────────────────
@@ -191,6 +295,13 @@ class TestSelectEventsToKeep:
         scores[5] = 0.9  # This one is high importance
         keep = sc._select_events_to_keep(events, essential, scores)
         assert 5 in keep
+
+    def test_non_recent_events_use_base_score_without_bonus(self):
+        sc = SmartCompactor(llm=None, recency_bonus_window=2, importance_threshold=0.7)
+        events = [_event(i, content=f'event-{i}') for i in range(6)]
+        keep = sc._select_events_to_keep(events, set(), {1: 0.8, 4: 0.2, 5: 0.2})
+
+        assert 1 in keep
 
 
 # ── get_compaction ─────────────────────────────────────────────────
@@ -263,6 +374,27 @@ class TestCreateScoringPrompt:
         assert '1.' in prompt
         assert '2.' in prompt
 
+    def test_get_event_summary_prefers_command_then_code(self):
+        sc = SmartCompactor(llm=None)
+
+        class _CommandOnly:
+            command = 'pytest -q'
+
+        class _CodeOnly:
+            code = 'print("hello")'
+
+        assert sc._get_event_summary(_CommandOnly()) == 'Command: pytest -q'
+        assert sc._get_event_summary(_CodeOnly()) == 'Code: print("hello")'
+
+    def test_get_event_summary_falls_back_to_string(self):
+        sc = SmartCompactor(llm=None)
+
+        class _Other:
+            def __str__(self) -> str:
+                return 'fallback summary'
+
+        assert sc._get_event_summary(_Other()) == 'fallback summary'
+
 
 # ── _parse_llm_scores ────────────────────────────────────────────────
 
@@ -307,6 +439,39 @@ class TestParseLlmScores:
         scores = sc._parse_llm_scores(response, events)
         # Should fall back to heuristic scoring
         assert 0 in scores
+
+    def test_no_choices_falls_back(self):
+        sc = SmartCompactor(llm=None)
+        scores = sc._parse_llm_scores(MagicMock(choices=[]), [_event(0)])
+        assert 0 in scores
+
+
+class TestScoreEventBatchWithLlm:
+    def test_returns_empty_without_llm(self):
+        sc = SmartCompactor(llm=None)
+        assert sc._score_event_batch_with_llm([_event(1)]) == {}
+
+    def test_returns_parsed_scores_on_success(self):
+        llm = MagicMock()
+        response = MagicMock()
+        response.choices = [MagicMock()]
+        response.choices[0].message.content = '[0.4]'
+        llm.completion.return_value = response
+        sc = SmartCompactor(llm=llm)
+
+        scores = sc._score_event_batch_with_llm([_event(1)])
+
+        assert scores[1] == pytest.approx(0.4)
+
+    def test_falls_back_to_heuristics_on_completion_error(self):
+        llm = MagicMock()
+        llm.completion.side_effect = RuntimeError('boom')
+        sc = SmartCompactor(llm=llm)
+        events = [_event(1)]
+
+        scores = sc._score_event_batch_with_llm(events)
+
+        assert scores[1] == 0.5
 
 
 # ── _preserve_action_observation_pairs ───────────────────────────────

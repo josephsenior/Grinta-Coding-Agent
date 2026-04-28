@@ -56,7 +56,6 @@ from backend.core.constants import (
     DEFAULT_AGENT_REFLECTION_ENABLED,
     DEFAULT_AGENT_REFLECTION_MAX_ATTEMPTS,
     DEFAULT_AGENT_REFLECTION_MIDDLEWARE_ENABLED,
-    DEFAULT_AGENT_SIGNAL_PROGRESS_ENABLED,
     DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED,
     DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
     DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
@@ -176,7 +175,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_editor: bool = Field(default=True)
     enable_working_memory: bool = Field(default=True)
     enable_lsp_query: bool = Field(default=False)
-    enable_signal_progress: bool = Field(default=DEFAULT_AGENT_SIGNAL_PROGRESS_ENABLED)
     enable_swarming: bool = Field(default=False)
     enable_blackboard: bool = Field(default=False)
     enable_verify_file_lines: bool = Field(default=True)

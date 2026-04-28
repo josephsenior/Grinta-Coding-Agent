@@ -10,7 +10,6 @@ from backend.core.errors import FunctionCallValidationError
 from backend.engine.function_calling import (
     _handle_cmd_run_tool,
     _handle_finish_tool,
-    _handle_llm_based_file_edit_tool,
     _handle_text_editor_tool,
     combine_thought,
     set_security_risk,
@@ -150,46 +149,6 @@ class TestHandleFinishTool:
     def test_missing_message_raises(self):
         with pytest.raises(FunctionCallValidationError, match='message'):
             _handle_finish_tool({})
-
-
-# ---------------------------------------------------------------------------
-# _handle_llm_based_file_edit_tool
-# ---------------------------------------------------------------------------
-
-
-class TestHandleLlmBasedFileEditTool:
-    """Tests for _handle_llm_based_file_edit_tool."""
-
-    def test_basic_edit(self):
-        action = _handle_llm_based_file_edit_tool(
-            {
-                'path': '/workspace/app.py',
-                'content': "print('hello')",
-            }
-        )
-        assert isinstance(action, FileEditAction)
-        assert action.path == '/workspace/app.py'
-        assert action.content == "print('hello')"
-
-    def test_with_range(self):
-        action = _handle_llm_based_file_edit_tool(
-            {
-                'path': '/workspace/app.py',
-                'content': 'new line',
-                'start': 5,
-                'end': 10,
-            }
-        )
-        assert action.start == 5
-        assert action.end == 10
-
-    def test_missing_path_raises(self):
-        with pytest.raises(FunctionCallValidationError, match='path'):
-            _handle_llm_based_file_edit_tool({'content': 'data'})
-
-    def test_missing_content_raises(self):
-        with pytest.raises(FunctionCallValidationError, match='content'):
-            _handle_llm_based_file_edit_tool({'path': '/workspace/app.py'})
 
 
 # ---------------------------------------------------------------------------

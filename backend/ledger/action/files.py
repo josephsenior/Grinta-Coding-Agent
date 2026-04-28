@@ -69,35 +69,24 @@ class FileWriteAction(Action):
 class FileEditAction(Action):
     """Edits a file using canonical file-editor commands.
 
-    This class supports two main modes of operation:
-    1. LLM-based editing (impl_source = FileEditSource.LLM_BASED_EDIT)
-    2. File editor-based editing (impl_source = FileEditSource.FILE_EDITOR)
-
     Attributes:
-        path (str): The path to the file being edited. Works for both LLM-based and FILE_EDITOR editing.
-        FILE_EDITOR only arguments:
-            command (str): The editing command to be performed (read_file, create_file, replace_text [internal substring replace], insert_text, undo_last_edit, write).
-            file_text (str): The content of the file to be created (used with 'create_file' command in FILE_EDITOR mode).
-            old_str (str): The string to be replaced (substring replace in FILE_EDITOR mode).
-            new_str (str): The replacement text (substring replace and insert_text in FILE_EDITOR mode).
-            insert_line (int): The line number after which to insert new_str (used with 'insert_text' command in FILE_EDITOR mode).
-        LLM-based editing arguments:
-            content (str): The content to be written or edited in the file (used in LLM-based editing and 'write' command).
-            start (int): The starting line for editing (1-indexed, inclusive). Default is 1.
-            end (int): The ending line for editing (1-indexed, inclusive). Default is -1 (end of file).
-            thought (str): The reasoning behind the edit action.
-            action (str): The type of action being performed (always ActionType.EDIT).
+        path (str): The path to the file being edited.
+        command (str): The editing command to be performed (read_file, create_file, replace_text [internal substring replace], insert_text, undo_last_edit, write).
+        file_text (str): The content of the file to be created (used with 'create_file').
+        old_str (str): The string to be replaced (substring replace).
+        new_str (str): The replacement text (substring replace and insert_text).
+        insert_line (int): The line number after which to insert new_str (used with 'insert_text').
+        content (str): Optional raw content payload kept for legacy compatibility.
+        start (int): Optional starting line for legacy payloads. Default is 1.
+        end (int): Optional ending line for legacy payloads. Default is -1 (end of file).
+        thought (str): The reasoning behind the edit action.
+        action (str): The type of action being performed (always ActionType.EDIT).
         runnable (bool): Indicates if the action can be executed (always True).
         security_risk (ActionSecurityRisk | None): Indicates any security risks associated with the action.
-        impl_source (FileEditSource): The source of the implementation (LLM_BASED_EDIT or FILE_EDITOR).
+        impl_source (FileEditSource): The source of the implementation.
 
     Usage:
-        - For LLM-based editing: Use path, content, start, and end attributes.
-        - For FILE_EDITOR-based editing: Use path, command, and the appropriate attributes for the specific command.
-
-    Note:
-        - If start is set to -1 in LLM-based editing, the content will be appended to the file.
-        - The 'write' command behaves similarly to LLM-based editing, using content, start, and end attributes.
+        - Use path, command, and the appropriate attributes for the specific command.
 
     """
 
@@ -139,7 +128,7 @@ class FileEditAction(Action):
         ret = '**FileEditAction**\n'
         ret += f'Path: [{self.path}]\n'
         ret += f'Thought: {self.thought}\n'
-        if self.impl_source == FileEditSource.LLM_BASED_EDIT:
+        if not self.command and self.content:
             ret += f'Range: [L{self.start}:L{self.end}]\n'
             ret += f'Content:\n```\n{self.content}\n```\n'
         else:

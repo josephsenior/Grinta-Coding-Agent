@@ -7,7 +7,7 @@ durable progress snapshot that survives condensation.
 
 **Roadmap (product):** hybrid checkpoints — implicit pre-risk snapshots before
 large edits/commands plus **manual** ``checkpoint`` for named milestones;
-``revert_to_checkpoint`` remains the coarse undo. Once auto-checkpoint coverage
+``checkpoint(revert)`` is the coarse undo. Once auto-checkpoint coverage
 is trusted, consider deprecating per-editor ``undo_last_edit`` in favor of this
 unified rollback story.
 """
@@ -170,7 +170,7 @@ def _save_checkpoint(label: str, files_modified: str) -> AgentThinkAction:
     if normalized_files:
         entry['files'] = normalized_files
 
-    # Create a RollbackManager file snapshot so revert_to_checkpoint can actually
+    # Create a RollbackManager file snapshot so checkpoint(revert) can actually
     # restore files when given this integer ID.
     try:
         from backend.core.rollback.rollback_manager import RollbackManager

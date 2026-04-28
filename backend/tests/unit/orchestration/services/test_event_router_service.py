@@ -14,7 +14,6 @@ from backend.ledger.action import (
     FileReadAction,
     MessageAction,
     PlaybookFinishAction,
-    SignalProgressAction,
     TaskTrackingAction,
 )
 from backend.ledger.observation import Observation
@@ -251,37 +250,6 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         self.mock_controller.state.set_planning_directive.assert_called_once()
         directive = self.mock_controller.state.set_planning_directive.call_args[0][0]
         self.assertIn('checkpoint is an intermediate control tool', directive)
-
-    async def test_handle_action_message_from_agent_blocks_incomplete_revert_handoff(
-        self,
-    ):
-        revert_obs = AgentThinkObservation(content='Your thought has been logged.')
-        revert_obs.tool_result = {
-            'tool': 'revert_to_checkpoint',
-            'ok': True,
-            'status': 'reverted',
-            'next_best_action': 'Continue from the restored checkpoint state.',
-        }
-        revert_obs.tool_call_metadata = ToolCallMetadata(
-            function_name='revert_to_checkpoint',
-            tool_call_id='call_revert',
-            model_response={'id': 'resp_revert'},
-            total_calls_in_response=1,
-        )
-        action = MessageAction(content='Rollback completed.')
-        action.source = EventSource.AGENT
-        action.wait_for_response = True
-        self.mock_controller.state.history = [revert_obs, action]
-
-        await self.service._handle_action(action)
-
-        self.mock_controller.set_agent_state_to.assert_not_called()
-        self.mock_controller.event_stream.add_event.assert_not_called()
-        self.mock_controller.state.set_planning_directive.assert_called_once()
-        directive = self.mock_controller.state.set_planning_directive.call_args[0][0]
-        self.assertIn(
-            'revert_to_checkpoint is an intermediate control tool', directive
-        )
 
     @patch.dict('os.environ', {'LOG_ALL_EVENTS': 'true'})
     async def test_handle_message_action_log_all_events(self):
@@ -581,12 +549,6 @@ class TestEventRouterService(unittest.IsolatedAsyncioTestCase):
         assert _summarize_delegate_worker_event(cmd_action) == (
             'running',
             'Ran Running tests for worker',
-        )
-
-        signal_action = SignalProgressAction(progress_note='Halfway through test setup')
-        assert _summarize_delegate_worker_event(signal_action) == (
-            'running',
-            'Halfway through test setup',
         )
 
     def test_build_delegate_progress_observation_is_hidden(self):

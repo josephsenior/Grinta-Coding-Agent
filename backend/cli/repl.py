@@ -2095,7 +2095,7 @@ class Repl:
         else:
             diff_text = (
                 '(checkpoint has no git commit; file-snapshot diff is not implemented '
-                'in the CLI — use the `revert_to_checkpoint` tool to inspect).'
+                'in the CLI — use checkpoint(revert) to roll back instead).'
             )
         if self._renderer is not None:
             # Trim to keep the panel manageable.

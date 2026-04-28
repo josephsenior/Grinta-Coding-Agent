@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import contextmanager
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.api_key_manager import api_key_manager
 from backend.core.config.app_config import AppConfig
 from backend.core.config.compactor_config import AutoCompactorConfig
+from backend.core.config.llm_config import LLMConfig
 from backend.core.config.config_loader import (
     ConfigLoadSummary,
     _to_posix_workspace_path,
@@ -166,6 +168,27 @@ class TestFinalization:
             and cfg.get_agent_config(cfg.default_agent).enable_native_browser
         )
 
+    def test_finalize_config_creates_missing_auto_compactor(self, tmp_path):
+        cfg = AppConfig()
+        cfg.cache_dir = str(tmp_path / 'cache')
+        cfg.get_agent_config(cfg.default_agent).compactor_config = None
+        cfg.get_llm_config().model = 'openai/gpt-4.1'
+
+        with (
+            patch('backend.core.config.config_loader.get_file_store') as mock_get_store,
+            patch('pathlib.Path.mkdir'),
+        ):
+            mock_store = MagicMock()
+            mock_get_store.return_value = mock_store
+            mock_store.read.return_value = 'secret'
+
+            finalize_config(cfg)
+
+        compactor_cfg = cfg.get_agent_config(cfg.default_agent).compactor_config
+        assert isinstance(compactor_cfg, AutoCompactorConfig)
+        assert compactor_cfg.llm_config is not None
+        assert compactor_cfg.llm_config.model == 'openai/gpt-4.1'
+
 
 # ── Named Group Loaders ───────────────────────────────────────────────
 
@@ -185,6 +208,12 @@ class TestNamedGroupLoaders:
             'backend.core.config.config_loader._load_json_config', return_value={}
         ):
             assert get_agent_config_arg('nonexistent') is None
+
+    def test_get_agent_config_arg_returns_none_when_json_missing(self):
+        with patch(
+            'backend.core.config.config_loader._load_json_config', return_value=None
+        ):
+            assert get_agent_config_arg('agent.anything') is None
 
     def test_get_compactor_config_arg_success(self, tmp_path):
         json_file = tmp_path / 'settings.json'
@@ -206,6 +235,29 @@ class TestNamedGroupLoaders:
         with patch('backend.core.config.config_loader._load_json_config') as mock_load:
             mock_load.return_value = {'compactor_type': None}
             assert get_compactor_config_arg('bad') is None
+
+    def test_get_compactor_config_arg_returns_none_when_json_missing(self):
+        with patch(
+            'backend.core.config.config_loader._load_json_config', return_value=None
+        ):
+            assert get_compactor_config_arg('missing') is None
+
+    def test_get_compactor_config_arg_passes_keep_first(self):
+        with patch('backend.core.config.config_loader._load_json_config') as mock_load:
+            mock_load.return_value = {
+                'compactor_type': 'recent',
+                'compactor_keep_first': 3,
+            }
+            with patch(
+                'backend.core.config.compactor_config.create_compactor_config'
+            ) as mock_create:
+                mock_cfg = MagicMock()
+                mock_create.return_value = mock_cfg
+
+                result = get_compactor_config_arg('keep_first_cfg')
+
+        assert result is mock_cfg
+        mock_create.assert_called_once_with('recent', {'type': 'recent', 'keep_first': 3})
 
 
 # ── Agent Registration ────────────────────────────────────────────────
@@ -296,6 +348,149 @@ class TestMainEntryPoints:
                     setup_config_from_args(args)
                     mock_load.assert_called_with(config_file='settings.json')
 
+    def test_load_app_config_warns_on_external_file_and_syncs_explicit_api_key(self):
+        original_model_validate = LLMConfig.model_validate
+
+        class _FakeAPIKeyManager:
+            def __init__(self) -> None:
+                self.suppress_env_export = True
+                self.set_api_key_calls: list[tuple[str | None, SecretStr | None]] = []
+                self.set_environment_calls: list[
+                    tuple[str | None, SecretStr | None]
+                ] = []
+
+            @contextmanager
+            def suppress_env_export_context(self):
+                yield
+
+            def set_api_key(self, model: str | None, api_key: SecretStr) -> None:
+                self.set_api_key_calls.append((model, api_key))
+
+            def set_environment_variables(
+                self, model: str | None, api_key: SecretStr | None
+            ) -> None:
+                self.set_environment_calls.append((model, api_key))
+
+            def extract_provider(self, model: str) -> str:
+                return 'groq'
+
+            def get_provider_key_from_env(self, provider: str) -> str | None:
+                return None
+
+        def _seed_env(cfg: AppConfig, _env: dict[str, str]) -> None:
+            cfg.set_llm_config(
+                LLMConfig.model_validate(
+                    {
+                        'model': 'groq/meta-llama/llama-4-scout',
+                        'api_key': 'x' * 32,
+                    }
+                )
+            )
+
+        def _validate_llm(payload, *args, **kwargs):
+            api_key = payload.get('api_key') if isinstance(payload, dict) else None
+            if isinstance(payload, dict) and api_key is None:
+                llm_cfg = LLMConfig()
+                for key, value in payload.items():
+                    object.__setattr__(llm_cfg, key, value)
+                object.__setattr__(llm_cfg, 'api_key', None)
+                return llm_cfg
+            if isinstance(payload, dict) and hasattr(api_key, 'get_secret_value'):
+                payload = {**payload, 'api_key': api_key.get_secret_value()}
+            return original_model_validate(payload, *args, **kwargs)
+
+        fake_manager = _FakeAPIKeyManager()
+
+        with (
+            patch('backend.core.config.config_loader.get_canonical_settings_path', return_value='canonical.json'),
+            patch('backend.core.config.config_loader.rebuild_config_models'),
+            patch('backend.core.config.config_loader.load_from_env', side_effect=_seed_env),
+            patch('backend.core.config.config_loader.load_from_json'),
+            patch('backend.core.config.config_loader.finalize_config'),
+            patch('backend.core.config.config_loader.export_llm_api_keys'),
+            patch('backend.core.config.config_loader.register_custom_agents'),
+            patch('backend.core.config.api_key_manager.api_key_manager', fake_manager),
+            patch('backend.core.config.llm_config.api_key_manager', fake_manager),
+            patch('backend.core.config.config_loader.logger.app_logger.warning') as mock_warn,
+            patch('backend.core.config.llm_config.LLMConfig.model_validate', side_effect=_validate_llm),
+        ):
+            cfg = load_app_config(set_logging_levels=False, config_file='custom.json')
+
+        llm_cfg = cfg.get_llm_config()
+        mock_warn.assert_any_call(
+            'Ignoring external config_file=%s; using canonical settings=%s',
+            'custom.json',
+            'canonical.json',
+        )
+        assert fake_manager.set_api_key_calls == [(llm_cfg.model, llm_cfg.api_key)]
+        assert fake_manager.set_environment_calls == [
+            (llm_cfg.model, llm_cfg.api_key)
+        ]
+
+    def test_load_app_config_backfills_api_key_from_provider_env(self):
+        original_model_validate = LLMConfig.model_validate
+
+        class _FakeAPIKeyManager:
+            def __init__(self) -> None:
+                self.suppress_env_export = True
+                self.set_api_key_calls: list[tuple[str | None, SecretStr | None]] = []
+                self.set_environment_calls: list[
+                    tuple[str | None, SecretStr | None]
+                ] = []
+
+            @contextmanager
+            def suppress_env_export_context(self):
+                yield
+
+            def set_api_key(self, model: str | None, api_key: SecretStr) -> None:
+                self.set_api_key_calls.append((model, api_key))
+
+            def set_environment_variables(
+                self, model: str | None, api_key: SecretStr | None
+            ) -> None:
+                self.set_environment_calls.append((model, api_key))
+
+            def extract_provider(self, model: str) -> str:
+                return 'groq'
+
+            def get_provider_key_from_env(self, provider: str) -> str | None:
+                return 'env-secret-long-enough-123456'
+
+        def _seed_env(cfg: AppConfig, _env: dict[str, str]) -> None:
+            llm_cfg = LLMConfig()
+            object.__setattr__(llm_cfg, 'model', 'groq/meta-llama/llama-4-scout')
+            object.__setattr__(llm_cfg, 'api_key', None)
+            cfg.set_llm_config(llm_cfg)
+
+        def _validate_llm(payload, *args, **kwargs):
+            api_key = payload.get('api_key') if isinstance(payload, dict) else None
+            if isinstance(payload, dict) and hasattr(api_key, 'get_secret_value'):
+                payload = {**payload, 'api_key': api_key.get_secret_value()}
+            return original_model_validate(payload, *args, **kwargs)
+
+        fake_manager = _FakeAPIKeyManager()
+
+        with (
+            patch('backend.core.config.config_loader.rebuild_config_models'),
+            patch('backend.core.config.config_loader.load_from_env', side_effect=_seed_env),
+            patch('backend.core.config.config_loader.load_from_json'),
+            patch('backend.core.config.config_loader.finalize_config'),
+            patch('backend.core.config.config_loader.export_llm_api_keys'),
+            patch('backend.core.config.config_loader.register_custom_agents'),
+            patch('backend.core.config.api_key_manager.api_key_manager', fake_manager),
+            patch('backend.core.config.llm_config.api_key_manager', fake_manager),
+            patch('backend.core.config.llm_config.LLMConfig.model_validate', side_effect=_validate_llm),
+        ):
+            cfg = load_app_config(set_logging_levels=False)
+
+        llm_cfg = cfg.get_llm_config()
+        assert llm_cfg.api_key is not None
+        assert llm_cfg.api_key.get_secret_value() == 'env-secret-long-enough-123456'
+        assert fake_manager.set_api_key_calls == [(llm_cfg.model, llm_cfg.api_key)]
+        assert fake_manager.set_environment_calls == [
+            (llm_cfg.model, llm_cfg.api_key)
+        ]
+
 
 # ── Config load (load_from_json) ──────────────────────────────────────
 
@@ -327,6 +522,77 @@ class TestLoadFromJson:
         cfg = AppConfig()
         load_from_json(cfg, str(json_file))
         assert cfg.get_llm_config().model == 'groq/meta-llama/llama-4-scout'
+
+    def test_load_from_json_blank_model_clears_existing_model(self, tmp_path):
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text('{"llm_model": "   ", "llm_provider": "openai"}')
+        cfg = AppConfig()
+        cfg.set_llm_config(
+            LLMConfig.model_validate({'model': 'openai/gpt-4.1', 'api_key': 'seed'})
+        )
+
+        load_from_json(cfg, str(json_file))
+
+        assert cfg.get_llm_config().model is None
+
+    def test_load_from_json_native_google_ignores_base_url(self, tmp_path):
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'llm_model': 'google/gemini-2.5-flash',
+                    'llm_base_url': 'https://proxy.example/v1',
+                }
+            )
+        )
+        cfg = AppConfig()
+
+        load_from_json(cfg, str(json_file))
+
+        llm_cfg = cfg.get_llm_config()
+        assert llm_cfg.model == 'google/gemini-2.5-flash'
+        assert not llm_cfg.base_url
+
+    def test_load_from_json_preserves_explicit_base_url_for_proxy_provider(
+        self, tmp_path
+    ) -> None:
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'llm_model': 'meta-llama/llama-4-scout',
+                    'llm_provider': 'groq',
+                    'llm_base_url': 'https://proxy.example/v1',
+                }
+            )
+        )
+        cfg = AppConfig()
+
+        load_from_json(cfg, str(json_file))
+
+        assert cfg.get_llm_config().base_url == 'https://proxy.example/v1'
+
+    def test_load_from_json_sets_provider_default_base_url_for_lightning(
+        self, tmp_path
+    ) -> None:
+        from backend.inference.provider_resolver import _PROVIDER_DEFAULT_URLS
+
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'llm_model': 'meta-llama/llama-4-scout',
+                    'llm_provider': 'lightning',
+                }
+            )
+        )
+        cfg = AppConfig()
+
+        load_from_json(cfg, str(json_file))
+
+        llm_cfg = cfg.get_llm_config()
+        assert llm_cfg.model == 'openai/meta-llama/llama-4-scout'
+        assert llm_cfg.base_url == _PROVIDER_DEFAULT_URLS['lightning']
 
     def test_load_from_json_llm_api_key_warns_on_literal_uses_env(
         self, tmp_path, monkeypatch: pytest.MonkeyPatch
@@ -411,14 +677,86 @@ class TestLoadFromJson:
             with pytest.raises(ValueError, match='Invalid JSON'):
                 load_from_json(AppConfig(), str(json_file))
 
+    def test_load_from_json_requires_provider_raises_in_strict_mode(self, tmp_path):
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text('{"llm_model": "gpt-4o"}')
+
+        with patch.dict(os.environ, {'APP_STRICT_CONFIG': 'true'}):
+            with pytest.raises(ValueError, match='llm_provider is required'):
+                load_from_json(AppConfig(), str(json_file))
+
     def test_load_from_json_strict_mode_fatal_issue(self, tmp_path):
         json_file = tmp_path / 'settings.json'
-        json_file.write_text('{"file_store": "memory"}')
-        AppConfig()
+        json_file.write_text('{}')
         with patch.dict(os.environ, {'APP_STRICT_CONFIG': 'true'}):
-            with patch('backend.core.config.config_loader.logger.app_logger.warning'):
-                # Manually force summary fatal in new json logic if needed
-                pass
+            with patch.object(ConfigLoadSummary, 'has_fatal_issues', return_value=True):
+                with patch.object(
+                    ConfigLoadSummary,
+                    'format_fatal_issues',
+                    return_value='core: invalid: bad value',
+                ):
+                    with pytest.raises(ValueError, match='config load issues'):
+                        load_from_json(AppConfig(), str(json_file))
+
+    def test_load_from_json_sets_project_root_and_merges_mcp_servers(
+        self, tmp_path
+    ) -> None:
+        from backend.core.config.mcp_config import MCPServerConfig
+
+        project_root = tmp_path / 'workspace'
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'project_root': str(project_root),
+                    'mcp_config': {
+                        'servers': [
+                            {'name': 'existing', 'type': 'stdio', 'command': 'python'},
+                            {'name': 'remote', 'type': 'shttp', 'url': 'https://example.com'},
+                            'not-a-dict',
+                            {'name': 'broken', 'type': 'stdio'},
+                        ]
+                    },
+                }
+            )
+        )
+        cfg = AppConfig()
+        cfg.mcp.servers = [
+            MCPServerConfig(name='existing', type='stdio', command='python')
+        ]
+
+        with patch('backend.core.config.config_loader.logger.app_logger.debug') as mock_debug:
+            load_from_json(cfg, str(json_file))
+
+        assert cfg.project_root == str(project_root)
+        assert [server.name for server in cfg.mcp.servers] == ['existing', 'remote']
+        assert cfg.mcp.enabled is True
+        mock_debug.assert_called()
+
+    def test_load_from_json_applies_valid_agent_overrides_and_skips_invalid(
+        self, tmp_path
+    ) -> None:
+        json_file = tmp_path / 'settings.json'
+        json_file.write_text(
+            json.dumps(
+                {
+                    'agent': {
+                        'custom': {'name': 'customized'},
+                        'skip_me': 'not-a-dict',
+                        'ignore_unknown': {'unknown_field': True},
+                        'broken': {'memory_max_threads': 'invalid'},
+                    }
+                }
+            )
+        )
+        cfg = AppConfig()
+
+        with patch('backend.core.config.config_loader.logger.app_logger.warning') as mock_warn:
+            load_from_json(cfg, str(json_file))
+
+        assert cfg.agents['custom'].name == 'customized'
+        assert 'ignore_unknown' not in cfg.agents
+        mock_warn.assert_called()
 
 
 # ── Compactor Loader Extra ───────────────────────────────────────────
@@ -461,6 +799,11 @@ class TestCompactorLoaderExtra:
             'backend.core.config.config_loader.get_llm_config_arg', return_value=None
         ):
             assert _process_llm_compactor(compactor_data, 'arg', 'file.toml') is None
+
+    def test_process_llm_compactor_without_llm_config(self):
+        from backend.core.config.config_loader import _process_llm_compactor
+
+        assert _process_llm_compactor({}, 'arg', 'file.toml') is None
 
 
 # ── Agent Registration Extra ──────────────────────────────────────────

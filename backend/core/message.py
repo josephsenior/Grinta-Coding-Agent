@@ -41,12 +41,18 @@ class ToolCall(BaseModel):
         id: Unique identifier for the tool call
         type: Type of tool call (usually "function")
         function: Function call details
+        thought_signature: Provider-specific opaque signature that must be
+            replayed verbatim on subsequent turns.  Currently used by Google
+            Gemini 2.5 thinking models, which return a ``thought_signature``
+            (bytes) on each function_call part and reject follow-up turns
+            that omit it.  ``None`` for providers that do not produce one.
 
     """
 
     id: str
     type: str = 'function'
     function: ToolCallFunction
+    thought_signature: bytes | None = Field(default=None, repr=False)
 
 
 from backend.core.enums import ContentType  # noqa: E402
@@ -244,6 +250,14 @@ class Message(BaseModel):
                         'name': tool_call.function.name,
                         'arguments': tool_call.function.arguments,
                     },
+                    # Optional opaque signature replayed verbatim by providers
+                    # that require it (Google Gemini 2.5 thinking models).
+                    # Omitted when None so non-Gemini transports are unaffected.
+                    **(
+                        {'thought_signature': tool_call.thought_signature}
+                        if tool_call.thought_signature is not None
+                        else {}
+                    ),
                 }
                 for tool_call in self.tool_calls
             ]

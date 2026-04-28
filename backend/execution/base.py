@@ -37,7 +37,6 @@ from backend.execution.playbook_loader import PlaybookLoaderMixin
 from backend.execution.plugins import PluginRequirement
 from backend.execution.security_enforcement import SecurityEnforcementMixin
 from backend.execution.task_tracking import TaskTrackingMixin
-from backend.execution.utils.edit import FileEditRuntimeMixin
 from backend.execution.utils.git_handler import CommandResult, GitHandler
 from backend.ledger import EventSource, EventStream, EventStreamSubscriber
 from backend.ledger.action import (
@@ -149,7 +148,6 @@ class Runtime(
     GitSetupMixin,
     PlaybookLoaderMixin,
     TaskTrackingMixin,
-    FileEditRuntimeMixin,
     CommandTimeoutMixin,
     SecurityEnforcementMixin,
 ):
@@ -235,13 +233,6 @@ class Runtime(
             ),
         )
         self.initial_env_vars.update(raw_env_vars)
-        FileEditRuntimeMixin.__init__(
-            self,
-            enable_llm_editor=getattr(
-                config.get_agent_config(), 'enable_llm_editor', False
-            ),
-            llm_registry=llm_registry,
-        )
         self.user_id = user_id
         self.vcs_provider_tokens = provider_tokens
 

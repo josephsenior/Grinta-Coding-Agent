@@ -19,7 +19,6 @@ def _make_config(**kwargs):
     cfg.enable_apply_patch = True
     cfg.enable_internal_task_tracker = True
     cfg.enable_checkpoints = True
-    cfg.enable_session_diff = True
     cfg.enable_working_memory = True
     cfg.enable_verify_file_lines = True
     cfg.enable_browsing = True

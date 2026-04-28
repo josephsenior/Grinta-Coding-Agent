@@ -170,7 +170,7 @@ class TestEventToDict:
     def test_tool_backed_think_observation_preserves_tool_result_roundtrip(self):
         obs = AgentThinkObservation(content='Your thought has been logged.')
         obs.tool_result = {
-            'tool': 'revert_to_checkpoint',
+            'tool': 'checkpoint',
             'ok': True,
             'status': 'reverted',
         }

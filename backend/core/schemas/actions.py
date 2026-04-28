@@ -96,13 +96,14 @@ class FileEditActionSchema(ActionSchemaV1):
         default=None, ge=1, description='Line number for insert command'
     )
     content: str | None = Field(
-        default=None, description='Content to write (LLM-based editing)'
+        default=None,
+        description='Optional raw content payload retained for legacy compatibility',
     )
     start: int = Field(default=1, ge=1, description='Starting line number (1-indexed)')
     end: int = Field(default=-1, description='Ending line number (-1 for end of file)')
     impl_source: str | None = Field(
         default=None,
-        description='Implementation source (LLM_BASED_EDIT or FILE_EDITOR)',
+        description='Implementation source (currently FILE_EDITOR when set)',
     )
 
     @field_validator('path')

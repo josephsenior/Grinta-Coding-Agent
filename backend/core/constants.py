@@ -26,7 +26,7 @@ def _parse_bool_env(var: str, default: str = 'false') -> bool:
 
 # ── Core Identity & Limits ──────────────────────────────────────────
 DEFAULT_AGENT_NAME = 'Orchestrator'
-DEFAULT_MAX_ITERATIONS = 10000  # effectively unlimited flexibility
+DEFAULT_MAX_ITERATIONS = 10000  # effectively unlimited; circuit breaker handles termination
 
 # ── Workspace & Paths ───────────────────────────────────────────────
 JWT_SECRET_FILE = '.jwt_secret'
@@ -188,7 +188,6 @@ DEFAULT_AGENT_STUCK_DETECTION_ENABLED = True
 DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS = 0
 # On by default; disable per-deploy via env (AGENT_*) or settings.json agent.* if needed.
 DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED = True
-DEFAULT_AGENT_SIGNAL_PROGRESS_ENABLED = True
 DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED = True
 DEFAULT_AGENT_CLI_MODE = True
 DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT = False
@@ -242,11 +241,16 @@ DEFAULT_TEXT_EDITOR_SYNTAX_PAUSE = 15
 # ── Stuck Detector Thresholds ───────────────────────────────────────
 # Window sizes for fast pattern detection on recent actions/observations.
 DEFAULT_STUCK_RECENT_WINDOW = 4
+# After detecting stuck, skip re-evaluation for this many agent turns so the
+# model has room to act on the recovery directive before being flagged again.
+DEFAULT_STUCK_COOLDOWN_TURNS = 3
 # A-B-A-B alternating-pattern window (must match in pairs).
+# Retained for compute_repetition_score (not used in is_stuck).
 DEFAULT_STUCK_AB_PATTERN_WINDOW = 6
 # Min consecutive condensation events to declare context-window loop.
 DEFAULT_STUCK_CONDENSATION_LOOP_MIN = 10
 # Sliding window for semantic loop / cost acceleration analysis.
+# Retained for compute_repetition_score (not used in is_stuck).
 DEFAULT_STUCK_SEMANTIC_WINDOW = 20
 DEFAULT_STUCK_SEMANTIC_MIN_EVENTS = 10
 # Intent diversity below this AND failure rate above the next constant trips.
@@ -358,7 +362,6 @@ DISABLE_COLOR_PRINTING = False
 # ── Tool Names ──────────────────────────────────────────────────────
 TEXT_EDITOR_TOOL_NAME = 'text_editor'
 FINISH_TOOL_NAME = 'finish'
-LLM_BASED_EDIT_TOOL_NAME = 'edit_file'
 TASK_TRACKER_TOOL_NAME = 'task_tracker'
 NOTE_TOOL_NAME = 'note'
 RECALL_TOOL_NAME = 'recall'

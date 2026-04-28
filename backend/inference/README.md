@@ -441,13 +441,14 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "edit_file",
-            "description": "Edit a file",
+            "name": "text_editor",
+            "description": "Edit a file with structured commands",
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "command": {"type": "string"},
                     "path": {"type": "string"},
-                    "content": {"type": "string"}
+                    "file_text": {"type": "string"}
                 }
             }
         }
