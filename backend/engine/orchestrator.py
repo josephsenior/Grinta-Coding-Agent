@@ -192,20 +192,51 @@ class Orchestrator(Agent):
         self._consecutive_context_errors = 0
 
     def step(self, state: State) -> Action:
-        """Thin synchronous wrapper around astep() to avoid maintaining duplicate logic."""
+        """Synchronous compatibility wrapper around :meth:`astep`.
+
+        Prefer ``await astep(state)`` from any async context; this wrapper is
+        a fragile shim for legacy/sync entry points (tests, replay).
+
+        Behavior:
+        * No running loop in this thread → ``asyncio.run(astep(state))``.
+        * Running loop in this thread → run ``astep`` in a worker thread
+          bound to either the registered main event loop (so cross-loop
+          primitives keep working) or, as a last resort, an isolated loop.
+          This pauses the calling thread; never call from the main loop
+          if you can ``await astep`` instead.
+        """
         import asyncio
         import concurrent.futures
+        import threading
+
+        from backend.utils.async_utils import get_main_event_loop
 
         try:
-            asyncio.get_running_loop()
+            current_loop = asyncio.get_running_loop()
         except RuntimeError:
-            # No running loop, create and run a new one
+            current_loop = None
+
+        if current_loop is None:
             return asyncio.run(self.astep(state))
-        else:
-            # Already in an async context; create a task and run in a new thread
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(asyncio.run, self.astep(state))
-                return future.result()
+
+        logger.warning(
+            'Engine.step() called from a running event loop; prefer await astep(). '
+            'caller_thread=%s',
+            threading.current_thread().name,
+        )
+
+        main_loop = get_main_event_loop()
+        if main_loop is not None and main_loop is not current_loop and main_loop.is_running():
+            # Run on the registered main loop so any cross-loop primitives in
+            # astep stay attached to the right loop.
+            future = asyncio.run_coroutine_threadsafe(self.astep(state), main_loop)
+            return future.result()
+
+        # Last resort: isolated loop in a worker thread. Cross-loop
+        # primitives in astep may misbehave under this path.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(asyncio.run, self.astep(state))
+            return future.result()
 
     async def astep(self, state: State) -> Action:
         """Async version of step() with hard circuit breaker for consecutive ContextLimitErrors."""

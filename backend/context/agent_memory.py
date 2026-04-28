@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import os
 import time
 import uuid
@@ -611,9 +612,25 @@ class Memory:
                 if self.loop is None:
                     self.loop = asyncio.get_running_loop()
                 try:
-                    asyncio.run_coroutine_threadsafe(
+                    future = asyncio.run_coroutine_threadsafe(
                         self._set_runtime_status('error', status, message), self.loop
                     )
+
+                    def _log_status_exception(
+                        fut: concurrent.futures.Future[Any],
+                        _status: RuntimeStatus = status,
+                    ) -> None:
+                        exc = fut.exception()
+                        if exc is not None:
+                            logger.error(
+                                'MEMORY.set_runtime_status: scheduled coroutine '
+                                'raised %s: %s (status=%s)',
+                                exc.__class__.__name__,
+                                exc,
+                                _status,
+                            )
+
+                    future.add_done_callback(_log_status_exception)
                 except RuntimeError:
                     try:
                         logger.info(

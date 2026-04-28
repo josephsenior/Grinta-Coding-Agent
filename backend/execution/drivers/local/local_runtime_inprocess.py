@@ -343,7 +343,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         """Execute a debugger action via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        return call_async_from_sync(self._executor.debugger, 30.0, action)
+        return call_async_from_sync(self._executor.debugger, 60.0, action)
 
     def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute LSP query via RuntimeExecutor."""

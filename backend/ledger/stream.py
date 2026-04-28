@@ -28,7 +28,11 @@ from backend.ledger.persistence import EventPersistence
 from backend.ledger.secret_masker import SecretMasker
 from backend.ledger.serialization.event import event_from_dict, event_to_dict
 from backend.persistence.locations import get_conversation_dir
-from backend.utils.async_utils import call_sync_from_async, run_or_schedule
+from backend.utils.async_utils import (
+    call_sync_from_async,
+    get_main_event_loop,
+    run_or_schedule,
+)
 
 if TYPE_CHECKING:
     from backend.persistence import FileStore
@@ -264,7 +268,13 @@ class EventStream(EventStore):
             self._cur_id = None
 
     def close(self) -> None:
-        """Close event stream, stopping queue processing and cleaning up subscribers."""
+        """Close event stream, stopping queue processing and cleaning up subscribers.
+
+        Idempotent: safe to call multiple times (e.g. explicit close + finalizer).
+        """
+        if getattr(self, '_closed', False):
+            return
+        self._closed = True
         # Detach safety finalizer — we're closing explicitly.
         if hasattr(self, '_finalizer'):
             self._finalizer.detach()
@@ -288,7 +298,10 @@ class EventStream(EventStore):
                     )
         self._subscribers.clear()
         self._activity_listeners.clear()
-        self._persist.close()
+        try:
+            self._persist.close()
+        except Exception as exc:  # pragma: no cover - defensive: already-closed path
+            logger.debug('EventPersistence close raised during teardown: %s', exc)
 
     def get_backpressure_snapshot(self) -> dict[str, int]:
         """Return a lightweight snapshot of enqueue/drop stats.
@@ -663,10 +676,31 @@ class EventStream(EventStore):
         subscriber_id: str,
         callback_id: str,
     ) -> None:
-        """Execute subscriber callback inside thread pool with error handling."""
+        """Execute subscriber callback inside thread pool with error handling.
+
+        If the subscriber returns an awaitable, it is awaited on the
+        application's main event loop (registered via ``set_main_event_loop``)
+        through ``run_coroutine_threadsafe``. Spinning up a fresh per-event
+        loop with ``asyncio.run`` would orphan any cross-loop primitives the
+        subscriber awaits (Locks/Events/Queues bound to the main loop).
+        """
         try:
             result = callback(event)
-            if inspect.isawaitable(result):
+            if not inspect.isawaitable(result):
+                return
+            main = get_main_event_loop()
+            if main is not None and main.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._await_result(result),  # type: ignore[arg-type]
+                    main,
+                )
+                # Block this worker thread until the coroutine completes so
+                # ``_dispatch_event``'s ``gather`` reflects true completion.
+                future.result()
+            else:
+                # No main loop registered (e.g. unit tests with no app loop).
+                # Fall back to a disposable loop; no cross-loop primitives
+                # are expected in that environment.
                 asyncio.run(self._await_result(result))  # type: ignore[arg-type]
         except Exception as exc:  # pragma: no cover - defensive logging
             logger.error(

@@ -82,6 +82,20 @@ class PendingActionService:
         ):
             # PTY / interactive work can be slow; align with shell pending floor.
             return max(float(base), float(TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR))
+        if type(action).__name__ == 'DebuggerAction':
+            # DAP adapter startup (debugpy cold init, subprocess spawn) can exceed
+            # the default 120s watchdog on slow machines.  Use action.timeout when
+            # given (the agent can tune per-step), otherwise apply a 60s floor so
+            # normal debug steps (step/continue/variables) still have room.
+            action_timeout = getattr(action, 'timeout', None)
+            try:
+                parsed = float(action_timeout) if action_timeout is not None else None
+            except (TypeError, ValueError):
+                parsed = None
+            floor = 60.0
+            if parsed is not None and parsed > 0:
+                return max(float(base), parsed + 5.0)  # +5s grace above the DAP timeout
+            return max(float(base), floor)
         return float(base)
 
     @staticmethod

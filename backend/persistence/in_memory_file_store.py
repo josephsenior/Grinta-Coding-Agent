@@ -63,8 +63,11 @@ class InMemoryFileStore(FileStore):
                 continue
             suffix = norm_file.removeprefix(path)
             parts = suffix.split('/')
-            if parts[0] == '':
+            if parts and parts[0] == '':
                 parts.pop(0)
+            if not parts:
+                # Entry is exactly ``path`` (or ``path + '/'``); nothing to list.
+                continue
             if len(parts) == 1:
                 if not path:
                     files.append(norm_file.lstrip('/'))
