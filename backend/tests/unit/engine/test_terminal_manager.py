@@ -100,7 +100,7 @@ class TestActionValidation:
 
     def test_unknown_action_launch_raises(self) -> None:
         # Regression: model hallucinated action='launch' — must not crash the step.
-        with pytest.raises(FunctionCallValidationError, match="Unknown terminal_manager action"):
+        with pytest.raises(FunctionCallValidationError, match='Unknown terminal_manager action'):
             handle_terminal_manager_tool({'action': 'launch', 'command': 'echo hi'})
 
     def test_unknown_action_message_contains_valid_actions(self) -> None:

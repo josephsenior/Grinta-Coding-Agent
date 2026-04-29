@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from backend.context import pre_condensation_snapshot as snapshot_module

@@ -18,7 +18,6 @@ from typing import Any
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.execution.action_execution_server_io import (
@@ -26,15 +25,8 @@ from backend.execution.action_execution_server_io import (
 )
 from backend.execution.debugger import DAPDebugManager
 from backend.execution.file_operations import (
-    execute_file_editor,
     get_max_edit_observation_chars,
-    handle_directory_view,
     truncate_large_text,
-)
-from backend.execution.security_enforcement import (
-    evaluate_hardened_local_command_policy,
-    path_is_within_workspace,
-    tokenize_command,
 )
 from backend.execution.mcp.proxy import MCPProxyManager
 from backend.execution.plugin_loader import init_plugins
@@ -43,12 +35,10 @@ from backend.execution.server_routes import (
     register_exception_handlers,
     register_routes,
 )
-from backend.execution.utils.diff import get_diff
 from backend.execution.utils.file_editor import FileEditor
 from backend.execution.utils.memory_monitor import MemoryMonitor
 from backend.execution.utils.session_manager import SessionManager
 from backend.ledger.action.browser_tool import BrowserToolAction
-from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.mcp import MCPAction
 from backend.ledger.observation import (
@@ -56,9 +46,7 @@ from backend.ledger.observation import (
     LspQueryObservation,
     Observation,
 )
-from backend.ledger.observation.files import FileEditObservation, FileReadObservation
 from backend.persistence.locations import get_workspace_downloads_dir
-from backend.utils.regex_limits import try_compile_user_regex
 
 
 def resolve_workspace_path(path: str, working_dir: str, workspace_root: str) -> Path:

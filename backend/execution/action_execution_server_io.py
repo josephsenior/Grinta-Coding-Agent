@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
+import time
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -759,19 +761,48 @@ class RuntimeExecutorIOAndTerminalMixin:
             _input_poll_timeout = PTY_INPUT_READ_TIMEOUT_SECONDS
             _input_waited = 0.0
             read_offset = self._get_terminal_read_cursor(action.session_id)
-            while _input_waited < _input_poll_timeout:
-                await asyncio.sleep(_input_poll_interval)
-                _input_waited += _input_poll_interval
-                _probe, *_ = self._read_terminal_with_mode(
-                    session=session, mode='delta', offset=read_offset
-                )
-                if _probe:
-                    break
+            _probe_reads = 0
+            # Only probe-loop when reading from start-of-buffer. For established
+            # sessions (cursor > 0), repeated probes can duplicate/destructively
+            # consume reads in some shell backends.
+            if read_offset <= 0:
+                while _input_waited < _input_poll_timeout:
+                    await asyncio.sleep(_input_poll_interval)
+                    _input_waited += _input_poll_interval
+                    _probe_reads += 1
+                    _probe, *_ = self._read_terminal_with_mode(
+                        session=session, mode='delta', offset=read_offset
+                    )
+                    if _probe:
+                        break
             content, next_offset, has_new_output, dropped_chars = self._read_terminal_with_mode(
                 session=session,
                 mode='delta',
                 offset=read_offset,
             )
+            # #region agent log
+            try:
+                payload = {
+                    'sessionId': 'fee086',
+                    'runId': 'pre-fix',
+                    'hypothesisId': 'H6_terminal_input_probe_loop',
+                    'location': 'backend/execution/action_execution_server_io.py:terminal_input',
+                    'message': 'terminal-input-read-stats',
+                    'data': {
+                        'session_id': action.session_id,
+                        'read_offset': read_offset,
+                        'probe_reads': _probe_reads,
+                        'next_offset': next_offset,
+                        'has_new_output': has_new_output,
+                    },
+                    'timestamp': int(time.time() * 1000),
+                }
+                log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+                with open(log_path, 'a', encoding='utf-8') as _f:
+                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+            except Exception:
+                pass
+            # #endregion
             self._advance_terminal_read_cursor(
                 action.session_id, next_offset, mode='delta'
             )

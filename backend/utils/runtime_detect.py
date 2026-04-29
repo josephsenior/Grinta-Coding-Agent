@@ -24,12 +24,10 @@ Results are cached in module globals; tests can call
 from __future__ import annotations
 
 import os
-import json
 import shutil
 import subprocess
 import sys
 import threading
-import time
 from dataclasses import dataclass, field
 from typing import Sequence
 
@@ -37,36 +35,6 @@ from backend.core.logger import app_logger as logger
 
 # Probe timeout — kept tight; missing tools should fail-fast.
 _PROBE_TIMEOUT_SEC = 3.0
-
-
-# #region agent log
-def _agent_debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
-    try:
-        log_path = (
-            __import__('pathlib').Path(__file__).resolve().parents[2] / 'debug-fee086.log'
-        )
-        payload = {
-            'sessionId': 'fee086',
-            'runId': 'pre-fix',
-            'hypothesisId': hypothesis_id,
-            'location': location,
-            'message': message,
-            'data': data,
-            'timestamp': int(time.time() * 1000),
-        }
-        with open(log_path, 'a', encoding='utf-8') as _f:
-            _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-    except Exception:
-        pass
-
-
-_agent_debug_log(
-    'H1_missing_exports',
-    'backend/utils/runtime_detect.py:41',
-    'runtime_detect module loaded',
-    {'has_debug_adapter_for_language': 'debug_adapter_for_language' in globals()},
-)
-# #endregion
 
 
 @dataclass(frozen=True)
