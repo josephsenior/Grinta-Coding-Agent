@@ -11,6 +11,11 @@ from typing import Any, cast
 
 from binaryornot.check import is_binary
 
+from backend.core.constants import (
+    PTY_INPUT_READ_TIMEOUT_SECONDS,
+    PTY_OPEN_READ_TIMEOUT_SECONDS,
+    PTY_READ_POLL_INTERVAL_SECONDS,
+)
 from backend.core.enums import FileReadSource
 from backend.core.logger import app_logger as logger
 from backend.execution.action_execution_server_helpers import (
@@ -616,10 +621,11 @@ class RuntimeExecutorIOAndTerminalMixin:
                 # before any bytes appear in the buffer.  Without a settle delay
                 # the immediate read is always empty (particularly pronounced on
                 # Windows / PowerShell where startup latency can exceed 500 ms).
-                # We poll in 50 ms ticks for up to 2 s and exit as soon as any
-                # output arrives; slow commands just need a follow-up read.
-                _open_poll_interval = 0.05   # seconds per tick
-                _open_poll_timeout  = 2.0    # give up and let model follow-up read
+                # We poll in 50 ms ticks for up to PTY_OPEN_READ_TIMEOUT_SECONDS
+                # and exit as soon as any output arrives; slow commands just need
+                # a follow-up read.
+                _open_poll_interval = PTY_READ_POLL_INTERVAL_SECONDS
+                _open_poll_timeout = PTY_OPEN_READ_TIMEOUT_SECONDS
                 _open_waited = 0.0
                 while _open_waited < _open_poll_timeout:
                     await asyncio.sleep(_open_poll_interval)
@@ -720,8 +726,26 @@ class RuntimeExecutorIOAndTerminalMixin:
                 session.write_input(to_send, is_control=action.is_control)
             if predicted_cwd is not None and hasattr(session, '_cwd'):
                 session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
-            await asyncio.sleep(0.2)
+            # Poll for new bytes after sending input instead of a flat sleep.
+            # The previous fixed 0.2 s wait was a workaround for the agent
+            # racing the PTY: it returned even when the shell hadn't echoed
+            # yet on slow startups (cold PowerShell, npm scripts, REPL
+            # prompts), forcing the agent to either spam empty reads or rely
+            # on a client-side delay. Polling in 50 ms ticks with an early
+            # exit on first byte gives the shell time to flush without
+            # blocking when output arrives quickly.
+            _input_poll_interval = PTY_READ_POLL_INTERVAL_SECONDS
+            _input_poll_timeout = PTY_INPUT_READ_TIMEOUT_SECONDS
+            _input_waited = 0.0
             read_offset = self._get_terminal_read_cursor(action.session_id)
+            while _input_waited < _input_poll_timeout:
+                await asyncio.sleep(_input_poll_interval)
+                _input_waited += _input_poll_interval
+                _probe, *_ = self._read_terminal_with_mode(
+                    session=session, mode='delta', offset=read_offset
+                )
+                if _probe:
+                    break
             content, next_offset, has_new_output, dropped_chars = self._read_terminal_with_mode(
                 session=session,
                 mode='delta',

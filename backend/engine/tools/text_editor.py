@@ -206,5 +206,5 @@ def create_text_editor_tool(
                 'type': 'integer',
             },
         },
-        required=['command', 'path'],
+        required=['command', 'path', 'security_risk'],
     )

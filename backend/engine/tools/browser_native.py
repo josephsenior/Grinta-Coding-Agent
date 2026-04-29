@@ -80,7 +80,7 @@ def create_browser_tool() -> ChatCompletionToolParam:
             },
             'security_risk': get_security_risk_param(),
         },
-        required=['command'],
+        required=['command', 'security_risk'],
     )
 
 

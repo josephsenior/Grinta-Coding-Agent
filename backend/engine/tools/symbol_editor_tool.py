@@ -246,5 +246,5 @@ def create_symbol_editor_tool(
             },
             'security_risk': get_security_risk_param(),
         },
-        required=['command'],
+        required=['command', 'security_risk'],
     )

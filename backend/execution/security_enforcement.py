@@ -390,39 +390,58 @@ class SecurityEnforcementMixin:
         return decision
 
     def _resolve_security_risk(self, action: Action) -> Any | None:
+        """Resolve the effective risk for *action* using escalate-only semantics.
+
+        The agent is required to declare ``security_risk`` on write/exec tools
+        (validated at the function-calling layer). Here the structural
+        :class:`SecurityAnalyzer` is used **only to escalate** — it can raise
+        a LOW/MEDIUM declaration to HIGH for true-unsafe operations
+        (``rm -rf /``, sensitive-path writes, etc.) but it never silently
+        invents a risk when the agent omitted one and never lowers what the
+        agent declared. When the agent declared nothing (legacy/read-only
+        actions) and the analyzer is unavailable or raises LOW, we default to
+        LOW so the action proceeds without confirmation.
+        """
         from backend.core.enums import ActionSecurityRisk
 
-        existing_risk = getattr(action, 'security_risk', ActionSecurityRisk.UNKNOWN)
-        if (
-            isinstance(existing_risk, ActionSecurityRisk)
-            and existing_risk != ActionSecurityRisk.UNKNOWN
-        ):
-            return existing_risk
+        declared = getattr(action, 'security_risk', ActionSecurityRisk.UNKNOWN)
+        if not isinstance(declared, ActionSecurityRisk):
+            declared = ActionSecurityRisk.UNKNOWN
 
-        if self.security_analyzer is None:  # type: ignore[attr-defined]
-            return None
+        analyzer_risk: ActionSecurityRisk | None = None
+        if self.security_analyzer is not None:  # type: ignore[attr-defined]
+            from backend.utils.async_utils import call_async_from_sync
 
-        from backend.utils.async_utils import call_async_from_sync
+            try:
+                # ``call_async_from_sync`` routes through the bounded EXECUTOR
+                # with task-cancellation timeouts.
+                analyzer_risk = call_async_from_sync(
+                    self.security_analyzer.security_risk, 30.0, action
+                )
+            except Exception:
+                logger.warning(
+                    'Security analysis failed for %s, falling back to declared risk',
+                    action.action,
+                    exc_info=True,
+                )
+                analyzer_risk = None
 
-        try:
-            # ``call_async_from_sync`` routes through the bounded EXECUTOR with
-            # task-cancellation timeouts, instead of plain ``asyncio.run`` which
-            # creates an unbounded loop in the calling worker thread and would
-            # raise ``RuntimeError`` if this is ever invoked from inside a
-            # running event loop.
-            risk = call_async_from_sync(
-                self.security_analyzer.security_risk, 30.0, action
-            )
-            if hasattr(action, 'security_risk'):
-                action.security_risk = risk
-            return risk
-        except Exception:
-            logger.warning(
-                'Security analysis failed for %s, allowing action to proceed',
-                action.action,
-                exc_info=True,
-            )
-            return None
+        if declared == ActionSecurityRisk.UNKNOWN:
+            effective = analyzer_risk if analyzer_risk is not None else ActionSecurityRisk.LOW
+        else:
+            effective = declared
+            if analyzer_risk is not None and analyzer_risk > declared:
+                logger.warning(
+                    'Security risk escalated from %s to %s by analyzer for %s',
+                    declared.name,
+                    analyzer_risk.name,
+                    action.action,
+                )
+                effective = analyzer_risk
+
+        if hasattr(action, 'security_risk'):
+            action.security_risk = effective
+        return effective
 
     def _enforce_editor_only_shell_writes(self, action: Action) -> str | None:
         """Enforce editor tools for workspace file writes (CmdRunAction only)."""

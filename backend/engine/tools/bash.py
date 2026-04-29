@@ -134,5 +134,5 @@ def create_cmd_run_tool(use_short_description: bool = False):
             ),
             'security_risk': get_security_risk_param(),
         },
-        required=['command'],
+        required=['command', 'security_risk'],
     )

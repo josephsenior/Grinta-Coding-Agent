@@ -71,6 +71,23 @@ MCP_PENDING_ACTION_TIMEOUT_FLOOR = 180.0
 CMD_PENDING_ACTION_TIMEOUT_FLOOR = 600.0
 # PTY / terminal_manager (Terminal* actions): same headroom as shell commands.
 TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR = CMD_PENDING_ACTION_TIMEOUT_FLOOR
+# Interactive PTY: how long the runtime polls the buffer for the *first* byte
+# of output after ``open`` / ``input`` before returning an empty result. The
+# loop exits as soon as any byte arrives — these caps only matter for slow
+# commands (cold PowerShell, npm cold start, etc.). Values are env-tunable
+# so operators can tune for slow machines without touching code.
+PTY_OPEN_READ_TIMEOUT_SECONDS = float(
+    os.getenv("GRINTA_PTY_OPEN_READ_TIMEOUT_SECONDS", "2.0")
+)
+PTY_INPUT_READ_TIMEOUT_SECONDS = float(
+    os.getenv("GRINTA_PTY_INPUT_READ_TIMEOUT_SECONDS", "1.0")
+)
+PTY_READ_POLL_INTERVAL_SECONDS = 0.05
+# Debugger pending-action floor: DAP step / continue can legitimately exceed
+# the default 60 s when stepping across slow native code, blocking I/O, or
+# breakpoints in long-running coroutines. Use the same generous floor as
+# terminal/cmd actions.
+DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR = CMD_PENDING_ACTION_TIMEOUT_FLOOR
 # Native browser: per-stage fail-fast budgets (see GrintaNativeBrowser).
 BROWSER_SESSION_START_TIMEOUT_SEC = 90.0
 BROWSER_CDP_NAVIGATE_TIMEOUT_SEC = 20.0
@@ -370,8 +387,9 @@ RECALL_TOOL_NAME = "recall"
 SEMANTIC_RECALL_TOOL_NAME = "semantic_recall"
 # ── Security Risk ───────────────────────────────────────────────────
 SECURITY_RISK_DESC = (
-    "Optional. Your assessment of this action's safety risk (LOW/MEDIUM/HIGH). "
-    "If omitted, risk is classified automatically server-side. "
+    "Required. Your assessment of this action's safety risk (LOW/MEDIUM/HIGH). "
+    "Server may only escalate (e.g. true-unsafe commands always become HIGH); "
+    "it never silently lowers your label or invents one when omitted. "
     "See the SECURITY_RISK_ASSESSMENT section in the system prompt for definitions."
 )
 RISK_LEVELS = ["LOW", "MEDIUM", "HIGH"]
