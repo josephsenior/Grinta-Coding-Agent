@@ -64,6 +64,9 @@ def _should_initialize(enabled: bool) -> bool:
     if not enabled:
         logger.debug('Tracing disabled')
         return False
+    if _tracing_opt_out_active():
+        logger.debug('Tracing disabled by user opt-out env var')
+        return False
     if _state.initialized:
         logger.debug('Tracing already initialized')
         return False
@@ -274,8 +277,31 @@ def shutdown_tracing() -> None:
             _state.initialized = False
 
 
+def _tracing_opt_out_active() -> bool:
+    """Return True if the user has opted out of tracing.
+
+    Honors widely-used opt-out conventions plus a Grinta-specific override:
+
+    * ``DO_NOT_TRACK`` \u2014 https://consoledonottrack.com/ convention
+    * ``GRINTA_DISABLE_METRICS`` \u2014 explicit project-level override
+
+    Any value that parses as truthy (``1``/``true``/``yes``/``on``) disables
+    tracing regardless of ``TRACING_ENABLED``.
+    """
+    for var in ('DO_NOT_TRACK', 'GRINTA_DISABLE_METRICS'):
+        raw = os.getenv(var)
+        if raw is None:
+            continue
+        if raw.strip().lower() in ('1', 'true', 'yes', 'on'):
+            return True
+    return False
+
+
 # Auto-initialize tracing on module import if enabled
-if os.getenv('TRACING_ENABLED', 'true').lower() == 'true':
+if (
+    os.getenv('TRACING_ENABLED', 'true').lower() == 'true'
+    and not _tracing_opt_out_active()
+):
     initialize_tracing(
         service_name=os.getenv('TRACING_SERVICE_NAME', 'app'),
         service_version=os.getenv('TRACING_SERVICE_VERSION', '1.0.0'),
@@ -283,4 +309,9 @@ if os.getenv('TRACING_ENABLED', 'true').lower() == 'true':
         endpoint=os.getenv('TRACING_ENDPOINT'),
         sample_rate=float(os.getenv('TRACING_SAMPLE_RATE', '0.1')),
         enabled=True,
+    )
+elif _tracing_opt_out_active():
+    logger.info(
+        'Tracing disabled by user opt-out '
+        '(DO_NOT_TRACK or GRINTA_DISABLE_METRICS is set).'
     )

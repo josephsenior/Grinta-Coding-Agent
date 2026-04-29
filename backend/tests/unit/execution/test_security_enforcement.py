@@ -137,13 +137,13 @@ class TestEnforceSecurity:
         from backend.ledger.action import ActionConfirmationStatus
 
         analyzer = MagicMock()
+        analyzer.security_risk = AsyncMock(return_value=ActionSecurityRisk.HIGH)
         rt = _FakeRuntime(analyzer=analyzer, enforce=True, block_high=False)
         action = MagicMock()
         action.action = 'test_action'
         action.confirmation_state = ActionConfirmationStatus.REJECTED  # Not CONFIRMED
         with patch('asyncio.get_running_loop', side_effect=RuntimeError):
-            with patch('asyncio.run', return_value=ActionSecurityRisk.HIGH):
-                result = rt._enforce_security(action)
+            result = rt._enforce_security(action)
         assert result is not None
         assert result.__class__.__name__ == 'NullObservation'
         assert (

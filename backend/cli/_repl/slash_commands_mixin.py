@@ -335,13 +335,120 @@ class SlashCommandsMixin:
         return True
 
     def _cmd_status(self, parsed) -> bool:
-        if self._reject_extra_args(parsed):
+        verbose = False
+        if parsed.args:
+            arg = parsed.args[0].strip().lower()
+            if arg in ('-v', '--verbose', 'verbose', 'v', 'full'):
+                verbose = True
+            else:
+                self._warn(f'Usage: {self._usage(parsed.name)}')
+                return True
+            if len(parsed.args) > 1:
+                self._warn(f'Usage: {self._usage(parsed.name)}')
+                return True
+        if self._renderer is None:
             return True
-        if self._renderer is not None:
-            self._renderer.add_system_message(
-                self._hud.plain_text(), title='status'
-            )
+        body = self._hud.plain_text()
+        if verbose:
+            body = body + '\n\n' + self._build_status_diagnostics()
+        self._renderer.add_system_message(body, title='status')
         return True
+
+    def _build_status_diagnostics(self) -> str:
+        """Best-effort runtime diagnostics for ``/status verbose``.
+
+        All attribute accesses are wrapped \u2014 if any subsystem isn't wired up
+        yet (no active controller, no breaker, etc.) the line is shown as
+        ``n/a`` rather than raising.
+        """
+        import os
+
+        lines: list[str] = ['Diagnostics:']
+
+        controller = self._controller
+        breaker_state = 'n/a'
+        consecutive_errors: int | str = 'n/a'
+        error_rate: float | str = 'n/a'
+        if controller is not None:
+            breaker = getattr(controller, 'circuit_breaker', None)
+            if breaker is not None:
+                consecutive_errors = getattr(breaker, 'consecutive_errors', 'n/a')
+                try:
+                    error_rate = round(float(breaker._calculate_error_rate()), 3)
+                except Exception:
+                    error_rate = 'n/a'
+                breaker_state = (
+                    'tripped'
+                    if isinstance(consecutive_errors, int)
+                    and consecutive_errors >= getattr(
+                        getattr(breaker, 'config', None),
+                        'max_consecutive_errors',
+                        10**9,
+                    )
+                    else 'closed'
+                )
+        lines.append(
+            f'  circuit_breaker: state={breaker_state} '
+            f'consecutive_errors={consecutive_errors} error_rate={error_rate}'
+        )
+
+        event_stream_depth: int | str = 'n/a'
+        if controller is not None:
+            stream = getattr(controller, 'event_stream', None) or getattr(
+                controller, '_event_stream', None
+            )
+            if stream is not None:
+                queue = getattr(stream, '_queue', None)
+                if queue is not None:
+                    try:
+                        event_stream_depth = queue.qsize()
+                    except Exception:
+                        event_stream_depth = 'n/a'
+        lines.append(f'  event_stream_queue_depth: {event_stream_depth}')
+
+        checkpoint_count: int | str = 'n/a'
+        if controller is not None:
+            ckpt_mgr = getattr(controller, 'checkpoint_manager', None)
+            if ckpt_mgr is not None:
+                checkpoints = getattr(ckpt_mgr, 'checkpoints', None) or getattr(
+                    ckpt_mgr, '_checkpoints', None
+                )
+                try:
+                    if checkpoints is not None:
+                        checkpoint_count = len(checkpoints)
+                except Exception:
+                    checkpoint_count = 'n/a'
+        lines.append(f'  checkpoints: {checkpoint_count}')
+
+        condensation_count: int | str = 'n/a'
+        if controller is not None:
+            state_obj = getattr(controller, 'state', None)
+            if state_obj is not None:
+                condensation_count = getattr(
+                    state_obj, 'condensation_count', 'n/a'
+                )
+        lines.append(f'  condensation_events: {condensation_count}')
+
+        hud = self._hud.state
+        lines.append(
+            f'  cost: ${hud.cost_usd:.4f} ({hud.context_tokens:,} ctx tokens, '
+            f'{hud.llm_calls} LLM calls)'
+        )
+
+        tracing_optout = any(
+            os.getenv(var, '').strip().lower() in ('1', 'true', 'yes', 'on')
+            for var in ('DO_NOT_TRACK', 'GRINTA_DISABLE_METRICS')
+        )
+        tracing_enabled_env = (
+            os.getenv('TRACING_ENABLED', 'true').lower() == 'true'
+            and not tracing_optout
+        )
+        lines.append(
+            f'  tracing: enabled={tracing_enabled_env} '
+            f'opt_out_env={tracing_optout}'
+        )
+
+        return '\n'.join(lines)
 
     def _cmd_cost(self, parsed) -> bool:
         if self._reject_extra_args(parsed):

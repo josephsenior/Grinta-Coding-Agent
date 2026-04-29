@@ -53,7 +53,9 @@ class TestGetNextAction:
         ctx = _make_context()
         confirmed_action = MagicMock()
         ctx.confirmation_service = MagicMock()
-        ctx.confirmation_service.get_next_action.return_value = confirmed_action
+        ctx.confirmation_service.aget_next_action = AsyncMock(
+            return_value=confirmed_action
+        )
         mock_controller = MagicMock()
         mock_controller._replay_manager.should_replay.return_value = True
         ctx.get_controller.return_value = mock_controller

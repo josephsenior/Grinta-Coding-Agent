@@ -143,7 +143,10 @@ _SLASH_COMMANDS = (
         '/retry', 'Re-send the last message', '/retry', help_section='control'
     ),
     SlashCommandSpec(
-        '/status', 'Show the current HUD snapshot', '/status', help_section='control'
+        '/status',
+        'Show the current HUD snapshot (use `verbose` for diagnostics)',
+        '/status [verbose]',
+        help_section='control',
     ),
     SlashCommandSpec(
         '/cost',
