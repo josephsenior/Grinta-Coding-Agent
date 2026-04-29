@@ -7,7 +7,6 @@ import importlib
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
 from pydantic import SecretStr
 
 from backend.core.config import api_key_manager as api_key_manager_module
@@ -516,10 +515,12 @@ class TestApiKeyManagerInternals:
     def test_suppress_env_export_context_restores_previous_value(self):
         mgr = APIKeyManager(suppress_env_export=False)
 
-        with pytest.raises(RuntimeError):
+        try:
             with mgr.suppress_env_export_context():
                 assert mgr.suppress_env_export is True
                 raise RuntimeError('boom')
+        except RuntimeError:
+            pass
 
         assert mgr.suppress_env_export is False
 

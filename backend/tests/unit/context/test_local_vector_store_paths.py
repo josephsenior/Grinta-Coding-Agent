@@ -14,9 +14,8 @@ def test_chromadb_backend_defaults_to_project_storage_memory_chroma(tmp_path) ->
     fake_collection.count.return_value = 0
     fake_client.get_collection.side_effect = Exception('missing')
     fake_client.create_collection.return_value = fake_collection
-    fake_model = MagicMock()
-    fake_sentence_transformers = types.SimpleNamespace(
-        SentenceTransformer=MagicMock(return_value=fake_model)
+    fake_ef_module = types.SimpleNamespace(
+        DefaultEmbeddingFunction=MagicMock(return_value=MagicMock())
     )
 
     with (
@@ -32,12 +31,12 @@ def test_chromadb_backend_defaults_to_project_storage_memory_chroma(tmp_path) ->
             'chromadb.config.Settings',
             side_effect=lambda **kwargs: kwargs,
         ),
-        patch.dict(
-            'sys.modules',
-            {'sentence_transformers': fake_sentence_transformers},
+        patch(
+            'chromadb.utils.embedding_functions',
+            fake_ef_module,
         ),
     ):
-        backend = ChromaDBBackend()
+        backend = ChromaDBBackend(warm_model_in_background=False)
 
     assert backend.client is fake_client
     assert (tmp_path / '.grinta' / 'storage' / 'memory' / 'chroma').exists()

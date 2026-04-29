@@ -254,20 +254,18 @@ def _summary_code_intelligence(args: dict[str, Any]) -> str:
     return _trunc(' · '.join(bits), 120) if bits else 'LSP…'
 
 
-def _summary_explore_tree(args: dict[str, Any]) -> str:
-    p = _arg_str(args, 'path', 'root')
-    return p if p else 'directory tree'
+def _summary_analyze_project(_args: dict[str, Any]) -> str:
+    return 'scan workspace'
 
 
 def _summary_read_symbol(args: dict[str, Any]) -> str:
-    sym = args.get('symbol') or args.get('name')
-    path = args.get('file') or args.get('path')
-    bits = [str(x) for x in (sym, path) if x]
-    return _trunc(' · '.join(bits), 120) if bits else 'symbol…'
-
-
-def _summary_analyze_project(_args: dict[str, Any]) -> str:
-    return 'scan workspace'
+    entities = args.get('entity_names')
+    if isinstance(entities, list) and entities:
+        first = str(entities[0])
+        if len(entities) == 1:
+            return _trunc(first, 60)
+        return f'{_trunc(first, 40)} (+{len(entities) - 1})'
+    return 'read symbol'
 
 
 def _summary_apply_patch(_args: dict[str, Any]) -> str:
@@ -343,9 +341,8 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'task_tracker': _summary_task_tracker,
     'search_code': _summary_search_code,
     'code_intelligence': _summary_code_intelligence,
-    'explore_tree_structure': _summary_explore_tree,
-    'read_symbol_definition': _summary_read_symbol,
     'analyze_project_structure': _summary_analyze_project,
+    'read_symbol_definition': _summary_read_symbol,
     'apply_patch': _summary_apply_patch,
     'verify_file_lines': _summary_verify_file,
     'delegate_task': _summary_delegate_task,

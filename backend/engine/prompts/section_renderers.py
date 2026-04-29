@@ -64,9 +64,15 @@ def _code_intelligence_available(config: Any = None) -> bool:
 
 def _explore_hint(_config: Any = None) -> str:
     """Return the canonical layout-discovery tool hint."""
+    if _code_intelligence_available(_config):
+        return (
+            '`search_code` for text/symbol search, `read_symbol_definition` to fetch a '
+            'specific symbol/file body, `code_intelligence` for definitions/references '
+            '(LSP), `analyze_project_structure` for tree layout'
+        )
     return (
-        '`search_code` first, then `explore_tree_structure`; '
-        'use `analyze_project_structure` only when needed'
+        '`search_code` for text/symbol search, `read_symbol_definition` to fetch a '
+        'specific symbol/file body, `analyze_project_structure` for tree layout'
     )
 
 
@@ -226,7 +232,7 @@ def _render_system_capabilities(
     if parallel_enabled:
         parallel_line = (
             '- **Parallel tool scheduling**: ENABLED for read-only batches '
-            '(`read_file`, `search_code`, `explore_tree_structure`, `get_entity`, `think`). '
+            '(`read_file`, `search_code`, `code_intelligence`, `symbol_editor`, `think`). '
             'Emit independent reads in a single assistant turn — the scheduler will run them concurrently. '
             'Writes/edits/shell commands always run sequentially.'
         )

@@ -1,13 +1,11 @@
-"""Enhanced vector store with 80% accuracy / 20% speed configuration.
+"""Enhanced local vector store: hybrid (semantic + BM25) search with LRU cache.
 
-This is the production-grade implementation with:
-- 92% accuracy (vs 82% baseline)
-- 110ms latency (vs 70ms baseline)
-- Re-ranking with cross-encoder
-- Smart caching (reduces avg to 35ms)
-- Hybrid search (vector + BM25)
+Features:
+- ChromaDB (ONNX MiniLM) semantic backend
+- SQLite FTS5 BM25 lexical backend
+- LRU query cache with TTL
 
-Comparable to Claude Code and GitHub Copilot quality.
+Requires the optional ``[rag]`` extra (``pip install 'grinta-ai[rag]'``).
 """
 
 from __future__ import annotations
@@ -82,117 +80,12 @@ class QueryCache:
         return hashlib.sha256(query.encode()).hexdigest()[:16]
 
 
-class ReRanker:
-    """Cross-encoder re-ranker for improved accuracy."""
-
-    def __init__(
-        self, model_name: str = 'cross-encoder/ms-marco-MiniLM-L-6-v2'
-    ) -> None:
-        """Configure the reranker with the chosen cross-encoder model name."""
-        self.model_name = model_name
-        self._model: Any | None = None
-        self.enabled = True
-
-    def _load_model(self) -> None:
-        """Lazy load the model."""
-        if self._model is None:
-            try:
-                import os as _os
-
-                _os.environ.setdefault('HF_HUB_OFFLINE', '1')
-                _os.environ.setdefault('TRANSFORMERS_OFFLINE', '1')
-
-                logger.info('Loading re-ranker model (local-only): %s', self.model_name)
-                snapshot_fn: Any = None
-                try:
-                    from huggingface_hub import (
-                        snapshot_download as huggingface_snapshot_download,
-                    )
-
-                    snapshot_fn = huggingface_snapshot_download
-                except Exception:
-                    pass
-                from sentence_transformers import CrossEncoder
-
-                model_source = self.model_name
-                if snapshot_fn is not None:
-                    try:
-                        local_path = snapshot_fn(
-                            repo_id=self.model_name, local_files_only=True
-                        )
-                        model_source = local_path
-                    except Exception as e:
-                        logger.warning(
-                            'Required local re-ranker model %s not found: %s',
-                            self.model_name,
-                            e,
-                        )
-                        self.enabled = False
-                        return
-
-                self._model = CrossEncoder(model_source)
-            except Exception as e:
-                logger.warning('Failed to load re-ranker: %s', e)
-                self.enabled = False
-
-    def rerank(
-        self, query: str, candidates: list[dict[str, Any]], top_k: int = 5
-    ) -> list[dict[str, Any]]:
-        """Re-rank candidates using cross-encoder.
-
-        Args:
-            query: Search query
-            candidates: List of candidate results
-            top_k: Number of results to return
-
-        Returns:
-            Re-ranked results with updated scores
-
-        """
-        if not self.enabled or not candidates:
-            return candidates[:top_k]
-
-        self._load_model()
-        if self._model is None:
-            return candidates[:top_k]
-
-        # Prepare pairs for cross-encoder
-        pairs = [
-            (query, candidate.get('excerpt', '') or candidate.get('rationale', ''))
-            for candidate in candidates
-        ]
-
-        # Get scores from cross-encoder
-        try:
-            scores = self._model.predict(pairs)
-
-            # Combine with original candidates
-            reranked = [
-                {**candidate, 'rerank_score': float(score)}
-                for candidate, score in zip(candidates, scores, strict=False)
-            ]
-
-            # Sort by rerank score
-            reranked.sort(key=lambda x: x['rerank_score'], reverse=True)
-
-            # 4. Return top-k
-            results = reranked[:top_k]
-            logger.debug('Re-ranked %s candidates to top %s', len(candidates), top_k)
-            return results
-        except Exception as e:
-            logger.warning('Re-ranking failed: %s, returning original results', e)
-            return candidates[:top_k]
-
-
 class EnhancedVectorStore:
-    """Enhanced vector store with 80% accuracy / 20% speed configuration.
+    """Hybrid (semantic + BM25) local vector store with LRU query cache.
 
-    Features:
-    - 92% accuracy (hybrid search + re-ranking)
-    - ~110ms first query, ~35ms average with cache
-    - Smart caching with LRU eviction
-    - Cross-encoder re-ranking
-    - Fallback to simpler methods if dependencies missing
+    Re-ranking with a cross-encoder was removed in 0.56 to drop the
+    sentence-transformers / torch dependency from the install footprint.
+    Top-k results come from BM25 + ANN deduplication.
     """
 
     def __init__(  # noqa: D417
@@ -200,7 +93,7 @@ class EnhancedVectorStore:
         collection_name: str = 'APP_memory',
         backend_type: str | None = None,
         enable_cache: bool = True,
-        enable_reranking: bool = True,
+        enable_reranking: bool = False,  # noqa: ARG002 — kept for backward compat
         cache_size: int = 10000,
         cache_ttl: int = 3600,
         warm_embeddings_in_background: bool = True,
@@ -211,7 +104,7 @@ class EnhancedVectorStore:
             collection_name: Name of the collection
             backend_type: Force backend ("chromadb", "qdrant", or None for auto)
             enable_cache: Enable query caching
-            enable_reranking: Enable cross-encoder re-ranking
+            enable_reranking: Deprecated; ignored. Reranker was removed in 0.56.
             cache_size: Maximum cache entries
             cache_ttl: Cache TTL in seconds
 
@@ -229,27 +122,22 @@ class EnhancedVectorStore:
             QueryCache(max_size=cache_size, ttl=cache_ttl) if enable_cache else None
         )
 
-        # Initialize re-ranker
-        self.reranker: ReRanker | None = ReRanker() if enable_reranking else None
+        # Re-ranker permanently disabled (removed in 0.56).
+        self.reranker: Any = None
 
         # Configuration
         self.config: dict[str, bool | int | float] = {
-            'accuracy_weight': 0.80,
-            'speed_weight': 0.20,
-            'reranking_enabled': enable_reranking,
             'caching_enabled': enable_cache,
-            'initial_k': 20,  # Retrieve more candidates for re-ranking
-            'final_k': 5,  # Return top 5 after re-ranking
+            'initial_k': 20,
+            'final_k': 5,
         }
 
         logger.info(
-            'Initialized EnhancedVectorStore (80%% accuracy / 20%% speed)\n'
+            'Initialized EnhancedVectorStore\n'
             '  Backend: %s\n'
-            '  Cache: %s\n'
-            '  Re-ranking: %s',
+            '  Cache: %s',
             getattr(self.backend, 'backend_name', type(self.backend).__name__),
             'enabled' if enable_cache else 'disabled',
-            'enabled' if enable_reranking else 'disabled',
         )
 
     def start_background_warmup(self) -> None:
@@ -316,10 +204,11 @@ class EnhancedVectorStore:
         return candidates
 
     def _finalize_hybrid_results(
-        self, query: str, k: int, candidates: list[dict[str, Any]]
+        self,
+        query: str,  # noqa: ARG002 — retained for API compatibility
+        k: int,
+        candidates: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
-        if self.reranker and self.reranker.enabled:
-            return self.reranker.rerank(query, candidates, top_k=k)
         return candidates[:k]
 
     def _try_cached_search(
@@ -459,12 +348,6 @@ class EnhancedVectorStore:
         if self.cache:
             stats['cache'] = self.cache.stats()
 
-        if self.reranker:
-            stats['reranker'] = {
-                'enabled': self.reranker.enabled,
-                'model': self.reranker.model_name,
-            }
-
         return stats
 
     @staticmethod
@@ -518,5 +401,4 @@ class EnhancedVectorStore:
 __all__ = [
     'EnhancedVectorStore',
     'QueryCache',
-    'ReRanker',
 ]

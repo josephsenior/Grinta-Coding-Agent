@@ -111,7 +111,7 @@ def test_launch_entry_runs_real_cli_session_via_subprocess(tmp_path: Path) -> No
     )
 
     assert result.returncode == 0, result.stderr or result.stdout
-    assert 'Input tips' in result.stdout
+    assert 'Input shortcuts' in result.stdout
     assert 'Quit grinta' in result.stdout
 
 

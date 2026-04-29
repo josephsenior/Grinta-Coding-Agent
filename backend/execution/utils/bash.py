@@ -304,12 +304,12 @@ class BashSession(BaseShellSession):
         """Fetch the active tmux window and pane, retrying if tmux is still booting."""
         last_exc: Exception | None = None
         for attempt in range(retries):
-            window = cast('Window | None', getattr(session, 'active_window', None))
+            window = getattr(session, 'active_window', None)
             if window is None:
                 time.sleep(delay)
                 continue
             try:
-                pane = cast('Pane | None', getattr(window, 'active_pane', None))
+                pane = getattr(window, 'active_pane', None)
             except libtmux.exc.LibTmuxException as exc:  # type: ignore[attr-defined]
                 pane_lookup_error = cast(Exception, exc)
                 last_exc = pane_lookup_error
@@ -503,7 +503,7 @@ class BashSession(BaseShellSession):
         )
         new_pane: Pane | None = None
         for _ in range(10):
-            new_pane = cast('Pane | None', getattr(new_window, 'active_pane', None))
+            new_pane = getattr(new_window, 'active_pane', None)
             if new_pane is not None:
                 return new_window, new_pane
             time.sleep(0.1)

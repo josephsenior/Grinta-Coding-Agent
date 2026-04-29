@@ -25,6 +25,9 @@ _Nothing yet._
   Python remains batteries-included via bundled `debugpy`.
 - `detect_lsp_servers()` and `detect_debug_adapters()` discovery helpers
   exported for diagnostics / UI.
+- Optional dependency extras: `[rag]` (chromadb + ONNX MiniLM-L6-v2),
+  `[documents]` (PyPDF2 / python-docx / python-pptx / pylatexenc),
+  `[browser]` (browser-use), and `[all]` (everything).
 
 ### Changed
 
@@ -32,6 +35,32 @@ _Nothing yet._
   `code_intelligence` tool whenever any supported LSP server is on `PATH`.
 - DAP `start` no longer requires the model to supply `adapter_command` for
   languages whose adapter is auto-discoverable.
+- **Massive install slim-down**: base wheel dropped from ~1.6GB to ~1.4MB.
+  Achieved by gating `chromadb` behind the `[rag]` extra, dropping the
+  redundant `sentence-transformers` + `torch` + `transformers` stack in
+  favour of chromadb's bundled ONNX `DefaultEmbeddingFunction` (384-dim,
+  ~80MB) when `[rag]` is installed, and moving document parsers
+  (`PyPDF2`, `python-docx`, `python-pptx`, `pylatexenc`) behind
+  `[documents]`. `enable_vector_memory` and `enable_hybrid_retrieval`
+  agent-config flags now default to `False`.
+- `MemoryMonitor` migrated from `memory-profiler` to a `psutil`-based RSS
+  sampler thread (no behaviour change for callers).
+
+### Removed
+
+- **GraphRAG** subsystem (`backend/context/graph_rag.py`,
+  `graph_store.py`) and its dependent tools (`explore_tree_structure`,
+  `read_symbol_definition`). The four remaining retrieval primitives
+  (`search_code` via ripgrep, `symbol_editor` via tree-sitter,
+  `code_intelligence` via LSP, `read_file`) cover the same surface
+  without the index-maintenance cost.
+- **`ReRanker`** class and the cross-encoder rerank step from
+  `EnhancedVectorStore` — over-engineered for a CLI agent's recall
+  workload. Hybrid retrieval now returns top-k candidates directly.
+- Unused dependencies dropped from base install: `sentence-transformers`,
+  `optimum`, `puremagic`, `memory-profiler`, plus the eager top-level
+  imports of `python-docx` / `python-pptx` / `pylatexenc` / `PyPDF2` /
+  `chromadb`.
 
 ## [0.55.0] - 2026-04-29
 

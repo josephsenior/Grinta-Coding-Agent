@@ -124,11 +124,18 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     )
     enable_vector_memory: bool = Field(
         default=DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
-        description='Enable persistent vector memory store',
+        description=(
+            'Enable persistent vector memory store. Disabled by default to keep '
+            "installs lean. Requires the optional [rag] extra "
+            '(`pip install "grinta-ai[rag]"`).'
+        ),
     )
     enable_hybrid_retrieval: bool = Field(
         default=DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED,
-        description='Enable hybrid retrieval for vector memory',
+        description=(
+            'Enable hybrid retrieval for vector memory. Requires '
+            'enable_vector_memory and the optional [rag] extra.'
+        ),
     )
     disabled_playbooks: list[str] = Field(
         default_factory=list, description='List of playbooks disabled for this agent'

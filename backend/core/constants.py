@@ -191,8 +191,12 @@ DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED = True
 DEFAULT_AGENT_BROWSING_ENABLED = True
 # In-process browser-use tools (optional dependency group `browser`)
 DEFAULT_AGENT_NATIVE_BROWSER_ENABLED = True
-DEFAULT_AGENT_VECTOR_MEMORY_ENABLED = True
-DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED = True
+# Vector memory & hybrid retrieval require the optional `[rag]` extra
+# (chromadb + bundled ONNX MiniLM). Off by default to keep the base install
+# lean (~150 MB vs ~400 MB). Enable via `--rag` CLI flag, agent config, or
+# AGENT_VECTOR_MEMORY_ENABLED=1 after running `pip install grinta-ai[rag]`.
+DEFAULT_AGENT_VECTOR_MEMORY_ENABLED = False
+DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED = False
 DEFAULT_AGENT_AUTO_LINT_ENABLED = True
 DEFAULT_AGENT_CONFIRM_ACTIONS = False
 DEFAULT_AGENT_AUTO_RETRY_ON_ERROR = True

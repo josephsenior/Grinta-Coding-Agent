@@ -5,7 +5,7 @@
   "license": "MIT",
   "depends": "python312",
   "url": "https://files.pythonhosted.org/packages/source/g/grinta-ai/grinta-ai-0.56.0.tar.gz",
-    "hash": "0a902cc1de015acbcbb2af79f3a81547da8c20fe00a927271e8dd9b695e747aa"
+  "hash": "327209e3b0232c1c2a79ea3525edfb19f3317314388b2ba8b9ef328b283c6956",
   "extract_dir": "grinta_ai-0.56.0",
   "installer": {
     "script": [

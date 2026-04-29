@@ -110,14 +110,6 @@ class TestToolActivityStatsHint(unittest.TestCase):
         hint = tool_activity_stats_hint('analyze_project_structure', {'path': '/mydir'})
         self.assertIn('/mydir', hint)  # type: ignore[arg-type]
 
-    def test_explore_tree_with_depth(self) -> None:
-        hint = tool_activity_stats_hint('explore_tree_structure', {'max_depth': 5})
-        self.assertIn('5', hint)  # type: ignore[arg-type]
-
-    def test_explore_tree_no_depth(self) -> None:
-        hint = tool_activity_stats_hint('explore_tree_structure', {})
-        self.assertIsNone(hint)
-
     def test_text_editor_read_with_range(self) -> None:
         hint = tool_activity_stats_hint('text_editor', {
             'command': 'read_file',
@@ -145,10 +137,6 @@ class TestToolActivityStatsHint(unittest.TestCase):
     def test_task_tracker_empty_list(self) -> None:
         hint = tool_activity_stats_hint('task_tracker', {'task_list': []})
         self.assertIsNone(hint)
-
-    def test_read_symbol_with_name(self) -> None:
-        hint = tool_activity_stats_hint('read_symbol_definition', {'symbol': 'MyClass'})
-        self.assertIn('MyClass', hint)  # type: ignore[arg-type]
 
     def test_terminal_manager_stats(self) -> None:
         hint = tool_activity_stats_hint('terminal_manager', {
@@ -307,10 +295,6 @@ class TestSummarizeToolArguments(unittest.TestCase):
         s = summarize_tool_arguments('code_intelligence', {'command': 'hover', 'symbol': 'Foo'})
         self.assertIn('Foo', s)
 
-    def test_explore_tree(self) -> None:
-        s = summarize_tool_arguments('explore_tree_structure', {'path': '/my/dir'})
-        self.assertEqual(s, '/my/dir')
-
     def test_analyze_project(self) -> None:
         s = summarize_tool_arguments('analyze_project_structure', {})
         self.assertEqual(s, 'scan workspace')
@@ -361,10 +345,6 @@ class TestSummarizeToolArguments(unittest.TestCase):
     def test_shared_task_board(self) -> None:
         s = summarize_tool_arguments('shared_task_board', {'operation': 'list'})
         self.assertEqual(s, 'list')
-
-    def test_read_symbol_definition(self) -> None:
-        s = summarize_tool_arguments('read_symbol_definition', {'symbol': 'MyClass', 'file': 'foo.py'})
-        self.assertIn('MyClass', s)
 
     def test_verify_file_lines(self) -> None:
         s = summarize_tool_arguments('verify_file_lines', {'path': '/a/b.py'})

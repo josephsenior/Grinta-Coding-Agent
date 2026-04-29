@@ -32,20 +32,7 @@ import_functions(
     module=file_reader, function_names=FILE_READER_EXPORTS, target_globals=globals()
 )
 exported_names = FILE_OPS_EXPORTS + FILE_READER_EXPORTS
-try:
-    from backend.execution.plugins.agent_skills import repo_ops
-
-    REPO_OPS_EXPORTS = [
-        'explore_tree_structure',
-        'get_entity_contents',
-        'search_code_snippets',
-    ]
-    import_functions(
-        module=repo_ops, function_names=REPO_OPS_EXPORTS, target_globals=globals()
-    )
-    exported_names += REPO_OPS_EXPORTS
-except ImportError:
-    pass
+# repo_ops is intentionally retired; keep skill docs focused on live functions.
 DOCUMENTATION = ''
 for func_name in exported_names:
     func = globals()[func_name]

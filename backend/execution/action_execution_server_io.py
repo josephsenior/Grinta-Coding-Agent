@@ -233,6 +233,12 @@ class RuntimeExecutorIOAndTerminalMixin:
     def _extract_failure_signature(content: str) -> str:
         return _extract_failure_signature_impl(content)
 
+    @staticmethod
+    def _append_debug_trace(payload: dict[str, Any]) -> None:
+        log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+        with open(log_path, 'a', encoding='utf-8') as _f:
+            _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+
     def _workspace_root(self) -> Path:
         return _workspace_root_impl(self)
 
@@ -600,9 +606,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                         'data': {'command': action.command or ''},
                         'timestamp': int(time.time() * 1000),
                     }
-                    log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
-                    with open(log_path, 'a', encoding='utf-8') as _f:
-                        _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+                    await asyncio.to_thread(self._append_debug_trace, payload)
                 except Exception:
                     pass
                 # #endregion
@@ -634,9 +638,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                         'data': {'command': action.command or '', 'cwd': cwd},
                         'timestamp': int(time.time() * 1000),
                     }
-                    log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
-                    with open(log_path, 'a', encoding='utf-8') as _f:
-                        _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+                    await asyncio.to_thread(self._append_debug_trace, payload)
                 except Exception:
                     pass
                 # #endregion
@@ -665,9 +667,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                         'data': {'rows': action.rows, 'cols': action.cols},
                         'timestamp': int(time.time() * 1000),
                     }
-                    log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
-                    with open(log_path, 'a', encoding='utf-8') as _f:
-                        _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+                    await asyncio.to_thread(self._append_debug_trace, payload)
                 except Exception:
                     pass
                 # #endregion
@@ -761,9 +761,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                     'data': {'error': str(exc), 'error_type': type(exc).__name__},
                     'timestamp': int(time.time() * 1000),
                 }
-                log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
-                with open(log_path, 'a', encoding='utf-8') as _f:
-                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+                await asyncio.to_thread(self._append_debug_trace, payload)
             except Exception:
                 pass
             # #endregion
@@ -865,9 +863,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                     },
                     'timestamp': int(time.time() * 1000),
                 }
-                log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
-                with open(log_path, 'a', encoding='utf-8') as _f:
-                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+                await asyncio.to_thread(self._append_debug_trace, payload)
             except Exception:
                 pass
             # #endregion

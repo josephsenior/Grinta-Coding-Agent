@@ -14,9 +14,16 @@ import sys
 OPTIONAL_TOP_LEVEL_MODULES = {
     # caching
     'redis',
-    # memory
+    # memory / RAG (extras: rag)
     'chromadb',
-    'sentence_transformers',
+    # documents (extras: documents)
+    'docx',
+    'pptx',
+    'pylatexenc',
+    'PyPDF2',
+    'pypdf',
+    # browser (extras: browser)
+    'browser_use',
     # telemetry
     'opentelemetry',
     'protobuf',
