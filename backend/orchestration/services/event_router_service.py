@@ -352,7 +352,7 @@ class EventRouterService:
             (DelegateTaskAction, self._handle_delegate_task_action),
         ):
             if isinstance(action, action_type):
-                await handler(action)
+                await handler(action)  # type: ignore[arg-type]
                 return
 
         if self._is_meta_cognition_action(action):

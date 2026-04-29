@@ -1,4 +1,4 @@
-"""Tests for backend.core.tracing – initialization, exporters, shutdown."""
+﻿"""Tests for backend.core.tracing â€“ initialization, exporters, shutdown."""
 
 from __future__ import annotations
 
@@ -197,7 +197,7 @@ class TestExporterHelpers(_TracingTestBase):
             'opentelemetry.exporter.otlp.proto.http.trace_exporter'
         )
         exporter_ctor = MagicMock(return_value='otlp_exporter')
-        exporter_module.OTLPSpanExporter = exporter_ctor
+        exporter_module.OTLPSpanExporter = exporter_ctor  # type: ignore[attr-defined]
 
         with patch.dict(
             sys.modules,
@@ -243,7 +243,7 @@ class TestExporterHelpers(_TracingTestBase):
     def test_try_jaeger_thrift_uses_endpoint_and_agent_settings(self):
         thrift_module = ModuleType('opentelemetry.exporter.jaeger.thrift')
         exporter_ctor = MagicMock(return_value='jaeger_exporter')
-        thrift_module.JaegerExporter = exporter_ctor
+        thrift_module.JaegerExporter = exporter_ctor  # type: ignore[attr-defined]
 
         with patch.dict(
             sys.modules,
@@ -309,7 +309,7 @@ class TestExporterHelpers(_TracingTestBase):
     def test_configure_zipkin_uses_endpoint(self):
         zipkin_module = ModuleType('opentelemetry.exporter.zipkin.json')
         exporter_ctor = MagicMock(return_value='zipkin_exporter')
-        zipkin_module.ZipkinExporter = exporter_ctor
+        zipkin_module.ZipkinExporter = exporter_ctor  # type: ignore[attr-defined]
 
         with patch.dict(
             sys.modules,
@@ -343,7 +343,7 @@ class TestExporterHelpers(_TracingTestBase):
     def test_configure_otlp_uses_endpoint(self):
         otlp_module = ModuleType('opentelemetry.exporter.otlp.proto.grpc.trace_exporter')
         exporter_ctor = MagicMock(return_value='grpc_exporter')
-        otlp_module.OTLPSpanExporter = exporter_ctor
+        otlp_module.OTLPSpanExporter = exporter_ctor  # type: ignore[attr-defined]
 
         with patch.dict(
             sys.modules,
@@ -402,9 +402,9 @@ class TestGetTracer(_TracingTestBase):
 
     def test_get_tracer_imports_trace_module_when_state_is_empty(self):
         trace_module = ModuleType('opentelemetry.trace')
-        trace_module.get_tracer = MagicMock(return_value='imported_tracer')
+        trace_module.get_tracer = MagicMock(return_value='imported_tracer')  # type: ignore[attr-defined]
         otel_module = _package('opentelemetry')
-        otel_module.trace = trace_module
+        otel_module.trace = trace_module  # type: ignore[attr-defined]
 
         tracing_mod._state.initialized = True
         tracing_mod._state.tracer = None

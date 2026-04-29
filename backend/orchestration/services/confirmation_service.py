@@ -95,7 +95,7 @@ class ConfirmationService:
             )
             return action
 
-        action = await controller.agent.astep(controller.state)
+        action = await controller.agent.astep(controller.state)  # type: ignore[attr-defined]
         action.source = EventSource.AGENT
         self._live_action_count += 1
         action_type = type(action).__name__

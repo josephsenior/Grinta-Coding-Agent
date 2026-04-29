@@ -22,7 +22,7 @@ from backend.inference.mappers.gemini import (
 
 def _assert_text_history_part(entry: dict[str, object], *, role: str, text: str) -> None:
     assert entry['role'] == role
-    part = entry['parts'][0]
+    part = entry['parts'][0]  # type: ignore[index]
     assert part['text'] == text
 
 
@@ -35,7 +35,7 @@ def _assert_function_call_history_part(
     signature: bytes,
 ) -> None:
     assert entry['role'] == role
-    part = entry['parts'][0]
+    part = entry['parts'][0]  # type: ignore[index]
     assert part['function_call']['name'] == name
     assert part['function_call']['args'] == args
     assert part['thought_signature'] == signature
@@ -49,7 +49,7 @@ def _assert_function_response_history_part(
     output: str,
 ) -> None:
     assert entry['role'] == role
-    part = entry['parts'][0]
+    part = entry['parts'][0]  # type: ignore[index]
     assert part['function_response']['name'] == name
     assert part['function_response']['response']['output'] == output
 
@@ -130,8 +130,8 @@ class TestExtractToolCallsThoughtSignature:
             ]
         )
         calls = extract_tool_calls(resp)
-        assert isinstance(calls[0]['thought_signature'], bytes)
-        assert calls[0]['thought_signature'] == sig
+        assert isinstance(calls[0]['thought_signature'], bytes)  # type: ignore[index]
+        assert calls[0]['thought_signature'] == sig  # type: ignore[index]
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ class TestConvertMessagesNativeToolHistory:
             },
             {'role': 'user', 'content': 'continue'},
         ]
-        sysi, hist, _ = convert_messages(messages)
+        sysi, hist, _ = convert_messages(messages)  # type: ignore[arg-type]
 
         assert sysi == 'sys'
         _assert_text_history_part(hist[0], role='user', text='find foo')

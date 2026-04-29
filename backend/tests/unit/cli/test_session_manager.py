@@ -1,4 +1,4 @@
-"""Tests for backend.cli.session_manager."""
+﻿"""Tests for backend.cli.session_manager."""
 
 from __future__ import annotations
 
@@ -139,7 +139,7 @@ class TestListSessions:
     def test_no_sessions(self, tmp_path: Path) -> None:
         console = _quiet_console()
         with patch('backend.cli.session_manager._find_sessions_root', return_value=tmp_path):
-            list_sessions(console)  # Empty dir — should not raise
+            list_sessions(console)  # Empty dir â€” should not raise
 
     def test_with_sessions(self, tmp_path: Path) -> None:
         _make_session_dir(tmp_path, 'sess-abc', {'title': 'Test', 'llm_model': 'openai/gpt-4o', 'accumulated_cost': 0.01, 'last_updated_at': '2024-01-01T12:00:00'}, event_count=2)
@@ -257,13 +257,13 @@ class TestResolveSessionId:
 
 class TestResolveSessionIndex:
     def test_valid_index(self) -> None:
-        sessions = [('sid1', {}, 0), ('sid2', {}, 0)]
+        sessions: list[Any] = [('sid1', {}, 0), ('sid2', {}, 0)]
         result, err = _resolve_session_index(sessions, '1')
         assert result == 'sid1'
         assert err is None
 
     def test_invalid_index(self) -> None:
-        sessions = [('sid1', {}, 0)]
+        sessions: list[Any] = [('sid1', {}, 0)]
         result, err = _resolve_session_index(sessions, '5')
         assert result is None
         assert err is not None
@@ -271,30 +271,30 @@ class TestResolveSessionIndex:
 
 class TestResolveSessionByIdOrPrefix:
     def test_exact_id_match(self) -> None:
-        sessions = [('session-abc123', {}, 0), ('session-xyz', {}, 0)]
+        sessions: list[Any] = [('session-abc123', {}, 0), ('session-xyz', {}, 0)]
         result, err = _resolve_session_by_id_or_prefix(sessions, 'session-abc123')
         assert result == 'session-abc123'
         assert err is None
 
     def test_unique_prefix(self) -> None:
-        sessions = [('session-abc', {}, 0), ('session-xyz', {}, 0)]
+        sessions: list[Any] = [('session-abc', {}, 0), ('session-xyz', {}, 0)]
         result, err = _resolve_session_by_id_or_prefix(sessions, 'session-a')
         assert result == 'session-abc'
         assert err is None
 
     def test_ambiguous_prefix(self) -> None:
-        sessions = [('session-abc1', {}, 0), ('session-abc2', {}, 0)]
+        sessions: list[Any] = [('session-abc1', {}, 0), ('session-abc2', {}, 0)]
         result, err = _resolve_session_by_id_or_prefix(sessions, 'session-abc')
         assert result is None
         assert 'ambiguous' in (err or '').lower()
 
     def test_no_match(self) -> None:
-        sessions = [('session-abc', {}, 0)]
+        sessions: list[Any] = [('session-abc', {}, 0)]
         result, err = _resolve_session_by_id_or_prefix(sessions, 'zzz')
         assert result is None
 
     def test_more_than_4_ambiguous_matches(self) -> None:
-        sessions = [(f'session-abc{i}', {}, 0) for i in range(6)]
+        sessions: list[Any] = [(f'session-abc{i}', {}, 0) for i in range(6)]
         result, err = _resolve_session_by_id_or_prefix(sessions, 'session-abc')
         assert result is None
         assert '...' in (err or '')
@@ -329,7 +329,7 @@ class TestGetSessionSuggestions:
             _make_session_dir(tmp_path, f'sess-{i:04d}', {'last_updated_at': f'2024-01-{i+1:02d}T00:00:00'})
         with patch('backend.cli.session_manager._find_sessions_root', return_value=tmp_path):
             suggestions = get_session_suggestions(limit=2)
-        # 2 sessions × 2 entries each = 4
+        # 2 sessions Ã— 2 entries each = 4
         assert len(suggestions) == 4
 
     def test_fallback_title(self, tmp_path: Path) -> None:

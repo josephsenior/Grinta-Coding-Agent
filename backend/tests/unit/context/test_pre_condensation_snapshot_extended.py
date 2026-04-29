@@ -1,3 +1,4 @@
+﻿from typing import Any
 """Tests for pre_condensation_snapshot covering attempted approaches extraction."""
 
 from __future__ import annotations
@@ -159,7 +160,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         )
 
     def test_extract_file_info_handles_reads_and_cmd_paths(self):
-        snapshot = {'files_touched': {}}
+        snapshot: dict[str, Any] = {'files_touched': {}}
 
         snapshot_module._extract_file_info(
             _fake_event('FileReadObservation', path='src/app.py'), snapshot
@@ -187,10 +188,10 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         assert snapshot['recent_errors'] == ['x'] * snapshot_module._MAX_ERRORS
 
     def test_extract_decisions_skips_boilerplate_and_honors_limit(self):
-        snapshot = {'decisions': []}
+        snapshot: dict[str, Any] = {'decisions': []}
 
         snapshot_module._extract_decisions(
-            _fake_event('AgentThinkObservation', thought='🔍 SELF-REFLECTION: boilerplate'),
+            _fake_event('AgentThinkObservation', thought='Ã°Å¸â€Â SELF-REFLECTION: boilerplate'),
             snapshot,
         )
         snapshot_module._extract_decisions(
@@ -207,7 +208,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         assert full_snapshot['decisions'] == ['d'] * snapshot_module._MAX_DECISIONS
 
     def test_extract_commands_honors_limit_and_truncates_long_output(self):
-        full_snapshot = {'recent_commands': [{}] * snapshot_module._MAX_COMMANDS}
+        full_snapshot: dict[str, Any] = {'recent_commands': [{}] * snapshot_module._MAX_COMMANDS}
         snapshot_module._extract_commands(
             _fake_event('CmdRunAction', command='pytest'), full_snapshot
         )
@@ -284,7 +285,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
             (snapshot_module._format_commands_section, []),
             (snapshot_module._format_approaches_section, []),
         ):
-            assert formatter(payload) == []
+            assert formatter(payload) == []  # type: ignore[arg-type]
 
         files = snapshot_module._format_files_section({'a.py': {'action': 'edit'}})
         errors = snapshot_module._format_errors_section(['boom'])
@@ -301,10 +302,10 @@ class TestPreCondensationSnapshot(unittest.TestCase):
 
         assert [files[-1], errors[-1], decisions[-1], commands[-2], commands[-1]] == [
             '  edit: a.py',
-            '  • boom',
-            '  • choose branch a',
+            '  Ã¢â‚¬Â¢ boom',
+            '  Ã¢â‚¬Â¢ choose branch a',
             '  $ pytest',
-            '    → ok',
+            '    Ã¢â€ â€™ ok',
         ]
         assert 'FAILED approaches' in approaches[1]
         assert 'Succeeded approaches:' in approaches[-2]

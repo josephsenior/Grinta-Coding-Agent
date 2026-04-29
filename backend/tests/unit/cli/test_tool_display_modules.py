@@ -96,7 +96,7 @@ class TestFriendlyVerbForTool(unittest.TestCase):
 class TestToolActivityStatsHint(unittest.TestCase):
     def test_search_code_with_path(self) -> None:
         hint = tool_activity_stats_hint('search_code', {'path': '/src'})
-        self.assertIn('/src', hint)
+        self.assertIn('/src', hint)  # type: ignore[arg-type]
 
     def test_search_code_no_path(self) -> None:
         hint = tool_activity_stats_hint('search_code', {})
@@ -104,15 +104,15 @@ class TestToolActivityStatsHint(unittest.TestCase):
 
     def test_analyze_project_with_depth(self) -> None:
         hint = tool_activity_stats_hint('analyze_project_structure', {'depth': 3})
-        self.assertIn('3', hint)
+        self.assertIn('3', hint)  # type: ignore[arg-type]
 
     def test_analyze_project_with_path(self) -> None:
         hint = tool_activity_stats_hint('analyze_project_structure', {'path': '/mydir'})
-        self.assertIn('/mydir', hint)
+        self.assertIn('/mydir', hint)  # type: ignore[arg-type]
 
     def test_explore_tree_with_depth(self) -> None:
         hint = tool_activity_stats_hint('explore_tree_structure', {'max_depth': 5})
-        self.assertIn('5', hint)
+        self.assertIn('5', hint)  # type: ignore[arg-type]
 
     def test_explore_tree_no_depth(self) -> None:
         hint = tool_activity_stats_hint('explore_tree_structure', {})
@@ -126,7 +126,7 @@ class TestToolActivityStatsHint(unittest.TestCase):
             'view_range_end': 20,
         })
         self.assertIsNotNone(hint)
-        self.assertIn('10', hint)
+        self.assertIn('10', hint)  # type: ignore[arg-type]
 
     def test_text_editor_replace_with_path(self) -> None:
         hint = tool_activity_stats_hint('text_editor', {
@@ -140,7 +140,7 @@ class TestToolActivityStatsHint(unittest.TestCase):
             'task_list': [{'title': 'A'}, {'title': 'B'}],
         })
         self.assertIsNotNone(hint)
-        self.assertIn('2', hint)
+        self.assertIn('2', hint)  # type: ignore[arg-type]
 
     def test_task_tracker_empty_list(self) -> None:
         hint = tool_activity_stats_hint('task_tracker', {'task_list': []})
@@ -148,7 +148,7 @@ class TestToolActivityStatsHint(unittest.TestCase):
 
     def test_read_symbol_with_name(self) -> None:
         hint = tool_activity_stats_hint('read_symbol_definition', {'symbol': 'MyClass'})
-        self.assertIn('MyClass', hint)
+        self.assertIn('MyClass', hint)  # type: ignore[arg-type]
 
     def test_terminal_manager_stats(self) -> None:
         hint = tool_activity_stats_hint('terminal_manager', {
@@ -156,7 +156,7 @@ class TestToolActivityStatsHint(unittest.TestCase):
             'session_id': 'sess-abc',
         })
         self.assertIsNotNone(hint)
-        self.assertIn('sess-abc', hint)
+        self.assertIn('sess-abc', hint)  # type: ignore[arg-type]
 
     def test_terminal_manager_open_no_stats(self) -> None:
         hint = tool_activity_stats_hint('terminal_manager', {
@@ -653,13 +653,13 @@ class TestMcpCountSummary(unittest.TestCase):
     def test_total_count(self) -> None:
         result = _mcp_count_summary({'total_count': 5, 'query': 'foo'})
         self.assertIsNotNone(result)
-        self.assertIn('5', result)
-        self.assertIn('foo', result)
+        self.assertIn('5', result)  # type: ignore[arg-type]
+        self.assertIn('foo', result)  # type: ignore[arg-type]
 
     def test_count_key(self) -> None:
         result = _mcp_count_summary({'count': 3})
         self.assertIsNotNone(result)
-        self.assertIn('3', result)
+        self.assertIn('3', result)  # type: ignore[arg-type]
 
     def test_no_count(self) -> None:
         result = _mcp_count_summary({'something': 'else'})
@@ -670,12 +670,12 @@ class TestMcpSearchCodeSummary(unittest.TestCase):
     def test_search_code_in_content(self) -> None:
         result = _mcp_search_code_summary({'results': ['a', 'b']}, 'search_code result')
         self.assertIsNotNone(result)
-        self.assertIn('2', result)
+        self.assertIn('2', result)  # type: ignore[arg-type]
 
     def test_tool_name_is_search_code(self) -> None:
         result = _mcp_search_code_summary({'tool_name': 'search_code', 'total_count': 7}, '')
         self.assertIsNotNone(result)
-        self.assertIn('7', result)
+        self.assertIn('7', result)  # type: ignore[arg-type]
 
     def test_no_match(self) -> None:
         result = _mcp_search_code_summary({}, 'some other content')
@@ -686,7 +686,7 @@ class TestMcpCollectionSummary(unittest.TestCase):
     def test_results_list(self) -> None:
         result = _mcp_collection_summary({'results': ['a', 'b', 'c']}, max_len=100)
         self.assertIsNotNone(result)
-        self.assertIn('3', result)
+        self.assertIn('3', result)  # type: ignore[arg-type]
 
     def test_items_list(self) -> None:
         result = _mcp_collection_summary({'items': ['x']}, max_len=100)
@@ -701,7 +701,7 @@ class TestMcpTextFieldSummary(unittest.TestCase):
     def test_text_field(self) -> None:
         result = _mcp_text_field_summary({'text': 'hello world'}, max_len=100)
         self.assertIsNotNone(result)
-        self.assertIn('hello', result)
+        self.assertIn('hello', result)  # type: ignore[arg-type]
 
     def test_message_field(self) -> None:
         result = _mcp_text_field_summary({'message': 'task complete'}, max_len=100)
@@ -724,7 +724,7 @@ class TestMcpErrorSummary(unittest.TestCase):
     def test_error_string(self) -> None:
         result = _mcp_error_summary({'error': 'not found'}, max_len=100)
         self.assertIsNotNone(result)
-        self.assertIn('not found', result)
+        self.assertIn('not found', result)  # type: ignore[arg-type]
 
     def test_error_dict_with_message(self) -> None:
         result = _mcp_error_summary({'error': {'message': 'bad request'}}, max_len=100)

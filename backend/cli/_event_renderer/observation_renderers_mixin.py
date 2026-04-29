@@ -99,6 +99,9 @@ class ObservationRenderersMixin:
         _hud: Any
         _reasoning: Any
         _pending_activity_card: Any
+        _pending_shell_command: str | None
+        _pending_shell_action: tuple[str, str] | None
+        _pending_shell_title: str | None
         _delegate_workers: Any
         _delegate_batch_id: Any
         _stream_fallback_count: Any

@@ -97,7 +97,10 @@ class ActionRenderersMixin:
     if TYPE_CHECKING:
         _reasoning: Any
         _cli_tool_icons: Any
-        _pending_shell_action: Any
+        _pending_shell_action: tuple[str, str] | None
+        _pending_shell_command: str | None
+        _pending_shell_title: str | None
+        _pending_shell_is_internal: bool
         _pending_activity_card: Any
 
         def refresh(self) -> None: ...

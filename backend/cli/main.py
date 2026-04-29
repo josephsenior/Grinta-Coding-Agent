@@ -42,7 +42,7 @@ def _create_console(*args: Any, **kwargs: Any) -> Any:
     return RichConsole(*args, **kwargs)
 
 
-Console = _create_console
+Console = _create_console  # type: ignore[misc,assignment]
 
 
 def _normalize_project_arg_early(value: str) -> str:

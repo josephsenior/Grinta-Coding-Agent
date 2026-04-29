@@ -354,7 +354,7 @@ def detect_powershell_in_bash_mismatch(command: str, content: str) -> str | None
 
     missing_cmd = _missing_bash_command_name(content)
     if missing_cmd in aes._POWERSHELL_BUILTIN_COMMANDS:
-        return _powershell_cmdlet_hint(missing_cmd)
+        return _powershell_cmdlet_hint(missing_cmd)  # type: ignore[arg-type]
 
     command_cmdlet = _powershell_cmdlet_in_command(aes, command)
     if command_cmdlet is not None:

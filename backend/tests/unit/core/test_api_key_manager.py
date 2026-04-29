@@ -1,4 +1,4 @@
-"""Tests for backend.core.config.api_key_manager — provider detection + key validation."""
+﻿"""Tests for backend.core.config.api_key_manager â€” provider detection + key validation."""
 
 from __future__ import annotations
 
@@ -540,7 +540,7 @@ class TestApiKeyManagerInternals:
             def get_secret_value(self):
                 raise RuntimeError('cannot read')
 
-        assert mgr._is_correct_provider_key(_BrokenSecret(), 'openai') is False
+        assert mgr._is_correct_provider_key(_BrokenSecret(), 'openai') is False  # type: ignore[arg-type]
 
     def test_module_creates_global_instance_when_missing(self):
         existing = getattr(builtins, 'app_api_key_manager_instance', None)

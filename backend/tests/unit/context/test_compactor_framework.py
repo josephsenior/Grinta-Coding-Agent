@@ -1,4 +1,4 @@
-"""Tests for backend.context.compactor.compactor - compactor framework classes."""
+﻿"""Tests for backend.context.compactor.compactor - compactor framework classes."""
 
 from __future__ import annotations
 
@@ -330,7 +330,7 @@ class TestBaseLLMCompactor:
 
     def test_add_response_metadata_records_response_and_metrics(self):
         c = ConcreteLLMCompactor(llm=MagicMock(), max_size=10)
-        c.llm.metrics.get.return_value = {'tokens': 5}
+        c.llm.metrics.get.return_value = {'tokens': 5}  # type: ignore[union-attr]
 
         with patch(
             'backend.core.pydantic_compat.model_dump_with_options',
@@ -398,7 +398,7 @@ class TestBaseLLMCompactor:
                 raise RuntimeError('bad llm')
 
         c = ConcreteLLMCompactor(llm=None, max_size=10)
-        c.llm = _BrokenLLM()
+        c.llm = _BrokenLLM()  # type: ignore[assignment]
         with patch(
             'backend.inference.provider_capabilities.model_token_correction',
             return_value=(1.23, None),
