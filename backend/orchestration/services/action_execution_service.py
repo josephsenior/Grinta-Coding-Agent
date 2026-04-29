@@ -220,8 +220,23 @@ class ActionExecutionService:
             and replay_mgr.should_replay() is True
         )
 
-    def _get_confirmation_action(self) -> Action | None:
+    async def _get_confirmation_action(self) -> Action | None:
         confirmation = self._context.confirmation_service
+        # Prefer the async entry point so live-agent fallback awaits
+        # ``agent.astep`` on the current loop instead of going through the
+        # sync ``Engine.step`` shim (which previously fell back to an
+        # isolated event loop and broke cross-loop primitives in ``astep``).
+        aget_next_action = (
+            getattr(confirmation, 'aget_next_action', None)
+            if confirmation is not None
+            else None
+        )
+        if callable(aget_next_action):
+            result = aget_next_action()
+            if inspect.isawaitable(result):
+                return await cast(Awaitable[Action], result)
+            # Mocks (or stale subclasses) may return a plain value.
+            return cast(Action | None, result)
         get_next_action = (
             getattr(confirmation, 'get_next_action', None)
             if confirmation is not None
@@ -318,7 +333,7 @@ class ActionExecutionService:
         controller = self._context.get_controller()
         use_confirmation_replay = self._should_use_confirmation_replay(controller)
         if use_confirmation_replay:
-            return self._get_confirmation_action(), True
+            return await self._get_confirmation_action(), True
         return await self._get_agent_step_action(attempt), False
 
     def _log_missing_action(self, attempt: int) -> None:

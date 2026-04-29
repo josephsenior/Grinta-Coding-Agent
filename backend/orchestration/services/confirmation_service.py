@@ -31,7 +31,15 @@ class ConfirmationService:
         self._live_action_count = 0
 
     def get_next_action(self) -> Action:
-        """Fetch the next action from replay logs or the agent directly."""
+        """Fetch the next action from replay logs or the agent directly.
+
+        Synchronous entry point retained for legacy test paths. Production
+        code on the agent loop must use :meth:`aget_next_action` so that the
+        live-agent fallback can ``await agent.astep(state)`` directly instead
+        of bouncing through :meth:`Engine.step`'s sync shim — that shim
+        previously fell back to an isolated event loop, which broke any
+        cross-loop ``asyncio`` primitives held inside ``astep``.
+        """
         controller = self._context.get_controller()
         if controller._replay_manager.should_replay():
             action = controller._replay_manager.step()
@@ -50,6 +58,44 @@ class ConfirmationService:
             return action
 
         action = controller.agent.step(controller.state)
+        action.source = EventSource.AGENT
+        self._live_action_count += 1
+        action_type = type(action).__name__
+        controller.log(
+            'debug',
+            f'Live action #{self._live_action_count}: {action_type}',
+            extra={
+                'msg_type': 'LIVE_ACTION',
+                'action_type': action_type,
+            },
+        )
+        return action
+
+    async def aget_next_action(self) -> Action:
+        """Async variant used by the agent loop.
+
+        Replay path stays synchronous (it just pops from a buffer). The live
+        path awaits ``agent.astep`` on the current event loop, eliminating the
+        sync ``Engine.step`` shim entirely for the only production caller.
+        """
+        controller = self._context.get_controller()
+        if controller._replay_manager.should_replay():
+            action = controller._replay_manager.step()
+            self._replay_action_count += 1
+            action_type = type(action).__name__
+            action_id = getattr(action, 'id', 'unknown')
+            controller.log(
+                'debug',
+                f'Replay action #{self._replay_action_count}: {action_type} (id={action_id})',
+                extra={
+                    'msg_type': 'REPLAY_ACTION',
+                    'replay_index': controller._replay_manager.replay_index,
+                    'action_type': action_type,
+                },
+            )
+            return action
+
+        action = await controller.agent.astep(controller.state)
         action.source = EventSource.AGENT
         self._live_action_count += 1
         action_type = type(action).__name__

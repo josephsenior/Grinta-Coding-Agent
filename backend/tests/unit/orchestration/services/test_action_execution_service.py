@@ -72,7 +72,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         mock_action = MagicMock(spec=Action)
 
         mock_confirmation = MagicMock()
-        mock_confirmation.get_next_action.return_value = mock_action
+        mock_confirmation.aget_next_action = AsyncMock(return_value=mock_action)
         self.mock_context.confirmation_service = mock_confirmation
         mock_controller = MagicMock()
         mock_controller._replay_manager.should_replay.return_value = True
@@ -82,7 +82,7 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
 
         # Should use confirmation service
         self.assertEqual(result, mock_action)
-        mock_confirmation.get_next_action.assert_called_once()
+        mock_confirmation.aget_next_action.assert_called_once()
         self.mock_context.agent.step.assert_not_called()
 
     async def test_get_next_action_malformed_action_error(self):

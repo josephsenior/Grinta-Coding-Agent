@@ -241,19 +241,29 @@ class Orchestrator(Agent):
     def step(self, state: State) -> Action:
         """Synchronous compatibility wrapper around :meth:`astep`.
 
-        Prefer ``await astep(state)`` from any async context; this wrapper is
-        a fragile shim for legacy/sync entry points (tests, replay).
+        Prefer ``await astep(state)`` from any async context. This shim only
+        exists for two scenarios and refuses anything else:
 
-        Behavior:
         * No running loop in this thread → ``asyncio.run(astep(state))``.
-        * Running loop in this thread → run ``astep`` in a worker thread
-          bound to either the registered main event loop (so cross-loop
-          primitives keep working) or, as a last resort, an isolated loop.
-          This pauses the calling thread; never call from the main loop
-          if you can ``await astep`` instead.
+          Used by sync test entry points and offline replay tools.
+        * Running loop in this thread that is **not** the registered main
+          loop, and the registered main loop *is* running → schedule
+          ``astep`` on the main loop via
+          ``asyncio.run_coroutine_threadsafe`` so any cross-loop primitives
+          inside ``astep`` (Locks/Events/Queues bound to the main loop)
+          stay attached to the right loop.
+
+        Calling ``step()`` from inside the main loop itself, or from a
+        worker thread when no main loop is registered, used to silently
+        fall back to an isolated event loop in a one-shot
+        ``ThreadPoolExecutor``. That fallback orphaned cross-loop
+        primitives and hid the misuse \u2014 it is now an explicit
+        ``RuntimeError``. The only production caller (replay-mode
+        ``ConfirmationService``) now uses :meth:`astep` directly via
+        :meth:`ConfirmationService.aget_next_action`, so this branch is
+        no longer reachable from the agent loop.
         """
         import asyncio
-        import concurrent.futures
         import threading
 
         from backend.utils.async_utils import get_main_event_loop
@@ -266,24 +276,22 @@ class Orchestrator(Agent):
         if current_loop is None:
             return asyncio.run(self.astep(state))
 
-        logger.warning(
-            'Engine.step() called from a running event loop; prefer await astep(). '
-            'caller_thread=%s',
-            threading.current_thread().name,
-        )
-
         main_loop = get_main_event_loop()
-        if main_loop is not None and main_loop is not current_loop and main_loop.is_running():
-            # Run on the registered main loop so any cross-loop primitives in
-            # astep stay attached to the right loop.
+        if (
+            main_loop is not None
+            and main_loop is not current_loop
+            and main_loop.is_running()
+        ):
+            # Run on the registered main loop so cross-loop primitives stay
+            # attached to the right loop.
             future = asyncio.run_coroutine_threadsafe(self.astep(state), main_loop)
             return future.result()
 
-        # Last resort: isolated loop in a worker thread. Cross-loop
-        # primitives in astep may misbehave under this path.
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            future = pool.submit(asyncio.run, self.astep(state))
-            return future.result()
+        raise RuntimeError(
+            'Engine.step() was called from inside a running event loop with no '
+            'separate registered main loop available. Use ``await self.astep(state)`` '
+            f'instead. caller_thread={threading.current_thread().name}'
+        )
 
     async def _attempt_graceful_context_degradation(
         self, state: State
