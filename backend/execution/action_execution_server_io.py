@@ -612,6 +612,24 @@ class RuntimeExecutorIOAndTerminalMixin:
                 if predicted_cwd is not None and hasattr(session, '_cwd'):
                     session._cwd = str(predicted_cwd)  # type: ignore[attr-defined]
 
+                # Poll for initial output — the PTY shell needs processing time
+                # before any bytes appear in the buffer.  Without a settle delay
+                # the immediate read is always empty (particularly pronounced on
+                # Windows / PowerShell where startup latency can exceed 500 ms).
+                # We poll in 50 ms ticks for up to 2 s and exit as soon as any
+                # output arrives; slow commands just need a follow-up read.
+                _open_poll_interval = 0.05   # seconds per tick
+                _open_poll_timeout  = 2.0    # give up and let model follow-up read
+                _open_waited = 0.0
+                while _open_waited < _open_poll_timeout:
+                    await asyncio.sleep(_open_poll_interval)
+                    _open_waited += _open_poll_interval
+                    _probe, *_ = self._read_terminal_with_mode(
+                        session=session, mode='delta', offset=0
+                    )
+                    if _probe:
+                        break
+
             content, next_offset, has_new_output, dropped_chars = self._read_terminal_with_mode(
                 session=session,
                 mode='delta',
