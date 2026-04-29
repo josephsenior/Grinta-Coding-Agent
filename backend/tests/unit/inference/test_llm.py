@@ -1,4 +1,4 @@
-"""Comprehensive tests for backend.inference.llm - LLM integration and exception mapping."""
+﻿"""Comprehensive tests for backend.inference.llm - LLM integration and exception mapping."""
 
 from types import SimpleNamespace
 from typing import cast
@@ -792,7 +792,7 @@ class TestInbandDisconnectDetection:
     """astream() must detect in-band provider disconnect messages and raise APIConnectionError.
 
     Regression suite for Lightning AI / DeepSeek proxy injecting disconnect
-    notices (e.g. "网络中断，请重新连接") as stream content instead of HTTP errors.
+    notices (e.g. "ç½‘ç»œä¸­æ–­ï¼Œè¯·é‡æ–°è¿žæŽ¥") as stream content instead of HTTP errors.
     """
 
     # ------------------------------------------------------------------ #
@@ -811,7 +811,7 @@ class TestInbandDisconnectDetection:
         llm = LLM.__new__(LLM)
         llm.debug = False  # satisfies DebugMixin.log_prompt / log_response
 
-        llm.config = SimpleNamespace(  # type: ignore[attr-defined]
+        llm.config = SimpleNamespace(  # type: ignore[attr-defined,assignment]
             model='lightning-ai/deepseek-v4-pro',
             temperature=0,
             max_output_tokens=None,
@@ -820,7 +820,7 @@ class TestInbandDisconnectDetection:
             timeout=None,
             seed=None,
             reasoning_effort=None,
-            num_retries=1,        # one attempt only → no retries
+            num_retries=1,        # one attempt only â†’ no retries
             retry_min_wait=0,
             retry_max_wait=0,
             on_cancel_requested_fn=None,
@@ -858,13 +858,13 @@ class TestInbandDisconnectDetection:
 
     def test_chinese_disconnect_raises_api_connection_error(self):
         """Chinese disconnect phrase from Lightning AI / DeepSeek proxy raises."""
-        llm = self._make_llm([self._make_chunk('网络中断，请重新连接')])
+        llm = self._make_llm([self._make_chunk('ç½‘ç»œä¸­æ–­ï¼Œè¯·é‡æ–°è¿žæŽ¥')])
         with pytest.raises(APIConnectionError, match='in-band disconnect'):
             self._run(llm)
 
     def test_disconnect_across_two_chunks_raises(self):
         """Phrase split across consecutive chunks is still detected."""
-        llm = self._make_llm([self._make_chunk('网络中断'), self._make_chunk('，请重新连接')])
+        llm = self._make_llm([self._make_chunk('ç½‘ç»œä¸­æ–­'), self._make_chunk('ï¼Œè¯·é‡æ–°è¿žæŽ¥')])
         with pytest.raises(APIConnectionError):
             self._run(llm)
 
@@ -890,6 +890,6 @@ class TestInbandDisconnectDetection:
 
         # First chunk is large legitimate content (beyond the prefix limit).
         big_content = 'A' * (_INBAND_PREFIX_LIMIT + 10)
-        chunks = [self._make_chunk(big_content), self._make_chunk('网络中断')]
+        chunks = [self._make_chunk(big_content), self._make_chunk('ç½‘ç»œä¸­æ–­')]
         result = self._run(self._make_llm(chunks))
         assert len(result) == 2

@@ -1,4 +1,4 @@
-"""Unit tests for backend.core.type_safety.path_validation — security-critical path checks."""
+﻿"""Unit tests for backend.core.type_safety.path_validation â€” security-critical path checks."""
 
 from __future__ import annotations
 
@@ -439,7 +439,7 @@ class TestPathValidationInternals:
         second.parent = first
 
         with patch('backend.core.type_safety.path_validation._is_windows_junction', return_value=False):
-            _reject_unsafe_links('loop', first, first)
+            _reject_unsafe_links('loop', first, first)  # type: ignore[arg-type]
 
     def test_non_windows_outside_workspace_raises(self, tmp_path: Path):
         workspace = tmp_path / 'workspace'

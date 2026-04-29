@@ -1,4 +1,4 @@
-"""Tests for backend.core.config.config_loader — primary config loading entry points."""
+﻿"""Tests for backend.core.config.config_loader â€” primary config loading entry points."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ from backend.core.config.config_loader import (
 )
 from backend.core.config.llm_config import LLMConfig
 
-# ── ConfigLoadSummary ──────────────────────────────────────────────────
+# â”€â”€ ConfigLoadSummary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestConfigLoadSummary:
@@ -68,7 +68,7 @@ class TestConfigLoadSummary:
             mock_warn.assert_not_called()
 
 
-# ── Path Helpers ──────────────────────────────────────────────────────
+# â”€â”€ Path Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestPathHelpers:
@@ -83,7 +83,7 @@ class TestPathHelpers:
         assert _to_posix_workspace_path('path//with///slashes') == '/path/with/slashes'
 
 
-# ── JWT Secret ────────────────────────────────────────────────────────
+# â”€â”€ JWT Secret â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestJwtSecret:
@@ -100,7 +100,7 @@ class TestJwtSecret:
         mock_store.write.assert_called_once()
 
 
-# ── Finalization ──────────────────────────────────────────────────────
+# â”€â”€ Finalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestFinalization:
@@ -171,7 +171,7 @@ class TestFinalization:
     def test_finalize_config_creates_missing_auto_compactor(self, tmp_path):
         cfg = AppConfig()
         cfg.cache_dir = str(tmp_path / 'cache')
-        cfg.get_agent_config(cfg.default_agent).compactor_config = None
+        cfg.get_agent_config(cfg.default_agent).compactor_config = None  # type: ignore[assignment]
         cfg.get_llm_config().model = 'openai/gpt-4.1'
 
         with (
@@ -187,10 +187,10 @@ class TestFinalization:
         compactor_cfg = cfg.get_agent_config(cfg.default_agent).compactor_config
         assert isinstance(compactor_cfg, AutoCompactorConfig)
         assert compactor_cfg.llm_config is not None
-        assert compactor_cfg.llm_config.model == 'openai/gpt-4.1'
+        assert compactor_cfg.llm_config.model == 'openai/gpt-4.1'  # type: ignore[union-attr]
 
 
-# ── Named Group Loaders ───────────────────────────────────────────────
+# â”€â”€ Named Group Loaders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestNamedGroupLoaders:
@@ -260,7 +260,7 @@ class TestNamedGroupLoaders:
         mock_create.assert_called_once_with('recent', {'type': 'recent', 'keep_first': 3})
 
 
-# ── Agent Registration ────────────────────────────────────────────────
+# â”€â”€ Agent Registration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestAgentRegistration:
@@ -280,7 +280,7 @@ class TestAgentRegistration:
                 mock_register.assert_called_with('custom', mock_cls)
 
 
-# ── Main Entry Points ─────────────────────────────────────────────────
+# â”€â”€ Main Entry Points â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestMainEntryPoints:
@@ -396,7 +396,7 @@ class TestMainEntryPoints:
                 object.__setattr__(llm_cfg, 'api_key', None)
                 return llm_cfg
             if isinstance(payload, dict) and hasattr(api_key, 'get_secret_value'):
-                payload = {**payload, 'api_key': api_key.get_secret_value()}
+                payload = {**payload, 'api_key': api_key.get_secret_value()}  # type: ignore[union-attr]
             return original_model_validate(payload, *args, **kwargs)
 
         fake_manager = _FakeAPIKeyManager()
@@ -465,7 +465,7 @@ class TestMainEntryPoints:
         def _validate_llm(payload, *args, **kwargs):
             api_key = payload.get('api_key') if isinstance(payload, dict) else None
             if isinstance(payload, dict) and hasattr(api_key, 'get_secret_value'):
-                payload = {**payload, 'api_key': api_key.get_secret_value()}
+                payload = {**payload, 'api_key': api_key.get_secret_value()}  # type: ignore[union-attr]
             return original_model_validate(payload, *args, **kwargs)
 
         fake_manager = _FakeAPIKeyManager()
@@ -492,7 +492,7 @@ class TestMainEntryPoints:
         ]
 
 
-# ── Config load (load_from_json) ──────────────────────────────────────
+# â”€â”€ Config load (load_from_json) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestLoadFromJson:
@@ -759,7 +759,7 @@ class TestLoadFromJson:
         mock_warn.assert_called()
 
 
-# ── Compactor Loader Extra ───────────────────────────────────────────
+# â”€â”€ Compactor Loader Extra â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestCompactorLoaderExtra:
@@ -806,7 +806,7 @@ class TestCompactorLoaderExtra:
         assert _process_llm_compactor({}, 'arg', 'file.toml') is None
 
 
-# ── Agent Registration Extra ──────────────────────────────────────────
+# â”€â”€ Agent Registration Extra â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestAgentRegistrationExtra:

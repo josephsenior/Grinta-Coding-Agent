@@ -519,7 +519,7 @@ class OrchestratorExecutor:
             self._extract_fallback_tool_calls(fallback, fallback_message)
         ):
             if not isinstance(tool_call, dict):
-                continue
+                continue  # type: ignore[unreachable]
             function = tool_call.get('function') or {}
             name = function.get('name') if isinstance(function, dict) else ''
             arguments = function.get('arguments') if isinstance(function, dict) else ''

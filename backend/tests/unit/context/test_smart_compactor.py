@@ -1,4 +1,4 @@
-"""Tests for backend.context.compactor.strategies.smart_compactor - SmartCompactor."""
+﻿"""Tests for backend.context.compactor.strategies.smart_compactor - SmartCompactor."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.empty import NullObservation
 
-# ── Helpers ──────────────────────────────────────────────────────────
+# â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 def _event(eid: int, cls=None, source=EventSource.AGENT, content='x') -> Event:
@@ -40,7 +40,7 @@ def _view(events: list) -> MagicMock:
     return v
 
 
-# ── SmartCondenser init ──────────────────────────────────────────────
+# â”€â”€ SmartCondenser init â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestSmartCondenserInit:
@@ -64,7 +64,7 @@ class TestSmartCondenserInit:
         assert sc.recency_bonus_window == 5
 
 
-# ── _identify_essential_events ───────────────────────────────────────
+# â”€â”€ _identify_essential_events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestIdentifyEssentialEvents:
@@ -184,7 +184,7 @@ class TestPlanAnchors:
         fallback_sc._anchor_last_task_tracker.assert_called_once()
 
 
-# ── _heuristic_scoring ───────────────────────────────────────────────
+# â”€â”€ _heuristic_scoring â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestHeuristicScoring:
@@ -227,7 +227,7 @@ class TestHeuristicScoring:
         assert sc._heuristic_score_single(cmd) == 0.7
 
 
-# ── _score_event_importance ──────────────────────────────────────────
+# â”€â”€ _score_event_importance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestScoreEventImportance:
@@ -264,7 +264,7 @@ class TestScoreEventImportance:
         assert sc._score_event_batch_with_llm.call_count == 2
 
 
-# ── _select_events_to_keep ───────────────────────────────────────────
+# â”€â”€ _select_events_to_keep â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestSelectEventsToKeep:
@@ -304,7 +304,7 @@ class TestSelectEventsToKeep:
         assert 1 in keep
 
 
-# ── get_compaction ─────────────────────────────────────────────────
+# â”€â”€ get_compaction â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestGetCompaction:
@@ -338,7 +338,7 @@ class TestGetCompaction:
         assert 1 not in pruned
 
 
-# ── _get_event_summary ───────────────────────────────────────────────
+# â”€â”€ _get_event_summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestGetEventSummary:
@@ -355,7 +355,7 @@ class TestGetEventSummary:
         assert len(summary) <= 100
 
 
-# ── _create_scoring_prompt ───────────────────────────────────────────
+# â”€â”€ _create_scoring_prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestCreateScoringPrompt:
@@ -383,8 +383,8 @@ class TestCreateScoringPrompt:
         class _CodeOnly:
             code = 'print("hello")'
 
-        assert sc._get_event_summary(_CommandOnly()) == 'Command: pytest -q'
-        assert sc._get_event_summary(_CodeOnly()) == 'Code: print("hello")'
+        assert sc._get_event_summary(_CommandOnly()) == 'Command: pytest -q'  # type: ignore[arg-type]
+        assert sc._get_event_summary(_CodeOnly()) == 'Code: print("hello")'  # type: ignore[arg-type]
 
     def test_get_event_summary_falls_back_to_string(self):
         sc = SmartCompactor(llm=None)
@@ -393,10 +393,10 @@ class TestCreateScoringPrompt:
             def __str__(self) -> str:
                 return 'fallback summary'
 
-        assert sc._get_event_summary(_Other()) == 'fallback summary'
+        assert sc._get_event_summary(_Other()) == 'fallback summary'  # type: ignore[arg-type]
 
 
-# ── _parse_llm_scores ────────────────────────────────────────────────
+# â”€â”€ _parse_llm_scores â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestParseLlmScores:
@@ -474,7 +474,7 @@ class TestScoreEventBatchWithLlm:
         assert scores[1] == 0.5
 
 
-# ── _preserve_action_observation_pairs ───────────────────────────────
+# â”€â”€ _preserve_action_observation_pairs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestPreserveActionObservationPairs:
@@ -505,7 +505,7 @@ class TestPreserveActionObservationPairs:
         assert 0 in result  # Action should be added
 
 
-# ── _get_extra_config_args ───────────────────────────────────────────
+# â”€â”€ _get_extra_config_args â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 class TestGetExtraConfigArgs:

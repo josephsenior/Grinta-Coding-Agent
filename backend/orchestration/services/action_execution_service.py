@@ -322,7 +322,7 @@ class ActionExecutionService:
                 )
                 raise Timeout(
                     f'LLM step timed out after {step_timeout} seconds',
-                    model=model_name,
+                    model=model_name,  # type: ignore[arg-type]
                 ) from exc
 
         if result is None:
@@ -451,8 +451,8 @@ class ActionExecutionService:
     async def _set_controller_error_if_running(controller: object) -> None:
         from backend.core.schemas import AgentState as _AgentState
 
-        if controller.get_agent_state() == _AgentState.RUNNING:
-            await controller.set_agent_state_to(_AgentState.ERROR)
+        if controller.get_agent_state() == _AgentState.RUNNING:  # type: ignore[attr-defined]
+            await controller.set_agent_state_to(_AgentState.ERROR)  # type: ignore[attr-defined]
 
     async def _handle_repairable_action_error(
         self,

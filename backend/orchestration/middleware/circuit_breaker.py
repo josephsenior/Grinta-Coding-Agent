@@ -76,7 +76,7 @@ def _record_success_progress(service: object, tool_name: str, observation: Obser
     record_success(tool_name=tool_name)
     obs_type = type(observation).__name__
     if obs_type in _PROGRESS_OBSERVATION_TYPES:
-        service.record_progress_signal(obs_type)
+        service.record_progress_signal(obs_type)  # type: ignore[attr-defined]
 
 
 class CircuitBreakerMiddleware(ToolInvocationMiddleware):

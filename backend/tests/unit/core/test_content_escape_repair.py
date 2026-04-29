@@ -216,5 +216,5 @@ class TestRepairArgumentsInPlace:
 
         assert ('edits[0].new_body', 4) in changes
         assert ('symbol_edits[0].new_body', 2) in changes
-        assert args['edits'][0]['new_body'] == '<div class="foo">\n  hi\n</div>'
-        assert args['symbol_edits'][0]['new_body'] == '<span>\n  hi\n</span>'
+        assert args['edits'][0]['new_body'] == '<div class="foo">\n  hi\n</div>'  # type: ignore[index]
+        assert args['symbol_edits'][0]['new_body'] == '<span>\n  hi\n</span>'  # type: ignore[index]

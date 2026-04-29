@@ -1,4 +1,4 @@
-"""Tests for backend.cli._repl.slash_commands_mixin.SlashCommandsMixin."""
+﻿"""Tests for backend.cli._repl.slash_commands_mixin.SlashCommandsMixin."""
 
 from __future__ import annotations
 
@@ -74,7 +74,7 @@ class _FakeRepl(SlashCommandsMixin):
         self._config = MagicMock()
         self._config.enable_think = False
         self._config.cli_tool_icons = True
-        self._hud = _MockHud()
+        self._hud = _MockHud()  # type: ignore[assignment]
         self._controller: MagicMock | None = None
         self._event_stream = None
         self._next_action = None
@@ -226,7 +226,7 @@ class TestCmdCost:
 class TestCmdThink:
     def test_toggle_on(self) -> None:
         r = _repl()
-        r._config.enable_think = False
+        r._config.enable_think = False  # type: ignore[attr-defined]
         result = r._cmd_think(_parse('/think'))
         assert result is True
         assert r._renderer is not None
@@ -235,7 +235,7 @@ class TestCmdThink:
 
     def test_toggle_off(self) -> None:
         r = _repl()
-        r._config.enable_think = True
+        r._config.enable_think = True  # type: ignore[attr-defined]
         result = r._cmd_think(_parse('/think'))
         assert result is True
         assert r._renderer is not None
@@ -244,7 +244,7 @@ class TestCmdThink:
 
     def test_set_on_explicitly(self) -> None:
         r = _repl()
-        r._config.enable_think = False
+        r._config.enable_think = False  # type: ignore[attr-defined]
         result = r._cmd_think(_parse('/think on'))
         assert result is True
         assert r._renderer is not None
@@ -253,7 +253,7 @@ class TestCmdThink:
 
     def test_set_off_explicitly(self) -> None:
         r = _repl()
-        r._config.enable_think = True
+        r._config.enable_think = True  # type: ignore[attr-defined]
         result = r._cmd_think(_parse('/think off'))
         assert result is True
         assert r._renderer is not None
@@ -582,7 +582,7 @@ class TestCmdHelp:
 class TestCmdDiff:
     def test_diff_no_git(self, tmp_path: Path) -> None:
         r = _repl(tmp_path)
-        # git not found — FileNotFoundError
+        # git not found â€” FileNotFoundError
         with patch('subprocess.run', side_effect=FileNotFoundError):
             result = r._cmd_diff(_parse('/diff'))
         assert result is True

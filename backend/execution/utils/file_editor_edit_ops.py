@@ -113,8 +113,8 @@ def ws_tolerant_replace(
             new_content=file_content,
         )
 
-    start, end = span  # type: ignore[misc]
-    return ''.join(lines_orig[:start]) + new_str + ''.join(lines_orig[end:])
+    start, end = span  # type: ignore[misc,has-type]
+    return ''.join(lines_orig[:start]) + new_str + ''.join(lines_orig[end:])  # type: ignore[has-type]
 
 
 def map_normalized_offset_to_original(original: str, norm_offset: int) -> int:

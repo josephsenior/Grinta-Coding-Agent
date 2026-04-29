@@ -375,13 +375,13 @@ def _set_mcp_bootstrap(
 ) -> None:
     set_mcp_bootstrap_status(
         MCPBootstrapStatus(
-            state=state,
+            state=state,  # type: ignore[arg-type]
             mcp_enabled=mcp_enabled,
             configured_server_count=configured_server_count,
-            attempted_server_count=attempted_server_count,
-            connected_client_count=connected_client_count,
-            remote_tool_param_count=remote_tool_param_count,
-            conversion_errors=conversion_errors,
+            attempted_server_count=attempted_server_count,  # type: ignore[arg-type]
+            connected_client_count=connected_client_count,  # type: ignore[arg-type]
+            remote_tool_param_count=remote_tool_param_count,  # type: ignore[arg-type]
+            conversion_errors=conversion_errors,  # type: ignore[arg-type]
             last_error=last_error,
         )
     )
@@ -695,7 +695,7 @@ _SCHEMA_COERCERS = {
 
 def _coerce_value_to_schema(value: Any, schema: dict[str, Any]) -> tuple[Any, bool]:
     """Best-effort coercion for common JSON schema field types."""
-    coercer = _SCHEMA_COERCERS.get(schema.get('type'))
+    coercer = _SCHEMA_COERCERS.get(schema.get('type'))  # type: ignore[arg-type]
     if coercer is None:
         return value, False
     return coercer(value)

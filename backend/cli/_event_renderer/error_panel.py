@@ -553,7 +553,7 @@ def build_error_panel(
         guidance=guidance,
         use_notice=use_notice,
         accent_style=accent_style,
-        wrap_w=wrap_w,
+        wrap_w=wrap_w,  # type: ignore[arg-type]
     )
     panel_title = _build_panel_title(
         title=title,

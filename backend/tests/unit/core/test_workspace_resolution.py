@@ -1,4 +1,4 @@
-"""Tests for backend/core/workspace_resolution.py helpers."""
+﻿"""Tests for backend/core/workspace_resolution.py helpers."""
 
 from __future__ import annotations
 
@@ -89,7 +89,7 @@ def test_reserved_user_app_data_dir_returns_false_on_resolution_error() -> None:
         def resolve(self) -> Path:
             raise OSError('boom')
 
-    assert is_reserved_user_app_data_dir(BrokenPath()) is False
+    assert is_reserved_user_app_data_dir(BrokenPath()) is False  # type: ignore[arg-type]
 
 
 def test_load_persisted_workspace_path_returns_none_when_missing(
@@ -403,7 +403,7 @@ def test_get_effective_workspace_root_loads_config_and_resolves(monkeypatch) -> 
     monkeypatch.setattr(
         workspace_resolution,
         'resolve_cli_workspace_directory',
-        lambda cfg=None: captured.append(cfg) or expected,
+        lambda cfg=None: captured.append(cfg) or expected,  # type: ignore[func-returns-value]
     )
 
     assert workspace_resolution.get_effective_workspace_root() == expected

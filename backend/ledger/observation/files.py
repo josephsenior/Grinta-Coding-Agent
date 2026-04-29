@@ -215,9 +215,9 @@ class FileEditObservation(Observation):
         """Get a string representation of the file edit observation."""
         if self.impl_source == FileEditSource.FILE_EDITOR:
             return self.content
-        if not self.prev_exist:
+        if not self.prev_exist:  # type: ignore[unreachable]
             assert self.old_content == '', (
                 'old_content should be empty if the file is new (prev_exist=False).'
             )
             return f'[New file {self.path} is created with the provided content.]\n'
-        return self.visualize_diff().rstrip() + '\n'  # type: ignore[unreachable]
+        return self.visualize_diff().rstrip() + '\n'
