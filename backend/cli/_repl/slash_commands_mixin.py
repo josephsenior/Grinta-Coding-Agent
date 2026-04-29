@@ -296,9 +296,10 @@ class SlashCommandsMixin:
             rendered_suggestions = ' or '.join(
                 f'`{item}`' for item in suggestion_text
             )
-            suffix = f' Try {rendered_suggestions}.'
+            suffix = f' Did you mean {rendered_suggestions}?'
         self._renderer.add_system_message(
-            f'Unknown command: {raw_cmd}.{suffix} Press Tab after `/` for autocomplete.',
+            f'Unknown command: `{raw_cmd}`.{suffix}\n'
+            'Type `/help` to list commands, or press Tab after `/` to autocomplete.',
             title='warning',
         )
 
@@ -329,7 +330,7 @@ class SlashCommandsMixin:
         if self._renderer is not None:
             self._renderer.clear_history()
             self._renderer.add_system_message(
-                'Screen cleared. Type a task or press Tab after `/` for commands.',
+                'Transcript cleared. Send a message, or type `/help` for commands.',
                 title='grinta',
             )
         return True
@@ -637,7 +638,8 @@ class SlashCommandsMixin:
         if len(parsed.args) != 1:
             if self._renderer is not None:
                 self._renderer.add_system_message(
-                    'Usage: /resume <N> or /resume <session_id>. Press Tab to autocomplete recent sessions.',
+                    'Usage: `/resume <N>` or `/resume <session_id>`.\n'
+                    'Press Tab after `/resume ` to autocomplete recent sessions.',
                     title='warning',
                 )
             return True

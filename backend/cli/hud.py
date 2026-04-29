@@ -232,20 +232,21 @@ class HUDBar:
         else:
             model_display = f'{provider}/{model}'
         # Compact glyphs: ``MCP·N`` / ``sk·N`` read faster than ``mN`` / ``kN``.
+        sep = (' · ', CLR_SEP)
         parts = [
             (
                 model_display,
                 'dim',
             ),
-            (' ', 'grey27'),
+            sep,
             (token_display, 'dim'),
-            (' ', 'grey27'),
+            sep,
             (f'${self.state.cost_usd:.3f}', 'dim'),
-            (' ', 'grey27'),
+            sep,
             (f'MCP·{mcp_short}', 'dim'),
-            (' ', 'grey27'),
+            sep,
             (f'sk·{sk_short}', 'dim'),
-            (' ', 'grey27'),
+            sep,
             (self._ledger_icon(), self._ledger_style()),
         ]
         txt = Text()
