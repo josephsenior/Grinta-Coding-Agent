@@ -47,17 +47,44 @@ class DAPClient:
             return
         if not self.adapter_command:
             raise DAPError('DAP adapter command is empty')
-        self.process = subprocess.Popen(
-            self.adapter_command,
-            cwd=self.cwd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        logger.info(
+            'DAP: spawning adapter %s (cwd=%s)',
+            self.adapter_command[0],
+            self.cwd,
         )
-        self._reader = threading.Thread(target=self._reader_loop, daemon=True)
-        self._reader.start()
-        self._stderr_reader = threading.Thread(target=self._stderr_loop, daemon=True)
-        self._stderr_reader.start()
+        spawn_started = time.monotonic()
+        try:
+            self.process = subprocess.Popen(
+                self.adapter_command,
+                cwd=self.cwd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except (OSError, ValueError) as exc:
+            # ``Popen`` itself can fail (e.g. executable missing on Windows,
+            # invalid argv). No subprocess exists yet, but raise a typed error
+            # so the caller can surface a useful message instead of swallowing
+            # ``FileNotFoundError`` deep in the stack.
+            self.process = None
+            raise DAPError(
+                f'Failed to spawn DAP adapter {self.adapter_command[0]!r}: {exc}'
+            ) from exc
+        try:
+            self._reader = threading.Thread(target=self._reader_loop, daemon=True)
+            self._reader.start()
+            self._stderr_reader = threading.Thread(target=self._stderr_loop, daemon=True)
+            self._stderr_reader.start()
+        except Exception:
+            # Reader thread creation failure is exotic but recoverable: kill
+            # the half-spawned subprocess so we never leak a debugpy.adapter.
+            self.close()
+            raise
+        logger.info(
+            'DAP: adapter pid=%s alive after %.2fs',
+            getattr(self.process, 'pid', None),
+            time.monotonic() - spawn_started,
+        )
 
     def close(self) -> None:
         """Terminate the adapter subprocess."""
@@ -290,16 +317,27 @@ class DAPDebugSession:
 
     def start(self, timeout: float = 15.0) -> dict[str, Any]:
         """Start the adapter, send launch/attach, and configure breakpoints."""
+        session_started = time.monotonic()
         self.client.start()
+        logger.info('DAP: sending initialize (session=%s)', self.session_id)
         self.client.request('initialize', self._initialize_arguments(), timeout=timeout)
+        logger.info(
+            'DAP: sending %s request (session=%s)', self.request, self.session_id
+        )
         self.start_request_seq = self.client.request_nowait(
             self.request, self._start_arguments()
         )
         initialized = self.client.wait_for_event('initialized', timeout=timeout)
         if initialized is None:
             raise DAPError('DAP adapter did not send initialized event')
+        logger.info('DAP: initialized event received (session=%s)', self.session_id)
         breakpoint_results = self._sync_all_breakpoints(timeout=timeout)
         self.client.request('configurationDone', {}, timeout=timeout)
+        logger.info(
+            'DAP: configurationDone ack (session=%s, breakpoints=%d)',
+            self.session_id,
+            sum(len(v) for v in self.breakpoints_by_file.values()),
+        )
         if self.start_request_seq is not None:
             try:
                 self.client.wait_for_response(
@@ -308,6 +346,11 @@ class DAPDebugSession:
             except DAPError:
                 logger.debug('DAP start response was not available yet', exc_info=True)
         event = self._wait_for_pause_or_exit(timeout=0.5)
+        logger.info(
+            'DAP: ready in %.2fs (session=%s)',
+            time.monotonic() - session_started,
+            self.session_id,
+        )
         return self._snapshot(
             state='started',
             extra={'breakpoints': breakpoint_results, 'event': event},
@@ -688,10 +731,48 @@ class DAPDebugManager:
                 payload = self._start(action, timeout=max(timeout, 15.0))
             else:
                 session = self._get_session(action.session_id)
-                payload = self._dispatch_existing(session, action, debug_action, timeout)
+                try:
+                    payload = self._dispatch_existing(
+                        session, action, debug_action, timeout
+                    )
+                except Exception:
+                    # Drop sessions whose adapter is in an unrecoverable state
+                    # so the model can ``start`` a fresh one instead of looping
+                    # against a wedged subprocess.
+                    self._drop_session(session)
+                    raise
             return self._observation(debug_action, payload)
         except Exception as exc:
-            return ErrorObservation(f'Debugger error: {type(exc).__name__}: {exc}')
+            stderr_tail = self._stderr_tail_for(action)
+            suffix = f'\nadapter_stderr:\n{stderr_tail}' if stderr_tail else ''
+            logger.warning(
+                'DAP: %s failed for session=%s: %s',
+                debug_action or '<unknown>',
+                action.session_id or '<new>',
+                exc,
+            )
+            return ErrorObservation(
+                f'Debugger error: {type(exc).__name__}: {exc}{suffix}'
+            )
+
+    def _drop_session(self, session: DAPDebugSession) -> None:
+        self.sessions.pop(session.session_id, None)
+        try:
+            session.close()
+        except Exception:
+            logger.debug('DAP session close after dispatch error failed', exc_info=True)
+
+    def _stderr_tail_for(self, action: DebuggerAction) -> str:
+        session = self.sessions.get(action.session_id) if action.session_id else None
+        if session is None:
+            return ''
+        try:
+            tail = session.client.stderr_tail()
+        except Exception:
+            return ''
+        if not tail:
+            return ''
+        return '\n'.join(line.rstrip() for line in tail)
 
     def close_all(self) -> None:
         """Close all active debug sessions."""

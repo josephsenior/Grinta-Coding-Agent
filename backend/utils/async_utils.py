@@ -179,19 +179,31 @@ def call_async_from_sync(
         finally:
             # Unbounded shutdown_asyncgens / shutdown_default_executor can hang (esp. default
             # executor joining browser/CDP threadpool work). Always bound wall time.
+            #
+            # Optimisation: when the loop never actually scheduled a default executor
+            # (the common case for the synchronous tools — file IO, debugger, lsp_query)
+            # ``shutdown_default_executor`` is still serialised through a 3 s wait per
+            # call. Skip both finalise steps when the loop is empty to remove ~5 s of
+            # invisible tail latency from every sync tool invocation.
             fin = _LOOP_FINALIZE_WAIT_SEC
-            try:
-                loop.run_until_complete(
-                    asyncio.wait_for(loop.shutdown_asyncgens(), timeout=fin)
-                )
-            except (TimeoutError, Exception):
-                pass
-            try:
-                loop.run_until_complete(
-                    asyncio.wait_for(loop.shutdown_default_executor(), timeout=fin)
-                )
-            except (TimeoutError, Exception):
-                pass
+            has_residual_tasks = any(not t.done() for t in asyncio.all_tasks(loop))
+            has_default_executor = (
+                getattr(loop, '_default_executor', None) is not None
+            )
+            if has_residual_tasks:
+                try:
+                    loop.run_until_complete(
+                        asyncio.wait_for(loop.shutdown_asyncgens(), timeout=fin)
+                    )
+                except (TimeoutError, Exception):
+                    pass
+            if has_default_executor:
+                try:
+                    loop.run_until_complete(
+                        asyncio.wait_for(loop.shutdown_default_executor(), timeout=fin)
+                    )
+                except (TimeoutError, Exception):
+                    pass
             asyncio.set_event_loop(None)
             try:
                 loop.close()

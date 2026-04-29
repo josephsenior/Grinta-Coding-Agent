@@ -155,6 +155,12 @@ _SLASH_COMMANDS = (
         help_section='control',
     ),
     SlashCommandSpec(
+        '/health',
+        'Run a fast self-check (debugpy, ripgrep, git, model)',
+        '/health',
+        help_section='control',
+    ),
+    SlashCommandSpec(
         '/diff',
         'Show workspace git changes',
         '/diff [--stat|--name-only|--patch] [path]',

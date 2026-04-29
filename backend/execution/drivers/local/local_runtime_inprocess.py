@@ -16,7 +16,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from backend.core.config.security_config import SecurityConfig
-from backend.core.constants import BROWSER_TOOL_SYNC_TIMEOUT_SECONDS
+from backend.core.constants import (
+    BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
+    TOOL_BRIDGE_TIMEOUT_BUFFER,
+    TOOL_BRIDGE_TIMEOUT_DEBUGGER,
+    TOOL_BRIDGE_TIMEOUT_FILE_IO,
+    TOOL_BRIDGE_TIMEOUT_LSP_QUERY,
+    TOOL_BRIDGE_TIMEOUT_TERMINAL_IO,
+    TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN,
+)
 from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.core.logger import app_logger as logger
@@ -244,6 +252,38 @@ class LocalRuntimeInProcess(ActionExecutionClient):
 
         elapsed = time.time() - start_time
         logger.info('🚀 In-process runtime ready in %.2fs', elapsed)
+        self._maybe_warm_debugpy()
+
+    def _maybe_warm_debugpy(self) -> None:
+        """Pre-import ``debugpy`` in a background thread.
+
+        The first ``debugger`` tool call would otherwise eat the full
+        cold-start latency on Windows. No-op when ``GRINTA_DEBUGPY_WARMUP=0``
+        or when ``debugpy`` is unavailable.
+        """
+        from backend.core.constants import DEBUGPY_WARMUP_ENABLED
+
+        if not DEBUGPY_WARMUP_ENABLED:
+            return
+
+        def _warm() -> None:
+            import time as _time
+
+            warm_start = _time.time()
+            try:
+                import importlib
+
+                importlib.import_module('debugpy.adapter')
+                logger.info(
+                    'debugpy adapter pre-imported in %.2fs',
+                    _time.time() - warm_start,
+                )
+            except Exception as exc:
+                logger.debug('debugpy warmup skipped: %s', exc)
+
+        threading.Thread(
+            target=_warm, name='grinta-debugpy-warmup', daemon=True
+        ).start()
 
     def _setup_workspace_directory(self) -> None:
         """Create temporary workspace directory."""
@@ -307,49 +347,80 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         """Read file via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        return call_async_from_sync(self._executor.read, 15.0, action)
+        return call_async_from_sync(
+            self._executor.read, TOOL_BRIDGE_TIMEOUT_FILE_IO, action
+        )
 
     def write(self, action: FileWriteAction) -> Observation:
         """Write file via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        return call_async_from_sync(self._executor.write, 15.0, action)
+        return call_async_from_sync(
+            self._executor.write, TOOL_BRIDGE_TIMEOUT_FILE_IO, action
+        )
 
     def edit(self, action: FileEditAction) -> Observation:
         """Edit file via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        return call_async_from_sync(self._executor.edit, 15.0, action)
+        return call_async_from_sync(
+            self._executor.edit, TOOL_BRIDGE_TIMEOUT_FILE_IO, action
+        )
 
     def terminal_run(self, action: TerminalRunAction) -> Observation:
         """Start an interactive terminal session via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        return call_async_from_sync(self._executor.terminal_run, 130.0, action)
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN)
+        return call_async_from_sync(self._executor.terminal_run, timeout, action)
 
     def terminal_input(self, action: TerminalInputAction) -> Observation:
         """Send input to a terminal session via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        return call_async_from_sync(self._executor.terminal_input, 30.0, action)
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_TERMINAL_IO)
+        return call_async_from_sync(self._executor.terminal_input, timeout, action)
 
     def terminal_read(self, action: TerminalReadAction) -> Observation:
         """Read terminal output via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        return call_async_from_sync(self._executor.terminal_read, 30.0, action)
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_TERMINAL_IO)
+        return call_async_from_sync(self._executor.terminal_read, timeout, action)
 
     def debugger(self, action: DebuggerAction) -> Observation:
-        """Execute a debugger action via RuntimeExecutor."""
+        """Execute a debugger action via RuntimeExecutor.
+
+        The bridge timeout is taken from ``action.timeout`` when set, capped at the
+        debugger pending-action floor. This prevents the historical mismatch where
+        a hardcoded 60 s sync bridge fired before the controller's 600 s ceiling,
+        making cold ``debugpy.adapter`` startups look frozen in the UI.
+        """
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        return call_async_from_sync(self._executor.debugger, 60.0, action)
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_DEBUGGER)
+        return call_async_from_sync(self._executor.debugger, timeout, action)
 
     def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute LSP query via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        return call_async_from_sync(self._executor.lsp_query, 15.0, action)
+        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_LSP_QUERY)
+        return call_async_from_sync(self._executor.lsp_query, timeout, action)
+
+    @staticmethod
+    def _bridge_timeout(action: Any, fallback_ceiling: float) -> float:
+        """Pick a sync-bridge timeout that respects the action's own timeout.
+
+        Returns ``action.timeout + buffer`` when the action carries a timeout,
+        otherwise falls back to ``fallback_ceiling``. This keeps the bridge in
+        lock-step with controller-level pending-action timeouts so we never
+        time out the bridge while the controller still considers the action live.
+        """
+        own = getattr(action, 'timeout', None)
+        if own is None or own <= 0:
+            return fallback_ceiling
+        return float(own) + TOOL_BRIDGE_TIMEOUT_BUFFER
 
     def browser_tool(self, action: Any) -> Observation:
         """Native browser-use tool via RuntimeExecutor."""
