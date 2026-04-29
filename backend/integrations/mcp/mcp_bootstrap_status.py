@@ -40,7 +40,7 @@ class MCPBootstrapStatus:
             'attempted_server_count': self.attempted_server_count,
             'connected_client_count': self.connected_client_count,
             'remote_tool_param_count': self.remote_tool_param_count,
-            'conversion_errors': list(self.conversion_errors),
+            'conversion_errors': list(self.conversion_errors or []),
             'last_error': self.last_error,
         }
 

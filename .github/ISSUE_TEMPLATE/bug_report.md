@@ -35,7 +35,7 @@ If applicable, add screenshots to help explain your problem.
 - **Python Version:** [e.g., 3.11.5]
 - **Node Version:** [e.g., 18.17.0]
 - **Docker Version:** [e.g., 24.0.5]
-- **Grinta Version:** [e.g., 0.56.0]
+- **Grinta Version:** [e.g., 1.0.0rc1]
 
 ## Configuration
 
