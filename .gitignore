@@ -1,6 +1,7 @@
 # Python
 .venv/
 venv/
+.smoke-venv/
 __pycache__/
 *.pyc
 *.pyo

@@ -5,8 +5,8 @@
   "license": "MIT",
   "depends": "python312",
   "url": "https://files.pythonhosted.org/packages/source/g/grinta-ai/grinta-ai-0.55.0.tar.gz",
-  "hash": "REPLACE_ON_RELEASE_WITH_PYPI_SDIST_SHA256",
-  "extract_dir": "grinta-ai-0.55.0",
+    "hash": "c1c0c8323a86b2b8abf0e0bb8cba37ba160eea2d2ebf144c5ff1c57fe8ec7793"
+  "extract_dir": "grinta_ai-0.55.0",
   "installer": {
     "script": [
       "python -m venv \"$dir\\.venv\"",
@@ -20,6 +20,6 @@
   "checkver": "github",
   "autoupdate": {
     "url": "https://files.pythonhosted.org/packages/source/g/grinta-ai/grinta-ai-$version.tar.gz",
-    "extract_dir": "grinta-ai-$version"
+    "extract_dir": "grinta_ai-$version"
   }
 }

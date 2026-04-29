@@ -20,3 +20,13 @@ lint:
     - bandit@1.9.4
     - trufflehog@3.94.3
     - ruff@0.15.10
+  ignore:
+    - linters: [ALL]
+      paths:
+        - .smoke-venv/**
+        - .venv/**
+        - dist/**
+        - build/**
+        - .mypy_cache/**
+        - .ruff_cache/**
+        - .pytest_cache/**

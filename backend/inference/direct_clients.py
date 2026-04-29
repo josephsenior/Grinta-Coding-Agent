@@ -22,8 +22,9 @@ from anthropic import Anthropic, AsyncAnthropic
 # while ``_api_client`` is loading. A local catch is reliable regardless of
 # PYTHONWARNINGS / filter registration order.
 with warnings.catch_warnings():
-    warnings.simplefilter('ignore', DeprecationWarning)
+    warnings.simplefilter("ignore", DeprecationWarning)
     from google import genai
+
 from openai import AsyncOpenAI, OpenAI
 
 from backend.cli.tool_call_display import flatten_tool_call_for_history
@@ -32,9 +33,7 @@ from backend.core.logger import app_logger as logger
 from backend.inference.direct_clients_anthropic_ops import (
     acompletion as _anthropic_acompletion,
 )
-from backend.inference.direct_clients_anthropic_ops import (
-    astream as _anthropic_astream,
-)
+from backend.inference.direct_clients_anthropic_ops import astream as _anthropic_astream
 from backend.inference.direct_clients_anthropic_ops import (
     completion as _anthropic_completion,
 )
@@ -50,15 +49,11 @@ from backend.inference.direct_clients_anthropic_ops import (
 from backend.inference.direct_clients_openai_ops import (
     acompletion as _openai_acompletion,
 )
-from backend.inference.direct_clients_openai_ops import (
-    astream as _openai_astream,
-)
+from backend.inference.direct_clients_openai_ops import astream as _openai_astream
 from backend.inference.direct_clients_openai_ops import (
     clean_messages as _clean_messages_impl,
 )
-from backend.inference.direct_clients_openai_ops import (
-    completion as _openai_completion,
-)
+from backend.inference.direct_clients_openai_ops import completion as _openai_completion
 from backend.inference.direct_clients_openai_ops import (
     extract_openai_tool_calls as _extract_openai_tool_calls_impl,
 )
@@ -97,9 +92,9 @@ def _with_default_timeout(
     kwargs: dict[str, Any], timeout: float | int | None
 ) -> dict[str, Any]:
     normalized = _normalize_timeout_seconds(timeout)
-    if normalized is None or 'timeout' in kwargs:
+    if normalized is None or "timeout" in kwargs:
         return kwargs
-    return {**kwargs, 'timeout': normalized}
+    return {**kwargs, "timeout": normalized}
 
 
 def _gemini_timeout_ms(timeout: float | int | None) -> int:
@@ -125,7 +120,7 @@ def get_shared_http_client(provider: str, base_url: str | None = None) -> httpx.
                     timeout=httpx.Timeout(timeout=60.0, connect=10.0),
                     follow_redirects=True,
                 )
-                logger.debug('Created shared sync httpx pool for %s', key)
+                logger.debug("Created shared sync httpx pool for %s", key)
     return _shared_sync_clients[key]
 
 
@@ -142,7 +137,7 @@ def get_shared_async_http_client(
                     timeout=httpx.Timeout(timeout=60.0, connect=10.0),
                     follow_redirects=True,
                 )
-                logger.debug('Created shared async httpx pool for %s', key)
+                logger.debug("Created shared async httpx pool for %s", key)
     return _shared_async_clients[key]
 
 
@@ -201,16 +196,16 @@ class LLMResponse:
         content: str,
         model: str,
         usage: dict[str, int],
-        response_id: str = '',
-        finish_reason: str = 'stop',
+        response_id: str = "",
+        finish_reason: str = "stop",
         tool_calls: list[dict[str, Any]] | None = None,
-        reasoning_content: str = '',
+        reasoning_content: str = "",
         **kwargs,
     ):
         self.content = content
         self.model = model
         self.usage = usage
-        self.id = kwargs.get('response_id', kwargs.get('id', response_id))
+        self.id = kwargs.get("response_id", kwargs.get("id", response_id))
         self.finish_reason = self._normalize_finish_reason(finish_reason)
         self.tool_calls = self._normalize_tool_calls(tool_calls)
         # Reasoning/thinking text from models that surface it separately
@@ -225,27 +220,27 @@ class LLMResponse:
                 self.arguments = arguments
 
             def model_dump(self):
-                return {'name': self.name, 'arguments': self.arguments}
+                return {"name": self.name, "arguments": self.arguments}
 
         class ToolCall:
             def __init__(self, tc_dict: dict[str, Any]):
-                self.id = tc_dict.get('id')
-                self.type = tc_dict.get('type', 'function')
-                func_dict = tc_dict.get('function', {})
+                self.id = tc_dict.get("id")
+                self.type = tc_dict.get("type", "function")
+                func_dict = tc_dict.get("function", {})
                 self.function = ToolCallFunction(
-                    name=func_dict.get('name', ''),
-                    arguments=func_dict.get('arguments', '{}'),
+                    name=func_dict.get("name", ""),
+                    arguments=func_dict.get("arguments", "{}"),
                 )
                 # Support any other fields via setattr to be safe
                 for k, v in tc_dict.items():
-                    if k not in ['id', 'type', 'function']:
+                    if k not in ["id", "type", "function"]:
                         setattr(self, k, v)
 
             def model_dump(self):
                 return {
-                    'id': self.id,
-                    'type': self.type,
-                    'function': self.function.model_dump(),
+                    "id": self.id,
+                    "type": self.type,
+                    "function": self.function.model_dump(),
                 }
 
         class Message:
@@ -264,18 +259,18 @@ class LLMResponse:
                 self.finish_reason = finish_reason
 
         self.choices = [
-            Choice(self.content, 'assistant', self.finish_reason, self.tool_calls)
+            Choice(self.content, "assistant", self.finish_reason, self.tool_calls)
         ]
 
     @staticmethod
     def _normalize_finish_reason(reason: str | None) -> str:
         if not reason:
-            return 'stop'
+            return "stop"
         reason = str(reason).strip().lower()
         mapping = {
-            'end_turn': 'stop',
-            'max_tokens': 'length',
-            'tool_use': 'tool_calls',
+            "end_turn": "stop",
+            "max_tokens": "length",
+            "tool_use": "tool_calls",
         }
         return mapping.get(reason, reason)
 
@@ -288,10 +283,10 @@ class LLMResponse:
         normalized = []
         for i, tc in enumerate(tool_calls):
             # Ensure function arguments are JSON strings
-            func = tc.get('function', {})
-            args = func.get('arguments', '{}')
+            func = tc.get("function", {})
+            args = func.get("arguments", "{}")
             if isinstance(args, dict):
-                args_str = json.dumps(args, ensure_ascii=False, separators=(',', ':'))
+                args_str = json.dumps(args, ensure_ascii=False, separators=(",", ":"))
             elif isinstance(args, str):
                 args_str = args
             else:
@@ -299,11 +294,11 @@ class LLMResponse:
 
             normalized.append(
                 {
-                    'id': tc.get('id', f'call_{i + 1}'),
-                    'type': tc.get('type', 'function'),
-                    'function': {
-                        'name': func.get('name', ''),
-                        'arguments': args_str,
+                    "id": tc.get("id", f"call_{i + 1}"),
+                    "type": tc.get("type", "function"),
+                    "function": {
+                        "name": func.get("name", ""),
+                        "arguments": args_str,
                     },
                 }
             )
@@ -311,19 +306,19 @@ class LLMResponse:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            'id': self.id,
-            'model': self.model,
-            'choices': [
+            "id": self.id,
+            "model": self.model,
+            "choices": [
                 {
-                    'message': {
-                        'content': self.content,
-                        'role': 'assistant',
-                        'tool_calls': self.tool_calls,
+                    "message": {
+                        "content": self.content,
+                        "role": "assistant",
+                        "tool_calls": self.tool_calls,
                     },
-                    'finish_reason': self.finish_reason,
+                    "finish_reason": self.finish_reason,
                 }
             ],
-            'usage': self.usage,
+            "usage": self.usage,
         }
 
     def __getitem__(self, key: str):
@@ -336,15 +331,15 @@ def _stringify_openai_metadata_value(value: Any) -> str:
     Several compatible providers reject metadata unless all values are strings.
     """
     if value is None:
-        return ''
+        return ""
     if isinstance(value, str):
         return value
     if isinstance(value, bool):
-        return 'true' if value else 'false'
+        return "true" if value else "false"
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, (list, tuple, set)):
-        return ','.join(
+        return ",".join(
             item
             for item in (_stringify_openai_metadata_value(part) for part in value)
             if item
@@ -354,7 +349,7 @@ def _stringify_openai_metadata_value(value: Any) -> str:
             value,
             ensure_ascii=False,
             sort_keys=True,
-            separators=(',', ':'),
+            separators=(",", ":"),
             default=str,
         )
     return str(value)
@@ -363,19 +358,19 @@ def _stringify_openai_metadata_value(value: Any) -> str:
 def _sanitize_openai_compatible_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     """Normalize request kwargs for OpenAI-compatible APIs."""
     sanitized = dict(kwargs)
-    extra_body = sanitized.get('extra_body')
+    extra_body = sanitized.get("extra_body")
     if not isinstance(extra_body, dict):
         return sanitized
-    metadata = extra_body.get('metadata')
+    metadata = extra_body.get("metadata")
     if not isinstance(metadata, dict):
         return sanitized
 
     sanitized_extra_body = dict(extra_body)
-    sanitized_extra_body['metadata'] = {
+    sanitized_extra_body["metadata"] = {
         str(key): _stringify_openai_metadata_value(value)
         for key, value in metadata.items()
     }
-    sanitized['extra_body'] = sanitized_extra_body
+    sanitized["extra_body"] = sanitized_extra_body
     return sanitized
 
 
@@ -386,13 +381,13 @@ def _extract_openai_message_text(content: Any) -> str:
     if isinstance(content, list):
         parts: list[str] = []
         for item in content:
-            if isinstance(item, dict) and item.get('type') == 'text':
-                text = item.get('text')
+            if isinstance(item, dict) and item.get("type") == "text":
+                text = item.get("text")
                 if text:
                     parts.append(str(text))
-        return '\n'.join(parts)
+        return "\n".join(parts)
     if content is None:
-        return ''
+        return ""
     return str(content)
 
 
@@ -455,13 +450,13 @@ def _resolve_transport_profile(
     from backend.inference.provider_capabilities import get_provider_capabilities
 
     # Metadata: only the real OpenAI API accepts the `metadata` request field.
-    is_native_openai = model_family == 'openai' and (
+    is_native_openai = model_family == "openai" and (
         not base_url
         or str(base_url)
         .strip()
-        .rstrip('/')
+        .rstrip("/")
         .lower()
-        .startswith('https://api.openai.com')
+        .startswith("https://api.openai.com")
     )
 
     # Tool replay correctness comes from the provider capability registry:
@@ -491,36 +486,36 @@ def _normalize_cross_family_tool_messages(
     cleaned: list[dict[str, Any]] = []
     for raw_msg in messages:
         msg = dict(raw_msg)
-        msg.pop('tool_ok', None)
+        msg.pop("tool_ok", None)
 
-        role = msg.get('role')
-        if role == 'assistant' and isinstance(msg.get('tool_calls'), list):
-            text = _extract_openai_message_text(msg.get('content'))
+        role = msg.get("role")
+        if role == "assistant" and isinstance(msg.get("tool_calls"), list):
+            text = _extract_openai_message_text(msg.get("content"))
             tool_lines: list[str] = []
-            for tc in msg.get('tool_calls', []) or []:
+            for tc in msg.get("tool_calls", []) or []:
                 if not isinstance(tc, dict):
                     continue
-                fn = tc.get('function') or {}
-                name = str(fn.get('name') or 'tool')
-                arguments = str(fn.get('arguments') or '{}')
+                fn = tc.get("function") or {}
+                name = str(fn.get("name") or "tool")
+                arguments = str(fn.get("arguments") or "{}")
                 tool_lines.append(flatten_tool_call_for_history(name, arguments))
-            normalized = {k: v for k, v in msg.items() if k != 'tool_calls'}
-            normalized['content'] = (
-                '\n'.join(part for part in [text, *tool_lines] if part)
-                or '[Assistant requested tool execution.]'
+            normalized = {k: v for k, v in msg.items() if k != "tool_calls"}
+            normalized["content"] = (
+                "\n".join(part for part in [text, *tool_lines] if part)
+                or "[Assistant requested tool execution.]"
             )
             cleaned.append(normalized)
             continue
 
-        if role == 'tool':
-            tool_name = str(msg.get('name') or 'tool')
-            tool_output = _extract_openai_message_text(msg.get('content'))
+        if role == "tool":
+            tool_name = str(msg.get("name") or "tool")
+            tool_output = _extract_openai_message_text(msg.get("content"))
             cleaned.append(
                 {
-                    'role': 'user',
-                    'content': (
-                        f'[Tool result from {tool_name}]\n{tool_output}'.strip()
-                        or f'[Tool result from {tool_name}]'
+                    "role": "user",
+                    "content": (
+                        f"[Tool result from {tool_name}]\n{tool_output}".strip()
+                        or f"[Tool result from {tool_name}]"
                     ),
                 }
             )
@@ -533,7 +528,7 @@ def _normalize_cross_family_tool_messages(
 class DirectLLMClient(ABC):
     """Abstract base class for direct LLM clients."""
 
-    _model_name: str = ''
+    _model_name: str = ""
 
     @abstractmethod
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
@@ -560,7 +555,7 @@ class DirectLLMClient(ABC):
     def model_name(self) -> str:
         """Get the model name. Must be implemented by subclasses."""
         if not self._model_name:
-            raise NotImplementedError('Subclasses must set _model_name attribute')
+            raise NotImplementedError("Subclasses must set _model_name attribute")
         return self._model_name
 
     def get_completion_cost(
@@ -592,12 +587,12 @@ class OpenAIClient(DirectLLMClient):
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
-            http_client=get_shared_http_client('openai', base_url),
+            http_client=get_shared_http_client("openai", base_url),
         )
         self.async_client = AsyncOpenAI(
             api_key=api_key,
             base_url=base_url,
-            http_client=get_shared_async_http_client('openai', base_url),
+            http_client=get_shared_async_http_client("openai", base_url),
         )
 
     @staticmethod
@@ -641,11 +636,11 @@ class AnthropicClient(DirectLLMClient):
         self._request_timeout = _normalize_timeout_seconds(timeout)
         self.client = Anthropic(
             api_key=api_key,
-            http_client=get_shared_http_client('anthropic'),
+            http_client=get_shared_http_client("anthropic"),
         )
         self.async_client = AsyncAnthropic(
             api_key=api_key,
-            http_client=get_shared_async_http_client('anthropic'),
+            http_client=get_shared_async_http_client("anthropic"),
         )
 
     @staticmethod
@@ -688,7 +683,7 @@ class GeminiClient(DirectLLMClient):
     ):
         # Never log secrets (even partial key prefixes/suffixes).
         logger.debug(
-            'Initializing Gemini client (api_key_set=%s, api_key_len=%s)',
+            "Initializing Gemini client (api_key_set=%s, api_key_len=%s)",
             bool(api_key),
             len(api_key) if api_key else 0,
         )
@@ -704,7 +699,7 @@ class GeminiClient(DirectLLMClient):
     def _resolve_gemini_model_name(self, model_name: str | None) -> str:
         """Normalize model name for Gemini API."""
         name = model_name or self.model_name
-        return name.split('/')[-1] if '/' in name else name
+        return name.split("/")[-1] if "/" in name else name
 
     def _get_gemini_cache_name(
         self,
@@ -721,7 +716,7 @@ class GeminiClient(DirectLLMClient):
         history_to_cache = history_messages if history_messages else []
         if not history_to_cache and not system_instruction:
             return None
-        backend = get_prompt_cache('google')
+        backend = get_prompt_cache("google")
         return backend.get_or_create_cache_handle(
             client=self.client,
             model=model_name,
@@ -730,28 +725,28 @@ class GeminiClient(DirectLLMClient):
         )
 
     def _extract_gemini_text(self, message: dict[str, Any]) -> str:
-        parts = message.get('parts') or []
+        parts = message.get("parts") or []
         text_parts: list[str] = []
         for part in parts:
             if isinstance(part, dict):
-                text = part.get('text')
+                text = part.get("text")
                 if isinstance(text, str) and text:
                     text_parts.append(text)
-        return '\n'.join(text_parts)
+        return "\n".join(text_parts)
 
     def _split_gemini_history_and_prompt(
         self, gemini_messages: list[dict[str, Any]]
     ) -> tuple[list[dict[str, Any]], str]:
         if not gemini_messages:
-            return [], ''
+            return [], ""
 
         active_messages = list(gemini_messages)
-        while active_messages and active_messages[-1].get('role') != 'user':
+        while active_messages and active_messages[-1].get("role") != "user":
             active_messages.pop()
 
         if not active_messages:
             logger.warning(
-                'GeminiClient: no trailing user message found; falling back to last message text'
+                "GeminiClient: no trailing user message found; falling back to last message text"
             )
             fallback_prompt = self._extract_gemini_text(gemini_messages[-1])
             fallback_history = gemini_messages[:-1] if len(gemini_messages) > 1 else []
@@ -759,12 +754,12 @@ class GeminiClient(DirectLLMClient):
 
         prompt_start = len(active_messages) - 1
         while (
-            prompt_start > 0 and active_messages[prompt_start - 1].get('role') == 'user'
+            prompt_start > 0 and active_messages[prompt_start - 1].get("role") == "user"
         ):
             prompt_start -= 1
 
         history = active_messages[:prompt_start]
-        prompt = '\n'.join(
+        prompt = "\n".join(
             text
             for text in (
                 self._extract_gemini_text(message)
@@ -816,38 +811,36 @@ class GeminiClient(DirectLLMClient):
     ) -> dict[str, Any]:
         config: dict[str, Any] = {
             **gen_cfg,
-            'tools': tools,
+            "tools": tools,
         }
         if cache_name:
-            config['cached_content'] = cache_name
+            config["cached_content"] = cache_name
         else:
-            config['system_instruction'] = system_instruction
+            config["system_instruction"] = system_instruction
         return config
 
     @staticmethod
     def _log_gemini_exception(exc: Exception) -> None:
-        logger.error('=' * 80)
-        logger.error('GOOGLE GENAI EXCEPTION: %s %s', type(exc), exc)
-        if hasattr(exc, 'code'):
-            logger.error('CODE: %s', exc.code)
-        if hasattr(exc, 'message'):
-            logger.error('MESSAGE: %s', exc.message)
-        if hasattr(exc, 'details'):
-            logger.error('DETAILS: %s', exc.details)
-        logger.error('=' * 80)
+        logger.error("=" * 80)
+        logger.error("GOOGLE GENAI EXCEPTION: %s %s", type(exc), exc)
+        if hasattr(exc, "code"):
+            logger.error("CODE: %s", exc.code)
+        if hasattr(exc, "message"):
+            logger.error("MESSAGE: %s", exc.message)
+        if hasattr(exc, "details"):
+            logger.error("DETAILS: %s", exc.details)
+        logger.error("=" * 80)
 
     @staticmethod
     def _is_gemini_api_key_error(error_str: str) -> bool:
-        return 'api key' in error_str and (
-            'not found' in error_str
-            or 'invalid api key' in error_str
-            or 'api_key_invalid' in error_str
+        return "api key" in error_str and (
+            "not found" in error_str
+            or "invalid api key" in error_str
+            or "api_key_invalid" in error_str
         )
 
     def _map_gemini_api_error(self, exc: Any, error_str: str) -> Exception:
-        from backend.inference.exceptions import (
-            APIError as ProviderAPIError,
-        )
+        from backend.inference.exceptions import APIError as ProviderAPIError
         from backend.inference.exceptions import (
             BadRequestError,
             ContextWindowExceededError,
@@ -862,49 +855,45 @@ class GeminiClient(DirectLLMClient):
             from backend.inference.exceptions import AuthenticationError
 
             return AuthenticationError(
-                str(exc), llm_provider='google', model=self.model_name
+                str(exc), llm_provider="google", model=self.model_name
             )
-        if exc.code == 429 or 'quota' in error_str or 'rate limit' in error_str:
+        if exc.code == 429 or "quota" in error_str or "rate limit" in error_str:
             return RateLimitError(
-                str(exc), llm_provider='google', model=self.model_name
+                str(exc), llm_provider="google", model=self.model_name
             )
         if (
             exc.code == 401
-            or 'unauthorized' in error_str
-            or 'invalid api key' in error_str
+            or "unauthorized" in error_str
+            or "invalid api key" in error_str
         ):
             from backend.inference.exceptions import AuthenticationError
 
             return AuthenticationError(
-                str(exc), llm_provider='google', model=self.model_name
+                str(exc), llm_provider="google", model=self.model_name
             )
-        if exc.code == 404 or 'not found' in error_str:
-            return NotFoundError(
-                str(exc), llm_provider='google', model=self.model_name
-            )
+        if exc.code == 404 or "not found" in error_str:
+            return NotFoundError(str(exc), llm_provider="google", model=self.model_name)
         if (
             exc.code in (500, 502, 503, 504)
-            or 'unavailable' in error_str
-            or 'overloaded' in error_str
+            or "unavailable" in error_str
+            or "overloaded" in error_str
         ):
             return ServiceUnavailableError(
-                str(exc), llm_provider='google', model=self.model_name
+                str(exc), llm_provider="google", model=self.model_name
             )
         if exc.code == 400:
             if is_context_window_error(error_str, exc):
                 return ContextWindowExceededError(
-                    str(exc), llm_provider='google', model=self.model_name
+                    str(exc), llm_provider="google", model=self.model_name
                 )
             return BadRequestError(
-                str(exc), llm_provider='google', model=self.model_name
+                str(exc), llm_provider="google", model=self.model_name
             )
         if exc.code and exc.code >= 500:
             return InternalServerError(
-                str(exc), llm_provider='google', model=self.model_name
+                str(exc), llm_provider="google", model=self.model_name
             )
-        return ProviderAPIError(
-            str(exc), llm_provider='google', model=self.model_name
-        )
+        return ProviderAPIError(str(exc), llm_provider="google", model=self.model_name)
 
     def _map_gemini_error(self, exc: Exception) -> Exception:
         """Map google.genai exceptions to App LLM exceptions."""
@@ -921,10 +910,10 @@ class GeminiClient(DirectLLMClient):
         self._log_gemini_exception(exc)
 
         if isinstance(exc, (asyncio.TimeoutError, httpx.TimeoutException)):
-            return Timeout(str(exc), llm_provider='google', model=self.model_name)
+            return Timeout(str(exc), llm_provider="google", model=self.model_name)
         if isinstance(exc, (aiohttp.ClientError, httpx.RequestError)):
             return APIConnectionError(
-                str(exc), llm_provider='google', model=self.model_name
+                str(exc), llm_provider="google", model=self.model_name
             )
 
         if isinstance(exc, APIError):
@@ -938,63 +927,63 @@ class GeminiClient(DirectLLMClient):
         input_tokens: int,
         output_tokens: int,
     ) -> tuple[int, int]:
-        usage_metadata = getattr(chunk, 'usage_metadata', None)
+        usage_metadata = getattr(chunk, "usage_metadata", None)
         if usage_metadata is None:
             return input_tokens, output_tokens
         return (
-            int(getattr(usage_metadata, 'prompt_token_count', 0) or 0),
-            int(getattr(usage_metadata, 'candidates_token_count', 0) or 0),
+            int(getattr(usage_metadata, "prompt_token_count", 0) or 0),
+            int(getattr(usage_metadata, "candidates_token_count", 0) or 0),
         )
 
     @staticmethod
     def _serialize_gemini_function_args(function_call: Any) -> str:
         try:
-            raw_args = getattr(function_call, 'args', {})
-            if hasattr(type(function_call), 'to_dict') and raw_args:
-                to_dict = getattr(type(function_call), 'to_dict')
+            raw_args = getattr(function_call, "args", {})
+            if hasattr(type(function_call), "to_dict") and raw_args:
+                to_dict = getattr(type(function_call), "to_dict")
                 args_dict = to_dict(raw_args) if callable(to_dict) else raw_args
-            elif hasattr(raw_args, 'items'):
+            elif hasattr(raw_args, "items"):
                 args_dict = dict(raw_args.items())  # type: ignore[union-attr]
-            elif hasattr(raw_args, '__dict__'):
+            elif hasattr(raw_args, "__dict__"):
                 args_dict = raw_args.__dict__
             else:
                 args_dict = raw_args
 
-            if hasattr(args_dict, 'pb') and hasattr(args_dict, 'items'):
+            if hasattr(args_dict, "pb") and hasattr(args_dict, "items"):
                 args_dict = dict(args_dict.items())  # type: ignore[union-attr]
 
             payload = args_dict if isinstance(args_dict, dict) else raw_args
-            return json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
+            return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
         except Exception:
-            return '{}'
+            return "{}"
 
     def _gemini_tool_call_chunks(
         self, chunk: Any, start_index: int
     ) -> tuple[list[dict[str, Any]], int]:
-        function_calls = getattr(chunk, 'function_calls', None) or []
+        function_calls = getattr(chunk, "function_calls", None) or []
         chunks: list[dict[str, Any]] = []
         next_index = start_index
         for function_call in function_calls:
             chunks.append(
                 {
-                    'choices': [
+                    "choices": [
                         {
-                            'delta': {
-                                'tool_calls': [
+                            "delta": {
+                                "tool_calls": [
                                     {
-                                        'index': next_index,
-                                        'id': f'call_{function_call.name}_{next_index}',
-                                        'type': 'function',
-                                        'function': {
-                                            'name': function_call.name,
-                                            'arguments': self._serialize_gemini_function_args(
+                                        "index": next_index,
+                                        "id": f"call_{function_call.name}_{next_index}",
+                                        "type": "function",
+                                        "function": {
+                                            "name": function_call.name,
+                                            "arguments": self._serialize_gemini_function_args(
                                                 function_call
                                             ),
                                         },
                                     }
                                 ]
                             },
-                            'finish_reason': None,
+                            "finish_reason": None,
                         }
                     ]
                 }
@@ -1004,29 +993,27 @@ class GeminiClient(DirectLLMClient):
 
     @staticmethod
     def _gemini_text_chunk(text: str) -> dict[str, Any]:
-        return {
-            'choices': [{'delta': {'content': text}, 'finish_reason': None}]
-        }
+        return {"choices": [{"delta": {"content": text}, "finish_reason": None}]}
 
     @staticmethod
     def _gemini_reasoning_chunks(chunk: Any) -> list[dict[str, Any]]:
-        candidates = getattr(chunk, 'candidates', None) or []
+        candidates = getattr(chunk, "candidates", None) or []
         chunks: list[dict[str, Any]] = []
         for candidate in candidates:
-            candidate_content = getattr(candidate, 'content', None)
+            candidate_content = getattr(candidate, "content", None)
             if candidate_content is None:
                 continue
-            for part in getattr(candidate_content, 'parts', []):
-                if not getattr(part, 'thought', False):
+            for part in getattr(candidate_content, "parts", []):
+                if not getattr(part, "thought", False):
                     continue
-                thought_text = getattr(part, 'text', '') or ''
+                thought_text = getattr(part, "text", "") or ""
                 if thought_text:
                     chunks.append(
                         {
-                            'choices': [
+                            "choices": [
                                 {
-                                    'delta': {'reasoning_content': thought_text},
-                                    'finish_reason': None,
+                                    "delta": {"reasoning_content": thought_text},
+                                    "finish_reason": None,
                                 }
                             ]
                         }
@@ -1041,15 +1028,15 @@ class GeminiClient(DirectLLMClient):
         if input_tokens or output_tokens:
             chunks.append(
                 {
-                    'choices': [],
-                    'usage': {
-                        'prompt_tokens': input_tokens,
-                        'completion_tokens': output_tokens,
-                        'total_tokens': input_tokens + output_tokens,
+                    "choices": [],
+                    "usage": {
+                        "prompt_tokens": input_tokens,
+                        "completion_tokens": output_tokens,
+                        "total_tokens": input_tokens + output_tokens,
                     },
                 }
             )
-        chunks.append({'choices': [{'delta': {}, 'finish_reason': 'stop'}]})
+        chunks.append({"choices": [{"delta": {}, "finish_reason": "stop"}]})
         return chunks
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
@@ -1072,33 +1059,33 @@ class GeminiClient(DirectLLMClient):
             cache_name,
         )
 
-        logger.debug('Gemini config: %s', config)
+        logger.debug("Gemini config: %s", config)
         logger.info(
-            'GeminiClient.completion: model=%s, history_len=%d, prompt_len=%d, '
-            'tools=%s, remaining_kwargs=%s',
+            "GeminiClient.completion: model=%s, history_len=%d, prompt_len=%d, "
+            "tools=%s, remaining_kwargs=%s",
             model_name,
             len(history),
             len(prompt) if isinstance(prompt, str) else 0,
             len(tools) if tools else 0,
             sorted(kwargs.keys()),
         )
-        logger.info('GeminiClient.completion: creating chat session...')
+        logger.info("GeminiClient.completion: creating chat session...")
         chat = self.client.chats.create(
             model=model_name,
             config=config,
             history=cast(Any, history),
         )
-        logger.info('GeminiClient.completion: chat created, calling send_message...')
+        logger.info("GeminiClient.completion: chat created, calling send_message...")
         try:
             response = chat.send_message(prompt, **kwargs)
         except Exception as e:
             logger.error(
-                'GeminiClient.completion: send_message raised %s: %s',
+                "GeminiClient.completion: send_message raised %s: %s",
                 type(e).__name__,
                 e,
             )
             raise self._map_gemini_error(e) from e
-        logger.info('GeminiClient.completion: send_message returned successfully')
+        logger.info("GeminiClient.completion: send_message returned successfully")
         tool_calls = extract_tool_calls(response)
         content = extract_text(response)
         content = ensure_non_empty_content(response, content, tool_calls)
@@ -1106,8 +1093,8 @@ class GeminiClient(DirectLLMClient):
             content=content,
             model=model_name,
             usage=gemini_usage(response),
-            id='',
-            finish_reason='stop',
+            id="",
+            finish_reason="stop",
             tool_calls=tool_calls,
             reasoning_content=extract_thinking(response),
         )
@@ -1135,7 +1122,7 @@ class GeminiClient(DirectLLMClient):
             cache_name,
         )
 
-        logger.debug('Gemini config: %s', config)
+        logger.debug("Gemini config: %s", config)
 
         chat = self.client.aio.chats.create(
             model=model_name,
@@ -1154,8 +1141,8 @@ class GeminiClient(DirectLLMClient):
             content=content,
             model=model_name,
             usage=gemini_usage(response),
-            id='',
-            finish_reason='stop',
+            id="",
+            finish_reason="stop",
             tool_calls=tool_calls,
             reasoning_content=extract_thinking(response),
         )
@@ -1175,7 +1162,7 @@ class GeminiClient(DirectLLMClient):
             cache_name,
         )
 
-        logger.debug('Gemini config: %s', config)
+        logger.debug("Gemini config: %s", config)
 
         chat = self.client.aio.chats.create(
             model=model_name,
@@ -1203,7 +1190,7 @@ class GeminiClient(DirectLLMClient):
                 for tool_chunk in tool_chunks:
                     yield tool_chunk
 
-                text = chunk.text or ''
+                text = chunk.text or ""
                 if text:
                     yield self._gemini_text_chunk(text)
 
@@ -1254,10 +1241,10 @@ def get_direct_client(
     resolved_base_url = resolver.resolve_base_url(model, base_url)
 
     logger.debug(
-        'Resolved model=%s → provider=%s, base_url=%s, stripped=%s',
+        "Resolved model=%s → provider=%s, base_url=%s, stripped=%s",
         model,
         provider,
-        resolved_base_url or 'default',
+        resolved_base_url or "default",
         stripped_model,
     )
 
@@ -1272,14 +1259,14 @@ def get_direct_client(
         # clients (i.e. Anthropic and Google).  All other providers already use
         # the OpenAI-compatible client so no special handling is needed.
         _NATIVE_ENDPOINTS: dict[str, str] = {
-            'anthropic': 'https://api.anthropic.com',
-            'google': 'https://generativelanguage.googleapis.com',
+            "anthropic": "https://api.anthropic.com",
+            "google": "https://generativelanguage.googleapis.com",
         }
-        native = _NATIVE_ENDPOINTS.get(provider or '', '')
-        is_native = native and resolved_base_url.rstrip('/').startswith(
-            native.rstrip('/')
+        native = _NATIVE_ENDPOINTS.get(provider or "", "")
+        is_native = native and resolved_base_url.rstrip("/").startswith(
+            native.rstrip("/")
         )
-        if not is_native and provider in ('anthropic', 'google'):
+        if not is_native and provider in ("anthropic", "google"):
             # Proxy route: use OpenAI-compatible client with full model name
             profile = _resolve_transport_profile(provider, resolved_base_url)
             return OpenAIClient(
@@ -1291,12 +1278,12 @@ def get_direct_client(
             )
 
     # Route to appropriate client based on provider
-    if provider == 'anthropic':
+    if provider == "anthropic":
         return AnthropicClient(
             model_name=stripped_model, api_key=api_key, timeout=timeout
         )
 
-    if provider == 'google':
+    if provider == "google":
         return GeminiClient(model_name=stripped_model, api_key=api_key, timeout=timeout)
 
     # All OpenAI-compatible providers use OpenAI client
@@ -1308,7 +1295,7 @@ def get_direct_client(
     # Lightning AI canonicalizes all models with an 'openai/' transport prefix,
     # which hides the actual model family from the outer provider field.
     model_family = provider
-    if '/' in stripped_model:
+    if "/" in stripped_model:
         try:
             model_family = resolver.resolve_provider(stripped_model)
         except (ValueError, Exception):

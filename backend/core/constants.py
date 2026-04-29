@@ -83,11 +83,16 @@ PTY_INPUT_READ_TIMEOUT_SECONDS = float(
     os.getenv("GRINTA_PTY_INPUT_READ_TIMEOUT_SECONDS", "1.0")
 )
 PTY_READ_POLL_INTERVAL_SECONDS = 0.05
-# Debugger pending-action floor: DAP step / continue can legitimately exceed
-# the default 60 s when stepping across slow native code, blocking I/O, or
-# breakpoints in long-running coroutines. Use the same generous floor as
-# terminal/cmd actions.
-DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR = CMD_PENDING_ACTION_TIMEOUT_FLOOR
+# Debugger pending-action floor: DAP step / continue legitimately need more
+# than the default 60 s when stepping across slow native code or waiting on
+# blocking I/O, but the cmd-run floor (600 s) is far too generous for an
+# interactive debugger and was the source of multi-minute "hangs" when an
+# adapter wedged. Cap at 120 s so the controller can recover quickly while
+# still allowing slow stops / large variable inspections to complete. Operators
+# who genuinely need longer can raise it via env override.
+DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR = float(
+    os.getenv("GRINTA_DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR", "120.0")
+)
 # Per-tool sync-bridge timeouts. Used by ``call_async_from_sync`` wrappers in
 # ``backend/execution/drivers/local/local_runtime_inprocess.py`` so the bridge
 # matches the controller's pending-action floor for each ActionType. A small
