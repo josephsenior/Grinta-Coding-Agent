@@ -221,6 +221,31 @@ LLM_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
     LLMNoResponseError,
 )
 
+# Provider proxies (Lightning AI, OpenRouter, etc.) sometimes inject error
+# messages directly into the stream body instead of returning an HTTP error
+# code.  These arrive as valid JSON chunks with content that happens to be a
+# disconnect notice.  The strings below are lowercased for case-insensitive
+# matching.  When detected before any real content has been yielded, the
+# stream is aborted and an APIConnectionError is raised so the existing
+# backoff/retry machinery kicks in exactly as for a proper network failure.
+_INBAND_DISCONNECT_PHRASES: tuple[str, ...] = (
+    '网络中断',              # Lightning AI / DeepSeek: "network disconnected"
+    '请重新连接',            # Lightning AI: "please reconnect"
+    '网络连接中断',          # variant
+    'network disconnected, please reconnect',
+    'connection was reset',
+    'upstream connect error',
+    'upstream request timeout',
+    'bad gateway',
+    'gateway timeout',
+    'service temporarily unavailable',
+)
+
+# We only inspect the first _INBAND_PREFIX_LIMIT chars so we never buffer
+# the entire stream.  Real responses are never this short, and all known
+# in-band error messages fit comfortably within this window.
+_INBAND_PREFIX_LIMIT = 256
+
 
 def _get_provider_resolver() -> Any:
     """Return the provider resolver instance."""
@@ -662,6 +687,7 @@ class LLM(RetryMixin, DebugMixin):
 
         for attempt in range(1, max_attempts + 1):
             yielded_any = False
+            _inband_prefix: list[str] = []  # accumulate leading content for disconnect probe
             try:
                 self.log_prompt(messages)
                 stream_iter = self.client.astream(messages=messages, **call_kwargs)
@@ -673,6 +699,19 @@ class LLM(RetryMixin, DebugMixin):
                         content = chunk['choices'][0]['delta'].get('content', '')
                         if content:
                             self.log_response(content)
+                            # Before the first real yield, accumulate a small
+                            # prefix and probe for known in-band disconnect
+                            # messages injected by provider proxies.
+                            if not yielded_any:
+                                _inband_prefix.append(content)
+                                prefix = ''.join(_inband_prefix)
+                                if len(prefix) <= _INBAND_PREFIX_LIMIT:
+                                    lower = prefix.lower()
+                                    if any(p in lower for p in _INBAND_DISCONNECT_PHRASES):
+                                        raise APIConnectionError(
+                                            f'Provider sent in-band disconnect message: {prefix.strip()!r}',
+                                            model=(self.config.model or '').strip(),
+                                        )
                     yield chunk
                     yielded_any = True
                 return

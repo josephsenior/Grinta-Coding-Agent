@@ -786,3 +786,110 @@ class TestGetCallKwargs:
         assert result['model'] == 'gpt-4o'
         assert result['seed'] == 123
         assert result['tool_choice'] == 'none'
+
+
+class TestInbandDisconnectDetection:
+    """astream() must detect in-band provider disconnect messages and raise APIConnectionError.
+
+    Regression suite for Lightning AI / DeepSeek proxy injecting disconnect
+    notices (e.g. "网络中断，请重新连接") as stream content instead of HTTP errors.
+    """
+
+    # ------------------------------------------------------------------ #
+    # Helpers                                                              #
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _make_chunk(content: str) -> dict:
+        return {'choices': [{'delta': {'content': content}}]}
+
+    @staticmethod
+    def _make_llm(chunks: list[dict]) -> LLM:
+        """Return a minimal LLM stub wired to yield *chunks* from astream()."""
+        from types import SimpleNamespace
+
+        llm = LLM.__new__(LLM)
+        llm.debug = False  # satisfies DebugMixin.log_prompt / log_response
+
+        llm.config = SimpleNamespace(  # type: ignore[attr-defined]
+            model='lightning-ai/deepseek-v4-pro',
+            temperature=0,
+            max_output_tokens=None,
+            top_p=None,
+            top_k=None,
+            timeout=None,
+            seed=None,
+            reasoning_effort=None,
+            num_retries=1,        # one attempt only → no retries
+            retry_min_wait=0,
+            retry_max_wait=0,
+            on_cancel_requested_fn=None,
+        )
+
+        async def _fake_astream(**_kwargs):
+            for c in chunks:
+                yield c
+
+        llm.client = MagicMock()
+        llm.client.astream = _fake_astream  # type: ignore[attr-defined]
+        return llm
+
+    @staticmethod
+    def _run(llm: LLM) -> list[dict]:
+        """Drive llm.astream() to completion, returning all yielded chunks."""
+        import asyncio
+
+        async def _collect():
+            result = []
+            async for chunk in llm.astream():
+                result.append(chunk)
+            return result
+
+        with patch.multiple(
+            'backend.inference.catalog_loader',
+            apply_model_param_overrides=lambda _m, kw, **_kw2: kw,
+            sanitize_call_kwargs_for_provider=lambda _m, kw: kw,
+        ):
+            return asyncio.run(_collect())
+
+    # ------------------------------------------------------------------ #
+    # Tests                                                                #
+    # ------------------------------------------------------------------ #
+
+    def test_chinese_disconnect_raises_api_connection_error(self):
+        """Chinese disconnect phrase from Lightning AI / DeepSeek proxy raises."""
+        llm = self._make_llm([self._make_chunk('网络中断，请重新连接')])
+        with pytest.raises(APIConnectionError, match='in-band disconnect'):
+            self._run(llm)
+
+    def test_disconnect_across_two_chunks_raises(self):
+        """Phrase split across consecutive chunks is still detected."""
+        llm = self._make_llm([self._make_chunk('网络中断'), self._make_chunk('，请重新连接')])
+        with pytest.raises(APIConnectionError):
+            self._run(llm)
+
+    def test_english_bad_gateway_raises(self):
+        """Generic English proxy disconnect phrase raises."""
+        llm = self._make_llm([self._make_chunk('bad gateway')])
+        with pytest.raises(APIConnectionError):
+            self._run(llm)
+
+    def test_normal_content_is_not_flagged(self):
+        """Normal model output passes through without raising."""
+        chunks = [self._make_chunk('Hello'), self._make_chunk(' world')]
+        result = self._run(self._make_llm(chunks))
+        assert len(result) == 2
+
+    def test_disconnect_phrase_beyond_prefix_limit_is_not_inspected(self):
+        """Content that starts with legitimate output is never probed for disconnect.
+
+        Once the first real chunk has been yielded the inspection window closes,
+        so a disconnect phrase appearing only in later chunks must not raise.
+        """
+        from backend.inference.llm import _INBAND_PREFIX_LIMIT
+
+        # First chunk is large legitimate content (beyond the prefix limit).
+        big_content = 'A' * (_INBAND_PREFIX_LIMIT + 10)
+        chunks = [self._make_chunk(big_content), self._make_chunk('网络中断')]
+        result = self._run(self._make_llm(chunks))
+        assert len(result) == 2
