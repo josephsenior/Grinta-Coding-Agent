@@ -109,7 +109,7 @@ class TestSetSecurityRisk:
 
 class TestHandleCmdRunTool:
     def test_basic_command(self):
-        action = _handle_cmd_run_tool({'command': 'echo hello'})
+        action = _handle_cmd_run_tool({'command': 'echo hello', 'security_risk': 'LOW'})
         assert isinstance(action, CmdRunAction)
         assert action.command == 'echo hello'
 
@@ -118,20 +118,24 @@ class TestHandleCmdRunTool:
             _handle_cmd_run_tool({})
 
     def test_timeout_set(self):
-        action = _handle_cmd_run_tool({'command': 'sleep 2', 'timeout': '5.5'})
+        action = _handle_cmd_run_tool({'command': 'sleep 2', 'timeout': '5.5', 'security_risk': 'LOW'})
         assert isinstance(action, CmdRunAction)
 
     def test_invalid_timeout_raises(self):
         with pytest.raises(FunctionCallValidationError, match='timeout'):
-            _handle_cmd_run_tool({'command': 'echo', 'timeout': 'not-a-number'})
+            _handle_cmd_run_tool({'command': 'echo', 'timeout': 'not-a-number', 'security_risk': 'LOW'})
 
     def test_is_input_flag(self):
-        action = _handle_cmd_run_tool({'command': 'y', 'is_input': 'true'})
+        action = _handle_cmd_run_tool({'command': 'y', 'is_input': 'true', 'security_risk': 'LOW'})
         assert action.is_input is True
 
     def test_is_input_false_default(self):
-        action = _handle_cmd_run_tool({'command': 'ls'})
+        action = _handle_cmd_run_tool({'command': 'ls', 'security_risk': 'LOW'})
         assert action.is_input is False
+
+    def test_missing_security_risk_raises(self):
+        with pytest.raises(FunctionCallValidationError, match='security_risk'):
+            _handle_cmd_run_tool({'command': 'ls'})
 
 
 # ---------------------------------------------------------------------------
@@ -158,24 +162,24 @@ class TestHandleFinishTool:
 class TestHandleStrReplaceEditorTool:
     def test_canonical_read_file_command_returns_file_read_action(self):
         action = _handle_text_editor_tool(
-            {'command': 'read_file', 'path': 'f.py'}
+            {'command': 'read_file', 'path': 'f.py', 'security_risk': 'LOW'}
         )
         assert isinstance(action, FileReadAction)
         assert action.path == 'f.py'
 
     def test_legacy_view_alias_is_rejected(self):
         with pytest.raises(FunctionCallValidationError, match='Unknown command'):
-            _handle_text_editor_tool({'command': 'view', 'path': 'f.py'})
+            _handle_text_editor_tool({'command': 'view', 'path': 'f.py', 'security_risk': 'LOW'})
 
     def test_file_path_alias_is_rejected(self):
         with pytest.raises(FunctionCallValidationError, match='path'):
             _handle_text_editor_tool(
-                {'command': 'read_file', 'file_path': 'f.py'}
+                {'command': 'read_file', 'file_path': 'f.py', 'security_risk': 'LOW'}
             )
 
     def test_view_with_range(self):
         action = _handle_text_editor_tool(
-            {'command': 'read_file', 'path': 'f.py', 'view_range': [1, 10]}
+            {'command': 'read_file', 'path': 'f.py', 'view_range': [1, 10], 'security_risk': 'LOW'}
         )
         assert isinstance(action, FileReadAction)
 
@@ -189,7 +193,7 @@ class TestHandleStrReplaceEditorTool:
 
     def test_create_file_command_returns_file_edit_action(self):
         action = _handle_text_editor_tool(
-            {'command': 'create_file', 'path': 'new.py', 'file_text': 'content'}
+            {'command': 'create_file', 'path': 'new.py', 'file_text': 'content', 'security_risk': 'LOW'}
         )
         assert isinstance(action, FileEditAction)
 
@@ -213,6 +217,7 @@ class TestHandleStrReplaceEditorTool:
                     'path': str(target),
                     'old_str': 'world',
                     'new_str': 'team',
+                    'security_risk': 'LOW',
                 }
             )
 
@@ -225,6 +230,7 @@ class TestHandleStrReplaceEditorTool:
                     'command': 'batch_replace',
                     'path': str(target),
                     'edits': [{'path': 'a.py', 'old_str': 'x', 'new_str': 'y'}],
+                    'security_risk': 'LOW',
                 }
             )
 
@@ -238,6 +244,7 @@ class TestHandleStrReplaceEditorTool:
                 'new_str': 'gamma',
                 'insert_line': 0,
                 'preview': True,
+                'security_risk': 'LOW',
             }
         )
         assert isinstance(action, AgentThinkAction)
@@ -411,7 +418,7 @@ class TestProcessSingleToolCall:
 
         tool_name = create_cmd_run_tool()['function']['name']
         tc = self._make_tool_call(tool_name)
-        action = _process_single_tool_call(tc, {'command': 'ls'})
+        action = _process_single_tool_call(tc, {'command': 'ls', 'security_risk': 'LOW'})
         assert isinstance(action, CmdRunAction)
 
     def test_dispatches_finish(self):
@@ -473,6 +480,7 @@ class TestValidateStructureEditorArgs:
             {
                 'command': 'read_file',
                 'path': 'x.py',
+                'security_risk': 'LOW',
             }
         )
         assert isinstance(result, FileReadAction)
@@ -489,6 +497,7 @@ class TestValidateStructureEditorArgs:
                     'path': 'x.py',
                     'old_str': 'old',
                     'new_str': 'new',
+                    'security_risk': 'LOW',
                 }
             )
 
@@ -497,7 +506,7 @@ class TestValidateStructureEditorArgs:
 
         with pytest.raises(FunctionCallValidationError, match='Unknown command'):
             _handle_symbol_editor_tool(
-                {'command': 'totally_unknown_cmd', 'path': 'x.py'}
+                {'command': 'totally_unknown_cmd', 'path': 'x.py', 'security_risk': 'LOW'}
             )
 
     def test_str_replace_alias_is_rejected(self):
@@ -510,6 +519,7 @@ class TestValidateStructureEditorArgs:
                     'path': 'x.py',
                     'old_str': 'old',
                     'new_str': 'new',
+                    'security_risk': 'LOW',
                 }
             )
 
@@ -531,6 +541,7 @@ class TestEditSymbolsBatch:
                     {'symbol_name': 'a', 'new_body': '    return 10'},
                     {'symbol_name': 'b', 'new_body': '    return 20'},
                 ],
+                'security_risk': 'LOW',
             }
         )
         from backend.ledger.action import FileReadAction
@@ -554,6 +565,7 @@ class TestEditSymbolsBatch:
                     {'symbol_name': 'a', 'new_body': '    return 99'},
                     {'symbol_name': 'nope_not_a_symbol', 'new_body': '    pass'},
                 ],
+                'security_risk': 'LOW',
             }
         )
         from backend.ledger.action import MessageAction
@@ -575,6 +587,7 @@ class TestEditSymbolsBatch:
                         {'symbol_name': 'a', 'new_body': '    return 2'},
                         {'symbol_name': 'a', 'new_body': '    return 3'},
                     ],
+                    'security_risk': 'LOW',
                 }
             )
 

@@ -25,7 +25,14 @@ def create_terminal_manager_tool() -> dict[str, Any]:
                 'with the next line (e.g. ``dir`` or ``ls``), not repeated blank Enter/control '
                 'unless you are diagnosing a hung prompt. Do not spam identical control/input '
                 'when reads show no new bytes. On Windows the shell is often PowerShell—use '
-                'PowerShell cmdlets, not Unix-only tools, unless you know the session is bash.'
+                'PowerShell cmdlets, not Unix-only tools, unless you know the session is bash. '
+                'TIMING: open and input poll the PTY internally for the first byte of '
+                'output (early-exit on arrival, capped by GRINTA_PTY_OPEN_READ_TIMEOUT_SECONDS '
+                '/ GRINTA_PTY_INPUT_READ_TIMEOUT_SECONDS env vars). An empty result with '
+                'has_new_output=false is normal for slow commands — wait and call action=read '
+                'again instead of resending input. Use action=open with is_background=true '
+                'on the underlying execute_bash for log tails or servers; do not park them '
+                'inside this tool.'
             ),
             'parameters': {
                 'type': 'object',

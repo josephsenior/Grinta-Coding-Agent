@@ -300,10 +300,21 @@ def _render_security(cli_mode: bool = True) -> str:
     )
     return (
         '# 🔐 Security Risk Policy\n'
-        'When using tools that support the security_risk parameter, assess the safety risk of your actions:\n\n'
+        '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
+        '`text_editor`, `symbol_editor`, and `browser`. Pick one of `LOW` / `MEDIUM` / `HIGH` '
+        'based on the action you are about to take. The server runs an independent analyzer '
+        'and may **escalate** your label (never lower it); a HIGH escalation can require user '
+        'confirmation. Missing or invalid values fail the tool call.\n\n'
         f'{risk_block}\n\n'
         '**Global Rules**\n'
-        '- Always escalate to **HIGH** if sensitive data leaves the environment.'
+        '- Always escalate to **HIGH** if sensitive data leaves the environment.\n'
+        '- Long-running shell commands: pass an explicit `timeout` (seconds) instead of '
+        'guessing — the server enforces a generous floor for interactive/debugger flows so '
+        'legitimate slow steps are not killed.\n'
+        '- Interactive terminals (`terminal_manager`): an empty result with '
+        '`has_new_output=false` is the normal "still warming up" signal — wait for the next '
+        'tick rather than spamming repeated reads. For servers and log tails, use '
+        '`is_background=true` on `execute_bash`/`execute_powershell`.'
     )
 
 

@@ -21,15 +21,38 @@ def combine_thought(action: Action, thought: str) -> Action:
 
 def set_security_risk(action: Action, arguments: Mapping[str, Any]) -> None:
     """Set the security risk level for the action."""
-    if 'security_risk' in arguments:
-        if arguments['security_risk'] in RISK_LEVELS:
-            action.security_risk = getattr(
-                ActionSecurityRisk, str(arguments['security_risk'])
-            )
-        else:
-            logger.warning(
-                'Invalid security_risk value: %s', arguments['security_risk']
-            )
+    raw = arguments.get('security_risk')
+    if raw is None:
+        return
+    normalized = str(raw).strip().upper()
+    if normalized in RISK_LEVELS:
+        action.security_risk = getattr(ActionSecurityRisk, normalized)
+    else:
+        logger.warning('Invalid security_risk value: %s', raw)
+
+
+def validate_security_risk(arguments: Mapping[str, Any], tool_name: str) -> None:
+    """Validate that ``security_risk`` is present and one of ``RISK_LEVELS``.
+
+    Used by tools that mandate an explicit risk label from the model
+    (``execute_bash``/``execute_powershell``, ``text_editor``, ``symbol_editor``,
+    ``browser``). Raises :class:`FunctionCallValidationError` on missing or
+    invalid value so the failure is surfaced to the model as a tool-call error
+    instead of being silently auto-classified server-side. Accepts any case
+    (``low``/``LOW``/``Low``) so model output variations don't trip validation.
+    """
+    raw = arguments.get('security_risk')
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        raise FunctionCallValidationError(
+            f'Missing required argument "security_risk" in tool call {tool_name}. '
+            f'Provide one of {RISK_LEVELS} based on the action you are about to take.'
+        )
+    normalized = str(raw).strip().upper()
+    if normalized not in RISK_LEVELS:
+        raise FunctionCallValidationError(
+            f'Invalid "security_risk" value {raw!r} in tool call {tool_name}. '
+            f'Must be one of {RISK_LEVELS} (case-insensitive).'
+        )
 
 
 def parse_bool_argument(raw: Any) -> bool:

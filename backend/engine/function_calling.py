@@ -31,6 +31,7 @@ from backend.engine.function_calling_helpers import (
     parse_bool_argument,
     require_tool_argument,
     set_security_risk,
+    validate_security_risk,
 )
 from backend.engine.tools import (
     create_cmd_run_tool,
@@ -144,6 +145,7 @@ if TYPE_CHECKING:
 
 def _handle_browser_tool(arguments: Mapping[str, Any]) -> BrowserToolAction:
     """Handle native browser-use tool calls."""
+    validate_security_risk(arguments, BROWSER_TOOL_NAME)
     action = build_browser_tool_action(dict(arguments))
     set_security_risk(action, arguments)
     return action
@@ -158,6 +160,7 @@ def _handle_cmd_run_tool(arguments: Mapping[str, Any]) -> CmdRunAction:
 
     tool_name = cast(str, create_cmd_run_tool().get('function', {}).get('name', ''))
     command = require_tool_argument(arguments, 'command', tool_name)
+    validate_security_risk(arguments, tool_name)
     raw_is_input = arguments.get('is_input', False)
     is_input = parse_bool_argument(raw_is_input)
     is_background = parse_bool_argument(arguments.get('is_background', False))
@@ -409,6 +412,7 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
     command = cast(str, arguments.get('command', ''))
 
     path, command = _validate_text_editor_args(arguments)
+    validate_security_risk(arguments, 'text_editor')
     command, normalized_args = _normalize_file_editor_command_and_args(
         command, arguments
     )
@@ -1182,6 +1186,7 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
     )
 
     command, path = _validate_symbol_editor_args(dict(arguments), tool_name)
+    validate_security_risk(arguments, tool_name)
     command, normalized_args = _normalize_symbol_editor_alias(command, dict(arguments))
 
     # Repair double-escaped content (``\n`` / ``\"``) before it reaches the
@@ -1211,7 +1216,9 @@ def _handle_symbol_editor_tool(arguments: Mapping[str, Any]) -> Action:
             f'Failed to initialize Structure Editor: {e}'
         ) from e
 
-    return _dispatch_structure_editor_commands(editor, command, path, normalized_args)
+    action = _dispatch_structure_editor_commands(editor, command, path, normalized_args)
+    set_security_risk(action, arguments)
+    return action
 
 
 def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:

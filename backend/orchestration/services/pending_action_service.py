@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 from backend.core.constants import (
     BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     CMD_PENDING_ACTION_TIMEOUT_FLOOR,
+    DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR,
     MCP_PENDING_ACTION_TIMEOUT_FLOOR,
     TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR,
 )
@@ -46,15 +47,25 @@ def _terminal_pending_timeout(base: float, _action: Action) -> float:
 
 
 def _debugger_pending_timeout(base: float, action: Action) -> float:
+    """Honour an explicit action ``timeout`` and apply the debugger floor.
+
+    DAP step / continue / breakpoint waits routinely exceed 60 s when the
+    debuggee is doing slow native work, blocking I/O, or deep recursion. The
+    previous 60 s clamp produced false-positive timeouts on legitimate slow
+    steps. We now use ``DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR`` (matches the
+    terminal/cmd floor) and let the action's own ``timeout`` extend it
+    further when the agent set one explicitly.
+    """
     action_timeout = getattr(action, 'timeout', None)
     try:
         parsed_timeout = float(action_timeout) if action_timeout is not None else None
     except (TypeError, ValueError):
         parsed_timeout = None
 
+    candidates = [float(base), float(DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR)]
     if parsed_timeout is not None and parsed_timeout > 0:
-        return max(float(base), parsed_timeout + 5.0)
-    return max(float(base), 60.0)
+        candidates.append(parsed_timeout + 5.0)
+    return max(candidates)
 
 
 def _identity_pending_timeout(base: float, _action: Action) -> float:
