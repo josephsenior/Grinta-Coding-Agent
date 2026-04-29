@@ -37,13 +37,14 @@ def _prompt_model_change(console: Console) -> bool:
     """Prompt user to change model via Provider → Model flow. Returns True if changed."""
     provider_map, custom_idx = _print_provider_menu(console)
 
-    choice = Prompt.ask('  Provider number', default='', console=console).strip()
+    choice = Prompt.ask('  Provider number [dim](Enter to cancel)[/dim]', default='', console=console).strip()
     if not choice:
+        console.print(f'[{CLR_META}]  Cancelled.[/]')
         return False
     try:
         num = int(choice)
     except ValueError:
-        console.print(f'[{CLR_STATUS_ERR}]  Invalid selection.[/]')
+        console.print(f'[{CLR_STATUS_ERR}]  Not a number: {choice!r}[/]')
         return False
 
     selection = _resolve_provider_selection(console, num, provider_map, custom_idx)
@@ -53,12 +54,13 @@ def _prompt_model_change(console: Console) -> bool:
 
     new_model = Prompt.ask('  Model name', console=console).strip()
     if not new_model:
+        console.print(f'[{CLR_META}]  Cancelled.[/]')
         return False
     if '/' not in new_model and provider_key:
         new_model = f'{provider_key}/{new_model}'
 
     update_model(new_model, provider=provider_key, base_url=base_url)
-    console.print(f'[{CLR_STATUS_OK}]  Model updated.[/]')
+    console.print(f'[{CLR_STATUS_OK}]  Model updated to [bold]{new_model}[/bold].[/]')
     return True
 
 
@@ -75,7 +77,7 @@ def _print_provider_menu(
         idx += 1
     custom_idx = idx
     console.print(
-        f'  [{CLR_BRAND}]{custom_idx:>2}[/]  [dim]Custom (OpenAI-compatible)[/dim]'
+        f'  [{CLR_BRAND}]{custom_idx:>2}[/]  Custom [dim](OpenAI-compatible endpoint)[/]'
     )
     console.print()
     return provider_map, custom_idx
@@ -111,21 +113,26 @@ def _resolve_provider_selection(
 
 
 def _render_tab_bar(active: int) -> Text:
-    bar = Text()
-    tabs = [(' 1  AI Config ', 'ai'), (' 2  MCP Servers ', 'mcp')]
-    for i, (label, _) in enumerate(tabs):
-        if i == active:
-            bar.append(label, style=CLR_BRAND)
-        else:
-            bar.append(label, style=CLR_META)
-        bar.append('  ')
+    bar = Text('  ')
+    tabs = ('AI Config', 'MCP Servers')
+    for i, label in enumerate(tabs):
+        marker = '●' if i == active else '○'
+        style = f'bold {CLR_BRAND}' if i == active else CLR_META
+        bar.append(f'{marker} {i + 1} {label}', style=style)
+        if i != len(tabs) - 1:
+            bar.append('   ·   ', style=CLR_META)
     return bar
 
 
 def _render_ai_tab(console: Console) -> None:
     config = load_app_config()
-    table = Table(show_header=False, border_style=CLR_CARD_BORDER, padding=(0, 2))
-    table.add_column('Field', style=CLR_CARD_TITLE)
+    table = Table(
+        show_header=False,
+        border_style=CLR_CARD_BORDER,
+        padding=(0, 2),
+        box=None,
+    )
+    table.add_column('Field', style=CLR_CARD_TITLE, no_wrap=True)
     table.add_column('Value')
 
     provider, model = HUDBar.describe_model(config.get_llm_config().model)
@@ -140,13 +147,22 @@ def _render_ai_tab(console: Console) -> None:
         Panel(
             table,
             title=f'[{CLR_BRAND}]AI Configuration[/]',
+            title_align='left',
             border_style=CLR_CARD_BORDER,
+            padding=(1, 2),
         )
     )
     console.print()
-    console.print(
-        f'[{CLR_META}]Commands:  [bold]m[/bold] model  │  [bold]k[/bold] api key  │  [bold]b[/bold] budget  │  '
-        '[bold]i[/bold] tool icons  │  [bold]q[/bold] back[/]'
+    _render_command_hint(
+        console,
+        [
+            ('m', 'model'),
+            ('k', 'api key'),
+            ('b', 'budget'),
+            ('i', 'tool icons'),
+            ('2', 'MCP tab'),
+            ('q', 'back'),
+        ],
     )
 
 
@@ -154,11 +170,16 @@ def _render_mcp_tab(console: Console) -> None:
     config = load_app_config()
     servers = get_mcp_servers(config)
 
-    table = Table(border_style=CLR_CARD_BORDER, padding=(0, 2))
-    table.add_column('#', style=CLR_META)
-    table.add_column('Name', style=CLR_CARD_TITLE)
-    table.add_column('Type')
-    table.add_column('Endpoint')
+    table = Table(
+        border_style=CLR_CARD_BORDER,
+        header_style=CLR_CARD_TITLE,
+        padding=(0, 2),
+        box=None,
+    )
+    table.add_column('#', style=CLR_META, no_wrap=True, justify='right')
+    table.add_column('Name', style=CLR_CARD_TITLE, no_wrap=True)
+    table.add_column('Type', no_wrap=True)
+    table.add_column('Endpoint', overflow='fold')
 
     if not servers:
         table.add_row('—', '(no servers configured)', '', '')
@@ -171,102 +192,51 @@ def _render_mcp_tab(console: Console) -> None:
         Panel(
             table,
             title=f'[{CLR_BRAND}]MCP Servers[/]',
+            title_align='left',
             border_style=CLR_CARD_BORDER,
+            padding=(1, 2),
         )
     )
     console.print()
     settings_path = _settings_path()
     console.print(
-        f'[{CLR_META}]Servers are stored as [bold]mcp_config[/bold] in [bold]{settings_path}[/bold] '
-        '(you can also edit that file directly).[/]'
+        f'[{CLR_META}]Stored as [bold]mcp_config[/bold] in [bold]{settings_path}[/bold] '
+        '— edit that file for advanced changes.[/]'
     )
     console.print()
-    console.print(
-        f'[{CLR_META}]Commands:  [bold]a[/bold] add server  │  [bold]q[/bold] back[/]'
+    _render_command_hint(
+        console,
+        [
+            ('a', 'add server'),
+            ('1', 'AI tab'),
+            ('q', 'back'),
+        ],
     )
 
 
-def _handle_ai_command(console: Console) -> bool:
-    """Handle a single command in the AI tab. Returns False to exit settings."""
-    cmd = (
-        Prompt.ask('[bold]settings/ai[/bold]', default='q', console=console)
-        .strip()
-        .lower()
-    )
-    if cmd == 'q':
-        return False
-    if cmd == 'm':
-        _prompt_model_change(console)
-    elif cmd == 'k':
-        new_key = Prompt.ask('  New API key', console=console)
-        if new_key.strip():
-            update_api_key(new_key.strip())
-            console.print(f'[{CLR_STATUS_OK}]  API key updated.[/]')
-    elif cmd == 'b':
-        val = Prompt.ask(
-            '  Budget per task in USD [dim](e.g. 5.0 — enter 0 for unlimited)[/dim]',
-            console=console,
-        ).strip()
-        try:
-            budget_val = float(val)
-            update_budget(budget_val if budget_val > 0 else None)  # type: ignore[arg-type]
-            console.print(f'[{CLR_STATUS_OK}]  Budget updated.[/]')
-        except ValueError:
-            console.print(f'[{CLR_STATUS_ERR}]  Invalid number.[/]')
-    elif cmd == 'i':
-        cfg = load_app_config()
-        new_val = not get_cli_tool_icons_enabled(cfg)
-        update_cli_tool_icons(new_val)
-        state = 'on' if new_val else 'off'
-        console.print(f'[{CLR_STATUS_OK}]  Tool icons {state}.[/]')
-    return True
-
-
-def _handle_mcp_command(console: Console) -> bool:
-    """Handle a single command in the MCP tab. Returns False to exit settings."""
-    cmd = (
-        Prompt.ask('[bold]settings/mcp[/bold]', default='q', console=console)
-        .strip()
-        .lower()
-    )
-    if cmd == 'q':
-        return False
-    if cmd == 'a':
-        name = Prompt.ask('  Server name', console=console)
-        if not name.strip():
-            return True
-        mode = Prompt.ask(
-            '  Type', choices=['url', 'command'], default='url', console=console
-        )
-        if mode == 'url':
-            url = Prompt.ask(
-                '  Server URL (e.g. https://mcp.example.com/sse)', console=console
-            )
-            if url.strip():
-                add_mcp_server(name.strip(), url=url.strip())
-                console.print(f'[{CLR_STATUS_OK}]  Server added.[/]')
-        else:
-            command = Prompt.ask(
-                '  Command (e.g. npx @some/mcp-server)', console=console
-            )
-            if command.strip():
-                add_mcp_server(name.strip(), command=command.strip())
-                console.print(f'[{CLR_STATUS_OK}]  Server added.[/]')
-    return True
+def _render_command_hint(
+    console: Console, items: list[tuple[str, str]]
+) -> None:
+    """Render a consistent ``[k]ey  label  ·  ...`` command hint line."""
+    line = Text('  ')
+    for idx, (key, label) in enumerate(items):
+        if idx > 0:
+            line.append('   ·   ', style=CLR_META)
+        line.append(f'[{key}]', style=f'bold {CLR_BRAND}')
+        line.append(f' {label}', style=CLR_META)
+    console.print(line)
 
 
 def open_settings(console: Console) -> None:
     """Main entry point for the /settings TUI."""
     active_tab = 0
     console.print()
-    console.print(
-        Panel(
-            Text('Settings', style=CLR_BRAND),
-            border_style=CLR_CARD_BORDER,
-            padding=(0, 2),
-        ),
-        justify='center',
-    )
+    header = Text()
+    header.append(' ⚙ ', style=CLR_BRAND)
+    header.append('Settings', style=f'bold {CLR_BRAND}')
+    header.append('   — model, API keys, MCP servers', style=CLR_META)
+    console.print(header)
+    console.print(Text('─' * 56, style=CLR_CARD_BORDER))
 
     while True:
         console.print()
@@ -286,7 +256,7 @@ def open_settings(console: Console) -> None:
 
 def _read_settings_command(console: Console) -> str:
     return (
-        Prompt.ask('[bold]settings[/bold]', default='q', console=console)
+        Prompt.ask(f'[{CLR_BRAND}]settings ›[/]', default='q', console=console)
         .strip()
         .lower()
     )
@@ -328,13 +298,18 @@ def _prompt_budget_change(console: Console) -> None:
         '  Budget per task in USD [dim](e.g. 5.0 — enter 0 for unlimited)[/dim]',
         console=console,
     ).strip()
+    if not val:
+        return
     try:
         budget_val = float(val)
     except ValueError:
-        console.print(f'[{CLR_STATUS_ERR}]  Invalid number.[/]')
+        console.print(f'[{CLR_STATUS_ERR}]  Not a number: {val!r}[/]')
         return
     update_budget(budget_val if budget_val > 0 else None)  # type: ignore[arg-type]
-    console.print(f'[{CLR_STATUS_OK}]  Budget updated.[/]')
+    if budget_val <= 0:
+        console.print(f'[{CLR_STATUS_OK}]  Budget set to unlimited.[/]')
+    else:
+        console.print(f'[{CLR_STATUS_OK}]  Budget set to ${budget_val:.2f}/task.[/]')
 
 
 def _toggle_tool_icons(console: Console) -> None:
@@ -342,7 +317,7 @@ def _toggle_tool_icons(console: Console) -> None:
     new_val = not get_cli_tool_icons_enabled(cfg)
     update_cli_tool_icons(new_val)
     state = 'on' if new_val else 'off'
-    console.print(f'[{CLR_STATUS_OK}]  Tool icons {state}.[/]')
+    console.print(f'[{CLR_STATUS_OK}]  Tool icons turned {state}.[/]')
 
 
 def _run_mcp_tab(console: Console) -> int | None:
@@ -360,19 +335,31 @@ def _run_mcp_tab(console: Console) -> int | None:
 
 
 def _prompt_add_mcp_server(console: Console) -> None:
-    name = Prompt.ask('  Server name', console=console)
-    if not name.strip():
+    name = Prompt.ask('  Server name', console=console).strip()
+    if not name:
+        console.print(f'[{CLR_META}]  Cancelled.[/]')
         return
     mode = Prompt.ask(
         '  Type', choices=['url', 'command'], default='url', console=console
     )
     if mode == 'url':
-        url = Prompt.ask('  Server URL', console=console)
-        if url.strip():
-            add_mcp_server(name.strip(), url=url.strip())
-            console.print(f'[{CLR_STATUS_OK}]  Server added.[/]')
+        url = Prompt.ask(
+            '  Server URL [dim](e.g. https://mcp.example.com/sse)[/dim]',
+            console=console,
+        ).strip()
+        if not url:
+            console.print(f'[{CLR_META}]  Cancelled.[/]')
+            return
+        add_mcp_server(name, url=url)
+        console.print(f'[{CLR_STATUS_OK}]  Added [bold]{name}[/bold] \u2192 {url}[/]')
     else:
-        command = Prompt.ask('  Command', console=console)
-        if command.strip():
-            add_mcp_server(name.strip(), command=command.strip())
-            console.print(f'[{CLR_STATUS_OK}]  Server added.[/]')
+        command = Prompt.ask(
+            '  Command [dim](e.g. npx @some/mcp-server)[/dim]', console=console
+        ).strip()
+        if not command:
+            console.print(f'[{CLR_META}]  Cancelled.[/]')
+            return
+        add_mcp_server(name, command=command)
+        console.print(
+            f'[{CLR_STATUS_OK}]  Added [bold]{name}[/bold] \u2192 {command}[/]'
+        )

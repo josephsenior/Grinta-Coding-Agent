@@ -304,7 +304,7 @@ def _help_for_specific_command(command_name: str) -> str:
         suffix = ''
         if suggestions:
             suffix = (
-                '\n\nTry ' + ' or '.join(f'`{item}`' for item in suggestions) + '.'
+                '\n\nDid you mean ' + ' or '.join(f'`{item}`' for item in suggestions) + '?'
             )
         return f'No help topic for `{command_name}`.{suffix}'
     detail_lines = [
@@ -335,12 +335,13 @@ def _help_section_lines(specs: list['SlashCommandSpec']) -> list[str]:
 
 _HELP_INPUT_TIPS: tuple[str, ...] = (
     '',
-    '**Input tips**',
+    '**Input shortcuts**',
     '',
-    '- `Tab` autocomplete slash commands and common arguments',
-    '- `↑` / `↓` search prompt history',
-    '- `Alt+Enter` insert a newline',
-    '- `Ctrl+C` interrupt the current run',
+    '- `Tab` — autocomplete slash commands and arguments',
+    '- `↑` / `↓` — search prompt history',
+    '- `Alt+Enter` — insert a newline (multi-line input)',
+    '- `Ctrl+C` — interrupt the current run',
+    '- `/help <command>` — detailed help for a single command',
 )
 
 

@@ -128,14 +128,11 @@ def render_confirmation(
             ),
         )
 
-    console.print()
-    console.print(
-        '[dim]Keys: [bold]y[/bold] approve · [bold]n[/bold] reject · [bold]Enter[/bold] confirms the prompt below[/dim]'
-    )
-    console.print()
     return Confirm.ask(
-        '[bold]Proceed?[/bold] [dim](y/n)[/dim]',
+        '  [bold]Approve?[/bold] [dim]\\[y/n][/dim]',
         console=console,
+        show_choices=False,
+        show_default=False,
     )
 
 
