@@ -112,10 +112,27 @@ class LspSymbol:
 
 
 @dataclass
+class LspCodeAction:
+    """A single quick-fix / refactor suggested by the language server."""
+
+    title: str
+    kind: str = ''  # quickfix | refactor | source | source.organizeImports | …
+    is_preferred: bool = False
+    diagnostic_message: str = ''  # the diagnostic this action resolves, if any
+
+    def __str__(self) -> str:
+        prefix = '★ ' if self.is_preferred else '  '
+        kind_tag = f' [{self.kind}]' if self.kind else ''
+        suffix = f' — fixes: {self.diagnostic_message}' if self.diagnostic_message else ''
+        return f'{prefix}{self.title}{kind_tag}{suffix}'
+
+
+@dataclass
 class LspResult:
     available: bool = True
     locations: list[LspLocation] = field(default_factory=list)
     symbols: list[LspSymbol] = field(default_factory=list)
+    code_actions: list[LspCodeAction] = field(default_factory=list)
     hover_text: str = ''
     error: str = ''
 
@@ -150,6 +167,23 @@ class LspResult:
             lines = [f'Diagnostics ({len(self.locations)} issue(s)):']
             for loc in self.locations[:30]:
                 lines.append(f'  - {loc}')
+            return '\n'.join(lines)
+        if command == 'code_action':
+            if not self.code_actions:
+                return (
+                    'No code actions / quick-fixes available at this location. '
+                    'Either the file is clean or the language server has no '
+                    'suggestions for this range. Apply edits manually via '
+                    '`symbol_editor` or `text_editor`.'
+                )
+            lines = [
+                f'Available code actions ({len(self.code_actions)}; ★ = preferred):',
+                '(Discovery-only — no auto-apply yet. Implement the chosen fix '
+                'via `symbol_editor` / `text_editor` and re-run `get_diagnostics` '
+                'to verify.)',
+            ]
+            for act in self.code_actions[:25]:
+                lines.append(f'  {act}')
             return '\n'.join(lines)
         return str(self)
 
@@ -285,6 +319,8 @@ class LspClient:
             return self._query_hover(abs_path, uri, source, lsp_line, lsp_col)
         elif command in ('diagnostics', 'get_diagnostics'):
             return self._query_diagnostics(abs_path, uri, source)
+        elif command == 'code_action':
+            return self._query_code_actions(abs_path, uri, source, lsp_line, lsp_col)
         elif command in ('find_definition', 'find_references'):
             return self._query_locations(
                 command, abs_path, uri, source, lsp_line, lsp_col
@@ -423,6 +459,138 @@ class LspClient:
                         # In a real impl, we'd have a LspDiagnostic class
 
         return LspResult(available=True, locations=errors)
+
+    def _query_code_actions(
+        self,
+        abs_path: str,
+        uri: str,
+        source: str,
+        lsp_line: int,
+        lsp_col: int,
+    ) -> LspResult:
+        """Query LSP for code actions / quick-fixes at the given position.
+
+        Returns a discovery-only list of suggested fixes (titles + kinds).
+        We do NOT auto-apply WorkspaceEdits — the agent reads the list and
+        implements the chosen fix via ``symbol_editor`` / ``text_editor``.
+        This keeps the apply path visible and reviewable.
+        """
+        server_cmd = self._get_server_command(abs_path)
+        if not server_cmd:
+            return LspResult(available=False)
+
+        # First collect diagnostics for the file so we can pass them as
+        # context to ``textDocument/codeAction`` — most servers only return
+        # quickfixes when the matching diagnostic is present in the request.
+        diag_msgs = self._build_init_msgs(uri, abs_path)
+        diag_msgs[2]['params']['textDocument']['text'] = source
+        diag_msgs.append(
+            {'jsonrpc': '2.0', 'method': 'shutdown', 'id': 99, 'params': {}}
+        )
+        diag_responses = self._rpc(diag_msgs, server_cmd)
+        diagnostics_payload: list[dict[str, Any]] = []
+        for resp in diag_responses:
+            if resp.get('method') == 'textDocument/publishDiagnostics':
+                params = resp.get('params', {})
+                if params.get('uri') == uri:
+                    diagnostics_payload = list(params.get('diagnostics', []))
+                    break
+
+        # If a position was given, restrict the request range to a single
+        # point so the server returns only actions relevant to that location.
+        # Otherwise (line<=1 and column<=1 → caller did not specify a target)
+        # request actions for the whole file.
+        if lsp_line == 0 and lsp_col == 0:
+            line_count = source.count('\n') + 1
+            req_range = {
+                'start': {'line': 0, 'character': 0},
+                'end': {'line': max(0, line_count - 1), 'character': 0},
+            }
+            relevant_diags = diagnostics_payload
+        else:
+            req_range = {
+                'start': {'line': lsp_line, 'character': lsp_col},
+                'end': {'line': lsp_line, 'character': lsp_col},
+            }
+            # Filter diagnostics to those overlapping the requested point.
+            relevant_diags = [
+                d
+                for d in diagnostics_payload
+                if self._diag_contains_point(d, lsp_line, lsp_col)
+            ]
+            # Fall back to all diagnostics if the point matched nothing — the
+            # server may still surface refactor / source actions independent
+            # of diagnostics.
+            if not relevant_diags:
+                relevant_diags = diagnostics_payload
+
+        msgs = self._build_init_msgs(uri, abs_path)
+        msgs[2]['params']['textDocument']['text'] = source
+        msgs.append(
+            {
+                'jsonrpc': '2.0',
+                'id': 30,
+                'method': 'textDocument/codeAction',
+                'params': {
+                    'textDocument': {'uri': uri},
+                    'range': req_range,
+                    'context': {
+                        'diagnostics': relevant_diags,
+                    },
+                },
+            }
+        )
+        msgs.append(
+            {'jsonrpc': '2.0', 'method': 'shutdown', 'id': 31, 'params': {}}
+        )
+
+        responses = self._rpc(msgs, server_cmd)
+        for resp in responses:
+            if resp.get('id') == 30 and 'result' in resp:
+                result = resp.get('result') or []
+                actions: list[LspCodeAction] = []
+                seen_titles: set[str] = set()
+                for item in result:
+                    if not isinstance(item, dict):
+                        continue
+                    title = str(item.get('title', '')).strip()
+                    if not title or title in seen_titles:
+                        continue
+                    seen_titles.add(title)
+                    diag_msg = ''
+                    diags = item.get('diagnostics') or []
+                    if diags and isinstance(diags[0], dict):
+                        diag_msg = str(diags[0].get('message', '')).strip()
+                    actions.append(
+                        LspCodeAction(
+                            title=title,
+                            kind=str(item.get('kind', '')),
+                            is_preferred=bool(item.get('isPreferred', False)),
+                            diagnostic_message=diag_msg,
+                        )
+                    )
+                # Preferred actions first, then alphabetical for stability.
+                actions.sort(key=lambda a: (not a.is_preferred, a.title.lower()))
+                return LspResult(available=True, code_actions=actions)
+
+        return LspResult(available=True, code_actions=[])
+
+    @staticmethod
+    def _diag_contains_point(diag: dict, lsp_line: int, lsp_col: int) -> bool:
+        rng = diag.get('range') or {}
+        start = rng.get('start') or {}
+        end = rng.get('end') or {}
+        s_line = int(start.get('line', 0))
+        s_col = int(start.get('character', 0))
+        e_line = int(end.get('line', 0))
+        e_col = int(end.get('character', 0))
+        if lsp_line < s_line or lsp_line > e_line:
+            return False
+        if lsp_line == s_line and lsp_col < s_col:
+            return False
+        if lsp_line == e_line and lsp_col > e_col:
+            return False
+        return True
 
     def _query_document_symbols(
         self, abs_path: str, uri: str, source: str, symbol_filter: str
