@@ -19,33 +19,35 @@ import os
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
-def _parse_bool_env(var: str, default: str = 'false') -> bool:
+def _parse_bool_env(var: str, default: str = "false") -> bool:
     """Return *True* when the env-var *var* is set to a truthy string."""
-    return os.getenv(var, default).strip().lower() in ('true', '1', 'yes')
+    return os.getenv(var, default).strip().lower() in ("true", "1", "yes")
 
 
 # ── Core Identity & Limits ──────────────────────────────────────────
-DEFAULT_AGENT_NAME = 'Orchestrator'
-DEFAULT_MAX_ITERATIONS = 10000  # effectively unlimited; circuit breaker handles termination
+DEFAULT_AGENT_NAME = "Orchestrator"
+DEFAULT_MAX_ITERATIONS = (
+    10000  # effectively unlimited; circuit breaker handles termination
+)
 
 # ── Workspace & Paths ───────────────────────────────────────────────
-JWT_SECRET_FILE = '.jwt_secret'
+JWT_SECRET_FILE = ".jwt_secret"
 # Default disk root for LocalFileStore when settings do not set ``local_data_root``.
 # Uses an absolute user-level directory so Grinta never writes inside the user's workspace.
-DEFAULT_LOCAL_DATA_ROOT = '~/.grinta/storage'
+DEFAULT_LOCAL_DATA_ROOT = "~/.grinta/storage"
 
-DEFAULT_CONFIG_FILE = 'settings.json'
+DEFAULT_CONFIG_FILE = "settings.json"
 
 # ── URLs ────────────────────────────────────────────────────────────
-GUIDE_URL = 'https://docs.app.dev/guide'
-TROUBLESHOOTING_URL = 'https://docs.app.dev/usage/troubleshooting'
+GUIDE_URL = "https://docs.app.dev/guide"
+TROUBLESHOOTING_URL = "https://docs.app.dev/usage/troubleshooting"
 # Host:port for the internal MCP HTTP endpoint (same process as default dev API :3000)
-DEFAULT_MCP_HOST = 'localhost:3000'
+DEFAULT_MCP_HOST = "localhost:3000"
 
 # ── Security ────────────────────────────────────────────────────────
-SECRET_PLACEHOLDER = '**********'
+SECRET_PLACEHOLDER = "**********"
 # settings.json must not store the real LLM secret; use LLM_API_KEY in .env instead.
-LLM_API_KEY_SETTINGS_PLACEHOLDER = '${LLM_API_KEY}'
+LLM_API_KEY_SETTINGS_PLACEHOLDER = "${LLM_API_KEY}"
 
 # ── Cache ───────────────────────────────────────────────────────────
 SETTINGS_CACHE_TTL = 60  # seconds
@@ -84,31 +86,31 @@ IDLE_RECLAIM_SPIKE_THRESHOLD = 3
 EVICTION_SPIKE_THRESHOLD = 1
 
 # ── Runtime Bootstrap ───────────────────────────────────────────────
-MICROMAMBA_ENV_NAME = 'App'
+MICROMAMBA_ENV_NAME = "App"
 DEFAULT_PYTHON_PREFIX = [
-    '/App/micromamba/bin/micromamba',
-    'run',
-    '-n',
+    "/App/micromamba/bin/micromamba",
+    "run",
+    "-n",
     MICROMAMBA_ENV_NAME,
-    'uv',
-    'run',
+    "uv",
+    "run",
 ]
-DEFAULT_MAIN_MODULE = 'app.runtime.action_execution_server'
+DEFAULT_MAIN_MODULE = "app.runtime.action_execution_server"
 
 # ── Storage ─────────────────────────────────────────────────────────
 # Relative sub-directory under local_data_root for conversation files.
-CONVERSATION_BASE_DIR = 'sessions'
+CONVERSATION_BASE_DIR = "sessions"
 
 # ── Default Configuration ───────────────────────────────────────────
-DEFAULT_RUNTIME = 'local'
-DEFAULT_FILE_STORE = 'local'
-DEFAULT_CACHE_DIR = '/tmp/cache'
+DEFAULT_RUNTIME = "local"
+DEFAULT_FILE_STORE = "local"
+DEFAULT_CACHE_DIR = "/tmp/cache"
 DEFAULT_CONVERSATION_MAX_AGE_SECONDS = 864000
 DEFAULT_MAX_CONCURRENT_CONVERSATIONS = 3
-DEFAULT_VCS_USER_NAME = 'app'
-DEFAULT_VCS_USER_EMAIL = 'App@app.dev'
-DEFAULT_LOG_FORMAT = 'text'
-DEFAULT_LOG_LEVEL = 'INFO'
+DEFAULT_VCS_USER_NAME = "app"
+DEFAULT_VCS_USER_EMAIL = "App@app.dev"
+DEFAULT_LOG_FORMAT = "text"
+DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_ENABLE_BROWSER = True
 DEFAULT_MAX_BUDGET_PER_TASK = 5.0
 
@@ -134,21 +136,21 @@ DEFAULT_LLM_CORRECT_NUM = 5
 # ── File Upload ─────────────────────────────────────────────────────
 DEFAULT_MAX_FILE_UPLOAD_SIZE_MB = 100
 DEFAULT_FILE_UPLOAD_RESTRICT_TYPES = False
-DEFAULT_FILE_UPLOAD_ALLOWED_EXTENSIONS = {'.*'}
+DEFAULT_FILE_UPLOAD_ALLOWED_EXTENSIONS = {".*"}
 FILES_TO_IGNORE = [
-    '.git/',
-    '.DS_Store',
-    'node_modules/',
-    '__pycache__/',
-    'lost+found/',
-    '.vscode/',
-    '.downloads/',
-    '.grinta/downloads/',
+    ".git/",
+    ".DS_Store",
+    "node_modules/",
+    "__pycache__/",
+    "lost+found/",
+    ".vscode/",
+    ".downloads/",
+    ".grinta/downloads/",
 ]
 
 # ── Agent Behavior Defaults ─────────────────────────────────────────
 DEFAULT_AGENT_MEMORY_MAX_THREADS = 10
-CURRENT_AGENT_CONFIG_SCHEMA_VERSION = '2025-11-14'
+CURRENT_AGENT_CONFIG_SCHEMA_VERSION = "2025-11-14"
 DEFAULT_AGENT_MEMORY_ENABLED = True
 DEFAULT_AGENT_PROMPT_EXTENSIONS_ENABLED = True
 DEFAULT_AGENT_BROWSING_ENABLED = True
@@ -159,7 +161,7 @@ DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED = True
 DEFAULT_AGENT_AUTO_LINT_ENABLED = True
 DEFAULT_AGENT_CONFIRM_ACTIONS = False
 DEFAULT_AGENT_AUTO_RETRY_ON_ERROR = True
-DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
+DEFAULT_AGENT_AUTONOMY_LEVEL = "balanced"
 DEFAULT_AGENT_CMD_ENABLED = True
 # Frontier models (Claude 3.5/4, GPT-5, Gemini 2.5/3) reason natively; the explicit
 # `think` tool duplicates that reasoning into an externally-visible tool call that
@@ -192,7 +194,7 @@ DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED = True
 DEFAULT_AGENT_CLI_MODE = True
 DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT = False
 DEFAULT_AGENT_MERGE_CONTROL_SYSTEM_INTO_PRIMARY = False
-DEFAULT_APP_MCP_CONFIG_CLS = 'backend.core.config.mcp_config.AppMCPConfig'
+DEFAULT_APP_MCP_CONFIG_CLS = "backend.core.config.mcp_config.AppMCPConfig"
 DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS = 5
 DEFAULT_AGENT_MAX_HIGH_RISK_ACTIONS = 10
 DEFAULT_AGENT_MAX_STUCK_DETECTIONS = 15
@@ -281,11 +283,11 @@ DEFAULT_KB_ACTIVE_COLLECTION_IDS: list[str] = []
 DEFAULT_KB_SEARCH_TOP_K = 5
 DEFAULT_KB_RELEVANCE_THRESHOLD = 0.7
 DEFAULT_KB_AUTO_SEARCH = True
-DEFAULT_KB_SEARCH_STRATEGY = 'hybrid'
+DEFAULT_KB_SEARCH_STRATEGY = "hybrid"
 
 # ── Graph RAG Defaults ──────────────────────────────────────────────
 DEFAULT_GRAPH_RAG_ENABLED = False
-DEFAULT_GRAPH_RAG_PERSISTENCE_PATH = '~/.grinta/storage/graph_rag'
+DEFAULT_GRAPH_RAG_PERSISTENCE_PATH = "~/.grinta/storage/graph_rag"
 DEFAULT_GRAPH_RAG_GRAPH_DEPTH = 2
 DEFAULT_GRAPH_RAG_MAX_SEED_RESULTS = 10
 
@@ -295,20 +297,20 @@ DEFAULT_SAVE_TRAJECTORY_PATH = None
 DEFAULT_SAVE_SCREENSHOTS_IN_TRAJECTORY = False
 
 # ── API & Server ────────────────────────────────────────────────────
-API_VERSION_V1 = 'v1'
+API_VERSION_V1 = "v1"
 CURRENT_API_VERSION = API_VERSION_V1
 
 # API versioning is strict by default: unversioned /api/ requests are
 # rejected with a 400 suggesting the correct path.  Existing deployments
 # that rely on unversioned routes can set APP_PERMISSIVE_API=1 to
 # restore the old permissive behavior during migration.
-ENFORCE_API_VERSIONING = os.getenv('APP_PERMISSIVE_API', '').strip().lower() not in (
-    '1',
-    'true',
-    'yes',
+ENFORCE_API_VERSIONING = os.getenv("APP_PERMISSIVE_API", "").strip().lower() not in (
+    "1",
+    "true",
+    "yes",
 )
 
-ROOM_KEY_TEMPLATE = 'room_{sid}'
+ROOM_KEY_TEMPLATE = "room_{sid}"
 DEFAULT_SESSION_WAIT_TIME_BEFORE_CLOSE = 90
 DEFAULT_SESSION_WAIT_TIME_BEFORE_CLOSE_INTERVAL = 5
 
@@ -316,8 +318,8 @@ DEFAULT_SESSION_WAIT_TIME_BEFORE_CLOSE_INTERVAL = 5
 DEFAULT_QUOTA_HOUR_WINDOW = 3600
 DEFAULT_QUOTA_DAY_WINDOW = 86400
 DEFAULT_QUOTA_MONTH_WINDOW = 2592000
-QUOTA_EXEMPT_PATHS = {'/', '/api/monitoring/health'}
-QUOTA_EXEMPT_PATH_PREFIXES = ['/assets']
+QUOTA_EXEMPT_PATHS = {"/", "/api/monitoring/health"}
+QUOTA_EXEMPT_PATH_PREFIXES = ["/assets"]
 
 
 # Quota limits (App is local-first / single-user — unlimited by default)
@@ -332,54 +334,54 @@ DEFAULT_CIRCUIT_TIMEOUT_SECONDS = 60
 ROOT_GID = 0
 
 # ── Logging & Debug (env-var driven) ────────────────────────────────
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
-DEBUG = _parse_bool_env('DEBUG')
-DEBUG_LLM = _parse_bool_env('DEBUG_LLM', default='true')
-DEBUG_LLM_PROMPT = _parse_bool_env('DEBUG_LLM_PROMPT')
-LOG_JSON = _parse_bool_env('LOG_JSON', default='true')  # Default to JSON for production
-LOG_JSON_LEVEL_KEY = os.getenv('LOG_JSON_LEVEL_KEY', 'level')
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+DEBUG = _parse_bool_env("DEBUG")
+DEBUG_LLM = _parse_bool_env("DEBUG_LLM", default="true")
+DEBUG_LLM_PROMPT = _parse_bool_env("DEBUG_LLM_PROMPT")
+LOG_JSON = _parse_bool_env("LOG_JSON", default="true")  # Default to JSON for production
+LOG_JSON_LEVEL_KEY = os.getenv("LOG_JSON_LEVEL_KEY", "level")
 # Enable OTEL log correlation when explicitly requested, defaulting to OTEL_ENABLED
 OTEL_LOG_CORRELATION = _parse_bool_env(
-    'OTEL_LOG_CORRELATION',
-    default=os.getenv('OTEL_ENABLED', 'false'),
+    "OTEL_LOG_CORRELATION",
+    default=os.getenv("OTEL_ENABLED", "false"),
 )
-LOG_TO_FILE = _parse_bool_env('LOG_TO_FILE', default='true')
-LOG_ALL_EVENTS = _parse_bool_env('LOG_ALL_EVENTS')
-DEBUG_RUNTIME = _parse_bool_env('DEBUG_RUNTIME')
+LOG_TO_FILE = _parse_bool_env("LOG_TO_FILE", default="true")
+LOG_ALL_EVENTS = _parse_bool_env("LOG_ALL_EVENTS")
+DEBUG_RUNTIME = _parse_bool_env("DEBUG_RUNTIME")
 
 LOG_COLORS = {
-    'ACTION': 'green',
-    'USER_ACTION': 'light_red',
-    'OBSERVATION': 'yellow',
-    'USER_OBSERVATION': 'light_green',
-    'DETAIL': 'cyan',
-    'ERROR': 'red',
-    'PLAN': 'light_magenta',
+    "ACTION": "green",
+    "USER_ACTION": "light_red",
+    "OBSERVATION": "yellow",
+    "USER_OBSERVATION": "light_green",
+    "DETAIL": "cyan",
+    "ERROR": "red",
+    "PLAN": "light_magenta",
 }
 
 DISABLE_COLOR_PRINTING = False
 
 # ── Tool Names ──────────────────────────────────────────────────────
-TEXT_EDITOR_TOOL_NAME = 'text_editor'
-FINISH_TOOL_NAME = 'finish'
-TASK_TRACKER_TOOL_NAME = 'task_tracker'
-NOTE_TOOL_NAME = 'note'
-RECALL_TOOL_NAME = 'recall'
-SEMANTIC_RECALL_TOOL_NAME = 'semantic_recall'
+TEXT_EDITOR_TOOL_NAME = "text_editor"
+FINISH_TOOL_NAME = "finish"
+TASK_TRACKER_TOOL_NAME = "task_tracker"
+NOTE_TOOL_NAME = "note"
+RECALL_TOOL_NAME = "recall"
+SEMANTIC_RECALL_TOOL_NAME = "semantic_recall"
 # ── Security Risk ───────────────────────────────────────────────────
 SECURITY_RISK_DESC = (
     "Optional. Your assessment of this action's safety risk (LOW/MEDIUM/HIGH). "
     "If omitted, risk is classified automatically server-side. "
     "See the SECURITY_RISK_ASSESSMENT section in the system prompt for definitions."
 )
-RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH']
+RISK_LEVELS = ["LOW", "MEDIUM", "HIGH"]
 
 # ── UX / Error Presentation ─────────────────────────────────────────
 # ErrorSeverity, ErrorCategory enums live in backend.core.enums
 
 # ── Command Output ──────────────────────────────────────────────────
-CMD_OUTPUT_PS1_BEGIN = '\n###PS1JSON###\n'
-CMD_OUTPUT_PS1_END = '\n###PS1END###'
+CMD_OUTPUT_PS1_BEGIN = "\n###PS1JSON###\n"
+CMD_OUTPUT_PS1_END = "\n###PS1END###"
 MAX_CMD_OUTPUT_SIZE = 10000
 DEFAULT_CMD_EXIT_CODE = -1
 DEFAULT_CMD_PID = -1
@@ -409,29 +411,29 @@ DEFAULT_SMART_COMPACTOR_RECENCY_BONUS_WINDOW = 20
 # ── Permissions & Safety Defaults ───────────────────────────────────
 DEFAULT_FILE_OPERATIONS_MAX_SIZE_MB = 50
 DEFAULT_FILE_OPERATIONS_BLOCKED_PATHS = [
-    '/etc/**',  # System config
-    '/sys/**',  # System files
-    '/proc/**',  # Process info
-    '~/.ssh/**',  # SSH keys
-    '**/.env',  # Environment files with secrets
-    '**/id_rsa*',  # Private keys
-    '**/id_ed25519*',  # Private keys
+    "/etc/**",  # System config
+    "/sys/**",  # System files
+    "/proc/**",  # Process info
+    "~/.ssh/**",  # SSH keys
+    "**/.env",  # Environment files with secrets
+    "**/id_rsa*",  # Private keys
+    "**/id_ed25519*",  # Private keys
 ]
-DEFAULT_GIT_PROTECTED_BRANCHES = ['main', 'master', 'production', 'prod']
+DEFAULT_GIT_PROTECTED_BRANCHES = ["main", "master", "production", "prod"]
 DEFAULT_NETWORK_MAX_REQUESTS_PER_MINUTE = 60
-DEFAULT_PACKAGE_ALLOWED_MANAGERS = ['pip', 'npm', 'yarn', 'pnpm', 'uv', 'cargo']
+DEFAULT_PACKAGE_ALLOWED_MANAGERS = ["pip", "npm", "yarn", "pnpm", "uv", "cargo"]
 DEFAULT_SHELL_BLOCKED_COMMANDS = [
-    'rm -rf /',
-    'mkfs',
-    'dd',
-    'fork',
-    ':(){ :|:& };:',  # Fork bomb
+    "rm -rf /",
+    "mkfs",
+    "dd",
+    "fork",
+    ":(){ :|:& };:",  # Fork bomb
 ]
 DEFAULT_SHELL_CONFIRMATION_PATTERNS = [
-    r'rm\s+-rf',
-    r'sudo\s+',
-    r'chmod\s+',
-    r'chown\s+',
+    r"rm\s+-rf",
+    r"sudo\s+",
+    r"chmod\s+",
+    r"chown\s+",
 ]
 DEFAULT_BROWSER_MAX_PAGES = 10
 
@@ -462,11 +464,11 @@ CACHE_NONE = 0  # No cache
 DEFAULT_MCP_CACHE_TTL_SECONDS = 600
 MAX_MCP_CACHE_ENTRY_BYTES = 5 * 1024 * 1024
 MCP_CACHEABLE_TOOLS = {
-    'list_components',
-    'list_blocks',
-    'get_component',
-    'get_block',
-    'get_component_metadata',
+    "list_components",
+    "list_blocks",
+    "get_component",
+    "get_block",
+    "get_component_metadata",
 }
 
 # ── Integrations ────────────────────────────────────────────────────
@@ -475,29 +477,29 @@ MAX_GITHUB_REPOS = 1000
 
 # ── Whitespace Handling ─────────────────────────────────────────────
 DEFAULT_INDENT_SIZES = {
-    'python': 4,
-    'javascript': 2,
-    'typescript': 2,
-    'tsx': 2,
-    'go': 1,  # Go uses tabs
-    'rust': 4,
-    'java': 4,
-    'c': 4,
-    'cpp': 4,
-    'c_sharp': 4,
-    'ruby': 2,
-    'php': 4,
-    'swift': 4,
-    'kotlin': 4,
-    'scala': 2,
-    'json': 2,
-    'yaml': 2,
-    'html': 2,
-    'css': 2,
+    "python": 4,
+    "javascript": 2,
+    "typescript": 2,
+    "tsx": 2,
+    "go": 1,  # Go uses tabs
+    "rust": 4,
+    "java": 4,
+    "c": 4,
+    "cpp": 4,
+    "c_sharp": 4,
+    "ruby": 2,
+    "php": 4,
+    "swift": 4,
+    "kotlin": 4,
+    "scala": 2,
+    "json": 2,
+    "yaml": 2,
+    "html": 2,
+    "css": 2,
 }
 
 # ── Storage Defaults ────────────────────────────────────────────────
-DEFAULT_SECRETS_FILENAME = 'user_secrets.json'
+DEFAULT_SECRETS_FILENAME = "user_secrets.json"
 
 
 # ── Env-Var Registry ───────────────────────────────────────────────
@@ -507,37 +509,37 @@ DEFAULT_SECRETS_FILENAME = 'user_secrets.json'
 # discover every knob.
 ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     # Logging & debug
-    'LOG_LEVEL': ('INFO', 'Root log level (DEBUG / INFO / WARNING / ERROR)'),
-    'DEBUG': ('false', 'Enable general debug mode'),
-    'DEBUG_LLM': ('true', 'Log raw LLM request/response payloads'),
-    'DEBUG_LLM_PROMPT': ('false', 'Log full prompt text sent to LLMs'),
-    'APP_CLI_SHOW_REASONING_TEXT': (
-        'true',
-        'Render reasoning/thinking text in CLI panels; set false/0 to suppress provider reasoning leakage',
+    "LOG_LEVEL": ("INFO", "Root log level (DEBUG / INFO / WARNING / ERROR)"),
+    "DEBUG": ("false", "Enable general debug mode"),
+    "DEBUG_LLM": ("true", "Log raw LLM request/response payloads"),
+    "DEBUG_LLM_PROMPT": ("false", "Log full prompt text sent to LLMs"),
+    "APP_CLI_SHOW_REASONING_TEXT": (
+        "true",
+        "Render reasoning/thinking text in CLI panels; set false/0 to suppress provider reasoning leakage",
     ),
-    'LOG_JSON': ('true', 'Emit structured JSON logs (recommended for prod)'),
-    'LOG_JSON_LEVEL_KEY': ('level', 'JSON key name for the log-level field'),
-    'OTEL_LOG_CORRELATION': ('<OTEL_ENABLED>', 'Attach OTEL trace/span IDs to logs'),
-    'OTEL_ENABLED': ('false', 'Master switch for OpenTelemetry integration'),
-    'LOG_TO_FILE': (
-        'true',
-        'Append structured logs under repo logs/app.log; set LOG_TO_FILE=false to disable — when off the CLI keeps the app logger at ERROR on the console',
+    "LOG_JSON": ("true", "Emit structured JSON logs (recommended for prod)"),
+    "LOG_JSON_LEVEL_KEY": ("level", "JSON key name for the log-level field"),
+    "OTEL_LOG_CORRELATION": ("<OTEL_ENABLED>", "Attach OTEL trace/span IDs to logs"),
+    "OTEL_ENABLED": ("false", "Master switch for OpenTelemetry integration"),
+    "LOG_TO_FILE": (
+        "true",
+        "Append structured logs under repo logs/app.log; set LOG_TO_FILE=false to disable — when off the CLI keeps the app logger at ERROR on the console",
     ),
-    'LOG_ALL_EVENTS': ('True', 'Log every event processed by the event stream'),
-    'DEBUG_RUNTIME': ('false', 'Extra runtime container debug output'),
-    'APP_DEBUG_PROMPT_ROLES': (
-        'false',
-        'Per astep: log message role histogram after build_messages (condensed event count, '
-        'pending condensation, assistant tool-call presence); use with LOG_LEVEL=INFO or DEBUG',
+    "LOG_ALL_EVENTS": ("True", "Log every event processed by the event stream"),
+    "DEBUG_RUNTIME": ("false", "Extra runtime container debug output"),
+    "APP_DEBUG_PROMPT_ROLES": (
+        "false",
+        "Per astep: log message role histogram after build_messages (condensed event count, "
+        "pending condensation, assistant tool-call presence); use with LOG_LEVEL=INFO or DEBUG",
     ),
-    'APP_DEBUG_REASONING_ASTEP': (
-        'false',
-        'CLI: log ReasoningDisplay lifecycle/thought/action updates with shared astep_id '
-        '(see APP_DEBUG_PROMPT_ROLES) to correlate UI with LLM steps',
+    "APP_DEBUG_REASONING_ASTEP": (
+        "false",
+        "CLI: log ReasoningDisplay lifecycle/thought/action updates with shared astep_id "
+        "(see APP_DEBUG_PROMPT_ROLES) to correlate UI with LLM steps",
     ),
     # API versioning
-    'APP_PERMISSIVE_API': (
-        '',
+    "APP_PERMISSIVE_API": (
+        "",
         "Set to '1' to allow unversioned /api/ routes (deprecated)",
     ),
 }

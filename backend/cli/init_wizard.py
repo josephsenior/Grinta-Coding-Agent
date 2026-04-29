@@ -31,48 +31,48 @@ from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
 from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 _PROVIDER_PRESETS: dict[str, dict[str, str]] = {
-    'openai': {
-        'env': 'OPENAI_API_KEY',
-        'default_model': 'openai/gpt-4o-mini',
-        'base_url': '',
-        'help': 'OpenAI / compatible (gpt-4o, gpt-4.1, o1, o3, ...)',
+    "openai": {
+        "env": "OPENAI_API_KEY",
+        "default_model": "openai/gpt-4o-mini",
+        "base_url": "",
+        "help": "OpenAI / compatible (gpt-4o, gpt-4.1, o1, o3, ...)",
     },
-    'anthropic': {
-        'env': 'ANTHROPIC_API_KEY',
-        'default_model': 'anthropic/claude-sonnet-4-20250514',
-        'base_url': '',
-        'help': 'Anthropic (claude-sonnet-4, claude-opus-4, claude-haiku-4)',
+    "anthropic": {
+        "env": "ANTHROPIC_API_KEY",
+        "default_model": "anthropic/claude-sonnet-4-20250514",
+        "base_url": "",
+        "help": "Anthropic (claude-sonnet-4, claude-opus-4, claude-haiku-4)",
     },
-    'google': {
-        'env': 'GEMINI_API_KEY',
-        'default_model': 'google/gemini-2.5-pro',
-        'base_url': '',
-        'help': 'Google Gemini (gemini-2.5-pro, gemini-2.5-flash)',
+    "google": {
+        "env": "GEMINI_API_KEY",
+        "default_model": "google/gemini-2.5-pro",
+        "base_url": "",
+        "help": "Google Gemini (gemini-2.5-pro, gemini-2.5-flash)",
     },
-    'ollama': {
-        'env': '',
-        'default_model': 'ollama/llama3.2',
-        'base_url': 'http://localhost:11434',
-        'help': 'Local Ollama server (any pulled model)',
+    "ollama": {
+        "env": "",
+        "default_model": "ollama/llama3.2",
+        "base_url": "http://localhost:11434",
+        "help": "Local Ollama server (any pulled model)",
     },
-    'lmstudio': {
-        'env': '',
-        'default_model': 'openai/local-model',
-        'base_url': 'http://localhost:1234/v1',
-        'help': 'Local LM Studio (OpenAI-compatible at /v1)',
+    "lmstudio": {
+        "env": "",
+        "default_model": "openai/local-model",
+        "base_url": "http://localhost:1234/v1",
+        "help": "Local LM Studio (OpenAI-compatible at /v1)",
     },
-    'openrouter': {
-        'env': 'OPENROUTER_API_KEY',
-        'default_model': 'openrouter/anthropic/claude-3.5-sonnet',
-        'base_url': 'https://openrouter.ai/api/v1',
-        'help': 'OpenRouter (proxy to many providers)',
+    "openrouter": {
+        "env": "OPENROUTER_API_KEY",
+        "default_model": "openrouter/anthropic/claude-3.5-sonnet",
+        "base_url": "https://openrouter.ai/api/v1",
+        "help": "OpenRouter (proxy to many providers)",
     },
 }
 
 
 def _http_ok(url: str) -> bool:
     """Best-effort liveness probe; only http/https URLs are accepted."""
-    if not (url.startswith('http://') or url.startswith('https://')):
+    if not (url.startswith("http://") or url.startswith("https://")):
         return False
     try:
         req = urllib.request.Request(url)  # noqa: S310 (scheme guarded above)
@@ -83,19 +83,19 @@ def _http_ok(url: str) -> bool:
 
 
 def _ollama_running(base_url: str) -> bool:
-    return _http_ok(f'{base_url}/api/tags')
+    return _http_ok(f"{base_url}/api/tags")
 
 
 def _lmstudio_running(base_url: str) -> bool:
-    return _http_ok(f'{base_url}/models')
+    return _http_ok(f"{base_url}/models")
 
 
 def _detect_local() -> list[str]:
     found: list[str] = []
-    if _ollama_running(_PROVIDER_PRESETS['ollama']['base_url']):
-        found.append('ollama')
-    if _lmstudio_running(_PROVIDER_PRESETS['lmstudio']['base_url']):
-        found.append('lmstudio')
+    if _ollama_running(_PROVIDER_PRESETS["ollama"]["base_url"]):
+        found.append("ollama")
+    if _lmstudio_running(_PROVIDER_PRESETS["lmstudio"]["base_url"]):
+        found.append("lmstudio")
     return found
 
 
@@ -113,57 +113,58 @@ def _load_existing(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     try:
-        return json.loads(path.read_text(encoding='utf-8'))
+        return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
 
 
 def _confirm_overwrite_existing(
-    console: Console, existing: dict[str, Any],
+    console: Console,
+    existing: dict[str, Any],
 ) -> bool:
-    cur_model = existing.get('llm_model', '(unset)')
-    cur_provider = existing.get('llm_provider', '(unset)')
+    cur_model = existing.get("llm_model", "(unset)")
+    cur_provider = existing.get("llm_provider", "(unset)")
     console.print(
-        f'[dim]Existing config:[/dim] provider=[bold]{cur_provider}[/bold]  model=[bold]{cur_model}[/bold]'
+        f"[dim]Existing config:[/dim] provider=[bold]{cur_provider}[/bold]  model=[bold]{cur_model}[/bold]"
     )
-    if not Confirm.ask('Overwrite existing settings?', default=False):
-        console.print('[dim]No changes made.[/dim]')
+    if not Confirm.ask("Overwrite existing settings?", default=False):
+        console.print("[dim]No changes made.[/dim]")
         return False
     return True
 
 
 def _print_provider_table(console: Console, detected: list[str]) -> None:
     table = Table(
-        title='Pick a provider',
+        title="Pick a provider",
         title_style=CLR_CARD_TITLE,
         border_style=CLR_CARD_BORDER,
     )
-    table.add_column('Key', style=CLR_BRAND)
-    table.add_column('Description')
-    table.add_column('Detected', style=CLR_STATUS_OK)
+    table.add_column("Key", style=CLR_BRAND)
+    table.add_column("Description")
+    table.add_column("Detected", style=CLR_STATUS_OK)
     for key, preset in _PROVIDER_PRESETS.items():
-        detected_marker = '✓' if key in detected else ''
-        table.add_row(key, preset['help'], detected_marker)
+        detected_marker = "✓" if key in detected else ""
+        table.add_row(key, preset["help"], detected_marker)
     console.print(table)
 
 
 def _collect_api_key(console: Console, preset: dict[str, Any]) -> str:
-    env_var = preset['env']
+    env_var = preset["env"]
     if not env_var:
         # Local providers: usually no key required.
-        return Prompt.ask('API key (optional)', password=True, default='')
-    env_value = os.environ.get(env_var, '')
+        return Prompt.ask("API key (optional)", password=True, default="")
+    env_value = os.environ.get(env_var, "")
     if env_value:
         console.print(
-            f'[dim]Found [bold]{env_var}[/bold] in environment — will reference it via [bold]${{{env_var}}}[/bold].[/dim]'
+            f"[dim]Found [bold]{env_var}[/bold] in environment — will reference it via [bold]${{{env_var}}}[/bold].[/dim]"
         )
-        return f'${{{env_var}}}'
+        return f"${{{env_var}}}"
     api_key = Prompt.ask(
-        f'API key (paste; or leave blank to set {env_var} later)',
+        f"API key (paste; or leave blank to set {env_var} later)",
         password=True,
-        default='',
+        default="",
     )
-    return api_key or f'${{{env_var}}}'
+    return api_key or f"${{{env_var}}}"
 
 
 def run_init(project_root: Path | None = None, console: Console | None = None) -> int:
@@ -175,10 +176,10 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
 
     console.print(
         Panel.fit(
-            '[bold]Welcome to Grinta.[/bold]\n'
-            'This wizard configures your LLM provider and writes [bold]settings.json[/bold].\n'
-            'API keys are stored in a sibling [bold].env[/bold] file when provided.\n'
-            f'Re-run any time with [{CLR_BRAND}]grinta init[/].',
+            "[bold]Welcome to Grinta.[/bold]\n"
+            "This wizard configures your LLM provider and writes [bold]settings.json[/bold].\n"
+            "API keys are stored in a sibling [bold].env[/bold] file when provided.\n"
+            f"Re-run any time with [{CLR_BRAND}]grinta init[/].",
             border_style=CLR_CARD_BORDER,
         )
     )
@@ -195,50 +196,52 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     _print_provider_table(console, detected)
 
     provider = Prompt.ask(
-        'Provider',
+        "Provider",
         choices=list(_PROVIDER_PRESETS.keys()),
-        default=detected[0] if detected else 'openai',
+        default=detected[0] if detected else "openai",
     )
     preset = _PROVIDER_PRESETS[provider]
     model = Prompt.ask(
-        'Model id (provider/model)', default=preset['default_model'],
+        "Model id (provider/model)",
+        default=preset["default_model"],
     )
     api_key = _collect_api_key(console, preset)
     base_url = Prompt.ask(
-        'Base URL (leave blank for default)', default=preset['base_url'],
+        "Base URL (leave blank for default)",
+        default=preset["base_url"],
     )
 
     settings = {
-        'llm_provider': provider,
-        'llm_model': model,
-        'llm_api_key': LLM_API_KEY_SETTINGS_PLACEHOLDER if api_key else '',
-        'llm_base_url': base_url,
+        "llm_provider": provider,
+        "llm_model": model,
+        "llm_api_key": LLM_API_KEY_SETTINGS_PLACEHOLDER if api_key else "",
+        "llm_base_url": base_url,
     }
     settings_file.parent.mkdir(parents=True, exist_ok=True)
-    settings_file.write_text(json.dumps(settings, indent=2) + '\n', encoding='utf-8')
+    settings_file.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
     if api_key:
         persist_llm_api_key_to_dotenv(api_key, settings_json_path=settings_file)
     console.print(
         Panel.fit(
-            f'Wrote [bold]{settings_file}[/bold]\n'
-            f'Provider: [bold]{provider}[/bold]\n'
-            f'Model: [bold]{model}[/bold]\n\n'
-            f'Start the agent with: [{CLR_BRAND}]grinta[/]\n'
-            f'Slash commands inside the REPL: [{CLR_BRAND}]/help[/]',
-            title='Setup complete',
+            f"Wrote [bold]{settings_file}[/bold]\n"
+            f"Provider: [bold]{provider}[/bold]\n"
+            f"Model: [bold]{model}[/bold]\n\n"
+            f"Start the agent with: [{CLR_BRAND}]grinta[/]\n"
+            f"Slash commands inside the REPL: [{CLR_BRAND}]/help[/]",
+            title="Setup complete",
             border_style=CLR_STATUS_OK,
         )
     )
 
     # Surface a security checklist link if it exists.
-    checklist = project_root / 'docs' / 'SECURITY_CHECKLIST.md'
+    checklist = project_root / "docs" / "SECURITY_CHECKLIST.md"
     if checklist.exists():
         console.print(
-            f'[{CLR_META}]Tip: read [bold]docs/SECURITY_CHECKLIST.md[/bold] '
-            'before pointing Grinta at untrusted code.[/]'
+            f"[{CLR_META}]Tip: read [bold]docs/SECURITY_CHECKLIST.md[/bold] "
+            "before pointing Grinta at untrusted code.[/]"
         )
 
     return 0
 
 
-__all__ = ['run_init']
+__all__ = ["run_init"]
