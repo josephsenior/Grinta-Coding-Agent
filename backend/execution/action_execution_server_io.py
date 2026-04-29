@@ -14,45 +14,121 @@ from binaryornot.check import is_binary
 from backend.core.enums import FileReadSource
 from backend.core.logger import app_logger as logger
 from backend.execution.action_execution_server_helpers import (
-    annotate_environment_errors as _annotate_environment_errors_impl,
-    append_blast_radius_warning as _append_blast_radius_warning_impl,
-    apply_grep_filter as _apply_grep_filter_impl,
-    apply_terminal_resize_if_requested as _apply_terminal_resize_if_requested_impl,
-    attach_detected_server as _attach_detected_server_impl,
-    build_env_check_command as _build_env_check_command_impl,
-    build_shell_git_config_command as _build_shell_git_config_command_impl,
-    clear_terminal_read_cursor as _clear_terminal_read_cursor_impl,
-    detect_powershell_in_bash_mismatch as _detect_powershell_in_bash_mismatch_impl,
-    detect_scaffold_setup_failure as _detect_scaffold_setup_failure_impl,
-    edit_try_directory_view as _edit_try_directory_view_impl,
-    edit_via_file_editor as _edit_via_file_editor_impl,
-    evaluate_interactive_terminal_command as _evaluate_interactive_terminal_command_impl,
-    extract_failure_signature as _extract_failure_signature_impl,
-    get_terminal_read_cursor as _get_terminal_read_cursor_impl,
-    handle_aci_file_read as _handle_aci_file_read_impl,
-    init_shell_commands as _init_shell_commands_impl,
-    is_auto_lint_enabled as _is_auto_lint_enabled_impl,
-    is_sandboxed_local as _is_sandboxed_local_impl,
-    is_workspace_restricted_profile as _is_workspace_restricted_profile_impl,
-    mark_terminal_session_interaction as _mark_terminal_session_interaction_impl,
-    missing_terminal_session_error as _missing_terminal_session_error_impl,
-    next_terminal_session_id as _next_terminal_session_id_impl,
-    normalize_terminal_command as _normalize_terminal_command_impl,
-    predict_interactive_cwd_change as _predict_interactive_cwd_change_impl,
-    read_terminal_with_mode as _read_terminal_with_mode_impl,
-    resolve_effective_cwd as _resolve_effective_cwd_impl,
-    resolve_path as _resolve_path_impl,
-    resolve_workspace_file_path as _resolve_workspace_file_path_impl,
-    should_rewrite_python3_to_python as _should_rewrite_python3_to_python_impl,
-    strip_ansi_obs_text as _strip_ansi_obs_text_impl,
-    terminal_mode as _terminal_mode_impl,
-    terminal_open_guardrail_error as _terminal_open_guardrail_error_impl,
-    terminal_read_empty_hints as _terminal_read_empty_hints_impl,
-    uses_powershell_shell_contract as _uses_powershell_shell_contract_impl,
-    validate_interactive_session_scope as _validate_interactive_session_scope_impl,
-    validate_workspace_scoped_cwd as _validate_workspace_scoped_cwd_impl,
-    workspace_root as _workspace_root_impl,
     advance_terminal_read_cursor as _advance_terminal_read_cursor_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    annotate_environment_errors as _annotate_environment_errors_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    append_blast_radius_warning as _append_blast_radius_warning_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    apply_grep_filter as _apply_grep_filter_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    apply_terminal_resize_if_requested as _apply_terminal_resize_if_requested_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    attach_detected_server as _attach_detected_server_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    build_env_check_command as _build_env_check_command_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    build_shell_git_config_command as _build_shell_git_config_command_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    clear_terminal_read_cursor as _clear_terminal_read_cursor_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    detect_powershell_in_bash_mismatch as _detect_powershell_in_bash_mismatch_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    detect_scaffold_setup_failure as _detect_scaffold_setup_failure_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    edit_try_directory_view as _edit_try_directory_view_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    edit_via_file_editor as _edit_via_file_editor_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    evaluate_interactive_terminal_command as _evaluate_interactive_terminal_command_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    extract_failure_signature as _extract_failure_signature_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    get_terminal_read_cursor as _get_terminal_read_cursor_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    handle_aci_file_read as _handle_aci_file_read_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    init_shell_commands as _init_shell_commands_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    is_auto_lint_enabled as _is_auto_lint_enabled_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    is_sandboxed_local as _is_sandboxed_local_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    is_workspace_restricted_profile as _is_workspace_restricted_profile_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    mark_terminal_session_interaction as _mark_terminal_session_interaction_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    missing_terminal_session_error as _missing_terminal_session_error_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    next_terminal_session_id as _next_terminal_session_id_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    normalize_terminal_command as _normalize_terminal_command_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    predict_interactive_cwd_change as _predict_interactive_cwd_change_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    read_terminal_with_mode as _read_terminal_with_mode_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    resolve_effective_cwd as _resolve_effective_cwd_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    resolve_path as _resolve_path_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    resolve_workspace_file_path as _resolve_workspace_file_path_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    should_rewrite_python3_to_python as _should_rewrite_python3_to_python_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    strip_ansi_obs_text as _strip_ansi_obs_text_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    terminal_mode as _terminal_mode_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    terminal_open_guardrail_error as _terminal_open_guardrail_error_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    terminal_read_empty_hints as _terminal_read_empty_hints_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    uses_powershell_shell_contract as _uses_powershell_shell_contract_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    validate_interactive_session_scope as _validate_interactive_session_scope_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    validate_workspace_scoped_cwd as _validate_workspace_scoped_cwd_impl,
+)
+from backend.execution.action_execution_server_helpers import (
+    workspace_root as _workspace_root_impl,
 )
 from backend.execution.file_operations import (
     ensure_directory_exists,
@@ -80,7 +156,6 @@ from backend.ledger.action.terminal import (
 from backend.ledger.observation import (
     CmdOutputObservation,
     ErrorObservation,
-    FileEditObservation,
     FileReadObservation,
     FileWriteObservation,
     Observation,

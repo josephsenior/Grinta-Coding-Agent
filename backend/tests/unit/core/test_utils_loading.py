@@ -15,7 +15,6 @@ from backend.core.config.agent_config import AgentConfig
 from backend.core.config.api_key_manager import api_key_manager
 from backend.core.config.app_config import AppConfig
 from backend.core.config.compactor_config import AutoCompactorConfig
-from backend.core.config.llm_config import LLMConfig
 from backend.core.config.config_loader import (
     ConfigLoadSummary,
     _to_posix_workspace_path,
@@ -29,6 +28,7 @@ from backend.core.config.config_loader import (
     register_custom_agents,
     setup_config_from_args,
 )
+from backend.core.config.llm_config import LLMConfig
 
 # ── ConfigLoadSummary ──────────────────────────────────────────────────
 

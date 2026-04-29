@@ -8,9 +8,9 @@ import pytest
 
 from backend.context.compactor.compactor import Compaction
 from backend.context.compactor.strategies.smart_compactor import SmartCompactor
+from backend.ledger.action import MessageAction
 from backend.ledger.action.agent import TaskTrackingAction
 from backend.ledger.action.commands import CmdRunAction
-from backend.ledger.action import MessageAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.empty import NullObservation

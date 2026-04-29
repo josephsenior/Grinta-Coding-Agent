@@ -45,5 +45,5 @@ If you observe latencies meaningfully worse than p95 targets, investigate before
 ## Measuring
 - **Per-turn cost / tokens / latency:** visible in the HUD bar at all times.
 - **System prompt size:** `python -m backend.engine.prompts.prompt_builder`.
-- **Audit log:** `.grinta/storage/<session>/audit/` contains per-action timing and classification.
+- **Audit log:** `~/.grinta/workspaces/<id>/storage/<session>/audit/` contains per-action timing and classification.
 - **Provider-side latency:** check the LLM provider dashboard if HUD round-trips look slow.

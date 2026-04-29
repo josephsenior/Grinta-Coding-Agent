@@ -7,6 +7,11 @@ import re
 from pathlib import Path
 from typing import Any, cast
 
+from backend.execution.sandboxing import (
+    is_sandboxed_local_profile as _sandbox_is_sandboxed_local_profile,
+    is_workspace_restricted_profile as _sandbox_is_workspace_restricted_profile,
+)
+
 
 def _aes_module():
     from backend.execution import action_execution_server as aes
@@ -133,13 +138,11 @@ def workspace_root(executor: Any) -> Path:
 
 
 def is_workspace_restricted_profile(executor: Any) -> bool:
-    aes = _aes_module()
-    return aes.is_workspace_restricted_profile(executor.security_config)
+    return _sandbox_is_workspace_restricted_profile(executor.security_config)
 
 
 def is_sandboxed_local(executor: Any) -> bool:
-    aes = _aes_module()
-    return aes.is_sandboxed_local_profile(executor.security_config)
+    return _sandbox_is_sandboxed_local_profile(executor.security_config)
 
 
 def validate_interactive_session_scope(
@@ -270,7 +273,13 @@ def validate_workspace_scoped_cwd(
 
 def resolve_workspace_file_path(executor: Any, path: str, working_dir: str) -> str:
     aes = _aes_module()
-    return str(aes.resolve_workspace_path(path, working_dir, executor._initial_cwd))
+    resolved = aes.resolve_workspace_path(path, working_dir, executor._initial_cwd)
+    root = executor._workspace_root()
+    if executor._is_workspace_restricted_profile() and not aes.path_is_within_workspace(
+        resolved, root
+    ):
+        raise PermissionError(path)
+    return str(resolved)
 
 
 def annotate_environment_errors(executor: Any, observation: Any) -> None:

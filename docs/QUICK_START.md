@@ -26,7 +26,7 @@ This script handles everything:
 
 ```powershell
 uv sync
-Copy-Item settings.template.json settings.json
+uv run python -m backend.cli.entry init
 ```
 
 ### 2) Start the CLI

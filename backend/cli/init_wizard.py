@@ -26,6 +26,9 @@ from backend.cli.theme import (
     CLR_META,
     CLR_STATUS_OK,
 )
+from backend.core.app_paths import get_canonical_settings_path
+from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
+from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 _PROVIDER_PRESETS: dict[str, dict[str, str]] = {
     'openai': {
@@ -96,8 +99,14 @@ def _detect_local() -> list[str]:
     return found
 
 
-def _settings_path(project_root: Path) -> Path:
-    return project_root / 'settings.json'
+def _settings_path(project_root: Path | None = None) -> Path:
+    """Return the canonical settings path used by runtime config loading.
+
+    ``project_root`` is accepted for backward compatibility with older callers;
+    workspace selection is handled separately through ``PROJECT_ROOT`` / ``--project``.
+    """
+    del project_root
+    return Path(get_canonical_settings_path())
 
 
 def _load_existing(path: Path) -> dict[str, Any]:
@@ -161,13 +170,14 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     """Run the wizard. Returns shell-style exit code."""
     console = console or Console()
     project_root = (project_root or Path.cwd()).resolve()
-    settings_file = _settings_path(project_root)
+    settings_file = _settings_path()
     existing = _load_existing(settings_file)
 
     console.print(
         Panel.fit(
             '[bold]Welcome to Grinta.[/bold]\n'
             'This wizard configures your LLM provider and writes [bold]settings.json[/bold].\n'
+            'API keys are stored in a sibling [bold].env[/bold] file when provided.\n'
             f'Re-run any time with [{CLR_BRAND}]grinta init[/].',
             border_style=CLR_CARD_BORDER,
         )
@@ -201,10 +211,13 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
     settings = {
         'llm_provider': provider,
         'llm_model': model,
-        'llm_api_key': api_key,
+        'llm_api_key': LLM_API_KEY_SETTINGS_PLACEHOLDER if api_key else '',
         'llm_base_url': base_url,
     }
+    settings_file.parent.mkdir(parents=True, exist_ok=True)
     settings_file.write_text(json.dumps(settings, indent=2) + '\n', encoding='utf-8')
+    if api_key:
+        persist_llm_api_key_to_dotenv(api_key, settings_json_path=settings_file)
     console.print(
         Panel.fit(
             f'Wrote [bold]{settings_file}[/bold]\n'

@@ -103,17 +103,14 @@ def _map_bad_request_error(client: Any, exc: Exception) -> Exception:
 
 
 def map_openai_error(client: Any, exc: Exception) -> Exception:
-    import openai
     import httpx
+    import openai
 
     from backend.inference.exceptions import (
         APIConnectionError,
         AuthenticationError,
-        BadRequestError,
-        ContextWindowExceededError,
         InternalServerError,
         NotFoundError,
-        RateLimitError,
         Timeout,
         is_html_api_body,
     )

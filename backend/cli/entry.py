@@ -11,7 +11,7 @@ Usage::
     grinta sessions prune [--days 30] [--yes]
     grinta --model anthropic/...     # Override model
     grinta --project /path/to/repo   # Set project root
-    grinta --cleanup-storage         # Consolidate legacy storage into .grinta/storage
+    grinta --cleanup-storage         # Consolidate legacy storage into the canonical workspace store
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ _EPILOG = """examples:
   grinta -p /path/to/repo -m anthropic/claude-sonnet-4-20250514
       Use that project folder and override the model for this session only.
   grinta --cleanup-storage
-      Consolidate legacy project data into .grinta/storage and exit.
+      Consolidate legacy project data into the canonical workspace store and exit.
 """
 
 
@@ -103,8 +103,9 @@ def _run_init(_args: argparse.Namespace) -> int:
 
     from backend.cli.init_wizard import run_init
 
-    _pin_project(getattr(_args, 'project', None))
-    return run_init(console=Console())
+    project = getattr(_args, 'project', None)
+    _pin_project(project)
+    return run_init(project_root=Path(project) if project else None, console=Console())
 
 
 def _run_sessions(args: argparse.Namespace) -> int:
@@ -156,7 +157,7 @@ def main() -> None:
     parser.add_argument(
         '--cleanup-storage',
         action='store_true',
-        help='Consolidate legacy project data into .grinta/storage and exit',
+        help='Consolidate legacy project data into the canonical workspace store and exit',
     )
     parser.add_argument(
         '--version',

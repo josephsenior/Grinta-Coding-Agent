@@ -27,6 +27,7 @@ def test_llm_records_context_window_from_limits():
     mock_config.custom_llm_provider = None
     mock_config.disable_vision = False
     mock_config.caching_prompt = False
+    mock_config.timeout = None
 
     with (
         patch('backend.inference.llm.get_direct_client') as mock_get_client,

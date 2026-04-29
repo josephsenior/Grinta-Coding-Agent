@@ -35,6 +35,7 @@ dependencies = [
   "libtmux>=0.37,<0.40",
   "mcp>=1.10,<2",
   "openai>=1.40,<3",
+  "pathspec>=0.12,<1",
   "pillow>=11.3,<13",
   "psutil>=7,<8",
   "python-dotenv>=1.1.1,<2",
@@ -72,9 +73,9 @@ dependencies = [
 ]
 
 urls = { Repository = "https://github.com/josephsenior/Grinta-Coding-Agent", Issues = "https://github.com/josephsenior/Grinta-Coding-Agent/issues", Documentation = "https://github.com/josephsenior/Grinta-Coding-Agent/tree/main/docs" }
-# Console script disabled — Windows Application Control blocks pip-generated
-# .exe launchers.  Use the grinta.cmd wrapper in Scripts/ instead, or run
-# directly: python -m backend.cli.entry
+
+[project.scripts]
+grinta = "launch.entry:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [

@@ -89,31 +89,52 @@ logger = logging.getLogger(__name__)
 
 
 from backend.cli._event_renderer.action_renderers_mixin import ActionRenderersMixin
-from backend.cli._event_renderer.observation_renderers_mixin import (
-    ObservationRenderersMixin,
-)
 from backend.cli._event_renderer.constants import (
     THINK_EXTRACT_RE as _THINK_EXTRACT_RE,
+)
+from backend.cli._event_renderer.constants import (
     THINK_STRIP_RE as _THINK_STRIP_RE,
 )
 from backend.cli._event_renderer.error_panel import (
     build_error_panel as _build_error_panel,
-    error_guidance as _error_guidance,
+)
+from backend.cli._event_renderer.error_panel import (
     use_recoverable_notice_style as _use_recoverable_notice_style,
+)
+from backend.cli._event_renderer.observation_renderers_mixin import (
+    ObservationRenderersMixin,
 )
 from backend.cli._event_renderer.panels import (
     PendingActivityCard,
+)
+from backend.cli._event_renderer.panels import (
     build_delegate_worker_panel as _build_delegate_worker_panel,
+)
+from backend.cli._event_renderer.panels import (
     build_system_notice_panel as _build_system_notice_panel,
+)
+from backend.cli._event_renderer.panels import (
     build_task_panel as _build_task_panel,
+)
+from backend.cli._event_renderer.panels import (
     delegate_worker_panel_signature as _delegate_worker_panel_signature,
+)
+from backend.cli._event_renderer.panels import (
     normalize_system_title as _normalize_system_title,
+)
+from backend.cli._event_renderer.panels import (
     task_panel_signature as _task_panel_signature,
 )
 from backend.cli._event_renderer.text_utils import (
     normalize_reasoning_text as _normalize_reasoning_text,
+)
+from backend.cli._event_renderer.text_utils import (
     reasoning_lines_skip_already_committed as _reasoning_lines_skip_already_committed,
+)
+from backend.cli._event_renderer.text_utils import (
     sanitize_visible_transcript_text as _sanitize_visible_transcript_text,
+)
+from backend.cli._event_renderer.text_utils import (
     show_reasoning_text as _show_reasoning_text,
 )
 
@@ -1246,10 +1267,13 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             frag in head_blob for frag in CLIEventRenderer._NO_MATCH_FRAGMENTS
         )
 
+    # Ripgrep-style lines: path/to/file.ext:LINE:text (LINE must be numeric).
+    _PLAIN_RG_LOCATION_LINE = re.compile(r'^[^:]+:\d+:')
+
     @staticmethod
     def _format_match_count(lines: list[str]) -> str:
         match_count = sum(
-            1 for line in lines if re.match(r'^.*:\\d+:', line)
+            1 for line in lines if CLIEventRenderer._PLAIN_RG_LOCATION_LINE.match(line)
         ) or len(lines)
         return f'Found {match_count} match{"es" if match_count != 1 else ""}.'
 
@@ -1258,13 +1282,13 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         plain_lines = [ln for ln in s.splitlines() if ln.strip()]
         if not plain_lines:
             return None
-        if not any(re.match(r'^.*:\\d+:', ln) for ln in plain_lines[:5]):
+        rg = CLIEventRenderer._PLAIN_RG_LOCATION_LINE
+        if not any(rg.match(ln) for ln in plain_lines[:5]):
             return None
         match_count = sum(
-            1 for line in plain_lines if re.match(r'^.*:\\d+:', line)
+            1 for line in plain_lines if rg.match(line)
         ) or len(plain_lines)
         return f'Found {match_count} match{"es" if match_count != 1 else ""}.'
-        self._append_history(Text(''))
 
     def _emit_activity_turn_header(self) -> None:
         if self._activity_turn_header_emitted:

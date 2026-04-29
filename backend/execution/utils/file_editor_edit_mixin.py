@@ -9,28 +9,74 @@ from typing import Any
 from backend.core.type_safety.sentinels import Sentinel, is_missing
 from backend.execution.utils.file_editor_edit_ops import (
     apply_edit_logic as _apply_edit_logic_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     apply_format_edit as _apply_format_edit_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     apply_section_edit as _apply_section_edit_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     apply_str_replace as _apply_str_replace_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     apply_unified_patch as _apply_unified_patch_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     build_no_match_error as _build_no_match_error_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     closest_match_candidates as _closest_match_candidates_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     find_actual_substring_for_replace as _find_actual_substring_for_replace_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     find_actual_substring_regex as _find_actual_substring_regex_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     flex_quote_pattern as _flex_quote_pattern_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     fuzzy_safe_replace as _fuzzy_safe_replace_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     line_ending_for_content as _line_ending_for_content_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     map_normalized_offset_to_original as _map_normalized_offset_to_original_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     mutate_structured_data as _mutate_structured_data_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     normalize_whitespace_for_match as _normalize_whitespace_for_match_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     parse_structured_content as _parse_structured_content_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     preserve_quote_style_in_new_string as _preserve_quote_style_in_new_string_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     replace_range_guarded as _replace_range_guarded_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     resolve_edit_content as _resolve_edit_content_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     serialize_structured_content as _serialize_structured_content_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     sha256_text as _sha256_text_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     slice_text_by_line_range as _slice_text_by_line_range_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     structured_path_tokens as _structured_path_tokens_impl,
+)
+from backend.execution.utils.file_editor_edit_ops import (
     ws_tolerant_replace as _ws_tolerant_replace_impl,
 )
 

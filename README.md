@@ -23,13 +23,13 @@ grinta init          # one-time wizard: pick provider + paste key
 grinta               # launch the REPL in the current directory
 ```
 
-That is the whole setup. The `grinta init` wizard auto-detects local Ollama and LM Studio servers and writes a working `settings.json` for you. Other install paths (uv, Homebrew, Scoop, Docker) are in [docs/INSTALL.md](docs/INSTALL.md).
+That is the whole setup. The `grinta init` wizard auto-detects local Ollama and LM Studio servers and writes a working settings file for you. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, Docker) are in [docs/INSTALL.md](docs/INSTALL.md).
 
 ## What you get
 
 - **Task completion, not just file edits.** Validation gates and stuck detection block premature "done".
 - **Model-agnostic.** OpenAI, Anthropic, Google, OpenRouter, Ollama, LM Studio — same prompt surface, same tools.
-- **Local-first.** Code, sessions, checkpoints, and audit log all live under `.grinta/` in your project.
+- **Local-first.** Code stays in your workspace; sessions, checkpoints, and audit logs live under `~/.grinta/workspaces/<id>/storage`.
 - **Strong safety rails.** Risk-classified actions, CRITICAL refusal gate, secret masking, and a session-wide audit trail.
 - **Durable long sessions.** Event-stream ledger, automatic compaction, manual `/checkpoint`, and revert.
 - **Lean TUI.** Cost / tokens / latency / breaker state visible in the HUD; rich slash commands (`/help`).
@@ -95,7 +95,7 @@ Optional dev/test tools: `uv sync --group dev --group test --group browser`.
 1. Create local settings:
 
 ```bash
-cp settings.template.json settings.json
+uv run python -m backend.cli.entry init
 ```
 
 1. Start the CLI:
@@ -120,16 +120,20 @@ Windows:
 
 ## LLM Setup (`settings.json`)
 
+When installed through `pipx`, Homebrew, or Scoop, settings are resolved from `~/.grinta/settings.json`. When running from a source checkout, settings resolve from the repository root unless `APP_ROOT` is set.
+
 Minimal config:
 
 ```json
 {
   "llm_provider": "openai",
   "llm_model": "openai/gpt-4o-mini",
-  "llm_api_key": "sk-...",
+  "llm_api_key": "${LLM_API_KEY}",
   "llm_base_url": ""
 }
 ```
+
+For manual setup, put the real value in a sibling `.env` file or your shell environment as `LLM_API_KEY`; avoid keeping the only copy of a secret directly in `settings.json`.
 
 Common model ids:
 

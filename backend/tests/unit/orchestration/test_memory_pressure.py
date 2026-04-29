@@ -6,6 +6,11 @@ from unittest.mock import MagicMock, patch
 from backend.orchestration.memory_pressure import MemoryPressureMonitor
 
 
+def _assert_snapshot_subset(snapshot: dict[str, object], expected: dict[str, object]) -> None:
+    for key, value in expected.items():
+        assert snapshot[key] == value
+
+
 def _make_monitor(**kwargs) -> MemoryPressureMonitor:
     """Create a monitor with zero baseline for deterministic threshold tests."""
     m = MemoryPressureMonitor(**kwargs)
@@ -137,16 +142,21 @@ class TestMemoryPressureMonitor:
 
         snapshot = monitor.snapshot()
 
-        assert snapshot['rss_mb'] == 600.0
-        assert snapshot['warn_threshold_mb'] == 512
-        assert snapshot['crit_threshold_mb'] == 1024
-        assert snapshot['warn_delta_mb'] == 512
-        assert snapshot['crit_delta_mb'] == 1024
-        assert snapshot['min_history_events'] == 30
-        assert snapshot['condensation_count'] == 3
+        _assert_snapshot_subset(
+            snapshot,
+            {
+                'rss_mb': 600.0,
+                'warn_threshold_mb': 512,
+                'crit_threshold_mb': 1024,
+                'warn_delta_mb': 512,
+                'crit_delta_mb': 1024,
+                'min_history_events': 30,
+                'condensation_count': 3,
+                'baseline_rss_mb': 0.0,
+            },
+        )
         assert 'psutil_available' in snapshot
         assert 'level' in snapshot
-        assert snapshot['baseline_rss_mb'] == 0.0
 
     def test_snapshot_level_normal(self):
         """Test snapshot level is 'normal' when below thresholds."""

@@ -680,7 +680,6 @@ class TestDefaultServerHelpers:
 class TestAppMCPConfig:
     def test_create_default_mcp_server_config(self):
         from backend.core.config.app_config import AppConfig
-        from backend.core.config.mcp_config import AppMCPConfig
 
         config = AppConfig()
         shttp, stdio = AppMCPConfig.create_default_mcp_server_config(
@@ -694,7 +693,6 @@ class TestAppMCPConfig:
 
     def test_create_default_mcp_server_config_skips_invalid_host(self):
         from backend.core.config.app_config import AppConfig
-        from backend.core.config.mcp_config import AppMCPConfig
 
         config = AppConfig()
         shttp, stdio = AppMCPConfig.create_default_mcp_server_config(

@@ -14,8 +14,8 @@ from backend.cli.init_wizard import (
     _confirm_overwrite_existing,
     _detect_local,
     _http_ok,
-    _load_existing,
     _lmstudio_running,
+    _load_existing,
     _ollama_running,
     _print_provider_table,
     _settings_path,
@@ -25,6 +25,17 @@ from backend.cli.init_wizard import (
 
 def _quiet_console() -> Console:
     return Console(quiet=True)
+
+
+def _patch_settings_path(path: Path):
+    return patch(
+        'backend.cli.init_wizard.get_canonical_settings_path', return_value=str(path)
+    )
+
+
+@pytest.fixture(autouse=True)
+def _clear_llm_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv('LLM_API_KEY', raising=False)
 
 
 # ---------------------------------------------------------------------------
@@ -95,8 +106,10 @@ class TestDetectLocal:
 
 class TestSettingsPath:
     def test_returns_settings_json(self, tmp_path: Path) -> None:
-        p = _settings_path(tmp_path)
-        assert p == tmp_path / 'settings.json'
+        expected = tmp_path / 'settings.json'
+        with _patch_settings_path(expected):
+            p = _settings_path(tmp_path)
+        assert p == expected
 
 
 class TestLoadExisting:
@@ -187,63 +200,76 @@ class TestRunInit:
 
     def test_new_settings_written(self, tmp_path: Path) -> None:
         console = _quiet_console()
+        settings_file = tmp_path / 'settings.json'
         with patch('backend.cli.init_wizard._detect_local', return_value=[]), \
-             patch('rich.prompt.Prompt.ask', side_effect=['openai', 'openai/gpt-4o-mini', 'sk-test', '']):
+             patch('rich.prompt.Prompt.ask', side_effect=['openai', 'openai/gpt-4o-mini', 'sk-test', '']), \
+             _patch_settings_path(settings_file):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
-        settings_file = tmp_path / 'settings.json'
         assert settings_file.exists()
         data = json.loads(settings_file.read_text(encoding='utf-8'))
         assert data['llm_provider'] == 'openai'
         assert data['llm_model'] == 'openai/gpt-4o-mini'
+        assert data['llm_api_key'] == '${LLM_API_KEY}'
+        assert (tmp_path / '.env').read_text(encoding='utf-8') == 'LLM_API_KEY=sk-test\n'
 
     def test_existing_settings_declined(self, tmp_path: Path) -> None:
         console = _quiet_console()
-        (tmp_path / 'settings.json').write_text(
+        settings_file = tmp_path / 'settings.json'
+        settings_file.write_text(
             json.dumps({'llm_model': 'x', 'llm_provider': 'y'}), encoding='utf-8'
         )
-        with patch('rich.prompt.Confirm.ask', return_value=False):
+        with patch('rich.prompt.Confirm.ask', return_value=False), \
+             _patch_settings_path(settings_file):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
         # Original file untouched
-        data = json.loads((tmp_path / 'settings.json').read_text(encoding='utf-8'))
+        data = json.loads(settings_file.read_text(encoding='utf-8'))
         assert data['llm_model'] == 'x'
 
     def test_existing_settings_overwritten(self, tmp_path: Path) -> None:
         console = _quiet_console()
-        (tmp_path / 'settings.json').write_text(
+        settings_file = tmp_path / 'settings.json'
+        settings_file.write_text(
             json.dumps({'llm_model': 'old', 'llm_provider': 'old'}), encoding='utf-8'
         )
         with patch('rich.prompt.Confirm.ask', return_value=True), \
              patch('backend.cli.init_wizard._detect_local', return_value=[]), \
-             patch('rich.prompt.Prompt.ask', side_effect=['anthropic', 'anthropic/claude-sonnet-4-20250514', 'key123', '']):
+             patch('rich.prompt.Prompt.ask', side_effect=['anthropic', 'anthropic/claude-sonnet-4-20250514', 'key123', '']), \
+             _patch_settings_path(settings_file):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
-        data = json.loads((tmp_path / 'settings.json').read_text(encoding='utf-8'))
+        data = json.loads(settings_file.read_text(encoding='utf-8'))
         assert data['llm_provider'] == 'anthropic'
 
     def test_ollama_detected_as_default(self, tmp_path: Path) -> None:
         console = _quiet_console()
+        settings_file = tmp_path / 'settings.json'
         with patch('backend.cli.init_wizard._detect_local', return_value=['ollama']), \
-             patch('rich.prompt.Prompt.ask', side_effect=['ollama', 'ollama/llama3.2', '', 'http://localhost:11434']):
+             patch('rich.prompt.Prompt.ask', side_effect=['ollama', 'ollama/llama3.2', '', 'http://localhost:11434']), \
+             _patch_settings_path(settings_file):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
 
     def test_security_checklist_shown_if_exists(self, tmp_path: Path) -> None:
         console = _quiet_console()
+        settings_file = tmp_path / 'settings.json'
         docs = tmp_path / 'docs'
         docs.mkdir()
         (docs / 'SECURITY_CHECKLIST.md').write_text('checklist', encoding='utf-8')
         with patch('backend.cli.init_wizard._detect_local', return_value=[]), \
-             patch('rich.prompt.Prompt.ask', side_effect=['openai', 'openai/gpt-4o-mini', 'sk', '']):
+             patch('rich.prompt.Prompt.ask', side_effect=['openai', 'openai/gpt-4o-mini', 'sk', '']), \
+             _patch_settings_path(settings_file):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
 
     def test_default_project_root_is_cwd(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.chdir(tmp_path)
         console = _quiet_console()
+        settings_file = tmp_path / 'settings.json'
         with patch('backend.cli.init_wizard._detect_local', return_value=[]), \
-             patch('rich.prompt.Prompt.ask', side_effect=['openai', 'openai/gpt-4o-mini', 'sk', '']):
+             patch('rich.prompt.Prompt.ask', side_effect=['openai', 'openai/gpt-4o-mini', 'sk', '']), \
+             _patch_settings_path(settings_file):
             rc = run_init(console=console)
         assert rc == 0
-        assert (tmp_path / 'settings.json').exists()
+        assert settings_file.exists()

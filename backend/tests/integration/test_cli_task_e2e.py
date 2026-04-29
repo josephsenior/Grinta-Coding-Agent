@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 

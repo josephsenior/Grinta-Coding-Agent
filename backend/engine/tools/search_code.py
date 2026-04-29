@@ -44,39 +44,42 @@ Use this when target location is unknown. For dependency traversal, use `explore
 SEARCH_CODE_TOOL_NAME = 'search_code'
 
 
-def _normalize_search_inputs(pattern: str, file_pattern: str) -> tuple[str, str]:
+def _should_prefix_hidden_file_pattern(file_pattern: str) -> bool:
+    return bool(file_pattern) and file_pattern.startswith('.') and not file_pattern.startswith(
+        ('*', '?', '!')
+    )
+
+
+def _wrap_literal_file_pattern(file_pattern: str) -> str:
+    if file_pattern and not any(char in file_pattern for char in '*?[]'):
+        return f'*{file_pattern}*'
+    return file_pattern
+
+
+def _looks_like_file_pattern_hint(pattern: str) -> bool:
     import re
 
+    if not re.match(r'^[\w\*\.\-\?]+$', pattern):
+        return False
+    if pattern.startswith(('*', '?', '.')):
+        return True
+    return any(token in pattern for token in ['test', 'tests', 'util', 'src'])
+
+
+def _normalize_search_inputs(pattern: str, file_pattern: str) -> tuple[str, str]:
     normalized_pattern = pattern
     normalized_file_pattern = file_pattern
 
-    if (
-        normalized_file_pattern
-        and not normalized_file_pattern.startswith(('*', '?', '!'))
-        and normalized_file_pattern.startswith('.')
-    ):
+    if _should_prefix_hidden_file_pattern(normalized_file_pattern):
         normalized_file_pattern = f'*{normalized_file_pattern}'
 
-    if (
-        not normalized_pattern
-        and normalized_file_pattern
-        and not any(c in normalized_file_pattern for c in '*?[]')
-    ):
-        normalized_file_pattern = f'*{normalized_file_pattern}*'
+    if not normalized_pattern and normalized_file_pattern:
+        return normalized_pattern, _wrap_literal_file_pattern(normalized_file_pattern)
 
-    if (
+    if normalized_pattern and not normalized_file_pattern and _looks_like_file_pattern_hint(
         normalized_pattern
-        and not normalized_file_pattern
-        and re.match(r'^[\w\*\.\-\?]+$', normalized_pattern)
-        and (
-            normalized_pattern.startswith(('*', '?', '.'))
-            or any(x in normalized_pattern for x in ['test', 'tests', 'util', 'src'])
-        )
     ):
-        normalized_file_pattern = normalized_pattern
-        if not any(c in normalized_file_pattern for c in '*?[]'):
-            normalized_file_pattern = f'*{normalized_file_pattern}*'
-        normalized_pattern = ''
+        return '', _wrap_literal_file_pattern(normalized_pattern)
 
     return normalized_pattern, normalized_file_pattern
 
@@ -299,6 +302,131 @@ def build_search_code_action(
     )
 
 
+def _run_ripgrep_command(args: list[str]):
+    import subprocess
+
+    return subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        encoding='utf-8',
+        errors='replace',
+        check=False,
+    )
+
+
+def _format_ripgrep_output(stdout: str, *, max_lines: int, empty_message: str) -> str:
+    lines = stdout.splitlines()[:max_lines]
+    output = '\n'.join(lines)
+    return output or empty_message
+
+
+def _ripgrep_error_action(exc: Exception) -> AgentThinkAction:
+    return _search_results_action(f'Error running ripgrep: {exc}')
+
+
+def _build_ripgrep_file_discovery_args(
+    rg_path: str,
+    *,
+    file_pattern: str,
+    path: str,
+) -> list[str]:
+    args = [rg_path, '--files']
+    for directory in _SEARCH_EXCLUDED_DIRS:
+        args.extend(['--glob', f'!**/{directory}/**'])
+    if file_pattern:
+        args.extend(['--glob', file_pattern])
+    args.append(path)
+    return args
+
+
+def _search_ripgrep_file_discovery(
+    rg_path: str,
+    *,
+    file_pattern: str,
+    path: str,
+    max_results: int,
+) -> AgentThinkAction:
+    try:
+        result = _run_ripgrep_command(
+            _build_ripgrep_file_discovery_args(
+                rg_path,
+                file_pattern=file_pattern,
+                path=path,
+            )
+        )
+    except Exception as exc:
+        return _ripgrep_error_action(exc)
+    return _search_results_action(
+        _format_ripgrep_output(
+            result.stdout,
+            max_lines=max_results,
+            empty_message='No matching files found.',
+        )
+    )
+
+
+def _build_ripgrep_search_args(
+    rg_path: str,
+    *,
+    pattern: str,
+    path: str,
+    file_pattern: str,
+    context_lines: int,
+    is_case_sensitive: bool,
+    max_results: int,
+) -> list[str]:
+    args = [
+        rg_path,
+        f'--context={context_lines}',
+        f'--max-count={max_results}',
+        '--line-number',
+        '--no-heading',
+    ]
+    if not is_case_sensitive:
+        args.append('--ignore-case')
+    for directory in ['.venv', 'node_modules', '__pycache__', '.git']:
+        args.extend(['--glob', f'!**/{directory}/**'])
+    if file_pattern:
+        args.extend(['--glob', file_pattern])
+    args.extend([pattern, path])
+    return args
+
+
+def _search_ripgrep_matches(
+    rg_path: str,
+    *,
+    pattern: str,
+    path: str,
+    file_pattern: str,
+    context_lines: int,
+    is_case_sensitive: bool,
+    max_results: int,
+) -> AgentThinkAction:
+    try:
+        result = _run_ripgrep_command(
+            _build_ripgrep_search_args(
+                rg_path,
+                pattern=pattern,
+                path=path,
+                file_pattern=file_pattern,
+                context_lines=context_lines,
+                is_case_sensitive=is_case_sensitive,
+                max_results=max_results,
+            )
+        )
+    except Exception as exc:
+        return _ripgrep_error_action(exc)
+
+    return _search_results_action(
+        _format_ripgrep_output(
+            result.stdout,
+            max_lines=max_results * (context_lines * 2 + 1) + 10,
+            empty_message='No matches found.',
+        )
+    )
+
+
 def _search_with_ripgrep(
     rg_path: str,
     pattern: str,
@@ -309,82 +437,73 @@ def _search_with_ripgrep(
     max_results: int,
 ) -> AgentThinkAction:
     """Execute ripgrep directly via subprocess."""
-    import subprocess
+    if not pattern:
+        return _search_ripgrep_file_discovery(
+            rg_path,
+            file_pattern=file_pattern,
+            path=path,
+            max_results=max_results,
+        )
+
+    return _search_ripgrep_matches(
+        rg_path,
+        pattern=pattern,
+        path=path,
+        file_pattern=file_pattern,
+        context_lines=context_lines,
+        is_case_sensitive=is_case_sensitive,
+        max_results=max_results,
+    )
+
+
+def _compile_python_search_regex(
+    pattern: str,
+    *,
+    is_case_sensitive: bool,
+) -> tuple[object | None, AgentThinkAction | None]:
+    import re
 
     if not pattern:
-        # File discovery mode
-        args = [rg_path, '--files']
-        for d in _SEARCH_EXCLUDED_DIRS:
-            args.extend(['--glob', f'!**/{d}/**'])
-        if file_pattern:
-            args.extend(['--glob', file_pattern])
-        args.append(path)
+        return None, None
 
-        try:
-            result = subprocess.run(
-                args,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                check=False,
-            )
-            lines = result.stdout.splitlines()[:max_results]
-            out = '\n'.join(lines)
-            if not out:
-                out = 'No matching files found.'
-            return AgentThinkAction(
-                source_tool='search_code',
-                thought=f'<search_results>\n{out}\n</search_results>',
-            )
-        except Exception as e:
-            return AgentThinkAction(
-                source_tool='search_code',
-                thought=f'<search_results>\nError running ripgrep: {e}\n</search_results>',
-            )
-
-    # Search mode
-    args = [
-        rg_path,
-        f'--context={context_lines}',
-        f'--max-count={max_results}',
-        '--line-number',
-        '--no-heading',
-    ]
-    if not is_case_sensitive:
-        args.append('--ignore-case')
-    # Let ripgrep handle .gitignore naturally, but enforce a few fail-safes
-    # if the user forgot them in .gitignore
-    for d in ['.venv', 'node_modules', '__pycache__', '.git']:
-        args.extend(['--glob', f'!**/{d}/**'])
-    if file_pattern:
-        args.extend(['--glob', file_pattern])
-
-    args.append(pattern)
-    args.append(path)
-
+    flags = 0 if is_case_sensitive else re.IGNORECASE
     try:
-        result = subprocess.run(
-            args,
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
-            check=False,
+        return re.compile(pattern, flags), None
+    except re.error as exc:
+        return None, _invalid_search_regex_action(f'Invalid regex pattern: {exc}')
+
+
+def _format_python_file_listing(target_files: list[str], *, max_results: int) -> str:
+    output = '\n'.join(target_files[:max_results])
+    return output or 'No matching files found.'
+
+
+def _collect_python_search_results(
+    target_files: list[str],
+    *,
+    regex: object,
+    context_lines: int,
+    max_results: int,
+) -> str:
+    results: list[str] = []
+    match_count = 0
+    for file_path in target_files:
+        if match_count >= max_results:
+            break
+
+        file_matches = _python_search_file_matches(
+            file_path,
+            regex=regex,
+            context_lines=context_lines,
+            remaining_results=max_results - match_count,
         )
-        out = result.stdout
-        limit = max_results * (context_lines * 2 + 1) + 10
-        lines = out.splitlines()[:limit]
-        out_limited = '\n'.join(lines)
-        if not out_limited:
-            out_limited = 'No matches found.'
-        return AgentThinkAction(
-            source_tool='search_code',
-            thought=f'<search_results>\n{out_limited}\n</search_results>',
-        )
-    except Exception as e:
-        return AgentThinkAction(thought=f'<search_results>\\nError running ripgrep: {e}\
-</search_results>')
+        match_count += len(file_matches)
+
+        if file_matches:
+            results.extend(file_matches)
+            results.append('--')
+
+    return '\n'.join(results) or 'No matches found.'
 
 
 def _search_with_python(
@@ -397,7 +516,6 @@ def _search_with_python(
 ) -> AgentThinkAction:
     """Execute search using pure Python standard library."""
     import os
-    import re
 
     if not os.path.exists(path):
         return AgentThinkAction(
@@ -405,42 +523,25 @@ def _search_with_python(
             thought=f'<search_results>\nPath does not exist: {path}\n</search_results>',
         )
 
-    regex = None
-    if pattern:
-        flags = 0 if is_case_sensitive else re.IGNORECASE
-        try:
-            regex = re.compile(pattern, flags)
-        except re.error as exc:
-            return _invalid_search_regex_action(f'Invalid regex pattern: {exc}')
+    regex, regex_error = _compile_python_search_regex(
+        pattern,
+        is_case_sensitive=is_case_sensitive,
+    )
+    if regex_error is not None:
+        return regex_error
 
     target_files = _collect_python_search_target_files(path, file_pattern)
 
     if not pattern:
-        lines = target_files[:max_results]
-        out = '\n'.join(lines)
-        if not out:
-            out = 'No matching files found.'
-        return _search_results_action(out)
+        return _search_results_action(
+            _format_python_file_listing(target_files, max_results=max_results)
+        )
 
-    results: list[str] = []
-    match_count = 0
-    for fpath in target_files:
-        if match_count >= max_results:
-            break
-
-        file_matches = _python_search_file_matches(
-            fpath,
+    return _search_results_action(
+        _collect_python_search_results(
+            target_files,
             regex=regex,
             context_lines=context_lines,
-            remaining_results=max_results - match_count,
+            max_results=max_results,
         )
-        match_count += len(file_matches)
-
-        if file_matches:
-            results.extend(file_matches)
-            results.append('--')
-
-    out = '\n'.join(results)
-    if not out:
-        out = 'No matches found.'
-    return _search_results_action(out)
+    )

@@ -433,26 +433,31 @@ async def _async_main(
     console = _build_async_console(show_splash)
     initial_input = _read_piped_stdin()
 
-    # -- load config -------------------------------------------------------
-    config = load_app_config()
+    try:
+        # -- load config -------------------------------------------------------
+        config = load_app_config()
 
-    # -- apply CLI overrides (non-persistent) ------------------------------
-    _apply_cli_overrides(
-        config, model, resolved_project, get_project_local_data_root,
-    )
+        # -- apply CLI overrides (non-persistent) ------------------------------
+        _apply_cli_overrides(
+            config, model, resolved_project, get_project_local_data_root,
+        )
 
-    # -- onboarding if needed ----------------------------------------------
-    config = await _ensure_onboarded(
-        config, console, model, resolved_project, get_project_local_data_root,
-    )
-    if config is None:
-        return
+        # -- onboarding if needed ----------------------------------------------
+        config = await _ensure_onboarded(
+            config, console, model, resolved_project, get_project_local_data_root,
+        )
+        if config is None:
+            return
 
-    # -- launch REPL -------------------------------------------------------
-    repl = Repl(config, console)
-    if initial_input:
-        repl.queue_initial_input(initial_input)
-    await repl.run()
+        # -- launch REPL -------------------------------------------------------
+        repl = Repl(config, console)
+        if initial_input:
+            repl.queue_initial_input(initial_input)
+        await repl.run()
+    finally:
+        from backend.inference.direct_clients import aclose_shared_http_clients
+
+        await aclose_shared_http_clients()
 
 
 def _build_async_console(show_splash: bool) -> Console:

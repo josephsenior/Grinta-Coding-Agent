@@ -27,7 +27,7 @@ from backend.core.constants import (
 from backend.core.enums import LifecyclePhase
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
-from backend.ledger import EventSource, EventStream, EventStreamSubscriber
+from backend.ledger import EventSource, EventStreamSubscriber
 from backend.ledger.action import (
     Action,
     MessageAction,
@@ -40,7 +40,6 @@ from backend.ledger.observation import (
 )
 from backend.ledger.observation_cause import attach_observation_cause
 from backend.orchestration.action_scheduler import ActionScheduler
-from backend.orchestration.agent import Agent
 from backend.orchestration.memory_pressure import MemoryPressureMonitor
 from backend.orchestration.orchestration_config import (
     OrchestrationConfig,
@@ -239,10 +238,17 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         Reuses the existing ``RollbackMiddleware``'s ``RollbackManager`` so we
         don't snapshot through a second instance (which would race on the
         on-disk ``checkpoints.json`` file).  Failures are non-fatal — a missed
-        phase-boundary checkpoint must never block a lifecycle transition.
+        phase-boundary checkpoint must never block a lifecycle transition —
+        but they are surfaced at WARNING level because rollback consumers
+        depend on these checkpoints existing for recovery.
         """
         mw = getattr(self, '_rollback_middleware', None)
         if mw is None:
+            logger.warning(
+                'Phase-boundary checkpoint at %s skipped: no RollbackMiddleware '
+                'is registered. Rollback to this transition will not be possible.',
+                label,
+            )
             return
         try:
             from backend.orchestration.tool_pipeline import ToolInvocationContext
@@ -250,6 +256,11 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             ctx = ToolInvocationContext(controller=self, action=None, state=None)  # type: ignore[arg-type]
             manager = mw._get_manager(ctx)  # type: ignore[attr-defined]
             if manager is None:
+                logger.warning(
+                    'Phase-boundary checkpoint at %s skipped: RollbackManager '
+                    'unavailable. Rollback to this transition will not be possible.',
+                    label,
+                )
                 return
             cid = manager.create_checkpoint(
                 description=f'phase boundary: {label}',
@@ -262,8 +273,9 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             )
             logger.debug('Phase-boundary checkpoint %s created at %s', cid, label)
         except Exception:
-            logger.debug(
-                'Phase-boundary checkpoint creation failed at %s',
+            logger.warning(
+                'Phase-boundary checkpoint creation failed at %s — rollback to '
+                'this transition will not be possible.',
                 label,
                 exc_info=True,
             )

@@ -84,6 +84,24 @@ def create_browser_tool() -> ChatCompletionToolParam:
     )
 
 
+def _collect_browser_params(arguments: dict[str, Any]) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+    for key in ('new_tab', 'full_page', 'clear'):
+        if key in arguments:
+            params[key] = arguments[key]
+    for key in ('url', 'index', 'text'):
+        value = arguments.get(key)
+        if value is not None:
+            params[key] = value
+    return params
+
+
+def _browser_command_risk(command: str) -> ActionSecurityRisk:
+    if command in ('navigate', 'click', 'type'):
+        return ActionSecurityRisk.HIGH
+    return ActionSecurityRisk.MEDIUM
+
+
 def build_browser_tool_action(arguments: dict[str, Any]) -> BrowserToolAction:
     from backend.core.errors import FunctionCallValidationError
 
@@ -92,27 +110,11 @@ def build_browser_tool_action(arguments: dict[str, Any]) -> BrowserToolAction:
         raise FunctionCallValidationError(
             f'Invalid browser command {cmd!r}. Allowed: {", ".join(_BROWSER_COMMANDS)}'
         )
-    params: dict[str, Any] = {}
-    if 'url' in arguments and arguments['url'] is not None:
-        params['url'] = arguments['url']
-    if 'new_tab' in arguments:
-        params['new_tab'] = arguments['new_tab']
-    if 'full_page' in arguments:
-        params['full_page'] = arguments['full_page']
-    if 'index' in arguments and arguments['index'] is not None:
-        params['index'] = arguments['index']
-    if 'text' in arguments and arguments['text'] is not None:
-        params['text'] = arguments['text']
-    if 'clear' in arguments:
-        params['clear'] = arguments['clear']
-
+    params = _collect_browser_params(arguments)
     thought = str(arguments.get('thought') or '')
     # Circuit breaker counts only HIGH; treat read-only / session lifecycle as MEDIUM
     # so browser demos (many start/snapshot) do not trip "too many high-risk actions".
-    if cmd in ('navigate', 'click', 'type'):
-        risk = ActionSecurityRisk.HIGH
-    else:
-        risk = ActionSecurityRisk.MEDIUM
+    risk = _browser_command_risk(cmd)
     return BrowserToolAction(
         command=cmd, params=params, thought=thought, security_risk=risk
     )

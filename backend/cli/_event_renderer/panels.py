@@ -22,7 +22,6 @@ from backend.core.task_status import (
     normalize_task_status,
 )
 
-
 # ---------------------------------------------------------------------------
 # Dataclasses (re-exported by the public event_renderer module)
 # ---------------------------------------------------------------------------

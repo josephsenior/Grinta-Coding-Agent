@@ -218,6 +218,33 @@ async def test_init_registers_main_event_loop(
     assert captured_loops == [running_loop]
 
 
+def test_default_operation_pipeline_order_is_stable() -> None:
+    ctrl = _make_controller()
+    ctrl.services.context = MagicMock()
+
+    SessionOrchestrator._initialize_operation_pipeline(ctrl)
+
+    middlewares = ctrl.services.context.initialize_operation_pipeline.call_args.args[0]
+    assert [middleware.__class__.__name__ for middleware in middlewares] == [
+        'SafetyValidatorMiddleware',
+        'BlackboardMiddleware',
+        'CircuitBreakerMiddleware',
+        'ProgressPolicyMiddleware',
+        'CostQuotaMiddleware',
+        'ContextWindowMiddleware',
+        'RollbackMiddleware',
+        'DestructiveCommandMiddleware',
+        'PreExecDiffMiddleware',
+        'AutoCheckMiddleware',
+        'FileStateMiddleware',
+        'LoggingMiddleware',
+        'TelemetryMiddleware',
+        'ToolResultValidator',
+    ]
+    assert ctrl._rollback_middleware.__class__.__name__ == 'RollbackMiddleware'
+    assert ctrl._file_state_tracker is middlewares[10].tracker
+
+
 # ── Service aliasing ────────────────────────────────────────────────
 
 

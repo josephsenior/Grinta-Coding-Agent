@@ -3,21 +3,11 @@
 from __future__ import annotations
 
 import unittest
-from typing import Any
 
 # ============================================================================
 # headline.py
 # ============================================================================
-
 from backend.cli._tool_display.headline import (
-    _stats_analyze_project,
-    _stats_explore_tree,
-    _stats_lsp,
-    _stats_read_symbol,
-    _stats_search_code,
-    _stats_task_tracker,
-    _stats_terminal_manager,
-    _stats_text_editor,
     friendly_verb_for_tool,
     tool_activity_stats_hint,
     tool_headline,
@@ -192,7 +182,6 @@ from backend.cli._tool_display.summarize import (
     _arg_str,
     _pluralize_result_label,
     _preview_result_item,
-    _summarize_raw_mcp_text,
     _summarize_result_collection,
     _term_input_summary,
     _term_open_summary,
@@ -491,7 +480,6 @@ class TestStreamingArgsHint(unittest.TestCase):
 
 from backend.cli._tool_display.redact import (
     _balanced_json_object_end,
-    _line_starts_protocol_prefix,
     extract_tool_calls_from_text_markers,
     redact_streamed_tool_call_markers,
     strip_protocol_echo_blocks,

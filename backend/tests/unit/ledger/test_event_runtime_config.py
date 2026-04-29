@@ -9,21 +9,31 @@ import pytest
 from backend.ledger.config import EventRuntimeDefaults, get_event_runtime_defaults
 
 
+def _assert_event_runtime_attrs(obj: EventRuntimeDefaults, expected: dict[str, object]) -> None:
+    for attr, value in expected.items():
+        assert getattr(obj, attr) == value
+
+
 class TestEventRuntimeDefaults:
     """Tests for the EventRuntimeDefaults frozen dataclass."""
 
     def test_default_values(self):
         defaults = EventRuntimeDefaults()
-        assert defaults.max_queue_size == 2000
-        assert defaults.drop_policy == 'drop_oldest'
-        assert defaults.hwm_ratio == 0.8
-        assert defaults.block_timeout == 0.1
-        assert defaults.rate_window_seconds == 60
-        assert defaults.workers == 1
-        assert defaults.async_write is False
-        assert defaults.coalesce is False
-        assert defaults.coalesce_window_ms == 100.0
-        assert defaults.coalesce_max_batch == 20
+        _assert_event_runtime_attrs(
+            defaults,
+            {
+                'max_queue_size': 2000,
+                'drop_policy': 'drop_oldest',
+                'hwm_ratio': 0.8,
+                'block_timeout': 0.1,
+                'rate_window_seconds': 60,
+                'workers': 1,
+                'async_write': False,
+                'coalesce': False,
+                'coalesce_window_ms': 100.0,
+                'coalesce_max_batch': 20,
+            },
+        )
 
     def test_custom_values(self):
         d = EventRuntimeDefaults(
@@ -96,16 +106,21 @@ class TestGetEventRuntimeDefaults:
         }
         with patch.dict(os.environ, env, clear=True):
             result = get_event_runtime_defaults()
-            assert result.max_queue_size == 500
-            assert result.drop_policy == 'reject'
-            assert result.hwm_ratio == 0.95
-            assert result.block_timeout == 0.5
-            assert result.rate_window_seconds == 30
-            assert result.workers == 4
-            assert result.async_write is True
-            assert result.coalesce is True
-            assert result.coalesce_window_ms == 50.0
-            assert result.coalesce_max_batch == 10
+            _assert_event_runtime_attrs(
+                result,
+                {
+                    'max_queue_size': 500,
+                    'drop_policy': 'reject',
+                    'hwm_ratio': 0.95,
+                    'block_timeout': 0.5,
+                    'rate_window_seconds': 30,
+                    'workers': 4,
+                    'async_write': True,
+                    'coalesce': True,
+                    'coalesce_window_ms': 50.0,
+                    'coalesce_max_batch': 10,
+                },
+            )
 
     @patch(
         'backend.core.config.config_loader.load_app_config',

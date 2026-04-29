@@ -3,7 +3,7 @@
   "description": "Autonomous local-first CLI coding agent",
   "homepage": "https://github.com/josephsenior/Grinta-Coding-Agent",
   "license": "MIT",
-  "depends": "python311",
+  "depends": "python312",
   "url": "https://files.pythonhosted.org/packages/source/g/grinta-ai/grinta-ai-0.55.0.tar.gz",
   "hash": "REPLACE_ON_RELEASE_WITH_PYPI_SDIST_SHA256",
   "extract_dir": "grinta-ai-0.55.0",

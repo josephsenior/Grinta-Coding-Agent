@@ -91,6 +91,25 @@ class _FakeCDPClient:
         return self._page
 
 
+def _assert_retry_screenshot_result(
+    obs: CmdOutputObservation,
+    state: _SharedMockState,
+    tmp_path: Path,
+) -> None:
+    assert 'Screenshot saved to' in obs.content
+    assert obs.content.strip().endswith('.jpg (7 bytes)')
+
+    capture_params = [p for name, p in state.log if name == 'captureScreenshot']
+    assert [(params['fromSurface'], params['quality']) for params in capture_params] == [
+        (True, 80),
+        (False, 80),
+    ]
+
+    saved = list(tmp_path.glob('browser_*.jpg'))
+    assert len(saved) == 1, saved
+    assert saved[0].read_bytes() == b'PNGDATA'
+
+
 class _FakeCDPSession:
     def __init__(self, state: _SharedMockState) -> None:
         self.cdp_client = _FakeCDPClient(state)
@@ -205,17 +224,7 @@ async def test_screenshot_retries_with_from_surface_false_on_failure(
     obs = await shot_tool.execute('screenshot', {})
 
     assert isinstance(obs, CmdOutputObservation), getattr(obs, 'content', obs)
-    assert 'Screenshot saved to' in obs.content
-    assert obs.content.strip().endswith('.jpg (7 bytes)')
-
-    capture_params = [p for name, p in state.log if name == 'captureScreenshot']
-    assert len(capture_params) == 2, capture_params
-    assert capture_params[0]['fromSurface'] is True
-    assert capture_params[1]['fromSurface'] is False
-
-    saved = list(tmp_path.glob('browser_*.jpg'))
-    assert len(saved) == 1, saved
-    assert saved[0].read_bytes() == b'PNGDATA'
+    _assert_retry_screenshot_result(obs, state, tmp_path)
 
 
 @pytest.mark.asyncio

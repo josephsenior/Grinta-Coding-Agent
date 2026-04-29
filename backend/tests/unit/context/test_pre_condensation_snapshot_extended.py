@@ -23,6 +23,18 @@ def _fake_event(name: str, **attrs):
     return event
 
 
+def _assert_approach(
+    approach: dict[str, str],
+    *,
+    expected_type: str,
+    detail_contains: str,
+    outcome_contains: str,
+) -> None:
+    assert approach['type'] == expected_type
+    assert detail_contains in approach['detail']
+    assert outcome_contains in approach['outcome']
+
+
 class TestPreCondensationSnapshot(unittest.TestCase):
     def test_snapshot_path_uses_agent_state_dir(self):
         from unittest.mock import patch
@@ -62,21 +74,24 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         # Verify
         approaches = snapshot['attempted_approaches']
         assert len(approaches) == 3
-
-        # Success command
-        assert approaches[0]['type'] == 'command'
-        assert 'pip install flask' in approaches[0]['detail']
-        assert approaches[0]['outcome'] == 'SUCCESS'
-
-        # Failed file edit
-        assert approaches[1]['type'] == 'file_edit'
-        assert 'test.py' in approaches[1]['detail']
-        assert 'FAILED' in approaches[1]['outcome']
-
-        # Failed command
-        assert approaches[2]['type'] == 'command'
-        assert 'pytest' in approaches[2]['detail']
-        assert 'FAILED (exit=1)' in approaches[2]['outcome']
+        _assert_approach(
+            approaches[0],
+            expected_type='command',
+            detail_contains='pip install flask',
+            outcome_contains='SUCCESS',
+        )
+        _assert_approach(
+            approaches[1],
+            expected_type='file_edit',
+            detail_contains='test.py',
+            outcome_contains='FAILED',
+        )
+        _assert_approach(
+            approaches[2],
+            expected_type='command',
+            detail_contains='pytest',
+            outcome_contains='FAILED (exit=1)',
+        )
 
     def test_format_snapshot_for_injection(self):
         from backend.context.pre_condensation_snapshot import (
@@ -262,11 +277,14 @@ class TestPreCondensationSnapshot(unittest.TestCase):
             snapshot_module.delete_snapshot()
 
     def test_format_helpers_cover_empty_and_populated_sections(self):
-        assert snapshot_module._format_files_section({}) == []
-        assert snapshot_module._format_errors_section([]) == []
-        assert snapshot_module._format_decisions_section([]) == []
-        assert snapshot_module._format_commands_section([]) == []
-        assert snapshot_module._format_approaches_section([]) == []
+        for formatter, payload in (
+            (snapshot_module._format_files_section, {}),
+            (snapshot_module._format_errors_section, []),
+            (snapshot_module._format_decisions_section, []),
+            (snapshot_module._format_commands_section, []),
+            (snapshot_module._format_approaches_section, []),
+        ):
+            assert formatter(payload) == []
 
         files = snapshot_module._format_files_section({'a.py': {'action': 'edit'}})
         errors = snapshot_module._format_errors_section(['boom'])
@@ -281,10 +299,12 @@ class TestPreCondensationSnapshot(unittest.TestCase):
             ]
         )
 
-        assert files[-1] == '  edit: a.py'
-        assert errors[-1] == '  • boom'
-        assert decisions[-1] == '  • choose branch a'
-        assert commands[-2] == '  $ pytest'
-        assert commands[-1] == '    → ok'
+        assert [files[-1], errors[-1], decisions[-1], commands[-2], commands[-1]] == [
+            '  edit: a.py',
+            '  • boom',
+            '  • choose branch a',
+            '  $ pytest',
+            '    → ok',
+        ]
         assert 'FAILED approaches' in approaches[1]
         assert 'Succeeded approaches:' in approaches[-2]

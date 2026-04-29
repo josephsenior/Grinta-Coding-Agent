@@ -5,12 +5,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import os
 import re
 import shutil
 import subprocess
 import sys
-import time
 from dataclasses import dataclass
 from difflib import get_close_matches
 from pathlib import Path
@@ -42,6 +40,8 @@ from backend.cli.theme import (
 )
 from backend.core.config import (
     AppConfig,
+)
+from backend.core.config import (
     load_app_config as load_app_config,  # re-exported for tests/back-compat
 )
 from backend.core.enums import AgentState

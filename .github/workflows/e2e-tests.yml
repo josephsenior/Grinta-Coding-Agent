@@ -7,6 +7,14 @@ on:
   pull_request:
     paths:
       - 'backend/**'
+      - 'launch/**'
+      - 'packaging/**'
+      - 'pyproject.toml'
+      - 'README.md'
+      - 'docs/INSTALL.md'
+      - 'docs/USER_GUIDE.md'
+      - 'docs/PERFORMANCE.md'
+      - 'docs/SECURITY_CHECKLIST.md'
       - '.github/workflows/e2e-tests.yml'
 
 concurrency:
@@ -62,3 +70,37 @@ jobs:
           backend/tests/unit/orchestration/services/test_action_execution_service.py
           -k "wait_for_agent_idle or step_from_threadpool_uses_main_loop or parallel_batch_failure_requeues_failed_actions_for_serial_retry or preserves_recovery_round_after_real_action or recovers_first_round_then_pauses"
           -q --tb=short
+
+      - name: Build and smoke installed CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv build --wheel
+          python -m venv .venv-smoke
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            . .venv-smoke/Scripts/activate
+          else
+            . .venv-smoke/bin/activate
+          fi
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+          grinta --help
+          grinta --version
+          mkdir -p .package-smoke-workspace
+          export APP_ROOT="$PWD/.package-smoke-app"
+          mkdir -p "$APP_ROOT"
+          cat > "$APP_ROOT/settings.json" <<'JSON'
+          {
+            "llm_provider": "openai",
+            "llm_model": "openai/gpt-4.1",
+            "llm_api_key": "${LLM_API_KEY}",
+            "llm_base_url": ""
+          }
+          JSON
+          printf '/help\n' | env \
+            APP_ROOT="$APP_ROOT" \
+            LLM_API_KEY=sk-test-cli-smoke \
+            LLM_MODEL=openai/gpt-4.1 \
+            GRINTA_NO_SPLASH=1 \
+            LOG_TO_FILE=false \
+            grinta --project .package-smoke-workspace --no-splash

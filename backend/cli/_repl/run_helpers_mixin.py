@@ -25,11 +25,12 @@ class RunHelpersMixin:
     """Mixin providing the async run() pipeline helpers."""
 
     def _build_prompt_session(self) -> Any | None:
+        import sys
+
         from backend.cli.repl import (
             _attach_prompt_buffer_csi_sanitizer,
             _supports_prompt_session,
         )
-        import sys
 
         session: Any | None = None
         if _supports_prompt_session(sys.stdin, sys.stdout):

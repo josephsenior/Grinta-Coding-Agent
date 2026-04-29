@@ -16,7 +16,6 @@ import backend.cli.repl as cli_repl
 from backend.core.config import AppConfig
 from backend.persistence.locations import get_project_local_data_root
 
-
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 

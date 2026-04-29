@@ -70,7 +70,6 @@ from backend.engine.tools.search_code import (
     SEARCH_CODE_TOOL_NAME,
     build_search_code_action,
 )
-from backend.engine.tools.security_utils import RISK_LEVELS
 from backend.engine.tools.task_tracker import TaskTracker
 from backend.engine.tools.terminal_manager import (
     TERMINAL_MANAGER_TOOL_NAME,
@@ -78,7 +77,6 @@ from backend.engine.tools.terminal_manager import (
 from backend.inference.tool_names import TASK_TRACKER_TOOL_NAME
 from backend.ledger.action import (
     Action,
-    ActionSecurityRisk,
     AgentThinkAction,
     BrowserToolAction,
     CmdRunAction,

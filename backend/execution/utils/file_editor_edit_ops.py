@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import difflib
 import hashlib
-import os
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from backend.core import json_compat as json_compat
+
+# Sentinel: multiple whitespace-normalized matches for the same old_str
+_NORM_WS_SPAN_AMBIGUOUS = object()
 
 
 def _file_editor_module():
@@ -31,6 +34,40 @@ def normalize_whitespace_for_match(text: str) -> str:
         normalized_lines.append(line)
     result = '\n'.join(normalized_lines)
     return re.sub(r'\n+', '\n', result).strip()
+
+
+def _match_normalized_block_at(
+    lines_norm: list[str],
+    norm_old_lines: list[str],
+    start: int,
+) -> tuple[bool, int]:
+    """Align ``norm_old_lines`` against ``lines_norm`` starting at ``start``."""
+    current = start
+    for target in norm_old_lines:
+        while current < len(lines_norm) and not lines_norm[current] and target:
+            current += 1
+        if current >= len(lines_norm) or lines_norm[current] != target:
+            return False, current
+        current += 1
+    return True, current
+
+
+def _find_unique_normalized_ws_span(
+    lines_norm: list[str],
+    norm_old_lines: list[str],
+) -> tuple[int, int] | None | object:
+    """Return ``(start, end_exclusive)``, ``None``, or ``_NORM_WS_SPAN_AMBIGUOUS``."""
+    first_line_matches = [
+        i for i, nl in enumerate(lines_norm) if nl == norm_old_lines[0]
+    ]
+    valid_match: tuple[int, int] | None = None
+    for start in first_line_matches:
+        found, end = _match_normalized_block_at(lines_norm, norm_old_lines, start)
+        if found:
+            if valid_match is not None:
+                return _NORM_WS_SPAN_AMBIGUOUS
+            valid_match = (start, end)
+    return valid_match
 
 
 def ws_tolerant_replace(
@@ -60,39 +97,24 @@ def ws_tolerant_replace(
             new_content=file_content,
         )
 
-    first_line_matches = [i for i, nl in enumerate(lines_norm) if nl == norm_old_lines[0]]
+    span = _find_unique_normalized_ws_span(lines_norm, norm_old_lines)
+    if span is _NORM_WS_SPAN_AMBIGUOUS:
+        return _tool_result(
+            output='',
+            error=build_no_match_error(
+                editor, file_content, old_str, mode='normalize_ws'
+            ),
+            new_content=file_content,
+        )
+    if span is None:
+        return _tool_result(
+            output='',
+            error=build_no_match_error(editor, file_content, old_str, mode='normalize_ws'),
+            new_content=file_content,
+        )
 
-    valid_match = None
-    for start in first_line_matches:
-        found = True
-        current = start
-        for target in norm_old_lines:
-            while current < len(lines_norm) and not lines_norm[current] and target:
-                current += 1
-            if current >= len(lines_norm) or lines_norm[current] != target:
-                found = False
-                break
-            current += 1
-        if found:
-            if valid_match:
-                return _tool_result(
-                    output='',
-                    error=build_no_match_error(
-                        editor, file_content, old_str, mode='normalize_ws'
-                    ),
-                    new_content=file_content,
-                )
-            valid_match = (start, current)
-
-    if valid_match:
-        start, end = valid_match
-        return ''.join(lines_orig[:start]) + new_str + ''.join(lines_orig[end:])
-
-    return _tool_result(
-        output='',
-        error=build_no_match_error(editor, file_content, old_str, mode='normalize_ws'),
-        new_content=file_content,
-    )
+    start, end = span
+    return ''.join(lines_orig[:start]) + new_str + ''.join(lines_orig[end:])
 
 
 def map_normalized_offset_to_original(original: str, norm_offset: int) -> int:
@@ -153,12 +175,8 @@ def build_no_match_error(editor: Any, file_content: str, old_str: str, mode: str
     return '\n'.join(lines)
 
 
-def fuzzy_safe_replace(
-    editor: Any,
-    file_content: str,
-    old_str: str,
-    new_str: str,
-) -> str | Any:
+def _fuzzy_precheck_old_str(old_str: str, file_content: str) -> Any | None:
+    """Return a ``ToolResult`` error if fuzzy_safe cannot run; otherwise ``None``."""
     if not old_str.strip():
         return _tool_result(
             output='',
@@ -177,7 +195,15 @@ def fuzzy_safe_replace(
             error='fuzzy_safe mode only supports old_str up to 120 characters.',
             new_content=file_content,
         )
+    return None
 
+
+def _fuzzy_score_lines_over_threshold(
+    file_content: str,
+    old_str: str,
+    *,
+    min_ratio: float = 0.9,
+) -> list[tuple[float, int, str]]:
     target = normalize_whitespace_for_match(old_str).strip()
     lines = file_content.splitlines(keepends=True)
     scored: list[tuple[float, int, str]] = []
@@ -186,9 +212,30 @@ def fuzzy_safe_replace(
         if not normalized_line:
             continue
         ratio = difflib.SequenceMatcher(None, target, normalized_line).ratio()
-        if ratio >= 0.9:
+        if ratio >= min_ratio:
             scored.append((ratio, idx, raw_line))
+    return scored
 
+
+def _fuzzy_line_ending_for_raw_line(raw_line: str) -> str:
+    if raw_line.endswith('\r\n'):
+        return '\r\n'
+    if raw_line.endswith('\n'):
+        return '\n'
+    return ''
+
+
+def fuzzy_safe_replace(
+    editor: Any,
+    file_content: str,
+    old_str: str,
+    new_str: str,
+) -> str | Any:
+    pre = _fuzzy_precheck_old_str(old_str, file_content)
+    if pre is not None:
+        return pre
+
+    scored = _fuzzy_score_lines_over_threshold(file_content, old_str)
     if not scored:
         return _tool_result(
             output='',
@@ -206,17 +253,12 @@ def fuzzy_safe_replace(
             new_content=file_content,
         )
 
-    line_ending = ''
-    if best_line.endswith('\r\n'):
-        line_ending = '\r\n'
-    elif best_line.endswith('\n'):
-        line_ending = '\n'
-
+    line_ending = _fuzzy_line_ending_for_raw_line(best_line)
     replacement = new_str
     if line_ending and not new_str.endswith(('\n', '\r')):
         replacement = f'{new_str}{line_ending}'
 
-    updated = list(lines)
+    updated = list(file_content.splitlines(keepends=True))
     updated[best_idx] = replacement
     return ''.join(updated)
 
@@ -286,6 +328,37 @@ def preserve_quote_style_in_new_string(actual_old: str, new_str: str) -> str:
     return ''.join(out)
 
 
+def _apply_str_replace_when_not_exact(
+    editor: Any,
+    old_content: str,
+    old_str: str,
+    new_str: str,
+    file_path: Path | None,
+) -> str | Any:
+    """Quote-normalize, ws-tolerant, then fuzzy_safe fallback (same precedence as before)."""
+    actual = find_actual_substring_for_replace(editor, old_content, old_str)
+    if actual is not None:
+        if old_content.count(actual) != 1:
+            return _tool_result(
+                output='',
+                error='ERROR: quote-normalized old_str is not unique.',
+                new_content=old_content,
+            )
+        adjusted_new = preserve_quote_style_in_new_string(actual, new_str)
+        return old_content.replace(actual, adjusted_new, 1)
+
+    tolerant = ws_tolerant_replace(editor, old_content, old_str, new_str)
+    fe = _file_editor_module()
+    if isinstance(tolerant, fe.ToolResult):
+        if '\n' not in old_str and '\r' not in old_str:
+            fuzzy_result = fuzzy_safe_replace(editor, old_content, old_str, new_str)
+            if not isinstance(fuzzy_result, fe.ToolResult):
+                return fuzzy_result
+            tolerant.error = ((tolerant.error or '') + '\n\n' + (fuzzy_result.error or ''))
+        return tolerant
+    return tolerant
+
+
 def apply_str_replace(
     editor: Any,
     old_content: str,
@@ -304,30 +377,55 @@ def apply_str_replace(
             new_content=old_content,
         )
 
-    actual = find_actual_substring_for_replace(editor, old_content, old_str)
-    if actual is not None:
-        if old_content.count(actual) != 1:
-            return _tool_result(
-                output='',
-                error='ERROR: quote-normalized old_str is not unique.',
-                new_content=old_content,
-            )
-        adjusted_new = preserve_quote_style_in_new_string(actual, new_str)
-        return old_content.replace(actual, adjusted_new, 1)
-
-    tolerant = ws_tolerant_replace(editor, old_content, old_str, new_str)
-    if isinstance(tolerant, _file_editor_module().ToolResult):
-        if '\n' not in old_str and '\r' not in old_str:
-            fuzzy_result = fuzzy_safe_replace(editor, old_content, old_str, new_str)
-            if not isinstance(fuzzy_result, _file_editor_module().ToolResult):
-                return fuzzy_result
-            tolerant.error = ((tolerant.error or '') + '\n\n' + (fuzzy_result.error or ''))
-        return tolerant
-    return tolerant
+    return _apply_str_replace_when_not_exact(editor, old_content, old_str, new_str, file_path)
 
 
 def resolve_edit_content(file_text_val: str | None, new_str_val: str | None) -> str:
     return new_str_val or file_text_val or ''
+
+
+def _apply_edit_implicit_legacy(
+    editor: Any,
+    old_content_str: str,
+    file_text_val: str | None,
+    old_str_val: str | None,
+    new_str_val: str | None,
+    insert_line: int | None,
+    start_line: int | None,
+    end_line: int | None,
+    file_path: Path | None,
+) -> str | Any:
+    """Insert/replace/str_replace/full-file paths when ``edit_mode`` is unset."""
+    if start_line is not None and end_line is not None:
+        return editor._replace_range(
+            old_content_str,
+            resolve_edit_content(file_text_val, new_str_val),
+            start_line,
+            end_line,
+        )
+    if insert_line is not None:
+        return editor._insert_at_line(
+            old_content_str,
+            resolve_edit_content(file_text_val, new_str_val),
+            insert_line,
+        )
+    if old_str_val and new_str_val:
+        return apply_str_replace(
+            editor,
+            old_content_str,
+            old_str_val,
+            new_str_val,
+            file_path=file_path,
+        )
+    if file_text_val:
+        return file_text_val
+    if new_str_val:
+        return old_content_str + new_str_val
+    return _tool_result(
+        output='',
+        error='No content provided for edit operation',
+        new_content=old_content_str,
+    )
 
 
 def apply_edit_logic(
@@ -355,7 +453,8 @@ def apply_edit_logic(
     file_path: Path | None = None,
 ) -> str | Any:
     resolved_mode = (edit_mode or '').strip().lower() or None
-    if resolved_mode == 'format':
+
+    def branch_format() -> str | Any:
         return apply_format_edit(
             editor,
             old_content_str,
@@ -365,7 +464,8 @@ def apply_edit_logic(
             format_path=format_path,
             format_value=format_value,
         )
-    if resolved_mode == 'section':
+
+    def branch_section() -> str | Any:
         return apply_section_edit(
             editor,
             old_content_str,
@@ -375,7 +475,8 @@ def apply_edit_logic(
             section_action=section_action,
             section_content=section_content,
         )
-    if resolved_mode == 'range':
+
+    def branch_range() -> str | Any:
         if start_line is None or end_line is None:
             return _tool_result(
                 output='',
@@ -390,40 +491,42 @@ def apply_edit_logic(
             end_line,
             expected_hash=expected_hash,
         )
-    if resolved_mode == 'patch':
+
+    def branch_patch() -> str | Any:
         return apply_unified_patch(editor, old_content_str, patch_text)
-    if resolved_mode == 'replace':
+
+    def branch_replace() -> str | Any:
         if old_str_val and new_str_val:
-            return apply_str_replace(editor, old_content_str, old_str_val, new_str_val, file_path=file_path)
+            return apply_str_replace(
+                editor, old_content_str, old_str_val, new_str_val, file_path=file_path
+            )
         return _tool_result(
             output='',
             error='edit_mode=replace requires old_str and new_str.',
             new_content=old_content_str,
         )
 
-    if start_line is not None and end_line is not None:
-        return editor._replace_range(
-            old_content_str,
-            resolve_edit_content(file_text_val, new_str_val),
-            start_line,
-            end_line,
-        )
-    if insert_line is not None:
-        return editor._insert_at_line(
-            old_content_str,
-            resolve_edit_content(file_text_val, new_str_val),
-            insert_line,
-        )
-    if old_str_val and new_str_val:
-        return apply_str_replace(editor, old_content_str, old_str_val, new_str_val, file_path=file_path)
-    if file_text_val:
-        return file_text_val
-    if new_str_val:
-        return old_content_str + new_str_val
-    return _tool_result(
-        output='',
-        error='No content provided for edit operation',
-        new_content=old_content_str,
+    branches: dict[str, Callable[[], str | Any]] = {
+        'format': branch_format,
+        'section': branch_section,
+        'range': branch_range,
+        'patch': branch_patch,
+        'replace': branch_replace,
+    }
+    if resolved_mode is not None:
+        handler = branches.get(resolved_mode)
+        if handler is not None:
+            return handler()
+    return _apply_edit_implicit_legacy(
+        editor,
+        old_content_str,
+        file_text_val,
+        old_str_val,
+        new_str_val,
+        insert_line,
+        start_line,
+        end_line,
+        file_path,
     )
 
 
@@ -540,13 +643,13 @@ def structured_path_tokens(path_expr: str) -> list[str]:
     return [part for part in cleaned.split('.') if part]
 
 
-def mutate_structured_data(data: Any, op: str, path_expr: str, value: Any) -> Any:
-    if not isinstance(data, dict):
-        raise ValueError('Structured root must be an object/map')
-    tokens = structured_path_tokens(path_expr)
-    if not tokens:
-        raise ValueError('format_path must point to a key')
-    node = data
+def _walk_structured_to_leaf_parent(
+    data: dict[str, Any],
+    tokens: list[str],
+    op: str,
+) -> tuple[dict[str, Any], str]:
+    """Walk to the parent dict of the final key in ``tokens``."""
+    node: dict[str, Any] = data
     for token in tokens[:-1]:
         if token not in node or not isinstance(node[token], dict):
             if op == 'set':
@@ -554,21 +657,39 @@ def mutate_structured_data(data: Any, op: str, path_expr: str, value: Any) -> An
             else:
                 raise ValueError(f'Path segment {token!r} not found')
         node = node[token]
-    leaf = tokens[-1]
+    return node, tokens[-1]
+
+
+def _mutate_structured_leaf(
+    parent: dict[str, Any],
+    leaf: str,
+    op: str,
+    value: Any,
+) -> None:
     if op == 'set':
-        node[leaf] = value
+        parent[leaf] = value
     elif op == 'delete':
-        node.pop(leaf, None)
+        parent.pop(leaf, None)
     elif op == 'append':
-        target = node.get(leaf)
+        target = parent.get(leaf)
         if target is None:
-            node[leaf] = [value]
+            parent[leaf] = [value]
         elif isinstance(target, list):
             target.append(value)
         else:
             raise ValueError('append target is not a list')
     else:
         raise ValueError(f'Unsupported format_op: {op!r}')
+
+
+def mutate_structured_data(data: Any, op: str, path_expr: str, value: Any) -> Any:
+    if not isinstance(data, dict):
+        raise ValueError('Structured root must be an object/map')
+    tokens = structured_path_tokens(path_expr)
+    if not tokens:
+        raise ValueError('format_path must point to a key')
+    parent, leaf = _walk_structured_to_leaf_parent(data, tokens, op)
+    _mutate_structured_leaf(parent, leaf, op, value)
     return data
 
 
@@ -702,13 +823,7 @@ def apply_section_edit(
     return ''.join(result_lines)
 
 
-def apply_unified_patch(editor: Any, content: str, patch_text: str | None) -> str | Any:
-    if not patch_text:
-        return _tool_result(
-            output='',
-            error='edit_mode=patch requires patch_text.',
-            new_content=content,
-        )
+def _collect_unified_patch_hunks(patch_text: str) -> list[tuple[str, str]]:
     hunks: list[tuple[str, str]] = []
     old_lines: list[str] = []
     new_lines: list[str] = []
@@ -732,7 +847,10 @@ def apply_unified_patch(editor: Any, content: str, patch_text: str | None) -> st
             new_lines.append(raw_line[1:] + '\n')
     if in_hunk:
         hunks.append((''.join(old_lines), ''.join(new_lines)))
+    return hunks
 
+
+def _apply_patch_hunks_to_content(content: str, hunks: list[tuple[str, str]]) -> str | Any:
     updated = content
     for old_chunk, new_chunk in hunks:
         if not old_chunk:
@@ -747,3 +865,14 @@ def apply_unified_patch(editor: Any, content: str, patch_text: str | None) -> st
             )
         updated = updated.replace(old_chunk, new_chunk, 1)
     return updated
+
+
+def apply_unified_patch(editor: Any, content: str, patch_text: str | None) -> str | Any:
+    if not patch_text:
+        return _tool_result(
+            output='',
+            error='edit_mode=patch requires patch_text.',
+            new_content=content,
+        )
+    hunks = _collect_unified_patch_hunks(patch_text)
+    return _apply_patch_hunks_to_content(content, hunks)

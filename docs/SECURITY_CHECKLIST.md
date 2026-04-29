@@ -15,7 +15,7 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 ## Built-in protections
 - **Hardened-local execution policy** — `command_analyzer.py` classifies every command into NONE / LOW / MEDIUM / HIGH / CRITICAL.
 - **Hard CRITICAL refusal gate** — in `safety_validator.py::_should_block_action`, every CRITICAL-classified action is blocked regardless of profile or model output.
-- **Audit log** — every action is appended to `.grinta/storage/<session>/audit/` with risk classification and outcome.
+- **Audit log** — every action is appended to `~/.grinta/workspaces/<id>/storage/<session>/audit/` with risk classification and outcome.
 - **Secret masker** — known secret patterns are stripped from event-stream output before display/logging.
 - **Pattern-based shell guard** — `rm -rf /`, force pushes to protected branches, encoded payloads, privilege escalation, and network exfiltration patterns are detected.
 
@@ -27,7 +27,7 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 ## Hardening recommendations
 1. **Run untrusted repos inside a VM or container.** Use a disposable Docker container or a fresh user account with limited home-directory ACLs.
 2. **Stay on `supervised` autonomy** the first time you point Grinta at a new repo.
-3. **Review the audit log** (`.grinta/storage/<session>/audit/`) at the end of each long session.
+3. **Review the audit log** (`~/.grinta/workspaces/<id>/storage/<session>/audit/`) at the end of each long session.
 4. **Keep your provider API keys scoped.** Use per-project keys with low spend limits where supported.
 5. **Pin Grinta to a known version** in production-adjacent workflows; track `CHANGELOG.md`.
 6. **Disable network-using tools** in `settings.json` `permissions` block when working offline-only.

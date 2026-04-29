@@ -346,6 +346,7 @@ class LLM(RetryMixin, DebugMixin):
             model=self.config.model,
             api_key=api_key_value or 'not-needed',
             base_url=self.config.base_url,
+            timeout=self.config.timeout,
         )
 
         self._function_calling_active = _resolve_function_calling_config(
@@ -430,6 +431,9 @@ class LLM(RetryMixin, DebugMixin):
             call_kwargs['top_p'] = self.config.top_p
         if self.config.top_k is not None:
             call_kwargs['top_k'] = self.config.top_k
+        timeout = getattr(self.config, 'timeout', None)
+        if timeout is not None:
+            call_kwargs['timeout'] = float(timeout)
 
         from backend.inference.catalog_loader import (
             apply_model_param_overrides,

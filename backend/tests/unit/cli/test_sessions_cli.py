@@ -2,23 +2,20 @@
 
 from __future__ import annotations
 
-import json
-import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
 from rich.console import Console
 
 from backend.cli.sessions_cli import (
-    _SessionResolveFailure,
     _build_session_table,
     _format_session_row,
     _resolve_by_index,
     _resolve_by_prefix,
     _session_older_than_cutoff,
+    _SessionResolveFailure,
     cmd_delete,
     cmd_export,
     cmd_list,
@@ -151,7 +148,6 @@ class TestSessionOlderThanCutoff:
         old_file = tmp_path / 'old'
         old_file.mkdir()
         import os
-        import time
 
         # Set mtime to a very old value
         old_ts = 1000.0  # very old epoch

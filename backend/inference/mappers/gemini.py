@@ -255,6 +255,7 @@ def extract_generation_config(
         'logprobs',
         'top_logprobs',
         'n',
+        'timeout',
     ):
         kwargs.pop(unsupported_key, None)
     return model_name, gen_cfg, tools

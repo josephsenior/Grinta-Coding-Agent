@@ -907,9 +907,9 @@ async def test_terminal_input_post_read_uses_stored_cursor(mock_executor, tmp_pa
 
 
 def test_pty_output_transcript_caption_notes_no_new_bytes_when_flag_false() -> None:
-    from backend.cli.event_renderer import _pty_output_transcript_caption
+    from backend.cli._event_renderer.text_utils import pty_output_transcript_caption
 
-    cap = _pty_output_transcript_caption(
+    cap = pty_output_transcript_caption(
         session_id='t1',
         n_lines=5,
         truncated=False,

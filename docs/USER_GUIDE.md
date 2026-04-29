@@ -4,7 +4,8 @@ This guide reflects the current CLI-first Grinta workflow.
 
 Canonical startup:
 
-- CLI: `uv run python -m backend.cli.entry`
+- Installed CLI: `grinta`
+- Source checkout: `uv run python -m backend.cli.entry`
 
 ## Table of Contents
 
@@ -27,6 +28,16 @@ Canonical startup:
 
 ### Install
 
+For a normal user install:
+
+```bash
+pipx install grinta-ai
+grinta init
+grinta
+```
+
+For source development:
+
 ```bash
 uv sync
 ```
@@ -34,20 +45,20 @@ uv sync
 ### Create local settings
 
 ```bash
-cp settings.template.json settings.json
+uv run python -m backend.cli.entry init
 ```
 
 On Windows PowerShell:
 
 ```powershell
-Copy-Item settings.template.json settings.json
+uv run python -m backend.cli.entry init
 ```
 
 ---
 
 ## Configuration
 
-Grinta supports layered configuration, but the default local path uses `settings.json`.
+Grinta supports layered configuration. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override the settings root.
 
 ### Minimal settings.json
 
@@ -55,7 +66,7 @@ Grinta supports layered configuration, but the default local path uses `settings
 {
   "llm_provider": "openai",
   "llm_model": "openai/gpt-4o-mini",
-  "llm_api_key": "sk-...",
+  "llm_api_key": "${LLM_API_KEY}",
   "llm_base_url": ""
 }
 ```
@@ -64,13 +75,14 @@ Notes:
 
 - `llm_provider` can be omitted when `llm_model` includes a provider prefix.
 - `llm_base_url` is optional and useful for OpenAI-compatible proxies.
+- Put the real key in a sibling `.env` file or your shell environment as `LLM_API_KEY`.
 - Environment variables still work and can override advanced settings.
 
 Common environment variables:
 
 - `LLM_API_KEY`
 - `LLM_MODEL`
-- `APP_ROOT` (forces where `settings.json` is resolved)
+- `APP_ROOT` (intentionally overrides where `settings.json` is resolved)
 
 ### Pending actions and the terminal manager
 
@@ -123,11 +135,11 @@ Add tests for backend/inference/provider_resolver.py and run them.
 
 The agent will plan, execute tools, validate progress, and only finish when completion checks pass.
 
-### Project-local state
+### Runtime state
 
 Session and runtime state are stored under:
 
-- `.grinta/storage`
+- `~/.grinta/workspaces/<id>/storage`
 
 ---
 
@@ -142,7 +154,7 @@ OpenAI:
 ```json
 {
   "llm_model": "openai/gpt-4o-mini",
-  "llm_api_key": "sk-..."
+  "llm_api_key": "${LLM_API_KEY}"
 }
 ```
 
@@ -151,7 +163,7 @@ Anthropic:
 ```json
 {
   "llm_model": "anthropic/claude-sonnet-4-20250514",
-  "llm_api_key": "sk-ant-..."
+  "llm_api_key": "${LLM_API_KEY}"
 }
 ```
 
@@ -160,7 +172,7 @@ Google:
 ```json
 {
   "llm_model": "google/gemini-2.5-pro",
-  "llm_api_key": "AIza..."
+  "llm_api_key": "${LLM_API_KEY}"
 }
 ```
 

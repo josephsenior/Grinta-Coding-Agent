@@ -7,6 +7,11 @@ from backend.core.config.permissions_config import (
     RiskLevel,
 )
 
+
+def _assert_attrs(obj: object, expected: dict[str, object]) -> None:
+    for attr, value in expected.items():
+        assert getattr(obj, attr) == value
+
 # ── Enums ────────────────────────────────────────────────────────────
 
 
@@ -20,16 +25,17 @@ class TestRiskLevel:
 
 class TestPermissionCategory:
     def test_all_categories(self):
-        cats = {c.value for c in PermissionCategory}
-        assert 'file_read' in cats
-        assert 'file_write' in cats
-        assert 'file_delete' in cats
-        assert 'network' in cats
-        assert 'git' in cats
-        assert 'package' in cats
-        assert 'shell' in cats
-        assert 'system' in cats
-        assert 'browser' in cats
+        assert {category.value for category in PermissionCategory} == {
+            'file_read',
+            'file_write',
+            'file_delete',
+            'network',
+            'git',
+            'package',
+            'shell',
+            'system',
+            'browser',
+        }
 
 
 # ── PermissionRule ───────────────────────────────────────────────────
@@ -68,13 +74,18 @@ class TestPermissionRule:
 class TestPermissionsConfigDefaults:
     def test_default_values(self):
         config = PermissionsConfig()
-        assert config.autonomy_level == 'balanced'
-        assert config.file_operations_enabled is True
-        assert config.git_enabled is True
-        assert config.git_allow_force_push is False
-        assert config.shell_allow_sudo is False
-        assert config.system_operations_enabled is False
-        assert config.browser_enabled is True
+        _assert_attrs(
+            config,
+            {
+                'autonomy_level': 'balanced',
+                'file_operations_enabled': True,
+                'git_enabled': True,
+                'git_allow_force_push': False,
+                'shell_allow_sudo': False,
+                'system_operations_enabled': False,
+                'browser_enabled': True,
+            },
+        )
 
 
 # ── Presets ──────────────────────────────────────────────────────────

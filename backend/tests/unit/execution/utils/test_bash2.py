@@ -63,7 +63,7 @@ class TestSplitBashCommands:
         # Mock bashlex.parse to raise NotImplementedError
         cmd = 'some command'
         with patch(
-            'backend.execution.utils.bash.bashlex.parse',
+            'backend.execution.utils.bash_support.bashlex.parse',
             side_effect=NotImplementedError,
         ):
             result = split_bash_commands(cmd)
@@ -71,14 +71,17 @@ class TestSplitBashCommands:
 
     def test_parsing_type_error_returns_original(self):
         cmd = 'some command'
-        with patch('backend.execution.utils.bash.bashlex.parse', side_effect=TypeError):
+        with patch(
+            'backend.execution.utils.bash_support.bashlex.parse', side_effect=TypeError
+        ):
             result = split_bash_commands(cmd)
             assert result == [cmd]
 
     def test_parsing_attribute_error_returns_original(self):
         cmd = 'some command'
         with patch(
-            'backend.execution.utils.bash.bashlex.parse', side_effect=AttributeError
+            'backend.execution.utils.bash_support.bashlex.parse',
+            side_effect=AttributeError,
         ):
             result = split_bash_commands(cmd)
             assert result == [cmd]

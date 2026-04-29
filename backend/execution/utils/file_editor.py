@@ -6,50 +6,19 @@ validation, and atomic operations. Designed for production agent environments.
 
 from __future__ import annotations
 
-import difflib
-import hashlib
-import json
 import os
-import re
 from collections import defaultdict, deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from backend.execution.utils.file_editor_edit_mixin import FileEditorEditOpsMixin
-from backend.execution.utils.file_editor_edit_ops import (
-    apply_edit_logic as _apply_edit_logic_impl,
-    apply_format_edit as _apply_format_edit_impl,
-    apply_section_edit as _apply_section_edit_impl,
-    apply_str_replace as _apply_str_replace_impl,
-    apply_unified_patch as _apply_unified_patch_impl,
-    build_no_match_error as _build_no_match_error_impl,
-    closest_match_candidates as _closest_match_candidates_impl,
-    find_actual_substring_for_replace as _find_actual_substring_for_replace_impl,
-    find_actual_substring_regex as _find_actual_substring_regex_impl,
-    flex_quote_pattern as _flex_quote_pattern_impl,
-    fuzzy_safe_replace as _fuzzy_safe_replace_impl,
-    line_ending_for_content as _line_ending_for_content_impl,
-    map_normalized_offset_to_original as _map_normalized_offset_to_original_impl,
-    mutate_structured_data as _mutate_structured_data_impl,
-    normalize_whitespace_for_match as _normalize_whitespace_for_match_impl,
-    parse_structured_content as _parse_structured_content_impl,
-    preserve_quote_style_in_new_string as _preserve_quote_style_in_new_string_impl,
-    replace_range_guarded as _replace_range_guarded_impl,
-    resolve_edit_content as _resolve_edit_content_impl,
-    serialize_structured_content as _serialize_structured_content_impl,
-    sha256_text as _sha256_text_impl,
-    slice_text_by_line_range as _slice_text_by_line_range_impl,
-    structured_path_tokens as _structured_path_tokens_impl,
-    ws_tolerant_replace as _ws_tolerant_replace_impl,
-)
-
 from backend.core.type_safety.path_validation import (
     PathValidationError,
     SafePath,
 )
 from backend.core.type_safety.sentinels import MISSING, Sentinel, is_missing
+from backend.execution.utils.file_editor_edit_mixin import FileEditorEditOpsMixin
 
 
 @dataclass
@@ -84,6 +53,80 @@ _QUOTE_TRANSLATE = str.maketrans(
 def normalize_quotes(s: str) -> str:
     """Map typographic quotes to straight quotes (Claude Code normalizeQuotes)."""
     return s.translate(_QUOTE_TRANSLATE)
+
+
+def _compose_create_file_success_message(content: str) -> str:
+    preview_lines = content.splitlines()[:20]
+    preview_str = '\n'.join(
+        f'{i + 1}\t{line}' for i, line in enumerate(preview_lines)
+    )
+    if len(content.splitlines()) > 20:
+        preview_str += '\n...\n(File truncated)'
+    line_end_desc = '\\r\\n' if '\r\n' in content else '\\n'
+    return (
+        'File created successfully. '
+        f'Line endings: {line_end_desc}. File preview:\n{preview_str}'
+    )
+
+
+def _compose_write_success_message(
+    *,
+    is_create: bool,
+    content: str,
+    soft_warning: str,
+) -> str:
+    if is_create:
+        output_msg = _compose_create_file_success_message(content)
+    else:
+        output_msg = 'File written successfully'
+    if soft_warning:
+        output_msg = f'{output_msg}\n{soft_warning}'
+    return output_msg
+
+
+def _attempt_escape_repair_at_disk_write(content: str, file_path: Path) -> str:
+    """Scrub literal escape residue before bytes hit disk (no-op if repair unavailable)."""
+    try:
+        from backend.core.content_escape_repair import repair_literal_escapes
+        from backend.core.logger import app_logger as _disk_logger
+
+        report = repair_literal_escapes(content, file_path)
+        if report.changed:
+            _disk_logger.warning(
+                '[escape_repair:disk] %s: scrubbed %d literal escape sequences '
+                'at write time (upstream repair missed this path)',
+                file_path,
+                report.replacements,
+            )
+            return report.content
+    except Exception:
+        try:
+            from backend.core.logger import app_logger as _disk_logger
+
+            _disk_logger.debug(
+                'escape_repair disk safety-net failed', exc_info=True
+            )
+        except Exception:
+            pass
+    return content
+
+
+def _normalize_newlines_for_metadata(content: str, meta: _FileReadMeta) -> str:
+    if meta.newline == 'crlf':
+        return content.replace('\r\n', '\n').replace('\n', '\r\n')
+    return content
+
+
+def _encode_disk_payload(content: str, meta: _FileReadMeta) -> bytes:
+    if meta.encoding == 'utf-16-le':
+        return b'\xff\xfe' + content.encode('utf-16-le')
+    if meta.encoding == 'utf-16-be':
+        return b'\xfe\xff' + content.encode('utf-16-be')
+    if meta.encoding == 'utf-8-sig' or (meta.had_bom and meta.encoding == 'utf-8'):
+        return b'\xef\xbb\xbf' + content.encode('utf-8')
+    if meta.encoding == 'latin-1':
+        return content.encode('latin-1')
+    return content.encode('utf-8')
 
 
 class ToolError(Exception):
@@ -378,8 +421,6 @@ class FileEditor(FileEditorEditOpsMixin):
 
     def _view_directory(self, path: Path, max_depth: int = 2) -> ToolResult:
         """List directory contents."""
-        import os
-
         output = [f'Directory contents of {path}:']
         path_str = str(path)
         base_level = path_str.rstrip(os.sep).count(os.sep)
@@ -595,6 +636,113 @@ class FileEditor(FileEditorEditOpsMixin):
             new_content=new_content,
         )
 
+    def _handle_write_maybe_short_circuit(
+        self,
+        *,
+        file_path: Path,
+        content: str,
+        old_content: str | None,
+        file_existed: bool,
+        is_create: bool,
+        dry_run: bool,
+    ) -> ToolResult | None:
+        """Early exits before validation / disk write."""
+        if is_create and file_existed:
+            # ``create_file`` on an already-existing file always returns
+            # silent success WITHOUT overwriting.  Agents should use
+            # ``str_replace`` to edit existing files.  Returning
+            # old==new lets the stuck-detector recognise repeated
+            # no-change create attempts and nudge the model forward.
+            return ToolResult(
+                output='File created successfully',
+                old_content=old_content,
+                new_content=old_content,
+            )
+        if dry_run:
+            return ToolResult(
+                output='Preview generated (no changes applied)',
+                old_content=old_content,
+                new_content=content,
+            )
+        if file_existed and old_content == content:
+            return ToolResult(
+                output='No changes applied (content unchanged).',
+                old_content=old_content,
+                new_content=content,
+            )
+        return None
+
+    def _handle_write_commit(
+        self,
+        *,
+        file_path: Path,
+        content: str,
+        old_content: str | None,
+        file_existed: bool,
+        is_create: bool,
+    ) -> ToolResult:
+        """Validate, detect stale disk, backup, undo snapshot, atomic write."""
+        is_valid, msg = self._maybe_validate_syntax_for_file(file_path, content)
+        if not is_valid:
+            return ToolResult(
+                output='',
+                error=f'Syntax validation failed: {msg}',
+                old_content=old_content,
+                new_content=content,
+            )
+        soft_warning = msg if msg and msg.startswith('WARNING:') else ''
+
+        stale = self._detect_stale_disk_on_write(
+            file_path=file_path,
+            file_existed=file_existed,
+            old_content=old_content,
+            new_content=content,
+        )
+        if stale is not None:
+            return stale
+
+        if self._transaction_stack:
+            self._backup_file(file_path, old_content)
+
+        self._push_undo_snapshot(file_path, old_content)
+
+        self._write_file(file_path, content)
+
+        output_msg = _compose_write_success_message(
+            is_create=is_create,
+            content=content,
+            soft_warning=soft_warning,
+        )
+
+        return ToolResult(
+            output=output_msg,
+            old_content=old_content,
+            new_content=content,
+        )
+
+    def _detect_stale_disk_on_write(
+        self,
+        *,
+        file_path: Path,
+        file_existed: bool,
+        old_content: str | None,
+        new_content: str,
+    ) -> ToolResult | None:
+        if not file_existed or old_content is None:
+            return None
+        disk_now = self._read_file(file_path)
+        if disk_now == old_content:
+            return None
+        return ToolResult(
+            output='',
+            error=(
+                'FILE_UNEXPECTEDLY_MODIFIED: file changed on disk since it was read. '
+                'Re-read the file and retry the write.'
+            ),
+            old_content=old_content,
+            new_content=new_content,
+        )
+
     def _handle_write(
         self,
         file_path: Path,
@@ -617,86 +765,23 @@ class FileEditor(FileEditorEditOpsMixin):
             if file_existed:
                 old_content = self._read_file(file_path)
 
-            if is_create and file_existed:
-                # ``create_file`` on an already-existing file always returns
-                # silent success WITHOUT overwriting.  Agents should use
-                # ``str_replace`` to edit existing files.  Returning
-                # old==new lets the stuck-detector recognise repeated
-                # no-change create attempts and nudge the model forward.
-                return ToolResult(
-                    output='File created successfully',
-                    old_content=old_content,
-                    new_content=old_content,
-                )
-
-            if dry_run:
-                output_msg = 'Preview generated (no changes applied)'
-                return ToolResult(
-                    output=output_msg,
-                    old_content=old_content,
-                    new_content=content,
-                )
-
-            if file_existed and old_content == content:
-                return ToolResult(
-                    output='No changes applied (content unchanged).',
-                    old_content=old_content,
-                    new_content=content,
-                )
-
-            # Validate syntax where possible before writing to avoid introducing
-            # syntax errors into the repository.
-            is_valid, msg = self._maybe_validate_syntax_for_file(file_path, content)
-            if not is_valid:
-                return ToolResult(
-                    output='',
-                    error=f'Syntax validation failed: {msg}',
-                    old_content=old_content,
-                    new_content=content,
-                )
-            soft_warning = msg if msg and msg.startswith('WARNING:') else ''
-
-            if file_existed and old_content is not None:
-                disk_now = self._read_file(file_path)
-                if disk_now != old_content:
-                    return ToolResult(
-                        output='',
-                        error=(
-                            'FILE_UNEXPECTEDLY_MODIFIED: file changed on disk since it was read. '
-                            'Re-read the file and retry the write.'
-                        ),
-                        old_content=old_content,
-                        new_content=content,
-                    )
-
-            # Backup original if in transaction
-            if self._transaction_stack:
-                self._backup_file(file_path, old_content)
-
-            self._push_undo_snapshot(file_path, old_content)
-
-            self._write_file(file_path, content)
-
-            # Use appropriate message based on command and whether file existed
-            if is_create:
-                preview_lines = content.splitlines()[:20]
-                preview_str = '\n'.join(
-                    f'{i + 1}\t{line}' for i, line in enumerate(preview_lines)
-                )
-                if len(content.splitlines()) > 20:
-                    preview_str += '\n...\n(File truncated)'
-                le = '\\r\\n' if '\r\n' in content else '\\n'
-                output_msg = f'File created successfully. Line endings: {le}. File preview:\n{preview_str}'
-            else:
-                output_msg = 'File written successfully'
-
-            if soft_warning:
-                output_msg = f'{output_msg}\n{soft_warning}'
-
-            return ToolResult(
-                output=output_msg,
+            short = self._handle_write_maybe_short_circuit(
+                file_path=file_path,
+                content=content,
                 old_content=old_content,
-                new_content=content,
+                file_existed=file_existed,
+                is_create=is_create,
+                dry_run=dry_run,
+            )
+            if short is not None:
+                return short
+
+            return self._handle_write_commit(
+                file_path=file_path,
+                content=content,
+                old_content=old_content,
+                file_existed=file_existed,
+                is_create=is_create,
             )
 
         except Exception as e:
@@ -755,51 +840,12 @@ class FileEditor(FileEditorEditOpsMixin):
         if meta is None:
             meta = _FileReadMeta(encoding='utf-8', newline='lf', had_bom=False)
 
-        # Last-chance safety net: if any tool path that bypassed the
-        # tool-handler-level repair (e.g. a non-standard entry point, or
-        # content assembled in-process) still has literal escape residue,
-        # scrub it here before the bytes hit disk. No-op on unaffected
-        # content / file types.
-        try:
-            from backend.core.content_escape_repair import repair_literal_escapes
-            from backend.core.logger import app_logger as _disk_logger
-
-            report = repair_literal_escapes(content, file_path)
-            if report.changed:
-                _disk_logger.warning(
-                    '[escape_repair:disk] %s: scrubbed %d literal escape sequences '
-                    'at write time (upstream repair missed this path)',
-                    file_path,
-                    report.replacements,
-                )
-                content = report.content
-        except Exception:
-            try:
-                from backend.core.logger import app_logger as _disk_logger
-
-                _disk_logger.debug(
-                    'escape_repair disk safety-net failed', exc_info=True
-                )
-            except Exception:
-                pass
-
-        if meta.newline == 'crlf':
-            content = content.replace('\r\n', '\n').replace('\n', '\r\n')
+        # Last-chance safety net: scrub literal escape residue before bytes hit disk.
+        content = _attempt_escape_repair_at_disk_write(content, file_path)
+        content = _normalize_newlines_for_metadata(content, meta)
+        data = _encode_disk_payload(content, meta)
 
         try:
-            if meta.encoding == 'utf-16-le':
-                data = b'\xff\xfe' + content.encode('utf-16-le')
-            elif meta.encoding == 'utf-16-be':
-                data = b'\xfe\xff' + content.encode('utf-16-be')
-            elif meta.encoding == 'utf-8-sig' or (
-                meta.had_bom and meta.encoding == 'utf-8'
-            ):
-                data = b'\xef\xbb\xbf' + content.encode('utf-8')
-            elif meta.encoding == 'latin-1':
-                data = content.encode('latin-1')
-            else:
-                data = content.encode('utf-8')
-
             temp_path.write_bytes(data)
             temp_path.replace(file_path)
         except Exception:

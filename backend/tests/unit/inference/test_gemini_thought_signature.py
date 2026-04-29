@@ -19,6 +19,40 @@ from backend.inference.mappers.gemini import (
     extract_tool_calls,
 )
 
+
+def _assert_text_history_part(entry: dict[str, object], *, role: str, text: str) -> None:
+    assert entry['role'] == role
+    part = entry['parts'][0]
+    assert part['text'] == text
+
+
+def _assert_function_call_history_part(
+    entry: dict[str, object],
+    *,
+    role: str,
+    name: str,
+    args: dict[str, object],
+    signature: bytes,
+) -> None:
+    assert entry['role'] == role
+    part = entry['parts'][0]
+    assert part['function_call']['name'] == name
+    assert part['function_call']['args'] == args
+    assert part['thought_signature'] == signature
+
+
+def _assert_function_response_history_part(
+    entry: dict[str, object],
+    *,
+    role: str,
+    name: str,
+    output: str,
+) -> None:
+    assert entry['role'] == role
+    part = entry['parts'][0]
+    assert part['function_response']['name'] == name
+    assert part['function_response']['response']['output'] == output
+
 # ---------------------------------------------------------------------------
 # Stub objects mimicking google-genai SDK shape
 # ---------------------------------------------------------------------------
@@ -215,23 +249,21 @@ class TestConvertMessagesNativeToolHistory:
         sysi, hist, _ = convert_messages(messages)
 
         assert sysi == 'sys'
-        # Expect: user, model(function_call+sig), user(function_response), user
-        assert hist[0]['role'] == 'user'
-        assert hist[0]['parts'][0]['text'] == 'find foo'
-
-        assert hist[1]['role'] == 'model'
-        fc_part = hist[1]['parts'][0]
-        assert fc_part['function_call']['name'] == 'grep'
-        assert fc_part['function_call']['args'] == {'pattern': 'foo'}
-        assert fc_part['thought_signature'] == sig
-
-        assert hist[2]['role'] == 'user'
-        fr_part = hist[2]['parts'][0]
-        assert fr_part['function_response']['name'] == 'grep'
-        assert fr_part['function_response']['response']['output'] == 'match: foo'
-
-        assert hist[3]['role'] == 'user'
-        assert hist[3]['parts'][0]['text'] == 'continue'
+        _assert_text_history_part(hist[0], role='user', text='find foo')
+        _assert_function_call_history_part(
+            hist[1],
+            role='model',
+            name='grep',
+            args={'pattern': 'foo'},
+            signature=sig,
+        )
+        _assert_function_response_history_part(
+            hist[2],
+            role='user',
+            name='grep',
+            output='match: foo',
+        )
+        _assert_text_history_part(hist[3], role='user', text='continue')
 
     def test_plain_text_messages_unchanged(self):
         messages = [

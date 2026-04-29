@@ -15,6 +15,18 @@ class _Safety:
         return True, actions
 
 
+def _assert_stream_chunk(
+    chunk,
+    *,
+    expected_chunk: str,
+    expected_accumulated: str,
+    expected_final: bool,
+) -> None:
+    assert chunk.chunk == expected_chunk
+    assert chunk.accumulated == expected_accumulated
+    assert chunk.is_final is expected_final
+
+
 def _planner_with_checkpoint_policy(
     *,
     max_age: float = 300.0,
@@ -167,18 +179,23 @@ def test_async_execute_emits_real_streaming_chunks(monkeypatch):
     # Check that the chunks were real streaming tokens
     calls = event_stream.add_event.call_args_list
     chunks = [c[0][0] for c in calls]
-
-    # First 4 are content chunks
-    assert chunks[0].chunk == 'Hello'
-    assert chunks[1].chunk == ', '
-    assert chunks[2].chunk == 'world'
-    assert chunks[3].chunk == '!'
-    assert chunks[3].accumulated == 'Hello, world!'
-    assert not chunks[3].is_final
-
-    # Last is the final marker
-    assert chunks[4].is_final
-    assert chunks[4].accumulated == 'Hello, world!'
+    for chunk, (expected_chunk, expected_accumulated, expected_final) in zip(
+        chunks,
+        [
+            ('Hello', 'Hello', False),
+            (', ', 'Hello, ', False),
+            ('world', 'Hello, world', False),
+            ('!', 'Hello, world!', False),
+            ('', 'Hello, world!', True),
+        ],
+        strict=True,
+    ):
+        _assert_stream_chunk(
+            chunk,
+            expected_chunk=expected_chunk,
+            expected_accumulated=expected_accumulated,
+            expected_final=expected_final,
+        )
 
 
 def test_async_execute_accumulates_tool_calls(monkeypatch):

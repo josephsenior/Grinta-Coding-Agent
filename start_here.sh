@@ -40,8 +40,7 @@ echo -e "${GREEN}✅ uv found!${NC}"
 
 # Step 1: Configuration
 if [ ! -f "settings.json" ]; then
-    echo -e "${CYAN}📝 Creating settings.json from template...${NC}"
-    cp settings.template.json settings.json
+    echo -e "${CYAN}📝 No settings.json found. Run uv run python -m backend.cli.entry init after dependencies sync if configuration is needed.${NC}"
 fi
 
 # Step 2: Install dependencies
@@ -54,7 +53,7 @@ uv run python3 -m backend.llm.discover_models aliases
 echo -e "${GREEN}✅ Model discovery complete.${NC}"
 
 echo -e "\n${GREEN}✅ Setup complete! Launching Grinta CLI...${NC}"
-echo -e "${CYAN}   Project-local state will be stored under .grinta/storage.${NC}"
+echo -e "${CYAN}   Runtime state will be stored under ~/.grinta/workspaces/<id>/storage.${NC}"
 echo ""
 
 uv run python -m backend.cli.entry

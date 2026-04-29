@@ -17,7 +17,11 @@ from rich.text import Text
 
 from backend.cli._event_renderer.constants import (
     INTERNAL_THINK_TAG_RE as _INTERNAL_THINK_TAG_RE,
+)
+from backend.cli._event_renderer.constants import (
     THINK_RESULT_JSON_RE as _THINK_RESULT_JSON_RE,
+)
+from backend.cli._event_renderer.constants import (
     TOOL_RESULT_TAG_RE as _TOOL_RESULT_TAG_RE,
 )
 from backend.cli._event_renderer.delegate import (
@@ -25,7 +29,11 @@ from backend.cli._event_renderer.delegate import (
 )
 from backend.cli._event_renderer.text_utils import (
     sanitize_visible_transcript_text as _sanitize_visible_transcript_text,
+)
+from backend.cli._event_renderer.text_utils import (
     show_reasoning_text as _show_reasoning_text,
+)
+from backend.cli._event_renderer.text_utils import (
     sync_reasoning_after_tool_line as _sync_reasoning_after_tool_line,
 )
 from backend.cli.layout_tokens import (

@@ -1,4 +1,9 @@
-"""Persistent retry queue with an in-memory backend."""
+"""Autonomous recovery retry queue with an in-memory backend.
+
+Scheduled retry metadata is process-local by design. If the CLI process exits
+or crashes before a retry fires, pending retry metadata is lost and the next run
+resumes from the durable event/session state instead.
+"""
 
 from __future__ import annotations
 
@@ -157,7 +162,7 @@ class InMemoryRetryBackend(BaseRetryBackend):
 
 
 class RetryQueue:
-    """High-level retry queue wrapper with automatic backend selection."""
+    """High-level process-local retry queue wrapper."""
 
     def __init__(
         self,
@@ -242,12 +247,12 @@ def get_retry_queue() -> RetryQueue | None:
 
     if backend_name not in ('', 'memory'):
         logger.warning(
-            'RetryQueue backend %s is no longer supported; using in-memory backend',
+            'RetryQueue backend %s is no longer supported; retry metadata is process-local',
             backend_name,
         )
 
     backend: BaseRetryBackend = InMemoryRetryBackend()
-    logger.info('RetryQueue using in-memory backend')
+    logger.info('RetryQueue using process-local in-memory backend')
 
     _retry_queue = RetryQueue(
         backend,

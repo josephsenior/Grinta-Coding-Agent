@@ -12,6 +12,7 @@ import pytest
 from backend.inference.direct_clients import (
     LLMResponse,
     _pool_key,
+    aclose_shared_http_clients,
     get_direct_client,
     get_shared_async_http_client,
     get_shared_http_client,
@@ -122,6 +123,59 @@ class TestSharedHttpClients:
         assert client is not None
         client2 = get_shared_async_http_client('test_provider_async', 'http://test')
         assert client is client2
+
+    @pytest.mark.asyncio
+    async def test_aclose_shared_clients_clears_pools(self):
+        sync_client = get_shared_http_client('test_provider_close', 'http://test')
+        async_client = get_shared_async_http_client(
+            'test_provider_close_async', 'http://test'
+        )
+
+        await aclose_shared_http_clients()
+
+        assert get_shared_http_client('test_provider_close', 'http://test') is not sync_client
+        assert (
+            get_shared_async_http_client('test_provider_close_async', 'http://test')
+            is not async_client
+        )
+        await aclose_shared_http_clients()
+
+    def test_openai_client_applies_default_timeout(self):
+        from backend.inference.direct_clients import OpenAIClient
+
+        with (
+            patch('backend.inference.direct_clients.OpenAI'),
+            patch('backend.inference.direct_clients.AsyncOpenAI'),
+            patch('backend.inference.direct_clients._openai_completion') as completion,
+        ):
+            client = OpenAIClient('gpt-4o', 'sk-test', timeout=12)
+            client.completion(messages=[])
+
+        assert completion.call_args.kwargs['timeout'] == 12.0
+
+    def test_anthropic_client_applies_default_timeout(self):
+        from backend.inference.direct_clients import AnthropicClient
+
+        with (
+            patch('backend.inference.direct_clients.Anthropic'),
+            patch('backend.inference.direct_clients.AsyncAnthropic'),
+            patch('backend.inference.direct_clients._anthropic_completion') as completion,
+        ):
+            client = AnthropicClient('claude-3', 'sk-test', timeout=9)
+            client.completion(messages=[])
+
+        assert completion.call_args.kwargs['timeout'] == 9.0
+
+    def test_gemini_client_uses_configured_timeout_ms(self):
+        from backend.inference.direct_clients import GeminiClient
+
+        with (
+            patch('google.genai.types.HttpOptions') as http_options,
+            patch('backend.inference.direct_clients.genai.Client'),
+        ):
+            GeminiClient('gemini-2.5-pro', 'key', timeout=7)
+
+        http_options.assert_called_once_with(timeout=7000)
 
 
 # ---------------------------------------------------------------------------

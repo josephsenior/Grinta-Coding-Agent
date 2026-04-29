@@ -7,10 +7,12 @@ LLM wouldn't otherwise know about.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import ast
 import os
 import re
+import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 from backend.engine.tools.ignore_filter import (
@@ -93,41 +95,47 @@ def create_analyze_project_structure_tool() -> dict:
     }
 
 
+def _analyze_depth(arguments: dict) -> int:
+    try:
+        return int(arguments.get('depth', 1))
+    except (ValueError, TypeError):
+        return 1
+
+
 def build_analyze_project_structure_action(
     arguments: dict,
 ) -> AgentThinkAction:
     """Build the action for the analyze_project_structure tool call."""
     command = arguments.get('command', 'tree')
     path = arguments.get('path', '.')
-    try:
-        depth = int(arguments.get('depth', 1))
-    except (ValueError, TypeError):
-        depth = 1
+    depth = _analyze_depth(arguments)
 
-    if command == 'tree':
-        return _build_tree_action(path, depth)
-    if command == 'imports':
-        return _build_imports_action(path)
-    if command == 'symbols':
-        return _build_symbols_action(path)
-    if command == 'file_outline':
-        return _build_file_outline_action(path)
-    if command == 'recent':
-        return _build_recent_action()
     if command == 'callers':
         if not (symbol := arguments.get('symbol', '')):
             return AgentThinkAction(
                 thought="[ANALYZE_PROJECT_STRUCTURE] 'callers' requires the 'symbol' parameter (function/class name to search for)."
             )
         return _build_callers_action(symbol, path)
-    if command == 'test_coverage':
-        return _build_test_coverage_action(path)
+
     if command == 'semantic_search':
         if not (symbol := arguments.get('symbol', '')):
             return AgentThinkAction(
                 thought="[ANALYZE_PROJECT_STRUCTURE] 'semantic_search' requires the 'symbol' parameter."
             )
         return _build_semantic_search_action(symbol, path)
+
+    handlers: dict[str, Callable[[], AgentThinkAction]] = {
+        'tree': lambda: _build_tree_action(path, depth),
+        'imports': lambda: _build_imports_action(path),
+        'symbols': lambda: _build_symbols_action(path),
+        'file_outline': lambda: _build_file_outline_action(path),
+        'recent': lambda: _build_recent_action(),
+        'test_coverage': lambda: _build_test_coverage_action(path),
+    }
+
+    if command in handlers:
+        return handlers[command]()
+
     return AgentThinkAction(
         thought=(
             f'[ANALYZE_PROJECT_STRUCTURE] Unknown command: {command}. '
@@ -162,10 +170,260 @@ def _sorted_tree_files(filenames: list[str]) -> list[str]:
     )
 
 
+def _class_outline_line(node: ast.ClassDef, methods: list[str]) -> str:
+    if methods:
+        head = ', '.join(methods[:3])
+        if len(methods) > 3:
+            head = f'{head}...'
+        return f'      class {node.name} (methods: {head})'
+    return f'      class {node.name}'
+
+
+def _imports_forward_block(path: str) -> list[str]:
+    """Lines describing import/from statements in ``path`` (lines only)."""
+    out: list[str] = []
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding='utf-8', errors='ignore') as f:
+                for i, line in enumerate(f, 1):
+                    if line.startswith('import ') or line.startswith('from '):
+                        out.append(f'{i}:{line.rstrip()}')
+        except Exception as e:
+            out.append(f'(error reading file: {e})')
+    else:
+        out.append('(file not found)')
+    return out
+
+
+def _imports_reverse_via_rg(basename: str) -> list[str] | None:
+    """Return importer paths from ripgrep when it finds hits; otherwise ``None``."""
+    rg = shutil.which('rg')
+    if not rg:
+        return None
+    try:
+        res = subprocess.run(
+            [
+                rg,
+                '-l',
+                f'(import|from).*{basename}',
+                '--type',
+                'py',
+                '--glob',
+                '!__pycache__',
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.stdout.strip():
+            return res.stdout.splitlines()[:30]
+    except Exception:
+        pass
+    return None
+
+
+def _imports_reverse_via_walk(basename: str) -> list[str]:
+    """Python traversal fallback for reverse-import search."""
+    import_re = re.compile(f'(import|from).*{re.escape(basename)}')
+    root = os.getcwd()
+    spec = get_ignore_spec(root)
+    lines: list[str] = []
+    count = 0
+    for root_dir, dirs, files in os.walk('.'):
+        prune_ignored_dirs(root, root_dir, dirs, spec)
+
+        for f in files:
+            if f.endswith('.py'):
+                if is_ignored_file(root, root_dir, f, spec):
+                    continue
+                fpath = os.path.join(root_dir, f)
+                try:
+                    with open(fpath, encoding='utf-8', errors='ignore') as fl:
+                        if import_re.search(fl.read()):
+                            lines.append(fpath)
+                            count += 1
+                            if count >= 30:
+                                break
+                except Exception:
+                    pass
+            if count >= 30:
+                break
+        if count >= 30:
+            break
+    return lines
+
+
+def _ast_func_outline_signature(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+    indent: str,
+) -> str:
+    pref = 'async def' if isinstance(node, ast.AsyncFunctionDef) else 'def'
+    try:
+        args_s = ast.unparse(node.args)
+    except Exception:
+        args_s = '(...)'
+    ret = ''
+    if node.returns is not None:
+        try:
+            ret = ' -> ' + ast.unparse(node.returns)
+        except Exception:
+            ret = ' -> ...'
+    return f'{indent}{pref} {node.name}{args_s}{ret}'
+
+
+def _outline_append_assign_targets(node: ast.Assign) -> list[str]:
+    lines: list[str] = []
+    for t in node.targets:
+        if isinstance(t, ast.Name) and not t.id.startswith('_'):
+            try:
+                lines.append(f'{t.id} = …')
+            except Exception:
+                lines.append('(assignment)')
+            break
+    return lines
+
+
+def _outline_class_body_lines(class_node: ast.ClassDef, start_count: int, max_lines: int) -> tuple[list[str], int]:
+    out: list[str] = [f'class {class_node.name}']
+    count = start_count + 1
+    for item in class_node.body:
+        if count >= max_lines:
+            break
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if item.name.startswith('__') and item.name not in (
+                '__init__',
+                '__new__',
+            ):
+                continue
+            out.append(_ast_func_outline_signature(item, '  '))
+            count += 1
+    return out, count
+
+
+def _python_outline_lines_from_ast(
+    tree: ast.Module,
+    *,
+    max_lines: int = 200,
+) -> list[str]:
+    """Outline body lines after header for parsed Python (may truncate)."""
+    out: list[str] = []
+    count = 0
+    for node in tree.body:
+        if count >= max_lines:
+            out.append('… (truncated)')
+            break
+        if isinstance(node, ast.ClassDef):
+            cls_lines, count = _outline_class_body_lines(node, count, max_lines)
+            out.extend(cls_lines)
+            continue
+
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if not node.name.startswith('_'):
+                out.append(_ast_func_outline_signature(node, ''))
+                count += 1
+            continue
+
+        if isinstance(node, ast.Assign):
+            assign_lines = _outline_append_assign_targets(node)
+            out.extend(assign_lines)
+            if assign_lines:
+                count += 1
+            continue
+
+    return out
+
+
+def _callers_lines_via_rg(symbol: str, safe_scope: str) -> list[str] | None:
+    """Return rg output lines only when rg finds matches."""
+    rg = shutil.which('rg')
+    if not rg:
+        return None
+    try:
+        res = subprocess.run(
+            [
+                rg,
+                '-n',
+                '--word-regexp',
+                symbol,
+                '--type',
+                'py',
+                '--type',
+                'js',
+                '--type',
+                'ts',
+                '--glob',
+                '!__pycache__',
+                '--glob',
+                '!node_modules',
+                '--glob',
+                '!.git',
+                safe_scope,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if res.stdout.strip():
+            return res.stdout.splitlines()[:50]
+    except Exception:
+        pass
+    return None
+
+
+def _gather_caller_hits_in_file(
+    fpath: str,
+    sym_re: re.Pattern[str],
+    lines: list[str],
+    count: int,
+    *,
+    limit: int = 50,
+) -> int:
+    """Append matches from ``fpath`` until ``limit`` total hits."""
+    try:
+        with open(fpath, encoding='utf-8', errors='ignore') as fl:
+            for i, line in enumerate(fl, 1):
+                if sym_re.search(line):
+                    lines.append(f'{fpath}:{i}:{line.rstrip()}')
+                    count += 1
+                    if count >= limit:
+                        return count
+    except Exception:
+        pass
+    return count
+
+
+def _callers_lines_via_walk(
+    *,
+    symbol: str,
+    safe_scope: str,
+) -> tuple[list[str], int]:
+    """Walk files for symbol references."""
+    sym_re = re.compile(r'\b' + re.escape(symbol) + r'\b')
+    lines: list[str] = []
+    count = 0
+    root = os.path.abspath('.')
+    spec = get_ignore_spec(root)
+    for root_dir, dirs, files in os.walk(safe_scope):
+        prune_ignored_dirs(root, root_dir, dirs, spec)
+
+        for f in files:
+            if is_ignored_file(root, root_dir, f, spec):
+                continue
+            if f.endswith(('.py', '.js', '.ts', '.tsx', '.jsx')):
+                fpath = os.path.join(root_dir, f)
+                count = _gather_caller_hits_in_file(fpath, sym_re, lines, count)
+                if count >= 50:
+                    break
+            if count >= 50:
+                break
+        if count >= 50:
+            break
+    return lines, count
+
+
 def _extract_ast_summary(filepath: str) -> list[str]:
     if not filepath.endswith('.py'):
         return []
-    import ast
 
     try:
         with open(filepath, 'r', encoding='utf-8') as file_handle:
@@ -183,12 +441,7 @@ def _extract_ast_summary(filepath: str) -> list[str]:
                 if isinstance(method, ast.FunctionDef)
                 and not method.name.startswith('__')
             ]
-            if methods:
-                symbols.append(
-                    f'      class {node.name} (methods: {", ".join(methods[:3])}{"..." if len(methods) > 3 else ""})'
-                )
-            else:
-                symbols.append(f'      class {node.name}')
+            symbols.append(_class_outline_line(node, methods))
             continue
         if isinstance(node, ast.FunctionDef) and not node.name.startswith('_'):
             symbols.append(f'      def {node.name}')
@@ -396,80 +649,21 @@ def _build_tree_action(path: str, depth: int) -> AgentThinkAction:
 def _build_imports_action(path: str) -> AgentThinkAction:
     """Show what a file imports AND what other files import it."""
     out = [f'=== IMPORTS IN {os.path.basename(path)} ===']
-    if os.path.isfile(path):
-        try:
-            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                for i, line in enumerate(f, 1):
-                    if line.startswith('import ') or line.startswith('from '):
-                        out.append(f'{i}:{line.rstrip()}')
-        except Exception as e:
-            out.append(f'(error reading file: {e})')
-    else:
-        out.append('(file not found)')
-
+    out.extend(_imports_forward_block(path))
     out.append('')
     out.append('=== FILES THAT IMPORT THIS MODULE ===')
     basename = os.path.splitext(os.path.basename(path))[0]
 
-    # Try ripgrep first
-    import shutil
+    rg_hits = _imports_reverse_via_rg(basename)
+    if rg_hits is not None:
+        out.extend(rg_hits)
+        return AgentThinkAction(thought='\n'.join(out))
 
-    rg = shutil.which('rg')
-    found_any = False
-
-    if rg:
-        try:
-            res = subprocess.run(
-                [
-                    rg,
-                    '-l',
-                    f'(import|from).*{basename}',
-                    '--type',
-                    'py',
-                    '--glob',
-                    '!__pycache__',
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if res.stdout.strip():
-                lines = res.stdout.splitlines()[:30]
-                out.extend(lines)
-                found_any = bool(lines)
-        except Exception:
-            pass
-
-    if not found_any:
-        # Fallback to python traversal
-        count = 0
-        import_re = re.compile(f'(import|from).*{re.escape(basename)}')
-        root = os.getcwd()  # Or some relevant root
-        spec = get_ignore_spec(root)
-
-        for root_dir, dirs, files in os.walk('.'):
-            # Use same robust filtering
-            prune_ignored_dirs(root, root_dir, dirs, spec)
-
-            for f in files:  # type: ignore
-                if f.endswith('.py'):  # type: ignore
-                    if is_ignored_file(root, root_dir, f, spec):  # type: ignore
-                        continue
-                    fpath = os.path.join(root_dir, f)  # type: ignore
-                    try:
-                        with open(fpath, 'r', encoding='utf-8', errors='ignore') as fl:
-                            if import_re.search(fl.read()):
-                                out.append(fpath)
-                                count += 1
-                                if count >= 30:
-                                    break
-                    except Exception:
-                        pass
-            if count >= 30:
-                break
-        if count == 0:
-            out.append('(no reverse imports found)')
-
+    walk_hits = _imports_reverse_via_walk(basename)
+    if walk_hits:
+        out.extend(walk_hits)
+    else:
+        out.append('(no reverse imports found)')
     return AgentThinkAction(thought='\n'.join(out))
 
 
@@ -482,8 +676,6 @@ def _build_file_outline_action(path: str) -> AgentThinkAction:
         return AgentThinkAction(thought='\n'.join(out))
 
     if path.endswith('.py'):
-        import ast
-
         try:
             src = Path(path).read_text(encoding='utf-8', errors='ignore')
             tree = ast.parse(src)
@@ -493,53 +685,7 @@ def _build_file_outline_action(path: str) -> AgentThinkAction:
                 thought='\n'.join(out + _file_outline_fallback_lines(path))
             )
 
-        def fmt_func(node: ast.FunctionDef | ast.AsyncFunctionDef, indent: str) -> str:
-            pref = 'async def' if isinstance(node, ast.AsyncFunctionDef) else 'def'
-            try:
-                args_s = ast.unparse(node.args)
-            except Exception:
-                args_s = '(...)'
-            ret = ''
-            if node.returns is not None:
-                try:
-                    ret = ' -> ' + ast.unparse(node.returns)
-                except Exception:
-                    ret = ' -> ...'
-            return f'{indent}{pref} {node.name}{args_s}{ret}'
-
-        count = 0
-        max_lines = 200
-        for node in tree.body:
-            if count >= max_lines:
-                out.append('… (truncated)')
-                break
-            if isinstance(node, ast.ClassDef):
-                out.append(f'class {node.name}')
-                count += 1
-                for item in node.body:
-                    if count >= max_lines:
-                        break
-                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        if item.name.startswith('__') and item.name not in (
-                            '__init__',
-                            '__new__',
-                        ):
-                            continue
-                        out.append(fmt_func(item, '  '))
-                        count += 1
-            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if not node.name.startswith('_'):
-                    out.append(fmt_func(node, ''))
-                    count += 1
-            elif isinstance(node, ast.Assign):
-                for t in node.targets:
-                    if isinstance(t, ast.Name) and not t.id.startswith('_'):
-                        try:
-                            out.append(f'{t.id} = …')
-                        except Exception:
-                            out.append('(assignment)')
-                        count += 1
-                        break
+        out.extend(_python_outline_lines_from_ast(tree))
         if len(out) <= 1:
             out.append('(no outline entries)')
         return AgentThinkAction(thought='\n'.join(out))
@@ -614,72 +760,17 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
     trunc_sym = f'{symbol[:40]}…' if len(symbol) > 40 else symbol
     out = [f'=== CALLERS OF {trunc_sym} ===']
 
-    import shutil
-
-    rg = shutil.which('rg')
     safe_scope = scope if scope and scope != '.' else '.'
-    root = os.path.abspath('.')
-    spec = get_ignore_spec(root)
+    rg_lines = _callers_lines_via_rg(symbol, safe_scope)
+    if rg_lines is not None:
+        out.extend(rg_lines)
+        return AgentThinkAction(thought='\n'.join(out))
 
-    if rg:
-        try:
-            res = subprocess.run(
-                [
-                    rg,
-                    '-n',
-                    '--word-regexp',
-                    symbol,
-                    '--type',
-                    'py',
-                    '--type',
-                    'js',
-                    '--type',
-                    'ts',
-                    # relies on .gitignore, but add failsafes
-                    '--glob',
-                    '!__pycache__',
-                    '--glob',
-                    '!node_modules',
-                    '--glob',
-                    '!.git',
-                    safe_scope,
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if res.stdout.strip():
-                out.extend(res.stdout.splitlines()[:50])
-                return AgentThinkAction(thought='\n'.join(out))
-        except Exception:
-            pass
-
-    # Python fallback
-    sym_re = re.compile(rf'\b{re.escape(symbol)}\b')
-    count = 0
-    for root_dir, dirs, files in os.walk(safe_scope):
-        prune_ignored_dirs(root, root_dir, dirs, spec)
-
-        for f in files:
-            if is_ignored_file(root, root_dir, f, spec):
-                continue
-            if f.endswith(('.py', '.js', '.ts', '.tsx', '.jsx')):
-                fpath = os.path.join(root_dir, f)
-                try:
-                    with open(fpath, 'r', encoding='utf-8', errors='ignore') as fl:
-                        for i, line in enumerate(fl, 1):
-                            if sym_re.search(line):
-                                out.append(f'{fpath}:{i}:{line.rstrip()}')
-                                count += 1
-                                if count >= 50:
-                                    break
-                except Exception:
-                    pass
-            if count >= 50:
-                break
-        if count >= 50:
-            break
-
+    walk_lines, count = _callers_lines_via_walk(
+        symbol=symbol,
+        safe_scope=safe_scope,
+    )
+    out.extend(walk_lines)
     if count == 0:
         out.append(f'(no references found for {trunc_sym})')
     return AgentThinkAction(thought='\n'.join(out))

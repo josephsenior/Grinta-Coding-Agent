@@ -402,10 +402,17 @@ class SecurityEnforcementMixin:
         if self.security_analyzer is None:  # type: ignore[attr-defined]
             return None
 
-        import asyncio
+        from backend.utils.async_utils import call_async_from_sync
 
         try:
-            risk = asyncio.run(self.security_analyzer.security_risk(action))
+            # ``call_async_from_sync`` routes through the bounded EXECUTOR with
+            # task-cancellation timeouts, instead of plain ``asyncio.run`` which
+            # creates an unbounded loop in the calling worker thread and would
+            # raise ``RuntimeError`` if this is ever invoked from inside a
+            # running event loop.
+            risk = call_async_from_sync(
+                self.security_analyzer.security_risk, 30.0, action
+            )
             if hasattr(action, 'security_risk'):
                 action.security_risk = risk
             return risk

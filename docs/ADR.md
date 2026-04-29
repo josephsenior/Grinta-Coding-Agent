@@ -201,8 +201,10 @@ edits respect syntactic boundaries.
 from the actual local onboarding path and created user confusion.
 
 **Decision (current):** Use `settings.json` as the default user-facing local
-configuration surface, with environment variables still supported for overrides
-and automation.
+configuration surface: `~/.grinta/settings.json` for installed CLI runs,
+repository `settings.json` for source checkouts, and `APP_ROOT` as an explicit
+override. Environment variables remain supported for secrets, overrides, and
+automation.
 
 **Consequences:**
 - ✅ Onboarding is simpler and consistent with starter templates

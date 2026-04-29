@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-
 from rich.text import Text
 
 from backend.cli._event_renderer.constants import (

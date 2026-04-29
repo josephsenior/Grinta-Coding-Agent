@@ -474,36 +474,42 @@ def _validate_connection(model: str, api_key: str, base_url: str | None) -> None
 
 async def _test_llm_call(model: str, api_key: str, base_url: str | None) -> bool | str:
     """Make a minimal LLM call to verify credentials. Returns True or error string."""
-    import httpx
-
-    # Determine the API endpoint from the model prefix
-    provider = model.split('/')[0] if '/' in model else ''
-    url = base_url or _provider_base_url(provider)
-    if not url:
-        return 'Unknown provider — skipping validation'
-    url = _normalize_test_url(url)
-
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json',
-    }
-    api_model = _strip_provider_prefix(model)
-    body: dict[str, Any] = {
-        'model': api_model,
-        'messages': [{'role': 'user', 'content': 'Say "ok" and nothing else.'}],
-        'max_tokens': 5,
-    }
-
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                f'{url}/chat/completions', json=body, headers=headers
-            )
-            return _interpret_test_response(resp.status_code, api_model)
-    except httpx.TimeoutException:
+        from backend.inference.direct_clients import get_direct_client
+        from backend.inference.exceptions import (
+            APIConnectionError,
+            AuthenticationError,
+            BadRequestError,
+            NotFoundError,
+            RateLimitError,
+            Timeout,
+        )
+
+        client = get_direct_client(
+            model=model,
+            api_key=api_key or 'not-needed',
+            base_url=base_url,
+            timeout=15.0,
+        )
+        await client.acompletion(
+            messages=[{'role': 'user', 'content': 'Say "ok" and nothing else.'}],
+            model=model,
+            max_tokens=5,
+            temperature=0,
+        )
+        return True
+    except Timeout:
         return 'Connection timed out — check your network'
-    except httpx.ConnectError:
+    except APIConnectionError:
         return 'Could not connect — check the base URL'
+    except AuthenticationError:
+        return 'Invalid API key'
+    except NotFoundError:
+        return f'Model not found: {_strip_provider_prefix(model)}'
+    except RateLimitError:
+        return 'Rate limited — but credentials look valid'
+    except BadRequestError as e:
+        return f'Request rejected: {e.message}'
     except Exception as e:
         return f'Connection error: {type(e).__name__}'
 

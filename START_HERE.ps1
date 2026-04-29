@@ -30,8 +30,7 @@ if ($pythonVersion -match 'Python 3\.(1[2-9]|[2-9][0-9])') {
 
 # Check for settings.json
 if (-not (Test-Path 'settings.json')) {
-    Write-Host 'Creating settings.json from template...' -ForegroundColor Cyan
-    Copy-Item 'settings.template.json' 'settings.json'
+    Write-Host 'No settings.json found. Run uv run python -m backend.cli.entry init after dependencies sync if configuration is needed.' -ForegroundColor Cyan
 }
 
 Write-Host 'Step 1: Syncing dependencies with uv (project .venv + browser group)...' -ForegroundColor Yellow
@@ -53,7 +52,7 @@ Write-Host '[OK] Dependencies synced!' -ForegroundColor Green
 
 # Step 2: Launch Grinta CLI
 Write-Host 'Step 2: Starting Grinta CLI...' -ForegroundColor Yellow
-Write-Host 'Project-local state will be stored under .grinta/storage.' -ForegroundColor Cyan
+Write-Host 'Runtime state will be stored under ~/.grinta/workspaces/<id>/storage.' -ForegroundColor Cyan
 
 & uv run python -m backend.cli.entry
 

@@ -19,11 +19,17 @@ from rich.text import Text
 
 from backend.cli._event_renderer.apply_patch import (
     compact_apply_patch_result as _compact_apply_patch_result,
+)
+from backend.cli._event_renderer.apply_patch import (
     is_apply_patch_activity as _is_apply_patch_activity,
+)
+from backend.cli._event_renderer.apply_patch import (
     summarize_cmd_failure as _summarize_cmd_failure,
 )
 from backend.cli._event_renderer.constants import (
     BROWSER_TOOL_COMMANDS as _BROWSER_TOOL_COMMANDS,
+)
+from backend.cli._event_renderer.constants import (
     DIRECTORY_VIEW_PREFIX as _DIRECTORY_VIEW_PREFIX,
 )
 from backend.cli._event_renderer.delegate import (
@@ -31,12 +37,20 @@ from backend.cli._event_renderer.delegate import (
 )
 from backend.cli._event_renderer.error_panel import (
     build_error_panel as _build_error_panel,
+)
+from backend.cli._event_renderer.error_panel import (
     build_llm_stream_fallback_panel as _build_llm_stream_fallback_panel,
+)
+from backend.cli._event_renderer.error_panel import (
     use_recoverable_notice_style as _use_recoverable_notice_style,
 )
 from backend.cli._event_renderer.text_utils import (
     pty_output_transcript_caption as _pty_output_transcript_caption,
+)
+from backend.cli._event_renderer.text_utils import (
     sanitize_visible_transcript_text as _sanitize_visible_transcript_text,
+)
+from backend.cli._event_renderer.text_utils import (
     strip_pty_echo as _strip_pty_echo,
 )
 from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
@@ -413,8 +427,10 @@ class ObservationRenderersMixin:
 
     @staticmethod
     def _file_read_result_message(content: str, n_lines: int) -> str:
-        """``text_editor view`` on a directory returns ``Directory contents of …:``
-        followed by entries; report entries instead of lines for that case."""
+        """``text_editor view`` on a directory returns ``Directory contents of …:``.
+
+        Followed by entries; report entries instead of lines for that case.
+        """
         if not content.startswith(_DIRECTORY_VIEW_PREFIX):
             return f'{n_lines:,} lines' if n_lines else 'empty file'
         n_entries = max(0, n_lines - 1)

@@ -109,7 +109,7 @@ Important entrypoints:
 
 ### Default user config
 
-`settings.json` is the default user-facing local config file.
+`settings.json` is the default user-facing local config file in a source checkout. Installed CLI runs use `~/.grinta/settings.json`; `APP_ROOT` can intentionally override the settings root.
 Template fields in `settings.template.json`:
 
 - `llm_provider`
@@ -125,6 +125,8 @@ Common examples:
 - `LLM_API_KEY`
 - `LLM_MODEL`
 - `APP_ROOT`
+
+Runtime/session state is stored under `~/.grinta/workspaces/<id>/storage`, not under the repository tree.
 
 ### Security boundary
 

@@ -3,7 +3,7 @@
 This guide targets the current Grinta runtime:
 
 - CLI-first local execution
-- `settings.json` for default local config
+- installed `~/.grinta/settings.json` or source-checkout `settings.json` for default local config
 
 ## Table of Contents
 
@@ -71,11 +71,17 @@ Use the canonical command:
 uv run python -m backend.cli.entry
 ```
 
+For installed CLI runs, use:
+
+```bash
+grinta
+```
+
 If startup fails, check:
 
-1. `settings.json` exists in the repo root.
+1. `settings.json` exists at the active settings root (`~/.grinta` for installed runs, the repo root for source checkouts, or `APP_ROOT` if set).
 2. `llm_model` and `llm_api_key` are set correctly.
-3. Current directory is the project root (or set `APP_ROOT`).
+3. Current directory is the project root for source runs, or set `APP_ROOT` intentionally.
 
 ### Invalid configuration
 
@@ -90,7 +96,7 @@ Fix:
 3. Start from minimal keys first.
 
 ```bash
-cp settings.template.json settings.json
+uv run python -m backend.cli.entry init
 ```
 
 Minimal known-good example:
@@ -99,7 +105,7 @@ Minimal known-good example:
 {
   "llm_provider": "openai",
   "llm_model": "openai/gpt-4o-mini",
-  "llm_api_key": "sk-...",
+  "llm_api_key": "${LLM_API_KEY}",
   "llm_base_url": ""
 }
 ```

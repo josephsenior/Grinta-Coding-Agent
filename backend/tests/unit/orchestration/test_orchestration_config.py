@@ -12,6 +12,41 @@ from backend.orchestration.orchestration_config import (
 )
 from backend.orchestration.state.state import State
 
+_WIRED_SERVICE_ATTRS = (
+    'lifecycle',
+    'autonomy',
+    'context',
+    'iteration',
+    'iteration_guard',
+    'step_guard',
+    'step_prerequisites',
+    'safety',
+    'pending_action',
+    'observation',
+    'confirmation',
+    'action',
+    'action_execution',
+    'state',
+    'retry',
+    'recovery',
+    'circuit_breaker',
+    'stuck',
+    'task_validation',
+    'event_router',
+    'step_decision',
+    'exception_handler',
+)
+
+
+def _assert_services_wired(services: OrchestrationServices) -> None:
+    for attr in _WIRED_SERVICE_ATTRS:
+        assert getattr(services, attr) is not None
+
+
+def _assert_config_attrs(config: OrchestrationConfig, expected: dict[str, object]) -> None:
+    for attr, value in expected.items():
+        assert getattr(config, attr) == value
+
 
 class TestOrchestrationConfig:
     """Tests for OrchestrationConfig dataclass."""
@@ -46,19 +81,23 @@ class TestOrchestrationConfig:
             conversation_stats=mock_stats,
             iteration_delta=5,
         )
-
-        assert config.budget_per_task_delta is None
-        assert config.agent_to_llm_config is None
-        assert config.agent_configs is None
-        assert config.sid is None
-        assert config.file_store is None
-        assert config.user_id is None
-        assert config.confirmation_mode is False
-        assert config.initial_state is None
-        assert config.headless_mode is True
-        assert config.status_callback is None
-        assert config.replay_events is None
-        assert config.security_analyzer is None
+        _assert_config_attrs(
+            config,
+            {
+                'budget_per_task_delta': None,
+                'agent_to_llm_config': None,
+                'agent_configs': None,
+                'sid': None,
+                'file_store': None,
+                'user_id': None,
+                'confirmation_mode': False,
+                'initial_state': None,
+                'headless_mode': True,
+                'status_callback': None,
+                'replay_events': None,
+                'security_analyzer': None,
+            },
+        )
 
     def test_config_with_all_optional_fields(self):
         """Test creates config with all optional fields populated."""
@@ -129,30 +168,7 @@ class TestOrchestrationServices:
         mock_controller.PENDING_ACTION_TIMEOUT = 30
 
         services = OrchestrationServices(mock_controller)
-
-        # Verify all services are created
-        assert services.lifecycle is not None
-        assert services.autonomy is not None
-        assert services.context is not None
-        assert services.iteration is not None
-        assert services.iteration_guard is not None
-        assert services.step_guard is not None
-        assert services.step_prerequisites is not None
-        assert services.safety is not None
-        assert services.pending_action is not None
-        assert services.observation is not None
-        assert services.confirmation is not None
-        assert services.action is not None
-        assert services.action_execution is not None
-        assert services.state is not None
-        assert services.retry is not None
-        assert services.recovery is not None
-        assert services.circuit_breaker is not None
-        assert services.stuck is not None
-        assert services.task_validation is not None
-        assert services.event_router is not None
-        assert services.step_decision is not None
-        assert services.exception_handler is not None
+        _assert_services_wired(services)
 
     def test_service_count_matches_documentation(self):
         """Test creates exactly 22 unique services as documented."""

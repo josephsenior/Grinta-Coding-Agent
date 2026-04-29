@@ -74,6 +74,21 @@ class DAPClient:
                     process.kill()
         finally:
             self.process = None
+            # Wake any waiters and best-effort join the reader threads. They are
+            # daemon=True so the process can still exit if a reader is wedged in
+            # a blocking read after the subprocess pipes close, but joining here
+            # avoids leaving stale handles on Windows where pipe teardown is
+            # asynchronous.
+            with self._lock:
+                self._event_condition.notify_all()
+            for reader in (self._reader, self._stderr_reader):
+                if reader is not None and reader.is_alive():
+                    try:
+                        reader.join(timeout=1.0)
+                    except Exception:
+                        pass
+            self._reader = None
+            self._stderr_reader = None
 
     def request(
         self,

@@ -11,11 +11,8 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 from backend.engine.orchestrator import Orchestrator
 from backend.ledger.observation import CmdOutputObservation, ErrorObservation
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -163,7 +160,7 @@ class TestErrorObservationThinning:
             orch._attempt_graceful_context_degradation(state)
         )
 
-        for orig, obs in zip(originals, errors):
+        for orig, obs in zip(originals, errors, strict=False):
             assert obs.content == orig
 
     def test_history_length_unchanged(self):

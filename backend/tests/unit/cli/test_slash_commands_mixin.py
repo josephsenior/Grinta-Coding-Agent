@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
-import io
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
 from rich.console import Console
 
 from backend.cli._repl.slash_commands_mixin import SlashCommandsMixin
 from backend.cli.repl import _parse_slash_command
-
 
 # ---------------------------------------------------------------------------
 # Minimal fake host class that provides SlashCommandsMixin requirements

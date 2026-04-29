@@ -46,5 +46,33 @@ jobs:
         run: uv sync
       - name: Build package
         run: uv build
+      - name: Smoke test built wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv .venv-smoke
+          . .venv-smoke/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+          grinta --help
+          grinta --version
+          mkdir -p .package-smoke-workspace
+          export APP_ROOT="$PWD/.package-smoke-app"
+          mkdir -p "$APP_ROOT"
+          cat > "$APP_ROOT/settings.json" <<'JSON'
+          {
+            "llm_provider": "openai",
+            "llm_model": "openai/gpt-4.1",
+            "llm_api_key": "${LLM_API_KEY}",
+            "llm_base_url": ""
+          }
+          JSON
+          printf '/help\n' | env \
+            APP_ROOT="$APP_ROOT" \
+            LLM_API_KEY=sk-test-release-smoke \
+            LLM_MODEL=openai/gpt-4.1 \
+            GRINTA_NO_SPLASH=1 \
+            LOG_TO_FILE=false \
+            grinta --project .package-smoke-workspace --no-splash
       - name: Publish to PyPI
         run: uv publish --token ${{ secrets.PYPI_TOKEN }}

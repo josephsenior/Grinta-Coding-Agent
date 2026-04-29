@@ -10,6 +10,17 @@ from backend.context.graph_rag import GraphRAG
 from backend.context.graph_store import EdgeType, GraphMemoryStore, NodeType
 
 
+def _assert_graph_node(
+    store: GraphMemoryStore,
+    node_id: str,
+    expected: dict[str, object],
+) -> None:
+    node = store.get_node(node_id)
+    assert node is not None
+    for key, value in expected.items():
+        assert node[key] == value
+
+
 def _make_vector_result(
     content: str,
     file_path: str | None = None,
@@ -190,31 +201,37 @@ def my_function():
         file_path.write_text(code, encoding='utf-8')
 
         rag.index_code_file(str(file_path), code)
-
-        # Check class node
-        class_node = gs.get_node('MyClass')
-        assert class_node is not None
-        assert class_node['type'] == 'class'
-        assert class_node['file_path'] == str(file_path)
-        assert class_node['line_start'] == 2
-        assert class_node['line_end'] == 4
-
-        # Check method node
-        method_node = gs.get_node('MyClass.my_method')
-        assert method_node is not None
-        assert method_node['type'] == 'function'
-        assert method_node['file_path'] == str(file_path)
-        assert method_node['line_start'] == 3
-        assert method_node['line_end'] == 4
-        assert method_node['parent_id'] == 'MyClass'
-
-        # Check function node
-        func_node = gs.get_node('my_function')
-        assert func_node is not None
-        assert func_node['type'] == 'function'
-        assert func_node['file_path'] == str(file_path)
-        assert func_node['line_start'] == 6
-        assert func_node['line_end'] == 7
+        _assert_graph_node(
+            gs,
+            'MyClass',
+            {
+                'type': 'class',
+                'file_path': str(file_path),
+                'line_start': 2,
+                'line_end': 4,
+            },
+        )
+        _assert_graph_node(
+            gs,
+            'MyClass.my_method',
+            {
+                'type': 'function',
+                'file_path': str(file_path),
+                'line_start': 3,
+                'line_end': 4,
+                'parent_id': 'MyClass',
+            },
+        )
+        _assert_graph_node(
+            gs,
+            'my_function',
+            {
+                'type': 'function',
+                'file_path': str(file_path),
+                'line_start': 6,
+                'line_end': 7,
+            },
+        )
 
 
 class TestFormatContext:

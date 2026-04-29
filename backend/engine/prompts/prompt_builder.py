@@ -20,18 +20,31 @@ import re
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
 from backend.engine.prompts.section_renderers import (
     _code_intelligence_available,
     _count_section_tokens,
-    _render_autonomy as _render_autonomy_impl,
-    _render_critical as _render_critical_impl,
-    _render_examples as _render_examples_impl,
-    _render_mcp_and_permissions as _render_mcp_and_permissions_impl,
     _render_permissions,
-    _render_routing as _render_routing_impl,
     _render_security,
-    _render_tool_reference as _render_tool_reference_impl,
     _resolve_terminal_command_tool,
+)
+from backend.engine.prompts.section_renderers import (
+    _render_autonomy as _render_autonomy_impl,
+)
+from backend.engine.prompts.section_renderers import (
+    _render_critical as _render_critical_impl,
+)
+from backend.engine.prompts.section_renderers import (
+    _render_examples as _render_examples_impl,
+)
+from backend.engine.prompts.section_renderers import (
+    _render_mcp_and_permissions as _render_mcp_and_permissions_impl,
+)
+from backend.engine.prompts.section_renderers import (
+    _render_routing as _render_routing_impl,
+)
+from backend.engine.prompts.section_renderers import (
+    _render_tool_reference as _render_tool_reference_impl,
 )
 
 # Per-model capability classification (capability adaptation, not provider tuning).

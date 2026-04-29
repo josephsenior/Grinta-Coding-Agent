@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from backend.security.safety_config import SafetyConfig
 
+
+def _assert_safety_attrs(cfg: SafetyConfig, expected: dict[str, object]) -> None:
+    for attr, value in expected.items():
+        assert getattr(cfg, attr) == value
+
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
@@ -12,17 +17,22 @@ from backend.security.safety_config import SafetyConfig
 class TestDefaults:
     def test_default_construction(self):
         cfg = SafetyConfig()
-        assert cfg.blocked_patterns == []
-        assert cfg.allowed_exceptions == []
-        assert cfg.risk_threshold == 'HIGH'
-        assert cfg.enable_audit_logging is False
-        assert cfg.audit_log_path == 'audit.log'
-        assert cfg.environment == 'production'
-        assert cfg.enable_mandatory_validation is True
-        assert cfg.block_in_production is True
-        assert cfg.require_review_for_high_risk is False
-        assert cfg.enable_risk_alerts is False
-        assert cfg.alert_webhook_url is None
+        _assert_safety_attrs(
+            cfg,
+            {
+                'blocked_patterns': [],
+                'allowed_exceptions': [],
+                'risk_threshold': 'HIGH',
+                'enable_audit_logging': False,
+                'audit_log_path': 'audit.log',
+                'environment': 'production',
+                'enable_mandatory_validation': True,
+                'block_in_production': True,
+                'require_review_for_high_risk': False,
+                'enable_risk_alerts': False,
+                'alert_webhook_url': None,
+            },
+        )
 
 
 # ---------------------------------------------------------------------------

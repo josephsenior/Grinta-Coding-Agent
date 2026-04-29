@@ -64,6 +64,15 @@ def _gemini_lightning_client():
     )
 
 
+def _assert_flattened_history_message(entry: dict, *, role: str, marker: str) -> None:
+    assert entry['role'] == role
+    assert marker in entry['content']
+
+
+def _assert_plain_message(entry: dict, *, role: str, content: str) -> None:
+    assert entry == {'role': role, 'content': content}
+
+
 # ---------------------------------------------------------------------------
 # 1. Profile resolution
 # ---------------------------------------------------------------------------
@@ -427,24 +436,29 @@ class TestHistoryNormalization:
             {'role': 'user', 'content': 'Now summarize it'},
         ]
         result = self.client._clean_messages(messages)
+        _assert_plain_message(result[0], role='system', content='You are helpful.')
+        _assert_plain_message(result[1], role='user', content='Read /etc/hosts')
 
-        # System/user messages unchanged
-        assert result[0] == {'role': 'system', 'content': 'You are helpful.'}
-        assert result[1] == {'role': 'user', 'content': 'Read /etc/hosts'}
-
-        # Prior tool-call assistant message → flattened
-        assert result[2]['role'] == 'assistant'
+        _assert_flattened_history_message(
+            result[2],
+            role='assistant',
+            marker='[Tool call]',
+        )
         assert 'tool_calls' not in result[2]
-        assert '[Tool call]' in result[2]['content']
         assert '/etc/hosts' in result[2]['content']
 
-        # Prior tool result → user message
-        assert result[3]['role'] == 'user'
-        assert '[Tool result from read_file]' in result[3]['content']
+        _assert_flattened_history_message(
+            result[3],
+            role='user',
+            marker='[Tool result from read_file]',
+        )
 
-        # Subsequent plain messages unchanged
-        assert result[4] == {'role': 'assistant', 'content': 'Here are the contents.'}
-        assert result[5] == {'role': 'user', 'content': 'Now summarize it'}
+        _assert_plain_message(
+            result[4],
+            role='assistant',
+            content='Here are the contents.',
+        )
+        _assert_plain_message(result[5], role='user', content='Now summarize it')
 
     def test_assistant_thinking_text_preserved_in_flattened_message(self):
         """Any text content alongside tool calls is preserved in the flatten."""

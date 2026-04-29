@@ -1447,7 +1447,10 @@ async def test_wait_for_agent_idle_default_timeout_disabled(monkeypatch) -> None
     monkeypatch.delenv('APP_AGENT_HARD_TIMEOUT_SECONDS', raising=False)
     monkeypatch.delenv('APP_AGENT_HARD_TIMEOUT_CMD_SECONDS', raising=False)
 
-    with patch('backend.cli.repl.time.monotonic', side_effect=_fake_monotonic):
+    with patch(
+        'backend.cli._repl.session_lifecycle_mixin.time.monotonic',
+        side_effect=_fake_monotonic,
+    ):
         await repl._wait_for_agent_idle(controller, agent_task)
 
     assert not agent_task.cancelled()
@@ -2185,7 +2188,9 @@ def test_error_guidance_routes_browser_timeouts_to_browser_branch() -> None:
     """Unit-level check that the classifier picks the browser branch before
     the generic timeout branch.
     """
-    from backend.cli.event_renderer import _error_guidance
+    from backend.cli._event_renderer.error_panel import (
+        error_guidance as _error_guidance,
+    )
 
     guidance = _error_guidance(
         'ERROR: Browser screenshot timed out after 45s (with one retry).'
@@ -2339,6 +2344,18 @@ def _make_renderer_sync() -> tuple[Console, HUDBar, CLIEventRenderer]:
     reasoning = ReasoningDisplay()
     renderer = CLIEventRenderer(console, hud, reasoning, loop=loop)
     return console, hud, renderer
+
+
+def test_renderer_summarizes_plain_ripgrep_match_lines() -> None:
+    summary = CLIEventRenderer._summarize_plain_match_lines(
+        'backend/foo.py:12:match one\nbackend/bar.py:34:match two\n'
+    )
+
+    assert summary == 'Found 2 matches.'
+
+
+def test_renderer_ignores_non_match_plain_lines() -> None:
+    assert CLIEventRenderer._summarize_plain_match_lines('no structured matches') is None
 
 
 @pytest.mark.asyncio

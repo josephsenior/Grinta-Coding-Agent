@@ -6,10 +6,12 @@ offering a lightweight and stable alternative to multi-provider abstraction libr
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -29,19 +31,41 @@ from backend.core import json_compat as json
 from backend.core.logger import app_logger as logger
 from backend.inference.direct_clients_anthropic_ops import (
     acompletion as _anthropic_acompletion,
+)
+from backend.inference.direct_clients_anthropic_ops import (
     astream as _anthropic_astream,
+)
+from backend.inference.direct_clients_anthropic_ops import (
     completion as _anthropic_completion,
+)
+from backend.inference.direct_clients_anthropic_ops import (
     extract_anthropic_tool_calls as _extract_anthropic_tool_calls_impl,
+)
+from backend.inference.direct_clients_anthropic_ops import (
     map_anthropic_error as _map_anthropic_error_impl,
+)
+from backend.inference.direct_clients_anthropic_ops import (
     prepare_anthropic_kwargs as _prepare_anthropic_kwargs_impl,
 )
 from backend.inference.direct_clients_openai_ops import (
     acompletion as _openai_acompletion,
+)
+from backend.inference.direct_clients_openai_ops import (
     astream as _openai_astream,
+)
+from backend.inference.direct_clients_openai_ops import (
     clean_messages as _clean_messages_impl,
+)
+from backend.inference.direct_clients_openai_ops import (
     completion as _openai_completion,
+)
+from backend.inference.direct_clients_openai_ops import (
     extract_openai_tool_calls as _extract_openai_tool_calls_impl,
+)
+from backend.inference.direct_clients_openai_ops import (
     map_openai_error as _map_openai_error_impl,
+)
+from backend.inference.direct_clients_openai_ops import (
     strip_unsupported_params as _strip_unsupported_params_impl,
 )
 
@@ -57,6 +81,32 @@ _POOL_LIMITS = httpx.Limits(
 _shared_sync_clients: dict[str, httpx.Client] = {}
 _shared_async_clients: dict[str, httpx.AsyncClient] = {}
 _pool_lock = threading.Lock()
+
+
+def _normalize_timeout_seconds(timeout: float | int | None) -> float | None:
+    if timeout is None:
+        return None
+    try:
+        value = float(timeout)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def _with_default_timeout(
+    kwargs: dict[str, Any], timeout: float | int | None
+) -> dict[str, Any]:
+    normalized = _normalize_timeout_seconds(timeout)
+    if normalized is None or 'timeout' in kwargs:
+        return kwargs
+    return {**kwargs, 'timeout': normalized}
+
+
+def _gemini_timeout_ms(timeout: float | int | None) -> int:
+    normalized = _normalize_timeout_seconds(timeout)
+    if normalized is None:
+        return 45000
+    return max(1, int(normalized * 1000))
 
 
 def _pool_key(provider: str, base_url: str | None) -> str:
@@ -94,6 +144,53 @@ def get_shared_async_http_client(
                 )
                 logger.debug('Created shared async httpx pool for %s', key)
     return _shared_async_clients[key]
+
+
+def _drain_shared_http_clients() -> tuple[list[httpx.Client], list[httpx.AsyncClient]]:
+    with _pool_lock:
+        sync_clients = list(_shared_sync_clients.values())
+        async_clients = list(_shared_async_clients.values())
+        _shared_sync_clients.clear()
+        _shared_async_clients.clear()
+    return sync_clients, async_clients
+
+
+async def _aclose_async_clients(clients: list[httpx.AsyncClient]) -> None:
+    for client in clients:
+        with suppress(Exception):
+            await client.aclose()
+
+
+def close_shared_http_clients() -> None:
+    """Close shared HTTP pools and clear the global pool cache.
+
+    Prefer :func:`aclose_shared_http_clients` from async shutdown paths so async
+    clients are awaited deterministically. This sync helper still closes async
+    pools when no event loop is running, and schedules closure on the running
+    loop otherwise.
+    """
+    sync_clients, async_clients = _drain_shared_http_clients()
+    for client in sync_clients:
+        with suppress(Exception):
+            client.close()
+    if not async_clients:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(_aclose_async_clients(async_clients))
+        return
+    for client in async_clients:
+        loop.create_task(client.aclose())
+
+
+async def aclose_shared_http_clients() -> None:
+    """Async close shared sync/async HTTP pools and clear the pool cache."""
+    sync_clients, async_clients = _drain_shared_http_clients()
+    for client in sync_clients:
+        with suppress(Exception):
+            client.close()
+    await _aclose_async_clients(async_clients)
 
 
 class LLMResponse:
@@ -486,10 +583,12 @@ class OpenAIClient(DirectLLMClient):
         api_key: str,
         base_url: str | None = None,
         profile: TransportProfile | None = None,
+        timeout: float | int | None = None,
     ):
         self._model_name = model_name
         self._api_base_url = base_url
         self._profile = profile or TransportProfile()
+        self._request_timeout = _normalize_timeout_seconds(timeout)
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
@@ -515,16 +614,19 @@ class OpenAIClient(DirectLLMClient):
         return _clean_messages_impl(self._profile, messages)
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
+        kwargs = _with_default_timeout(kwargs, self._request_timeout)
         return _openai_completion(self, messages, **kwargs)
 
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
+        kwargs = _with_default_timeout(kwargs, self._request_timeout)
         return await _openai_acompletion(self, messages, **kwargs)
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
+        kwargs = _with_default_timeout(kwargs, self._request_timeout)
         async for chunk in _openai_astream(self, messages, **kwargs):
             yield chunk
 
@@ -532,8 +634,11 @@ class OpenAIClient(DirectLLMClient):
 class AnthropicClient(DirectLLMClient):
     """Client for Anthropic Claude."""
 
-    def __init__(self, model_name: str, api_key: str):
+    def __init__(
+        self, model_name: str, api_key: str, timeout: float | int | None = None
+    ):
         self._model_name = model_name
+        self._request_timeout = _normalize_timeout_seconds(timeout)
         self.client = Anthropic(
             api_key=api_key,
             http_client=get_shared_http_client('anthropic'),
@@ -558,16 +663,19 @@ class AnthropicClient(DirectLLMClient):
         return _map_anthropic_error_impl(self, exc)
 
     def completion(self, messages: list[dict[str, Any]], **kwargs) -> LLMResponse:
+        kwargs = _with_default_timeout(kwargs, self._request_timeout)
         return _anthropic_completion(self, messages, **kwargs)
 
     async def acompletion(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> LLMResponse:
+        kwargs = _with_default_timeout(kwargs, self._request_timeout)
         return await _anthropic_acompletion(self, messages, **kwargs)
 
     async def astream(
         self, messages: list[dict[str, Any]], **kwargs
     ) -> AsyncIterator[dict[str, Any]]:
+        kwargs = _with_default_timeout(kwargs, self._request_timeout)
         async for chunk in _anthropic_astream(self, messages, **kwargs):
             yield chunk
 
@@ -575,7 +683,9 @@ class AnthropicClient(DirectLLMClient):
 class GeminiClient(DirectLLMClient):
     """Client for Google Gemini."""
 
-    def __init__(self, model_name: str, api_key: str):
+    def __init__(
+        self, model_name: str, api_key: str, timeout: float | int | None = None
+    ):
         # Never log secrets (even partial key prefixes/suffixes).
         logger.debug(
             'Initializing Gemini client (api_key_set=%s, api_key_len=%s)',
@@ -588,7 +698,7 @@ class GeminiClient(DirectLLMClient):
         # Add timeout to prevent infinite hanging when the API is overloaded
         from google.genai.types import HttpOptions
 
-        http_options = HttpOptions(timeout=45000)  # 45 seconds
+        http_options = HttpOptions(timeout=_gemini_timeout_ms(timeout))
         self.client = genai.Client(api_key=api_key, http_options=http_options)
 
     def _resolve_gemini_model_name(self, model_name: str | None) -> str:
@@ -736,6 +846,9 @@ class GeminiClient(DirectLLMClient):
 
     def _map_gemini_api_error(self, exc: Any, error_str: str) -> Exception:
         from backend.inference.exceptions import (
+            APIError as ProviderAPIError,
+        )
+        from backend.inference.exceptions import (
             BadRequestError,
             ContextWindowExceededError,
             InternalServerError,
@@ -743,9 +856,6 @@ class GeminiClient(DirectLLMClient):
             RateLimitError,
             ServiceUnavailableError,
             is_context_window_error,
-        )
-        from backend.inference.exceptions import (
-            APIError as ProviderAPIError,
         )
 
         if self._is_gemini_api_key_error(error_str):
@@ -805,18 +915,7 @@ class GeminiClient(DirectLLMClient):
 
         from backend.inference.exceptions import (
             APIConnectionError,
-            AuthenticationError,
-            BadRequestError,
-            ContextWindowExceededError,
-            InternalServerError,
-            NotFoundError,
-            RateLimitError,
-            ServiceUnavailableError,
             Timeout,
-            is_context_window_error,
-        )
-        from backend.inference.exceptions import (
-            APIError as ProviderAPIError,
         )
 
         self._log_gemini_exception(exc)
@@ -1120,7 +1219,10 @@ class GeminiClient(DirectLLMClient):
 
 
 def get_direct_client(
-    model: str, api_key: str, base_url: str | None = None
+    model: str,
+    api_key: str,
+    base_url: str | None = None,
+    timeout: float | int | None = None,
 ) -> DirectLLMClient:
     """Factory function to get the correct direct client using explicit routing.
 
@@ -1133,6 +1235,7 @@ def get_direct_client(
         model: Model name (e.g., "gpt-4o", "claude-opus-4", "ollama/llama3")
         api_key: API key for the provider
         base_url: Optional explicit base URL (overrides auto-resolution)
+        timeout: Optional request timeout in seconds
 
     Returns:
         Appropriate DirectLLMClient instance
@@ -1184,14 +1287,17 @@ def get_direct_client(
                 api_key=api_key,
                 base_url=resolved_base_url,
                 profile=profile,
+                timeout=timeout,
             )
 
     # Route to appropriate client based on provider
     if provider == 'anthropic':
-        return AnthropicClient(model_name=stripped_model, api_key=api_key)
+        return AnthropicClient(
+            model_name=stripped_model, api_key=api_key, timeout=timeout
+        )
 
     if provider == 'google':
-        return GeminiClient(model_name=stripped_model, api_key=api_key)
+        return GeminiClient(model_name=stripped_model, api_key=api_key, timeout=timeout)
 
     # All OpenAI-compatible providers use OpenAI client
     # (OpenAI, xAI, DeepSeek, Mistral, Ollama, LM Studio, vLLM, Lightning, etc.)
@@ -1214,4 +1320,5 @@ def get_direct_client(
         api_key=api_key,
         base_url=resolved_base_url,
         profile=profile,
+        timeout=timeout,
     )

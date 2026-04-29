@@ -116,8 +116,9 @@ Key properties:
 
 Default local setup uses:
 
-- `settings.json` for user-facing model/provider keys
+- installed `~/.grinta/settings.json`, or repository `settings.json` when running from source, for user-facing model/provider keys
 - environment variables for automation and secret injection
+- `~/.grinta/workspaces/<id>/storage` for runtime/session state
 
 Minimal fields in `settings.template.json`:
 

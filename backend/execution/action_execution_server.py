@@ -7,133 +7,65 @@ NOTE: this executes inside the local runtime environment.
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import os
 import re
 import time
-import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
-from binaryornot.check import is_binary
 from fastapi import FastAPI
 from pydantic import BaseModel
-from uvicorn import Config, Server
 
 from backend.core.enums import FileEditSource, FileReadSource
 from backend.core.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
+from backend.execution.action_execution_server_io import (
+    RuntimeExecutorIOAndTerminalMixin,
+)
 from backend.execution.debugger import DAPDebugManager
 from backend.execution.file_operations import (
-    ensure_directory_exists,
     execute_file_editor,
     get_max_edit_observation_chars,
     handle_directory_view,
-    handle_file_read_errors,
-    read_image_file,
-    read_pdf_file,
-    read_text_file,
-    read_video_file,
-    truncate_cmd_output,
     truncate_large_text,
-    write_file_content,
-)
-from backend.execution.action_execution_server_helpers import (
-    annotate_environment_errors as _annotate_environment_errors_impl,
-    append_blast_radius_warning as _append_blast_radius_warning_impl,
-    apply_grep_filter as _apply_grep_filter_impl,
-    apply_terminal_resize_if_requested as _apply_terminal_resize_if_requested_impl,
-    attach_detected_server as _attach_detected_server_impl,
-    build_env_check_command as _build_env_check_command_impl,
-    build_shell_git_config_command as _build_shell_git_config_command_impl,
-    clear_terminal_read_cursor as _clear_terminal_read_cursor_impl,
-    detect_powershell_in_bash_mismatch as _detect_powershell_in_bash_mismatch_impl,
-    detect_scaffold_setup_failure as _detect_scaffold_setup_failure_impl,
-    edit_try_directory_view as _edit_try_directory_view_impl,
-    edit_via_file_editor as _edit_via_file_editor_impl,
-    evaluate_interactive_terminal_command as _evaluate_interactive_terminal_command_impl,
-    extract_failure_signature as _extract_failure_signature_impl,
-    get_terminal_read_cursor as _get_terminal_read_cursor_impl,
-    handle_aci_file_read as _handle_aci_file_read_impl,
-    init_shell_commands as _init_shell_commands_impl,
-    is_auto_lint_enabled as _is_auto_lint_enabled_impl,
-    is_sandboxed_local as _is_sandboxed_local_impl,
-    is_workspace_restricted_profile as _is_workspace_restricted_profile_impl,
-    mark_terminal_session_interaction as _mark_terminal_session_interaction_impl,
-    missing_terminal_session_error as _missing_terminal_session_error_impl,
-    next_terminal_session_id as _next_terminal_session_id_impl,
-    normalize_terminal_command as _normalize_terminal_command_impl,
-    predict_interactive_cwd_change as _predict_interactive_cwd_change_impl,
-    read_terminal_with_mode as _read_terminal_with_mode_impl,
-    resolve_effective_cwd as _resolve_effective_cwd_impl,
-    resolve_path as _resolve_path_impl,
-    resolve_workspace_file_path as _resolve_workspace_file_path_impl,
-    should_rewrite_python3_to_python as _should_rewrite_python3_to_python_impl,
-    strip_ansi_obs_text as _strip_ansi_obs_text_impl,
-    terminal_mode as _terminal_mode_impl,
-    terminal_open_guardrail_error as _terminal_open_guardrail_error_impl,
-    terminal_read_empty_hints as _terminal_read_empty_hints_impl,
-    uses_powershell_shell_contract as _uses_powershell_shell_contract_impl,
-    validate_interactive_session_scope as _validate_interactive_session_scope_impl,
-    validate_workspace_scoped_cwd as _validate_workspace_scoped_cwd_impl,
-    workspace_root as _workspace_root_impl,
-    advance_terminal_read_cursor as _advance_terminal_read_cursor_impl,
-)
-from backend.execution.action_execution_server_io import RuntimeExecutorIOAndTerminalMixin
-from backend.execution.file_viewer_server import start_file_viewer_server
-from backend.execution.mcp.proxy import MCPProxyManager
-from backend.execution.plugin_loader import init_plugins
-from backend.execution.plugins import ALL_PLUGINS, Plugin
-from backend.execution.sandboxing import (
-    is_sandboxed_local_profile,
-    is_workspace_restricted_profile,
 )
 from backend.execution.security_enforcement import (
     evaluate_hardened_local_command_policy,
     path_is_within_workspace,
     tokenize_command,
 )
+from backend.execution.mcp.proxy import MCPProxyManager
+from backend.execution.plugin_loader import init_plugins
+from backend.execution.plugins import Plugin
 from backend.execution.server_routes import (
     register_exception_handlers,
     register_routes,
 )
-from backend.execution.utils import find_available_tcp_port
 from backend.execution.utils.diff import get_diff
 from backend.execution.utils.file_editor import FileEditor
-from backend.execution.utils.files import resolve_path as resolve_workspace_path
 from backend.execution.utils.memory_monitor import MemoryMonitor
 from backend.execution.utils.session_manager import SessionManager
-from backend.execution.utils.unified_shell import BaseShellSession
-from backend.ledger.action import (
-    CmdRunAction,
-    DebuggerAction,
-    FileEditAction,
-    FileReadAction,
-    FileWriteAction,
-)
 from backend.ledger.action.browser_tool import BrowserToolAction
+from backend.ledger.action.commands import CmdRunAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.mcp import MCPAction
-from backend.ledger.action.terminal import (
-    TerminalInputAction,
-    TerminalReadAction,
-    TerminalRunAction,
-)
 from backend.ledger.observation import (
-    CmdOutputObservation,
     ErrorObservation,
-    FileEditObservation,
-    FileReadObservation,
-    FileWriteObservation,
     LspQueryObservation,
     Observation,
 )
-from backend.ledger.observation.terminal import TerminalObservation
+from backend.ledger.observation.files import FileEditObservation, FileReadObservation
 from backend.persistence.locations import get_workspace_downloads_dir
-from backend.utils.async_utils import call_sync_from_async
 from backend.utils.regex_limits import try_compile_user_regex
+
+
+def resolve_workspace_path(path: str, working_dir: str, workspace_root: str) -> Path:
+    """Resolve a workspace-relative path against *working_dir* (session cwd)."""
+    base = Path(working_dir).resolve()
+    candidate = Path(path)
+    return candidate.resolve() if candidate.is_absolute() else (base / candidate).resolve()
 
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m')
 _POWERSHELL_BUILTIN_COMMANDS = frozenset(

@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
 from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from backend.ledger.config import EventRuntimeDefaults, get_event_runtime_defaults
+
+
+def _assert_event_runtime_attrs(
+    defaults: EventRuntimeDefaults, expected: dict[str, object]
+) -> None:
+    for attr, value in expected.items():
+        assert getattr(defaults, attr) == value
 
 # ── EventRuntimeDefaults dataclass ─────────────────────────────────────
 
@@ -18,16 +26,21 @@ class TestEventRuntimeDefaults:
     def test_creates_with_defaults(self):
         """Test creating EventRuntimeDefaults with default values."""
         defaults = EventRuntimeDefaults()
-        assert defaults.max_queue_size == 2000
-        assert defaults.drop_policy == 'drop_oldest'
-        assert defaults.hwm_ratio == 0.8
-        assert defaults.block_timeout == 0.1
-        assert defaults.rate_window_seconds == 60
-        assert defaults.workers == 1
-        assert defaults.async_write is False
-        assert defaults.coalesce is False
-        assert defaults.coalesce_window_ms == 100.0
-        assert defaults.coalesce_max_batch == 20
+        _assert_event_runtime_attrs(
+            defaults,
+            {
+                'max_queue_size': 2000,
+                'drop_policy': 'drop_oldest',
+                'hwm_ratio': 0.8,
+                'block_timeout': 0.1,
+                'rate_window_seconds': 60,
+                'workers': 1,
+                'async_write': False,
+                'coalesce': False,
+                'coalesce_window_ms': 100.0,
+                'coalesce_max_batch': 20,
+            },
+        )
 
     def test_creates_with_custom_values(self):
         """Test creating EventRuntimeDefaults with custom values."""
@@ -43,21 +56,26 @@ class TestEventRuntimeDefaults:
             coalesce_window_ms=200.0,
             coalesce_max_batch=50,
         )
-        assert defaults.max_queue_size == 5000
-        assert defaults.drop_policy == 'block'
-        assert defaults.hwm_ratio == 0.9
-        assert defaults.block_timeout == 0.5
-        assert defaults.rate_window_seconds == 120
-        assert defaults.workers == 16
-        assert defaults.async_write is True
-        assert defaults.coalesce is True
-        assert defaults.coalesce_window_ms == 200.0
-        assert defaults.coalesce_max_batch == 50
+        _assert_event_runtime_attrs(
+            defaults,
+            {
+                'max_queue_size': 5000,
+                'drop_policy': 'block',
+                'hwm_ratio': 0.9,
+                'block_timeout': 0.5,
+                'rate_window_seconds': 120,
+                'workers': 16,
+                'async_write': True,
+                'coalesce': True,
+                'coalesce_window_ms': 200.0,
+                'coalesce_max_batch': 50,
+            },
+        )
 
     def test_is_frozen(self):
         """Test EventRuntimeDefaults is immutable."""
         defaults = EventRuntimeDefaults()
-        with pytest.raises(Exception):  # FrozenInstanceError
+        with pytest.raises(FrozenInstanceError):
             cast(Any, defaults).max_queue_size = 3000
 
 
@@ -95,17 +113,21 @@ class TestGetEventRuntimeDefaults:
         mock_load_config.return_value = mock_config
 
         defaults = get_event_runtime_defaults()
-
-        assert defaults.max_queue_size == 3000  # Mock sets it to 3000
-        assert defaults.drop_policy == 'block'
-        assert defaults.hwm_ratio == 0.9
-        assert defaults.block_timeout == 0.2
-        assert defaults.rate_window_seconds == 90
-        assert defaults.workers == 12
-        assert defaults.async_write is True
-        assert defaults.coalesce is True
-        assert defaults.coalesce_window_ms == 150.0
-        assert defaults.coalesce_max_batch == 30
+        _assert_event_runtime_attrs(
+            defaults,
+            {
+                'max_queue_size': 3000,
+                'drop_policy': 'block',
+                'hwm_ratio': 0.9,
+                'block_timeout': 0.2,
+                'rate_window_seconds': 90,
+                'workers': 12,
+                'async_write': True,
+                'coalesce': True,
+                'coalesce_window_ms': 150.0,
+                'coalesce_max_batch': 30,
+            },
+        )
 
     @patch('backend.core.config.config_loader.load_app_config')
     def test_returns_defaults_when_no_event_stream_section(self, mock_load_config):
@@ -146,17 +168,21 @@ class TestGetEventRuntimeDefaults:
             'backend.core.config.config_loader.load_app_config', side_effect=Exception
         ):
             defaults = get_event_runtime_defaults()
-
-        assert defaults.max_queue_size == 4000
-        assert defaults.drop_policy == 'block'  # lowercased
-        assert defaults.hwm_ratio == 0.75
-        assert defaults.block_timeout == 0.3
-        assert defaults.rate_window_seconds == 45
-        assert defaults.workers == 4
-        assert defaults.async_write is True
-        assert defaults.coalesce is True
-        assert defaults.coalesce_window_ms == 250.0
-        assert defaults.coalesce_max_batch == 40
+        _assert_event_runtime_attrs(
+            defaults,
+            {
+                'max_queue_size': 4000,
+                'drop_policy': 'block',
+                'hwm_ratio': 0.75,
+                'block_timeout': 0.3,
+                'rate_window_seconds': 45,
+                'workers': 4,
+                'async_write': True,
+                'coalesce': True,
+                'coalesce_window_ms': 250.0,
+                'coalesce_max_batch': 40,
+            },
+        )
 
     def test_coalesce_bool_parsing(self, monkeypatch):
         """Test coalesce boolean environment parsing."""

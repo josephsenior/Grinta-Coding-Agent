@@ -208,13 +208,15 @@ class TestActionFromDict:
 
 class TestActionTypeToClass:
     def test_has_common_actions(self):
-        assert 'message' in ACTION_TYPE_TO_CLASS
-        assert 'run' in ACTION_TYPE_TO_CLASS
-        assert 'null' in ACTION_TYPE_TO_CLASS
-        assert 'read' in ACTION_TYPE_TO_CLASS
-        assert 'edit' in ACTION_TYPE_TO_CLASS
-        assert 'lsp_query' in ACTION_TYPE_TO_CLASS
-        assert 'terminal_run' in ACTION_TYPE_TO_CLASS
-        assert 'terminal_input' in ACTION_TYPE_TO_CLASS
-        assert 'terminal_read' in ACTION_TYPE_TO_CLASS
-        assert 'debugger' in ACTION_TYPE_TO_CLASS
+        assert {
+            'message',
+            'run',
+            'null',
+            'read',
+            'edit',
+            'lsp_query',
+            'terminal_run',
+            'terminal_input',
+            'terminal_read',
+            'debugger',
+        } <= set(ACTION_TYPE_TO_CLASS)

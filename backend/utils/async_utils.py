@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import atexit
 import logging
 import os
 from collections.abc import Awaitable, Callable, Coroutine, Iterable
@@ -74,6 +75,27 @@ def _get_max_workers() -> int:
 
 _MAX_WORKERS = _get_max_workers()
 EXECUTOR: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=_MAX_WORKERS)
+
+
+def _shutdown_executor_atexit() -> None:
+    """Cancel queued work and request worker termination at interpreter exit.
+
+    ``ThreadPoolExecutor`` worker threads are non-daemon, so without an
+    explicit shutdown they can keep the process alive after the CLI's main
+    coroutine returns — most visibly on Windows, where leftover workers
+    holding subprocess/SQLite handles delay process exit.
+
+    ``cancel_futures=True`` drops queued tasks; running tasks are not
+    interrupted but are bounded by their own timeouts.
+    """
+    try:
+        EXECUTOR.shutdown(wait=True, cancel_futures=True)
+    except Exception:
+        # atexit handlers must never raise.
+        pass
+
+
+atexit.register(_shutdown_executor_atexit)
 
 # Hard cap for cancelling stray tasks after the main coroutine completes (e.g. browser-use CDP tasks).
 _LOOP_SHUTDOWN_WAIT_SEC = float(os.getenv('CALL_ASYNC_LOOP_SHUTDOWN_WAIT_SEC', '2.0'))

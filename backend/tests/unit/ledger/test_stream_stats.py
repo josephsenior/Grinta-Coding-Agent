@@ -7,6 +7,11 @@ from unittest.mock import MagicMock, patch
 from backend.ledger.stream_stats import get_aggregated_event_stream_stats
 
 
+def _assert_stats_subset(stats: dict[str, int], expected: dict[str, int]) -> None:
+    for key, value in expected.items():
+        assert stats[key] == value
+
+
 class TestGetAggregatedEventStreamStats:
     """Tests for get_aggregated_event_stream_stats function."""
 
@@ -24,8 +29,7 @@ class TestGetAggregatedEventStreamStats:
 
     def test_single_stream_aggregates_stats(self):
         """Test aggregates stats from a single stream."""
-        mock_stream = MagicMock()
-        mock_stream.get_backpressure_snapshot.return_value = {
+        snapshot = {
             'enqueued': 100,
             'dropped_oldest': 5,
             'dropped_newest': 3,
@@ -46,33 +50,27 @@ class TestGetAggregatedEventStreamStats:
             'uptime_seconds': 120,
             'queue_size': 150,
         }
+        mock_stream = MagicMock()
+        mock_stream.get_backpressure_snapshot.return_value = snapshot
 
         with patch(
             'backend.ledger.stream_stats.EventStream.iter_global_streams',
             return_value=[mock_stream],
         ):
             stats = get_aggregated_event_stream_stats()
-
-            assert stats['streams'] == 1
-            assert stats['enqueued'] == 100
-            assert stats['dropped_oldest'] == 5
-            assert stats['dropped_newest'] == 3
-            assert stats['high_watermark_hits'] == 2
-            assert stats['persist_failures'] == 1
-            assert stats['cache_write_failures'] == 0
-            assert stats['critical_events'] == 4
-            assert stats['critical_queue_blocked'] == 0
-            assert stats['critical_sync_persistence'] == 2
-            assert stats['durable_enqueue_failures'] == 0
-            assert stats['durable_writer_drops'] == 0
-            assert stats['durable_writer_queue_depth'] == 10
-            assert stats['durable_writer_errors'] == 0
-            assert stats['events_per_minute'] == 60
-            assert stats['drops_per_minute'] == 1
-            assert stats['persist_failures_per_minute'] == 0
-            assert stats['queue_utilization_pct_avg'] == 75
-            assert stats['uptime_seconds_sum'] == 120
-            assert stats['queue_size'] == 150
+            expected = {
+                k: v
+                for k, v in snapshot.items()
+                if k not in ('queue_utilization_pct', 'uptime_seconds')
+            }
+            expected.update(
+                {
+                    'streams': 1,
+                    'queue_utilization_pct_avg': 75,
+                    'uptime_seconds_sum': 120,
+                }
+            )
+            _assert_stats_subset(stats, expected)
 
     def test_multiple_streams_sum_statistics(self):
         """Test aggregates and sums stats from multiple streams."""

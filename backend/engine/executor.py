@@ -21,16 +21,28 @@ from backend.core.constants import (
 )
 from backend.core.errors import ModelProviderError
 from backend.core.logger import app_logger as logger
+from backend.engine import function_calling as _function_calling_module  # noqa: F401
 from backend.engine.executor_response_helpers import (
     build_recoverable_tool_call_error_action as _build_recoverable_tool_call_error_action_impl,
+)
+from backend.engine.executor_response_helpers import (
     content_to_str as _content_to_str_impl,
+)
+from backend.engine.executor_response_helpers import (
     extract_last_user_text as _extract_last_user_text_impl,
+)
+from backend.engine.executor_response_helpers import (
     extract_recent_user_text as _extract_recent_user_text_impl,
+)
+from backend.engine.executor_response_helpers import (
     extract_response_text as _extract_response_text_impl,
+)
+from backend.engine.executor_response_helpers import (
     is_recoverable_tool_call_error as _is_recoverable_tool_call_error_impl,
+)
+from backend.engine.executor_response_helpers import (
     without_blank_agent_messages as _without_blank_agent_messages_impl,
 )
-from backend.engine import function_calling as _function_calling_module  # noqa: F401
 from backend.engine.streaming_checkpoint import (
     StreamingCheckpoint,
 )
@@ -375,59 +387,71 @@ class OrchestratorExecutor:
             await self._emit_stream_text_piece(state, remaining, event_stream)
             return
 
-    async def _process_stream_tool_calls(
+    async def _ingest_stream_tool_call_chunk(
         self,
-        delta: dict[str, Any],
+        tool_call_chunk: dict[str, Any],
         state: _AsyncStreamingState,
         event_stream: EventStream | None,
     ) -> None:
         from backend.ledger.action.message import StreamingChunkAction
         from backend.ledger.event import EventSource
 
+        idx = tool_call_chunk['index']
+        if idx not in state.tool_calls_dict:
+            state.tool_calls_dict[idx] = {
+                'id': tool_call_chunk.get('id'),
+                'type': 'function',
+                'function': {'name': '', 'arguments': ''},
+            }
+
+        function = tool_call_chunk.get('function', {})
+        raw_name = function.get('name') if isinstance(function, dict) else None
+        if isinstance(raw_name, str) and raw_name:
+            current_name = state.tool_calls_dict[idx]['function']['name']
+            state.tool_calls_dict[idx]['function']['name'] = (
+                self._merge_stream_fragment(current_name, raw_name)
+            )
+
+        raw_args = function.get('arguments') if isinstance(function, dict) else None
+        if not isinstance(raw_args, str) or not raw_args:
+            return
+
+        current_args = state.tool_calls_dict[idx]['function']['arguments']
+        state.tool_calls_dict[idx]['function']['arguments'] = (
+            self._merge_stream_fragment(current_args, raw_args)
+        )
+        if event_stream:
+            logger.debug(
+                'DEBUG: Emitting tool argument chunk of len %d',
+                len(raw_args),
+            )
+            ev = StreamingChunkAction(
+                chunk=raw_args,
+                accumulated=state.tool_calls_dict[idx]['function']['arguments'],
+                is_final=False,
+                is_tool_call=True,
+                tool_call_name=state.tool_calls_dict[idx]['function']['name'],
+            )
+            ev.source = EventSource.AGENT
+            event_stream.add_event(ev, EventSource.AGENT)
+            await asyncio.sleep(0)
+
+    async def _process_stream_tool_calls(
+        self,
+        delta: dict[str, Any],
+        state: _AsyncStreamingState,
+        event_stream: EventStream | None,
+    ) -> None:
         tool_call_chunks = delta.get('tool_calls')
         if not tool_call_chunks:
             return
 
         for tool_call_chunk in tool_call_chunks:
-            idx = tool_call_chunk['index']
-            if idx not in state.tool_calls_dict:
-                state.tool_calls_dict[idx] = {
-                    'id': tool_call_chunk.get('id'),
-                    'type': 'function',
-                    'function': {'name': '', 'arguments': ''},
-                }
-
-            function = tool_call_chunk.get('function', {})
-            raw_name = function.get('name') if isinstance(function, dict) else None
-            if isinstance(raw_name, str) and raw_name:
-                current_name = state.tool_calls_dict[idx]['function']['name']
-                state.tool_calls_dict[idx]['function']['name'] = (
-                    self._merge_stream_fragment(current_name, raw_name)
-                )
-
-            raw_args = function.get('arguments') if isinstance(function, dict) else None
-            if not isinstance(raw_args, str) or not raw_args:
-                continue
-
-            current_args = state.tool_calls_dict[idx]['function']['arguments']
-            state.tool_calls_dict[idx]['function']['arguments'] = (
-                self._merge_stream_fragment(current_args, raw_args)
+            await self._ingest_stream_tool_call_chunk(
+                tool_call_chunk,
+                state,
+                event_stream,
             )
-            if event_stream:
-                logger.debug(
-                    'DEBUG: Emitting tool argument chunk of len %d',
-                    len(raw_args),
-                )
-                ev = StreamingChunkAction(
-                    chunk=raw_args,
-                    accumulated=state.tool_calls_dict[idx]['function']['arguments'],
-                    is_final=False,
-                    is_tool_call=True,
-                    tool_call_name=state.tool_calls_dict[idx]['function']['name'],
-                )
-                ev.source = EventSource.AGENT
-                event_stream.add_event(ev, EventSource.AGENT)
-                await asyncio.sleep(0)
 
     async def _process_stream_delta(
         self,

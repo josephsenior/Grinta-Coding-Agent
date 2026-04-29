@@ -3,26 +3,37 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from backend.core.config.security_config import SecurityConfig
+
+
+def _assert_security_attrs(cfg: SecurityConfig, expected: dict[str, object]) -> None:
+    for attr, value in expected.items():
+        assert getattr(cfg, attr) == value
 
 
 class TestSecurityConfigDefaults:
     def test_defaults(self):
         cfg = SecurityConfig()
-        assert cfg.confirmation_mode is False
-        assert cfg.security_analyzer is None
-        assert cfg.enforce_security is True
-        assert cfg.block_high_risk is False
-        assert cfg.validation_mode == 'permissive'
-        assert cfg.execution_profile == 'standard'
-        assert cfg.allow_network_commands is False
-        assert cfg.allow_package_installs is False
-        assert cfg.allow_background_processes is False
-        assert cfg.allow_sensitive_path_access is False
+        _assert_security_attrs(
+            cfg,
+            {
+                'confirmation_mode': False,
+                'security_analyzer': None,
+                'enforce_security': True,
+                'block_high_risk': False,
+                'validation_mode': 'permissive',
+                'execution_profile': 'standard',
+                'allow_network_commands': False,
+                'allow_package_installs': False,
+                'allow_background_processes': False,
+                'allow_sensitive_path_access': False,
+                'hardened_local_package_allowlist': [],
+                'hardened_local_network_allowlist': [],
+            },
+        )
         assert 'diff' in cfg.hardened_local_git_allowlist
-        assert cfg.hardened_local_package_allowlist == []
-        assert cfg.hardened_local_network_allowlist == []
 
 
 class TestSecurityConfigValidation:
@@ -32,7 +43,7 @@ class TestSecurityConfigValidation:
         assert not hasattr(cfg, 'unknown_field')
 
     def test_invalid_validation_mode(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             SecurityConfig(validation_mode='invalid')
 
     def test_valid_strict_mode(self):
@@ -59,18 +70,24 @@ class TestSecurityConfigValidation:
             hardened_local_package_allowlist=['npm_install'],
             hardened_local_network_allowlist=['curl'],
         )
-        assert cfg.confirmation_mode is True
-        assert cfg.security_analyzer == 'custom_analyzer'
-        assert cfg.enforce_security is False
-        assert cfg.block_high_risk is True
-        assert cfg.execution_profile == 'sandboxed_local'
-        assert cfg.allow_network_commands is True
-        assert cfg.allow_package_installs is True
-        assert cfg.allow_background_processes is True
-        assert cfg.allow_sensitive_path_access is True
-        assert cfg.hardened_local_git_allowlist == ['status', 'diff']
-        assert cfg.hardened_local_package_allowlist == ['npm_install']
-        assert cfg.hardened_local_network_allowlist == ['curl']
+        _assert_security_attrs(
+            cfg,
+            {
+                'confirmation_mode': True,
+                'security_analyzer': 'custom_analyzer',
+                'enforce_security': False,
+                'block_high_risk': True,
+                'validation_mode': 'strict',
+                'execution_profile': 'sandboxed_local',
+                'allow_network_commands': True,
+                'allow_package_installs': True,
+                'allow_background_processes': True,
+                'allow_sensitive_path_access': True,
+                'hardened_local_git_allowlist': ['status', 'diff'],
+                'hardened_local_package_allowlist': ['npm_install'],
+                'hardened_local_network_allowlist': ['curl'],
+            },
+        )
 
 
 class TestSecurityConfigFromToml:

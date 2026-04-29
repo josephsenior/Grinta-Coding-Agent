@@ -11,6 +11,11 @@ from backend.orchestration.state.control_flags import (
 from backend.orchestration.state.state import State
 
 
+def _assert_state_attrs(state: State, expected: dict[str, object]) -> None:
+    for attr, value in expected.items():
+        assert getattr(state, attr) == value
+
+
 class TestStateMutationMethods:
     def test_set_last_error_without_source(self):
         """Test setting last error without source."""
@@ -231,17 +236,21 @@ class TestStateInitialization:
     def test_default_initialization(self):
         """Test State with default values."""
         state = State()
-
-        assert state.session_id == ''
-        assert state.user_id is None
-        assert state.agent_state == AgentState.LOADING
-        assert state.confirmation_mode is False
-        assert state.history == []
-        assert state.inputs == {}
-        assert state.outputs == {}
-        assert state.extra_data == {}
-        assert state.last_error == ''
-        assert state.delegate_level == 0
+        _assert_state_attrs(
+            state,
+            {
+                'session_id': '',
+                'user_id': None,
+                'agent_state': AgentState.LOADING,
+                'confirmation_mode': False,
+                'history': [],
+                'inputs': {},
+                'outputs': {},
+                'extra_data': {},
+                'last_error': '',
+                'delegate_level': 0,
+            },
+        )
 
     def test_initialization_with_values(self):
         """Test State initialization with custom values."""

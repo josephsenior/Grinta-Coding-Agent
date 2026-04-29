@@ -278,7 +278,7 @@ class ActionExecutionService:
         self,
         agent: object,
         async_step: Callable[[object], Awaitable[Action]],
-        timeout: float,
+        step_timeout: float,
     ) -> Action:
         import asyncio as _asyncio
 
@@ -287,7 +287,7 @@ class ActionExecutionService:
             try:
                 result = await _asyncio.wait_for(
                     async_step(self._context.state),
-                    timeout=timeout,
+                    timeout=step_timeout,
                 )
                 break  # success
             except _asyncio.TimeoutError as exc:
@@ -295,18 +295,18 @@ class ActionExecutionService:
                     logger.warning(
                         'ActionExecutionService.get_next_action: '
                         'astep timed out after %s seconds, retrying once',
-                        timeout,
+                        step_timeout,
                     )
                     continue
                 model_name = self._agent_model_name(agent)
                 logger.error(
                     'ActionExecutionService.get_next_action: astep timed out '
                     'after %s seconds for model=%s (after retry)',
-                    timeout,
+                    step_timeout,
                     model_name,
                 )
                 raise Timeout(
-                    f'LLM step timed out after {timeout} seconds',
+                    f'LLM step timed out after {step_timeout} seconds',
                     model=model_name,
                 ) from exc
 
