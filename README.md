@@ -11,9 +11,29 @@
 [![Lint](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/lint.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/lint.yml)
 [![CLI Regression](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml)
 
-> Local-first autonomous coding agent. Plan → execute → validate → finish.
+> **Local-first. Provider-agnostic. Ships with real LSP + DAP. ~1.4 MB wheel.**
+>
+> A CLI coding agent that plans, executes, validates, and finishes — without a cloud control plane, without lock-in to one model vendor, and without a 1.6 GB install.
 
 ![Grinta in action](docs/grinta-demo.gif)
+
+## Why Grinta vs the rest
+
+| | **Grinta** | Aider | Claude Code | Codex CLI |
+|---|---|---|---|---|
+| Install size (base wheel) | **1.4 MB** | ~80 MB | ~15 MB | ~12 MB |
+| Provider-agnostic (OpenAI / Anthropic / Google / Ollama / LM Studio / OpenRouter) | ✅ | ✅ | ❌ Anthropic only | ❌ OpenAI only |
+| Local-first (works fully offline w/ Ollama) | ✅ auto-detected | partial | ❌ | ❌ |
+| LSP integration (auto-discovers 17 servers) | ✅ | ❌ | partial | ❌ |
+| DAP debugger integration | ✅ auto-discovered | ❌ | ❌ | ❌ |
+| Cost / token / latency HUD | ✅ live | partial | ❌ | partial |
+| Stuck-loop + cost-acceleration detection | ✅ | ❌ | partial | ❌ |
+| Risk-classified actions + audit log | ✅ `hardened_local` | ❌ | partial | partial |
+| Session checkpoint / resume / revert | ✅ event-stream | ✅ git | partial | ❌ |
+| Windows-first parity (PowerShell) | ✅ | partial | partial | partial |
+| MCP support | ✅ | ❌ | ✅ best in class | partial |
+
+The pitch in one sentence: **everything Aider's local-first ethos gives you, plus the depth of tooling Claude Code has, without locking you to a single model vendor.**
 
 ## Install in 30 seconds
 

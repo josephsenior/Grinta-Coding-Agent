@@ -16,7 +16,7 @@ warnings.filterwarnings(
 from importlib.metadata import PackageNotFoundError, version  # noqa: E402
 from pathlib import Path  # noqa: E402
 
-__version__ = '0.56.0'
+__version__ = '1.0.0rc1'
 __package_name__ = 'app-ai'
 
 
@@ -28,7 +28,7 @@ def get_version() -> str:
     from_pyproject = _version_from_pyproject()
     if from_pyproject:
         return from_pyproject
-    return '0.56.0'
+    return '1.0.0rc1'
 
 
 def _version_from_metadata() -> str | None:
@@ -59,10 +59,10 @@ try:
     __version__ = get_version()
 except Exception as _exc:
     warnings.warn(
-        f"App: could not determine package version ({_exc!r}); reporting '0.56.0'.",
+        f"App: could not determine package version ({_exc!r}); reporting '1.0.0rc1'.",
         stacklevel=1,
     )
-__version__ = '0.56.0'
+__version__ = '1.0.0rc1'
 
 
 __all__ = ['__version__', '__package_name__', 'get_version']

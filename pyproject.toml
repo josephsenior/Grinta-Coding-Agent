@@ -6,7 +6,7 @@ requires = [
 
 [project]
 name = "grinta-ai"
-version = "0.56.0"
+version = "1.0.0rc1"
 description = "Grinta: Your AI-Powered Development Platform"
 readme = "README.md"
 license = "MIT"

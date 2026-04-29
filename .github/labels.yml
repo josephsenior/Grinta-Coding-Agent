@@ -1,0 +1,201 @@
+# GitHub label catalog for the Grinta repo.
+#
+# Apply with the GitHub CLI in one command:
+#
+#   gh label sync -f .github/labels.yml -R josephsenior/Grinta-Coding-Agent
+#
+# Or with `actions/labeler` / `crazy-max/ghaction-github-labeler`.
+# Labels are grouped by purpose; colors follow the GitHub default palette
+# so they remain accessible.
+
+# ---------------------------------------------------------------------------
+# Triage / lifecycle
+# ---------------------------------------------------------------------------
+- name: triage
+  color: "ededed"
+  description: "Needs initial review by a maintainer."
+
+- name: needs-repro
+  color: "fbca04"
+  description: "Reporter must provide a minimal reproduction."
+
+- name: needs-info
+  color: "fbca04"
+  description: "Waiting for clarification from the reporter."
+
+- name: confirmed
+  color: "0e8a16"
+  description: "Issue has been reproduced by a maintainer."
+
+- name: wontfix
+  color: "ffffff"
+  description: "Closed without action; rationale in the thread."
+
+- name: duplicate
+  color: "cfd3d7"
+  description: "Duplicate of an existing issue."
+
+- name: stale
+  color: "cccccc"
+  description: "No activity for an extended period; will be closed if not refreshed."
+
+# ---------------------------------------------------------------------------
+# Type
+# ---------------------------------------------------------------------------
+- name: bug
+  color: "d73a4a"
+  description: "Something is not working."
+
+- name: enhancement
+  color: "a2eeef"
+  description: "New feature or improvement request."
+
+- name: regression
+  color: "b60205"
+  description: "Previously working behavior is now broken."
+
+- name: documentation
+  color: "0075ca"
+  description: "Improvements or fixes to docs."
+
+- name: question
+  color: "d876e3"
+  description: "User question, not yet a bug or feature."
+
+- name: discussion
+  color: "d4c5f9"
+  description: "Open-ended conversation."
+
+# ---------------------------------------------------------------------------
+# Contributor onboarding
+# ---------------------------------------------------------------------------
+- name: good-first-issue
+  color: "7057ff"
+  description: "Friendly entry point for new contributors."
+
+- name: help-wanted
+  color: "008672"
+  description: "Maintainers are open to outside PRs on this."
+
+# ---------------------------------------------------------------------------
+# Operating system
+# ---------------------------------------------------------------------------
+- name: "os: windows"
+  color: "0052cc"
+  description: "Specific to Windows / PowerShell."
+
+- name: "os: linux"
+  color: "0052cc"
+  description: "Specific to Linux."
+
+- name: "os: macos"
+  color: "0052cc"
+  description: "Specific to macOS."
+
+# ---------------------------------------------------------------------------
+# LLM provider
+# ---------------------------------------------------------------------------
+- name: "provider: openai"
+  color: "fef2c0"
+  description: "OpenAI / Azure OpenAI."
+
+- name: "provider: anthropic"
+  color: "fef2c0"
+  description: "Anthropic Claude."
+
+- name: "provider: google"
+  color: "fef2c0"
+  description: "Google Gemini / Vertex."
+
+- name: "provider: openrouter"
+  color: "fef2c0"
+  description: "OpenRouter aggregator."
+
+- name: "provider: ollama"
+  color: "fef2c0"
+  description: "Local Ollama runtime."
+
+- name: "provider: lmstudio"
+  color: "fef2c0"
+  description: "Local LM Studio runtime."
+
+- name: provider-bug
+  color: "ff7f50"
+  description: "Bug specific to one provider's API surface."
+
+# ---------------------------------------------------------------------------
+# Subsystem
+# ---------------------------------------------------------------------------
+- name: "area: cli"
+  color: "1d76db"
+  description: "CLI / TUI / HUD surface."
+
+- name: "area: engine"
+  color: "1d76db"
+  description: "Planner / function calling / prompt assembly."
+
+- name: "area: execution"
+  color: "1d76db"
+  description: "Runtime, terminal, command execution, file editing."
+
+- name: "area: lsp"
+  color: "1d76db"
+  description: "Language server / `code_intelligence` tool."
+
+- name: "area: dap"
+  color: "1d76db"
+  description: "Debug Adapter Protocol / `debugger` tool."
+
+- name: "area: rag"
+  color: "1d76db"
+  description: "Vector memory / hybrid retrieval (`[rag]` extra)."
+
+- name: "area: mcp"
+  color: "1d76db"
+  description: "Model Context Protocol integration."
+
+- name: "area: safety"
+  color: "1d76db"
+  description: "Risk classification, audit log, hardened_local profile."
+
+- name: "area: telemetry"
+  color: "1d76db"
+  description: "Cost / token / latency tracking, logging."
+
+- name: "area: packaging"
+  color: "1d76db"
+  description: "PyPI / Homebrew / Scoop / Docker distribution."
+
+# ---------------------------------------------------------------------------
+# Severity / risk
+# ---------------------------------------------------------------------------
+- name: "severity: critical"
+  color: "b60205"
+  description: "Data loss, security, or unrecoverable state."
+
+- name: "severity: high"
+  color: "d93f0b"
+  description: "Blocks normal use of a major capability."
+
+- name: "severity: medium"
+  color: "e99695"
+  description: "Workaround exists but UX is degraded."
+
+- name: "severity: low"
+  color: "fef2c0"
+  description: "Cosmetic or rare-edge issue."
+
+- name: security
+  color: "b60205"
+  description: "Security-sensitive issue. See SECURITY.md before commenting."
+
+# ---------------------------------------------------------------------------
+# Release / governance
+# ---------------------------------------------------------------------------
+- name: breaking-change
+  color: "b60205"
+  description: "Backwards-incompatible change."
+
+- name: dependencies
+  color: "0366d6"
+  description: "Pull request that updates a dependency."

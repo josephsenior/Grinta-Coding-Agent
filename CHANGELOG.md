@@ -9,6 +9,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.0.0-rc1] - 2026-04-29
+
+First release candidate. Includes everything in `0.56.0` plus the
+pre-launch polish below. Tagged as `rc1` to invite community feedback
+before the final `1.0.0` cut.
+
+### Added
+
+- **`read_symbol_definition` tool restored** (tree-sitter-backed). Lets the
+  agent fetch a single named symbol (`path:Symbol` or `path:Class.method`)
+  or a whole file in one call, replacing the previous 2-3 call dance of
+  `search_code` + `read_file`. Backed by the already-core
+  `backend.utils.treesitter_editor.TreeSitterEditor.find_symbol()`. Wired
+  through `planner.py`, `function_calling.py`, and the CLI display layer.
+- **README** rewritten with a multi-line pitch and an 11-row competitor
+  comparison table (Grinta vs Aider, Claude Code, Codex CLI) covering
+  install size, provider-agnosticism, local-first posture, LSP, DAP, HUD,
+  stuck-detection, hardened_local profile, checkpoint/resume, Windows
+  parity, and MCP support.
+- **Demo material**: `docs/DEMO_SCRIPT.md` — a 60-second asciinema scenario
+  (`demo_app/calc.py::average` `ZeroDivisionError`) plus an `agg` command
+  for converting the cast into a GIF for the README.
+- **Smoke-test scripts** for clean-box install verification:
+  - `scripts/smoke_install.sh` (Linux/macOS, accepts extras as positional
+    args; prefers a local wheel from `$WHEEL_DIR=./dist`, falls back to PyPI).
+  - `scripts/smoke_install.ps1` (Windows mirror; reports site-packages MB).
+  - `scripts/Dockerfile.smoke` (Python 3.12-slim base, ripgrep pre-installed,
+    `EXTRAS` env var picks the optional extras to test).
+  Each script runs `python -c "import backend"`, `--help`, and
+  `verify_optional_imports.py` so a broken extras gate is caught before
+  publishing to PyPI.
+- **GitHub label catalog** at `.github/labels.yml` covering triage,
+  type, severity, OS (`os: windows|linux|macos`), provider
+  (`provider: openai|anthropic|google|openrouter|ollama|lmstudio`), area
+  (`area: cli|engine|execution|lsp|dap|rag|mcp|safety|telemetry|packaging`),
+  contributor onboarding, and release governance. Apply with
+  `gh label sync -f .github/labels.yml`.
+
+### Changed
+
+- **Wheel size**: stable at ~1.4 MB on the base install (see `0.56.0`).
+- **Issue template** version hint bumped to `1.0.0rc1`.
+
 ## [0.56.0] - 2026-04-29
 
 ### Added
@@ -147,6 +190,7 @@ HTTP server.
   local `AuditLogger`. No outbound calls are made beyond configured LLM
   providers and explicitly enabled MCP servers.
 
-[Unreleased]: https://github.com/josephsenior/Grinta-Coding-Agent/compare/v0.56.0...HEAD
+[Unreleased]: https://github.com/josephsenior/Grinta-Coding-Agent/compare/v1.0.0-rc1...HEAD
+[1.0.0-rc1]: https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v1.0.0-rc1
 [0.56.0]: https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v0.56.0
 [0.55.0]: https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v0.55.0
