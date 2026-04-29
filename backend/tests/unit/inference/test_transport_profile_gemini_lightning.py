@@ -243,7 +243,7 @@ class TestRequestParamsPreserved:
         """extra_body.metadata must be removed (Lightning rejects it)."""
         kwargs = {
             'extra_body': {
-                'metadata': {'trace_version': '0.55.0', 'session_id': 'abc'},
+                'metadata': {'trace_version': '0.56.0', 'session_id': 'abc'},
                 'other_field': 'keep_me',
             }
         }

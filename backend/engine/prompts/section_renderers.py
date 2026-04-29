@@ -52,12 +52,12 @@ def _resolve_terminal_command_tool(
 
 def _code_intelligence_available(config: Any = None) -> bool:
     """Return whether the code_intelligence tool should be considered available."""
-    if not getattr(config, 'enable_lsp_query', False):
+    if not getattr(config, 'enable_lsp_query', True):
         return False
     try:
-        from backend.utils.lsp_client import _detect_pylsp
+        from backend.utils.runtime_detect import has_any_lsp_server
 
-        return bool(_detect_pylsp())
+        return bool(has_any_lsp_server())
     except Exception:
         return False
 

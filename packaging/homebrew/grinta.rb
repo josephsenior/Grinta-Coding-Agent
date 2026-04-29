@@ -8,7 +8,7 @@ class Grinta < Formula
 
   desc "Autonomous local-first CLI coding agent"
   homepage "https://github.com/josephsenior/Grinta-Coding-Agent"
-  url "https://files.pythonhosted.org/packages/source/g/grinta-ai/grinta-ai-0.55.0.tar.gz"
+  url "https://files.pythonhosted.org/packages/source/g/grinta-ai/grinta-ai-0.56.0.tar.gz"
   sha256 "0a902cc1de015acbcbb2af79f3a81547da8c20fe00a927271e8dd9b695e747aa"
   license "MIT"
 

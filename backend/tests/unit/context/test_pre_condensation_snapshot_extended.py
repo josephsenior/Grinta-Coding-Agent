@@ -1,7 +1,8 @@
-﻿from typing import Any
-"""Tests for pre_condensation_snapshot covering attempted approaches extraction."""
+﻿"""Tests for pre_condensation_snapshot covering attempted approaches extraction."""
 
 from __future__ import annotations
+
+from typing import Any
 
 import unittest
 from pathlib import Path
@@ -191,7 +192,10 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         snapshot: dict[str, Any] = {'decisions': []}
 
         snapshot_module._extract_decisions(
-            _fake_event('AgentThinkObservation', thought='Ã°Å¸â€Â SELF-REFLECTION: boilerplate'),
+            _fake_event(
+                'AgentThinkObservation',
+                thought='\U0001F50D SELF-REFLECTION: boilerplate',
+            ),
             snapshot,
         )
         snapshot_module._extract_decisions(
@@ -302,10 +306,10 @@ class TestPreCondensationSnapshot(unittest.TestCase):
 
         assert [files[-1], errors[-1], decisions[-1], commands[-2], commands[-1]] == [
             '  edit: a.py',
-            '  Ã¢â‚¬Â¢ boom',
-            '  Ã¢â‚¬Â¢ choose branch a',
+            '  \u2022 boom',
+            '  \u2022 choose branch a',
             '  $ pytest',
-            '    Ã¢â€ â€™ ok',
+            '    \u2192 ok',
         ]
         assert 'FAILED approaches' in approaches[1]
         assert 'Succeeded approaches:' in approaches[-2]

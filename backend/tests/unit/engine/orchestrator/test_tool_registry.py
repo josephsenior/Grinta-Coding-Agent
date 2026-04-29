@@ -201,7 +201,7 @@ class TestFeatureFlagToolPresence:
     def test_lsp_query_enabled_with_pylsp(self):
         from unittest.mock import patch
 
-        with patch('backend.utils.lsp_client._detect_pylsp', return_value=True):
+        with patch('backend.utils.runtime_detect.has_any_lsp_server', return_value=True):
             names = _build_toolset(enable_lsp_query=True)
         assert 'code_intelligence' in names
         self._assert_dispatch_covered(names)
@@ -209,7 +209,7 @@ class TestFeatureFlagToolPresence:
     def test_lsp_query_absent_without_pylsp(self):
         from unittest.mock import patch
 
-        with patch('backend.utils.lsp_client._detect_pylsp', return_value=False):
+        with patch('backend.utils.runtime_detect.has_any_lsp_server', return_value=False):
             names = _build_toolset(enable_lsp_query=True)
         assert 'code_intelligence' not in names
 
@@ -236,7 +236,7 @@ class TestFeatureFlagToolPresence:
         """All-flags-on toolset must have 100 % dispatch coverage."""
         from unittest.mock import patch
 
-        with patch('backend.utils.lsp_client._detect_pylsp', return_value=True):
+        with patch('backend.utils.runtime_detect.has_any_lsp_server', return_value=True):
             names = _build_toolset(
                 enable_think=True,
                 enable_finish=True,

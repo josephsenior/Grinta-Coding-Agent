@@ -41,8 +41,8 @@ versions are best-effort.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.55.x  | :white_check_mark: |
-| < 0.55  | :x:                |
+| 0.56.x  | :white_check_mark: |
+| < 0.56  | :x:                |
 
 ## Security architecture
 
@@ -99,7 +99,7 @@ captures the boundaries operators care about most.
   opt-in. See `backend/telemetry/`.
 - The legacy local web surface — when enabled — restricts CORS to localhost,
   ships strict security headers, and supports CSRF protection via
-  `APP_CSRF_ENABLED`. The supported interactive surface for 0.55 is the CLI.
+  `APP_CSRF_ENABLED`. The supported interactive surface for 0.56 is the CLI.
 
 ### Data storage
 

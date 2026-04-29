@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import shutil
 import subprocess
 import sys
 import threading
@@ -22,6 +23,153 @@ from backend.ledger.observation.debugger import DebuggerObservation
 
 class DAPError(RuntimeError):
     """Raised when DAP communication fails."""
+
+
+# ── Auto-discovery of DAP adapters ─────────────────────────────────────────
+#
+# Each entry maps a language label (matching ``adapter`` / ``language``) to a
+# discovery recipe. ``probe`` is the executable name we look up on PATH;
+# ``build`` constructs the full DAP-over-stdio argv when probe is found.
+# ``fallbacks`` is an ordered list of (probe, build) pairs to try next.
+# ``extensions`` is the set of file extensions that map to the language so
+# the recipe can be resolved from ``action.program`` alone.
+# Python is special-cased in :meth:`DAPDebugManager._adapter_command` because
+# we ship debugpy as a wheel dependency and want to use the *same* interpreter.
+_DAP_ADAPTER_RECIPES: dict[str, dict[str, Any]] = {
+    'go': {
+        'probe': 'dlv',
+        'build': lambda exe: [exe, 'dap'],
+        'extensions': ('.go',),
+    },
+    'rust': {
+        'probe': 'codelldb',
+        'build': lambda exe: [exe, '--port', '0'],
+        'fallbacks': [
+            ('lldb-dap', lambda exe: [exe]),
+            ('lldb-vscode', lambda exe: [exe]),
+        ],
+        'extensions': ('.rs',),
+    },
+    'cpp': {
+        'probe': 'codelldb',
+        'build': lambda exe: [exe, '--port', '0'],
+        'fallbacks': [
+            ('lldb-dap', lambda exe: [exe]),
+            ('lldb-vscode', lambda exe: [exe]),
+            ('OpenDebugAD7', lambda exe: [exe]),
+        ],
+        'extensions': ('.cpp', '.cc', '.cxx', '.hpp'),
+    },
+    'c': {
+        'probe': 'lldb-dap',
+        'build': lambda exe: [exe],
+        'fallbacks': [
+            ('codelldb', lambda exe: [exe, '--port', '0']),
+            ('lldb-vscode', lambda exe: [exe]),
+            ('OpenDebugAD7', lambda exe: [exe]),
+        ],
+        'extensions': ('.c', '.h'),
+    },
+    'csharp': {
+        'probe': 'netcoredbg',
+        'build': lambda exe: [exe, '--interpreter=vscode'],
+        'extensions': ('.cs',),
+    },
+    'javascript': {
+        'probe': 'js-debug-adapter',
+        'build': lambda exe: [exe],
+        'fallbacks': [
+            ('js-debug-dap', lambda exe: [exe]),
+            ('node-debug2', lambda exe: [exe]),
+        ],
+        'extensions': ('.js', '.mjs', '.cjs', '.jsx'),
+    },
+    'typescript': {
+        'probe': 'js-debug-adapter',
+        'build': lambda exe: [exe],
+        'fallbacks': [
+            ('js-debug-dap', lambda exe: [exe]),
+            ('node-debug2', lambda exe: [exe]),
+        ],
+        'extensions': ('.ts', '.tsx'),
+    },
+    'java': {
+        'probe': 'java-debug-adapter',
+        'build': lambda exe: [exe],
+        'extensions': ('.java',),
+    },
+    'ruby': {
+        'probe': 'rdbg',
+        'build': lambda exe: [exe, '--open', '--stop-at-load'],
+        'extensions': ('.rb',),
+    },
+    'php': {
+        'probe': 'php-debug-adapter',
+        'build': lambda exe: [exe],
+        'extensions': ('.php',),
+    },
+}
+
+
+def _resolve_recipe(language: str) -> list[str] | None:
+    """Walk a recipe's probe + fallbacks and return the first hit."""
+    recipe = _DAP_ADAPTER_RECIPES.get(language)
+    if not recipe:
+        return None
+    for probe, build in [
+        (recipe['probe'], recipe['build']),
+        *recipe.get('fallbacks', []),
+    ]:
+        exe = shutil.which(probe)
+        if exe:
+            return build(exe)
+    return None
+
+
+def _language_from_extension(ext: str) -> str | None:
+    ext = ext.lower()
+    for lang, recipe in _DAP_ADAPTER_RECIPES.items():
+        if ext in recipe.get('extensions', ()):
+            return lang
+    return None
+
+
+def detect_debug_adapters() -> list[dict[str, Any]]:
+    """Probe PATH for known DAP adapters; useful for diagnostics / UI.
+
+    Always reports Python as available because we ship ``debugpy`` as a
+    wheel dependency. All other adapters are PATH-discovered.
+    """
+    results: list[dict[str, Any]] = [
+        {
+            'language': 'python',
+            'adapter': 'debugpy',
+            'available': True,
+            'command': [sys.executable, '-m', 'debugpy.adapter'],
+            'source': 'bundled',
+        }
+    ]
+    for label, recipe in _DAP_ADAPTER_RECIPES.items():
+        candidates = [(recipe['probe'], recipe['build'])]
+        candidates.extend(recipe.get('fallbacks', []))
+        found_command: list[str] | None = None
+        found_probe: str | None = None
+        for probe, build in candidates:
+            exe = shutil.which(probe)
+            if exe:
+                found_command = build(exe)
+                found_probe = probe
+                break
+        results.append(
+            {
+                'language': label,
+                'adapter': found_probe or recipe['probe'],
+                'available': found_command is not None,
+                'command': found_command,
+                'source': 'PATH',
+            }
+        )
+    return results
 
 
 class DAPClient:
@@ -882,10 +1030,24 @@ class DAPDebugManager:
             return action.adapter_command
         if adapter in self._PYTHON_ADAPTERS:
             return [action.python or sys.executable, '-m', 'debugpy.adapter']
+        # Auto-discovery: probe PATH for a known adapter so the model
+        # doesn't have to hand-roll ``adapter_command`` for the common
+        # languages (Go/dlv, Rust/codelldb, JS/js-debug, C#/netcoredbg, …).
+        discovered: list[str] | None = None
+        if adapter:
+            discovered = _resolve_recipe(adapter)
+        if discovered is None and action.program:
+            lang = _language_from_extension(Path(action.program).suffix)
+            if lang:
+                discovered = _resolve_recipe(lang)
+        if discovered is not None:
+            return discovered
         hint = f' for adapter {adapter!r}' if adapter else ''
         raise DAPError(
             'debugger start requires adapter_command'
-            f'{hint}. Provide a DAP adapter command over stdio, or use adapter="python".'
+            f'{hint}. No DAP adapter found on PATH; install one '
+            '(e.g. dlv for Go, codelldb for Rust/C++, js-debug-adapter for '
+            'Node/TS, netcoredbg for C#) or pass adapter_command explicitly.'
         )
 
     def _get_session(self, session_id: str | None) -> DAPDebugSession:
