@@ -27,11 +27,27 @@ def create_lsp_query_tool() -> dict[str, Any]:
         'function': {
             'name': CODE_INTELLIGENCE_TOOL_NAME,
             'description': (
-                'Code navigation and diagnostics via language server. '
-                'Commands: find_definition, find_references, hover, list_symbols, get_diagnostics. '
-                'Use get_diagnostics after editing a file to check for errors/warnings. '
-                'Use find_definition/find_references when you know the file and position. '
-                'Falls back gracefully if LSP is not installed.'
+                'Read-only semantic code navigation via the locally-installed '
+                'language server (LSP). Auto-detects servers on PATH (pylsp, '
+                'pyright, typescript-language-server, gopls, rust-analyzer, '
+                'clangd, …) — the System Capabilities block in the system prompt '
+                'lists which are actually present on this host; do NOT shell out '
+                'to discover them.\n'
+                'Commands: find_definition, find_references, hover, list_symbols, '
+                'get_diagnostics. Use get_diagnostics after editing a file to '
+                'check for errors/warnings. Use find_definition / find_references '
+                'when you know the file and 1-based position.\n'
+                'Tool boundaries (do not duplicate effort):\n'
+                '  • Rename symbol / edit by symbol name → use `symbol_editor` '
+                '(rename_symbol, edit_symbol_body, multi_edit). `code_intelligence` '
+                'is read-only and intentionally does not expose rename.\n'
+                '  • Workspace-wide text/symbol search → use `search_code` '
+                '(ripgrep). `list_symbols` only enumerates symbols in a single file.\n'
+                '  • Code formatting / quick-fix application → run the project '
+                'formatter or linter via `execute_bash` / `execute_powershell`.\n'
+                'When no LSP server is installed this tool is hidden from the '
+                'toolset entirely — its absence here means the user has at least '
+                'one server on PATH.'
             ),
             'parameters': {
                 'type': 'object',

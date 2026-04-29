@@ -38,6 +38,7 @@ from backend.execution.server_routes import (
 from backend.execution.utils.file_editor import FileEditor
 from backend.execution.utils.memory_monitor import MemoryMonitor
 from backend.execution.utils.session_manager import SessionManager
+from backend.utils.regex_limits import try_compile_user_regex as _try_compile_user_regex
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.mcp import MCPAction
@@ -70,6 +71,12 @@ _POWERSHELL_BUILTIN_COMMANDS = frozenset(
         'Remove-Item',
     }
 )
+
+
+def try_compile_user_regex(pattern_str: str) -> tuple[re.Pattern[str] | None, str | None]:
+    """Compile a user-provided regex pattern safely."""
+    return _try_compile_user_regex(pattern_str)
+
 
 # Note: Import is deferred to avoid executing windows_bash.py on non-Windows platforms
 if OS_CAPS.is_windows:
