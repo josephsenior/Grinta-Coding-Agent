@@ -34,6 +34,28 @@ _MAX_COMMANDS = 10
 _MAX_CONTENT_LENGTH = 500
 
 
+# #region agent log
+def _agent_debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    try:
+        log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+        payload = {
+            'sessionId': 'fee086',
+            'runId': 'pre-fix',
+            'hypothesisId': hypothesis_id,
+            'location': location,
+            'message': message,
+            'data': data,
+            'timestamp': int(time.time() * 1000),
+        }
+        with open(log_path, 'a', encoding='utf-8') as _f:
+            _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+    except Exception:
+        pass
+
+
+# #endregion
+
+
 def _snapshot_path() -> Path:
     from backend.core.workspace_resolution import workspace_agent_state_dir
 
@@ -167,7 +189,21 @@ def _extract_decisions(event: Event, snapshot: dict) -> None:
             '[SCRATCHPAD]',
             '[SEMANTIC_RECALL',
         )
-        if thought and not any(thought.startswith(p) for p in skip_prefixes):
+        should_skip = bool(thought) and any(thought.startswith(p) for p in skip_prefixes)
+        # #region agent log
+        if 'SELF-REFLECTION' in thought:
+            _agent_debug_log(
+                'H2_mojibake_prefix_mismatch',
+                'backend/context/pre_condensation_snapshot.py:_extract_decisions',
+                'decision-prefix-check',
+                {
+                    'raw_prefix': thought[:24],
+                    'raw_prefix_codepoints': [ord(ch) for ch in thought[:6]],
+                    'should_skip': should_skip,
+                },
+            )
+        # #endregion
+        if thought and not should_skip:
             snapshot['decisions'].append(thought[:_MAX_CONTENT_LENGTH])
 
 
@@ -368,6 +404,15 @@ def _format_errors_section(errors: list) -> list[str]:
     lines = [f'\nRecent errors ({len(errors)}):']
     for err in errors[-5:]:
         lines.append(f'  • {err[:200]}')
+    # #region agent log
+    if lines:
+        _agent_debug_log(
+            'H3_unicode_bullet_expectation',
+            'backend/context/pre_condensation_snapshot.py:_format_errors_section',
+            'formatted-errors-bullet',
+            {'sample_line': lines[-1], 'sample_codepoints': [ord(ch) for ch in lines[-1][:4]]},
+        )
+    # #endregion
     return lines
 
 

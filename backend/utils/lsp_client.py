@@ -15,23 +15,37 @@ from typing import Any
 
 from backend.core.logger import app_logger as logger
 
-# ── Try importing pylsp; soft-dependency only ──────────────────────────────
+# ── Soft pylsp detection — delegates to the unified runtime detector ──────
+# ``_PYLSP_AVAILABLE`` is kept for backward-compatibility with tests that
+# monkeypatch it directly. ``_detect_pylsp`` now consults the multi-language
+# detector so other languages (gopls, typescript-language-server, …) are
+# discovered through the same mechanism.
 _PYLSP_AVAILABLE: bool | None = None  # None = not yet detected
 
 
 def _detect_pylsp() -> bool:
+    """Return True when the Python language server is available locally."""
     global _PYLSP_AVAILABLE
-    if _PYLSP_AVAILABLE is None:
-        try:
-            result = subprocess.run(
-                ['python', '-m', 'pylsp', '--version'],
-                capture_output=True,
-                timeout=5,
-            )
-            _PYLSP_AVAILABLE = result.returncode == 0
-        except Exception:
-            _PYLSP_AVAILABLE = False
-    return _PYLSP_AVAILABLE  # type: ignore[return-value]
+    if _PYLSP_AVAILABLE is not None:
+        return _PYLSP_AVAILABLE
+    try:
+        from backend.utils.runtime_detect import detect_lsp_servers
+
+        servers = detect_lsp_servers()
+        _PYLSP_AVAILABLE = bool(servers.get('pylsp') and servers['pylsp'].available)
+    except Exception:
+        _PYLSP_AVAILABLE = False
+    return _PYLSP_AVAILABLE
+
+
+def _detect_any_lsp_server() -> bool:
+    """Return True when at least one supported LSP server is available."""
+    try:
+        from backend.utils.runtime_detect import has_any_lsp_server
+
+        return has_any_lsp_server()
+    except Exception:
+        return False
 
 
 # ── Data types ─────────────────────────────────────────────────────────────
@@ -148,8 +162,21 @@ class LspClient:
     }
 
     def _get_server_command(self, file_path: str) -> list[str] | None:
-        """Get the LSP server command based on file extension."""
+        """Get the LSP server command based on file extension.
+
+        Prefers the unified runtime detector (which only returns commands
+        for tools actually installed on the machine). Falls back to the
+        legacy hard-coded mapping so existing test patches keep working.
+        """
         ext = Path(file_path).suffix.lower()
+        try:
+            from backend.utils.runtime_detect import lsp_command_for_extension
+
+            resolved = lsp_command_for_extension(ext)
+            if resolved is not None:
+                return list(resolved)
+        except Exception:
+            pass
         return self._SERVER_COMMANDS.get(ext)
 
     def query(

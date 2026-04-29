@@ -37,7 +37,9 @@ class TestAgentConfigDefaults:
 
     def test_default_lsp_query_enabled(self):
         cfg = AgentConfig()
-        assert cfg.enable_lsp_query is False
+        # LSP is opt-out as of v0.56: the runtime detector silently skips the
+        # tool when no language server is installed, so default-on is safe.
+        assert cfg.enable_lsp_query is True
 
     def test_default_swarming_enabled(self):
         cfg = AgentConfig()

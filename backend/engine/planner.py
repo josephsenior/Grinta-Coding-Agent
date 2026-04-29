@@ -188,10 +188,10 @@ class OrchestratorPlanner:
 
         tools.append(create_analyze_project_structure_tool())
 
-        if getattr(self._config, 'enable_lsp_query', False):
-            from backend.utils.lsp_client import _detect_pylsp
+        if getattr(self._config, 'enable_lsp_query', True):
+            from backend.utils.runtime_detect import has_any_lsp_server
 
-            if _detect_pylsp():
+            if has_any_lsp_server():
                 tools.append(create_lsp_query_tool())
         if getattr(self._config, 'enable_swarming', False):
             tools.append(create_delegate_task_tool())

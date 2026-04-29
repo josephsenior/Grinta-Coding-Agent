@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [0.56.0] - 2026-04-29
+
+### Added
+
+- **Auto-discovery of LSP servers**: `LspClient` now probes `PATH` for
+  installed language servers (pylsp, typescript-language-server, rust-analyzer,
+  gopls, clangd, jdtls, omnisharp, lua-language-server, bash-language-server,
+  vscode-html-language-server, vscode-css-language-server, vscode-json-language-server,
+  yaml-language-server, ruby-lsp, solargraph, intelephense, terraform-ls).
+  No more pylsp-only gating.
+- **Auto-discovery of DAP debug adapters**: `DAPDebugManager` now probes
+  `PATH` for `dlv`, `codelldb`, `lldb-dap`, `netcoredbg`, `node`, etc. and
+  falls back to a sensible adapter command when the model omits `adapter_command`.
+  Python remains batteries-included via bundled `debugpy`.
+- `detect_lsp_servers()` and `detect_debug_adapters()` discovery helpers
+  exported for diagnostics / UI.
+
+### Changed
+
+- `enable_lsp_query` now defaults to **`True`** — the planner enables the
+  `code_intelligence` tool whenever any supported LSP server is on `PATH`.
+- DAP `start` no longer requires the model to supply `adapter_command` for
+  languages whose adapter is auto-discoverable.
+
 ## [0.55.0] - 2026-04-29
 
 First public open-source release. Grinta is now a **CLI-only**, local-first
@@ -94,5 +118,6 @@ HTTP server.
   local `AuditLogger`. No outbound calls are made beyond configured LLM
   providers and explicitly enabled MCP servers.
 
-[Unreleased]: https://github.com/josephsenior/Grinta-Coding-Agent/compare/v0.55.0...HEAD
+[Unreleased]: https://github.com/josephsenior/Grinta-Coding-Agent/compare/v0.56.0...HEAD
+[0.56.0]: https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v0.56.0
 [0.55.0]: https://github.com/josephsenior/Grinta-Coding-Agent/releases/tag/v0.55.0

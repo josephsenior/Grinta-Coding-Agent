@@ -174,7 +174,15 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_debugger: bool = Field(default=True)
     enable_editor: bool = Field(default=True)
     enable_working_memory: bool = Field(default=True)
-    enable_lsp_query: bool = Field(default=False)
+    enable_lsp_query: bool = Field(
+        default=True,
+        description=(
+            'Expose the code_intelligence (LSP) tool. The runtime detector probes the '
+            'machine for installed language servers (pylsp, gopls, rust-analyzer, '
+            'typescript-language-server, clangd, …). When none are present the tool is '
+            'silently skipped, so leaving this on is safe even on minimal images.'
+        ),
+    )
     enable_swarming: bool = Field(default=False)
     enable_blackboard: bool = Field(default=False)
     enable_verify_file_lines: bool = Field(default=True)
