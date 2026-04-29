@@ -275,17 +275,75 @@ def _render_system_capabilities(
 
     fc_line = f'- **Function-calling mode**: `{fc_mode}`.'
 
+    # Runtime-detected language servers and debug adapters. These come from a
+    # live probe so the agent never has to shell out (`Get-Command`, `which`)
+    # to answer "do I have an LSP / debugger" questions.
+    lsp_line, dap_line = _render_runtime_detection_lines(config)
+
     return (
         '# 🧭 System Capabilities (verified at runtime)\n'
         'The following statements are derived from live config and feature flags. '
-        'Treat them as authoritative — do not contradict them in user-facing replies.\n\n'
+        'Treat them as authoritative — do not contradict them in user-facing replies. '
+        'In particular, **never run shell commands like `Get-Command`/`which`/`where` '
+        'to discover language servers or debug adapters** — the lines below are the '
+        'authoritative answer.\n\n'
         f'{parallel_line}\n'
         f'{provider_line}\n'
         f'{multi_edit_line}\n'
         f'{condensation_line}\n'
         f'{checkpoint_line}\n'
-        f'{fc_line}'
+        f'{fc_line}\n'
+        f'{lsp_line}\n'
+        f'{dap_line}'
     )
+
+
+def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
+    """Return ``(lsp_line, dap_line)`` summarizing detected runtimes."""
+    lsp_enabled = bool(getattr(config, 'enable_lsp_query', True))
+    try:
+        from backend.utils.runtime_detect import detection_summary
+
+        summary = detection_summary()
+    except Exception:
+        summary = {'lsp_available': [], 'debug_available': []}
+
+    lsp_available = summary.get('lsp_available', [])
+    if not lsp_enabled:
+        lsp_line = (
+            '- **Language servers (LSP / `code_intelligence`)**: tool DISABLED in this run.'
+        )
+    elif lsp_available:
+        lsp_line = (
+            '- **Language servers (LSP / `code_intelligence`)**: detected on PATH → '
+            f'{", ".join(lsp_available)}. Use `code_intelligence` for definition / '
+            'references / hover / diagnostics on these languages. '
+            'For symbol rename or structural edits use `symbol_editor` (rename, '
+            'edit_symbol_body, multi_edit) — `code_intelligence` is read-only.'
+        )
+    else:
+        lsp_line = (
+            '- **Language servers (LSP / `code_intelligence`)**: none detected on the '
+            'host. The `code_intelligence` tool is hidden from your toolset; fall back '
+            'to `search_code` + `read_file` for navigation. To enable it the user can '
+            'install e.g. `pip install python-lsp-server`, `npm i -g '
+            'typescript-language-server`, `rustup component add rust-analyzer`.'
+        )
+
+    debug_available = summary.get('debug_available', [])
+    if debug_available:
+        dap_line = (
+            '- **Debug adapters (DAP / `debugger`)**: detected → '
+            f'{", ".join(debug_available)}. The `debugger` tool resolves the right '
+            'adapter automatically from the file extension or `adapter` field; do not '
+            'pass `adapter_command` unless you have a custom binary.'
+        )
+    else:
+        dap_line = (
+            '- **Debug adapters (DAP / `debugger`)**: none detected (Python `debugpy` '
+            'normally ships bundled — if it is missing the install is broken).'
+        )
+    return lsp_line, dap_line
 
 
 def _render_security(cli_mode: bool = True) -> str:
