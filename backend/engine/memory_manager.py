@@ -140,7 +140,7 @@ class ContextMemoryManager:
         self._extract_pre_condensation_snapshot(list(history))
 
         condensation_result = self.compactor.compacted_history(state)
-        condensation_result = self._maybe_force_compaction_under_memory_pressure(
+        condensation_result = self._maybe_force_compaction_under_memory_pressure(  # type: ignore[assignment]
             state, list(history), condensation_result
         )
         memory_pressure = self._memory_pressure_signal(state)

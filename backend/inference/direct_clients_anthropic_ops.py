@@ -312,8 +312,8 @@ async def astream(
                         yield chunk
                     continue
 
-                chunk = _anthropic_stream_event_chunk(event)
-                if chunk is not None:
-                    yield chunk
+                event_chunk: dict[str, Any] | None = _anthropic_stream_event_chunk(event)
+                if event_chunk is not None:
+                    yield event_chunk
     except Exception as e:
         raise client._map_anthropic_error(e) from e

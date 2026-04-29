@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from backend.cli.event_renderer import CLIEventRenderer
 from backend.core.config import AppConfig
@@ -23,6 +23,39 @@ logger = logging.getLogger(__name__)
 
 class RunHelpersMixin:
     """Mixin providing the async run() pipeline helpers."""
+
+    # Attributes & helpers provided by the concrete ``backend.cli.repl.Repl``
+    # host class. Declared as ``Any`` so the mixin type-checks in isolation
+    # without constraining the concrete attribute types in :class:`Repl`.
+    if TYPE_CHECKING:
+        _config: Any
+        _memory: Any
+        _runtime: Any
+        _agent: Any
+        _llm_registry: Any
+        _conversation_stats: Any
+        _pt_session: Any
+        _renderer: Any
+        _console: Any
+        _hud: Any
+        _reasoning: Any
+        _pending_resume: str | None
+        _next_action: Any
+        _last_user_message: str | None
+        _prompt_ctrl_c_hint_shown: bool
+
+        def _create_prompt_session(self) -> Any: ...
+        def _set_footer_system_line(
+            self, text: str, *, kind: str = ...
+        ) -> None: ...
+        def _read_non_interactive_input(self) -> Any: ...
+        def _handle_parsed_command(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _cancel_agent(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _resume_session(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _wait_for_agent_idle(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _sync_terminal_after_agent_turn(self, *args: Any, **kwargs: Any) -> Any: ...
+        def _invalidate_pt(self) -> None: ...
+        def _warn(self, msg: str) -> None: ...
 
     def _build_prompt_session(self) -> Any | None:
         import sys
@@ -181,7 +214,7 @@ class RunHelpersMixin:
         try:
             runtime_state = await asyncio.to_thread(
                 _setup_runtime_for_controller,
-                config_, llm_registry, session_id, True, agent, None,
+                config_, llm_registry, session_id, True, agent, None,  # type: ignore[arg-type]
                 inline_event_delivery=True,
             )
             runtime = runtime_state[0]
@@ -197,7 +230,7 @@ class RunHelpersMixin:
             self._acquire_result = acquire_result
 
             memory = await _setup_memory(
-                config_, runtime, session_id, repo_directory, None, None, agent,
+                config_, runtime, session_id, repo_directory, None, None, agent,  # type: ignore[arg-type]
             )
             self._memory = memory
 

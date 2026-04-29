@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from backend.cli.config_manager import get_current_model
 from backend.cli.hud import HUDBar
@@ -24,9 +24,33 @@ from backend.cli.settings_tui import open_settings
 from backend.core.config import load_app_config
 from backend.ledger.action import MessageAction
 
+if TYPE_CHECKING:
+    from rich.console import Console
+
+    from backend.core.config import AppConfig
+
 
 class SlashCommandsMixin:
     """Mixin providing the slash-command surface of the REPL."""
+
+    # Attributes provided by the concrete ``backend.cli.repl.Repl`` host class.
+    # Declared here so the mixin's references type-check without forcing each
+    # call site to carry an ``# type: ignore[attr-defined]``.
+    if TYPE_CHECKING:
+        _renderer: Any | None
+        _console: Console
+        _config: AppConfig
+        _hud: HUDBar
+        _controller: Any | None
+        _event_stream: Any | None
+        _next_action: Any | None
+        _pending_resume: str | None
+        _last_user_message: str | None
+
+        def _warn(self, msg: str) -> None: ...
+        def _usage(self, name: str) -> str: ...
+        def _reject_extra_args(self, parsed: Any) -> bool: ...
+        def _command_project_root(self) -> Path: ...
 
     # -- checkpoint inspection --------------------------------------------
 

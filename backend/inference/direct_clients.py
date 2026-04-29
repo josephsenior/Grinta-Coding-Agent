@@ -180,8 +180,8 @@ def close_shared_http_clients() -> None:
     except RuntimeError:
         asyncio.run(_aclose_async_clients(async_clients))
         return
-    for client in async_clients:
-        loop.create_task(client.aclose())
+    for async_client in async_clients:
+        loop.create_task(async_client.aclose())
 
 
 async def aclose_shared_http_clients() -> None:

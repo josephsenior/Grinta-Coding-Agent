@@ -18,7 +18,7 @@ import contextlib
 import logging
 import os
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from backend.cli.confirmation import build_confirmation_action, render_confirmation
 from backend.core.config import AppConfig
@@ -29,6 +29,20 @@ logger = logging.getLogger(__name__)
 
 class SessionLifecycleMixin:
     """Mixin providing agent-wait, interrupt, resume and confirmation flows."""
+
+    # Attributes provided by the concrete ``backend.cli.repl.Repl`` host class.
+    if TYPE_CHECKING:
+        _memory: Any
+        _runtime: Any
+        _agent: Any
+        _llm_registry: Any
+        _conversation_stats: Any
+        _event_stream: Any
+        _acquire_result: Any
+        _renderer: Any
+        _console: Any
+        _hud: Any
+        _reasoning: Any
 
     # -- wait for agent to be idle -----------------------------------------
 
