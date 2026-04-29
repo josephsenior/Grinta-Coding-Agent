@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,28 @@ from backend.core.logger import app_logger as logger
 _PYLSP_AVAILABLE: bool | None = None  # None = not yet detected
 
 
+# #region agent log
+def _agent_debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    try:
+        payload = {
+            'sessionId': 'fee086',
+            'runId': 'pre-fix',
+            'hypothesisId': hypothesis_id,
+            'location': location,
+            'message': message,
+            'data': data,
+            'timestamp': int(time.time() * 1000),
+        }
+        log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+        with open(log_path, 'a', encoding='utf-8') as _f:
+            _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+    except Exception:
+        pass
+
+
+# #endregion
+
+
 def _detect_pylsp() -> bool:
     """Return True when the Python language server is available locally."""
     global _PYLSP_AVAILABLE
@@ -32,7 +55,24 @@ def _detect_pylsp() -> bool:
         from backend.utils.runtime_detect import detect_lsp_servers
 
         servers = detect_lsp_servers()
-        _PYLSP_AVAILABLE = bool(servers.get('pylsp') and servers['pylsp'].available)
+        detected = servers.get('pylsp')
+        _PYLSP_AVAILABLE = bool(detected and detected.available)
+        if _PYLSP_AVAILABLE and detected is not None:
+            # Validate the command actually runs; PATH/import probes can pass while
+            # execution still fails in this process environment.
+            try:
+                probe_cmd = list(detected.resolved_command) + ['--version']
+                subprocess.run(probe_cmd, capture_output=True, timeout=3)
+            except Exception:
+                _PYLSP_AVAILABLE = False
+        # #region agent log
+        _agent_debug_log(
+            'H4_lsp_detection_path',
+            'backend/utils/lsp_client.py:_detect_pylsp',
+            'pylsp-detection-result',
+            {'cached_value': _PYLSP_AVAILABLE, 'server_keys': sorted(servers.keys())[:4]},
+        )
+        # #endregion
     except Exception:
         _PYLSP_AVAILABLE = False
     return _PYLSP_AVAILABLE
@@ -198,7 +238,20 @@ class LspClient:
 
         # Special-case Python hover when pylsp is not available: degrade gracefully
         if command == 'hover' and Path(file).suffix.lower() == '.py':
-            if not _detect_pylsp():
+            pylsp_available = _detect_pylsp()
+            # #region agent log
+            _agent_debug_log(
+                'H5_hover_degrade_gate',
+                'backend/utils/lsp_client.py:query',
+                'hover-python-gate',
+                {
+                    'file': file,
+                    'detected_pylsp': pylsp_available,
+                    'cmd': cmd,
+                },
+            )
+            # #endregion
+            if not pylsp_available:
                 return LspResult(available=False)
 
         try:

@@ -9,6 +9,8 @@ from typing import Any, cast
 
 from backend.execution.sandboxing import (
     is_sandboxed_local_profile as _sandbox_is_sandboxed_local_profile,
+)
+from backend.execution.sandboxing import (
     is_workspace_restricted_profile as _sandbox_is_workspace_restricted_profile,
 )
 

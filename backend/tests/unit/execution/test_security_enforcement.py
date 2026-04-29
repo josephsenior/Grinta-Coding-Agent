@@ -177,7 +177,8 @@ class TestEnforceSecurity:
     def test_precomputed_high_risk_still_runs_analyzer_for_escalation(self):
         """Under the escalate-only contract, the analyzer is consulted on every
         action so it can raise an undeclared higher risk; it can never lower
-        a model-declared risk. A precomputed HIGH still triggers blocking."""
+        a model-declared risk. A precomputed HIGH still triggers blocking.
+        """
         from backend.core.enums import ActionSecurityRisk
         from backend.ledger.action import CmdRunAction
 
