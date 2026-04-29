@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from backend.ledger import EventStream
@@ -12,6 +12,12 @@ if TYPE_CHECKING:
 
 
 class SessionOrchestratorAccessorsMixin:
+    # Attributes provided by the concrete ``SessionOrchestrator`` host class.
+    if TYPE_CHECKING:
+        config: Any
+        state_tracker: Any
+        services: Any
+
     @property
     def id(self) -> str | None:
         return self.config.sid or (

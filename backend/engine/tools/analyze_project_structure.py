@@ -14,6 +14,7 @@ import shutil
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from backend.engine.tools.ignore_filter import (
     get_ignore_spec,
@@ -479,7 +480,7 @@ def _tree_valid_filenames(
     filenames: list[str],
     use_git: bool,
     git_files: set[str],
-    spec: object,
+    spec: Any,
 ) -> list[str]:
     if use_git:
         valid_filenames: list[str] = []
@@ -527,7 +528,7 @@ def _collect_matching_files(
     start_dir: str,
     *,
     root: str,
-    spec: object,
+    spec: Any,
     limit: int,
     predicate: Callable[[str, str, str], bool],
 ) -> list[str]:

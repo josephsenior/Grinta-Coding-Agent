@@ -18,8 +18,11 @@ import sys
 import time
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote, urlparse
+
+if TYPE_CHECKING:
+    from rich.console import Console as Console  # noqa: PLC0414
 
 from backend.core.os_capabilities import OS_CAPS
 
@@ -443,11 +446,12 @@ async def _async_main(
         )
 
         # -- onboarding if needed ----------------------------------------------
-        config = await _ensure_onboarded(
+        config_or_none: Any = await _ensure_onboarded(
             config, console, model, resolved_project, get_project_local_data_root,
         )
-        if config is None:
+        if config_or_none is None:
             return
+        config = config_or_none
 
         # -- launch REPL -------------------------------------------------------
         repl = Repl(config, console)

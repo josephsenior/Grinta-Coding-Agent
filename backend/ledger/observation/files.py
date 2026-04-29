@@ -220,4 +220,4 @@ class FileEditObservation(Observation):
                 'old_content should be empty if the file is new (prev_exist=False).'
             )
             return f'[New file {self.path} is created with the provided content.]\n'
-        return self.visualize_diff().rstrip() + '\n'
+        return self.visualize_diff().rstrip() + '\n'  # type: ignore[unreachable]

@@ -113,7 +113,7 @@ def ws_tolerant_replace(
             new_content=file_content,
         )
 
-    start, end = span
+    start, end = span  # type: ignore[misc]
     return ''.join(lines_orig[:start]) + new_str + ''.join(lines_orig[end:])
 
 
