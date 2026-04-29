@@ -52,12 +52,10 @@ dependencies = [
   "whatthepatch>=1.0.6,<2",
   "chromadb>=1.4,<2",
   "sentence-transformers>=5.2,<6",
-  "einops>=0.8,<1",
   "python-docx>=1.1,<2",
   "PyPDF2>=3.0,<4",
   "python-pptx>=1.0,<2",
   "pylatexenc>=2.10,<3",
-  "opencv-python>=4.11,<5",
   "puremagic (>=1.30,<2.0)",
   "binaryornot (>=0.4.4,<0.5.0)",
   "memory-profiler (>=0.61.0,<0.62.0)",
@@ -81,6 +79,37 @@ grinta = "launch.entry:main"
 packages = [
   "backend",
   "launch",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/backend",
+  "/launch",
+  "/docs",
+  "/packaging",
+  "/scripts",
+  "/README.md",
+  "/CHANGELOG.md",
+  "/LICENSE",
+  "/SECURITY.md",
+  "/CONTRIBUTING.md",
+  "/CODE_OF_CONDUCT.md",
+  "/SUPPORT.md",
+  "/MANIFEST.in",
+  "/pyproject.toml",
+  "/mypy.ini",
+  "/pytest.ini",
+  "/rigour.yml",
+  "/pydoc-markdown.yml",
+]
+exclude = [
+  "**/__pycache__",
+  "**/*.pyc",
+  "**/.pytest_cache",
+  "**/.mypy_cache",
+  "**/.ruff_cache",
+  "backend/tests",
+  "scripts/__pycache__",
 ]
 
 [dependency-groups]

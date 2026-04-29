@@ -26,10 +26,13 @@ jobs:
     name: CLI Regression (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    # macOS is advisory until validated for a release; failures on macos-latest
+    # do not block the merge while Linux + Windows remain required.
+    continue-on-error: ${{ matrix.os == 'macos-latest' }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ['3.12']
 
     env:

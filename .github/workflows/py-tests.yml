@@ -154,3 +154,42 @@ jobs:
         run: uv run python -m compileall backend
       - name: Run heavy / integration tests
         run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -m "heavy or integration or benchmark" -vv
+
+  gates-on-macos:
+    # Advisory only — failures should not block merge while macOS is being
+    # validated. Promote to required once the matrix is green for a release.
+    name: Python Gates on macOS (advisory)
+    runs-on: macos-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        python-version: ['3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Lockfile validation
+        run: uv lock --check
+      - name: Install Python dependencies
+        run: uv sync --group dev --group test --group runtime
+      - name: Verify optional imports
+        run: python backend/scripts/verify/verify_optional_imports.py
+      - name: Compile backend (syntax gate)
+        run: uv run python -m compileall backend
+      - name: Run minimal pytest slice
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -q \
+          backend/tests/unit/core/test_launch_entry.py \
+          backend/tests/unit/core/test_runtime_config.py \
+          backend/tests/unit/core/test_agent_config.py \
+          backend/tests/unit/execution/test_command_timeout.py \
+          backend/tests/unit/engine/orchestrator/test_streaming_checkpoint.py \
+          backend/tests/unit/engine/orchestrator/test_executor_streaming.py \
+          backend/tests/unit/engine/orchestrator/test_planner.py \
+          backend/tests/unit/utils/test_prompt_utils.py \
+          backend/tests/unit/engine/orchestrator/test_tool_registry.py
