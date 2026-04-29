@@ -34,9 +34,14 @@ def create_lsp_query_tool() -> dict[str, Any]:
                 'lists which are actually present on this host; do NOT shell out '
                 'to discover them.\n'
                 'Commands: find_definition, find_references, hover, list_symbols, '
-                'get_diagnostics. Use get_diagnostics after editing a file to '
+                'get_diagnostics, code_action. Use get_diagnostics after editing a file to '
                 'check for errors/warnings. Use find_definition / find_references '
-                'when you know the file and 1-based position.\n'
+                'when you know the file and 1-based position. Use code_action to '
+                'discover quick-fixes / refactors the language server suggests for '
+                'a file or position (auto-import, remove-unused, organize-imports, '
+                'add-missing-match-arm, …); the result is a list of titles — apply '
+                'the chosen fix yourself via `symbol_editor` / `text_editor` and '
+                're-run `get_diagnostics` to verify.\n'
                 'Tool boundaries (do not duplicate effort):\n'
                 '  • Rename symbol / edit by symbol name → use `symbol_editor` '
                 '(rename_symbol, edit_symbol_body, multi_edit). `code_intelligence` '
@@ -60,12 +65,16 @@ def create_lsp_query_tool() -> dict[str, Any]:
                             'hover',
                             'list_symbols',
                             'get_diagnostics',
+                            'code_action',
                         ],
                         'description': (
                             'The command to execute. '
                             'get_diagnostics: get errors/warnings for a file (no line/column needed). '
                             'find_definition/find_references/hover: require line and column. '
-                            'list_symbols: lists top-level definitions in a file.'
+                            'list_symbols: lists top-level definitions in a file. '
+                            'code_action: list quick-fixes / refactors suggested by the '
+                            'language server. Pass line+column to scope to one location, '
+                            'or omit them to list actions for the whole file.'
                         ),
                     },
                     'file': {

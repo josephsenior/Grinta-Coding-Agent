@@ -589,6 +589,23 @@ class RuntimeExecutorIOAndTerminalMixin:
         try:
             guard_err = self._terminal_open_guardrail_error(action.command or '')
             if guard_err is not None:
+                # #region agent log
+                try:
+                    payload = {
+                        'sessionId': 'fee086',
+                        'runId': 'pre-fix',
+                        'hypothesisId': 'H7_terminal_run_branch',
+                        'location': 'backend/execution/action_execution_server_io.py:terminal_run',
+                        'message': 'terminal-run-guard-error',
+                        'data': {'command': action.command or ''},
+                        'timestamp': int(time.time() * 1000),
+                    }
+                    log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+                    with open(log_path, 'a', encoding='utf-8') as _f:
+                        _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+                except Exception:
+                    pass
+                # #endregion
                 return guard_err
 
             session_id = self._next_terminal_session_id()
@@ -606,6 +623,23 @@ class RuntimeExecutorIOAndTerminalMixin:
                 cwd,
             )
             if cwd_error is not None:
+                # #region agent log
+                try:
+                    payload = {
+                        'sessionId': 'fee086',
+                        'runId': 'pre-fix',
+                        'hypothesisId': 'H7_terminal_run_branch',
+                        'location': 'backend/execution/action_execution_server_io.py:terminal_run',
+                        'message': 'terminal-run-cwd-error',
+                        'data': {'command': action.command or '', 'cwd': cwd},
+                        'timestamp': int(time.time() * 1000),
+                    }
+                    log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+                    with open(log_path, 'a', encoding='utf-8') as _f:
+                        _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+                except Exception:
+                    pass
+                # #endregion
                 return cwd_error
 
             cwd = str(self._resolve_effective_cwd(action.cwd, cwd))
@@ -620,6 +654,23 @@ class RuntimeExecutorIOAndTerminalMixin:
             if resize_err is not None:
                 self.session_manager.close_session(session_id)
                 self._clear_terminal_read_cursor(session_id)
+                # #region agent log
+                try:
+                    payload = {
+                        'sessionId': 'fee086',
+                        'runId': 'pre-fix',
+                        'hypothesisId': 'H8_terminal_resize_branch',
+                        'location': 'backend/execution/action_execution_server_io.py:terminal_run',
+                        'message': 'terminal-run-resize-error',
+                        'data': {'rows': action.rows, 'cols': action.cols},
+                        'timestamp': int(time.time() * 1000),
+                    }
+                    log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+                    with open(log_path, 'a', encoding='utf-8') as _f:
+                        _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+                except Exception:
+                    pass
+                # #endregion
                 return resize_err
 
             if action.command:
@@ -699,6 +750,23 @@ class RuntimeExecutorIOAndTerminalMixin:
             self._advance_terminal_read_cursor(session_id, next_offset, mode='delta')
             return obs
         except Exception as exc:
+            # #region agent log
+            try:
+                payload = {
+                    'sessionId': 'fee086',
+                    'runId': 'pre-fix',
+                    'hypothesisId': 'H9_terminal_run_exception',
+                    'location': 'backend/execution/action_execution_server_io.py:terminal_run',
+                    'message': 'terminal-run-exception',
+                    'data': {'error': str(exc), 'error_type': type(exc).__name__},
+                    'timestamp': int(time.time() * 1000),
+                }
+                log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+                with open(log_path, 'a', encoding='utf-8') as _f:
+                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+            except Exception:
+                pass
+            # #endregion
             logger.error('Error starting terminal session: %s', exc, exc_info=True)
             return ErrorObservation(f'Failed to start terminal: {exc}')
 

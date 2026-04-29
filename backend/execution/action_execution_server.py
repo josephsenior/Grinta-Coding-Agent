@@ -31,6 +31,11 @@ from backend.execution.file_operations import (
 from backend.execution.mcp.proxy import MCPProxyManager
 from backend.execution.plugin_loader import init_plugins
 from backend.execution.plugins import Plugin
+from backend.execution.security_enforcement import (
+    evaluate_hardened_local_command_policy,
+    path_is_within_workspace,
+    tokenize_command,
+)
 from backend.execution.server_routes import (
     register_exception_handlers,
     register_routes,
@@ -38,6 +43,7 @@ from backend.execution.server_routes import (
 from backend.execution.utils.file_editor import FileEditor
 from backend.execution.utils.memory_monitor import MemoryMonitor
 from backend.execution.utils.session_manager import SessionManager
+from backend.ledger.action import CmdRunAction
 from backend.utils.regex_limits import try_compile_user_regex as _try_compile_user_regex
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction

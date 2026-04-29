@@ -302,16 +302,27 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
     """Return ``(lsp_line, dap_line)`` summarizing detected runtimes."""
     lsp_enabled = bool(getattr(config, 'enable_lsp_query', True))
     try:
-        from backend.utils.runtime_detect import detection_summary
+        from backend.utils.runtime_detect import (
+            detection_summary,
+            has_any_debug_adapter,
+            has_any_lsp_server,
+        )
 
-        summary = detection_summary()
+        any_lsp = bool(has_any_lsp_server())
+        any_dap = bool(has_any_debug_adapter())
+        summary = detection_summary() if (any_lsp or any_dap) else {
+            'lsp_available': [],
+            'debug_available': [],
+        }
     except Exception:
+        any_lsp = False
+        any_dap = False
         summary = {'lsp_available': [], 'debug_available': []}
 
-    lsp_available = summary.get('lsp_available', [])
+    lsp_available = summary.get('lsp_available', []) if any_lsp else []
     if not lsp_enabled:
         lsp_line = (
-            '- **Language servers (LSP / `code_intelligence`)**: tool DISABLED in this run.'
+            '- **Language servers (LSP)**: tool DISABLED in this run.'
         )
     elif lsp_available:
         lsp_line = (
@@ -323,14 +334,14 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
         )
     else:
         lsp_line = (
-            '- **Language servers (LSP / `code_intelligence`)**: none detected on the '
-            'host. The `code_intelligence` tool is hidden from your toolset; fall back '
-            'to `search_code` + `read_file` for navigation. To enable it the user can '
-            'install e.g. `pip install python-lsp-server`, `npm i -g '
+            '- **Language servers (LSP)**: none detected on the host. The LSP '
+            'navigation tool is hidden from your toolset; fall back to '
+            '`search_code` + `read_file` for navigation. To enable it the user '
+            'can install e.g. `pip install python-lsp-server`, `npm i -g '
             'typescript-language-server`, `rustup component add rust-analyzer`.'
         )
 
-    debug_available = summary.get('debug_available', [])
+    debug_available = summary.get('debug_available', []) if any_dap else []
     if debug_available:
         dap_line = (
             '- **Debug adapters (DAP / `debugger`)**: detected → '
