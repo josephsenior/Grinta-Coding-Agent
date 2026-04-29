@@ -7,7 +7,7 @@ import os
 import re
 import uuid
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from binaryornot.check import is_binary
 
@@ -168,8 +168,24 @@ from backend.ledger.observation import (
 from backend.ledger.observation.terminal import TerminalObservation
 from backend.utils.async_utils import call_sync_from_async
 
+if TYPE_CHECKING:
+    from backend.execution.debugger import DAPDebugManager
+    from backend.execution.utils.session_manager import SessionManager
+
 
 class RuntimeExecutorIOAndTerminalMixin:
+    # Attributes provided by the concrete ``RuntimeExecutor`` subclass. Declared
+    # here so the mixin's references type-check without forcing each call site
+    # to carry an ``# type: ignore[attr-defined]``.
+    if TYPE_CHECKING:
+        _initialized: bool
+        _initial_cwd: str
+        lock: asyncio.Lock
+        session_manager: SessionManager
+        debug_manager: DAPDebugManager
+        _terminal_sessions_awaiting_interaction: list[str]
+        _terminal_open_commands_no_interaction: list[str]
+
     def initialized(self) -> bool:
         """Check if action execution server has completed initialization."""
         return self._initialized
@@ -334,7 +350,12 @@ class RuntimeExecutorIOAndTerminalMixin:
         )
 
     async def debugger(self, action: DebuggerAction) -> Observation:
-        return self.debug_manager.handle(action)
+        # ``DAPDebugManager.handle`` is fully synchronous: it spawns a
+        # ``debugpy.adapter`` subprocess and performs blocking ``queue.get``
+        # waits on DAP responses. Running it directly on the event loop
+        # blocks every other coroutine for the duration of the cold start.
+        # Off-load to a worker thread so the loop stays responsive.
+        return await asyncio.to_thread(self.debug_manager.handle, action)
 
     def _maybe_promote_blocking_action(self, action: CmdRunAction) -> None:
         try:

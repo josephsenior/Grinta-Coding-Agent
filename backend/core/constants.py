@@ -88,6 +88,19 @@ PTY_READ_POLL_INTERVAL_SECONDS = 0.05
 # breakpoints in long-running coroutines. Use the same generous floor as
 # terminal/cmd actions.
 DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR = CMD_PENDING_ACTION_TIMEOUT_FLOOR
+# Per-tool sync-bridge timeouts. Used by ``call_async_from_sync`` wrappers in
+# ``backend/execution/drivers/local/local_runtime_inprocess.py`` so the bridge
+# matches the controller's pending-action floor for each ActionType. A small
+# buffer is added on top of each tool's own ``action.timeout`` at the call site.
+TOOL_BRIDGE_TIMEOUT_FILE_IO = 30.0
+TOOL_BRIDGE_TIMEOUT_LSP_QUERY = 30.0
+TOOL_BRIDGE_TIMEOUT_DEBUGGER = DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR
+TOOL_BRIDGE_TIMEOUT_TERMINAL_RUN = TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR
+TOOL_BRIDGE_TIMEOUT_TERMINAL_IO = 60.0
+TOOL_BRIDGE_TIMEOUT_BUFFER = 10.0
+# Opt-in (default-on) debugpy import warmup at agent startup. Keeps the first
+# real ``debugger`` tool call snappy. Set GRINTA_DEBUGPY_WARMUP=0 to disable.
+DEBUGPY_WARMUP_ENABLED = os.getenv('GRINTA_DEBUGPY_WARMUP', '1') not in {'0', 'false', 'False'}
 # Native browser: per-stage fail-fast budgets (see GrintaNativeBrowser).
 BROWSER_SESSION_START_TIMEOUT_SEC = 90.0
 BROWSER_CDP_NAVIGATE_TIMEOUT_SEC = 20.0

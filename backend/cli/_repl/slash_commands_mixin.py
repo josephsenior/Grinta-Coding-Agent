@@ -275,6 +275,7 @@ class SlashCommandsMixin:
         '/model': '_cmd_model',
         '/compact': '_cmd_compact',
         '/retry': '_cmd_retry',
+        '/health': '_cmd_health',
     }
 
     def _handle_parsed_command(self, parsed) -> bool:
@@ -466,6 +467,44 @@ class SlashCommandsMixin:
         )
         if self._renderer is not None:
             self._renderer.add_system_message(msg, title='cost')
+        return True
+
+    def _cmd_health(self, parsed) -> bool:
+        """Run a fast self-check.
+
+        Verifies provider reachable, debugpy importable, ripgrep + git
+        available.
+        """
+        if self._reject_extra_args(parsed):
+            return True
+        import shutil
+
+        checks: list[tuple[str, bool, str]] = []
+
+        try:
+            import importlib
+
+            importlib.import_module('debugpy.adapter')
+            checks.append(('debugpy', True, 'importable'))
+        except Exception as exc:
+            checks.append(('debugpy', False, f'import failed: {exc}'))
+
+        for binary in ('rg', 'git'):
+            path = shutil.which(binary)
+            checks.append(
+                (binary, path is not None, path or 'not found on PATH')
+            )
+
+        hud = self._hud.state
+        checks.append(('model', bool(hud.model), hud.model or 'not set'))
+
+        lines = ['Self-check:']
+        for name, ok, detail in checks:
+            mark = 'ok ' if ok else 'FAIL'
+            lines.append(f'  [{mark}] {name}: {detail}')
+
+        if self._renderer is not None:
+            self._renderer.add_system_message('\n'.join(lines), title='health')
         return True
 
     def _cmd_diff(self, parsed) -> bool:
