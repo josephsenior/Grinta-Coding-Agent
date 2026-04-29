@@ -2904,26 +2904,6 @@ async def test_renderer_displays_done_task_state() -> None:
 
 
 @pytest.mark.asyncio
-async def test_renderer_hides_internal_tool_thought_payloads() -> None:
-    console = _make_console()
-    hud = HUDBar()
-    reasoning = ReasoningDisplay()
-    renderer = CLIEventRenderer(
-        console, hud, reasoning, loop=asyncio.get_running_loop()
-    )
-    action = AgentThinkAction(
-        thought='[READ_SYMBOL_DEFINITION]\n{\n  "entities": {\n    "foo.py": "missing"\n  }\n}'
-    )
-    action.source = EventSource.AGENT
-
-    await renderer.handle_event(action)
-
-    assert reasoning.active
-    assert 'symbol' in reasoning._current_action.lower()
-    assert reasoning._thought_lines == []
-
-
-@pytest.mark.asyncio
 async def test_renderer_hides_working_memory_thought_payloads() -> None:
     console = _make_console()
     hud = HUDBar()

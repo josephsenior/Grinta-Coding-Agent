@@ -10,7 +10,6 @@ from typing import Any, cast
 
 from backend.context.action_processors import convert_action_to_messages
 from backend.context.context_tracking import ContextTracker
-from backend.context.graph_store import GraphMemoryStore
 from backend.context.memory_types import (
     ContextAnchor,
     Decision,
@@ -36,7 +35,6 @@ from backend.core.config.agent_config import AgentConfig
 from backend.core.logger import app_logger as logger
 from backend.core.message import ImageContent, Message, TextContent
 from backend.core.schemas import ActionType
-from backend.core.workspace_context import ensure_project_state_dir
 from backend.inference.tool_result_format import encode_tool_result_payload
 from backend.ledger.action import (
     Action,
@@ -103,19 +101,11 @@ class ContextMemory:
 
         # Initialize vector memory if enabled
         vector_store: EnhancedVectorStore | None = None
-        graph_store: GraphMemoryStore | None = None
         if bool(getattr(config, 'enable_vector_memory', False)):
             vector_store = self._initialize_vector_memory()
-            try:
-                project_state_dir = ensure_project_state_dir()
-                graph_store = GraphMemoryStore(
-                    persistence_path=str(project_state_dir / 'graph_memory.json')
-                )
-            except Exception as e:
-                logger.warning('Failed to initialize graph memory store: %s', e)
 
         # Context tracking (decisions, anchors, vector memory)
-        self._ctx = ContextTracker(vector_store=vector_store, graph_store=graph_store)
+        self._ctx = ContextTracker(vector_store=vector_store)
         self._indexed_event_ids: set[str] = set()
 
     # Delegate context-tracking API to ContextTracker

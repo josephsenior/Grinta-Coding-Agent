@@ -60,9 +60,15 @@ class VectorBackend(ABC):
 
 
 class ChromaDBBackend(VectorBackend):
-    """Local ChromaDB backend for vector storage."""
+    """Local ChromaDB backend for vector storage.
+
+    Uses ChromaDB's bundled ONNX embedding function (``all-MiniLM-L6-v2``)
+    via ``onnxruntime``. No PyTorch / sentence-transformers dependency.
+    """
 
     backend_name = 'ChromaDB (Local)'
+    # ChromaDB ships a quantised ONNX MiniLM-L6 (~80 MB) as its default EF.
+    _DEFAULT_EMBEDDING_MODEL = 'all-MiniLM-L6-v2 (chromadb-onnx)'
 
     def __init__(  # noqa: D417
         self,
@@ -82,26 +88,32 @@ class ChromaDBBackend(VectorBackend):
             persist_directory = _default_memory_persist_directory('chroma')
         persist_directory.mkdir(parents=True, exist_ok=True)
 
-        import chromadb
-        from chromadb.config import Settings
+        try:
+            import chromadb
+            from chromadb.config import Settings
+        except ImportError as exc:
+            raise RuntimeError(
+                'Vector memory requires the optional [rag] extra. '
+                "Install with: pip install 'grinta-ai[rag]'"
+            ) from exc
 
         self.client = chromadb.PersistentClient(
             path=str(persist_directory),
             settings=Settings(anonymized_telemetry=False),
         )
 
-        # Embedding model — lazy-loaded in a background thread so __init__ is instant.
-        self._model_name = os.getenv(
-            'EMBEDDING_MODEL', 'nomic-ai/nomic-embed-text-v1.5'
-        )
-        self._model: Any | None = None
+        # Embedding function — lazy-loaded in a background thread so __init__ is instant.
+        self._model_name = os.getenv('EMBEDDING_MODEL', self._DEFAULT_EMBEDDING_MODEL)
+        self._model: Any | None = None  # ChromaDB EmbeddingFunction instance
         self._model_lock = threading.Lock()
         self._model_loader_thread: threading.Thread | None = None
 
         # Load or create collection, handling embedding model changes
         self._collection_name = collection_name
         try:
-            self.collection = self.client.get_collection(name=collection_name)
+            self.collection = self.client.get_collection(
+                name=collection_name, embedding_function=self._embedding_function()
+            )
             stored_model = self.collection.metadata.get('embedding_model', '')
             if stored_model and stored_model != self._model_name:
                 logger.info(
@@ -126,60 +138,36 @@ class ChromaDBBackend(VectorBackend):
         """Create a new ChromaDB collection with model metadata."""
         collection = self.client.create_collection(
             name=name,
+            embedding_function=self._embedding_function(),
             metadata={'hnsw:space': 'cosine', 'embedding_model': self._model_name},
         )
         logger.info('Created new ChromaDB collection')
         return collection
 
+    def _embedding_function(self) -> Any:
+        """Return ChromaDB's default ONNX embedding function (cached)."""
+        if self._model is None:
+            self._load_model()
+        return self._model
+
     def _load_model(self) -> None:
-        """Load the embedding model. Thread-safe, called from background thread."""
+        """Instantiate ChromaDB's bundled ONNX MiniLM EF. Thread-safe."""
         with self._model_lock:
-            if self._model is None:
-                logger.info(
-                    "Loading embedding model '%s' (local-only)…", self._model_name
-                )
+            if self._model is not None:
+                return
+            logger.info(
+                "Loading bundled ONNX embedding model '%s'…", self._model_name
+            )
+            from chromadb.utils import embedding_functions
 
-                # Force fully offline — never phone home to HuggingFace.
-                os.environ.setdefault('HF_HUB_OFFLINE', '1')
-                os.environ.setdefault('TRANSFORMERS_OFFLINE', '1')
-
-                snapshot_fn: Any = None
-                try:
-                    from huggingface_hub import (
-                        snapshot_download as huggingface_snapshot_download,
-                    )
-
-                    snapshot_fn = huggingface_snapshot_download
-                except Exception:
-                    pass
-                from sentence_transformers import SentenceTransformer
-
-                # Resolve a local snapshot path first; require prebundled artifacts.
-                model_source = self._model_name
-                if snapshot_fn is not None:
-                    try:
-                        local_path = snapshot_fn(
-                            repo_id=self._model_name, local_files_only=True
-                        )
-                        model_source = local_path
-                    except Exception as e:
-                        logger.error(
-                            'Required prebundled embedding model %s not found locally: %s',
-                            self._model_name,
-                            e,
-                        )
-                        raise RuntimeError(
-                            f'Embedding model {self._model_name} not available locally'
-                        ) from e
-
-                with (
-                    contextlib.redirect_stderr(io.StringIO()),
-                    contextlib.redirect_stdout(io.StringIO()),
-                ):
-                    self._model = SentenceTransformer(
-                        model_source, trust_remote_code=True
-                    )
-                logger.info('Embedding model loaded from %s', model_source)
+            with (
+                contextlib.redirect_stderr(io.StringIO()),
+                contextlib.redirect_stdout(io.StringIO()),
+            ):
+                # Default EF lazily downloads + caches the ONNX MiniLM weights
+                # under ~/.cache/chroma/onnx_models/ on first use.
+                self._model = embedding_functions.DefaultEmbeddingFunction()
+            logger.info('Embedding model ready (%s)', self._model_name)
 
     def warm_model_in_background(self) -> None:
         """Start loading the embedding model in a daemon thread when not already running."""
@@ -197,7 +185,7 @@ class ChromaDBBackend(VectorBackend):
 
     @property
     def model(self) -> Any:
-        """Lazy-loaded embedding model. Blocks on first access if still loading."""
+        """Lazy-loaded embedding function. Blocks on first access if still loading."""
         if self._model is None:
             self._load_model()
         return self._model
@@ -213,7 +201,8 @@ class ChromaDBBackend(VectorBackend):
     ) -> None:
         """Insert a new document embedding into the local ChromaDB collection."""
         text = self._prepare_text(rationale, content_text)
-        embedding = self.model.encode(text, show_progress_bar=False).tolist()
+        # Ensure EF is loaded; ChromaDB will call it server-side on the document.
+        _ = self.model
 
         doc_metadata = {
             'step_id': step_id,
@@ -226,7 +215,6 @@ class ChromaDBBackend(VectorBackend):
 
         self.collection.add(
             ids=[step_id],
-            embeddings=[embedding],  # type: ignore[arg-type]
             documents=[text[:2000]],
             metadatas=[doc_metadata],
         )
@@ -238,9 +226,9 @@ class ChromaDBBackend(VectorBackend):
         if self.collection.count() == 0:
             return []
 
-        query_embedding = self.model.encode(query, show_progress_bar=False).tolist()
+        _ = self.model  # ensure EF loaded for query embedding
         results = self.collection.query(
-            query_embeddings=[query_embedding],  # type: ignore[arg-type]
+            query_texts=[query],
             n_results=min(k, self.collection.count()),
             where=filter_metadata,
             include=['documents', 'metadatas', 'distances'],
@@ -316,7 +304,8 @@ class ChromaDBBackend(VectorBackend):
             'model_loaded': self._model is not None,
         }
         if self._model is not None:
-            stats['embedding_dim'] = self._model.get_sentence_embedding_dimension()
+            # Chroma's bundled MiniLM-L6 emits 384-dim vectors.
+            stats['embedding_dim'] = 384
         return stats
 
     @staticmethod

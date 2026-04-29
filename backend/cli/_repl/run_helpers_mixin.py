@@ -10,7 +10,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
+import time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from backend.cli.event_renderer import CLIEventRenderer
@@ -270,6 +273,23 @@ class RunHelpersMixin:
         try:
             if session is None:
                 user_input = await self._read_non_interactive_input()
+                # #region agent log
+                try:
+                    payload = {
+                        'sessionId': 'fee086',
+                        'runId': 'pre-fix',
+                        'hypothesisId': 'H12_noninteractive_input_flow',
+                        'location': 'backend/cli/_repl/run_helpers_mixin.py:_read_repl_input',
+                        'message': 'noninteractive-read',
+                        'data': {'input_repr': repr(user_input), 'input_len': len(user_input)},
+                        'timestamp': int(time.time() * 1000),
+                    }
+                    lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
+                    with open(lp, 'a', encoding='utf-8') as _f:
+                        _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+                except Exception:
+                    pass
+                # #endregion
                 if user_input == '':
                     raise EOFError
             else:
@@ -285,6 +305,23 @@ class RunHelpersMixin:
                 self._prompt_ctrl_c_hint_shown = True
             return ''
         except EOFError:
+            # #region agent log
+            try:
+                payload = {
+                    'sessionId': 'fee086',
+                    'runId': 'pre-fix',
+                    'hypothesisId': 'H12_noninteractive_input_flow',
+                    'location': 'backend/cli/_repl/run_helpers_mixin.py:_read_repl_input',
+                    'message': 'prompt-loop-eof',
+                    'data': {'session_is_none': session is None},
+                    'timestamp': int(time.time() * 1000),
+                }
+                lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
+                with open(lp, 'a', encoding='utf-8') as _f:
+                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+            except Exception:
+                pass
+            # #endregion
             self._console.print('EOF Error received in prompt loop.')
             return None
         except Exception as e:
@@ -412,6 +449,23 @@ class RunHelpersMixin:
         )
 
         event_stream.add_event(initial_action, EventSource.USER)
+        # #region agent log
+        try:
+            payload = {
+                'sessionId': 'fee086',
+                'runId': 'pre-fix',
+                'hypothesisId': 'H16_cli_task_dispatch',
+                'location': 'backend/cli/_repl/run_helpers_mixin.py:_dispatch_user_turn',
+                'message': 'user-action-dispatched',
+                'data': {'action_type': type(initial_action).__name__, 'text': text[:120]},
+                'timestamp': int(time.time() * 1000),
+            }
+            lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
+            with open(lp, 'a', encoding='utf-8') as _f:
+                _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+        except Exception:
+            pass
+        # #endregion
         try:
             controller.step()
         except Exception:

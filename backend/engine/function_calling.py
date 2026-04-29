@@ -13,7 +13,6 @@ import backend.engine.tools.blackboard as blackboard_tools
 import backend.engine.tools.checkpoint as checkpoint_tools
 import backend.engine.tools.debugger as debugger_tools
 import backend.engine.tools.delegate_task as delegate_task_tools
-import backend.engine.tools.explore_code as explore_code_tools
 import backend.engine.tools.lsp_query as lsp_query_tools
 import backend.engine.tools.terminal_manager as terminal_manager_tools
 from backend.core.constants import NOTE_TOOL_NAME, RECALL_TOOL_NAME
@@ -67,6 +66,10 @@ from backend.engine.tools.memory_manager import (
 )
 from backend.engine.tools.meta_cognition import COMMUNICATE_TOOL_NAME
 from backend.engine.tools.note import build_note_action, build_recall_action
+from backend.engine.tools.read_symbol import (
+    READ_SYMBOL_DEFINITION_TOOL_NAME,
+    build_read_symbol_definition_action,
+)
 from backend.engine.tools.search_code import (
     SEARCH_CODE_TOOL_NAME,
     build_search_code_action,
@@ -105,14 +108,6 @@ build_checkpoint_action = cast(
 )
 build_delegate_task_action = cast(
     ToolHandler, cast(Any, delegate_task_tools).build_delegate_task_action
-)
-build_explore_tree_structure_action = cast(
-    AgentThinkToolHandler,
-    cast(Any, explore_code_tools).build_explore_tree_structure_action,
-)
-build_read_symbol_definition_action = cast(
-    AgentThinkToolHandler,
-    cast(Any, explore_code_tools).build_read_symbol_definition_action,
 )
 build_lsp_query_action = cast(
     ToolHandler, cast(Any, lsp_query_tools).build_lsp_query_action
@@ -280,6 +275,13 @@ def _handle_search_code_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
         case_sensitive=cast(bool, arguments.get('case_sensitive', False)),
         max_results=cast(int, arguments.get('max_results', 50)),
     )
+
+
+def _handle_read_symbol_definition_tool(
+    arguments: Mapping[str, Any],
+) -> AgentThinkAction:
+    """Handle READ_SYMBOL_DEFINITION_TOOL: fetch symbol/file source via tree-sitter."""
+    return build_read_symbol_definition_action(dict(arguments))
 
 
 def _handle_checkpoint_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
@@ -1290,14 +1292,13 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         NOTE_TOOL_NAME: lambda args: build_note_action(cast(str, args['key']), cast(str, args['value'])),
         RECALL_TOOL_NAME: lambda args: build_recall_action(cast(str, args['key'])),
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
+        READ_SYMBOL_DEFINITION_TOOL_NAME: _handle_read_symbol_definition_tool,
         ANALYZE_PROJECT_STRUCTURE_TOOL_NAME: _handle_analyze_project_structure_tool,
         DELEGATE_TASK_TOOL_NAME: lambda args: build_delegate_task_action(dict(args)),
         CODE_INTELLIGENCE_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
         DEBUGGER_TOOL_NAME: lambda args: handle_debugger_tool(dict(args)),
         BLACKBOARD_TOOL_NAME: lambda args: build_blackboard_action(dict(args)),
         TERMINAL_MANAGER_TOOL_NAME: lambda args: handle_terminal_manager_tool(dict(args)),
-        'explore_tree_structure': lambda args: build_explore_tree_structure_action(dict(args)),
-        'read_symbol_definition': lambda args: build_read_symbol_definition_action(dict(args)),
         COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
         EXECUTE_MCP_TOOL_TOOL_NAME: _handle_execute_mcp_tool_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,

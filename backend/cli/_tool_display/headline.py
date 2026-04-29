@@ -51,9 +51,8 @@ _SIMPLE_VERB_MAP = {
     'task_tracker': 'Tracked',
     'search_code': 'Searched',
     'code_intelligence': 'Analyzed',
-    'explore_tree_structure': 'Explored',
-    'read_symbol_definition': 'Analyzed',
     'analyze_project_structure': 'Explored',
+    'read_symbol_definition': 'Read',
     'browser': 'Browser',
     'delegate_task': 'Delegated',
     'shared_task_board': 'Checked',
@@ -111,13 +110,6 @@ def _stats_analyze_project(args: dict[str, Any]) -> str | None:
     return None
 
 
-def _stats_explore_tree(args: dict[str, Any]) -> str | None:
-    depth = args.get('max_depth') or args.get('depth')
-    if isinstance(depth, int) and depth > 0:
-        return f'max depth {depth}'
-    return None
-
-
 def _stats_text_editor(args: dict[str, Any]) -> str | None:
     cmd = str(args.get('command', '') or '')
     path_hint = str(args.get('path', '') or '')
@@ -135,13 +127,6 @@ def _stats_task_tracker(args: dict[str, Any]) -> str | None:
     tasks = args.get('task_list')
     if isinstance(tasks, list) and tasks:
         return f'{len(tasks)} tasks'
-    return None
-
-
-def _stats_read_symbol(args: dict[str, Any]) -> str | None:
-    sym = args.get('symbol') or args.get('name')
-    if isinstance(sym, str) and sym.strip():
-        return f'symbol: {sym}'
     return None
 
 
@@ -165,13 +150,22 @@ def _stats_lsp(args: dict[str, Any]) -> str | None:
     return None
 
 
+def _stats_read_symbol(args: dict[str, Any]) -> str | None:
+    entities = args.get('entity_names')
+    if isinstance(entities, list) and entities:
+        first = str(entities[0])
+        if len(entities) == 1:
+            return first
+        return f'{first} (+{len(entities) - 1} more)'
+    return None
+
+
 _STATS_HANDLERS: dict[str, Callable[[dict[str, Any]], str | None]] = {
     'search_code': _stats_search_code,
     'analyze_project_structure': _stats_analyze_project,
-    'explore_tree_structure': _stats_explore_tree,
+    'read_symbol_definition': _stats_read_symbol,
     'text_editor': _stats_text_editor,
     'task_tracker': _stats_task_tracker,
-    'read_symbol_definition': _stats_read_symbol,
     'terminal_manager': _stats_terminal_manager,
     'code_intelligence': _stats_lsp,
     'lsp_query': _stats_lsp,

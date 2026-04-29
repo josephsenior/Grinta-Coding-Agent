@@ -9,8 +9,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from backend.context.graph_rag import GraphRAG
-from backend.context.graph_store import GraphMemoryStore
 from backend.context.memory_types import ContextAnchor, Decision, DecisionType
 from backend.context.vector_store import EnhancedVectorStore
 from backend.core.logger import app_logger as logger
@@ -31,15 +29,10 @@ class ContextTracker:
         self,
         *,
         vector_store: EnhancedVectorStore | None = None,
-        graph_store: GraphMemoryStore | None = None,
         max_decisions: int = 200,
         max_anchors: int = 200,
     ) -> None:
         self.vector_store = vector_store
-        self.graph_store = graph_store
-        self.graph_rag: GraphRAG | None = None
-        if self.vector_store is not None and self.graph_store is not None:
-            self.graph_rag = GraphRAG(self.vector_store, self.graph_store)
         self.decisions: dict[str, Decision] = {}
         self.anchors: dict[str, ContextAnchor] = {}
         self.max_decisions = max_decisions
@@ -156,14 +149,6 @@ class ContextTracker:
                 metadata=metadata or {},
             )
             logger.debug('Stored event %s in vector memory', event_id)
-
-            # Optional GraphRAG indexing (best-effort). Only index when we have
-            # a stable identifier for a code artifact.
-            if self.graph_rag is not None:
-                meta = metadata or {}
-                file_path = meta.get('file_path')
-                if isinstance(file_path, str) and file_path.strip():
-                    self.graph_rag.index_code_file(file_path, content)
         except Exception as e:
             logger.warning('Failed to store event in memory: %s', e)
 
@@ -173,24 +158,6 @@ class ContextTracker:
             return []
         try:
             results = self.vector_store.search(query, k=k)
-
-            # Prepend GraphRAG context (semantic + structural) when available.
-            if self.graph_rag is not None:
-                retrieval = self.graph_rag.retrieve(query, max_results=k)
-                formatted = self.graph_rag.format_context(retrieval)
-                results = [
-                    {
-                        'role': 'graph_rag',
-                        'content_text': formatted,
-                        'metadata': {
-                            'graph_rag': True,
-                            'stats': retrieval.get('stats', {}),
-                            'seed_nodes': retrieval.get('seed_nodes', []),
-                        },
-                        'score': 1.0,
-                    },
-                    *results,
-                ]
             logger.debug(
                 'Retrieved %d relevant memories for query: %s', len(results), query[:50]
             )

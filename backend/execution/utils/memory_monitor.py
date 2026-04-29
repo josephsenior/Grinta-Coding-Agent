@@ -1,8 +1,9 @@
 """Memory monitoring utilities for the runtime."""
 
 import threading
+import time
 
-from memory_profiler import memory_usage
+import psutil
 
 from backend.core.logger import app_logger as logger
 
@@ -33,6 +34,8 @@ class MemoryMonitor:
         self._stop_monitoring = threading.Event()
         self.log_stream = LogStream()
         self.enable = enable
+        self._sample_interval = 0.1
+        self._max_runtime_seconds = 3600
 
     def start_monitoring(self) -> None:
         """Start monitoring memory usage."""
@@ -42,19 +45,27 @@ class MemoryMonitor:
             return
 
         def monitor_process() -> None:
-            """Monitor memory usage of current process in background thread."""
+            """Sample RSS (incl. children) using psutil and log via LogStream."""
             try:
-                mem_usage = memory_usage(
-                    -1,
-                    interval=0.1,
-                    timeout=3600,
-                    max_usage=False,
-                    include_children=True,
-                    multiprocess=True,
-                    stream=self.log_stream,
-                    backend='psutil_pss',
-                )
-                logger.info('Memory usage across time: %s', mem_usage)
+                proc = psutil.Process()
+                samples: list[float] = []
+                deadline = time.monotonic() + self._max_runtime_seconds
+                while not self._stop_monitoring.is_set() and time.monotonic() < deadline:
+                    try:
+                        rss = proc.memory_info().rss
+                        for child in proc.children(recursive=True):
+                            try:
+                                rss += child.memory_info().rss
+                            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                                continue
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        break
+                    rss_mib = rss / (1024 * 1024)
+                    samples.append(rss_mib)
+                    self.log_stream.write(f'{rss_mib:.1f} MiB')
+                    if self._stop_monitoring.wait(self._sample_interval):
+                        break
+                logger.info('Memory usage across time: %s', samples)
             except Exception as e:
                 logger.error('Memory monitoring failed: %s', e)
 

@@ -18,9 +18,18 @@
 ## Install in 30 seconds
 
 ```bash
-pipx install grinta-ai
-grinta init          # one-time wizard: pick provider + paste key
-grinta               # launch the REPL in the current directory
+pipx install grinta-ai          # lean install (~few MB) — all you need for coding
+grinta init                     # one-time wizard: pick provider + paste key
+grinta                          # launch the REPL in the current directory
+```
+
+Optional extras (install only what you need):
+
+```bash
+pipx install "grinta-ai[rag]"        # adds chromadb (~80MB ONNX model) for vector memory
+pipx install "grinta-ai[documents]"  # adds PDF / DOCX / PPTX / LaTeX parsing
+pipx install "grinta-ai[browser]"    # adds browser-use for web automation
+pipx install "grinta-ai[all]"        # everything
 ```
 
 That is the whole setup. The `grinta init` wizard auto-detects local Ollama and LM Studio servers and writes a working settings file for you. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, Docker) are in [docs/INSTALL.md](docs/INSTALL.md).

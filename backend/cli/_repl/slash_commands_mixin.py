@@ -14,7 +14,9 @@ The mixin assumes the host class provides:
 
 from __future__ import annotations
 
+import json
 import subprocess
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -713,10 +715,33 @@ class SlashCommandsMixin:
         if len(parsed.args) > 1:
             self._warn(f'Usage: {self._usage(parsed.name)}')
             return True
+        help_text = _build_help_markdown(parsed.args[0] if parsed.args else None)
+        # #region agent log
+        try:
+            payload = {
+                'sessionId': 'fee086',
+                'runId': 'pre-fix',
+                'hypothesisId': 'H13_help_render_path',
+                'location': 'backend/cli/_repl/slash_commands_mixin.py:_cmd_help',
+                'message': 'help-command-render',
+                'data': {
+                    'renderer_present': self._renderer is not None,
+                    'text_has_input_shortcuts': 'Input shortcuts' in help_text,
+                    'text_has_input_tips': 'Input tips' in help_text,
+                    'text_has_quit': 'Quit grinta' in help_text,
+                },
+                'timestamp': int(time.time() * 1000),
+            }
+            lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
+            with open(lp, 'a', encoding='utf-8') as _f:
+                _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+        except Exception:
+            pass
+        # #endregion
         if self._renderer is not None:
             self._renderer.add_markdown_block(
                 'Help',
-                _build_help_markdown(parsed.args[0] if parsed.args else None),
+                help_text,
             )
         return True
 

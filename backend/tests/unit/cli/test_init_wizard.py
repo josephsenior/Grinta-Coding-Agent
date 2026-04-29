@@ -198,9 +198,12 @@ class TestRunInit:
             patch('rich.prompt.Prompt.ask', side_effect=[provider, model, api_key, base_url]),
         ]
 
-    def test_new_settings_written(self, tmp_path: Path) -> None:
+    def test_new_settings_written(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         console = _quiet_console()
         settings_file = tmp_path / 'settings.json'
+        monkeypatch.delenv('OPENAI_API_KEY', raising=False)
         with patch('backend.cli.init_wizard._detect_local', return_value=[]), \
              patch('rich.prompt.Prompt.ask', side_effect=['openai', 'openai/gpt-4o-mini', 'sk-test', '']), \
              _patch_settings_path(settings_file):
@@ -227,9 +230,12 @@ class TestRunInit:
         data = json.loads(settings_file.read_text(encoding='utf-8'))
         assert data['llm_model'] == 'x'
 
-    def test_existing_settings_overwritten(self, tmp_path: Path) -> None:
+    def test_existing_settings_overwritten(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         console = _quiet_console()
         settings_file = tmp_path / 'settings.json'
+        monkeypatch.delenv('ANTHROPIC_API_KEY', raising=False)
         settings_file.write_text(
             json.dumps({'llm_model': 'old', 'llm_provider': 'old'}), encoding='utf-8'
         )
@@ -251,9 +257,12 @@ class TestRunInit:
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
 
-    def test_security_checklist_shown_if_exists(self, tmp_path: Path) -> None:
+    def test_security_checklist_shown_if_exists(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         console = _quiet_console()
         settings_file = tmp_path / 'settings.json'
+        monkeypatch.delenv('OPENAI_API_KEY', raising=False)
         docs = tmp_path / 'docs'
         docs.mkdir()
         (docs / 'SECURITY_CHECKLIST.md').write_text('checklist', encoding='utf-8')

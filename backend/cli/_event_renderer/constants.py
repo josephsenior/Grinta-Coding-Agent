@@ -23,9 +23,8 @@ INTERNAL_THINK_TAG_RE = re.compile(
 INTERNAL_THINK_LABELS: dict[str, str] = {
     'CHECKPOINT': 'Saving checkpoint…',
     'CHECKPOINT_RESULT': 'Checkpoint…',
-    'EXPLORE_TREE_STRUCTURE': 'Exploring code graph…',
     'PREVIEW': 'Preparing preview…',
-    'READ_SYMBOL_DEFINITION': 'Reading symbol definitions…',
+    'READ_SYMBOL_DEFINITION': 'Reading symbol definition…',
     'ROLLBACK': 'Reverting…',
     'SCRATCHPAD': 'Updating scratchpad…',
     'VERIFY_FILE_LINES': 'Verifying file lines…',
@@ -42,7 +41,7 @@ VISIBLE_INTERNAL_SECTION_RE = re.compile(
 )
 VISIBLE_SUPPRESSED_LINE_RE = re.compile(
     r'^\[(?:ANALYZE_PROJECT_STRUCTURE|CHECKPOINT|CHECKPOINT_RESULT|'
-    r'EXPLORE_TREE_STRUCTURE|PREVIEW|READ_SYMBOL_DEFINITION|'
+    r'PREVIEW|READ_SYMBOL_DEFINITION|'
     r'REVERT_RESULT|ROLLBACK|SCRATCHPAD|SEMANTIC_RECALL_RESULT|'
     r'TASK_TRACKER|VERIFY_FILE_LINES|WORKING_MEMORY)\]\b',
     re.IGNORECASE,

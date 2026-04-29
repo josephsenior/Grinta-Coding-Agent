@@ -10,6 +10,7 @@ Functions:
 from __future__ import annotations
 
 import copy
+import json
 import time
 from collections.abc import AsyncIterator, Callable
 from typing import (
@@ -232,6 +233,10 @@ _INBAND_DISCONNECT_PHRASES: tuple[str, ...] = (
     '网络中断',              # Lightning AI / DeepSeek: "network disconnected"
     '请重新连接',            # Lightning AI: "please reconnect"
     '网络连接中断',          # variant
+    # Common mojibake variants observed in proxies/tests where UTF-8 Chinese
+    # text is decoded with a Western codepage before reaching the SDK stream.
+    'ç½‘ç»œä¸­æ–­',
+    'è¯·é‡æ–°è¿žæŽ¥',
     'network disconnected, please reconnect',
     'connection was reset',
     'upstream connect error',
@@ -707,6 +712,43 @@ class LLM(RetryMixin, DebugMixin):
                                 prefix = ''.join(_inband_prefix)
                                 if len(prefix) <= _INBAND_PREFIX_LIMIT:
                                     lower = prefix.lower()
+                                    # #region agent log
+                                    try:
+                                        payload = {
+                                            'sessionId': 'fee086',
+                                            'runId': 'pre-fix',
+                                            'hypothesisId': 'H10_inband_disconnect_encoding',
+                                            'location': 'backend/inference/llm.py:astream',
+                                            'message': 'inband-prefix-probe',
+                                            'data': {
+                                                'prefix': prefix[:120],
+                                                'prefix_repr': repr(prefix[:120]),
+                                                'lower_preview': lower[:120],
+                                                'matched_phrases': [
+                                                    p
+                                                    for p in _INBAND_DISCONNECT_PHRASES
+                                                    if p in lower
+                                                ][:5],
+                                            },
+                                            'timestamp': int(time.time() * 1000),
+                                        }
+                                        from pathlib import Path as _P
+
+                                        _lp = _P(__file__).resolve().parents[2] / 'debug-fee086.log'
+                                        _serialized_payload = (
+                                            json.dumps(payload, ensure_ascii=True) + '\n'
+                                        )
+
+                                        def _append_log_line(
+                                            path: '_P' = _lp, line: str = _serialized_payload
+                                        ) -> None:
+                                            with path.open('a', encoding='utf-8') as _f:
+                                                _f.write(line)
+
+                                        await _asyncio.to_thread(_append_log_line)
+                                    except Exception:
+                                        pass
+                                    # #endregion
                                     if any(p in lower for p in _INBAND_DISCONNECT_PHRASES):
                                         raise APIConnectionError(
                                             f'Provider sent in-band disconnect message: {prefix.strip()!r}',

@@ -23,14 +23,16 @@ import base64
 import warnings
 from typing import Any, cast
 
-import docx
-from pptx import Presentation
-from pylatexenc.latex2text import LatexNodes2Text  # type: ignore[import-untyped]
-
 from backend.execution.plugins.agent_skills.utils.config import (
     _get_max_token,
     _get_openai_client,
     _get_openai_model,
+)
+
+
+_DOCUMENTS_EXTRA_HINT = (
+    "Document parsing requires the optional [documents] extra. "
+    "Install with: pip install 'grinta-ai[documents]'"
 )
 
 
@@ -42,7 +44,10 @@ def _read_pdf_reader():
     except Exception:
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', DeprecationWarning)
-            import PyPDF2
+            try:
+                import PyPDF2
+            except ImportError as exc:
+                raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
 
             return PyPDF2.PdfReader
 
@@ -70,6 +75,10 @@ def parse_docx(file_path: str) -> None:
         file_path: str: The path to the file to open.
 
     """
+    try:
+        import docx  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
     content = docx.Document(file_path)
     output_lines = [f'[Reading DOCX file from {file_path}]']
     for i, para in enumerate(content.paragraphs, start=1):
@@ -86,6 +95,10 @@ def parse_latex(file_path: str) -> None:
         file_path: str: The path to the file to open.
 
     """
+    try:
+        from pylatexenc.latex2text import LatexNodes2Text  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
     with open(file_path, encoding='utf-8') as f:
         data = f.read()
     text = LatexNodes2Text().latex_to_text(data).strip()
@@ -211,6 +224,10 @@ def parse_pptx(file_path: str) -> None:
 
     """
     try:
+        try:
+            from pptx import Presentation  # type: ignore[import-untyped]
+        except ImportError as exc:
+            raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
         pres = Presentation(file_path)
         output_lines = [f'[Reading PowerPoint file from {file_path}]']
         for slide_idx, slide in enumerate(pres.slides, start=1):

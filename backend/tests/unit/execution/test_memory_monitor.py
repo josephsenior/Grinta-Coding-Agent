@@ -56,7 +56,7 @@ class TestMemoryMonitor:
 
     def test_start_creates_thread_when_enabled(self):
         m = MemoryMonitor(enable=True)
-        with patch('backend.execution.utils.memory_monitor.memory_usage'):
+        with patch('backend.execution.utils.memory_monitor.psutil'):
             m.start_monitoring()
             assert m._monitoring_thread is not None
             # Clean up
@@ -64,7 +64,7 @@ class TestMemoryMonitor:
 
     def test_start_idempotent(self):
         m = MemoryMonitor(enable=True)
-        with patch('backend.execution.utils.memory_monitor.memory_usage'):
+        with patch('backend.execution.utils.memory_monitor.psutil'):
             m.start_monitoring()
             thread1 = m._monitoring_thread
             m.start_monitoring()
@@ -73,7 +73,7 @@ class TestMemoryMonitor:
 
     def test_stop_clears_thread(self):
         m = MemoryMonitor(enable=True)
-        with patch('backend.execution.utils.memory_monitor.memory_usage'):
+        with patch('backend.execution.utils.memory_monitor.psutil'):
             m.start_monitoring()
             m.stop_monitoring()
             assert m._monitoring_thread is None

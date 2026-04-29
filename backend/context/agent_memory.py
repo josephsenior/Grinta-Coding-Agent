@@ -16,7 +16,13 @@ import backend
 from backend.core.constants import RECALL_PIPELINE_TIMEOUT_SECONDS
 from backend.core.enums import RecallType, RuntimeStatus
 from backend.core.logger import app_logger as logger
-from backend.knowledge import KnowledgeBaseManager
+try:
+    from backend.knowledge import KnowledgeBaseManager
+
+    _KNOWLEDGE_BASE_AVAILABLE = True
+except ImportError:
+    KnowledgeBaseManager = None  # type: ignore[assignment,misc]
+    _KNOWLEDGE_BASE_AVAILABLE = False
 from backend.ledger.action.agent import RecallAction
 from backend.ledger.event import Event, EventSource
 from backend.ledger.observation.agent import (
@@ -80,7 +86,16 @@ class Memory:
         self.conversation_instructions: ConversationInstructions | None = None
         self._load_global_playbooks()
         self._load_user_playbooks()
-        self._kb_manager = KnowledgeBaseManager(user_id=user_id or 'default')
+        if _KNOWLEDGE_BASE_AVAILABLE:
+            try:
+                self._kb_manager = KnowledgeBaseManager(user_id=user_id or 'default')
+            except (ImportError, RuntimeError) as exc:
+                logger.info(
+                    'Knowledge base disabled (optional [rag] extra missing): %s', exc
+                )
+                self._kb_manager = None
+        else:
+            self._kb_manager = None
 
     def on_event(self, event: Event) -> None:
         """Handle an event from the event stream."""
@@ -408,7 +423,7 @@ class Memory:
                 kb_top_k = self._kb_settings.search_top_k
                 kb_collections = self._kb_settings.active_collection_ids
 
-            if kb_enabled:
+            if kb_enabled and self._kb_manager is not None:
                 # We use a relatively high threshold by default for auto-search
                 kb_results = self._kb_manager.search(
                     query=event.query,

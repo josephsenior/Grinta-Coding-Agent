@@ -304,6 +304,33 @@ class DAPClient:
         try:
             response = response_queue.get(timeout=timeout)
         except queue.Empty as exc:
+            # #region agent log
+            try:
+                payload = {
+                    'sessionId': 'fee086',
+                    'runId': 'pre-fix',
+                    'hypothesisId': 'H14_dap_initialize_timeout',
+                    'location': 'backend/execution/debugger.py:wait_for_response',
+                    'message': 'dap-wait-timeout',
+                    'data': {
+                        'request_seq': request_seq,
+                        'timeout': timeout,
+                        'pending_count': len(self._pending),
+                        'stderr_tail': self.stderr_tail(10),
+                        'process_alive': (
+                            self.process is not None and self.process.poll() is None
+                        ),
+                    },
+                    'timestamp': int(time.time() * 1000),
+                }
+                from pathlib import Path as _P
+
+                _lp = _P(__file__).resolve().parents[2] / 'debug-fee086.log'
+                with open(_lp, 'a', encoding='utf-8') as _f:
+                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+            except Exception:
+                pass
+            # #endregion
             raise DAPError(f'DAP request {request_seq} timed out') from exc
         finally:
             with self._lock:
@@ -409,6 +436,29 @@ class DAPClient:
     def _handle_message(self, message: dict[str, Any]) -> None:
         message_type = message.get('type')
         if message_type == 'response':
+            # #region agent log
+            try:
+                payload = {
+                    'sessionId': 'fee086',
+                    'runId': 'pre-fix',
+                    'hypothesisId': 'H15_dap_response_arrival',
+                    'location': 'backend/execution/debugger.py:_handle_message',
+                    'message': 'dap-response-received',
+                    'data': {
+                        'request_seq': message.get('request_seq'),
+                        'command': message.get('command'),
+                        'success': bool(message.get('success', False)),
+                    },
+                    'timestamp': int(time.time() * 1000),
+                }
+                from pathlib import Path as _P
+
+                _lp = _P(__file__).resolve().parents[2] / 'debug-fee086.log'
+                with open(_lp, 'a', encoding='utf-8') as _f:
+                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+            except Exception:
+                pass
+            # #endregion
             request_seq = int(message.get('request_seq', -1))
             response_queue = self._pending.get(request_seq)
             if response_queue is not None:

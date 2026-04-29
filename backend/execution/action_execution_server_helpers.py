@@ -7,42 +7,70 @@ import re
 from pathlib import Path
 from typing import Any, cast
 
+from backend.core.enums import FileEditSource, FileReadSource
+from backend.core.logger import app_logger as logger
+from backend.core.os_capabilities import OS_CAPS
 from backend.execution.sandboxing import (
     is_sandboxed_local_profile as _sandbox_is_sandboxed_local_profile,
 )
 from backend.execution.sandboxing import (
     is_workspace_restricted_profile as _sandbox_is_workspace_restricted_profile,
 )
+from backend.execution.security_enforcement import (
+    evaluate_hardened_local_command_policy,
+    path_is_within_workspace,
+    tokenize_command,
+)
+from backend.execution.utils.diff import get_diff
+from backend.ledger.action import CmdRunAction
+from backend.ledger.observation import ErrorObservation, FileEditObservation, FileReadObservation
+from backend.utils.regex_limits import try_compile_user_regex
 
 
-def _aes_module():
-    from backend.execution import action_execution_server as aes
+_ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m')
+_POWERSHELL_BUILTIN_COMMANDS = frozenset(
+    {
+        'Get-Content',
+        'Write-Output',
+        'Get-ChildItem',
+        'Select-String',
+        'Set-Location',
+        'Select-Object',
+        'Measure-Object',
+        'Out-File',
+        'Test-Path',
+        'Remove-Item',
+    }
+)
 
-    return aes
+
+def resolve_workspace_path(path: str, working_dir: str, workspace_root: str) -> Path:
+    base = Path(working_dir).resolve()
+    candidate = Path(path)
+    return candidate.resolve() if candidate.is_absolute() else (base / candidate).resolve()
 
 
 def init_shell_commands(executor: Any) -> None:
-    aes = _aes_module()
     shell_session = executor.session_manager.get_session('default')
     assert shell_session is not None
 
     use_powershell = executor._uses_powershell_shell_contract()
 
     shell_session.execute(
-        aes.CmdRunAction(
+        CmdRunAction(
             command=executor._build_shell_git_config_command(use_powershell),
         )
     )
 
     shell_session.execute(
-        aes.CmdRunAction(command=executor._build_env_check_command(use_powershell))
+        CmdRunAction(command=executor._build_env_check_command(use_powershell))
     )
 
     for plugin in executor.plugins.values():
         init_cmds = plugin.get_init_bash_commands()
         if init_cmds:
             for cmd in init_cmds:
-                shell_session.execute(aes.CmdRunAction(command=cmd))
+                shell_session.execute(CmdRunAction(command=cmd))
 
 
 def build_shell_git_config_command(executor: Any, use_powershell: bool) -> str:
@@ -87,8 +115,7 @@ def build_env_check_command(use_powershell: bool) -> str:
 
 
 def uses_powershell_shell_contract(executor: Any) -> bool:
-    aes = _aes_module()
-    if not aes.OS_CAPS.is_windows:
+    if not OS_CAPS.is_windows:
         return False
 
     tool_registry = getattr(executor.session_manager, 'tool_registry', None)
@@ -116,10 +143,9 @@ def uses_powershell_shell_contract(executor: Any) -> bool:
 
 
 def strip_ansi_obs_text(text: str) -> str:
-    aes = _aes_module()
     if not text:
         return text
-    return aes._ANSI_ESCAPE_RE.sub('', text)
+    return _ANSI_ESCAPE_RE.sub('', text)
 
 
 def should_rewrite_python3_to_python(executor: Any) -> bool:
@@ -150,17 +176,16 @@ def is_sandboxed_local(executor: Any) -> bool:
 def validate_interactive_session_scope(
     executor: Any, session_id: str, session: Any
 ) -> Any:
-    aes = _aes_module()
     if not executor._is_workspace_restricted_profile():
         return None
 
     current_cwd = Path(getattr(session, 'cwd', executor._initial_cwd)).resolve()
-    if aes.path_is_within_workspace(current_cwd, executor._workspace_root()):
+    if path_is_within_workspace(current_cwd, executor._workspace_root()):
         return None
 
     executor.session_manager.close_session(session_id)
     executor._clear_terminal_read_cursor(session_id)
-    return aes.ErrorObservation(
+    return ErrorObservation(
         content=(
             'Interactive terminal session closed by hardened_local policy: '
             f'session cwd escaped the workspace. Session: {session_id} | cwd={current_cwd}'
@@ -171,8 +196,7 @@ def validate_interactive_session_scope(
 def predict_interactive_cwd_change(
     executor: Any, command: str, current_cwd: Path
 ) -> tuple[Path | None, str | None]:
-    aes = _aes_module()
-    tokens = aes.tokenize_command(command)
+    tokens = tokenize_command(command)
     if not tokens:
         return (None, None)
 
@@ -188,7 +212,7 @@ def predict_interactive_cwd_change(
 
     target = Path(tokens[1])
     predicted = target.resolve() if target.is_absolute() else (current_cwd / target).resolve()
-    if not aes.path_is_within_workspace(predicted, executor._workspace_root()):
+    if not path_is_within_workspace(predicted, executor._workspace_root()):
         return (
             None,
             'Action blocked by hardened_local policy: interactive terminal sessions cannot change directory outside the workspace. '
@@ -200,7 +224,6 @@ def predict_interactive_cwd_change(
 def evaluate_interactive_terminal_command(
     executor: Any, command: str, current_cwd: Path
 ) -> tuple[Path | None, Any]:
-    aes = _aes_module()
     if not executor._is_workspace_restricted_profile():
         return (None, None)
 
@@ -211,12 +234,12 @@ def evaluate_interactive_terminal_command(
     if any(separator in stripped for separator in ('\n', '&&', ';', '||')):
         return (
             None,
-            aes.ErrorObservation(
+            ErrorObservation(
                 content='Action blocked by hardened_local policy: interactive terminal input cannot contain chained or multiline commands.'
             ),
         )
 
-    block_message = aes.evaluate_hardened_local_command_policy(
+    block_message = evaluate_hardened_local_command_policy(
         command=stripped,
         security_config=executor.security_config,
         workspace_root=executor._workspace_root(),
@@ -225,13 +248,13 @@ def evaluate_interactive_terminal_command(
         is_background=stripped.endswith('&'),
     )
     if block_message is not None:
-        return (None, aes.ErrorObservation(content=block_message))
+        return (None, ErrorObservation(content=block_message))
 
     predicted_cwd, cwd_error = executor._predict_interactive_cwd_change(
         stripped, current_cwd
     )
     if cwd_error is not None:
-        return (None, aes.ErrorObservation(content=cwd_error))
+        return (None, ErrorObservation(content=cwd_error))
 
     return (predicted_cwd, None)
 
@@ -255,7 +278,6 @@ def validate_workspace_scoped_cwd(
     requested_cwd: str | None,
     base_cwd: str | None = None,
 ) -> Any:
-    aes = _aes_module()
     if not executor._is_workspace_restricted_profile():
         return None
 
@@ -264,7 +286,7 @@ def validate_workspace_scoped_cwd(
     try:
         effective_cwd.relative_to(root)
     except ValueError:
-        return aes.ErrorObservation(
+        return ErrorObservation(
             content=(
                 'Action blocked by hardened_local policy: command execution must stay inside the workspace. '
                 f'Command: {command} | cwd={effective_cwd}'
@@ -274,12 +296,9 @@ def validate_workspace_scoped_cwd(
 
 
 def resolve_workspace_file_path(executor: Any, path: str, working_dir: str) -> str:
-    aes = _aes_module()
-    resolved = aes.resolve_workspace_path(path, working_dir, executor._initial_cwd)
+    resolved = resolve_workspace_path(path, working_dir, executor._initial_cwd)
     root = executor._workspace_root()
-    if executor._is_workspace_restricted_profile() and not aes.path_is_within_workspace(
-        resolved, root
-    ):
+    if executor._is_workspace_restricted_profile() and not path_is_within_workspace(resolved, root):
         raise PermissionError(path)
     return str(resolved)
 
@@ -338,16 +357,15 @@ def _missing_bash_command_name(content: str) -> str | None:
     return missing_match.group(1)
 
 
-def _powershell_cmdlet_in_command(aes: Any, command: str) -> str | None:
+def _powershell_cmdlet_in_command(command: str) -> str | None:
     command_tokens = set(re.findall(r'\b[A-Za-z][A-Za-z0-9-]*\b', command))
-    for token in aes._POWERSHELL_BUILTIN_COMMANDS:
+    for token in _POWERSHELL_BUILTIN_COMMANDS:
         if token in command_tokens:
             return token
     return None
 
 
 def detect_powershell_in_bash_mismatch(command: str, content: str) -> str | None:
-    aes = _aes_module()
     if not command or not content:
         return None
 
@@ -355,10 +373,10 @@ def detect_powershell_in_bash_mismatch(command: str, content: str) -> str | None
         return None
 
     missing_cmd = _missing_bash_command_name(content)
-    if missing_cmd in aes._POWERSHELL_BUILTIN_COMMANDS:
+    if missing_cmd in _POWERSHELL_BUILTIN_COMMANDS:
         return _powershell_cmdlet_hint(missing_cmd)  # type: ignore[arg-type]
 
-    command_cmdlet = _powershell_cmdlet_in_command(aes, command)
+    command_cmdlet = _powershell_cmdlet_in_command(command)
     if command_cmdlet is not None:
         return _powershell_cmdlet_hint(command_cmdlet)
 
@@ -398,8 +416,7 @@ def detect_scaffold_setup_failure(command: str, content: str) -> str | None:
 
 
 def apply_grep_filter(content: str, pattern_str: str) -> str:
-    aes = _aes_module()
-    pattern, err = aes.try_compile_user_regex(pattern_str)
+    pattern, err = try_compile_user_regex(pattern_str)
     if pattern is None:
         return f"[Grep Error: Invalid regex pattern '{pattern_str}': {err}]\n{content}"
 
@@ -410,13 +427,12 @@ def apply_grep_filter(content: str, pattern_str: str) -> str:
 
 
 def attach_detected_server(executor: Any, observation: Any, bash_session: Any) -> None:
-    aes = _aes_module()
     if bash_session is None:
         return
     detected = cast(Any, bash_session.get_detected_server())
     if not detected:
         return
-    aes.logger.info('🚀 Adding detected server to observation extras: %s', detected.url)
+    logger.info('Adding detected server to observation extras: %s', detected.url)
     if not hasattr(observation, 'extras'):
         observation.extras = {}  # type: ignore[attr-defined]
     observation.extras['server_ready'] = {  # type: ignore[attr-defined]
@@ -430,23 +446,22 @@ def attach_detected_server(executor: Any, observation: Any, bash_session: Any) -
 def apply_terminal_resize_if_requested(
     executor: Any, session: Any, rows: int | None, cols: int | None
 ) -> Any:
-    aes = _aes_module()
     if rows is None and cols is None:
         return None
     if rows is None or cols is None:
-        return aes.ErrorObservation(
+        return ErrorObservation(
             'Terminal resize requires both `rows` and `cols` (or omit both).'
         )
     r, c = int(rows), int(cols)
     if not (1 <= r <= 500 and 1 <= c <= 2000):
-        return aes.ErrorObservation(
+        return ErrorObservation(
             f'Invalid terminal size: rows={r}, cols={c} '
             '(allowed: rows 1–500, cols 1–2000).'
         )
     try:
         session.resize(r, c)
     except Exception as exc:
-        aes.logger.debug('Terminal resize not applied: %s', exc)
+        logger.debug('Terminal resize not applied: %s', exc)
     return None
 
 
@@ -475,7 +490,6 @@ def mark_terminal_session_interaction(executor: Any, session_id: str) -> None:
 
 
 def terminal_open_guardrail_error(executor: Any, command: str) -> Any:
-    aes = _aes_module()
     pending = list(executor._terminal_sessions_awaiting_interaction)
     if len(pending) < 3:
         return None
@@ -488,7 +502,7 @@ def terminal_open_guardrail_error(executor: Any, command: str) -> Any:
         return None
 
     sample_ids = ', '.join(pending[:8]) if pending else 'none'
-    return aes.ErrorObservation(
+    return ErrorObservation(
         'terminal_manager open loop detected: multiple sessions were opened but '
         'none were used via action=read or action=input. '
         f'Current command={command!r}. '
@@ -499,7 +513,6 @@ def terminal_open_guardrail_error(executor: Any, command: str) -> Any:
 def missing_terminal_session_error(
     executor: Any, session_id: str, *, operation: str
 ) -> Any:
-    aes = _aes_module()
     sessions_obj = getattr(executor.session_manager, 'sessions', None)
     active_ids = (
         sorted(k for k in sessions_obj if k != 'default')
@@ -516,7 +529,7 @@ def missing_terminal_session_error(
             'No active terminal sessions exist right now. '
             'Call terminal_manager with action=open first, then reuse that session_id.'
         )
-    return aes.ErrorObservation(
+    return ErrorObservation(
         f"Terminal session '{session_id}' does not exist for action={operation}. "
         f'Do not invent IDs like terminal_session_0. {suggestion}'
     )
@@ -611,35 +624,39 @@ def resolve_path(executor: Any, path: str, working_dir: str) -> str:
 
 
 def handle_aci_file_read(executor: Any, action: Any) -> Any:
-    aes = _aes_module()
-    result_str, _ = aes.execute_file_editor(
+    from backend.execution.file_operations import execute_file_editor
+    result_str, _ = execute_file_editor(
         executor.file_editor,
         command='read_file',
         path=action.path,
         view_range=action.view_range,
     )
-    return aes.FileReadObservation(
-        content=result_str, path=action.path, impl_source=aes.FileReadSource.FILE_EDITOR
+    return FileReadObservation(
+        content=result_str, path=action.path, impl_source=FileReadSource.FILE_EDITOR
     )
 
 
 def edit_try_directory_view(
     executor: Any, filepath: str, path_for_obs: str, action: Any
 ) -> Any:
-    aes = _aes_module()
+    from backend.execution.file_operations import handle_directory_view
     try:
         if os.path.isdir(filepath) and (action.command == 'read_file' or not action.command):
-            return aes.handle_directory_view(filepath, path_for_obs)
+            return handle_directory_view(filepath, path_for_obs)
     except Exception:
         pass
     return None
 
 
 def edit_via_file_editor(executor: Any, action: Any) -> Any:
-    aes = _aes_module()
+    from backend.execution.file_operations import (
+        execute_file_editor,
+        get_max_edit_observation_chars,
+        truncate_large_text,
+    )
     command = action.command or 'write'
     enable_lint = executor._is_auto_lint_enabled()
-    result_str, (old_content, new_content) = aes.execute_file_editor(
+    result_str, (old_content, new_content) = execute_file_editor(
         executor.file_editor,
         command=command,
         path=action.path,
@@ -667,12 +684,12 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         expected_file_hash=getattr(action, 'expected_file_hash', None),
     )
     if result_str.startswith('ERROR:'):
-        return aes.ErrorObservation(result_str)
-    max_chars = aes.get_max_edit_observation_chars()
-    result_str = aes.truncate_large_text(result_str, max_chars, label='edit')
+        return ErrorObservation(result_str)
+    max_chars = get_max_edit_observation_chars()
+    result_str = truncate_large_text(result_str, max_chars, label='edit')
     if old_content is not None and new_content is not None and command != 'read_file':
         try:
-            diff = aes.get_diff(old_content, new_content, action.path)
+            diff = get_diff(old_content, new_content, action.path)
             if diff:
                 result_str = result_str + '\n\n[EDIT_DIFF]\n' + diff
         except Exception:
@@ -684,13 +701,13 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         new_content=new_content,
     )
 
-    return aes.FileEditObservation(
+    return FileEditObservation(
         content=result_str,
         path=action.path,
         prev_exist=old_content is not None,
         old_content=old_content,
         new_content=new_content,
-        impl_source=aes.FileEditSource.FILE_EDITOR,
+        impl_source=FileEditSource.FILE_EDITOR,
     )
 
 
@@ -702,7 +719,6 @@ def append_blast_radius_warning(
     action_path: str,
     new_content: str | None,
 ) -> str:
-    aes = _aes_module()
     if command == 'read_file' or new_content is None:
         return base_content
     try:
@@ -712,7 +728,7 @@ def append_blast_radius_warning(
         if warning:
             return base_content + warning
     except Exception as exc:
-        aes.logger.debug('Failed to check blast radius: %s', exc)
+        logger.debug('Failed to check blast radius: %s', exc)
     return base_content
 
 
