@@ -18,6 +18,7 @@ actions and observations are immutable events appended to an `EventStream`.
 Session state is reconstructed by replaying events.
 
 **Consequences:**
+
 - ✅ Full session replay from any point
 - ✅ Crash recovery via Write-Ahead Log (WAL)
 - ✅ Natural audit trail for every agent action
@@ -37,6 +38,7 @@ Session state is reconstructed by replaying events.
 On startup, scan for pending markers and replay incomplete writes.
 
 **Consequences:**
+
 - ✅ Zero event loss guarantee on crash
 - ✅ Simple implementation (no external dependencies)
 - ⚠️ Slightly slower writes (two filesystem operations per event)
@@ -55,6 +57,7 @@ high-water mark (HWM). When the queue is full, apply a configurable policy
 (drop oldest or slow the producer).
 
 **Consequences:**
+
 - ✅ Prevents OOM under load
 - ✅ Configurable per subscriber
 - ⚠️ Events may be dropped for slow subscribers (drop policy)
@@ -74,6 +77,7 @@ state through an `OrchestrationContext` facade. The session orchestrator coordin
 calls but delegates logic.
 
 **Consequences:**
+
 - ✅ Each service is independently testable
 - ✅ Single responsibility per service
 - ✅ Controller LOC reduced from 2000+ to ~870
@@ -94,6 +98,7 @@ thresholds: consecutive errors (5), stuck detections (3), or high-risk
 actions (10). When tripped, the agent pauses and requires user intervention.
 
 **Consequences:**
+
 - ✅ Prevents runaway cost
 - ✅ Protects against infinite loops
 - ✅ User retains control
@@ -109,6 +114,7 @@ actions (10). When tripped, the agent pauses and requires user intervention.
 stuck patterns like semantic loops or oscillating action-observation pairs.
 
 **Decision:** Implement six complementary detection strategies:
+
 1. Repeating identical actions
 2. Repeating identical errors
 3. Monologue loops (thinking without acting)
@@ -117,6 +123,7 @@ stuck patterns like semantic loops or oscillating action-observation pairs.
 6. Context window error loops
 
 **Consequences:**
+
 - ✅ Catches subtle stuck patterns
 - ✅ Each strategy independently tunable
 - ⚠️ More complex than simple repetition check
@@ -141,6 +148,7 @@ configure compactors per agent. The current code/config surface may still use
 structured_summary, no_op, pipeline, auto.
 
 **Consequences:**
+
 - ✅ Optimal strategy for each use case
 - ✅ Pipeline compactor allows chaining
 - ✅ Smart default requires no configuration
@@ -156,12 +164,14 @@ structured_summary, no_op, pipeline, auto.
 and backend for streaming agent actions.
 
 **Decision:** Use Socket.IO instead of raw WebSocket for its built-in:
+
 - Automatic reconnection with backoff
 - Room management for conversation isolation
 - Event namespacing (typed events vs raw messages)
 - Fallback to long-polling if WebSocket fails
 
 **Consequences:**
+
 - ✅ Robust reconnection out of the box
 - ✅ Clean event-based API
 - ✅ Room-based message routing
@@ -185,6 +195,7 @@ code structure before applying edits. The structure editor validates that
 edits respect syntactic boundaries.
 
 **Consequences:**
+
 - ✅ Edits that respect language structure
 - ✅ 45+ language support via Tree-sitter grammars
 - ✅ Better error detection before applying changes
@@ -207,6 +218,7 @@ override. Environment variables remain supported for secrets, overrides, and
 automation.
 
 **Consequences:**
+
 - ✅ Onboarding is simpler and consistent with starter templates
 - ✅ LLM-facing tooling and scripts can read/write one familiar format
 - ✅ Environment-based secret handling remains available
@@ -226,6 +238,7 @@ storage are local. Only LLM API calls leave the machine (and Ollama
 eliminates even that).
 
 **Consequences:**
+
 - ✅ Complete privacy — code never leaves the machine
 - ✅ Works offline with Ollama
 - ✅ No cloud infrastructure required
@@ -245,6 +258,7 @@ error messages, and serialization support.
 and API request/response models.
 
 **Consequences:**
+
 - ✅ Runtime validation with clear error messages
 - ✅ Automatic JSON serialization
 - ✅ IDE support via type annotations
@@ -268,6 +282,7 @@ environment-backed config loading) and their tools appear
 alongside built-in tools.
 
 **Consequences:**
+
 - ✅ Access to growing MCP tool ecosystem
 - ✅ Standard protocol (future-proof)
 - ✅ Clean separation: tool servers are external processes
@@ -286,6 +301,7 @@ well with ASGI middleware patterns and provides automatic API documentation.
 **Decision:** Use FastAPI with Uvicorn ASGI server.
 
 **Consequences:**
+
 - ✅ Native async/await support
 - ✅ Automatic OpenAPI documentation
 - ✅ Pydantic integration for validation
@@ -308,6 +324,7 @@ integrates naturally into terminal workflows.
 as an alternative during that phase.
 
 **Consequences (historical):**
+
 - ✅ Zero Node.js/browser dependency for TUI users
 - ✅ Native terminal integration
 - ✅ Keyboard-driven workflow
@@ -377,6 +394,7 @@ semantics cleanly without implying that only world-state mutations matter.
 **Context:** Tree-sitter provides strong structure-aware edits for source code, but non-code artifacts (markdown, config, docs) are fragile when edited only through raw `old_str`/`new_str` matching.
 
 **Decision:** Standardize a document-edit protocol for non-code files with explicit edit modes:
+
 - `format` for parser-based mutations of structured formats (JSON/YAML/TOML)
 - `section` for anchor-bounded edits
 - `range` for deterministic line-range edits with optional hash guards
@@ -384,6 +402,7 @@ semantics cleanly without implying that only world-state mutations matter.
 - `replace` retained only as backward-compatible fallback
 
 **Consequences:**
+
 - ✅ Deterministic edits with stronger constraints than raw substring replacement
 - ✅ Better behavior under text drift and repeated phrases
 - ✅ Clear failure modes for ambiguous anchors/hunks

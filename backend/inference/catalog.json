@@ -10,6 +10,7 @@
       "verified": false,
       "featured": false,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "strip_temperature": true,
       "strip_top_p": true,
       "strip_penalties": true,
@@ -28,6 +29,7 @@
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_response_schema": true,
       "supports_vision": true
     },
@@ -43,6 +45,7 @@
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_vision": true
     },
     "gpt-5": {
@@ -57,6 +60,7 @@
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_response_schema": true,
       "supports_vision": true
     },
@@ -72,6 +76,7 @@
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_response_schema": true,
       "supports_vision": true
     },
@@ -88,6 +93,7 @@
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_response_schema": true,
       "supports_vision": true
     },
@@ -103,6 +109,7 @@
       "verified": true,
       "featured": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_response_schema": true,
       "supports_vision": true
     },
@@ -118,6 +125,7 @@
       "output_price_per_m": 8.0,
       "verified": true,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_vision": true
     },
     "gpt-4.1-mini": {
@@ -130,6 +138,7 @@
       "input_price_per_m": 0.4,
       "output_price_per_m": 1.6,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_vision": true
     },
     "gpt-4.1-nano": {
@@ -141,7 +150,8 @@
       "max_output_tokens": 4096,
       "input_price_per_m": 0.1,
       "output_price_per_m": 0.4,
-      "supports_function_calling": true
+      "supports_function_calling": true,
+      "supports_parallel_tool_calls": true
     },
     "gpt-4-turbo": {
       "provider": "openai",
@@ -150,6 +160,7 @@
       "input_price_per_m": 10.0,
       "output_price_per_m": 30.0,
       "supports_function_calling": true,
+      "supports_parallel_tool_calls": true,
       "supports_response_schema": true,
       "supports_vision": true
     },

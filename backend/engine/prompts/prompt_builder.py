@@ -44,6 +44,9 @@ from backend.engine.prompts.section_renderers import (
     _render_routing as _render_routing_impl,
 )
 from backend.engine.prompts.section_renderers import (
+    _render_system_capabilities as _render_system_capabilities_impl,
+)
+from backend.engine.prompts.section_renderers import (
     _render_tool_reference as _render_tool_reference_impl,
 )
 
@@ -63,6 +66,42 @@ if TYPE_CHECKING:
         RepositoryInfo,
         RuntimeInfo,
     )
+
+
+def _multi_edit_tool_available() -> bool:
+    """Return True when the symbol_editor exposes the atomic multi_edit command.
+
+    Detected by looking up the dispatcher's command registry so the prompt
+    block stays in lockstep with the actual tool surface — no flag drift.
+    """
+    try:
+        from backend.engine.function_calling import (
+            _structure_editor_supports_multi_edit,  # type: ignore[attr-defined]
+        )
+
+        return bool(_structure_editor_supports_multi_edit())
+    except Exception:
+        return False
+
+
+def _provider_parallel_tool_calls_supported(model_id: str) -> bool:
+    """Return True when the active model's catalog entry advertises parallel tool_calls.
+
+    Strictly model-agnostic: we read the catalog capability flag, never the
+    model name. A model lacking the flag never gets the kwarg.
+    """
+    if not model_id:
+        return False
+    try:
+        from backend.inference.catalog_loader import lookup as _catalog_lookup
+
+        entry = _catalog_lookup(model_id)
+        if entry is None:
+            return False
+        return bool(getattr(entry, 'supports_parallel_tool_calls', False))
+    except Exception:
+        return False
+
 
 _DIR = Path(__file__).parent
 _log = logging.getLogger(__name__)
@@ -334,6 +373,17 @@ def _collect_system_prompt_sections(
         (
             'system_partial_02_tools',
             _render_tool_reference(shell_is_powershell, config),
+        ),
+        (
+            'system_partial_03_capabilities',
+            _render_system_capabilities_impl(
+                config,
+                function_calling_mode=function_calling_mode,
+                multi_edit_available=_multi_edit_tool_available(),
+                parallel_tool_calls_provider_flag=_provider_parallel_tool_calls_supported(
+                    model_id
+                ),
+            ),
         ),
     ]
 

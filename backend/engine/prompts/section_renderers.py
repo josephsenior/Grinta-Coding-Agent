@@ -205,6 +205,89 @@ def _render_routing(
     )
 
 
+def _render_system_capabilities(
+    config: Any,
+    *,
+    function_calling_mode: str | None,
+    multi_edit_available: bool,
+    parallel_tool_calls_provider_flag: bool,
+) -> str:
+    """Runtime-truth capability statement.
+
+    This block exists so the agent can never lie about its own runtime behavior.
+    Every bullet is derived from a live config flag or runtime check — do NOT
+    add aspirational text here. If you change a default, this block updates
+    automatically on the next prompt assembly.
+    """
+    parallel_enabled = bool(getattr(config, 'enable_parallel_tool_scheduling', False))
+    checkpoints_on = bool(getattr(config, 'enable_checkpoints', False))
+    fc_mode = (function_calling_mode or 'unknown').strip().lower()
+
+    if parallel_enabled:
+        parallel_line = (
+            '- **Parallel tool scheduling**: ENABLED for read-only batches '
+            '(`read_file`, `search_code`, `explore_tree_structure`, `get_entity`, `think`). '
+            'Emit independent reads in a single assistant turn — the scheduler will run them concurrently. '
+            'Writes/edits/shell commands always run sequentially.'
+        )
+    else:
+        parallel_line = (
+            '- **Parallel tool scheduling**: DISABLED in this run. All tool calls run sequentially.'
+        )
+
+    if parallel_enabled and parallel_tool_calls_provider_flag and fc_mode == 'native':
+        provider_line = (
+            '- **Provider-side parallel function calls**: enabled for this model. '
+            'Emitting multiple tool_calls in one assistant message is supported by the API.'
+        )
+    else:
+        provider_line = (
+            '- **Provider-side parallel function calls**: emit one tool_call per assistant message '
+            'unless you have explicit confirmation the model supports parallel tool_calls.'
+        )
+
+    if multi_edit_available:
+        multi_edit_line = (
+            '- **Atomic multi-file edits**: AVAILABLE via `symbol_editor` `command=multi_edit`. '
+            'Pass a list of `{path, new_content}` items; all files commit together or all roll back. '
+            'Use this instead of sequential `replace_text` calls when the changes must succeed as a unit.'
+        )
+    else:
+        multi_edit_line = (
+            '- **Atomic multi-file edits**: not exposed in this build — use `text_editor` `replace_text` '
+            'sequentially' + (' and take a `checkpoint` before the batch for coarse rollback.' if checkpoints_on else '.')
+        )
+
+    condensation_line = (
+        '- **Conversation condensation**: AUTOMATIC and middleware-driven. '
+        'It costs ZERO tool calls and ZERO turns from your budget. '
+        'It uses a 3-tier memory model (working / episodic / semantic) and re-injects a pre-condensation '
+        'snapshot after pruning, so verified facts and the immediate task surface survive. '
+        'Do not describe condensation as "lossy" or as something you must invoke manually.'
+    )
+
+    checkpoint_line = (
+        '- **Checkpoints**: AVAILABLE for coarse-grained rollback of file/edit state. '
+        'Take one before risky multi-step edits when atomic batch tools are not a fit.'
+        if checkpoints_on
+        else '- **Checkpoints**: not enabled in this run.'
+    )
+
+    fc_line = f'- **Function-calling mode**: `{fc_mode}`.'
+
+    return (
+        '# 🧭 System Capabilities (verified at runtime)\n'
+        'The following statements are derived from live config and feature flags. '
+        'Treat them as authoritative — do not contradict them in user-facing replies.\n\n'
+        f'{parallel_line}\n'
+        f'{provider_line}\n'
+        f'{multi_edit_line}\n'
+        f'{condensation_line}\n'
+        f'{checkpoint_line}\n'
+        f'{fc_line}'
+    )
+
+
 def _render_security(cli_mode: bool = True) -> str:
     risk_block = (
         '- **LOW**: Safe, read-only actions.\n'

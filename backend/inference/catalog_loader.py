@@ -33,6 +33,7 @@ class ModelEntry:
     verified: bool = False
     featured: bool = False
     supports_function_calling: bool = False
+    supports_parallel_tool_calls: bool = False
     supports_reasoning_effort: bool = False
     supports_prompt_cache: bool = False
     supports_stop_words: bool = True
@@ -73,6 +74,9 @@ def get_catalog() -> tuple[ModelEntry, ...]:
                 verified=info.get('verified', False),
                 featured=info.get('featured', False),
                 supports_function_calling=info.get('supports_function_calling', False),
+                supports_parallel_tool_calls=info.get(
+                    'supports_parallel_tool_calls', False
+                ),
                 supports_reasoning_effort=info.get('supports_reasoning_effort', False),
                 supports_prompt_cache=info.get('supports_prompt_cache', False),
                 supports_stop_words=info.get('supports_stop_words', True),
@@ -361,6 +365,13 @@ def apply_model_param_overrides(
         call_kwargs['reasoning_effort'] = reasoning_effort
 
     _apply_catalog_token_and_penalty_strips(entry, call_kwargs)
+
+    # Provider-side parallel tool_calls. Strictly capability-driven: only set
+    # when the catalog entry advertises support. Provider sanitizers below
+    # still strip it for providers whose SDK rejects the kwarg (e.g. Anthropic,
+    # Google native), so this is safe to set unconditionally here.
+    if entry.supports_parallel_tool_calls and 'parallel_tool_calls' not in call_kwargs:
+        call_kwargs['parallel_tool_calls'] = True
 
     return call_kwargs
 

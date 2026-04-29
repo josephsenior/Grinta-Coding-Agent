@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from backend.core.errors import FunctionCallValidationError
 from backend.engine.tools.terminal_manager import handle_terminal_manager_tool
 from backend.ledger.action.terminal import (
     TerminalInputAction,
@@ -84,3 +85,24 @@ def test_input_rejects_empty_operation() -> None:
                 'session_id': 'x',
             }
         )
+
+
+class TestActionValidation:
+    """Missing / unrecognised action values raise FunctionCallValidationError."""
+
+    def test_missing_action_raises(self) -> None:
+        with pytest.raises(FunctionCallValidationError, match="requires an 'action'"):
+            handle_terminal_manager_tool({'command': 'dir'})
+
+    def test_none_action_raises(self) -> None:
+        with pytest.raises(FunctionCallValidationError, match="requires an 'action'"):
+            handle_terminal_manager_tool({'action': None})
+
+    def test_unknown_action_launch_raises(self) -> None:
+        # Regression: model hallucinated action='launch' — must not crash the step.
+        with pytest.raises(FunctionCallValidationError, match="Unknown terminal_manager action"):
+            handle_terminal_manager_tool({'action': 'launch', 'command': 'echo hi'})
+
+    def test_unknown_action_message_contains_valid_actions(self) -> None:
+        with pytest.raises(FunctionCallValidationError, match="'open'.*'input'.*'read'"):
+            handle_terminal_manager_tool({'action': 'execute'})

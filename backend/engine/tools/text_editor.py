@@ -21,7 +21,7 @@ _DETAILED_TEXT_EDITOR_DESCRIPTION = """File viewing, creation, and editing tool.
   - `range`: line-range replacement with optional `expected_hash` (slice) or `expected_file_hash` (whole file as read).
   - `patch`: unified diff hunk apply with strict context — for strict apply or review, not the default editing style.
 
-Default mental model: **`replace_text`** for code edits on existing files; **minimal valid `file_text` on create**, then **`replace_text`** or **`insert_text`** to extend. Multi-file work: sequential **`replace_text`** calls or checkpoints — there is no atomic batch API.
+Default mental model: **`replace_text`** for code edits on existing files; **minimal valid `file_text` on create**, then **`replace_text`** or **`insert_text`** to extend. For atomic multi-file batches (all-or-nothing across many files), use `symbol_editor` `command=multi_edit`.
 
 Paths are project-relative or absolute under the project root. Do not use a ``/workspace`` path prefix — there is no virtual mount alias.
 

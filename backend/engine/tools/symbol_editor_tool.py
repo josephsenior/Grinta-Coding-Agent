@@ -62,6 +62,11 @@ COMMANDS:
 
 9. `undo_last_edit` - Undo the last runtime file-editor change to this path (session-local, bounded). Applies to commands delegated to the string editor (`create_file`, `insert_text`, etc.). Symbol-level commands (`edit_symbol_body`, `edit_symbols`, `rename_symbol`, …) update the file directly and do not add to this undo stack—use checkpoints for those.
 
+10. `multi_edit` - **ATOMIC multi-file edit (cross-file)**. Applies a batch of full-file replacements across many files as a single transaction: every file commits or none do (auto-rollback on first failure).
+    Required: `file_edits` array (each item: `{ path, new_content }`).
+    Optional: top-level `path` may be omitted (or set to `<batch>`).
+    Use this for coordinated refactors that span 2+ files where partial application would corrupt the project (rename a public symbol + update its imports, split a module, change an API signature + update all call sites you already prepared, etc.). Backups are taken before the batch and restored on any failure. Limit: 50 files per call.
+
 NOTE:
 - Prefer this tool for structure-aware code edits.
 - For non-code files, string-match edits (old_str→new_str), or document-oriented edits (format/section/range/patch), use `text_editor`.
@@ -85,7 +90,7 @@ BEST PRACTICES:
 _SHORT_STRUCTURE_EDITOR_DESCRIPTION = """Structure-aware editor for 40+ languages (Python, JS, TS, Go, Rust, Java, C++, etc.)
 
 Commands: edit_symbol_body, edit_symbols, rename_symbol, find_symbol, replace_range, normalize_indent,
-          create_file, read_file, insert_text, undo_last_edit
+          create_file, read_file, insert_text, undo_last_edit, multi_edit (atomic cross-file batch)
 - Edits by symbol name (function/class), not line numbers
 - Auto-indents code to match file style
 - Validates syntax before saving
@@ -129,6 +134,7 @@ def create_symbol_editor_tool(
                     'read_file',
                     'insert_text',
                     'undo_last_edit',
+                    'multi_edit',
                 ],
             ),
             'path': get_path_param('Path to the file to edit'),
@@ -213,7 +219,32 @@ def create_symbol_editor_tool(
                 'description': 'Line number to insert after (0 for beginning of file, for insert_text command)',
                 'type': 'integer',
             },
+            'file_edits': {
+                'type': 'array',
+                'description': (
+                    'For multi_edit only: list of full-file replacements applied as one '
+                    'atomic transaction. All edits succeed together or all are rolled back. '
+                    'Each item: { path: str, new_content: str }. Max 50 items.'
+                ),
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'path': {
+                            'type': 'string',
+                            'description': 'Project-relative or absolute path to the file to write.',
+                        },
+                        'new_content': {
+                            'type': 'string',
+                            'description': (
+                                'Full new content for the file. JSON string — escape newlines as \\n, '
+                                'embedded double quotes as \\".'
+                            ),
+                        },
+                    },
+                    'required': ['path', 'new_content'],
+                },
+            },
             'security_risk': get_security_risk_param(),
         },
-        required=['command', 'path'],
+        required=['command'],
     )

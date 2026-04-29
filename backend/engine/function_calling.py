@@ -670,6 +670,12 @@ def _validate_symbol_editor_args(
 
     """
     command = require_tool_argument(arguments, 'command', tool_name)
+    cmd_lower = str(command).strip().lower()
+    if cmd_lower == 'multi_edit':
+        # multi_edit operates on a list of files (file_edits[]). The top-level
+        # `path` is intentionally optional for this batch command.
+        path = arguments.get('path', '') or ''
+        return str(command), str(path)
     path = require_tool_argument(arguments, 'path', tool_name)
     return str(command), str(path)
 
@@ -969,6 +975,114 @@ def _handle_undo_last_edit_command(
     )
 
 
+_MAX_MULTI_EDIT_FILES = 50
+
+
+def _structure_editor_supports_multi_edit() -> bool:
+    """Capability probe used by the system-prompt builder.
+
+    Returns True when this build registers the ``multi_edit`` symbol_editor
+    command. Keeping the probe co-located with the handler ensures the system
+    prompt automatically tracks the live tool surface — no flag drift.
+    """
+    return True
+
+
+def _handle_multi_edit_command(
+    _path: str, arguments: Mapping[str, Any]
+) -> Action:
+    """Apply an atomic multi-file batch edit via :class:`AtomicRefactor`.
+
+    All edits commit together or all are rolled back from per-file backups.
+    Side effects run synchronously inside this handler (same pattern as
+    ``edit_symbols``); the returned ``MessageAction`` summarizes the outcome.
+    """
+    raw_edits = arguments.get('file_edits')
+    if not isinstance(raw_edits, list) or not raw_edits:
+        raise FunctionCallValidationError(
+            "multi_edit requires a non-empty 'file_edits' array of "
+            "{ path, new_content } items."
+        )
+    if len(raw_edits) > _MAX_MULTI_EDIT_FILES:
+        raise FunctionCallValidationError(
+            f'multi_edit supports at most {_MAX_MULTI_EDIT_FILES} files per call '
+            f'(got {len(raw_edits)}). Split the batch.'
+        )
+
+    parsed: list[tuple[str, str]] = []
+    seen_paths: set[str] = set()
+    for idx, item in enumerate(raw_edits):
+        if not isinstance(item, Mapping):
+            raise FunctionCallValidationError(
+                f"multi_edit item {idx} must be an object with 'path' and 'new_content'."
+            )
+        item_path = item.get('path')
+        new_content = item.get('new_content')
+        if not isinstance(item_path, str) or not item_path.strip():
+            raise FunctionCallValidationError(
+                f"multi_edit item {idx} is missing required 'path'."
+            )
+        if not isinstance(new_content, str):
+            raise FunctionCallValidationError(
+                f"multi_edit item {idx} is missing required 'new_content' (string)."
+            )
+        canonical = item_path.strip()
+        if canonical in seen_paths:
+            raise FunctionCallValidationError(
+                f'multi_edit item {idx}: duplicate path {canonical!r} in batch. '
+                'Combine edits to the same file before submitting.'
+            )
+        seen_paths.add(canonical)
+        parsed.append((canonical, new_content))
+
+    try:
+        from backend.engine.tools.atomic_refactor import AtomicRefactor
+    except Exception as e:  # pragma: no cover - defensive import guard
+        return MessageAction(
+            content=f'❌ multi_edit unavailable: AtomicRefactor import failed: {e}'
+        )
+
+    refactor = AtomicRefactor()
+    transaction = refactor.begin_transaction()
+    try:
+        for item_path, new_content in parsed:
+            import os as _os
+
+            operation = 'modify' if _os.path.exists(item_path) else 'create'
+            refactor.add_file_edit(
+                transaction,
+                item_path,
+                new_content,
+                operation=operation,
+            )
+        result = refactor.commit(transaction, validate=False)
+    except Exception as e:
+        # Best-effort rollback if commit raised before completion.
+        try:
+            refactor.rollback(transaction)
+        except Exception:
+            pass
+        return MessageAction(
+            content=f'❌ multi_edit failed before commit: {e}. No files modified.'
+        )
+
+    if result.success:
+        affected = ', '.join(p for p, _ in parsed)
+        return MessageAction(
+            content=(
+                f'✓ multi_edit committed {result.files_modified} file(s) atomically: '
+                f'{affected}'
+            )
+        )
+    err_lines = '\n'.join(f'  - {e}' for e in (result.errors or [result.message]))
+    return MessageAction(
+        content=(
+            '❌ multi_edit transaction rolled back — no files modified.\n'
+            f'{err_lines}'
+        )
+    )
+
+
 _SYMBOL_EDITOR_TEXT_EDITOR_COMMANDS = frozenset({
     'create_file',
     'read_file',
@@ -1039,6 +1153,7 @@ def _dispatch_structure_editor_commands(
         'read_file': _handle_read_file_command,
         'insert_text': _handle_insert_text_command,
         'undo_last_edit': _handle_undo_last_edit_command,
+        'multi_edit': _handle_multi_edit_command,
     }
     try:
         if command in editor_command_handlers:

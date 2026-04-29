@@ -1,5 +1,6 @@
 from typing import Any
 
+from backend.core.errors import FunctionCallValidationError
 from backend.ledger.action.terminal import (
     TerminalInputAction,
     TerminalReadAction,
@@ -150,6 +151,21 @@ def handle_terminal_manager_tool(arguments: dict) -> Any:
     """Route terminal manager intents back into the core backend actions."""
     action = arguments.get('action')
 
+    if not action:
+        raise FunctionCallValidationError(
+            "terminal_manager requires an 'action' argument. "
+            "Valid actions: 'open' (start session + run command), "
+            "'read' (fetch output), 'input' (send more text). "
+            "Example: {\"action\": \"open\", \"command\": \"Get-ChildItem\"}"
+        )
+
+    if action not in ('open', 'input', 'read'):
+        raise FunctionCallValidationError(
+            f"Unknown terminal_manager action: {action!r}. "
+            f"Must be one of: 'open', 'input', 'read'. "
+            f"To run a command use action='open' with a 'command' argument."
+        )
+
     if action == 'open':
         cmd = arguments.get('command')
         if not cmd:
@@ -211,4 +227,8 @@ def handle_terminal_manager_tool(arguments: dict) -> Any:
             cols=_opt_int(arguments.get('cols')),
         )
 
-    raise ValueError(f'Unknown terminal manager action: {action}')
+    # Unreachable — the enum guard above catches all invalid values.
+    raise FunctionCallValidationError(  # pragma: no cover
+        f"Unknown terminal_manager action: {action!r}. "
+        f"Must be one of: 'open', 'input', 'read'."
+    )

@@ -200,7 +200,7 @@ DEFAULT_AGENT_MAX_ERROR_RATE = 0.5
 DEFAULT_AGENT_ERROR_RATE_WINDOW = 10
 DEFAULT_AGENT_WARNING_FIRST_TRIP_ENABLED = True
 DEFAULT_AGENT_WARNING_FIRST_TRIP_LIMIT = 3
-DEFAULT_AGENT_PARALLEL_TOOL_SCHEDULING_ENABLED = False
+DEFAULT_AGENT_PARALLEL_TOOL_SCHEDULING_ENABLED = True
 
 # ── Agent Recovery Heuristics ───────────────────────────────────────
 # Threshold knobs for the action-execution repair loop and null-action
