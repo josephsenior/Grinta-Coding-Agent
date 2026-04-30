@@ -1,4 +1,4 @@
-"""code_intelligence tool — code navigation via the language server.
+"""lsp tool — code navigation via the language server.
 
 Supports the following commands:
 - ``find_definition``  locate where a symbol is defined
@@ -17,11 +17,11 @@ from typing import Any
 
 from backend.ledger.action.code_nav import LspQueryAction
 
-CODE_INTELLIGENCE_TOOL_NAME = 'code_intelligence'
+CODE_INTELLIGENCE_TOOL_NAME = 'lsp'
 
 
 def create_lsp_query_tool() -> dict[str, Any]:
-    """Return the OpenAI function-calling tool definition for code_intelligence."""
+    """Return the OpenAI function-calling tool definition for lsp."""
     return {
         'type': 'function',
         'function': {
@@ -44,7 +44,7 @@ def create_lsp_query_tool() -> dict[str, Any]:
                 're-run `get_diagnostics` to verify.\n'
                 'Tool boundaries (do not duplicate effort):\n'
                 '  • Rename symbol / edit by symbol name → use `symbol_editor` '
-                '(rename_symbol, edit_symbol_body, multi_edit). `code_intelligence` '
+                '(rename_symbol, edit_symbol_body, multi_edit). `lsp` '
                 'is read-only and intentionally does not expose rename.\n'
                 '  • Workspace-wide text/symbol search → use `search_code` '
                 '(ripgrep). `list_symbols` only enumerates symbols in a single file.\n'

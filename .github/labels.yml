@@ -140,7 +140,7 @@
 
 - name: "area: lsp"
   color: "1d76db"
-  description: "Language server / `code_intelligence` tool."
+  description: "Language server / `lsp` tool."
 
 - name: "area: dap"
   color: "1d76db"

@@ -50,7 +50,7 @@ _SIMPLE_VERB_MAP = {
     'memory_manager': 'Managed',
     'task_tracker': 'Tracked',
     'search_code': 'Searched',
-    'code_intelligence': 'Analyzed',
+    'lsp': 'Analyzed',
     'analyze_project_structure': 'Explored',
     'read_symbol_definition': 'Read',
     'browser': 'Browser',
@@ -167,7 +167,7 @@ _STATS_HANDLERS: dict[str, Callable[[dict[str, Any]], str | None]] = {
     'text_editor': _stats_text_editor,
     'task_tracker': _stats_task_tracker,
     'terminal_manager': _stats_terminal_manager,
-    'code_intelligence': _stats_lsp,
+    'lsp': _stats_lsp,
     'lsp_query': _stats_lsp,
 }
 

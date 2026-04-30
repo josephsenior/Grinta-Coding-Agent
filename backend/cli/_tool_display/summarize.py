@@ -246,7 +246,7 @@ def _summary_search_code(args: dict[str, Any]) -> str:
     return ' in '.join(bits) if bits else 'search…'
 
 
-def _summary_code_intelligence(args: dict[str, Any]) -> str:
+def _summary_lsp(args: dict[str, Any]) -> str:
     cmd = args.get('command') or args.get('query_type')
     path = args.get('file') or args.get('path')
     sym = args.get('symbol') or args.get('name')
@@ -340,7 +340,7 @@ _TOOL_SUMMARIZERS: dict[str, Callable[[dict[str, Any]], str]] = {
     'memory_manager': _summary_memory,
     'task_tracker': _summary_task_tracker,
     'search_code': _summary_search_code,
-    'code_intelligence': _summary_code_intelligence,
+    'lsp': _summary_lsp,
     'analyze_project_structure': _summary_analyze_project,
     'read_symbol_definition': _summary_read_symbol,
     'apply_patch': _summary_apply_patch,

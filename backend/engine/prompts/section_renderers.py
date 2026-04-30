@@ -50,8 +50,8 @@ def _resolve_terminal_command_tool(
     return 'execute_powershell' if is_windows else 'execute_bash'
 
 
-def _code_intelligence_available(config: Any = None) -> bool:
-    """Return whether the code_intelligence tool should be considered available."""
+def _lsp_available(config: Any = None) -> bool:
+    """Return whether the lsp tool should be considered available."""
     if not getattr(config, 'enable_lsp_query', True):
         return False
     try:
@@ -64,10 +64,10 @@ def _code_intelligence_available(config: Any = None) -> bool:
 
 def _explore_hint(_config: Any = None) -> str:
     """Return the canonical layout-discovery tool hint."""
-    if _code_intelligence_available(_config):
+    if _lsp_available(_config):
         return (
             '`search_code` for text/symbol search, `read_symbol_definition` to fetch a '
-            'specific symbol/file body, `code_intelligence` for definitions/references '
+            'specific symbol/file body, `lsp` for definitions/references '
             '(LSP), `analyze_project_structure` for tree layout'
         )
     return (
@@ -162,7 +162,7 @@ def _render_routing(
     function_calling_mode: str | None = None,
 ) -> str:
     explore = _explore_hint(config)
-    code_intelligence_available = _code_intelligence_available(config)
+    lsp_available = _lsp_available(config)
     meta_cognition_on = getattr(config, 'enable_meta_cognition', False)
     working_memory_on = getattr(config, 'enable_working_memory', True)
     condensation_on = getattr(config, 'enable_condensation_request', False)
@@ -176,9 +176,9 @@ def _render_routing(
         f'For repo layout and file content, use **{explore}** '
         'and **`text_editor` (`read_file`)**—not `ls && cat && grep` chains for project files.',
     )
-    code_intelligence_routing = (
-        '- **Known file + symbol position, precise definition/references/hover** → `code_intelligence`'
-        if code_intelligence_available
+    lsp_routing = (
+        '- **Known file + symbol position, precise definition/references/hover** → `lsp`'
+        if lsp_available
         else ''
     )
     tool_call_batching_mode = _routing_tool_batching_paragraph(function_calling_mode)
@@ -192,7 +192,7 @@ def _render_routing(
         'system_partial_00_routing.md',
         ambiguous_intent_instruction=memory_kw['ambiguous_intent_instruction'],
         batch_commands=batch_cmds,
-        code_intelligence_routing=code_intelligence_routing,
+        lsp_routing=lsp_routing,
         context_budget_sync_clause=memory_kw['context_budget_sync_clause'],
         context_budget_next_step=memory_kw['context_budget_next_step'],
         explore_layout_hint=explore,
@@ -226,7 +226,7 @@ def _render_system_capabilities(
     if parallel_enabled:
         parallel_line = (
             '- **Parallel tool scheduling**: ENABLED for read-only batches '
-            '(`read_file`, `search_code`, `code_intelligence`, `symbol_editor`, `think`). '
+            '(`read_file`, `search_code`, `lsp`, `symbol_editor`, `think`). '
             'Emit independent reads in a single assistant turn — the scheduler will run them concurrently. '
             'Writes/edits/shell commands always run sequentially.'
         )
@@ -331,11 +331,11 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
         lsp_line = '- **Language servers (LSP)**: tool DISABLED in this run.'
     elif lsp_available:
         lsp_line = (
-            '- **Language servers (LSP / `code_intelligence`)**: detected on PATH → '
-            f'{", ".join(lsp_available)}. Use `code_intelligence` for definition / '
+            '- **Language servers (LSP / `lsp`)**: detected on PATH → '
+            f'{", ".join(lsp_available)}. Use `lsp` for definition / '
             'references / hover / diagnostics on these languages. '
             'For symbol rename or structural edits use `symbol_editor` (rename, '
-            'edit_symbol_body, multi_edit) — `code_intelligence` is read-only.'
+            'edit_symbol_body, multi_edit) — `lsp` is read-only.'
         )
     else:
         lsp_line = (
@@ -396,7 +396,7 @@ def _render_autonomy(
     render_partial: Callable[..., str], config: Any, is_windows: bool
 ) -> str:
     checkpoints = getattr(config, 'enable_checkpoints', False)
-    code_intelligence_available = _code_intelligence_available(config)
+    lsp_available = _lsp_available(config)
     cp_line = (
         " Auto-save occurs before large writes; use 'checkpoint' tool to manually save logically safe states."
         if checkpoints
@@ -424,9 +424,9 @@ def _render_autonomy(
         f'run {_explore_hint(config)}, or list with `Get-ChildItem` only if no tool fits',
         f'run {_explore_hint(config)}—avoid blind `cat` of guessed paths',
     )
-    code_intelligence_fallback = (
-        '- `search_code` returns nothing → try `code_intelligence`'
-        if code_intelligence_available
+    lsp_fallback = (
+        '- `search_code` returns nothing → try `lsp`'
+        if lsp_available
         else '- `search_code` returns nothing → try alternate search terms, do not fall back to shell.'
     )
     tracker_on = getattr(config, 'enable_internal_task_tracker', False)
@@ -462,7 +462,7 @@ def _render_autonomy(
         task_tracker_discipline_block=task_tracker_discipline_block,
         task_sync_instruction=task_sync_instruction,
         path_discovery_hint=path_hint,
-        code_intelligence_fallback=code_intelligence_fallback,
+        lsp_fallback=lsp_fallback,
         problem_solving_workflow_body=problem_solving_workflow_body,
     )
 
@@ -540,7 +540,7 @@ def _render_examples(
     tracker_on: bool,
     enable_think: bool,
     meta_cognition_on: bool,
-    code_intelligence_available: bool,
+    lsp_available: bool,
     checkpoints_on: bool,
 ) -> str:
     """Render the worked-examples partial with capability-aware tool references."""
@@ -564,8 +564,8 @@ def _render_examples(
         else 'If approved, keep the change surface small and verify immediately after the action.'
     )
     adjacent_tool_fallback = (
-        '`symbol_editor` → `text_editor`; `code_intelligence` → `search_code`'
-        if code_intelligence_available
+        '`symbol_editor` → `text_editor`; `lsp` → `search_code`'
+        if lsp_available
         else '`symbol_editor` → `text_editor`; refine the `search_code` query and read nearby files'
     )
     failure_escalation_step = (
@@ -722,9 +722,9 @@ def _mcp_tail_render_kwargs(
         if meta_cognition
         else ''
     )
-    code_intelligence_available = _code_intelligence_available(config)
-    if code_intelligence_available:
-        uncertainty_state_1_discover_line = '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**; use tools like `search_code`, editor `view_*`, or `code_intelligence`. Do NOT ask first.'
+    lsp_available = _lsp_available(config)
+    if lsp_available:
+        uncertainty_state_1_discover_line = '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**; use tools like `search_code`, editor `view_*`, or `lsp`. Do NOT ask first.'
     else:
         uncertainty_state_1_discover_line = '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**, not shell repo search/read. Do NOT ask first.'
     thinking_tool_section = (

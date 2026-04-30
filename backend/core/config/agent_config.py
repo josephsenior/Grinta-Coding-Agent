@@ -184,7 +184,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     enable_lsp_query: bool = Field(
         default=True,
         description=(
-            'Expose the code_intelligence (LSP) tool. The runtime detector probes the '
+            'Expose the lsp (LSP) tool. The runtime detector probes the '
             'machine for installed language servers (pylsp, gopls, rust-analyzer, '
             'typescript-language-server, clangd, …). When none are present the tool is '
             'silently skipped, so leaving this on is safe even on minimal images.'

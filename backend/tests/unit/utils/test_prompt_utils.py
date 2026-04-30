@@ -258,7 +258,7 @@ class TestOrchestratorPromptManager:
             in result
         )
 
-    def test_get_system_message_uses_code_intelligence_when_lsp_is_available(
+    def test_get_system_message_uses_lsp_when_lsp_is_available(
         self, tmp_path
     ):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -282,10 +282,10 @@ class TestOrchestratorPromptManager:
         ):
             result = opm.get_system_message()
 
-        assert '`code_intelligence`' in result
+        assert '`lsp`' in result
         assert '`lsp_query`' not in result
 
-    def test_get_system_message_omits_code_intelligence_when_lsp_unavailable(
+    def test_get_system_message_omits_lsp_when_lsp_unavailable(
         self, tmp_path
     ):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -309,7 +309,7 @@ class TestOrchestratorPromptManager:
         ):
             result = opm.get_system_message()
 
-        assert '`code_intelligence`' not in result
+        assert '`lsp`' not in result
         assert '`lsp_query`' not in result
 
     def test_get_system_message_omits_terminal_manager_when_terminal_disabled(
@@ -931,7 +931,7 @@ class TestBuildSystemPromptRenders:
                 config=_base_config(enable_lsp_query=True),
                 function_calling_mode='native',
             )
-        assert 'code_intelligence' in result
+        assert 'lsp' in result
 
     def test_unknown_function_calling_mode(self) -> None:
         result = self._assert_renders_cleanly(
