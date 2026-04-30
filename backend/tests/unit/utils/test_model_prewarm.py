@@ -8,7 +8,9 @@ import pytest
 from backend.utils import model_prewarm
 
 
-def test_get_default_models_to_prewarm_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_default_models_to_prewarm_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv('EMBEDDING_MODEL', raising=False)
     monkeypatch.delenv('RERANKER_MODEL', raising=False)
     monkeypatch.delenv('PREBUNDLED_MODELS', raising=False)
@@ -54,7 +56,8 @@ def test_ensure_models_available_success_sets_offline_env(
         return f'/cache/{repo_id}'
 
     with patch(
-        'backend.utils.model_prewarm.snapshot_download', side_effect=_fake_snapshot_download
+        'backend.utils.model_prewarm.snapshot_download',
+        side_effect=_fake_snapshot_download,
     ):
         result = model_prewarm.ensure_models_available(['m/one', 'm/two'])
 
@@ -68,9 +71,11 @@ def test_ensure_models_available_raises_on_missing_model() -> None:
         raise FileNotFoundError(repo_id)
 
     with patch(
-        'backend.utils.model_prewarm.snapshot_download', side_effect=_fake_snapshot_download
+        'backend.utils.model_prewarm.snapshot_download',
+        side_effect=_fake_snapshot_download,
     ):
         with pytest.raises(RuntimeError) as exc:
-            model_prewarm.ensure_models_available(['missing/repo'], fail_on_missing=True)
+            model_prewarm.ensure_models_available(
+                ['missing/repo'], fail_on_missing=True
+            )
     assert 'missing/repo' in str(exc.value)
-

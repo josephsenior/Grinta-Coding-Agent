@@ -128,8 +128,8 @@ class SlashCommandsMixin:
         except Exception:
             ts_str = str(ts)
         return (
-            f"  {e.get('id', '?')[:12]:<12} {ts_str}  "
-            f"{e.get('checkpoint_type', '?'):<18} {e.get('description', '')[:60]}"
+            f'  {e.get("id", "?")[:12]:<12} {ts_str}  '
+            f'{e.get("checkpoint_type", "?"):<18} {e.get("description", "")[:60]}'
         )
 
     def _handle_checkpoint_diff(self, args: list[str]) -> None:
@@ -154,7 +154,7 @@ class SlashCommandsMixin:
             if len(diff_text) > 8000:
                 diff_text = diff_text[:8000] + '\n[... diff truncated ...]\n'
             self._renderer.add_markdown_block(
-                f"checkpoint diff {match.get('id', '?')[:12]}",
+                f'checkpoint diff {match.get("id", "?")[:12]}',
                 f'```diff\n{diff_text}\n```',
             )
 
@@ -474,7 +474,7 @@ class SlashCommandsMixin:
             and not tracing_optout
         )
         lines.append(
-            f'  tracing: enabled={tracing_enabled_env} ' f'opt_out_env={tracing_optout}'
+            f'  tracing: enabled={tracing_enabled_env} opt_out_env={tracing_optout}'
         )
 
         return '\n'.join(lines)
@@ -488,7 +488,7 @@ class SlashCommandsMixin:
             if hud.llm_calls
             else 'no LLM calls yet'
         )
-        msg = f'Session cost: ${hud.cost_usd:.4f}  ·  {tokens}\n' f'Model: {hud.model}'
+        msg = f'Session cost: ${hud.cost_usd:.4f}  ·  {tokens}\nModel: {hud.model}'
         if self._renderer is not None:
             self._renderer.add_system_message(msg, title='cost')
         return True
@@ -570,7 +570,7 @@ class SlashCommandsMixin:
             return None
         body = (completed.stdout or '').strip() or '(no changes)'
         if completed.stderr and completed.returncode != 0:
-            body = f'git diff failed in {cwd}\n\n' f'{completed.stderr.strip() or body}'
+            body = f'git diff failed in {cwd}\n\n{completed.stderr.strip() or body}'
         return body
 
     def _parse_diff_args(

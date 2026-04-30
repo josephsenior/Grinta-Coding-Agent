@@ -25,7 +25,9 @@ class TestGenerateQuickstartConfig:
         assert data['llm_model'] == 'gpt-4o'
 
     def test_custom_base_url(self):
-        result = quickstart.generate_quickstart_config(base_url='https://api.example.com')
+        result = quickstart.generate_quickstart_config(
+            base_url='https://api.example.com'
+        )
         data = json.loads(result)
         assert data['llm_base_url'] == 'https://api.example.com'
 

@@ -223,9 +223,7 @@ class FileEditorEditOpsMixin:
         *,
         limit: int = 3,
     ) -> list[tuple[float, int, str]]:
-        return _closest_match_candidates_impl(
-            self, file_content, old_str, limit=limit
-        )
+        return _closest_match_candidates_impl(self, file_content, old_str, limit=limit)
 
     def _build_no_match_error(self, file_content: str, old_str: str, mode: str) -> str:
         return _build_no_match_error_impl(self, file_content, old_str, mode)

@@ -227,9 +227,7 @@ def _anthropic_stream_thinking_chunk(event: Any) -> dict[str, Any] | None:
     return {
         'choices': [
             {
-                'delta': {
-                    'reasoning_content': getattr(event.delta, 'thinking', '')
-                },
+                'delta': {'reasoning_content': getattr(event.delta, 'thinking', '')},
                 'finish_reason': None,
             }
         ]
@@ -312,7 +310,9 @@ async def astream(
                         yield chunk
                     continue
 
-                event_chunk: dict[str, Any] | None = _anthropic_stream_event_chunk(event)
+                event_chunk: dict[str, Any] | None = _anthropic_stream_event_chunk(
+                    event
+                )
                 if event_chunk is not None:
                     yield event_chunk
     except Exception as e:

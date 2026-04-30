@@ -86,7 +86,9 @@ async def test_lifespan_fails_when_prewarm_check_fails() -> None:
             'backend.utils.model_prewarm.ensure_models_available',
             side_effect=RuntimeError('missing model'),
         ),
-        patch('backend.utils.model_prewarm.get_default_models_to_prewarm', return_value=[]),
+        patch(
+            'backend.utils.model_prewarm.get_default_models_to_prewarm', return_value=[]
+        ),
     ):
         with pytest.raises(RuntimeError):
             async with aes.lifespan(app):
@@ -111,7 +113,9 @@ async def test_lifespan_runs_initialize_and_shutdown_calls_client_close() -> Non
         aes._initialize_background = _init_background
 
         with (
-            patch('backend.utils.model_prewarm.ensure_models_available', return_value={}),
+            patch(
+                'backend.utils.model_prewarm.ensure_models_available', return_value={}
+            ),
             patch(
                 'backend.utils.model_prewarm.get_default_models_to_prewarm',
                 return_value=['a/b'],
@@ -139,8 +143,13 @@ async def test_lifespan_cancels_pending_initialization_task_on_shutdown() -> Non
     try:
         aes._initialize_background = _init_background
         with (
-            patch('backend.utils.model_prewarm.ensure_models_available', return_value={}),
-            patch('backend.utils.model_prewarm.get_default_models_to_prewarm', return_value=[]),
+            patch(
+                'backend.utils.model_prewarm.ensure_models_available', return_value={}
+            ),
+            patch(
+                'backend.utils.model_prewarm.get_default_models_to_prewarm',
+                return_value=[],
+            ),
         ):
             async with aes.lifespan(app):
                 assert aes.initialization_task is not None
@@ -178,7 +187,9 @@ async def test_lsp_query_success_and_failure(tmp_path: Path) -> None:
     ex = aes.RuntimeExecutor([], str(tmp_path), 'u', 1, False)
     action = LspQueryAction(file=str(py), command='hover', line=1, column=1)
     with patch('backend.utils.lsp_client.LspClient') as LC:
-        LC.return_value.query.return_value = LspResult(available=True, hover_text='docs')
+        LC.return_value.query.return_value = LspResult(
+            available=True, hover_text='docs'
+        )
         obs = await ex.lsp_query(action)
     assert 'docs' in obs.content
 
@@ -217,4 +228,3 @@ def test_runtime_executor_close_sync_cleanup(tmp_path: Path) -> None:
     ex.debug_manager.close_all.assert_called_once()
     ex.session_manager.close_all.assert_called_once()
     ex.memory_monitor.stop_monitoring.assert_called_once()
-

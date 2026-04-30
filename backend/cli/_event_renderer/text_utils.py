@@ -140,8 +140,7 @@ def _should_skip_visible_line(compact: str, had_task_tracking_block: bool) -> bo
         return False
     lower_compact = compact.lower()
     return any(
-        lower_compact.startswith(prefix)
-        for prefix in _TASK_TRACKING_BLOCK_PREFIXES
+        lower_compact.startswith(prefix) for prefix in _TASK_TRACKING_BLOCK_PREFIXES
     )
 
 

@@ -287,10 +287,10 @@ def detection_summary() -> dict[str, list[str]]:
             t.spec.name for t in detect_lsp_servers().values() if not t.available
         ),
         'debug_available': sorted(
-            f"{e['language']}:{e['adapter']}" for e in debug if e.get('available')
+            f'{e["language"]}:{e["adapter"]}' for e in debug if e.get('available')
         ),
         'debug_missing': sorted(
-            f"{e['language']}:{e['adapter']}" for e in debug if not e.get('available')
+            f'{e["language"]}:{e["adapter"]}' for e in debug if not e.get('available')
         ),
     }
 

@@ -1,4 +1,4 @@
-﻿"""Tests for backend.core.config.api_key_manager â€” provider detection + key validation."""
+"""Tests for backend.core.config.api_key_manager â€” provider detection + key validation."""
 
 from __future__ import annotations
 
@@ -184,8 +184,9 @@ class TestGetApiKeyForModel:
     def test_generic_llm_api_key_fallback(self):
         mgr = APIKeyManager()
         mgr.provider_api_keys.clear()
-        with patch.object(mgr, '_get_provider_key_from_env', return_value=None), patch.dict(
-            os.environ, {'LLM_API_KEY': 'generic-fallback-key'}, clear=True
+        with (
+            patch.object(mgr, '_get_provider_key_from_env', return_value=None),
+            patch.dict(os.environ, {'LLM_API_KEY': 'generic-fallback-key'}, clear=True),
         ):
             result = mgr.get_api_key_for_model('openai/gpt-4')
             assert result is not None
@@ -194,8 +195,10 @@ class TestGetApiKeyForModel:
     def test_no_key_found(self):
         mgr = APIKeyManager()
         mgr.provider_api_keys.clear()
-        with patch.object(mgr, '_get_provider_key_from_env', return_value=None), \
-                patch.dict(os.environ, {'LLM_API_KEY': ''}):
+        with (
+            patch.object(mgr, '_get_provider_key_from_env', return_value=None),
+            patch.dict(os.environ, {'LLM_API_KEY': ''}),
+        ):
             result = mgr.get_api_key_for_model('openai/gpt-4')
             assert result is None
 
@@ -211,8 +214,10 @@ class TestGetApiKeyForModel:
         mgr.provider_api_keys.clear()
         # Key that doesn't match pattern and is too short (<= 10 chars)
         key = SecretStr('short-key')  # Only 9 chars
-        with patch.object(mgr, '_get_provider_key_from_env', return_value=None), \
-                patch.dict(os.environ, {'LLM_API_KEY': ''}):
+        with (
+            patch.object(mgr, '_get_provider_key_from_env', return_value=None),
+            patch.dict(os.environ, {'LLM_API_KEY': ''}),
+        ):
             result = mgr.get_api_key_for_model('openai/gpt-4', provided_key=key)
             # Should not return the key, fall back to None
             assert result is None
@@ -327,9 +332,15 @@ class TestSetEnvironmentVariables:
             )
             pcm.get_environment_variable.return_value = 'OPENAI_API_KEY'
             pcm.validate_api_key_format.return_value = None
-            with patch.object(APIKeyManager, 'get_api_key_for_model', return_value=None), patch.object(
-                APIKeyManager, '_get_provider_key_from_env', return_value='late-env-key'
-            ), patch.dict(os.environ, {}, clear=True):
+            with (
+                patch.object(APIKeyManager, 'get_api_key_for_model', return_value=None),
+                patch.object(
+                    APIKeyManager,
+                    '_get_provider_key_from_env',
+                    return_value='late-env-key',
+                ),
+                patch.dict(os.environ, {}, clear=True),
+            ):
                 mgr.set_environment_variables('openai/gpt-4', None)
                 assert os.environ.get('OPENAI_API_KEY') == 'late-env-key'
                 assert os.environ.get('LLM_API_KEY') == 'late-env-key'
@@ -423,7 +434,9 @@ class TestSetEnvironmentVariables:
             pcm.get_environment_variable.return_value = None
             pcm.validate_api_key_format.return_value = None
             with patch.dict(os.environ, {}, clear=True):
-                mgr.set_environment_variables('openai/gpt-4', SecretStr('sk-test-env-var'))
+                mgr.set_environment_variables(
+                    'openai/gpt-4', SecretStr('sk-test-env-var')
+                )
                 assert 'OPENAI_API_KEY' not in os.environ
                 assert os.environ.get('LLM_API_KEY') == 'sk-test-env-var'
 
@@ -439,7 +452,9 @@ class TestSetEnvironmentVariables:
             pcm.get_environment_variable.return_value = 'OPENAI_API_KEY'
             pcm.validate_api_key_format.return_value = None
             with patch.dict(os.environ, {'LLM_API_KEY': 'existing'}, clear=True):
-                mgr.set_environment_variables('openai/gpt-4', SecretStr('sk-test-env-var'))
+                mgr.set_environment_variables(
+                    'openai/gpt-4', SecretStr('sk-test-env-var')
+                )
                 assert os.environ.get('OPENAI_API_KEY') == 'sk-test-env-var'
                 assert os.environ.get('LLM_API_KEY') == 'existing'
 
@@ -498,7 +513,9 @@ class TestGetProviderKeyFromEnv:
 
     def test_get_provider_key_from_env_wrapper(self):
         mgr = APIKeyManager()
-        with patch.object(mgr, '_get_provider_key_from_env', return_value='wrapped-key') as mock_get:
+        with patch.object(
+            mgr, '_get_provider_key_from_env', return_value='wrapped-key'
+        ) as mock_get:
             assert mgr.get_provider_key_from_env('openai') == 'wrapped-key'
         mock_get.assert_called_once_with('openai')
 
@@ -530,7 +547,9 @@ class TestApiKeyManagerInternals:
 
     def test_extract_provider_delegates_to_private_helper(self):
         mgr = APIKeyManager()
-        with patch.object(mgr, '_extract_provider', return_value='openai') as mock_extract:
+        with patch.object(
+            mgr, '_extract_provider', return_value='openai'
+        ) as mock_extract:
             assert mgr.extract_provider('openai/gpt-4') == 'openai'
         mock_extract.assert_called_once_with('openai/gpt-4')
 

@@ -32,4 +32,3 @@ def test_mcp_bootstrap_status_set_and_get() -> None:
     assert out['state'] == 'healthy'
     assert out['connected_client_count'] == 2
     assert out['conversion_errors'] == ['x']
-

@@ -126,7 +126,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_VECTOR_MEMORY_ENABLED,
         description=(
             'Enable persistent vector memory store. Disabled by default to keep '
-            "installs lean. Requires the optional [rag] extra "
+            'installs lean. Requires the optional [rag] extra '
             '(`pip install "grinta-ai[rag]"`).'
         ),
     )

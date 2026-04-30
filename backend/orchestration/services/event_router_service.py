@@ -114,7 +114,9 @@ def _summarize_delegate_reject_event(
 ) -> tuple[str, str] | None:
     if not isinstance(event, AgentRejectAction):
         return None
-    reason = _truncate_delegate_progress(str(event.outputs.get('reason', '') or ''), 140)
+    reason = _truncate_delegate_progress(
+        str(event.outputs.get('reason', '') or ''), 140
+    )
     return 'failed', reason or 'Rejected delegated task'
 
 
@@ -210,9 +212,7 @@ class EventRouterService:
     def __init__(self, controller: SessionOrchestrator) -> None:
         self._ctrl = controller
 
-    async def _handle_change_state_action(
-        self, action: ChangeAgentStateAction
-    ) -> None:
+    async def _handle_change_state_action(self, action: ChangeAgentStateAction) -> None:
         try:
             target_state = AgentState(action.agent_state)
         except ValueError:
@@ -266,7 +266,9 @@ class EventRouterService:
         is_first = action.id == first_user_message.id if first_user_message else False
         return RecallType.WORKSPACE_CONTEXT if is_first else RecallType.KNOWLEDGE
 
-    def _set_pending_recall(self, recall_action: RecallAction, recall_type: RecallType) -> None:
+    def _set_pending_recall(
+        self, recall_action: RecallAction, recall_type: RecallType
+    ) -> None:
         pending_service = getattr(self._ctrl, 'pending_action_service', None)
         if recall_type == RecallType.WORKSPACE_CONTEXT:
             if pending_service is not None:

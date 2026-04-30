@@ -440,7 +440,9 @@ def _has_named_app_mcp_server(cfg: Any) -> bool:
 def _has_default_server_url(cfg: Any, default_server: MCPServerConfig) -> bool:
     if not default_server.url:
         return False
-    return any(getattr(server, 'url', None) == default_server.url for server in cfg.mcp.servers)
+    return any(
+        getattr(server, 'url', None) == default_server.url for server in cfg.mcp.servers
+    )
 
 
 def _append_default_mcp_server(

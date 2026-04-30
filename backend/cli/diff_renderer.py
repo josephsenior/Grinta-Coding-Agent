@@ -113,7 +113,9 @@ class DiffPanel:
             return None
 
     def _append_groups_diff(
-        self, parts: list[Any], groups: list[dict[str, list[str]]],
+        self,
+        parts: list[Any],
+        groups: list[dict[str, list[str]]],
     ) -> None:
         diff_text = self._render_groups(groups)
         added = sum(

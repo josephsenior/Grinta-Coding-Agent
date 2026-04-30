@@ -282,7 +282,9 @@ class KnowledgePlaybook(BasePlaybook):
             raise ValueError(msg)
 
     def _partition_triggers(self) -> tuple[list[str], list[str]]:
-        slash_triggers = [trigger for trigger in self.triggers if trigger.startswith('/')]
+        slash_triggers = [
+            trigger for trigger in self.triggers if trigger.startswith('/')
+        ]
         non_slash_triggers = [
             trigger for trigger in self.triggers if not trigger.startswith('/')
         ]

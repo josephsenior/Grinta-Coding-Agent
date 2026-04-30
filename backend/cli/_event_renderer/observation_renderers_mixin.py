@@ -234,7 +234,9 @@ class ObservationRenderersMixin:
         """Return ``(msg, result_kind, extra_lines)`` for the shell card."""
         if is_internal and _is_apply_patch_activity(title, label):
             return _compact_apply_patch_result(
-                exit_code=exit_code, label=label, content=content,
+                exit_code=exit_code,
+                label=label,
+                content=content,
             )
         # CmdOutputObservation defaults to exit_code=-1 when unknown; treat any
         # non-zero exit code (including -1) as a failure.
@@ -253,12 +255,11 @@ class ObservationRenderersMixin:
 
     @staticmethod
     def _cmd_observation_success(
-        exit_code: int | None, content: str,
+        exit_code: int | None,
+        content: str,
     ) -> tuple[str | None, str, list[Any] | None]:
         raw_lines = (
-            [ln.strip() for ln in content.split('\n') if ln.strip()]
-            if content
-            else []
+            [ln.strip() for ln in content.split('\n') if ln.strip()] if content else []
         )
         msg: str | None = 'done' if (raw_lines or exit_code == 0) else None
         result_kind = 'ok' if exit_code == 0 else 'neutral'
@@ -363,14 +364,18 @@ class ObservationRenderersMixin:
         if not worker_id:
             return False
         self._delegate_workers[worker_id] = self._delegate_worker_record(
-            obs, extras, worker_id,
+            obs,
+            extras,
+            worker_id,
         )
         self._set_delegate_panel()
         return True
 
     @staticmethod
     def _delegate_worker_record(
-        obs: StatusObservation, extras: Any, worker_id: str,
+        obs: StatusObservation,
+        extras: Any,
+        worker_id: str,
     ) -> dict[str, Any]:
         order = extras.get('order', 9999)
         if not isinstance(order, int):
@@ -379,9 +384,7 @@ class ObservationRenderersMixin:
             'label': str(extras.get('worker_label') or worker_id),
             'status': str(extras.get('worker_status') or 'running'),
             'task': str(extras.get('task_description') or 'subtask'),
-            'detail': str(
-                extras.get('detail') or getattr(obs, 'content', '') or ''
-            ),
+            'detail': str(extras.get('detail') or getattr(obs, 'content', '') or ''),
             'order': order,
         }
 
@@ -393,12 +396,17 @@ class ObservationRenderersMixin:
         )
 
     def _handle_retry_status(
-        self, obs: StatusObservation, *, status_type: str,
+        self,
+        obs: StatusObservation,
+        *,
+        status_type: str,
     ) -> None:
         extras = getattr(obs, 'extras', None) or {}
         attempt = self._coerce_positive_int(extras.get('attempt'), default=1)
         max_attempts = self._coerce_positive_int(
-            extras.get('max_attempts'), default=attempt, floor=attempt,
+            extras.get('max_attempts'),
+            default=attempt,
+            floor=attempt,
         )
         self._hud.update_ledger('Backoff')
         prefix = 'Auto Retry' if status_type == 'retry_pending' else 'Retrying'
@@ -413,7 +421,10 @@ class ObservationRenderersMixin:
         return max(floor, coerced)
 
     def _render_status_content(
-        self, obs: StatusObservation, *, force_visible_status: bool,
+        self,
+        obs: StatusObservation,
+        *,
+        force_visible_status: bool,
     ) -> None:
         content = getattr(obs, 'content', '')
         if not content:
@@ -433,7 +444,8 @@ class ObservationRenderersMixin:
         self._flush_pending_tool_cards()
         self._append_history(
             format_activity_result_secondary(
-                f'status · {content}', kind='neutral',
+                f'status · {content}',
+                kind='neutral',
             )
         )
 
@@ -508,7 +520,10 @@ class ObservationRenderersMixin:
         if content:
             body = content[:cap] + '…' if truncated else content
             self._render_terminal_panel(
-                body=body, session_id=session_id, n_lines=n_lines, truncated=truncated,
+                body=body,
+                session_id=session_id,
+                n_lines=n_lines,
+                truncated=truncated,
             )
             return
         self._render_terminal_caption(
@@ -545,9 +560,7 @@ class ObservationRenderersMixin:
             has_output=False,
             has_new_output=has_new,
         )
-        self._append_history(
-            format_activity_result_secondary(caption, kind='neutral')
-        )
+        self._append_history(format_activity_result_secondary(caption, kind='neutral'))
 
     def _render_terminal_panel(
         self,
@@ -619,7 +632,8 @@ class ObservationRenderersMixin:
         label = url or f'port {port}'
         self._append_history(
             format_activity_result_secondary(
-                f'server ready · {label}', kind='ok',
+                f'server ready · {label}',
+                kind='ok',
             ),
         )
 
@@ -632,7 +646,8 @@ class ObservationRenderersMixin:
             )
 
     def _render_recall_failure_observation(
-        self, obs: RecallFailureObservation,
+        self,
+        obs: RecallFailureObservation,
     ) -> None:
         self._flush_pending_tool_cards()
         error_msg = getattr(obs, 'error_message', '')
@@ -641,23 +656,27 @@ class ObservationRenderersMixin:
         if error_msg:
             self._append_history(
                 format_activity_result_secondary(
-                    f'{label} failed · {error_msg}', kind='err',
+                    f'{label} failed · {error_msg}',
+                    kind='err',
                 )
             )
 
     def _render_file_download_observation(
-        self, obs: FileDownloadObservation,
+        self,
+        obs: FileDownloadObservation,
     ) -> None:
         self._flush_pending_tool_cards()
         path = getattr(obs, 'file_path', '')
         self._append_history(
             format_activity_result_secondary(
-                f'downloaded · {path}', kind='neutral',
+                f'downloaded · {path}',
+                kind='neutral',
             ),
         )
 
     def _render_delegate_task_observation(
-        self, obs: DelegateTaskObservation,
+        self,
+        obs: DelegateTaskObservation,
     ) -> None:
         self._stop_reasoning()
         pending = self._take_pending_activity_card('delegate')
@@ -678,7 +697,8 @@ class ObservationRenderersMixin:
             self._append_history(line)
 
     def _render_task_tracking_observation(
-        self, obs: TaskTrackingObservation,
+        self,
+        obs: TaskTrackingObservation,
     ) -> None:
         task_list = getattr(obs, 'task_list', None)
         cmd = getattr(obs, 'command', '')
@@ -698,7 +718,8 @@ class ObservationRenderersMixin:
         self.refresh()
 
     def _render_agent_condensation_observation(
-        self, obs: AgentCondensationObservation,
+        self,
+        obs: AgentCondensationObservation,
     ) -> None:
         del obs
 

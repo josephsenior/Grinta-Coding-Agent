@@ -35,7 +35,9 @@ _MAX_CONTENT_LENGTH = 500
 
 
 # #region agent log
-def _agent_debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
+def _agent_debug_log(
+    hypothesis_id: str, location: str, message: str, data: dict
+) -> None:
     try:
         log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
         payload = {
@@ -189,7 +191,9 @@ def _extract_decisions(event: Event, snapshot: dict) -> None:
             '[SCRATCHPAD]',
             '[SEMANTIC_RECALL',
         )
-        should_skip = bool(thought) and any(thought.startswith(p) for p in skip_prefixes)
+        should_skip = bool(thought) and any(
+            thought.startswith(p) for p in skip_prefixes
+        )
         # #region agent log
         if 'SELF-REFLECTION' in thought:
             _agent_debug_log(
@@ -410,7 +414,10 @@ def _format_errors_section(errors: list) -> list[str]:
             'H3_unicode_bullet_expectation',
             'backend/context/pre_condensation_snapshot.py:_format_errors_section',
             'formatted-errors-bullet',
-            {'sample_line': lines[-1], 'sample_codepoints': [ord(ch) for ch in lines[-1][:4]]},
+            {
+                'sample_line': lines[-1],
+                'sample_codepoints': [ord(ch) for ch in lines[-1][:4]],
+            },
         )
     # #endregion
     return lines

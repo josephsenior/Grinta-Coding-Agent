@@ -35,9 +35,7 @@ def _build_gemini_model_parts(
     return parts
 
 
-def _build_gemini_tool_response_parts(
-    name: str, content: Any
-) -> list[dict[str, Any]]:
+def _build_gemini_tool_response_parts(name: str, content: Any) -> list[dict[str, Any]]:
     """Build a ``function_response`` parts list for a tool result message."""
     if isinstance(content, list):
         text_chunks = [
@@ -124,9 +122,7 @@ def convert_messages(
             continue
 
         role = 'model' if role_name == 'assistant' else 'user'
-        gemini_messages.append(
-            {'role': role, 'parts': [{'text': content_text}]}
-        )
+        gemini_messages.append({'role': role, 'parts': [{'text': content_text}]})
 
     return system_instruction, gemini_messages, caching_requested
 

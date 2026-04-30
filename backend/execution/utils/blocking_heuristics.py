@@ -64,7 +64,7 @@ def is_known_slow_command(command: str) -> bool:
         m = re.match(r'^[A-Za-z_][A-Za-z0-9_]*=\S*\s+', head)
         if not m:
             break
-        head = head[m.end():]
+        head = head[m.end() :]
     for pat in _BLOCKING_PREFIX_PATTERNS:
         if pat.match(head):
             return True

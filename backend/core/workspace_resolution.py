@@ -137,12 +137,7 @@ def normalize_user_workspace_path(path_str: str) -> str:
     if s.lower().startswith('file:'):
         parsed = urlparse(s)
         path = unquote(parsed.path or '')
-        if (
-            OS_CAPS.is_windows
-            and len(path) >= 3
-            and path[0] == '/'
-            and path[2] == ':'
-        ):
+        if OS_CAPS.is_windows and len(path) >= 3 and path[0] == '/' and path[2] == ':':
             path = path[1:]
         s = path
     return s

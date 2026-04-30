@@ -225,4 +225,3 @@ help:
 
 # Phony targets
 .PHONY: build check-dependencies check-system check-python check-uv install-python-dependencies install-pre-commit-hooks lint start-backend run setup-config setup-config-prompts setup-config-basic clean help
-

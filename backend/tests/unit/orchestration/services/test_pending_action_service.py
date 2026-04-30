@@ -163,7 +163,8 @@ class TestPendingActionService(unittest.TestCase):
         self.assertEqual(self.service.get(), mock_action)
 
         progress_logs = [
-            call for call in self.mock_controller.log.call_args_list
+            call
+            for call in self.mock_controller.log.call_args_list
             if 'Pending action still running' in call[0][1]
         ]
         self.assertEqual(len(progress_logs), 1)
@@ -391,7 +392,8 @@ class TestPendingActionService(unittest.TestCase):
         self.assertEqual(service.get(), action)
 
         progress_logs = [
-            call for call in self.mock_controller.log.call_args_list
+            call
+            for call in self.mock_controller.log.call_args_list
             if 'Pending action still running' in call[0][1]
         ]
         self.assertEqual(len(progress_logs), 1)

@@ -256,10 +256,7 @@ class ToolResultValidator(ToolInvocationMiddleware):
                         is not None
                     )
                     object_not_found = f'ObjectNotFound: ({tool}:String)' in content
-                    if (
-                        missing_unix_tool
-                        or object_not_found
-                    ):
+                    if missing_unix_tool or object_not_found:
                         return (
                             f"You attempted to use Unix tools ('{tool}') in PowerShell but they are missing or aliased incorrectly. "
                             f'DO NOT use Unix tools here. ALWAYS use `search_code`, `text_editor` (read_file), or native PowerShell cmdlets.'

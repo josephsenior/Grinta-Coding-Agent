@@ -34,21 +34,48 @@ if TYPE_CHECKING:
 # ``echo "rm -rf"`` inside a non-leading position still get caught (we choose
 # safety over precision here — a false-positive is just an extra checkpoint).
 _DESTRUCTIVE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ('rm-recursive-force', re.compile(r'\brm\s+(?:-[a-zA-Z]*[rRf][a-zA-Z]*\s+|--recursive\s+|--force\s+)+', re.IGNORECASE)),
+    (
+        'rm-recursive-force',
+        re.compile(
+            r'\brm\s+(?:-[a-zA-Z]*[rRf][a-zA-Z]*\s+|--recursive\s+|--force\s+)+',
+            re.IGNORECASE,
+        ),
+    ),
     ('git-reset-hard', re.compile(r'\bgit\s+reset\s+--hard\b', re.IGNORECASE)),
-    ('git-push-force', re.compile(r'\bgit\s+push\s+(?:.*\s+)?(?:--force\b|--force-with-lease\b|-f\b)', re.IGNORECASE)),
-    ('git-clean', re.compile(r'\bgit\s+clean\s+-[a-zA-Z]*[fdx][a-zA-Z]*\b', re.IGNORECASE)),
-    ('git-checkout-force', re.compile(r'\bgit\s+checkout\s+(?:--\s|--force\b|-f\b)', re.IGNORECASE)),
+    (
+        'git-push-force',
+        re.compile(
+            r'\bgit\s+push\s+(?:.*\s+)?(?:--force\b|--force-with-lease\b|-f\b)',
+            re.IGNORECASE,
+        ),
+    ),
+    (
+        'git-clean',
+        re.compile(r'\bgit\s+clean\s+-[a-zA-Z]*[fdx][a-zA-Z]*\b', re.IGNORECASE),
+    ),
+    (
+        'git-checkout-force',
+        re.compile(r'\bgit\s+checkout\s+(?:--\s|--force\b|-f\b)', re.IGNORECASE),
+    ),
     ('git-branch-delete-force', re.compile(r'\bgit\s+branch\s+-D\b', re.IGNORECASE)),
-    ('sql-drop', re.compile(r'\bdrop\s+(?:table|database|schema|index)\b', re.IGNORECASE)),
+    (
+        'sql-drop',
+        re.compile(r'\bdrop\s+(?:table|database|schema|index)\b', re.IGNORECASE),
+    ),
     ('sql-truncate', re.compile(r'\btruncate\s+table\b', re.IGNORECASE)),
     ('dd-write', re.compile(r'\bdd\s+(?:.*\s+)?(?:if=|of=)', re.IGNORECASE)),
     ('mkfs', re.compile(r'\bmkfs(?:\.[a-z0-9]+)?\b', re.IGNORECASE)),
     ('fdisk', re.compile(r'\b(?:fdisk|parted|gdisk)\b', re.IGNORECASE)),
     ('shred', re.compile(r'\bshred\s+', re.IGNORECASE)),
     ('format-windows', re.compile(r'\bformat\s+[a-zA-Z]:\s', re.IGNORECASE)),
-    ('powershell-remove-recurse', re.compile(r'\bRemove-Item\b[^|;]*-Recurse\b[^|;]*-Force\b', re.IGNORECASE)),
-    ('rmdir-recurse', re.compile(r'\b(?:Remove-Item|rmdir)\b[^|;]*\s/s\b', re.IGNORECASE)),
+    (
+        'powershell-remove-recurse',
+        re.compile(r'\bRemove-Item\b[^|;]*-Recurse\b[^|;]*-Force\b', re.IGNORECASE),
+    ),
+    (
+        'rmdir-recurse',
+        re.compile(r'\b(?:Remove-Item|rmdir)\b[^|;]*\s/s\b', re.IGNORECASE),
+    ),
     ('fork-bomb', re.compile(r':\(\)\s*\{\s*:\|.*&\s*\}\s*;\s*:')),
 )
 

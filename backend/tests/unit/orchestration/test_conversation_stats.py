@@ -112,7 +112,9 @@ def test_register_llm_without_metrics_creates_metrics() -> None:
 def test_register_llm_skips_invalid_event() -> None:
     stats = ConversationStats(_FileStore(), conversation_id='c7', user_id='u7')
     stats.register_llm(SimpleNamespace(llm=None, service_id='svc-z'))
-    stats.register_llm(SimpleNamespace(llm=SimpleNamespace(metrics=None), service_id=None))
+    stats.register_llm(
+        SimpleNamespace(llm=SimpleNamespace(metrics=None), service_id=None)
+    )
     assert stats.service_to_metrics == {}
 
 
@@ -132,4 +134,3 @@ def test_merge_and_save_drops_zero_cost_and_persists() -> None:
     payload = json.loads(base64.b64decode(fs.data['merged']).decode('utf-8'))
     assert set(payload.keys()) == {'keep'}
     assert payload['keep']['accumulated_cost'] == pytest.approx(0.9)
-

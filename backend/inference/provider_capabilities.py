@@ -215,8 +215,7 @@ def model_has_inherent_reasoning(model_id: str | None) -> bool:
     if provider is None:
         for caps in _PROVIDER_REGISTRY.values():
             if any(
-                bare.startswith(p) or p in bare
-                for p in caps.inherent_reasoning_models
+                bare.startswith(p) or p in bare for p in caps.inherent_reasoning_models
             ):
                 return True
     return False

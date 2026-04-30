@@ -27,4 +27,3 @@ def test_to_param_without_extra_metadata_keeps_description() -> None:
     t = MCPClientTool(name='demo3', description='base', inputSchema={'type': 'object'})
     p = t.to_param()
     assert p['function']['description'] == 'base'
-

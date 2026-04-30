@@ -456,10 +456,16 @@ class BaseLLMCompactor(RollingCompactor, ABC):
         """
         model: str = ''
         try:
-            model = str(getattr(getattr(getattr(self, 'llm', None), 'config', None), 'model', '') or '')
+            model = str(
+                getattr(
+                    getattr(getattr(self, 'llm', None), 'config', None), 'model', ''
+                )
+                or ''
+            )
         except Exception:
             pass
         from backend.inference.provider_capabilities import model_token_correction
+
         factor, _ = model_token_correction(model)
         return factor
 

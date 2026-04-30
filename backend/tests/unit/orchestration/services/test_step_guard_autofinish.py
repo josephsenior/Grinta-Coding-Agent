@@ -31,17 +31,17 @@ class TestNormalizePath(unittest.TestCase):
 
 class TestRecoveryMessage(unittest.TestCase):
     def test_build_message_with_created_files_is_generic(self):
-        msg, planning, _vr = StepGuardService(MagicMock())._build_stuck_recovery_message(
-            {'src/app/page.tsx', 'src/app/layout.tsx'}, []
-        )
+        msg, planning, _vr = StepGuardService(
+            MagicMock()
+        )._build_stuck_recovery_message({'src/app/page.tsx', 'src/app/layout.tsx'}, [])
         self.assertIn('Files already touched in this session', msg)
         self.assertIn('Do NOT assume the task is complete', msg)
         self.assertIn('verify current state', planning)
 
     def test_build_message_without_created_files_is_generic(self):
-        msg, planning, _vr = StepGuardService(MagicMock())._build_stuck_recovery_message(
-            set(), []
-        )
+        msg, planning, _vr = StepGuardService(
+            MagicMock()
+        )._build_stuck_recovery_message(set(), [])
         self.assertIn('Stop repeating', msg)
         self.assertIn('verify state', planning)
 

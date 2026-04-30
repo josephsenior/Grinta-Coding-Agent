@@ -247,9 +247,7 @@ def _reject_path_traversal(path: str) -> None:
         None,
     )
     if matched_pattern is not None:
-        raise PathValidationError(
-            f'Path traversal detected: {matched_pattern}', path
-        )
+        raise PathValidationError(f'Path traversal detected: {matched_pattern}', path)
     if _DOTDOT_SEGMENT_RE.search(normalized_input) is not None:
         raise PathValidationError('Path traversal detected: ..', path)
 
@@ -370,7 +368,9 @@ def _validate_path_depth(path: str, rel_parts: tuple[str, ...]) -> None:
         raise PathValidationError(f'Path depth too great (max 100): {depth}', path)
 
 
-def _resolve_workspace_relative_path(path: str, workspace_root: str | Path | None) -> Path:
+def _resolve_workspace_relative_path(
+    path: str, workspace_root: str | Path | None
+) -> Path:
     if workspace_root is None:
         raise PathValidationError('workspace_root required for relative paths', path)
 

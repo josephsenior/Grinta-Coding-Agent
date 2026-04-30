@@ -626,9 +626,7 @@ class LocalRuntimeInProcess(ActionExecutionClient):
     @property
     def workspace_root(self) -> Path:
         """Return the workspace root path."""
-        return (
-            Path(self._temp_workspace) if self._temp_workspace else Path('.')
-        )  # pylint: disable=redefined-outer-name,reimported
+        return Path(self._temp_workspace) if self._temp_workspace else Path('.')  # pylint: disable=redefined-outer-name,reimported
 
     @workspace_root.setter
     def workspace_root(self, value: Path) -> None:

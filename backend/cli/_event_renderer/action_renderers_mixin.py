@@ -171,9 +171,11 @@ class ActionRenderersMixin:
                 # Most handlers do their own ``_clear_streaming_preview`` /
                 # flush calls; only ``AgentThinkAction`` is allowed to skip
                 # the preview clear so reasoning text keeps rendering.
-                if action_type is not AgentThinkAction and action_type is not (
-                    StreamingChunkAction
-                ) and action_type is not MessageAction:
+                if (
+                    action_type is not AgentThinkAction
+                    and action_type is not (StreamingChunkAction)
+                    and action_type is not MessageAction
+                ):
                     self._clear_streaming_preview()
                 getattr(self, method_name)(action)
                 return
@@ -250,7 +252,11 @@ class ActionRenderersMixin:
         self._print_or_buffer(
             Padding(
                 format_activity_block(
-                    verb, detail, secondary=None, secondary_kind=kind, title=title,
+                    verb,
+                    detail,
+                    secondary=None,
+                    secondary_kind=kind,
+                    title=title,
                 ),
                 pad=ACTIVITY_BLOCK_BOTTOM_PAD,
             )
@@ -281,9 +287,9 @@ class ActionRenderersMixin:
         head_blob = '\n'.join(lines[:5])
         if any(frag in head_blob for frag in cls._NO_MATCH_FRAGMENTS):
             return 'No matches found.'
-        match_count = sum(
-            1 for line in lines if re.match(r'^.*:\d+:', line)
-        ) or len(lines)
+        match_count = sum(1 for line in lines if re.match(r'^.*:\d+:', line)) or len(
+            lines
+        )
         return f'Found {match_count} match lines.'
 
     def _render_cmd_run_action(self, action: CmdRunAction) -> None:

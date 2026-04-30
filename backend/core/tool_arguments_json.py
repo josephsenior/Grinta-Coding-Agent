@@ -48,9 +48,7 @@ def parse_tool_arguments_object(raw: object) -> dict[str, Any]:
         parsed_direct: Any = json.loads(text)
         if isinstance(parsed_direct, dict):
             return parsed_direct
-        msg = (
-            f'tool arguments must decode to a JSON object, got {type(parsed_direct).__name__}'
-        )
+        msg = f'tool arguments must decode to a JSON object, got {type(parsed_direct).__name__}'
         raise TypeError(msg)
     except (json.JSONDecodeError, ValueError):
         pass

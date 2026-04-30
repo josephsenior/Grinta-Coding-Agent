@@ -446,7 +446,9 @@ class TestBuildLlmParams:
             params = p.build_llm_params(messages, state, [])
 
         joined = '\n'.join(
-            m['content'] for m in params['messages'] if isinstance(m.get('content'), str)
+            m['content']
+            for m in params['messages']
+            if isinstance(m.get('content'), str)
         )
         assert '<FIRST_TURN_ORIENTATION>' not in joined
 
@@ -462,7 +464,9 @@ class TestBuildLlmParams:
             params = p.build_llm_params(messages, state, [])
 
         joined = '\n'.join(
-            m['content'] for m in params['messages'] if isinstance(m.get('content'), str)
+            m['content']
+            for m in params['messages']
+            if isinstance(m.get('content'), str)
         )
         assert '<FIRST_TURN_ORIENTATION>' not in joined
 
@@ -480,7 +484,9 @@ class TestBuildLlmParams:
 
         for params in (first, second):
             joined = '\n'.join(
-                m['content'] for m in params['messages'] if isinstance(m.get('content'), str)
+                m['content']
+                for m in params['messages']
+                if isinstance(m.get('content'), str)
             )
             assert '<FIRST_TURN_ORIENTATION>' not in joined
 

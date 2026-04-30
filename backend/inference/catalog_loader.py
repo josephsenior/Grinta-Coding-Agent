@@ -46,7 +46,9 @@ class ModelEntry:
     strip_temperature: bool = False  # Remove temperature when thinking is active
     strip_top_p: bool = False  # Remove top_p from kwargs
     strip_penalties: bool = False  # Remove presence_penalty and frequency_penalty
-    use_max_completion_tokens: bool = False  # Use max_completion_tokens instead of max_tokens
+    use_max_completion_tokens: bool = (
+        False  # Use max_completion_tokens instead of max_tokens
+    )
 
 
 @functools.lru_cache(maxsize=1)

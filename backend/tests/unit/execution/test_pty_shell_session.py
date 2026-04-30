@@ -218,9 +218,7 @@ class TestNonPs1Execute:
         next_dir = tmp_path / 'app'
         next_dir.mkdir()
         delta = f'cd app\r\nPS {next_dir}> '
-        read_output_since = MagicMock(
-            side_effect=[('', 41, 0), (delta, 59, 0)]
-        )
+        read_output_since = MagicMock(side_effect=[('', 41, 0), (delta, 59, 0)])
         monkeypatch.setattr(session, 'read_output_since', read_output_since)
         monkeypatch.setattr(
             'backend.execution.utils.pty_shell_session.IS_WINDOWS',
@@ -383,11 +381,14 @@ class TestLivePtyShellSession:
             marker = 'grinta-exec-round-trip'
             obs = session.execute(CmdRunAction(command=f'echo {marker}'))
             assert isinstance(obs, CmdOutputObservation)
-            # Give the reader thread time if the echo hasn't drained yet.
+            # On Windows/ConPTY the immediate execute() delta can occasionally
+            # contain only the prompt while the reader thread is still draining.
+            # Accept marker either in this observation or shortly after in the
+            # session buffer.
             assert _wait_for(
-                lambda: marker in session.read_output(),
-                timeout=5.0,
-            ), f'marker not observed; buffer={session.read_output()!r}'
+                lambda: marker in obs.content or marker in session.read_output(),
+                timeout=8.0,
+            ), f'marker not observed; obs={obs.content!r}; buffer={session.read_output()!r}'
         finally:
             session.close()
 

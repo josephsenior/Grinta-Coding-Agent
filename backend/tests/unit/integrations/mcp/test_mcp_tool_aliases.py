@@ -52,4 +52,3 @@ def test_prepare_mcp_tool_exposed_names_resolves_collisions() -> None:
     for exposed, protocol in c2.exposed_to_protocol.items():
         assert protocol == 'search'
         assert exposed in c2.tool_map
-

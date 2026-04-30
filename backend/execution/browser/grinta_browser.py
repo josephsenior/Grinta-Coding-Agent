@@ -273,9 +273,7 @@ class GrintaNativeBrowser:
             logger.debug('browser close: %s', exc)
         self._session = None
 
-    async def _execute_start(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_start(self, cmd: str, params: dict[str, Any]) -> Observation:
         del params
         await self._ensure_session()
         return _finalize_observation(
@@ -287,9 +285,7 @@ class GrintaNativeBrowser:
             ),
         )
 
-    async def _execute_close(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_close(self, cmd: str, params: dict[str, Any]) -> Observation:
         del params
         await self.shutdown()
         return _finalize_observation(
@@ -310,7 +306,9 @@ class GrintaNativeBrowser:
         nav_budget: float,
     ) -> None:
         if not new_tab:
-            await asyncio.wait_for(_navigate_direct_cdp(browser, url), timeout=nav_budget)
+            await asyncio.wait_for(
+                _navigate_direct_cdp(browser, url), timeout=nav_budget
+            )
             return
 
         from browser_use.browser.events import NavigateToUrlEvent
@@ -324,9 +322,7 @@ class GrintaNativeBrowser:
         )
         await asyncio.wait_for(_await_nav_event(nav), timeout=nav_budget)
 
-    async def _execute_navigate(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_navigate(self, cmd: str, params: dict[str, Any]) -> Observation:
         url = str(params.get('url') or '').strip()
         err = _validate_http_url(url)
         if err:
@@ -372,9 +368,7 @@ class GrintaNativeBrowser:
             ),
         )
 
-    async def _execute_snapshot(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_snapshot(self, cmd: str, params: dict[str, Any]) -> Observation:
         del params
         browser = await self._ensure_session()
         t_snap = time.monotonic()
@@ -588,9 +582,7 @@ class GrintaNativeBrowser:
             )
         return node, None
 
-    async def _execute_click(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_click(self, cmd: str, params: dict[str, Any]) -> Observation:
         index, error_observation = self._parse_browser_index(
             cmd,
             params.get('index'),
@@ -622,9 +614,7 @@ class GrintaNativeBrowser:
             ),
         )
 
-    async def _execute_type(
-        self, cmd: str, params: dict[str, Any]
-    ) -> Observation:
+    async def _execute_type(self, cmd: str, params: dict[str, Any]) -> Observation:
         text = str(params.get('text') or '')
         if len(text) > _MAX_TYPE_LEN:
             return _finalize_observation(
@@ -652,7 +642,9 @@ class GrintaNativeBrowser:
         clear = bool(params.get('clear', True))
         from browser_use.browser.events import TypeTextEvent
 
-        evt = browser.event_bus.dispatch(TypeTextEvent(node=node, text=text, clear=clear))
+        evt = browser.event_bus.dispatch(
+            TypeTextEvent(node=node, text=text, clear=clear)
+        )
         await evt
         await evt.event_result(raise_if_any=True, raise_if_none=False)
         return _finalize_observation(

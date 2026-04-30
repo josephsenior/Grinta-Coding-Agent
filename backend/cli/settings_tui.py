@@ -37,7 +37,9 @@ def _prompt_model_change(console: Console) -> bool:
     """Prompt user to change model via Provider → Model flow. Returns True if changed."""
     provider_map, custom_idx = _print_provider_menu(console)
 
-    choice = Prompt.ask('  Provider number [dim](Enter to cancel)[/dim]', default='', console=console).strip()
+    choice = Prompt.ask(
+        '  Provider number [dim](Enter to cancel)[/dim]', default='', console=console
+    ).strip()
     if not choice:
         console.print(f'[{CLR_META}]  Cancelled.[/]')
         return False
@@ -214,9 +216,7 @@ def _render_mcp_tab(console: Console) -> None:
     )
 
 
-def _render_command_hint(
-    console: Console, items: list[tuple[str, str]]
-) -> None:
+def _render_command_hint(console: Console, items: list[tuple[str, str]]) -> None:
     """Render a consistent ``[k]ey  label  ·  ...`` command hint line."""
     line = Text('  ')
     for idx, (key, label) in enumerate(items):

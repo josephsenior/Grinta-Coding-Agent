@@ -230,9 +230,9 @@ LLM_RETRY_EXCEPTIONS: tuple[type[Exception], ...] = (
 # stream is aborted and an APIConnectionError is raised so the existing
 # backoff/retry machinery kicks in exactly as for a proper network failure.
 _INBAND_DISCONNECT_PHRASES: tuple[str, ...] = (
-    '网络中断',              # Lightning AI / DeepSeek: "network disconnected"
-    '请重新连接',            # Lightning AI: "please reconnect"
-    '网络连接中断',          # variant
+    '网络中断',  # Lightning AI / DeepSeek: "network disconnected"
+    '请重新连接',  # Lightning AI: "please reconnect"
+    '网络连接中断',  # variant
     # Common mojibake variants observed in proxies/tests where UTF-8 Chinese
     # text is decoded with a Western codepage before reaching the SDK stream.
     'ç½‘ç»œä¸­æ–­',
@@ -671,7 +671,9 @@ class LLM(RetryMixin, DebugMixin):
         them inside astream() consumes the first-chunk timeout window and
         prevents that outer machinery from ever seeing the rate-limit.
         """
-        if exc is not None and isinstance(exc, (RateLimitError, ServiceUnavailableError)):
+        if exc is not None and isinstance(
+            exc, (RateLimitError, ServiceUnavailableError)
+        ):
             return False
         return is_retryable and not is_last and not yielded_any
 
@@ -692,7 +694,9 @@ class LLM(RetryMixin, DebugMixin):
 
         for attempt in range(1, max_attempts + 1):
             yielded_any = False
-            _inband_prefix: list[str] = []  # accumulate leading content for disconnect probe
+            _inband_prefix: list[
+                str
+            ] = []  # accumulate leading content for disconnect probe
             try:
                 self.log_prompt(messages)
                 stream_iter = self.client.astream(messages=messages, **call_kwargs)
@@ -734,13 +738,18 @@ class LLM(RetryMixin, DebugMixin):
                                         }
                                         from pathlib import Path as _P
 
-                                        _lp = _P(__file__).resolve().parents[2] / 'debug-fee086.log'
+                                        _lp = (
+                                            _P(__file__).resolve().parents[2]
+                                            / 'debug-fee086.log'
+                                        )
                                         _serialized_payload = (
-                                            json.dumps(payload, ensure_ascii=True) + '\n'
+                                            json.dumps(payload, ensure_ascii=True)
+                                            + '\n'
                                         )
 
                                         def _append_log_line(
-                                            path: '_P' = _lp, line: str = _serialized_payload
+                                            path: '_P' = _lp,
+                                            line: str = _serialized_payload,
                                         ) -> None:
                                             with path.open('a', encoding='utf-8') as _f:
                                                 _f.write(line)
@@ -749,7 +758,9 @@ class LLM(RetryMixin, DebugMixin):
                                     except Exception:
                                         pass
                                     # #endregion
-                                    if any(p in lower for p in _INBAND_DISCONNECT_PHRASES):
+                                    if any(
+                                        p in lower for p in _INBAND_DISCONNECT_PHRASES
+                                    ):
                                         raise APIConnectionError(
                                             f'Provider sent in-band disconnect message: {prefix.strip()!r}',
                                             model=(self.config.model or '').strip(),
@@ -761,7 +772,9 @@ class LLM(RetryMixin, DebugMixin):
             except Exception as e:
                 is_retryable = isinstance(e, LLM_RETRY_EXCEPTIONS)
                 is_last = attempt >= max_attempts
-                if not self._should_retry_astream(is_retryable, is_last, yielded_any, exc=e):
+                if not self._should_retry_astream(
+                    is_retryable, is_last, yielded_any, exc=e
+                ):
                     logger.error('LLM astream error: %s', e)
                     mapped = _map_provider_exception(
                         e, (self.config.model or '').strip()

@@ -4,15 +4,15 @@ When a deterministic system fails, you get a stack trace. A null pointer excepti
 
 When an LLM agent fails, you get a hallucination buried in turn 48 of a conversation. You get a loop where it reads the same file three times, nods to itself, and then writes a completely incorrect regex. There is no stack trace for "the model forgot what the user asked because the context window filled up with `ls -la` outputs."
 
-In the early days of Grinta, debugging was a nightmare. I would run the agent, watch it do something incredibly stupid, and then scroll through thousands of lines of raw terminal output trying to reconstruct its latent reasoning. It was an observability black hole. 
+In the early days of Grinta, debugging was a nightmare. I would run the agent, watch it do something incredibly stupid, and then scroll through thousands of lines of raw terminal output trying to reconstruct its latent reasoning. It was an observability black hole.
 
 Other frameworks solve this by dumping everything into a massive JSON log file or forcing you to use external observability platforms like LangSmith or Helicone. But I wanted Grinta to be local-first and self-contained. I didn't want to rely on a SaaS product just to figure out why my agent was stuck.
 
 ## The Event Streams
 
-The solution was treating the agent's execution not as a call-and-response loop, but as an append-only event stream (like I discussed in the architecture layer). Every thought, every tool call, every stdout chunk, every validation failure is emitted as a distinct event. 
+The solution was treating the agent's execution not as a call-and-response loop, but as an append-only event stream (like I discussed in the architecture layer). Every thought, every tool call, every stdout chunk, every validation failure is emitted as a distinct event.
 
-But emitting events isn't enough; you have to *see* them. That's why the `cli/` module has specialized renderers (`event_renderer.py`, `reasoning_display.py`, `tool_call_display.py`). Because prompt debugging is UI design. If you can't see the exact moment the agent's mental model diverged from reality, you can't fix the prompt that caused it. 
+But emitting events isn't enough; you have to *see* them. That's why the `cli/` module has specialized renderers (`event_renderer.py`, `reasoning_display.py`, `tool_call_display.py`). Because prompt debugging is UI design. If you can't see the exact moment the agent's mental model diverged from reality, you can't fix the prompt that caused it.
 
 I stopped tracing JSON and started streaming reasoning directly into the terminal, formatted beautifully by Rich and Textual components when they existed, and now through strict ANSI renderers.
 

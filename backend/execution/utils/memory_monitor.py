@@ -50,7 +50,9 @@ class MemoryMonitor:
                 proc = psutil.Process()
                 samples: list[float] = []
                 deadline = time.monotonic() + self._max_runtime_seconds
-                while not self._stop_monitoring.is_set() and time.monotonic() < deadline:
+                while (
+                    not self._stop_monitoring.is_set() and time.monotonic() < deadline
+                ):
                     try:
                         rss = proc.memory_info().rss
                         for child in proc.children(recursive=True):

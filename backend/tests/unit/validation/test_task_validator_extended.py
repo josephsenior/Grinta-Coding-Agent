@@ -74,14 +74,18 @@ class TestTestPassingValidator:
     async def test_no_test_execution(self):
         v = TestPassingValidator()
         state = self._make_state([])
-        result = await v.validate_completion(Task(description='Explain this code path'), state)
+        result = await v.validate_completion(
+            Task(description='Explain this code path'), state
+        )
         assert result.passed is True
         assert result.applicable is False
 
     async def test_no_test_execution_when_tests_required(self):
         v = TestPassingValidator()
         state = self._make_state([])
-        result = await v.validate_completion(Task(description='Fix bug', requirements=['run tests']), state)
+        result = await v.validate_completion(
+            Task(description='Fix bug', requirements=['run tests']), state
+        )
         assert result.passed is False
         assert 'No test execution' in result.reason
 
@@ -121,7 +125,9 @@ class TestDiffValidator:
     async def test_no_diff(self):
         v = DiffValidator()
         state = self._make_state([])
-        result = await v.validate_completion(Task(description='Change the login logic'), state)
+        result = await v.validate_completion(
+            Task(description='Change the login logic'), state
+        )
         assert result.passed is False
         assert 'No repository changes' in result.reason
 
@@ -134,7 +140,9 @@ class TestDiffValidator:
             content=diff_text, command_id=1, command='git diff', exit_code=0
         )
         state = self._make_state([cmd, obs])
-        result = await v.validate_completion(Task(description='Change the login logic'), state)
+        result = await v.validate_completion(
+            Task(description='Change the login logic'), state
+        )
         assert result.passed is True
         assert 'Small but meaningful changes detected' in result.reason
 
@@ -146,13 +154,17 @@ class TestDiffValidator:
             content=diff_text, command_id=1, command='git diff', exit_code=0
         )
         state = self._make_state([cmd, obs])
-        result = await v.validate_completion(Task(description='Change the login logic'), state)
+        result = await v.validate_completion(
+            Task(description='Change the login logic'), state
+        )
         assert result.passed is True
 
     async def test_read_only_task_without_diff(self):
         v = DiffValidator()
         state = self._make_state([])
-        result = await v.validate_completion(Task(description='Analyze the prompt behavior and rate it'), state)
+        result = await v.validate_completion(
+            Task(description='Analyze the prompt behavior and rate it'), state
+        )
         assert result.passed is True
         assert 'does not require repository changes' in result.reason
 

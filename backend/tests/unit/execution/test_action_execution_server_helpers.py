@@ -22,8 +22,10 @@ def _executor() -> SimpleNamespace:
     ex._terminal_read_cursor = {}
     ex._workspace_root = lambda: Path('C:/ws').resolve()
     ex._is_workspace_restricted_profile = lambda: True
-    ex._resolve_effective_cwd = lambda requested_cwd, base_cwd=None: h.resolve_effective_cwd(
-        ex, requested_cwd, base_cwd
+    ex._resolve_effective_cwd = (
+        lambda requested_cwd, base_cwd=None: h.resolve_effective_cwd(
+            ex, requested_cwd, base_cwd
+        )
     )
     ex._clear_terminal_read_cursor = MagicMock()
     ex._normalize_terminal_command = h.normalize_terminal_command
@@ -60,7 +62,9 @@ def test_strip_and_failure_signature_and_terminal_mode_hints() -> None:
     assert h.extract_failure_signature('a\nb\nc\nd') == 'b | c | d'
     assert h.terminal_mode('snapshot') == 'snapshot'
     assert h.terminal_mode('weird') == 'delta'
-    assert h.terminal_read_empty_hints(mode='delta', has_new_output=False)['delta_empty']
+    assert h.terminal_read_empty_hints(mode='delta', has_new_output=False)[
+        'delta_empty'
+    ]
     assert h.terminal_read_empty_hints(mode='snapshot', has_new_output=False)[
         'snapshot_empty'
     ]
@@ -97,7 +101,9 @@ def test_predict_and_evaluate_interactive_terminal_command() -> None:
         'backend.execution.action_execution_server_helpers.path_is_within_workspace',
         return_value=True,
     ):
-        cwd, err = h.predict_interactive_cwd_change(ex, 'cd sub', Path('C:/ws').resolve())
+        cwd, err = h.predict_interactive_cwd_change(
+            ex, 'cd sub', Path('C:/ws').resolve()
+        )
     assert err is None and cwd is not None
 
     with patch(
@@ -109,7 +115,9 @@ def test_predict_and_evaluate_interactive_terminal_command() -> None:
         )
     assert cwd2 is None and err2 is not None
 
-    p, obs = h.evaluate_interactive_terminal_command(ex, 'echo x && echo y', Path('C:/ws'))
+    p, obs = h.evaluate_interactive_terminal_command(
+        ex, 'echo x && echo y', Path('C:/ws')
+    )
     assert p is None and isinstance(obs, ErrorObservation)
 
 
@@ -135,7 +143,11 @@ def test_terminal_ids_guardrails_and_cursor_helpers() -> None:
     assert h.next_terminal_session_id(ex) == 'terminal_2'
     assert h.normalize_terminal_command('  Echo   Hi ') == 'echo hi'
 
-    ex._terminal_sessions_awaiting_interaction = ['terminal_1', 'terminal_2', 'terminal_3']
+    ex._terminal_sessions_awaiting_interaction = [
+        'terminal_1',
+        'terminal_2',
+        'terminal_3',
+    ]
     ex._terminal_open_commands_no_interaction = ['echo x', 'echo x', 'echo x']
     err = h.terminal_open_guardrail_error(ex, 'echo x')
     assert isinstance(err, ErrorObservation)
@@ -157,7 +169,9 @@ def test_terminal_read_modes_and_resize() -> None:
         read_output_since=lambda off: ('tail', off + 4, 0),
         resize=MagicMock(),
     )
-    c, n, has, d = h.read_terminal_with_mode(executor=ex, session=session, mode='snapshot', offset=None)
+    c, n, has, d = h.read_terminal_with_mode(
+        executor=ex, session=session, mode='snapshot', offset=None
+    )
     assert c == 'buf' and n is None and has is True and d is None
     c2, n2, has2, _ = h.read_terminal_with_mode(
         executor=ex, session=session, mode='delta', offset=10
@@ -176,9 +190,12 @@ def test_file_read_edit_and_blast_warning_helpers() -> None:
     out = h.handle_aci_file_read(ex, SimpleNamespace(path='a.py', view_range=None))
     assert isinstance(out, FileReadObservation)
 
-    with patch('os.path.isdir', return_value=True), patch(
-        'backend.execution.file_operations.handle_directory_view',
-        return_value=FileReadObservation(path='d', content='dir'),
+    with (
+        patch('os.path.isdir', return_value=True),
+        patch(
+            'backend.execution.file_operations.handle_directory_view',
+            return_value=FileReadObservation(path='d', content='dir'),
+        ),
     ):
         dir_obs = h.edit_try_directory_view(
             ex, 'C:/ws/dir', 'dir', SimpleNamespace(command='read_file')
@@ -191,4 +208,3 @@ def test_file_read_edit_and_blast_warning_helpers() -> None:
         assert h.append_blast_radius_warning(
             ex, 'base', command='write', action_path='a.py', new_content='def x(): pass'
         ).endswith('warn')
-

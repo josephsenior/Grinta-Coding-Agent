@@ -9,7 +9,9 @@ import pytest
 from backend.ledger.config import EventRuntimeDefaults, get_event_runtime_defaults
 
 
-def _assert_event_runtime_attrs(obj: EventRuntimeDefaults, expected: dict[str, object]) -> None:
+def _assert_event_runtime_attrs(
+    obj: EventRuntimeDefaults, expected: dict[str, object]
+) -> None:
     for attr, value in expected.items():
         assert getattr(obj, attr) == value
 

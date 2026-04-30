@@ -114,12 +114,8 @@ def _routing_memory_tool_placeholders(
             'Rule: long-lived facts → `note`; task-local state → `memory_manager`.\n'
             '</MEMORY_AND_CONTEXT_TOOLS>'
         )
-        post_condensation_retrieval = (
-            'Call `memory_manager(action="working_memory")` after condensation to restore plan/findings before acting.'
-        )
-        surviving_state_facts = (
-            'Only `note` (disk) and `memory_manager` (session) facts reliably survive condensation.'
-        )
+        post_condensation_retrieval = 'Call `memory_manager(action="working_memory")` after condensation to restore plan/findings before acting.'
+        surviving_state_facts = 'Only `note` (disk) and `memory_manager` (session) facts reliably survive condensation.'
     else:
         memory_and_context_section = (
             '<MEMORY_AND_CONTEXT_TOOLS>\n'
@@ -127,9 +123,7 @@ def _routing_memory_tool_placeholders(
             '- No structured within-session working-memory tool is available in this run; keep active hypotheses compact and rely on verified observations.\n'
             '</MEMORY_AND_CONTEXT_TOOLS>'
         )
-        post_condensation_retrieval = (
-            'Resume from the summary and your most recent verified observations; no structured working-memory tool is available in this run.'
-        )
+        post_condensation_retrieval = 'Resume from the summary and your most recent verified observations; no structured working-memory tool is available in this run.'
         surviving_state_facts = (
             'Only `note` (disk) facts are guaranteed to survive condensation.'
         )
@@ -237,9 +231,7 @@ def _render_system_capabilities(
             'Writes/edits/shell commands always run sequentially.'
         )
     else:
-        parallel_line = (
-            '- **Parallel tool scheduling**: DISABLED in this run. All tool calls run sequentially.'
-        )
+        parallel_line = '- **Parallel tool scheduling**: DISABLED in this run. All tool calls run sequentially.'
 
     if parallel_enabled and parallel_tool_calls_provider_flag and fc_mode == 'native':
         provider_line = (
@@ -261,7 +253,12 @@ def _render_system_capabilities(
     else:
         multi_edit_line = (
             '- **Atomic multi-file edits**: not exposed in this build — use `text_editor` `replace_text` '
-            'sequentially' + (' and take a `checkpoint` before the batch for coarse rollback.' if checkpoints_on else '.')
+            'sequentially'
+            + (
+                ' and take a `checkpoint` before the batch for coarse rollback.'
+                if checkpoints_on
+                else '.'
+            )
         )
 
     condensation_line = (
@@ -316,10 +313,14 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
 
         any_lsp = bool(has_any_lsp_server())
         any_dap = bool(has_any_debug_adapter())
-        summary = detection_summary() if (any_lsp or any_dap) else {
-            'lsp_available': [],
-            'debug_available': [],
-        }
+        summary = (
+            detection_summary()
+            if (any_lsp or any_dap)
+            else {
+                'lsp_available': [],
+                'debug_available': [],
+            }
+        )
     except Exception:
         any_lsp = False
         any_dap = False
@@ -327,9 +328,7 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
 
     lsp_available = summary.get('lsp_available', []) if any_lsp else []
     if not lsp_enabled:
-        lsp_line = (
-            '- **Language servers (LSP)**: tool DISABLED in this run.'
-        )
+        lsp_line = '- **Language servers (LSP)**: tool DISABLED in this run.'
     elif lsp_available:
         lsp_line = (
             '- **Language servers (LSP / `code_intelligence`)**: detected on PATH → '
@@ -393,7 +392,9 @@ def _render_security(cli_mode: bool = True) -> str:
     )
 
 
-def _render_autonomy(render_partial: Callable[..., str], config: Any, is_windows: bool) -> str:
+def _render_autonomy(
+    render_partial: Callable[..., str], config: Any, is_windows: bool
+) -> str:
     checkpoints = getattr(config, 'enable_checkpoints', False)
     code_intelligence_available = _code_intelligence_available(config)
     cp_line = (
@@ -410,7 +411,7 @@ def _render_autonomy(render_partial: Callable[..., str], config: Any, is_windows
     # gate as authoritative and continue from where you stopped.
     autonomy = (
         '<AUTONOMY>\n'
-        'Plan, execute, and verify the user\'s task end-to-end. The runtime may '
+        "Plan, execute, and verify the user's task end-to-end. The runtime may "
         'interrupt a tool call to surface a user decision; treat that decision as '
         'authoritative and continue from where you stopped. On tool failure, pivot '
         'to an alternative tool in the same turn (e.g. symbol_editor \u2192 text_editor) '
@@ -450,14 +451,10 @@ def _render_autonomy(render_partial: Callable[..., str], config: Any, is_windows
             base_workflow
             + '\n\nWith **task_tracker** enabled, treat **sync** as part of the loop: after verify, update the plan when progress changed.'
         )
-        task_sync_instruction = (
-            '**Task synchronization:** Update `task_tracker` to `done`, `skipped`, or `blocked` before attempting to finish.'
-        )
+        task_sync_instruction = '**Task synchronization:** Update `task_tracker` to `done`, `skipped`, or `blocked` before attempting to finish.'
     else:
         problem_solving_workflow_body = base_workflow
-        task_sync_instruction = (
-            '**Plan synchronization:** Keep your working memory and finish summary aligned with what was actually completed before attempting to finish.'
-        )
+        task_sync_instruction = '**Plan synchronization:** Keep your working memory and finish summary aligned with what was actually completed before attempting to finish.'
 
     return render_partial(
         'system_partial_01_autonomy.md',
@@ -488,9 +485,7 @@ def _render_tool_reference(
     )
     checkpoints = getattr(config, 'enable_checkpoints', False)
     checkpoint_rollback_hint = (
-        '; use **checkpoint** for coarse rollback'
-        if checkpoints
-        else ''
+        '; use **checkpoint** for coarse rollback' if checkpoints else ''
     )
     return render_partial(
         'system_partial_02_tools.md',
@@ -524,9 +519,7 @@ def _render_critical(
             '   - If the latest user message is about your behavior rather than more terminal work, answer in natural language first.'
         )
     else:
-        terminal_manager_rule = (
-            f'**Interactive terminal sessions are unavailable in this run** — do not refer to `terminal_manager`; use `{terminal_command_tool}` for non-interactive command execution only.'
-        )
+        terminal_manager_rule = f'**Interactive terminal sessions are unavailable in this run** — do not refer to `terminal_manager`; use `{terminal_command_tool}` for non-interactive command execution only.'
     user_question_antipattern = (
         '**Asking the user a question in plain prose mid-turn** when `communicate_with_user` is available. The turn must end so the user can answer.'
         if meta_cognition_on
@@ -610,7 +603,9 @@ def _permission_git_summary(perm: Any) -> tuple[str, str]:
 
 def _permission_shell_network_limits(perm: Any) -> tuple[str, str, str, str]:
     shell_str = 'ENABLED' if getattr(perm, 'shell_enabled', False) else 'DISABLED'
-    if getattr(perm, 'shell_enabled', False) and getattr(perm, 'shell_allow_sudo', False):
+    if getattr(perm, 'shell_enabled', False) and getattr(
+        perm, 'shell_allow_sudo', False
+    ):
         shell_str += ' + SUDO'
     shell_blocked = ', '.join(getattr(perm, 'shell_blocked_commands', []))
 
@@ -695,14 +690,14 @@ def _append_mcp_connected_catalog_sections(
     parts.extend(('', '<MCP_WHEN_TO_USE>', '**Discipline (MCP):**'))
     if mcp_server_hints:
         parts.append(
-            "Follow **Configured MCP servers** above for *when* to prefer each server; "
+            'Follow **Configured MCP servers** above for *when* to prefer each server; '
             "match the user's task to those hints, then pick the concrete tool name from the list "
             "and each tool's description."
         )
     else:
         parts.append(
             "Infer *when* to call MCP from each tool's **name** and **description** in the list above "
-            "(and avoid training-memory guesses for vendor-specific or version-specific facts—use a tool when one fits)."
+            '(and avoid training-memory guesses for vendor-specific or version-specific facts—use a tool when one fits).'
         )
     parts.extend(
         (
@@ -729,13 +724,9 @@ def _mcp_tail_render_kwargs(
     )
     code_intelligence_available = _code_intelligence_available(config)
     if code_intelligence_available:
-        uncertainty_state_1_discover_line = (
-            '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**; use tools like `search_code`, editor `view_*`, or `code_intelligence`. Do NOT ask first.'
-        )
+        uncertainty_state_1_discover_line = '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**; use tools like `search_code`, editor `view_*`, or `code_intelligence`. Do NOT ask first.'
     else:
-        uncertainty_state_1_discover_line = (
-            '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**, not shell repo search/read. Do NOT ask first.'
-        )
+        uncertainty_state_1_discover_line = '**Can be discovered** (unknown path, API, or config shape) → follow **TOOL_ROUTING_LADDER**, not shell repo search/read. Do NOT ask first.'
     thinking_tool_section = (
         '<THINKING_TOOL>\n'
         'Use `think` for multi-step planning, complex debugging, or architecture trade-offs. It records reasoning only; it does not execute actions.\n'

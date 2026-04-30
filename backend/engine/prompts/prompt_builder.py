@@ -157,7 +157,9 @@ def _render_routing(
     config: Any = None,
     function_calling_mode: str | None = None,
 ) -> str:
-    return _render_routing_impl(_render_partial, is_windows, config, function_calling_mode)
+    return _render_routing_impl(
+        _render_partial, is_windows, config, function_calling_mode
+    )
 
 
 def _render_autonomy(config: Any, is_windows: bool) -> str:
@@ -399,7 +401,9 @@ def _collect_system_prompt_sections(
 
     # ``think`` is opt-in via config, but if the model has inherent reasoning
     # (o1/o3/r1/grok-4/gemini-thinking) we suppress the scaffolding regardless.
-    effective_enable_think = bool(getattr(config, 'enable_think', False)) and not has_inherent_reasoning
+    effective_enable_think = (
+        bool(getattr(config, 'enable_think', False)) and not has_inherent_reasoning
+    )
 
     # Worked-examples partial — capability-adapted: omit on small/local models
     # where prompt budget is tight, and where examples can crowd out tool docs.
@@ -408,9 +412,13 @@ def _collect_system_prompt_sections(
             (
                 'system_partial_05_examples',
                 _render_examples(
-                    tracker_on=bool(getattr(config, 'enable_internal_task_tracker', False)),
+                    tracker_on=bool(
+                        getattr(config, 'enable_internal_task_tracker', False)
+                    ),
                     enable_think=effective_enable_think,
-                    meta_cognition_on=bool(getattr(config, 'enable_meta_cognition', False)),
+                    meta_cognition_on=bool(
+                        getattr(config, 'enable_meta_cognition', False)
+                    ),
                     code_intelligence_available=code_intelligence_available,
                     checkpoints_on=bool(getattr(config, 'enable_checkpoints', False)),
                 ),
@@ -572,9 +580,7 @@ def _build_repository_info_block(repository_info: RepositoryInfo | None) -> str 
 def _build_repo_instructions_block(repo_instructions: str) -> str | None:
     if not repo_instructions:
         return None
-    return (
-        f'<REPOSITORY_INSTRUCTIONS>\n{repo_instructions}\n</REPOSITORY_INSTRUCTIONS>'
-    )
+    return f'<REPOSITORY_INSTRUCTIONS>\n{repo_instructions}\n</REPOSITORY_INSTRUCTIONS>'
 
 
 def _runtime_hosts_lines(hosts: dict[object, object]) -> list[str]:
@@ -699,11 +705,11 @@ def build_playbook_info(triggered_agents: list[Any]) -> str:
             else f'The following information has been included based on a keyword match for "{trigger}".\n'
         )
         blocks.append(
-            f"<EXTRA_INFO>\n"
-            f"{intro}"
+            f'<EXTRA_INFO>\n'
+            f'{intro}'
             f"It may or may not be relevant to the user's request.\n\n"
-            f"{content}\n"
-            f"</EXTRA_INFO>"
+            f'{content}\n'
+            f'</EXTRA_INFO>'
         )
     return '\n'.join(blocks).strip()
 
@@ -728,26 +734,26 @@ def build_knowledge_base_info(kb_results: list[Any]) -> str:
 def build_remember_prompt_template(events: str) -> str:
     """Render the remember-prompt template."""
     return (
-        "You are tasked with generating a prompt that will be used by another AI to revise a special reference file. "
-        "This file contains important information and learnings that are used to carry out certain tasks. "
-        "The file can be extended over time to incorporate new knowledge and experiences.\n\n"
-        "You have been provided with a subset of new events that may require changes to the special file. "
-        "These events are:\n"
-        "<events>\n"
-        f"{events}\n"
-        "</events>\n\n"
-        "Your task is to analyze these events and determine what changes, if any, should be made to the special file. "
-        "Then, you need to generate a prompt that will instruct another AI to make these revisions correctly and efficiently.\n\n"
-        "When creating your prompt, follow these guidelines:\n"
-        "1. Clearly specify which parts of the file need to be revised or if new sections should be added.\n"
-        "2. Provide context for why these changes are necessary based on the new events.\n"
-        "3. Be specific about the information that should be added or modified.\n"
-        "4. Maintain the existing structure and formatting of the file.\n"
+        'You are tasked with generating a prompt that will be used by another AI to revise a special reference file. '
+        'This file contains important information and learnings that are used to carry out certain tasks. '
+        'The file can be extended over time to incorporate new knowledge and experiences.\n\n'
+        'You have been provided with a subset of new events that may require changes to the special file. '
+        'These events are:\n'
+        '<events>\n'
+        f'{events}\n'
+        '</events>\n\n'
+        'Your task is to analyze these events and determine what changes, if any, should be made to the special file. '
+        'Then, you need to generate a prompt that will instruct another AI to make these revisions correctly and efficiently.\n\n'
+        'When creating your prompt, follow these guidelines:\n'
+        '1. Clearly specify which parts of the file need to be revised or if new sections should be added.\n'
+        '2. Provide context for why these changes are necessary based on the new events.\n'
+        '3. Be specific about the information that should be added or modified.\n'
+        '4. Maintain the existing structure and formatting of the file.\n'
         "5. Ensure that the revisions are consistent with the current content and don't contradict existing information.\n\n"
-        "Now, based on the new events provided, generate a prompt that will guide the AI in making the appropriate "
-        "revisions to the special file. Your prompt should be clear, specific, and actionable. "
-        "Include your prompt within <revision_prompt> tags.\n\n"
-        "<revision_prompt>\n\n</revision_prompt>"
+        'Now, based on the new events provided, generate a prompt that will guide the AI in making the appropriate '
+        'revisions to the special file. Your prompt should be clear, specific, and actionable. '
+        'Include your prompt within <revision_prompt> tags.\n\n'
+        '<revision_prompt>\n\n</revision_prompt>'
     )
 
 

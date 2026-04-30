@@ -86,4 +86,3 @@ def test_get_knowledge_base_store_uses_env_path(tmp_path: Path, monkeypatch) -> 
         assert Path(s.storage_dir).resolve() == tmp_path.resolve()
     finally:
         mod._store = old
-

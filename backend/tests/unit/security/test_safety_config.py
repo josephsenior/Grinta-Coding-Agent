@@ -9,6 +9,7 @@ def _assert_safety_attrs(cfg: SafetyConfig, expected: dict[str, object]) -> None
     for attr, value in expected.items():
         assert getattr(cfg, attr) == value
 
+
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------

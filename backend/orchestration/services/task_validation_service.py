@@ -125,14 +125,16 @@ class TaskValidationService:
 
             persisted_steps = TaskTracker(project_root.strip()).load_from_file()
         except Exception as exc:
-            logger.debug('Could not load persisted active plan for finish validation: %s', exc)
+            logger.debug(
+                'Could not load persisted active plan for finish validation: %s', exc
+            )
             return []
 
         return self._collect_non_terminal_steps(persisted_steps)
 
     @staticmethod
     def _dedupe_active_steps(
-        steps: list[tuple[str, str, str]]
+        steps: list[tuple[str, str, str]],
     ) -> list[tuple[str, str, str]]:
         """Return stable unique active-step tuples preserving first-seen order."""
         unique: list[tuple[str, str, str]] = []
@@ -208,7 +210,9 @@ class TaskValidationService:
         from backend.ledger.observation_cause import attach_observation_cause
 
         controller = self._context.get_controller()
-        error_obs = ErrorObservation(content=message, error_id=error_id, agent_only=True)
+        error_obs = ErrorObservation(
+            content=message, error_id=error_id, agent_only=True
+        )
         attach_observation_cause(
             error_obs,
             cause_action,

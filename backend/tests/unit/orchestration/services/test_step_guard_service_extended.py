@@ -174,4 +174,6 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(requirement['paths'], ['backend/context/schemas.py'])
         emitted = self.controller.event_stream.add_event.call_args.args[0]
         self.assertIsInstance(emitted, ErrorObservation)
-        self.assertIn('Do NOT emit another write/edit or finish action', emitted.content)
+        self.assertIn(
+            'Do NOT emit another write/edit or finish action', emitted.content
+        )

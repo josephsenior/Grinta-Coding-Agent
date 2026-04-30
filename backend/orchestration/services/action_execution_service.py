@@ -346,8 +346,7 @@ class ActionExecutionService:
     def _log_obtained_action(self, action: Action) -> None:
         agent = self._context.agent
         logger.info(
-            'ActionExecutionService.get_next_action: obtained action=%s '
-            'from agent=%s',
+            'ActionExecutionService.get_next_action: obtained action=%s from agent=%s',
             getattr(action, 'action', type(action).__name__),
             self._agent_name(agent),
         )
@@ -534,16 +533,19 @@ class ActionExecutionService:
                 CommonFunctionCallValidationError,
                 CommonFunctionCallNotExistsError,
             ) as exc:
-                should_continue, error_logged, last_error_signature, identical_error_count = (
-                    await self._handle_repairable_action_error(
-                        exc,
-                        attempt=attempt,
-                        max_repair_attempts=max_repair_attempts,
-                        max_identical_retries=max_identical_retries,
-                        error_logged=error_logged,
-                        last_error_signature=last_error_signature,
-                        identical_error_count=identical_error_count,
-                    )
+                (
+                    should_continue,
+                    error_logged,
+                    last_error_signature,
+                    identical_error_count,
+                ) = await self._handle_repairable_action_error(
+                    exc,
+                    attempt=attempt,
+                    max_repair_attempts=max_repair_attempts,
+                    max_identical_retries=max_identical_retries,
+                    error_logged=error_logged,
+                    last_error_signature=last_error_signature,
+                    identical_error_count=identical_error_count,
                 )
                 if should_continue:
                     continue
@@ -734,7 +736,9 @@ class ActionExecutionService:
         self, requirement: dict[str, object]
     ) -> str:
         raw_paths_value = requirement.get('paths')
-        raw_paths: list[object] = raw_paths_value if isinstance(raw_paths_value, list) else []
+        raw_paths: list[object] = (
+            raw_paths_value if isinstance(raw_paths_value, list) else []
+        )
         paths = ', '.join(
             str(path_value) for path_value in raw_paths if str(path_value).strip()
         )
@@ -779,8 +783,10 @@ class ActionExecutionService:
             )
 
             step_guard_service_cls = cast(Any, StepGuardService)
-            requirement = step_guard_service_cls._build_verification_requirement_from_history(
-                history
+            requirement = (
+                step_guard_service_cls._build_verification_requirement_from_history(
+                    history
+                )
             )
             if isinstance(requirement, dict):
                 return cast(dict[str, object], requirement)
@@ -808,8 +814,14 @@ class ActionExecutionService:
             return False
 
         from backend.ledger.event import Event as _Event
-        _cause = action if getattr(action, 'id', _Event.INVALID_ID) != _Event.INVALID_ID else None
+
+        _cause = (
+            action
+            if getattr(action, 'id', _Event.INVALID_ID) != _Event.INVALID_ID
+            else None
+        )
         from backend.orchestration.services.guard_bus import VERIFICATION, GuardBus
+
         GuardBus.emit(
             self._context,
             VERIFICATION,

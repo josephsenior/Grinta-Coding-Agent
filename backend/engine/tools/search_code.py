@@ -45,8 +45,10 @@ SEARCH_CODE_TOOL_NAME = 'search_code'
 
 
 def _should_prefix_hidden_file_pattern(file_pattern: str) -> bool:
-    return bool(file_pattern) and file_pattern.startswith('.') and not file_pattern.startswith(
-        ('*', '?', '!')
+    return (
+        bool(file_pattern)
+        and file_pattern.startswith('.')
+        and not file_pattern.startswith(('*', '?', '!'))
     )
 
 
@@ -76,8 +78,10 @@ def _normalize_search_inputs(pattern: str, file_pattern: str) -> tuple[str, str]
     if not normalized_pattern and normalized_file_pattern:
         return normalized_pattern, _wrap_literal_file_pattern(normalized_file_pattern)
 
-    if normalized_pattern and not normalized_file_pattern and _looks_like_file_pattern_hint(
+    if (
         normalized_pattern
+        and not normalized_file_pattern
+        and _looks_like_file_pattern_hint(normalized_pattern)
     ):
         return '', _wrap_literal_file_pattern(normalized_pattern)
 
@@ -172,7 +176,9 @@ def _format_python_search_match_block(
     end = min(len(lines), match_index + context_lines + 1)
     block: list[str] = []
     for line_index in range(start, end):
-        prefix = f'{line_index + 1}:' if line_index == match_index else f'{line_index + 1}-'
+        prefix = (
+            f'{line_index + 1}:' if line_index == match_index else f'{line_index + 1}-'
+        )
         block.append(f'{fpath}:{prefix}{lines[line_index].rstrip()}')
     return '\n'.join(block)
 
@@ -221,7 +227,7 @@ def create_search_code_tool() -> dict:
                 'type': 'string',
                 'description': (
                     "Regex pattern for text search (e.g., 'function\\s+\\w+'). "
-                    "Leave empty to list files only."
+                    'Leave empty to list files only.'
                 ),
             },
             'path': {
@@ -235,7 +241,7 @@ def create_search_code_tool() -> dict:
                 'type': 'string',
                 'description': (
                     "Glob pattern for file filtering (e.g., '*.ts', 'src/**/*.test.js'). "
-                    "Leave empty to search all text files."
+                    'Leave empty to search all text files.'
                 ),
             },
             'context_lines': {

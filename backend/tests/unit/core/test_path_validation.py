@@ -1,4 +1,4 @@
-﻿"""Unit tests for backend.core.type_safety.path_validation â€” security-critical path checks."""
+"""Unit tests for backend.core.type_safety.path_validation â€” security-critical path checks."""
 
 from __future__ import annotations
 
@@ -52,6 +52,7 @@ def _posix_caps() -> OSCapabilities:
         sys_platform='linux',
         os_name='posix',
     )
+
 
 # ---------------------------------------------------------------------------
 # PathValidationError
@@ -226,7 +227,9 @@ class TestValidateAndSanitizePath:
 
         with override_os_capabilities(_windows_caps()):
             with patch.object(Path, 'resolve', new=fake_resolve):
-                with pytest.raises(PathValidationError, match='outside workspace boundary'):
+                with pytest.raises(
+                    PathValidationError, match='outside workspace boundary'
+                ):
                     _resolve_path('outside.py', workspace, True)
 
 
@@ -438,7 +441,10 @@ class TestPathValidationInternals:
         first.parent = second
         second.parent = first
 
-        with patch('backend.core.type_safety.path_validation._is_windows_junction', return_value=False):
+        with patch(
+            'backend.core.type_safety.path_validation._is_windows_junction',
+            return_value=False,
+        ):
             _reject_unsafe_links('loop', first, first)  # type: ignore[arg-type]
 
     def test_non_windows_outside_workspace_raises(self, tmp_path: Path):
@@ -455,5 +461,7 @@ class TestPathValidationInternals:
 
         with override_os_capabilities(_posix_caps()):
             with patch.object(Path, 'resolve', new=fake_resolve):
-                with pytest.raises(PathValidationError, match='outside workspace boundary'):
+                with pytest.raises(
+                    PathValidationError, match='outside workspace boundary'
+                ):
                     _resolve_path('outside.py', workspace, True)

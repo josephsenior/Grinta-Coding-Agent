@@ -277,9 +277,7 @@ class StateTracker:
             total = (sample_total // sample_count) * len(history)
         return total
 
-    def get_transcript(
-        self, include_screenshots: bool = False
-    ) -> list[dict[str, Any]]:
+    def get_transcript(self, include_screenshots: bool = False) -> list[dict[str, Any]]:
         """Convert state history to transcript format for export.
 
         Args:

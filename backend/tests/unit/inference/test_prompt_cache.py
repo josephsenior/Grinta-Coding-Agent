@@ -28,12 +28,15 @@ def test_register_prompt_cache_backend_and_fetch() -> None:
     try:
         prompt_cache.register_prompt_cache_backend(key, _Backend())
         backend = prompt_cache.get_prompt_cache('CUSTOM-provider')
-        assert backend.get_or_create_cache_handle(
-            client=None,
-            model='abc',
-            system_instruction='sys',
-            messages=[],
-        ) == 'abc-cache'
+        assert (
+            backend.get_or_create_cache_handle(
+                client=None,
+                model='abc',
+                system_instruction='sys',
+                messages=[],
+            )
+            == 'abc-cache'
+        )
     finally:
         prompt_cache._REGISTRY.clear()
         prompt_cache._REGISTRY.update(old)
@@ -56,9 +59,7 @@ def test_register_default_backends_with_gemini_adapter() -> None:
     old = dict(prompt_cache._REGISTRY)
     try:
         prompt_cache._REGISTRY.clear()
-        with patch(
-            'backend.inference.gemini_cache.gemini_cache_manager', fake_manager
-        ):
+        with patch('backend.inference.gemini_cache.gemini_cache_manager', fake_manager):
             prompt_cache._register_default_backends()
         backend = prompt_cache.get_prompt_cache('google')
         out = backend.get_or_create_cache_handle(
@@ -80,10 +81,12 @@ def test_register_default_backends_fallback_when_module_missing() -> None:
         prompt_cache._REGISTRY.clear()
         with patch.dict('sys.modules', {'backend.inference.gemini_cache': None}):
             prompt_cache._register_default_backends()
-        assert prompt_cache.get_prompt_cache('google').get_or_create_cache_handle(
-            client=None, model='m', system_instruction=None, messages=[]
-        ) is None
+        assert (
+            prompt_cache.get_prompt_cache('google').get_or_create_cache_handle(
+                client=None, model='m', system_instruction=None, messages=[]
+            )
+            is None
+        )
     finally:
         prompt_cache._REGISTRY.clear()
         prompt_cache._REGISTRY.update(old)
-

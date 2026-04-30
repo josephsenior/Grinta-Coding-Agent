@@ -46,7 +46,9 @@ def test_format_reflection_modified_files_truncates_after_five() -> None:
 
 
 def test_format_reflection_initial_request_swallows_errors() -> None:
-    mm = SimpleNamespace(get_initial_user_message=lambda _h: (_ for _ in ()).throw(RuntimeError('x')))
+    mm = SimpleNamespace(
+        get_initial_user_message=lambda _h: (_ for _ in ()).throw(RuntimeError('x'))
+    )
     assert format_reflection_initial_request(mm, []) == ''
 
 

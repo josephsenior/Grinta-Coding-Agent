@@ -99,9 +99,7 @@ def _graceful_trim_old_error_observations(history: list[Any]) -> int:
     """Replace oldest ErrorObservations beyond the last five; returns count mutated."""
     from backend.ledger.observation.error import ErrorObservation
 
-    errors = [
-        i for i, ev in enumerate(history) if isinstance(ev, ErrorObservation)
-    ]
+    errors = [i for i, ev in enumerate(history) if isinstance(ev, ErrorObservation)]
     dropped = 0
     if len(errors) <= 5:
         return dropped

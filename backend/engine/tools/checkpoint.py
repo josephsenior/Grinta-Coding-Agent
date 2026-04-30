@@ -63,8 +63,8 @@ def create_checkpoint_tool() -> dict:
                 "Manage workspace checkpoints. Use 'save' after completing a logical "
                 "phase of work (e.g., 'auth module complete'). Use 'view' to list all "
                 "saved checkpoints with their IDs. Use 'revert' to roll back the "
-                "workspace to a previously saved state — use immediately after a bad "
-                "edit or failed command to undo changes without wasting turns. "
+                'workspace to a previously saved state — use immediately after a bad '
+                'edit or failed command to undo changes without wasting turns. '
                 "Use 'clear' to reset all checkpoints."
             ),
             'parameters': {
@@ -86,7 +86,7 @@ def create_checkpoint_tool() -> dict:
                     'checkpoint_id': {
                         'description': (
                             "For 'revert': the checkpoint ID to roll back to (integer from 'view'). "
-                            "If omitted, reverts to the most recent checkpoint."
+                            'If omitted, reverts to the most recent checkpoint.'
                         ),
                         'type': 'string',
                     },
@@ -307,7 +307,7 @@ def _revert_checkpoint(checkpoint_id: str) -> AgentThinkAction:
                 reason_code='CHECKPOINT_NOT_FOUND',
                 reason=(
                     f"Checkpoint ID '{checkpoint_id}' was not found. "
-                    "Use checkpoint(view) to list available checkpoints."
+                    'Use checkpoint(view) to list available checkpoints.'
                 ),
                 retryable=True,
                 changed_state=False,

@@ -96,7 +96,9 @@ def _worker_summary_lines(
     ]
     if total > 3:
         extra_lines.append(
-            format_activity_result_secondary(f'+{total - 3} more workers', kind='neutral')
+            format_activity_result_secondary(
+                f'+{total - 3} more workers', kind='neutral'
+            )
         )
     if failed_count and error:
         extra_lines.append(
@@ -133,7 +135,8 @@ def summarize_delegate_observation(
 
 
 def _delegation_failure_summary(
-    error: str, lines: list[str],
+    error: str,
+    lines: list[str],
 ) -> tuple[str | None, str, list[Text]]:
     if error:
         return (
@@ -151,7 +154,8 @@ def _delegation_failure_summary(
 
 
 def _delegation_success_summary(
-    raw_content: str, lines: list[str],
+    raw_content: str,
+    lines: list[str],
 ) -> tuple[str | None, str, list[Text]]:
     if not lines:
         if raw_content:

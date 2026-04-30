@@ -8,7 +8,9 @@ from backend.orchestration.services.step_guard_service import StepGuardService
 
 
 def _make_controller(stuck: bool) -> SimpleNamespace:
-    state = SimpleNamespace(extra_data={}, turn_signals=SimpleNamespace(repetition_score=0))
+    state = SimpleNamespace(
+        extra_data={}, turn_signals=SimpleNamespace(repetition_score=0)
+    )
     state.set_extra = MagicMock()
     state.set_planning_directive = MagicMock()
     return SimpleNamespace(

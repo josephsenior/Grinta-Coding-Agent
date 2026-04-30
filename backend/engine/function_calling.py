@@ -115,9 +115,7 @@ build_lsp_query_action = cast(
 handle_terminal_manager_tool = cast(
     ToolHandler, cast(Any, terminal_manager_tools).handle_terminal_manager_tool
 )
-handle_debugger_tool = cast(
-    ToolHandler, cast(Any, debugger_tools).handle_debugger_tool
-)
+handle_debugger_tool = cast(ToolHandler, cast(Any, debugger_tools).handle_debugger_tool)
 
 # Callback for semantic recall — set by the orchestrator at init time.
 # Signature: (query: str, k: int) -> list[dict[str, Any]]
@@ -296,9 +294,7 @@ def _handle_analyze_project_structure_tool(
     return build_analyze_project_structure_action(dict(arguments))
 
 
-def _validate_text_editor_args(
-    arguments: Mapping[str, Any]
-) -> tuple[str, str]:
+def _validate_text_editor_args(arguments: Mapping[str, Any]) -> tuple[str, str]:
     """Validate required arguments for text_editor tool."""
     tool_name = cast(str, create_text_editor_tool().get('function', {}).get('name', ''))
     command = require_tool_argument(arguments, 'command', tool_name)
@@ -322,13 +318,13 @@ def _normalize_file_editor_command_and_args(
     return normalized_command, normalized_args
 
 
-def _filter_valid_editor_kwargs(
-    other_kwargs: Mapping[str, Any]
-) -> dict[str, Any]:
+def _filter_valid_editor_kwargs(other_kwargs: Mapping[str, Any]) -> dict[str, Any]:
     """Filter and validate kwargs for file editor."""
     text_editor_tool = create_text_editor_tool()
     valid_params = set(
-        cast(dict[str, Any], text_editor_tool.get('function', {}).get('parameters', {})).get('properties', {}).keys()
+        cast(dict[str, Any], text_editor_tool.get('function', {}).get('parameters', {}))
+        .get('properties', {})
+        .keys()
     )
     valid_kwargs_for_editor: dict[str, Any] = {}
     tool_name = cast(str, text_editor_tool.get('function', {}).get('name', ''))
@@ -387,9 +383,7 @@ def _preview_str_replace_edit(
     )
 
 
-def _apply_confidence_preview_override(
-    kwargs: dict[str, Any], path: str
-) -> None:
+def _apply_confidence_preview_override(kwargs: dict[str, Any], path: str) -> None:
     """If confidence < 0.7, force preview mode. Mutates kwargs."""
     confidence = kwargs.pop('confidence', None)
     if confidence is None or not isinstance(confidence, (int, float)):
@@ -442,7 +436,7 @@ def _handle_text_editor_tool(arguments: Mapping[str, Any]) -> Action:
     if command not in valid_commands:
         raise FunctionCallValidationError(
             f"Unknown command '{command}' for text_editor tool. "
-            f"Valid commands: {sorted(valid_commands)}"
+            f'Valid commands: {sorted(valid_commands)}'
         )
     path = str(normalized_args.get('path', path))
     other_kwargs = {
@@ -483,7 +477,7 @@ def _handle_think_tool(arguments: Mapping[str, Any]) -> AgentThinkAction:
 
 
 def _handle_summarize_context_tool(
-    arguments: Mapping[str, Any]
+    arguments: Mapping[str, Any],
 ) -> CondensationRequestAction:
     """Handle Summarize Context tool call."""
     return CondensationRequestAction()
@@ -504,7 +498,7 @@ def _normalize_task_tracker_step(s: Mapping[str, Any], idx: int) -> dict[str, An
 
 
 def _normalize_task_tracker_list(
-    raw_list: list[Mapping[str, Any]]
+    raw_list: list[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     """Normalize task list. Raises FunctionCallValidationError on invalid structure."""
     try:
@@ -523,9 +517,7 @@ def _task_tracker_existing_normalized(
 ) -> list[dict[str, Any]]:
     existing_raw = tracker.load_from_file()
     try:
-        return _normalize_task_tracker_list(
-            cast(list[Mapping[str, Any]], existing_raw)
-        )
+        return _normalize_task_tracker_list(cast(list[Mapping[str, Any]], existing_raw))
     except FunctionCallValidationError:
         return []
 
@@ -729,9 +721,7 @@ def _normalized_edit_symbols_tuple(
     seen: set[str],
 ) -> tuple[str, str]:
     if not isinstance(item_any, Mapping):
-        raise FunctionCallValidationError(
-            f'edit_symbols edits[{i}] must be an object'
-        )
+        raise FunctionCallValidationError(f'edit_symbols edits[{i}] must be an object')
     item: Mapping[str, Any] = cast(Mapping[str, Any], item_any)
     fn = cast(str | None, item.get('symbol_name'))
     nb = cast(str | None, item.get('new_body'))
@@ -759,13 +749,13 @@ def _parse_edit_symbols_edits(arguments: Mapping[str, Any]) -> list[tuple[str, s
     ):
         raise FunctionCallValidationError(
             "edit_symbols requires a non-empty 'edits' array "
-            "(objects with function_name or symbol, and new_body)"
+            '(objects with function_name or symbol, and new_body)'
         )
     raw_edits: list[Any] = list(raw_edits_any)
     if not raw_edits:
         raise FunctionCallValidationError(
             "edit_symbols requires a non-empty 'edits' array "
-            "(objects with function_name or symbol, and new_body)"
+            '(objects with function_name or symbol, and new_body)'
         )
     if len(raw_edits) > _MAX_EDIT_SYMBOLS_PER_BATCH:
         raise FunctionCallValidationError(
@@ -889,8 +879,8 @@ def _handle_find_symbol_command(
     if result:
         message = (
             f"✓ Found '{symbol_name}' in {path}:\n"
-            f"  Type: {result.node_type}\n"
-            f"  Lines: {result.line_start}-{result.line_end}"
+            f'  Type: {result.node_type}\n'
+            f'  Lines: {result.line_start}-{result.line_end}'
         )
         if result.parent_name:
             message += f'\n  Parent: {result.parent_name}'
@@ -994,9 +984,7 @@ def _structure_editor_supports_multi_edit() -> bool:
     return True
 
 
-def _handle_multi_edit_command(
-    _path: str, arguments: Mapping[str, Any]
-) -> Action:
+def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Action:
     """Apply an atomic multi-file batch edit via :class:`AtomicRefactor`.
 
     All edits commit together or all are rolled back from per-file backups.
@@ -1007,7 +995,7 @@ def _handle_multi_edit_command(
     if not isinstance(raw_edits, list) or not raw_edits:
         raise FunctionCallValidationError(
             "multi_edit requires a non-empty 'file_edits' array of "
-            "{ path, new_content } items."
+            '{ path, new_content } items.'
         )
     if len(raw_edits) > _MAX_MULTI_EDIT_FILES:
         raise FunctionCallValidationError(
@@ -1083,18 +1071,19 @@ def _handle_multi_edit_command(
     err_lines = '\n'.join(f'  - {e}' for e in (result.errors or [result.message]))
     return MessageAction(
         content=(
-            '❌ multi_edit transaction rolled back — no files modified.\n'
-            f'{err_lines}'
+            f'❌ multi_edit transaction rolled back — no files modified.\n{err_lines}'
         )
     )
 
 
-_SYMBOL_EDITOR_TEXT_EDITOR_COMMANDS = frozenset({
-    'create_file',
-    'read_file',
-    'insert_text',
-    'undo_last_edit',
-})
+_SYMBOL_EDITOR_TEXT_EDITOR_COMMANDS = frozenset(
+    {
+        'create_file',
+        'read_file',
+        'insert_text',
+        'undo_last_edit',
+    }
+)
 
 _SYMBOL_EDITOR_BRIDGE_KEYS = (
     'file_text',
@@ -1152,9 +1141,7 @@ def _dispatch_structure_editor_commands(
         'replace_range': _handle_replace_range_command,
         'normalize_indent': _handle_normalize_indent_command,
     }
-    simple_command_handlers: dict[
-        str, Callable[[str, Mapping[str, Any]], Action]
-    ] = {
+    simple_command_handlers: dict[str, Callable[[str, Mapping[str, Any]], Action]] = {
         'create_file': _handle_create_file_command,
         'read_file': _handle_read_file_command,
         'insert_text': _handle_insert_text_command,
@@ -1173,7 +1160,7 @@ def _dispatch_structure_editor_commands(
         )
         raise FunctionCallValidationError(
             f"Unknown command '{command}' for symbol_editor tool. "
-            f"Valid commands: {all_cmds}"
+            f'Valid commands: {all_cmds}'
         )
     except FunctionCallValidationError:
         raise
@@ -1281,15 +1268,29 @@ def _handle_communicate_tool(arguments: Mapping[str, Any]) -> Action:
 def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
     """Create dispatch map for tool handlers."""
     return {
-        cast(str, create_cmd_run_tool().get('function', {}).get('name', '')): _handle_cmd_run_tool,
-        cast(str, create_finish_tool().get('function', {}).get('name', '')): _handle_finish_tool,
-        cast(str, create_text_editor_tool().get('function', {}).get('name', '')): _handle_text_editor_tool,
-        cast(str, create_symbol_editor_tool().get('function', {}).get('name', '')): _handle_symbol_editor_tool,
-        cast(str, create_think_tool().get('function', {}).get('name', '')): _handle_think_tool,
-        cast(str, create_summarize_context_tool().get('function', {}).get('name', '')): _handle_summarize_context_tool,
+        cast(
+            str, create_cmd_run_tool().get('function', {}).get('name', '')
+        ): _handle_cmd_run_tool,
+        cast(
+            str, create_finish_tool().get('function', {}).get('name', '')
+        ): _handle_finish_tool,
+        cast(
+            str, create_text_editor_tool().get('function', {}).get('name', '')
+        ): _handle_text_editor_tool,
+        cast(
+            str, create_symbol_editor_tool().get('function', {}).get('name', '')
+        ): _handle_symbol_editor_tool,
+        cast(
+            str, create_think_tool().get('function', {}).get('name', '')
+        ): _handle_think_tool,
+        cast(
+            str, create_summarize_context_tool().get('function', {}).get('name', '')
+        ): _handle_summarize_context_tool,
         TASK_TRACKER_TOOL_NAME: _handle_task_tracker_tool,
         MEMORY_MANAGER_TOOL_NAME: _handle_memory_manager_tool,
-        NOTE_TOOL_NAME: lambda args: build_note_action(cast(str, args['key']), cast(str, args['value'])),
+        NOTE_TOOL_NAME: lambda args: build_note_action(
+            cast(str, args['key']), cast(str, args['value'])
+        ),
         RECALL_TOOL_NAME: lambda args: build_recall_action(cast(str, args['key'])),
         SEARCH_CODE_TOOL_NAME: _handle_search_code_tool,
         READ_SYMBOL_DEFINITION_TOOL_NAME: _handle_read_symbol_definition_tool,
@@ -1298,7 +1299,9 @@ def _create_tool_dispatch_map() -> dict[str, ToolHandler]:
         CODE_INTELLIGENCE_TOOL_NAME: lambda args: build_lsp_query_action(dict(args)),
         DEBUGGER_TOOL_NAME: lambda args: handle_debugger_tool(dict(args)),
         BLACKBOARD_TOOL_NAME: lambda args: build_blackboard_action(dict(args)),
-        TERMINAL_MANAGER_TOOL_NAME: lambda args: handle_terminal_manager_tool(dict(args)),
+        TERMINAL_MANAGER_TOOL_NAME: lambda args: handle_terminal_manager_tool(
+            dict(args)
+        ),
         COMMUNICATE_TOOL_NAME: _handle_communicate_tool,
         EXECUTE_MCP_TOOL_TOOL_NAME: _handle_execute_mcp_tool_tool,
         CHECKPOINT_TOOL_NAME: _handle_checkpoint_tool,

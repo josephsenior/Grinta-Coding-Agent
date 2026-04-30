@@ -14,4 +14,3 @@ def test_get_supported_llm_models_uses_featured_models() -> None:
 
     assert models == ['openai/gpt-4.1', 'google/gemini-2.5-pro']
     mocked.assert_called_once()
-

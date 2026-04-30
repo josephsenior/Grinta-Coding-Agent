@@ -71,7 +71,9 @@ class TestBlastRadiusHook:
         mock_run.return_value = MagicMock(stdout='a.py:1\nb.py:4\n')
         assert _grep_cross_file_refs('symbol', search_root='/tmp') == 5
 
-    @patch('backend.utils.blast_radius.subprocess.run', side_effect=RuntimeError('boom'))
+    @patch(
+        'backend.utils.blast_radius.subprocess.run', side_effect=RuntimeError('boom')
+    )
     def test_grep_cross_file_refs_handles_subprocess_error(self, _mock_run):
         assert _grep_cross_file_refs('symbol', search_root='/tmp') == 0
 

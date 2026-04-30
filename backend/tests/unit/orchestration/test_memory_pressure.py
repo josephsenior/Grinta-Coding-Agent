@@ -6,7 +6,9 @@ from unittest.mock import MagicMock, patch
 from backend.orchestration.memory_pressure import MemoryPressureMonitor
 
 
-def _assert_snapshot_subset(snapshot: dict[str, object], expected: dict[str, object]) -> None:
+def _assert_snapshot_subset(
+    snapshot: dict[str, object], expected: dict[str, object]
+) -> None:
     for key, value in expected.items():
         assert snapshot[key] == value
 

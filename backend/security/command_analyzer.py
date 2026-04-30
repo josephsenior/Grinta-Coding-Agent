@@ -193,8 +193,10 @@ _CRITICAL_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # without internal whitespace.
     (re.compile(r':\(\)\s*\{[^}]*:\s*\|\s*:\s*&[^}]*\}\s*;\s*:'), 'fork bomb'),
     # Shell redirect into a raw device node — corrupts disks/partitions.
-    (re.compile(r'>\s*/dev/(sd[a-z]|nvme|hd[a-z]|vd[a-z]|xvd[a-z])', re.I),
-     'redirect into raw block device'),
+    (
+        re.compile(r'>\s*/dev/(sd[a-z]|nvme|hd[a-z]|vd[a-z]|xvd[a-z])', re.I),
+        'redirect into raw block device',
+    ),
     # Remote code execution / supply-chain attacks
     (re.compile(r'\bcurl\b.*\|\s*(ba)?sh\b', re.I), 'pipe remote script to shell'),
     (re.compile(r'\bwget\b.*\|\s*(ba)?sh\b', re.I), 'pipe remote download to shell'),
@@ -263,7 +265,9 @@ _HIGH_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # System modification
     (re.compile(r'\bsystemctl\s+(stop|disable|mask)\b', re.I), 'service disruption'),
     (
-        re.compile(r'\bsystemctl\s+(start|restart|reload|enable|reboot|poweroff|halt)\b', re.I),
+        re.compile(
+            r'\bsystemctl\s+(start|restart|reload|enable|reboot|poweroff|halt)\b', re.I
+        ),
         'systemctl service control',
     ),
     (
@@ -367,9 +371,7 @@ class CommandAnalyzer:
         # original and the normalized form and keep whichever risk is higher.
         normalized = _normalize_command(cmd)
         if normalized != cmd:
-            norm_risk, norm_reason, norm_recs = self._classify_unnormalized(
-                normalized
-            )
+            norm_risk, norm_reason, norm_recs = self._classify_unnormalized(normalized)
             raw_risk, raw_reason, raw_recs = self._classify_unnormalized(cmd)
             if _RISK_ORDER.get(norm_risk, 0) > _RISK_ORDER.get(raw_risk, 0):
                 return (
@@ -382,9 +384,7 @@ class CommandAnalyzer:
 
         return self._classify_unnormalized(cmd)
 
-    def _classify_unnormalized(
-        self, cmd: str
-    ) -> tuple[RiskCategory, str, list[str]]:
+    def _classify_unnormalized(self, cmd: str) -> tuple[RiskCategory, str, list[str]]:
         """Pattern classification on a (possibly already normalized) command."""
         blocked = _check_blocklist_allowlist(
             cmd, self._blocked_regex, self._blocked, self._allowed

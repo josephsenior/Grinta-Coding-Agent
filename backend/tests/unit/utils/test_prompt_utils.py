@@ -277,7 +277,9 @@ class TestOrchestratorPromptManager:
         )
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
-        with patch('backend.utils.runtime_detect.has_any_lsp_server', return_value=True):
+        with patch(
+            'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
+        ):
             result = opm.get_system_message()
 
         assert '`code_intelligence`' in result
@@ -302,7 +304,9 @@ class TestOrchestratorPromptManager:
         )
 
         opm = OrchestratorPromptManager(prompt_dir=str(tmp_path), config=config)
-        with patch('backend.utils.runtime_detect.has_any_lsp_server', return_value=False):
+        with patch(
+            'backend.utils.runtime_detect.has_any_lsp_server', return_value=False
+        ):
             result = opm.get_system_message()
 
         assert '`code_intelligence`' not in result
@@ -918,7 +922,9 @@ class TestBuildSystemPromptRenders:
         assert 'terminal_manager' not in result or 'do not refer to' in result
 
     def test_lsp_available(self) -> None:
-        with patch('backend.utils.runtime_detect.has_any_lsp_server', return_value=True):
+        with patch(
+            'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
+        ):
             result = self._assert_renders_cleanly(
                 active_llm_model='gpt-4o',
                 is_windows=False,

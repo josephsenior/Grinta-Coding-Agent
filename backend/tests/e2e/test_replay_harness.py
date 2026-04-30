@@ -66,8 +66,16 @@ def record(request: dict, response: dict) -> Path:
 @pytest.mark.integration
 def test_canonicalisation_is_stable() -> None:
     """The hash of a request must not depend on dict iteration order."""
-    a = {'model': 'm', 'messages': [{'role': 'user', 'content': 'hi'}], 'temperature': 0}
-    b = {'temperature': 0, 'messages': [{'role': 'user', 'content': 'hi'}], 'model': 'm'}
+    a = {
+        'model': 'm',
+        'messages': [{'role': 'user', 'content': 'hi'}],
+        'temperature': 0,
+    }
+    b = {
+        'temperature': 0,
+        'messages': [{'role': 'user', 'content': 'hi'}],
+        'model': 'm',
+    }
     assert _canonical_request(a) == _canonical_request(b)
 
 

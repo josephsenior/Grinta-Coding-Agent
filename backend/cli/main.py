@@ -48,7 +48,11 @@ Console = _create_console  # type: ignore[misc,assignment]
 def _normalize_project_arg_early(value: str) -> str:
     """Normalize a project arg before backend modules are safe to import."""
     normalized = value.strip()
-    if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {'"', "'"}:
+    if (
+        len(normalized) >= 2
+        and normalized[0] == normalized[-1]
+        and normalized[0] in {'"', "'"}
+    ):
         normalized = normalized[1:-1].strip()
     if normalized.lower().startswith('file:'):
         parsed = urlparse(normalized)
@@ -67,12 +71,20 @@ def _parse_project_dir_from_argv() -> Path | None:
         a = argv[i]
         if a in ('-p', '--project') and i + 1 < len(argv):
             try:
-                return Path(_normalize_project_arg_early(argv[i + 1])).expanduser().resolve()
+                return (
+                    Path(_normalize_project_arg_early(argv[i + 1]))
+                    .expanduser()
+                    .resolve()
+                )
             except OSError:
                 return None
         if a.startswith('--project='):
             try:
-                return Path(_normalize_project_arg_early(a.split('=', 1)[1])).expanduser().resolve()
+                return (
+                    Path(_normalize_project_arg_early(a.split('=', 1)[1]))
+                    .expanduser()
+                    .resolve()
+                )
             except OSError:
                 return None
         i += 1
@@ -442,12 +454,19 @@ async def _async_main(
 
         # -- apply CLI overrides (non-persistent) ------------------------------
         _apply_cli_overrides(
-            config, model, resolved_project, get_project_local_data_root,
+            config,
+            model,
+            resolved_project,
+            get_project_local_data_root,
         )
 
         # -- onboarding if needed ----------------------------------------------
         config_or_none: Any = await _ensure_onboarded(
-            config, console, model, resolved_project, get_project_local_data_root,
+            config,
+            console,
+            model,
+            resolved_project,
+            get_project_local_data_root,
         )
         if config_or_none is None:
             return
@@ -561,7 +580,9 @@ def main(
         run_storage_cleanup_command(project)
         return
     try:
-        asyncio.run(_async_main(model=model, project=project, show_splash=not no_splash))
+        asyncio.run(
+            _async_main(model=model, project=project, show_splash=not no_splash)
+        )
     except KeyboardInterrupt:
         # Top-level Ctrl+C — exit cleanly without traceback.
         print()  # newline after ^C

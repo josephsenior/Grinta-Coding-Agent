@@ -187,9 +187,7 @@ def call_async_from_sync(
             # invisible tail latency from every sync tool invocation.
             fin = _LOOP_FINALIZE_WAIT_SEC
             has_residual_tasks = any(not t.done() for t in asyncio.all_tasks(loop))
-            has_default_executor = (
-                getattr(loop, '_default_executor', None) is not None
-            )
+            has_default_executor = getattr(loop, '_default_executor', None) is not None
             if has_residual_tasks:
                 try:
                     loop.run_until_complete(

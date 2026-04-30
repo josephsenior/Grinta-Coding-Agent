@@ -34,9 +34,12 @@ def mock_executor(tmp_path: Path):
 
 
 @pytest.mark.asyncio
-async def test_call_tool_mcp_returns_error_observation_on_exception(mock_executor) -> None:
+async def test_call_tool_mcp_returns_error_observation_on_exception(
+    mock_executor,
+) -> None:
     with patch(
-        'backend.integrations.mcp.mcp_utils.create_mcps', side_effect=RuntimeError('boom')
+        'backend.integrations.mcp.mcp_utils.create_mcps',
+        side_effect=RuntimeError('boom'),
     ):
         obs = await mock_executor.call_tool_mcp(MCPAction(name='x', arguments={}))
     assert isinstance(obs, ErrorObservation)
@@ -47,12 +50,31 @@ async def test_call_tool_mcp_returns_error_observation_on_exception(mock_executo
 async def test_call_tool_mcp_success_truncates_content(mock_executor) -> None:
     fake_obs = SimpleNamespace(content='hello world')
     with (
-        patch('backend.core.config.config_loader.load_app_config', return_value=SimpleNamespace(mcp=SimpleNamespace(servers=[], mcp_exposed_name_reserved=frozenset()))),
-        patch('backend.core.config.mcp_config._filter_windows_stdio_servers', side_effect=lambda s: s),
-        patch('backend.integrations.mcp.mcp_utils.create_mcps', AsyncMock(return_value=[])),
-        patch('backend.integrations.mcp.mcp_utils.call_tool_mcp', AsyncMock(return_value=fake_obs)),
-        patch('backend.execution.action_execution_server.get_max_edit_observation_chars', return_value=5),
-        patch('backend.execution.action_execution_server.truncate_large_text', side_effect=lambda t, m, label='': t[:m]),
+        patch(
+            'backend.core.config.config_loader.load_app_config',
+            return_value=SimpleNamespace(
+                mcp=SimpleNamespace(servers=[], mcp_exposed_name_reserved=frozenset())
+            ),
+        ),
+        patch(
+            'backend.core.config.mcp_config._filter_windows_stdio_servers',
+            side_effect=lambda s: s,
+        ),
+        patch(
+            'backend.integrations.mcp.mcp_utils.create_mcps', AsyncMock(return_value=[])
+        ),
+        patch(
+            'backend.integrations.mcp.mcp_utils.call_tool_mcp',
+            AsyncMock(return_value=fake_obs),
+        ),
+        patch(
+            'backend.execution.action_execution_server.get_max_edit_observation_chars',
+            return_value=5,
+        ),
+        patch(
+            'backend.execution.action_execution_server.truncate_large_text',
+            side_effect=lambda t, m, label='': t[:m],
+        ),
     ):
         obs = await mock_executor.call_tool_mcp(MCPAction(name='x', arguments={}))
     assert obs.content == 'hello'
@@ -72,7 +94,9 @@ async def test_lsp_query_success_and_failure(mock_executor) -> None:
     assert ok.__class__.__name__ == 'LspQueryObservation'
     assert ok.tool_result['available'] is True
 
-    with patch('backend.utils.lsp_client.LspClient', side_effect=RuntimeError('lsp down')):
+    with patch(
+        'backend.utils.lsp_client.LspClient', side_effect=RuntimeError('lsp down')
+    ):
         bad = await mock_executor.lsp_query(action)
     assert isinstance(bad, ErrorObservation)
     assert bad.tool_result['available'] is False
@@ -80,7 +104,9 @@ async def test_lsp_query_success_and_failure(mock_executor) -> None:
 
 @pytest.mark.asyncio
 async def test_browser_tool_disabled_and_enabled_paths(mock_executor) -> None:
-    disabled = await mock_executor.browser_tool(BrowserToolAction(command='goto', params={}))
+    disabled = await mock_executor.browser_tool(
+        BrowserToolAction(command='goto', params={})
+    )
     assert isinstance(disabled, ErrorObservation)
     assert 'disabled' in disabled.content
 
@@ -103,12 +129,9 @@ def test_close_cleans_resources(mock_executor) -> None:
     mock_executor._native_browser = native
     mock_executor.browser = MagicMock()
 
-    with patch(
-        'backend.utils.async_utils.call_async_from_sync', return_value=None
-    ):
+    with patch('backend.utils.async_utils.call_async_from_sync', return_value=None):
         mock_executor.close()
 
     mock_executor.debug_manager.close_all.assert_called_once()
     mock_executor.session_manager.close_all.assert_called_once()
     mock_executor.memory_monitor.stop_monitoring.assert_called_once()
-

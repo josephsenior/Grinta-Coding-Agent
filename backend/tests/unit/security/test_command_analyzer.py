@@ -316,7 +316,9 @@ class TestObfuscationNormalization:
         result = analyzer.analyze_command('$(echo rm) -rf /')
         # The reason should either mention 'de-obfuscat' or the normalized form.
         lowered = result.reason.lower()
-        assert 'de-obfuscat' in lowered or 'after' in lowered or 'substitution' in lowered
+        assert (
+            'de-obfuscat' in lowered or 'after' in lowered or 'substitution' in lowered
+        )
 
     def test_safe_echo_unaffected(self, analyzer: CommandAnalyzer):
         """A trivial ``echo hello`` must not be escalated."""

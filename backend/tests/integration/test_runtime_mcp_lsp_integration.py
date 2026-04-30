@@ -20,7 +20,11 @@ from backend.integrations.mcp.mcp_bootstrap_status import (
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.mcp import MCPAction
-from backend.ledger.observation import ErrorObservation, LspQueryObservation, MCPObservation
+from backend.ledger.observation import (
+    ErrorObservation,
+    LspQueryObservation,
+    MCPObservation,
+)
 from backend.utils.lsp_client import LspClient, LspLocation, LspResult, LspSymbol
 
 

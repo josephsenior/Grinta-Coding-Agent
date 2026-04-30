@@ -41,21 +41,21 @@ def windows_drive_glued_hint() -> str:
 
 
 _DETAILED_BASH_DESCRIPTION = (
-    "Execute a {shell} command in a persistent shell session.\n\n"
-    "* **Discovery & reading project files:** use `search_code` or "
-    "`text_editor` (`read_file`)—not `cat`/`grep`/`find` for source and config under the repo.\n"
-    "* One shell command payload per tool call. Chain subcommands with `&&` or `;` when needed.\n"
-    "* This rule applies to shell syntax only; it does not define global tool-call batching policy.\n"
-    "* Persistent: env vars, venvs, cwd persist between calls.\n"
-    "* Do NOT use `set -e` / `set -eu` / `set -euo pipefail`.\n"
-    "* Long-running: background with `cmd > out.log 2>&1 &`, or set `timeout`.\n"
-    "* Exit code `-1`: process still running. Set `is_input=true` to send input, "
-    "empty string for more logs, or `C-c`/`C-d`/`C-z` to interrupt.\n"
+    'Execute a {shell} command in a persistent shell session.\n\n'
+    '* **Discovery & reading project files:** use `search_code` or '
+    '`text_editor` (`read_file`)—not `cat`/`grep`/`find` for source and config under the repo.\n'
+    '* One shell command payload per tool call. Chain subcommands with `&&` or `;` when needed.\n'
+    '* This rule applies to shell syntax only; it does not define global tool-call batching policy.\n'
+    '* Persistent: env vars, venvs, cwd persist between calls.\n'
+    '* Do NOT use `set -e` / `set -eu` / `set -euo pipefail`.\n'
+    '* Long-running: background with `cmd > out.log 2>&1 &`, or set `timeout`.\n'
+    '* Exit code `-1`: process still running. Set `is_input=true` to send input, '
+    'empty string for more logs, or `C-c`/`C-d`/`C-z` to interrupt.\n'
     "* Do NOT create/write files with this tool — use `text_editor(command='create')` instead.\n"
-    "* Shell cwd is the **project root** (see runtime). Prefer relative paths (`dir/file`, `./script`). "
-    "There is no `/workspace` alias — use real relative or absolute paths.\n"
-    "* In bash, never glue a folder name to a Windows drive letter: use `dir/C:/path` or quotes, "
-    "not `dirC:/path`.\n"
+    '* Shell cwd is the **project root** (see runtime). Prefer relative paths (`dir/file`, `./script`). '
+    'There is no `/workspace` alias — use real relative or absolute paths.\n'
+    '* In bash, never glue a folder name to a Windows drive letter: use `dir/C:/path` or quotes, '
+    'not `dirC:/path`.\n'
 )
 _SHORT_BASH_DESCRIPTION = (
     'Execute a {shell} command. Prefer `search_code` / `analyze_project_structure` / editor `read_file` '

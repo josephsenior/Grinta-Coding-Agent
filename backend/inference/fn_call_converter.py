@@ -201,8 +201,8 @@ def _build_example_header() -> str:
     """Build the header section of the example."""
     return (
         "Here's a running example of how to perform a task with the provided tools.\n\n"
-        "--------------------- START OF EXAMPLE ---------------------\n\n"
-        "USER: Create a list of numbers from 1 to 10, and display them in a web page at port 5000.\n\n"
+        '--------------------- START OF EXAMPLE ---------------------\n\n'
+        'USER: Create a list of numbers from 1 to 10, and display them in a web page at port 5000.\n\n'
     )
 
 
@@ -615,7 +615,7 @@ def _extract_and_validate_params(
         if param_name in found_params:
             msg = (
                 f"Duplicate parameter '{param_name}' provided for function '{fn_name}'. "
-                "Each parameter may appear at most once."
+                'Each parameter may appear at most once.'
             )
             raise FunctionCallValidationError(msg)
 
@@ -1167,9 +1167,9 @@ def _process_tool_message(
         _tool_call_message = pending_tool_calls.pop(message['tool_call_id'])
         converted_messages.append(_tool_call_message)
     else:
-        assert (
-            not pending_tool_calls
-        ), f'Found pending tool calls but not found in pending list: {pending_tool_calls:=}'
+        assert not pending_tool_calls, (
+            f'Found pending tool calls but not found in pending list: {pending_tool_calls:=}'
+        )
 
     converted_messages.append(message)
 
@@ -1189,7 +1189,7 @@ def _process_other_message(
         role: Message role
 
     """
-    assert (
-        not pending_tool_calls
-    ), f'Found pending tool calls but not expect to handle it with role {role}: {pending_tool_calls:=}, {message:=}'
+    assert not pending_tool_calls, (
+        f'Found pending tool calls but not expect to handle it with role {role}: {pending_tool_calls:=}, {message:=}'
+    )
     converted_messages.append(message)

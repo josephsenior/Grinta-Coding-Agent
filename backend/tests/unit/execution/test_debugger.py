@@ -41,7 +41,11 @@ def test_manager_start_and_status_with_generic_adapter(monkeypatch, tmp_path) ->
             instances.append(self)
 
         def start(self, timeout: float = 15.0) -> dict[str, Any]:
-            return {'session_id': self.session_id, 'state': 'started', 'timeout': timeout}
+            return {
+                'session_id': self.session_id,
+                'state': 'started',
+                'timeout': timeout,
+            }
 
         def status(self, timeout: float = 5.0) -> dict[str, Any]:
             return {'session_id': self.session_id, 'state': 'status', 'threads': []}

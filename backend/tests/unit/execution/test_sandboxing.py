@@ -17,21 +17,40 @@ from backend.execution.sandboxing import (
 
 def test_is_sandboxed_local_profile() -> None:
     assert is_sandboxed_local_profile(None) is False
-    assert is_sandboxed_local_profile(SimpleNamespace(execution_profile='standard')) is False
-    assert is_sandboxed_local_profile(SimpleNamespace(execution_profile='sandboxed_local')) is True
+    assert (
+        is_sandboxed_local_profile(SimpleNamespace(execution_profile='standard'))
+        is False
+    )
+    assert (
+        is_sandboxed_local_profile(SimpleNamespace(execution_profile='sandboxed_local'))
+        is True
+    )
 
 
 def test_is_workspace_restricted_profile() -> None:
     assert is_workspace_restricted_profile(None) is False
-    assert is_workspace_restricted_profile(SimpleNamespace(execution_profile='hardened_local')) is True
-    assert is_workspace_restricted_profile(SimpleNamespace(execution_profile='sandboxed_local')) is True
+    assert (
+        is_workspace_restricted_profile(
+            SimpleNamespace(execution_profile='hardened_local')
+        )
+        is True
+    )
+    assert (
+        is_workspace_restricted_profile(
+            SimpleNamespace(execution_profile='sandboxed_local')
+        )
+        is True
+    )
 
 
 def test_resolve_policy_returns_none_when_not_sandboxed_local() -> None:
-    assert resolve_execution_sandbox_policy(
-        security_config=SimpleNamespace(execution_profile='standard'),
-        workspace_root='C:/ws',
-    ) is None
+    assert (
+        resolve_execution_sandbox_policy(
+            security_config=SimpleNamespace(execution_profile='standard'),
+            workspace_root='C:/ws',
+        )
+        is None
+    )
 
 
 def test_execution_sandbox_policy_wrap_appcontainer_argv() -> None:

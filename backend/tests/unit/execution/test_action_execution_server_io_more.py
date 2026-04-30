@@ -8,7 +8,12 @@ import pytest
 
 from backend.execution.action_execution_server import RuntimeExecutor
 from backend.execution.utils.unified_shell import BaseShellSession
-from backend.ledger.action import CmdRunAction, FileEditAction, FileReadAction, FileWriteAction
+from backend.ledger.action import (
+    CmdRunAction,
+    FileEditAction,
+    FileReadAction,
+    FileWriteAction,
+)
 from backend.ledger.observation import ErrorObservation, FileReadObservation
 
 
@@ -84,7 +89,9 @@ async def test_run_static_closes_temp_session_even_on_success(mock_executor) -> 
     mock_executor.session_manager.create_session.return_value = session
     mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
 
-    out = await mock_executor._run_static_cmd(CmdRunAction(command='ls', is_static=True))
+    out = await mock_executor._run_static_cmd(
+        CmdRunAction(command='ls', is_static=True)
+    )
     assert out.content == 'ok'
     mock_executor.session_manager.close_session.assert_called_once()
 
@@ -94,7 +101,9 @@ async def test_read_binary_file_returns_binary_error(mock_executor) -> None:
     mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
     with (
         patch('os.path.isfile', return_value=True),
-        patch('backend.execution.action_execution_server_io.is_binary', return_value=True),
+        patch(
+            'backend.execution.action_execution_server_io.is_binary', return_value=True
+        ),
     ):
         out = await mock_executor.read(FileReadAction(path='foo.bin'))
     assert isinstance(out, ErrorObservation)
@@ -144,7 +153,9 @@ async def test_read_dispatches_by_extension(mock_executor) -> None:
 async def test_write_permission_error_path(mock_executor) -> None:
     mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
     with patch.object(
-        mock_executor, '_resolve_workspace_file_path', side_effect=PermissionError('nope')
+        mock_executor,
+        '_resolve_workspace_file_path',
+        side_effect=PermissionError('nope'),
     ):
         out = await mock_executor.write(FileWriteAction(path='../a.txt', content='x'))
     assert isinstance(out, ErrorObservation)
@@ -160,7 +171,10 @@ async def test_write_success_path(mock_executor) -> None:
         ),
         patch('backend.execution.action_execution_server_io.ensure_directory_exists'),
         patch('os.path.exists', return_value=False),
-        patch('backend.execution.action_execution_server_io.write_file_content', return_value=None),
+        patch(
+            'backend.execution.action_execution_server_io.write_file_content',
+            return_value=None,
+        ),
     ):
         out = await mock_executor.write(FileWriteAction(path='a.txt', content='x'))
     assert out.__class__.__name__ == 'FileWriteObservation'
@@ -168,7 +182,9 @@ async def test_write_success_path(mock_executor) -> None:
 
 
 @pytest.mark.asyncio
-async def test_edit_permission_error_command_missing_and_directory_view(mock_executor) -> None:
+async def test_edit_permission_error_command_missing_and_directory_view(
+    mock_executor,
+) -> None:
     mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
     with patch.object(
         mock_executor, '_resolve_workspace_file_path', side_effect=PermissionError()
@@ -177,7 +193,9 @@ async def test_edit_permission_error_command_missing_and_directory_view(mock_exe
     assert isinstance(out1, ErrorObservation)
 
     with (
-        patch.object(mock_executor, '_resolve_workspace_file_path', return_value='C:/ws/x'),
+        patch.object(
+            mock_executor, '_resolve_workspace_file_path', return_value='C:/ws/x'
+        ),
         patch.object(mock_executor, '_edit_try_directory_view', return_value=None),
     ):
         out2 = await mock_executor.edit(FileEditAction(path='x', command=''))
@@ -186,9 +204,12 @@ async def test_edit_permission_error_command_missing_and_directory_view(mock_exe
 
     directory_obs = FileReadObservation(path='x', content='[DIR]')
     with (
-        patch.object(mock_executor, '_resolve_workspace_file_path', return_value='C:/ws/x'),
-        patch.object(mock_executor, '_edit_try_directory_view', return_value=directory_obs),
+        patch.object(
+            mock_executor, '_resolve_workspace_file_path', return_value='C:/ws/x'
+        ),
+        patch.object(
+            mock_executor, '_edit_try_directory_view', return_value=directory_obs
+        ),
     ):
         out3 = await mock_executor.edit(FileEditAction(path='x', command='replace'))
     assert out3 is directory_obs
-

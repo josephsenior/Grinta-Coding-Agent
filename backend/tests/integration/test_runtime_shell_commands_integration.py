@@ -32,7 +32,9 @@ def test_runtime_executor_env_check_command_powershell_vs_bash(tmp_path) -> None
 
 
 @pytest.mark.integration
-def test_runtime_executor_uses_powershell_contract_follows_os_and_session(tmp_path) -> None:
+def test_runtime_executor_uses_powershell_contract_follows_os_and_session(
+    tmp_path,
+) -> None:
     ex = RuntimeExecutor([], str(tmp_path), 'user', 1, enable_browser=False)
     # Default session is not PowerShell-specific — should match OS_CAPS.is_windows.
     uses = ex._uses_powershell_shell_contract()  # noqa: SLF001

@@ -1,7 +1,6 @@
 # Python
 .venv/
-venv/
-.smoke-venv/
+.venv-smoke/
 __pycache__/
 *.pyc
 *.pyo
@@ -28,10 +27,6 @@ backend/~/  # Never commit JWT secrets or sensitive backend configs
 
 # Runtime config (user-specific — only template is tracked)
 settings.json
-
-# local venv created during snapshot work
-.venv2/
-
 # Debug backups
 debug_backups/
 

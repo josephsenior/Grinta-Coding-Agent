@@ -36,6 +36,7 @@ def _force_os(request, *, windows: bool) -> None:
     cm.__enter__()
     request.addfinalizer(lambda: cm.__exit__(None, None, None))
 
+
 # -----------------------------------------------------------
 # Concrete stub
 # -----------------------------------------------------------
@@ -312,7 +313,9 @@ class TestCreateShellSession:
 
         assert isinstance(session, _DummySession)
 
-    def test_unix_falls_back_to_simple_bash_without_tmux(self, tmp_path, monkeypatch, request):
+    def test_unix_falls_back_to_simple_bash_without_tmux(
+        self, tmp_path, monkeypatch, request
+    ):
         _force_os(request, windows=False)
         monkeypatch.setitem(
             sys.modules,
@@ -328,7 +331,9 @@ class TestCreateShellSession:
         )
         assert isinstance(session, _DummySession)
 
-    def test_windows_prefers_powershell_when_available(self, tmp_path, monkeypatch, request):
+    def test_windows_prefers_powershell_when_available(
+        self, tmp_path, monkeypatch, request
+    ):
         _force_os(request, windows=True)
         monkeypatch.setitem(
             sys.modules,

@@ -105,7 +105,11 @@ TOOL_BRIDGE_TIMEOUT_TERMINAL_IO = 60.0
 TOOL_BRIDGE_TIMEOUT_BUFFER = 10.0
 # Opt-in (default-on) debugpy import warmup at agent startup. Keeps the first
 # real ``debugger`` tool call snappy. Set GRINTA_DEBUGPY_WARMUP=0 to disable.
-DEBUGPY_WARMUP_ENABLED = os.getenv('GRINTA_DEBUGPY_WARMUP', '1') not in {'0', 'false', 'False'}
+DEBUGPY_WARMUP_ENABLED = os.getenv('GRINTA_DEBUGPY_WARMUP', '1') not in {
+    '0',
+    'false',
+    'False',
+}
 # Native browser: per-stage fail-fast budgets (see GrintaNativeBrowser).
 BROWSER_SESSION_START_TIMEOUT_SEC = 90.0
 BROWSER_CDP_NAVIGATE_TIMEOUT_SEC = 20.0
@@ -410,9 +414,9 @@ SEMANTIC_RECALL_TOOL_NAME = 'semantic_recall'
 # ── Security Risk ───────────────────────────────────────────────────
 SECURITY_RISK_DESC = (
     "Required. Your assessment of this action's safety risk (LOW/MEDIUM/HIGH). "
-    "Server may only escalate (e.g. true-unsafe commands always become HIGH); "
-    "it never silently lowers your label or invents one when omitted. "
-    "See the SECURITY_RISK_ASSESSMENT section in the system prompt for definitions."
+    'Server may only escalate (e.g. true-unsafe commands always become HIGH); '
+    'it never silently lowers your label or invents one when omitted. '
+    'See the SECURITY_RISK_ASSESSMENT section in the system prompt for definitions.'
 )
 RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH']
 
@@ -430,11 +434,11 @@ DEFAULT_CMD_PID = -1
 # Runtime constants
 BASH_TIMEOUT_MESSAGE_TEMPLATE = (
     "You may wait longer to see additional output by sending empty command '', "
-    "send other commands to interact with the current process, "
+    'send other commands to interact with the current process, '
     'send keys ("C-c", "C-z", "C-d") to interrupt/kill the previous command '
-    "before sending your new command, or use the timeout parameter in the active terminal tool "
-    "(execute_bash or execute_powershell, depending on runtime) "
-    "for future commands."
+    'before sending your new command, or use the timeout parameter in the active terminal tool '
+    '(execute_bash or execute_powershell, depending on runtime) '
+    'for future commands.'
 )
 
 # ── Compactor Defaults ──────────────────────────────────────────────

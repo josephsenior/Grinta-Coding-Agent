@@ -362,11 +362,11 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                 if not exists:
                     return
                 ctx.block(
-                        '[FILE_STATE_GUARD] File has not been read yet in this '
-                        f'session: {target_path}. Read it first (use read_file or '
-                        'grep to locate the exact text) before editing, otherwise '
-                        'your old_str / anchor context will likely not match.'
-                    )
+                    '[FILE_STATE_GUARD] File has not been read yet in this '
+                    f'session: {target_path}. Read it first (use read_file or '
+                    'grep to locate the exact text) before editing, otherwise '
+                    'your old_str / anchor context will likely not match.'
+                )
 
         if (
             not ctx.blocked
@@ -423,9 +423,7 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                 if diff:
                     symbols = _extract_removed_symbols(diff)
                     if symbols:
-                        session_files = [
-                            e.path for e in self._tracker._files.values()
-                        ]
+                        session_files = [e.path for e in self._tracker._files.values()]
                         refs = _find_symbol_references(
                             symbols, session_files, exclude_path=mutated_path
                         )
@@ -438,7 +436,8 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                                     + 'Symbols removed/renamed: '
                                     + ', '.join(symbols)
                                     + '\nSession files that reference them:\n'
-                                    + refs + '\n'
+                                    + refs
+                                    + '\n'
                                     + '</BLAST_RADIUS>'
                                 )
             except Exception:

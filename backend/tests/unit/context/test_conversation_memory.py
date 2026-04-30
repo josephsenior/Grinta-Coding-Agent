@@ -111,7 +111,10 @@ class TestMcpUserAddendum:
 
         assert normalized[0].role == 'system'
         assert normalized[1].role == 'user'
-        assert extract_first_text(normalized[1]) == '<MCP_TOOLS>\n`github_search`\n</MCP_TOOLS>'
+        assert (
+            extract_first_text(normalized[1])
+            == '<MCP_TOOLS>\n`github_search`\n</MCP_TOOLS>'
+        )
         assert normalized[2].role == 'user'
         assert extract_first_text(normalized[2]) == 'Implement the fix'
 

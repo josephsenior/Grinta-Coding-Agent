@@ -76,10 +76,22 @@ class DebugMixin:
             tool_calls = message.get('tool_calls')
             if tool_calls:
                 for tc in tool_calls:
-                    func = tc.get('function') if isinstance(tc, dict) else getattr(tc, 'function', None)
+                    func = (
+                        tc.get('function')
+                        if isinstance(tc, dict)
+                        else getattr(tc, 'function', None)
+                    )
                     if func:
-                        name = func.get('name') if isinstance(func, dict) else getattr(func, 'name', '')
-                        arguments = func.get('arguments') if isinstance(func, dict) else getattr(func, 'arguments', '')
+                        name = (
+                            func.get('name')
+                            if isinstance(func, dict)
+                            else getattr(func, 'name', '')
+                        )
+                        arguments = (
+                            func.get('arguments')
+                            if isinstance(func, dict)
+                            else getattr(func, 'arguments', '')
+                        )
                         content += f'\nFunction call: {name}({arguments})'
             if content:
                 llm_response_logger.debug(content)

@@ -66,4 +66,3 @@ def test_clear_cache_prefix_and_all() -> None:
         assert cache.get_cached('u', {'a': 2}) == {'content': '2'}
         removed_all = cache.clear_cache()
         assert removed_all >= 1
-

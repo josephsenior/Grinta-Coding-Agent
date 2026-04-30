@@ -89,7 +89,7 @@ def _warn_unclosed_stream(sid: str) -> None:
     try:
         stderr.write(
             f"WARNING: EventStream '{sid}' was GC'd without close(); "
-            "resources may leak.\n"
+            'resources may leak.\n'
         )
     except (ValueError, OSError):
         pass

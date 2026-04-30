@@ -147,8 +147,9 @@ class StuckDetector:
 
     def _check_advanced_stuck_patterns(self, filtered_history: list[Event]) -> bool:
         """Check for advanced stuck patterns."""
-        if len(filtered_history) >= DEFAULT_STUCK_AB_PATTERN_WINDOW and self._is_stuck_action_observation_pattern(
-            filtered_history
+        if (
+            len(filtered_history) >= DEFAULT_STUCK_AB_PATTERN_WINDOW
+            and self._is_stuck_action_observation_pattern(filtered_history)
         ):
             return True
         return bool(
@@ -313,7 +314,9 @@ class StuckDetector:
         if len(condensation_events) < DEFAULT_STUCK_CONDENSATION_LOOP_MIN:
             return False
 
-        last_condensation_events = condensation_events[-DEFAULT_STUCK_CONDENSATION_LOOP_MIN:]
+        last_condensation_events = condensation_events[
+            -DEFAULT_STUCK_CONDENSATION_LOOP_MIN:
+        ]
         return self._check_consecutive_condensation_events(
             last_condensation_events, filtered_history
         )
@@ -617,9 +620,7 @@ class StuckDetector:
         )
         return min(1.0, identical_count / 3.0)
 
-    def _score_observation_errors(
-        self, last_observations: Sequence[Event]
-    ) -> float:
+    def _score_observation_errors(self, last_observations: Sequence[Event]) -> float:
         """Score for error rate in recent observations (0.0-1.0)."""
         if not last_observations:
             return 0.0

@@ -57,7 +57,9 @@ def strip_protocol_echo_blocks(text: str) -> str:
 
     text = ''.join(kept_parts)
     return ''.join(
-        line for line in text.splitlines(keepends=True) if not _line_starts_protocol_prefix(line)
+        line
+        for line in text.splitlines(keepends=True)
+        if not _line_starts_protocol_prefix(line)
     )
 
 

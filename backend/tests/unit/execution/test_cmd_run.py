@@ -296,9 +296,9 @@ async def test_chained_scaffold_failure_adds_scaffold_guidance(mock_executor):
     mock_session.cwd = '/project/space'
     mock_session.execute.return_value = CmdOutputObservation(
         content=(
-            "npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, "
+            'npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, '
             "open '/project/space/react-app/package.json'\n"
-            "npm error A complete log of this run can be found in: /project/space/npm-debug.log"
+            'npm error A complete log of this run can be found in: /project/space/npm-debug.log'
         ),
         command='npm create vite@latest . -- --template react && npm install',
         metadata={'exit_code': 38},

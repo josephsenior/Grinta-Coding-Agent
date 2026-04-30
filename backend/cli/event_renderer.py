@@ -43,8 +43,8 @@ from backend.cli.layout_tokens import (
 )
 from backend.cli.theme import (
     CLR_AUTONOMY_BALANCED,
-    CLR_AUTONOMY_FULL,
     CLR_AUTONOMY_CONSERVATIVE,
+    CLR_AUTONOMY_FULL,
     CLR_BRAND,
     CLR_HUD_DETAIL,
     CLR_HUD_MODEL,
@@ -85,7 +85,6 @@ from backend.ledger.observation import (
 )
 
 logger = logging.getLogger(__name__)
-
 
 
 from backend.cli._event_renderer.action_renderers_mixin import ActionRenderersMixin
@@ -155,6 +154,7 @@ _IDLE_STATES = {
 }
 # Subscriber ID for the CLI renderer.
 _SUBSCRIBER = EventStreamSubscriber.CLI
+
 
 class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     """Bridges EventStream → live rich layout.
@@ -584,7 +584,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         live_sections: list[Any] = self._collect_live_sections()
         stream_max_lines, reasoning_max_lines = self._live_section_budgets(options)
         reasoning_section = self._append_streaming_and_reasoning_sections(
-            live_sections, stream_max_lines, reasoning_max_lines, options.max_width,
+            live_sections,
+            stream_max_lines,
+            reasoning_max_lines,
+            options.max_width,
         )
         body_items = self._frame_live_sections(live_sections, reasoning_section)
         if live_sections:
@@ -630,14 +633,13 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
     @staticmethod
     def _budgets_with_both(
-        available: int, thought_rows: bool,
+        available: int,
+        thought_rows: bool,
     ) -> tuple[int, int]:
         if thought_rows:
             reasoning_share = max(10, available * 3 // 5)
             stream_max = max(6, min(16, available - reasoning_share - 1))
-            reasoning_max = max(
-                10, min(reasoning_share, available - stream_max - 1)
-            )
+            reasoning_max = max(10, min(reasoning_share, available - stream_max - 1))
             return stream_max, reasoning_max
         # Header-only Thinking panel: give the draft-reply preview the bulk.
         return max(10, min(28, available - 5)), 6
@@ -667,7 +669,8 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
     @staticmethod
     def _frame_live_sections(
-        live_sections: list[Any], reasoning_section: Any | None,
+        live_sections: list[Any],
+        reasoning_section: Any | None,
     ) -> list[Any]:
         body_items: list[Any] = []
         for index, section in enumerate(live_sections):
@@ -756,7 +759,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
     @classmethod
     def _fake_prompt_compact_row(
-        cls, hud: Any, provider: str, model: str,
+        cls,
+        hud: Any,
+        provider: str,
+        model: str,
     ) -> Text:
         sep = cls._FAKE_PROMPT_SEP
         state_label = hud.agent_state_label or 'Running'
@@ -767,9 +773,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             else f'{provider}/{model}'
         )
         ctx = (
-            HUDBar._format_tokens(hud.context_tokens)
-            if hud.context_tokens > 0
-            else '0'
+            HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
         )
         line = Text()
         first = True
@@ -831,9 +835,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     @classmethod
     def _fake_prompt_token_display(cls, hud: Any) -> str:
         ctx = (
-            HUDBar._format_tokens(hud.context_tokens)
-            if hud.context_tokens > 0
-            else '0'
+            HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
         )
         if hud.context_tokens == 0 and hud.context_limit == 0:
             return '0 tokens'
@@ -851,7 +853,11 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         return CLR_STATUS_OK + ' bold'
 
     def _fake_prompt_metrics_rows(
-        self, hud: Any, provider: str, model: str, width: int,
+        self,
+        hud: Any,
+        provider: str,
+        model: str,
+        width: int,
     ) -> list[Text]:
         sep = self._FAKE_PROMPT_SEP
         token_display = self._fake_prompt_token_display(hud)
@@ -948,7 +954,8 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self.refresh()
 
     def _absorb_streaming_thinking_field(
-        self, action: StreamingChunkAction,
+        self,
+        action: StreamingChunkAction,
     ) -> None:
         if not (action.thinking_accumulated and _show_reasoning_text()):
             return
@@ -970,9 +977,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             self._reasoning.set_streaming_thought(thinking_text)
         # Strip thinking from the streaming preview.
         display_text = _THINK_STRIP_RE.sub('', raw).strip()
-        self._streaming_accumulated = _sanitize_visible_transcript_text(
-            display_text
-        )
+        self._streaming_accumulated = _sanitize_visible_transcript_text(display_text)
 
     # -- state transitions -------------------------------------------------
 
@@ -1263,9 +1268,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     @staticmethod
     def _search_head_says_no_match(lines: list[str]) -> bool:
         head_blob = '\n'.join(lines[:5])
-        return any(
-            frag in head_blob for frag in CLIEventRenderer._NO_MATCH_FRAGMENTS
-        )
+        return any(frag in head_blob for frag in CLIEventRenderer._NO_MATCH_FRAGMENTS)
 
     # Ripgrep-style lines: path/to/file.ext:LINE:text (LINE must be numeric).
     _PLAIN_RG_LOCATION_LINE = re.compile(r'^[^:]+:\d+:')
@@ -1285,9 +1288,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         rg = CLIEventRenderer._PLAIN_RG_LOCATION_LINE
         if not any(rg.match(ln) for ln in plain_lines[:5]):
             return None
-        match_count = sum(
-            1 for line in plain_lines if rg.match(line)
-        ) or len(plain_lines)
+        match_count = sum(1 for line in plain_lines if rg.match(line)) or len(
+            plain_lines
+        )
         return f'Found {match_count} match{"es" if match_count != 1 else ""}.'
 
     def _emit_activity_turn_header(self) -> None:

@@ -59,9 +59,7 @@ def _mcp_search_code_summary(data: dict[str, Any], content: str) -> str | None:
     if 'search_code' in content or data.get('tool_name') == 'search_code':
         results = data.get('results')
         count = (
-            len(results)
-            if isinstance(results, list)
-            else data.get('total_count', 0)
+            len(results) if isinstance(results, list) else data.get('total_count', 0)
         )
         return f'{count} matches found'
     return None

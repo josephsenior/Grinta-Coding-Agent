@@ -48,9 +48,7 @@ class RunHelpersMixin:
         _prompt_ctrl_c_hint_shown: bool
 
         def _create_prompt_session(self) -> Any: ...
-        def _set_footer_system_line(
-            self, text: str, *, kind: str = ...
-        ) -> None: ...
+        def _set_footer_system_line(self, text: str, *, kind: str = ...) -> None: ...
         def _read_non_interactive_input(self) -> Any: ...
         def _handle_parsed_command(self, *args: Any, **kwargs: Any) -> Any: ...
         def _cancel_agent(self, *args: Any, **kwargs: Any) -> Any: ...
@@ -114,9 +112,7 @@ class RunHelpersMixin:
                 title='error',
             )
         else:
-            renderer.add_system_message(
-                f'Initialization failed: {exc}', title='error'
-            )
+            renderer.add_system_message(f'Initialization failed: {exc}', title='error')
         self._running = False
         self._invalidate_prompt_session(session)
 
@@ -133,12 +129,17 @@ class RunHelpersMixin:
 
         try:
             init_ok = await self._bootstrap_init_session(
-                renderer, session, engine_init_exc,
+                renderer,
+                session,
+                engine_init_exc,
             )
             if not init_ok:
                 return
             runtime_ok = await self._bootstrap_setup_runtime(
-                renderer, session, chat_ready_done, engine_init_exc,
+                renderer,
+                session,
+                chat_ready_done,
+                engine_init_exc,
             )
             if not runtime_ok:
                 return
@@ -162,9 +163,7 @@ class RunHelpersMixin:
                 if session is not None:
                     self._set_footer_system_line('MCP tools loaded.')
                 else:
-                    renderer.add_system_message(
-                        'MCP tools loaded.', title='system'
-                    )
+                    renderer.add_system_message('MCP tools loaded.', title='system')
         finally:
             chat_ready_done.set()
             engine_init_done.set()
@@ -179,7 +178,9 @@ class RunHelpersMixin:
 
         try:
             bootstrap_state = await asyncio.to_thread(
-                _initialize_session_components, self._config, None,
+                _initialize_session_components,
+                self._config,
+                None,
             )
         except Exception as exc:
             self._handle_bootstrap_failure(exc, renderer, session, engine_init_exc)
@@ -217,7 +218,12 @@ class RunHelpersMixin:
         try:
             runtime_state = await asyncio.to_thread(
                 _setup_runtime_for_controller,
-                config_, llm_registry, session_id, True, agent, None,  # type: ignore[arg-type]
+                config_,
+                llm_registry,
+                session_id,
+                True,
+                agent,
+                None,  # type: ignore[arg-type]
                 inline_event_delivery=True,
             )
             runtime = runtime_state[0]
@@ -233,7 +239,13 @@ class RunHelpersMixin:
             self._acquire_result = acquire_result
 
             memory = await _setup_memory(
-                config_, runtime, session_id, repo_directory, None, None, agent,  # type: ignore[arg-type]
+                config_,
+                runtime,
+                session_id,
+                repo_directory,
+                None,
+                None,
+                agent,  # type: ignore[arg-type]
             )
             self._memory = memory
 
@@ -248,7 +260,10 @@ class RunHelpersMixin:
             return False
 
     def _announce_chat_ready(
-        self, agent: Any, session: Any | None, renderer: Any,
+        self,
+        agent: Any,
+        session: Any | None,
+        renderer: Any,
     ) -> None:
         if agent.config.enable_mcp:
             msg = 'Chat ready. MCP tools warming in background.'
@@ -281,7 +296,10 @@ class RunHelpersMixin:
                         'hypothesisId': 'H12_noninteractive_input_flow',
                         'location': 'backend/cli/_repl/run_helpers_mixin.py:_read_repl_input',
                         'message': 'noninteractive-read',
-                        'data': {'input_repr': repr(user_input), 'input_len': len(user_input)},
+                        'data': {
+                            'input_repr': repr(user_input),
+                            'input_len': len(user_input),
+                        },
                         'timestamp': int(time.time() * 1000),
                     }
                     lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
@@ -381,8 +399,12 @@ class RunHelpersMixin:
             controller = None
             agent_task = None
             result = await self._resume_session(
-                target, self._config, create_controller,
-                create_status_callback, run_agent_until_done, end_states,
+                target,
+                self._config,
+                create_controller,
+                create_status_callback,
+                run_agent_until_done,
+                end_states,
             )
             if result is not None:
                 controller, agent_task = result
@@ -457,7 +479,10 @@ class RunHelpersMixin:
                 'hypothesisId': 'H16_cli_task_dispatch',
                 'location': 'backend/cli/_repl/run_helpers_mixin.py:_dispatch_user_turn',
                 'message': 'user-action-dispatched',
-                'data': {'action_type': type(initial_action).__name__, 'text': text[:120]},
+                'data': {
+                    'action_type': type(initial_action).__name__,
+                    'text': text[:120],
+                },
                 'timestamp': int(time.time() * 1000),
             }
             lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
@@ -487,7 +512,9 @@ class RunHelpersMixin:
         return controller, agent_task
 
     async def _prepare_initial_action(
-        self, text: str, renderer: Any,
+        self,
+        text: str,
+        renderer: Any,
     ) -> Any:
         if self._next_action is not None:
             initial_action = self._next_action
@@ -497,9 +524,7 @@ class RunHelpersMixin:
                 renderer.start_live()
                 await renderer.add_user_message(str(msg_content))
             else:
-                renderer.add_system_message(
-                    'Condensing context\u2026', title='grinta'
-                )
+                renderer.add_system_message('Condensing context\u2026', title='grinta')
                 renderer.start_live()
             return initial_action
         self._last_user_message = text

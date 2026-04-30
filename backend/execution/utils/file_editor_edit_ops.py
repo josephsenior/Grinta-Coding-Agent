@@ -83,7 +83,9 @@ def ws_tolerant_replace(
     if count == 0 or count > 1:
         return _tool_result(
             output='',
-            error=build_no_match_error(editor, file_content, old_str, mode='normalize_ws'),
+            error=build_no_match_error(
+                editor, file_content, old_str, mode='normalize_ws'
+            ),
             new_content=file_content,
         )
 
@@ -109,7 +111,9 @@ def ws_tolerant_replace(
     if span is None:
         return _tool_result(
             output='',
-            error=build_no_match_error(editor, file_content, old_str, mode='normalize_ws'),
+            error=build_no_match_error(
+                editor, file_content, old_str, mode='normalize_ws'
+            ),
             new_content=file_content,
         )
 
@@ -158,7 +162,9 @@ def closest_match_candidates(
     return candidates[:limit]
 
 
-def build_no_match_error(editor: Any, file_content: str, old_str: str, mode: str) -> str:
+def build_no_match_error(
+    editor: Any, file_content: str, old_str: str, mode: str
+) -> str:
     base = {
         'exact': 'No exact match found for old_str.',
         'normalize_ws': 'No match found even with whitespace normalization.',
@@ -239,7 +245,9 @@ def fuzzy_safe_replace(
     if not scored:
         return _tool_result(
             output='',
-            error=build_no_match_error(editor, file_content, old_str, mode='fuzzy_safe'),
+            error=build_no_match_error(
+                editor, file_content, old_str, mode='fuzzy_safe'
+            ),
             new_content=file_content,
         )
 
@@ -286,7 +294,9 @@ def find_actual_substring_regex(editor: Any, haystack: str, needle: str) -> str 
     return None
 
 
-def find_actual_substring_for_replace(editor: Any, haystack: str, needle: str) -> str | None:
+def find_actual_substring_for_replace(
+    editor: Any, haystack: str, needle: str
+) -> str | None:
     fe = _file_editor_module()
     if needle in haystack:
         return needle
@@ -354,7 +364,9 @@ def _apply_str_replace_when_not_exact(
             fuzzy_result = fuzzy_safe_replace(editor, old_content, old_str, new_str)
             if not isinstance(fuzzy_result, fe.ToolResult):
                 return fuzzy_result
-            tolerant.error = ((tolerant.error or '') + '\n\n' + (fuzzy_result.error or ''))
+            tolerant.error = (
+                (tolerant.error or '') + '\n\n' + (fuzzy_result.error or '')
+            )
         return tolerant
     return tolerant
 
@@ -377,7 +389,9 @@ def apply_str_replace(
             new_content=old_content,
         )
 
-    return _apply_str_replace_when_not_exact(editor, old_content, old_str, new_str, file_path)
+    return _apply_str_replace_when_not_exact(
+        editor, old_content, old_str, new_str, file_path
+    )
 
 
 def resolve_edit_content(file_text_val: str | None, new_str_val: str | None) -> str:
@@ -850,7 +864,9 @@ def _collect_unified_patch_hunks(patch_text: str) -> list[tuple[str, str]]:
     return hunks
 
 
-def _apply_patch_hunks_to_content(content: str, hunks: list[tuple[str, str]]) -> str | Any:
+def _apply_patch_hunks_to_content(
+    content: str, hunks: list[tuple[str, str]]
+) -> str | Any:
     updated = content
     for old_chunk, new_chunk in hunks:
         if not old_chunk:

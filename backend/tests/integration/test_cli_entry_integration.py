@@ -43,7 +43,9 @@ def test_entry_main_launches_cli_repl_with_project_and_piped_input(
     monkeypatch.setenv('USERPROFILE', str(sim_home))
     monkeypatch.delenv('PROJECT_ROOT', raising=False)
 
-    with patch.object(sys, 'argv', ['grinta', '--project', str(tmp_path), '--no-splash']):
+    with patch.object(
+        sys, 'argv', ['grinta', '--project', str(tmp_path), '--no-splash']
+    ):
         with patch.object(sys, 'stdin', stdin):
             with patch('backend.cli.main._load_dotenv_early'):
                 with patch('backend.cli.main._setup_logging'):

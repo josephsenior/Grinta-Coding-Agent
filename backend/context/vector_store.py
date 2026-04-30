@@ -133,9 +133,7 @@ class EnhancedVectorStore:
         }
 
         logger.info(
-            'Initialized EnhancedVectorStore\n'
-            '  Backend: %s\n'
-            '  Cache: %s',
+            'Initialized EnhancedVectorStore\n  Backend: %s\n  Cache: %s',
             getattr(self.backend, 'backend_name', type(self.backend).__name__),
             'enabled' if enable_cache else 'disabled',
         )
@@ -223,9 +221,7 @@ class EnhancedVectorStore:
         cached_results = self.cache.get(query)
         if cached_results is None:
             return None
-        filtered_results = self._apply_filters(
-            cached_results, k, filter_metadata
-        )
+        filtered_results = self._apply_filters(cached_results, k, filter_metadata)
         elapsed_ms = (time.time() - start_time) * 1000
         logger.debug('Cache hit! Returned in %.1fms', elapsed_ms)
         return filtered_results
