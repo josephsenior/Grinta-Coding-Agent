@@ -740,6 +740,7 @@ class LLM(RetryMixin, DebugMixin):
 
                                         _lp = (
                                             _P(__file__).resolve().parents[2]
+                                            / 'logs'
                                             / 'debug-fee086.log'
                                         )
                                         _serialized_payload = (

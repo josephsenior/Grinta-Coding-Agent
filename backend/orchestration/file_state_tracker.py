@@ -157,7 +157,7 @@ class FileStateTracker:
                     },
                     'timestamp': int(time.time() * 1000),
                 }
-                lp = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+                lp = Path(__file__).resolve().parents[2] / 'logs' / 'debug-fee086.log'
                 with open(lp, 'a', encoding='utf-8') as _f:
                     _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
             except Exception:
