@@ -53,8 +53,8 @@ before the final `1.0.0` cut.
 - **Issue template** version hint bumped to `1.0.0rc1`.
 - **Autonomy is now a single-axis knob**. The three modes
   (`conservative` / `balanced` / `full`) share identical execution,
-  prompting, and retry behaviour. The *only* difference between them is
-  *when* the runtime stops to ask the user before running an action:
+  prompting, and retry behaviour. The _only_ difference between them is
+  _when_ the runtime stops to ask the user before running an action:
   conservative asks for every action, balanced asks only for high-risk
   actions, full never asks. The system prompt no longer branches on the
   mode (the previous "FULL AUTONOMOUS MODE" block has been replaced by a
