@@ -277,7 +277,9 @@ def show_grinta_splash(console: Any | None = None) -> None:
 
     console = console or Console()
     _figlet_lines = _build_splash_lines()
-    _D = 'dim'
+    from backend.cli.theme import STYLE_DIM, STYLE_ITALIC_DIM
+
+    _D = STYLE_DIM
 
     _TAGLINE = 'AI coding agent for the terminal.'
     _HINT = 'Describe a task in plain language · /help for commands · /quit to leave'
@@ -293,7 +295,7 @@ def show_grinta_splash(console: Any | None = None) -> None:
                 figlet.append(' ' * len(text_obj))
         parts: list = [Align.center(figlet), Text('')]
         if tagline:
-            parts.append(Text(_TAGLINE, style='italic dim', justify='center'))
+            parts.append(Text(_TAGLINE, style=STYLE_ITALIC_DIM, justify='center'))
         else:
             parts.append(Text(''))
         return Group(*parts)
@@ -308,7 +310,7 @@ def show_grinta_splash(console: Any | None = None) -> None:
         )
         rows: list = [Text(''), Align.center(panel), Text('')]
         if hint:
-            rows.append(Align.center(Text(_HINT, style='dim')))
+            rows.append(Align.center(Text(_HINT, style=STYLE_DIM)))
             rows.append(Text(''))
         return Group(*rows)
 

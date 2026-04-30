@@ -5,9 +5,6 @@ from __future__ import annotations
 import argparse
 from argparse import ArgumentParser, _SubParsersAction
 
-from backend.core.constants import DEFAULT_CONFIG_FILE
-
-
 def get_subparser(parser: ArgumentParser, name: str) -> ArgumentParser:
     """Get a subparser by name from an argument parser.
 
@@ -32,12 +29,6 @@ def get_subparser(parser: ArgumentParser, name: str) -> ArgumentParser:
 def add_common_arguments(parser: argparse.ArgumentParser) -> None:
     """Add common arguments shared between CLI and headless modes."""
     parser.add_argument(
-        '--config-file',
-        type=str,
-        default=DEFAULT_CONFIG_FILE,
-        help=f'Path to the config file (default: {DEFAULT_CONFIG_FILE} in the current directory)',
-    )
-    parser.add_argument(
         '-t', '--task', type=str, default='', help='The task for the agent to perform'
     )
     parser.add_argument(
@@ -54,8 +45,8 @@ def add_common_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         type=str,
         help=(
-            'Replace default LLM config with the specified LLM config, '
-            "e.g. 'llama3' for llm.llama3 section in settings.json"
+            'Select an LLM config key already loaded into the app config (usually "llm"). '
+            'Canonical settings are loaded from repo-root settings.json.'
         ),
     )
     parser.add_argument(
@@ -63,8 +54,7 @@ def add_common_arguments(parser: argparse.ArgumentParser) -> None:
         default=None,
         type=str,
         help=(
-            'Replace default Agent config with the specified Agent config, '
-            "e.g. 'Orchestrator' for agent.Orchestrator section in settings.json"
+            'Select an agent key already loaded into app config (for example, "Orchestrator").'
         ),
     )
     parser.add_argument(

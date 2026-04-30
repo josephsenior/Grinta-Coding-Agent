@@ -31,6 +31,7 @@ from backend.cli.theme import (
     CLR_HUD_MODEL,
     CLR_META,
     CLR_MUTED_TEXT,
+    MARK_PROMPT,
     CLR_SEP,
     CLR_STATE_RUNNING,
     CLR_STATUS_ERR,
@@ -979,7 +980,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             label = 'retry '
         else:
             label = ''
-        return f'{label}❯ '
+        return f'{label}{MARK_PROMPT} '
 
     def _prompt_placeholder(self) -> Any:
         from prompt_toolkit.formatted_text import HTML
@@ -1129,11 +1130,11 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         )
 
         # Optional fields in priority order.
+        # Keep the default prompt compact: surface only ledger + calls.
+        # MCP server and bundled skill counts remain available via `/status`.
         optionals: list[tuple[str, str]] = [
             (self._prompt_ledger_style(data['ledger']), data['ledger']),
             ('class:prompt.value', data['calls']),
-            ('class:prompt.value', data['mcp']),
-            ('class:prompt.value', data['skills']),
         ]
 
         def _len(frags: list[tuple[str, str]]) -> int:

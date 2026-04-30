@@ -4,7 +4,6 @@ Major subsystems have been extracted into focused modules:
 - ``env_loader``    – environment variable loading and type casting
 - ``model_rebuild`` – Pydantic model forward-reference resolution
 - ``cli_config``    – CLI argument parsing and config overrides
-- ``config_sections`` – per-section TOML processors
 
 This module remains the primary entry point for ``load_app_config()``
 and ``setup_config_from_args()``.
@@ -20,7 +19,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 from uuid import uuid4
 
-from pydantic import SecretStr, ValidationError
+from pydantic import SecretStr
 
 from backend.core import logger
 from backend.core.app_paths import get_canonical_settings_path
@@ -45,8 +44,6 @@ from backend.utils.import_utils import get_impl
 
 if TYPE_CHECKING:
     import argparse
-
-    from backend.core.config.compactor_config import CompactorConfig
     from backend.persistence.files import FileStore
 
 
@@ -108,25 +105,6 @@ class ConfigLoadSummary:
             self._toml_file,
             '\n'.join(lines),
         )
-
-
-# ---------------------------------------------------------------------------
-# Path helpers
-# ---------------------------------------------------------------------------
-
-
-def _to_posix_workspace_path(path: str) -> str:
-    """Convert an OS-specific absolute path to a POSIX-style path."""
-    if not path:
-        return path
-    p = path.replace('\\', '/')
-    if len(p) >= 2 and p[1] == ':':
-        p = p[2:]
-    if not p.startswith('/'):
-        p = f'/{p}'
-    while '//' in p:
-        p = p.replace('//', '/')
-    return p.rstrip('/') if p != '/' else p
 
 
 _JSON_LLM_KEYS = ('llm_model', 'llm_api_key', 'llm_base_url', 'llm_provider')
@@ -499,142 +477,6 @@ def _configure_jwt_secret(cfg: AppConfig) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Named config group loaders (agent, llm, compactor)
-# ---------------------------------------------------------------------------
-
-
-def get_agent_config_arg(
-    agent_config_arg: str, json_file: str = 'settings.json'
-) -> AgentConfig | None:
-    """Get a group of agent settings from the config file."""
-    agent_config_arg = agent_config_arg.strip('[]').removeprefix('agent.')
-    logger.app_logger.debug('Loading agent config from %s', agent_config_arg)
-    json_config = _load_json_config(json_file)
-    if json_config is None:
-        return None
-    if 'agent' in json_config and agent_config_arg in json_config['agent']:
-        return AgentConfig(**json_config['agent'][agent_config_arg])
-    logger.app_logger.debug('Loading from toml failed for %s', agent_config_arg)
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Compactor config group loader
-# ---------------------------------------------------------------------------
-
-
-def _validate_compactor_section(
-    json_config: dict, compactor_config_arg: str, json_file: str
-) -> dict | None:
-    if 'compactor_type' not in json_config:
-        logger.app_logger.error(
-            'Compactor config section [compactor.%s] not found in %s',
-            compactor_config_arg,
-            json_file,
-        )
-        return None
-
-    compactor_dict = {'type': json_config.get('compactor_type')}
-    if json_config.get('compactor_max_events') is not None:
-        compactor_dict['max_events'] = json_config.get('compactor_max_events')
-    if json_config.get('compactor_keep_first') is not None:
-        compactor_dict['keep_first'] = json_config.get('compactor_keep_first')
-    if json_config.get('compactor_llm_config') is not None:
-        compactor_dict['llm_config'] = json_config.get('compactor_llm_config')
-
-    return compactor_dict
-
-
-def _process_llm_compactor(
-    compactor_data: dict, compactor_config_arg: str, json_file: str
-) -> dict | None:
-    llm_config_name = compactor_data.get('llm_config')
-    if not llm_config_name:
-        return None
-
-    logger.app_logger.debug(
-        'Compactor [%s] requires LLM config [%s]. Loading it...',
-        compactor_config_arg,
-        llm_config_name,
-    )
-    if referenced_llm_config := get_llm_config_arg(
-        llm_config_name, json_file=json_file
-    ):
-        compactor_data['llm_config'] = referenced_llm_config
-        return compactor_data
-    logger.app_logger.error(
-        "Failed to load required LLM config '%s' for compactor '%s'.",
-        llm_config_name,
-        compactor_config_arg,
-    )
-    return None
-
-
-def _process_compactor_data(
-    compactor_data: dict, compactor_config_arg: str, json_file: str
-) -> dict | None:
-    compactor_type = compactor_data.get('type')
-    if (
-        compactor_type in ('llm', 'llm_attention', 'structured')
-        and 'llm_config' in compactor_data
-        and isinstance(compactor_data['llm_config'], str)
-    ):
-        return _process_llm_compactor(compactor_data, compactor_config_arg, json_file)
-    return compactor_data
-
-
-def get_compactor_config_arg(
-    compactor_config_arg: str, json_file: str = 'settings.json'
-) -> CompactorConfig | None:
-    """Get a group of compactor settings from the config file by name."""
-    compactor_config_arg = compactor_config_arg.strip('[]').removeprefix('compactor.')
-    logger.app_logger.debug(
-        'Loading compactor config [%s] from %s', compactor_config_arg, json_file
-    )
-
-    json_config = _load_json_config(json_file)
-    if json_config is None:
-        return None
-
-    compactor_data = _validate_compactor_section(
-        json_config, compactor_config_arg, json_file
-    )
-    if compactor_data is None:
-        return None
-
-    compactor_type = compactor_data.get('type')
-    if not compactor_type:
-        logger.app_logger.error(
-            'Missing "type" field in [compactor.%s] section of %s',
-            compactor_config_arg,
-            json_file,
-        )
-        return None
-
-    compactor_data = _process_compactor_data(
-        compactor_data, compactor_config_arg, json_file
-    )
-    if compactor_data is None:
-        return None
-
-    try:
-        from backend.core.config.compactor_config import create_compactor_config
-
-        config = create_compactor_config(compactor_type, compactor_data)
-        logger.app_logger.info(
-            'Successfully loaded compactor config [%s] from %s',
-            compactor_config_arg,
-            json_file,
-        )
-        return config
-    except (ValidationError, ValueError) as e:
-        logger.app_logger.error(
-            'Invalid compactor configuration for [%s]: %s.', compactor_config_arg, e
-        )
-        return None
-
-
-# ---------------------------------------------------------------------------
 # Agent registration
 # ---------------------------------------------------------------------------
 
@@ -679,9 +521,7 @@ def parse_arguments() -> argparse.Namespace:
 # ---------------------------------------------------------------------------
 
 
-def load_app_config(
-    set_logging_levels: bool = True, config_file: str = 'settings.json'
-) -> AppConfig:
+def load_app_config(set_logging_levels: bool = True) -> AppConfig:
     """Load the configuration from environment variables and the specified config file.
 
     **LLM API key** comes only from ``LLM_API_KEY`` in the process environment
@@ -694,14 +534,8 @@ def load_app_config(
     rebuild_config_models()
 
     # Hard-enforce a single source of truth for configuration.
-    # External config files are ignored by design; only repo-root settings.json is used.
+    # Only repo-root settings.json is used.
     resolved_config_file = get_canonical_settings_path()
-    if config_file != 'settings.json':
-        logger.app_logger.warning(
-            'Ignoring external config_file=%s; using canonical settings=%s',
-            config_file,
-            resolved_config_file,
-        )
 
     config = AppConfig()
 
@@ -761,7 +595,7 @@ def setup_config_from_args(args: argparse.Namespace) -> AppConfig:
     1. CLI parameters (e.g., -l for LLM config)
     2. Canonical repo-root ``settings.json`` only
     """
-    config = load_app_config(config_file=args.config_file)
+    config = load_app_config()
     apply_llm_config_override(config, args)
     apply_additional_overrides(config, args)
     return config

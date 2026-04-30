@@ -60,6 +60,11 @@ from backend.cli.theme import (
     CLR_USER_BORDER,
     CLR_WARN_BODY,
     CLR_WARN_ICON,
+    STYLE_BOLD_DIM,
+    STYLE_DEFAULT,
+    STYLE_DIM,
+    STYLE_EMPTY,
+    STYLE_ITALIC_DIM,
 )
 from backend.cli.tool_call_display import (
     looks_like_streaming_tool_arguments,
@@ -434,15 +439,15 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
     async def add_user_message(self, text: str) -> None:
         """Print a user turn — rounded panel, high-contrast label."""
-        body = Text((text or '').rstrip(), style='default')
+        body = Text((text or '').rstrip(), style=STYLE_DEFAULT)
         panel = Panel(
             Padding(body, CALLOUT_PANEL_PADDING),
-            title=Text('You', style='bold dim'),
+            title=Text('You', style=STYLE_BOLD_DIM),
             title_align='left',
             box=box.ROUNDED,
             border_style=CLR_USER_BORDER,
             padding=(0, 0),
-            style='default',
+            style=STYLE_DEFAULT,
         )
         framed = frame_transcript_body(panel)
         spacer = frame_transcript_body(Text(''))
@@ -517,7 +522,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
         self._print_or_buffer(Text(''))
         self._print_or_buffer(
-            Padding(Rule(title, style='dim'), (1, 0, 1, 0), expand=False)
+            Padding(Rule(title, style=STYLE_DIM), (1, 0, 1, 0), expand=False)
         )
         self._print_or_buffer(Padding(Markdown(text), (0, 0, 1, 0), expand=False))
         self._print_or_buffer(Text(''))
@@ -797,7 +802,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         ):
             if not first:
                 line.append(sep[0], style=sep[1])
-            line.append(content, style='dim')
+            line.append(content, style=STYLE_DIM)
             first = False
         return line
 
@@ -807,14 +812,14 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         autonomy = hud.autonomy_level or 'balanced'
         row1 = Text()
         row1.append('GRINTA', style=CLR_BRAND)
-        row1.append('  ', style='')
+        row1.append('  ', style=STYLE_EMPTY)
         row1.append(
             f' {state_label.upper()} ',
             style=cls._FAKE_PROMPT_BADGE_STYLES.get(
                 state_label, CLR_STATUS_OK + ' bold'
             ),
         )
-        row1.append('  ', style='')
+        row1.append('  ', style=STYLE_EMPTY)
         auto_style = CLR_AUTONOMY_BALANCED
         for needle, style in cls._FAKE_PROMPT_AUTONOMY_STYLES.items():
             if needle in autonomy:
@@ -1552,11 +1557,11 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             body.append(
                 Text(
                     'Tail preview — full reply will appear in chat when streaming finishes',
-                    style='dim italic',
+                    style=STYLE_ITALIC_DIM,
                 )
             )
         if not self._streaming_final:
-            body.append(Text('Still streaming…', style='dim'))
+            body.append(Text('Still streaming…', style=STYLE_DIM))
         return format_callout_panel(
             'Draft Reply',
             Group(*body),

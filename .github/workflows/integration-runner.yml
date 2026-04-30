@@ -109,7 +109,7 @@ jobs:
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           MAX_ITERATIONS: 10
         run: |
-          echo '{"llm":{"eval":{"model":"'$LLM_MODEL'","api_key":"'$LLM_API_KEY'","base_url":"'$LLM_BASE_URL'","temperature":0}}}' > settings.json
+          echo '{"llm_model":"'$LLM_MODEL'","llm_base_url":"'$LLM_BASE_URL'"}' > settings.json
 
       - name: Build environment
         run: make build
@@ -138,7 +138,7 @@ jobs:
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           MAX_ITERATIONS: 10
         run: |
-          echo '{"llm":{"eval":{"model":"'$LLM_MODEL'","api_key":"'$LLM_API_KEY'","base_url":"'$LLM_BASE_URL'","temperature":0}}}' > settings.json
+          echo '{"llm_model":"'$LLM_MODEL'","llm_base_url":"'$LLM_BASE_URL'"}' > settings.json
 
       - name: Run integration test evaluation for DeepSeek
         env:
@@ -166,7 +166,7 @@ jobs:
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           MAX_ITERATIONS: 15
         run: |
-          echo '{"llm":{"eval":{"model":"'$LLM_MODEL'","api_key":"'$LLM_API_KEY'","base_url":"'$LLM_BASE_URL'","temperature":0}}}' > settings.json
+          echo '{"llm_model":"'$LLM_MODEL'","llm_base_url":"'$LLM_BASE_URL'"}' > settings.json
       - name: Run integration test evaluation for VisualNavigator (DeepSeek)
         env:
           RUNTIME_FORCE_REBUILD: True

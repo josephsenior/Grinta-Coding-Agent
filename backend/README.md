@@ -60,3 +60,15 @@ python backend/scripts/build/compile_protos.py
 ## Development
 
 Backend code imports from `backend.*`. The supported entrypoints are the CLI under `backend/cli/` and the portable launcher in `launch/`.
+
+### CLI Mixin Typing Convention
+
+When extracting logic into CLI mixins (for example in `backend/cli/_repl/` or
+`backend/cli/_event_renderer/`), define host interfaces in
+`backend/cli/_typing.py` and import them into mixins instead of re-declaring
+`TYPE_CHECKING`-only host stubs per file.
+
+- Keep shared host contracts in `backend/cli/_typing.py` as `Protocol` classes.
+- In mixins, cast `self` to the relevant host protocol where needed.
+- Prefer this shared protocol approach over file-local structural stubs so
+  typing and lint behavior stays consistent across extracted modules.

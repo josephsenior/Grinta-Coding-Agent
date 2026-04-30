@@ -32,6 +32,12 @@ from backend.cli.theme import (
     CLR_ERR_ICON,
     CLR_INFO_BODY,
     CLR_INFO_ICON,
+    MARK_ERR,
+    MARK_INFO,
+    MARK_OK,
+    STYLE_DEFAULT,
+    STYLE_DIM,
+    STYLE_EMPTY,
     CLR_OK_BODY,
     CLR_OK_ICON,
     CLR_REASONING_COMMITTED,
@@ -65,21 +71,21 @@ _ACTIVITY_SECONDARY_INDENT = (
 def format_activity_primary(verb: str, detail: str) -> Text:
     """Bold verb + detail on one line (no ``>`` prefix)."""
     line = Text()
-    line.append(_ACTIVITY_PRIMARY_INDENT, style='')
+    line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
     line.append(
         f'{(verb or "Did").strip():<{_ACTIVITY_VERB_WIDTH}}',
-        style='dim',
+        style=STYLE_DIM,
     )
     d = (detail or '').strip()
     if d:
-        line.append(_ACTIVITY_GAP, style='')
-        line.append(d, style='default')
+        line.append(_ACTIVITY_GAP, style=STYLE_EMPTY)
+        line.append(d, style=STYLE_DEFAULT)
     return line
 
 
 def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
     """Continuation row for inline stats and previews inside activity cards."""
-    line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
+    line = Text(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
     styles = {
         'ok': CLR_OK_BODY,
         'err': CLR_ERR_BODY,
@@ -93,12 +99,12 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
 def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> Text:
     """Continuation row for user-visible results within an activity card."""
     styles: dict[str, tuple[str, str, str]] = {
-        'ok': ('✓', CLR_OK_ICON, CLR_OK_BODY),
-        'err': ('✗', CLR_ERR_ICON, CLR_ERR_BODY),
-        'neutral': ('•', CLR_INFO_ICON, CLR_INFO_BODY),
+        'ok': (MARK_OK, CLR_OK_ICON, CLR_OK_BODY),
+        'err': (MARK_ERR, CLR_ERR_ICON, CLR_ERR_BODY),
+        'neutral': (MARK_INFO, CLR_INFO_ICON, CLR_INFO_BODY),
     }
     icon, icon_style, text_style = styles.get(kind, styles['neutral'])
-    line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
+    line = Text(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
     line.append(f'{icon} ', style=icon_style)
     line.append((message or '').strip(), style=text_style)
     return line
@@ -115,14 +121,14 @@ def format_activity_delta_secondary(
     if not added and not removed:
         return None
 
-    line = Text(_ACTIVITY_SECONDARY_INDENT, style='')
+    line = Text(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
     wrote = False
     if added:
         line.append(f'+ {added:,} {added_label}', style=f'dim {CLR_DIFF_ADD}')
         wrote = True
     if removed:
         if wrote:
-            line.append('  ', style='dim')
+            line.append('  ', style=STYLE_DIM)
         line.append(f'- {removed:,} {removed_label}', style=f'dim {CLR_DIFF_REM}')
     return line
 
@@ -253,6 +259,6 @@ def format_callout_panel(
 def format_ground_truth_tool_line(label: str) -> Text:
     """One structured transcript row for a tool invocation (ASCII prefix, no emoji)."""
     line = Text()
-    line.append(_GROUND_PREFIX, style='dim')
-    line.append((label or '').strip(), style='')
+    line.append(_GROUND_PREFIX, style=STYLE_DIM)
+    line.append((label or '').strip(), style=STYLE_EMPTY)
     return line

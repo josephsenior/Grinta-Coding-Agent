@@ -2,7 +2,7 @@
 
 ## Overview
 
-The application uses a flexible configuration system that allows settings to be defined through environment variables, TOML files, and command-line arguments. The configuration is managed through the `backend/core/config/` package.
+The application uses a canonical configuration system centered on repo-root `settings.json` plus environment variables. The configuration is managed through the `backend/core/config/` package.
 
 ## Configuration Classes
 
@@ -14,7 +14,7 @@ The main configuration classes are:
 - `RuntimeConfig`: Configuration for the runtime environment
 - `SecurityConfig`: Configuration for security settings
 
-These classes are defined as dataclasses, with class attributes holding default values for all fields.
+These classes are Pydantic models with explicit defaults and validation.
 
 ## Loading Configuration from Environment Variables
 
@@ -22,7 +22,7 @@ The `load_from_env` function in the config package is responsible for loading co
 
 ### Naming Convention for Environment Variables
 
-- Prefix: uppercase name of the configuration class followed by an underscore (e.g., `LLM_`, `AGENT_`)
+- Prefix: uppercase field path with underscores (e.g., `LLM_`, `AGENT_`, `EVENT_STREAM_`)
 - Field Names: all uppercase
 - Full Variable Name: Prefix + Field Name (e.g., `LLM_API_KEY`, `AGENT_MEMORY_ENABLED`)
 
@@ -32,7 +32,7 @@ The `load_from_env` function in the config package is responsible for loading co
 export LLM_API_KEY='your_api_key_here'
 export LLM_MODEL='gpt-4'
 export AGENT_MEMORY_ENABLED='true'
-export RUNTIME_TIMEOUT='300'
+export RUNTIME_CONFIG_TIMEOUT='300'
 ```
 
 ## Type Handling
@@ -58,12 +58,12 @@ Be cautious when setting sensitive information like API keys in environment vari
 The `load_app_config()` function is the recommended way to initialize your configuration. It performs the following steps:
 
 1. Creates an instance of `AppConfig`
-2. Loads settings from the `config.toml` file (if present)
-3. Loads settings from environment variables, overriding TOML settings if applicable
+2. Loads settings from environment variables
+3. Loads settings from canonical repo-root `settings.json`
 4. Applies final tweaks and validations to the configuration, falling back to the default values specified in the code
 5. Optionally sets global logging levels based on the configuration
 
-There are also command line args, which may work to override other sources.
+CLI arguments can override selected runtime fields after config load.
 
 Here's an example of how to use `load_app_config()`:
 
@@ -88,12 +88,7 @@ By using `load_app_config()`, you ensure that all configuration sources are prop
 
 ## Additional Configuration Methods
 
-While this document focuses on environment variable configuration, the application also supports:
-
-- Loading from TOML files
-- Parsing command-line arguments
-
-These methods are handled by separate functions in the config package.
+While this document focuses on environment variables, CLI overrides are also supported for selected fields.
 
 ## Conclusion
 

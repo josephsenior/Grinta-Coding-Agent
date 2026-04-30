@@ -24,6 +24,8 @@ from backend.cli.theme import (
     CLR_META,
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
+    MARK_OK,
+    STYLE_DIM,
 )
 
 
@@ -81,13 +83,13 @@ def _build_session_table() -> Table:
         border_style=CLR_CARD_BORDER,
         show_lines=False,
     )
-    table.add_column('#', style='dim')
+    table.add_column('#', style=STYLE_DIM)
     table.add_column('ID')
     table.add_column('Title')
-    table.add_column('Model', style='dim')
+    table.add_column('Model', style=STYLE_DIM)
     table.add_column('Events', justify='right')
     table.add_column('Cost', justify='right')
-    table.add_column('Updated', style='dim')
+    table.add_column('Updated', style=STYLE_DIM)
     return table
 
 
@@ -221,11 +223,11 @@ def cmd_export(console: Console, target: str, out_path: str) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     if out.suffix.lower() == '.zip':
         archive = shutil.make_archive(str(out.with_suffix('')), 'zip', root_dir=path)
-        console.print(f'[{CLR_STATUS_OK}]✓[/] Wrote [bold]{archive}[/bold]')
+        console.print(f'[{CLR_STATUS_OK}]{MARK_OK}[/] Wrote [bold]{archive}[/bold]')
     else:
         # Tree copy.
         shutil.copytree(path, out, dirs_exist_ok=True)
-        console.print(f'[{CLR_STATUS_OK}]✓[/] Copied to [bold]{out}[/bold]')
+        console.print(f'[{CLR_STATUS_OK}]{MARK_OK}[/] Copied to [bold]{out}[/bold]')
     return 0
 
 
@@ -246,7 +248,7 @@ def cmd_delete(console: Console, target: str, *, yes: bool = False) -> int:
             console.print(f'[{CLR_META}]Aborted.[/]')
             return 0
     shutil.rmtree(path, ignore_errors=True)
-    console.print(f'[{CLR_STATUS_OK}]✓[/] Deleted [bold]{sid}[/bold]')
+    console.print(f'[{CLR_STATUS_OK}]{MARK_OK}[/] Deleted [bold]{sid}[/bold]')
     return 0
 
 
@@ -277,7 +279,7 @@ def cmd_prune(console: Console, *, days: int = 30, yes: bool = False) -> int:
             return 0
     for sid, path in to_delete:
         shutil.rmtree(path, ignore_errors=True)
-        console.print(f'  [{CLR_STATUS_OK}]✓[/] deleted {sid}')
+        console.print(f'  [{CLR_STATUS_OK}]{MARK_OK}[/] deleted {sid}')
     return 0
 
 

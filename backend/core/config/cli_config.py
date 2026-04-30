@@ -92,9 +92,7 @@ def get_llm_config_arg(
     return llm
 
 
-def _resolve_llm_config_from_cli(
-    llm_config_name: str, config: AppConfig, config_file: str
-) -> LLMConfig:
+def _resolve_llm_config_from_cli(llm_config_name: str, config: AppConfig) -> LLMConfig:
     """Resolve LLM config from CLI parameter."""
     if llm_config_name in config.llms:
         logger.app_logger.debug(
@@ -118,7 +116,7 @@ def apply_llm_config_override(config: AppConfig, args: argparse.Namespace) -> No
         return
 
     logger.app_logger.debug('CLI specified LLM config: %s', args.llm_config)
-    llm_config = _resolve_llm_config_from_cli(args.llm_config, config, args.config_file)
+    llm_config = _resolve_llm_config_from_cli(args.llm_config, config)
     config.set_llm_config(llm_config)
     logger.app_logger.debug('Set LLM config from CLI parameter: %s', args.llm_config)
 

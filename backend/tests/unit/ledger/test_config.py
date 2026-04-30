@@ -84,7 +84,7 @@ class TestEventRuntimeDefaults:
 
 
 class TestGetEventRuntimeDefaults:
-    """Test configuration resolution with config file and env fallback."""
+    """Test configuration resolution via app config and env fallback."""
 
     def setup_method(self):
         """Clear LRU cache before each test."""
@@ -96,7 +96,7 @@ class TestGetEventRuntimeDefaults:
 
     @patch('backend.core.config.config_loader.load_app_config')
     def test_loads_from_app_config(self, mock_load_config):
-        """Test loads configuration from App config file."""
+        """Test loads configuration from AppConfig event_stream."""
         # Mock config with event_stream section
         mock_config = MagicMock()
         mock_event_cfg = MagicMock()
@@ -184,6 +184,22 @@ class TestGetEventRuntimeDefaults:
                 'coalesce_max_batch': 40,
             },
         )
+
+    def test_prefers_event_stream_environment_namespace(self, monkeypatch):
+        """Test canonical EVENT_STREAM_* env vars are honored."""
+        get_event_runtime_defaults.cache_clear()
+        monkeypatch.setenv('EVENT_STREAM_MAX_QUEUE_SIZE', '4100')
+        monkeypatch.setenv('EVENT_STREAM_DROP_POLICY', 'BLOCK')
+        monkeypatch.setenv('EVENT_STREAM_WORKERS', '5')
+
+        with patch(
+            'backend.core.config.config_loader.load_app_config', side_effect=Exception
+        ):
+            defaults = get_event_runtime_defaults()
+
+        assert defaults.max_queue_size == 4100
+        assert defaults.drop_policy == 'block'
+        assert defaults.workers == 5
 
     def test_coalesce_bool_parsing(self, monkeypatch):
         """Test coalesce boolean environment parsing."""

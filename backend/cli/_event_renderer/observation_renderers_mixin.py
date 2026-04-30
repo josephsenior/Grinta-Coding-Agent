@@ -5,12 +5,10 @@ under the per-file LOC budget.  All methods rely on attributes/methods
 defined on ``CLIEventRenderer``; this mixin is meant to be combined with
 that class via multiple inheritance.
 """
-# pylint: disable=assignment-from-no-return,no-member
-
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any, cast
 
 from rich import box
 from rich.padding import Padding
@@ -54,6 +52,7 @@ from backend.cli._event_renderer.text_utils import (
 from backend.cli._event_renderer.text_utils import (
     strip_pty_echo as _strip_pty_echo,
 )
+from backend.cli._typing import ObservationRenderersHost
 from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
 from backend.cli.theme import (
     CLR_OUTPUT_PANEL_BORDER,
@@ -98,35 +97,6 @@ logger = logging.getLogger(__name__)
 
 class ObservationRenderersMixin:
     """Per-observation ``_render_*_observation`` renderers + dispatch."""
-
-    # Attributes and helpers supplied by the concrete ``CLIEventRenderer``
-    # host class. All typed ``Any`` to avoid conflicts with concrete annotations.
-    if TYPE_CHECKING:
-        _console: Any
-        _hud: Any
-        _reasoning: Any
-        _pending_activity_card: Any
-        _pending_shell_command: str | None
-        _pending_shell_action: tuple[str, str] | None
-        _pending_shell_title: str | None
-        _delegate_workers: Any
-        _delegate_batch_id: Any
-        _stream_fallback_count: Any
-
-        def refresh(self) -> None: ...
-        def _apply_reasoning_text(self, *a: Any, **kw: Any) -> Any: ...
-        def _stop_reasoning(self, *a: Any, **kw: Any) -> Any: ...
-        def _ensure_reasoning(self, *a: Any, **kw: Any) -> Any: ...
-        def _flush_pending_activity_card(self, *a: Any, **kw: Any) -> Any: ...
-        def _flush_pending_tool_cards(self, *a: Any, **kw: Any) -> Any: ...
-        def _clear_streaming_preview(self, *a: Any, **kw: Any) -> Any: ...
-        def _print_or_buffer(self, *a: Any, **kw: Any) -> Any: ...
-        def _emit_activity_turn_header(self, *a: Any, **kw: Any) -> Any: ...
-        def _append_history(self, *a: Any, **kw: Any) -> Any: ...
-        def _take_pending_activity_card(self, *a: Any, **kw: Any) -> Any: ...
-        def _render_pending_activity_card(self, *a: Any, **kw: Any) -> Any: ...
-        def _set_delegate_panel(self, *a: Any, **kw: Any) -> Any: ...
-        def _set_task_panel(self, *a: Any, **kw: Any) -> Any: ...
 
     # Dispatch table for :meth:`_handle_observation` — maps observation class
     # to the method that knows how to render it.
@@ -277,7 +247,7 @@ class ObservationRenderersMixin:
         from backend.cli.diff_renderer import DiffPanel
 
         path = getattr(obs, 'path', '')
-        pending = self._take_pending_activity_card('file_edit')
+        pending = cast(Any, self._take_pending_activity_card('file_edit'))
         self._emit_activity_turn_header()
         self._print_or_buffer(
             Padding(
@@ -294,7 +264,7 @@ class ObservationRenderersMixin:
     def _render_file_write_observation(self, obs: FileWriteObservation) -> None:
         del obs
         self._stop_reasoning()
-        pending = self._take_pending_activity_card('file_write')
+        pending = cast(Any, self._take_pending_activity_card('file_write'))
         line_count = 0
         if pending and pending.payload:
             raw_line_count = pending.payload.get('line_count', 0)
@@ -433,15 +403,17 @@ class ObservationRenderersMixin:
         *,
         force_visible_status: bool,
     ) -> None:
+        host = cast(ObservationRenderersHost, self)
         content = getattr(obs, 'content', '')
         if not content:
             return
         lower_c = content.lower()
         if 'stream timed out' in lower_c or 'retrying without streaming' in lower_c:
-            self._stream_fallback_count += 1
+            count = int(getattr(host, '_stream_fallback_count', 0)) + 1
+            setattr(host, '_stream_fallback_count', count)
             logger.warning(
                 'stream_fallback_retry: count=%d content=%r',
-                self._stream_fallback_count,
+                count,
                 content[:120],
             )
             self._append_history(_build_llm_stream_fallback_panel())
@@ -460,7 +432,7 @@ class ObservationRenderersMixin:
         self._stop_reasoning()
         content = getattr(obs, 'content', '') or ''
         n_lines = len(content.splitlines()) if content else 0
-        pending = self._take_pending_activity_card('file_read')
+        pending = cast(Any, self._take_pending_activity_card('file_read'))
         result_message = self._file_read_result_message(content, n_lines)
         if pending is not None:
             self._render_pending_activity_card(
@@ -492,7 +464,7 @@ class ObservationRenderersMixin:
         self._stop_reasoning()
         content = getattr(obs, 'content', '')
         friendly = mcp_result_user_preview(content)
-        pending = self._take_pending_activity_card('mcp')
+        pending = cast(Any, self._take_pending_activity_card('mcp'))
         if pending is not None:
             self._render_pending_activity_card(
                 pending,
@@ -606,7 +578,7 @@ class ObservationRenderersMixin:
         self._stop_reasoning()
         available = getattr(obs, 'available', True)
         content = getattr(obs, 'content', '') or ''
-        pending = self._take_pending_activity_card('lsp')
+        pending = cast(Any, self._take_pending_activity_card('lsp'))
         result_message = self._lsp_result_message(available=available, content=content)
         if pending is not None:
             self._render_pending_activity_card(
@@ -686,7 +658,7 @@ class ObservationRenderersMixin:
         obs: DelegateTaskObservation,
     ) -> None:
         self._stop_reasoning()
-        pending = self._take_pending_activity_card('delegate')
+        pending = cast(Any, self._take_pending_activity_card('delegate'))
         result_message, result_kind, extra_lines = _summarize_delegate_observation(obs)
         if pending is not None:
             self._render_pending_activity_card(

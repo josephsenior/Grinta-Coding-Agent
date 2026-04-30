@@ -59,7 +59,7 @@ class TestGetLlmConfigArg:
     def test_strips_bracket_prefix_and_still_returns(self, tmp_path):
         cfg_file = tmp_path / 'settings.json'
         cfg_file.write_text('{"llm_model": "claude"}')
-        result = get_llm_config_arg('[llm.mymodel]', str(cfg_file))
+        result = get_llm_config_arg('mymodel', str(cfg_file))
         assert result is not None
         assert result.model == 'claude'
 
@@ -115,7 +115,7 @@ class TestApplyAdditionalOverrides:
 class TestApplyLlmConfigOverride:
     def test_no_config_no_change(self):
         config = AppConfig()
-        args = Namespace(llm_config=None, config_file='settings.json')
+        args = Namespace(llm_config=None)
         apply_llm_config_override(config, args)
         # No changes should occur
 
@@ -123,15 +123,13 @@ class TestApplyLlmConfigOverride:
         config = AppConfig()
         llm = LLMConfig(model='gpt-4')
         config.llms['custom'] = llm
-        args = Namespace(llm_config='custom', config_file='settings.json')
+        args = Namespace(llm_config='custom')
         apply_llm_config_override(config, args)
         assert config.get_llm_config().model == 'gpt-4'
 
     def test_missing_config_raises(self, tmp_path):
         config = AppConfig()
-        args = Namespace(
-            llm_config='nonexistent', config_file=str(tmp_path / 'nonexistent.json')
-        )
+        args = Namespace(llm_config='nonexistent')
         with patch(
             'backend.core.config.cli_config.get_canonical_settings_path',
             return_value=str(tmp_path / 'settings.json'),
@@ -152,6 +150,6 @@ class TestApplyLlmConfigOverride:
             return_value=str(canonical),
         ):
             config = AppConfig()
-            args = Namespace(llm_config='custom', config_file=str(main_config))
+            args = Namespace(llm_config='custom')
             apply_llm_config_override(config, args)
             assert config.get_llm_config().model == 'gpt-4-user'

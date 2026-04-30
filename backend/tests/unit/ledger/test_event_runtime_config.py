@@ -126,6 +126,24 @@ class TestGetEventRuntimeDefaults:
 
     @patch(
         'backend.core.config.config_loader.load_app_config',
+        side_effect=RuntimeError('fail'),
+    )
+    def test_prefers_event_stream_namespace(self, mock_load):
+        """Canonical EVENT_STREAM_* env vars should be preferred over legacy APP_* vars."""
+        get_event_runtime_defaults.cache_clear()
+        env = {
+            'EVENT_STREAM_MAX_QUEUE_SIZE': '750',
+            'APP_EVENTSTREAM_MAX_QUEUE': '500',
+            'EVENT_STREAM_WORKERS': '6',
+            'APP_EVENTSTREAM_WORKERS': '2',
+        }
+        with patch.dict(os.environ, env, clear=True):
+            result = get_event_runtime_defaults()
+            assert result.max_queue_size == 750
+            assert result.workers == 6
+
+    @patch(
+        'backend.core.config.config_loader.load_app_config',
         side_effect=Exception('fail'),
     )
     def test_workers_minimum_one(self, mock_load):

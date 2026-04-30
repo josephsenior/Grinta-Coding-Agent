@@ -20,6 +20,10 @@ from backend.cli.theme import (
     CLR_RISK_HIGH,
     CLR_RISK_LOW,
     CLR_RISK_MEDIUM,
+    STYLE_BOLD,
+    STYLE_BOLD_DIM,
+    STYLE_DEFAULT,
+    STYLE_DIM,
 )
 from backend.core.enums import ActionSecurityRisk, AgentState
 from backend.ledger.action import (
@@ -122,14 +126,14 @@ def render_confirmation(
 
     table = Table(
         show_header=True,
-        header_style='bold dim',
-        border_style='dim',
+        header_style=STYLE_BOLD_DIM,
+        border_style=STYLE_DIM,
         show_lines=False,
         box=box.SIMPLE,
         pad_edge=False,
     )
-    table.add_column('Target', style='dim', no_wrap=True, overflow='fold')
-    table.add_column('What will run', style='default', overflow='fold')
+    table.add_column('Target', style=STYLE_DIM, no_wrap=True, overflow='fold')
+    table.add_column('What will run', style=STYLE_DEFAULT, overflow='fold')
     table.add_column('Risk', justify='center', no_wrap=True)
 
     table.add_row(
@@ -141,7 +145,7 @@ def render_confirmation(
     # Risk badge in the title gives an at-a-glance signal even when the row
     # is scrolled out of focus on small terminals.
     title = Text()
-    title.append('Approve this action  ', style='bold')
+    title.append('Approve this action  ', style=STYLE_BOLD)
     title.append(f' {risk_text} ', style=f'reverse {risk_style}')
 
     console.print()

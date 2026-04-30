@@ -9,7 +9,7 @@ that class via multiple inheritance.
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any
+from typing import Any, cast
 
 from rich.console import Group
 from rich.padding import Padding
@@ -36,6 +36,7 @@ from backend.cli._event_renderer.text_utils import (
 from backend.cli._event_renderer.text_utils import (
     sync_reasoning_after_tool_line as _sync_reasoning_after_tool_line,
 )
+from backend.cli._typing import ActionRenderersHost
 from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
     ACTIVITY_CARD_TITLE_BROWSER,
@@ -55,6 +56,8 @@ from backend.cli.theme import (
     CLR_OPTION_RECOMMENDED,
     CLR_OPTION_TEXT,
     CLR_QUESTION_TEXT,
+    MARK_INFO,
+    STYLE_DIM,
 )
 from backend.cli.tool_call_display import (
     format_tool_activity_rows,
@@ -95,36 +98,6 @@ from backend.ledger.action import (
 
 class ActionRenderersMixin:
     """Per-action ``_render_*_action`` renderers + dispatch."""
-
-    # Attributes and helpers supplied by the concrete ``CLIEventRenderer``
-    # host class. All typed ``Any`` so the stubs don't conflict with the
-    # concrete initialisations in event_renderer.py.
-    if TYPE_CHECKING:
-        _reasoning: Any
-        _cli_tool_icons: Any
-        _pending_shell_action: tuple[str, str] | None
-        _pending_shell_command: str | None
-        _pending_shell_title: str | None
-        _pending_shell_is_internal: bool
-        _pending_activity_card: Any
-
-        def refresh(self) -> None: ...
-        def _apply_reasoning_text(self, *a: Any, **kw: Any) -> Any: ...
-        def _stop_reasoning(self, *a: Any, **kw: Any) -> Any: ...
-        def _ensure_reasoning(self, *a: Any, **kw: Any) -> Any: ...
-        def _clear_streaming_preview(self, *a: Any, **kw: Any) -> Any: ...
-        def _flush_pending_tool_cards(self, *a: Any, **kw: Any) -> Any: ...
-        def _flush_pending_activity_card(self, *a: Any, **kw: Any) -> Any: ...
-        def _flush_pending_shell_action(self, *a: Any, **kw: Any) -> Any: ...
-        def _handle_streaming_chunk(self, *a: Any, **kw: Any) -> Any: ...
-        def _print_or_buffer(self, *a: Any, **kw: Any) -> Any: ...
-        def _emit_activity_turn_header(self, *a: Any, **kw: Any) -> Any: ...
-        def _append_assistant_message(self, *a: Any, **kw: Any) -> Any: ...
-        def _append_history(self, *a: Any, **kw: Any) -> Any: ...
-        def _buffer_pending_activity(self, *a: Any, **kw: Any) -> Any: ...
-        def _print_activity(self, *a: Any, **kw: Any) -> Any: ...
-        def _set_task_panel(self, *a: Any, **kw: Any) -> Any: ...
-        def _reset_delegate_panel(self, *a: Any, **kw: Any) -> Any: ...
 
     # Dispatch table for :meth:`_handle_agent_action` — maps action class to
     # the method that knows how to render it.  Looked up via ``isinstance``
@@ -192,6 +165,7 @@ class ActionRenderersMixin:
         self._handle_streaming_chunk(action)
 
     def _render_message_action(self, action: MessageAction) -> None:
+        host = cast(ActionRenderersHost, self)
         self._flush_pending_tool_cards()
         # Suppress mid-task internal messages that were intercepted by the
         # event router (e.g. verbose model text between checkpoint and next
@@ -207,7 +181,7 @@ class ActionRenderersMixin:
             cleaned_cot = _sanitize_visible_transcript_text(cot)
             if cleaned_cot:
                 self._ensure_reasoning()
-                self._reasoning.update_thought(cleaned_cot)
+                host._reasoning.update_thought(cleaned_cot)
         self._stop_reasoning()
         self._clear_streaming_preview()
         display_content = _sanitize_visible_transcript_text(action.content or '')
@@ -638,8 +612,8 @@ class ActionRenderersMixin:
         uncertainty_parts: list[Any] = []
         for concern in concerns[:5]:
             concern_line = Text()
-            concern_line.append('• ', style='dim')
-            concern_line.append(str(concern), style='dim')
+            concern_line.append(f'{MARK_INFO} ', style=STYLE_DIM)
+            concern_line.append(str(concern), style=STYLE_DIM)
             uncertainty_parts.append(concern_line)
         if info_needed:
             uncertainty_parts.append(Text(f'Need: {info_needed}', style=CLR_QUESTION_TEXT))
@@ -661,7 +635,7 @@ class ActionRenderersMixin:
         rationale = getattr(action, 'rationale', '')
         proposal_parts: list[Any] = []
         if rationale:
-            proposal_parts.append(Text(rationale, style='dim'))
+            proposal_parts.append(Text(rationale, style=STYLE_DIM))
         for i, opt in enumerate(options):
             label = opt.get('name', opt.get('title', f'Option {i + 1}'))
             desc = opt.get('description', '')
@@ -677,7 +651,7 @@ class ActionRenderersMixin:
             )
             proposal_parts.append(proposal_line)
             if desc:
-                proposal_parts.append(Text(f'   {desc}', style='dim'))
+                proposal_parts.append(Text(f'   {desc}', style=STYLE_DIM))
         if proposal_parts:
             self._append_history(
                 format_callout_panel(

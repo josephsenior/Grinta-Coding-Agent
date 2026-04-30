@@ -18,8 +18,9 @@ import contextlib
 import logging
 import os
 import time
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
+from backend.cli._typing import SessionLifecycleHost
 from backend.cli.confirmation import build_confirmation_action, render_confirmation
 from backend.core.config import AppConfig
 from backend.core.enums import AgentState, EventSource
@@ -29,20 +30,6 @@ logger = logging.getLogger(__name__)
 
 class SessionLifecycleMixin:
     """Mixin providing agent-wait, interrupt, resume and confirmation flows."""
-
-    # Attributes provided by the concrete ``backend.cli.repl.Repl`` host class.
-    if TYPE_CHECKING:
-        _memory: Any
-        _runtime: Any
-        _agent: Any
-        _llm_registry: Any
-        _conversation_stats: Any
-        _event_stream: Any
-        _acquire_result: Any
-        _renderer: Any
-        _console: Any
-        _hud: Any
-        _reasoning: Any
 
     # -- wait for agent to be idle -----------------------------------------
 
@@ -104,9 +91,10 @@ class SessionLifecycleMixin:
         # to a positive value to re-enable limits.
         hard_timeout, cmd_timeout = self._resolve_hard_timeouts()
         start = time.monotonic()
+        host = cast(SessionLifecycleHost, self)
 
         while True:
-            renderer = cast(Any, self._renderer)
+            renderer = host._renderer
 
             # Drain queued events and render — this is the ONLY place
             # where Live.update() happens during agent execution.

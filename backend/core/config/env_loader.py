@@ -138,7 +138,7 @@ def _set_attr_from_env(
 def load_from_env(
     cfg: AppConfig, env_or_toml_dict: dict | MutableMapping[str, str]
 ) -> None:
-    """Set config attributes from environment variables or TOML dictionary."""
+    """Set config attributes from environment variables."""
     env_dict = dict(env_or_toml_dict)
 
     _set_attr_from_env(cfg, env_dict)

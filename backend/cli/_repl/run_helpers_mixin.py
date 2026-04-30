@@ -5,21 +5,50 @@ user-turn dispatch, and finalization helpers — extracted from
 :mod:`backend.cli.repl` to keep the main module under the project's per-file
 LOC budget.
 """
-# pylint: disable=assignment-from-no-return
-
 from __future__ import annotations
 
 import asyncio
 import contextlib
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+from backend.cli._typing import RunHelpersHost
 from backend.cli.event_renderer import CLIEventRenderer
 from backend.core.config import AppConfig
 from backend.core.enums import AgentState, EventSource
 from backend.ledger.action import MessageAction
 
 logger = logging.getLogger(__name__)
+
+
+def _create_prompt_session_from_host(host: RunHelpersHost) -> Any:
+    return host._create_prompt_session()
+
+
+def _handle_parsed_command_from_host(
+    host: RunHelpersHost,
+    parsed_command: Any,
+) -> bool:
+    return bool(host._handle_parsed_command(parsed_command))
+
+
+async def _resume_session_from_host(
+    host: RunHelpersHost,
+    target: str,
+    config: Any,
+    create_controller: Any,
+    create_status_callback: Any,
+    run_agent_until_done: Any,
+    end_states: list[AgentState],
+) -> Any:
+    return await host._resume_session(
+        target,
+        config,
+        create_controller,
+        create_status_callback,
+        run_agent_until_done,
+        end_states,
+    )
 
 
 class RunHelpersMixin:
@@ -66,7 +95,8 @@ class RunHelpersMixin:
 
         session: Any | None = None
         if _supports_prompt_session(sys.stdin, sys.stdout):
-            session = self._create_prompt_session()
+            host = cast(RunHelpersHost, self)
+            session = _create_prompt_session_from_host(host)
             _attach_prompt_buffer_csi_sanitizer(session)
         self._pt_session = session
         return session
@@ -338,6 +368,7 @@ class RunHelpersMixin:
         """Handle /command. Returns (continue_loop, controller, agent_task) or None to break."""
         from backend.cli.repl import SlashCommandParseError, _parse_slash_command
 
+        host = cast(RunHelpersHost, self)
         try:
             parsed_command = _parse_slash_command(text)
         except SlashCommandParseError as exc:
@@ -347,7 +378,7 @@ class RunHelpersMixin:
             await engine_init_done.wait()
             if engine_init_exc[0] is not None:
                 return True, controller, agent_task
-        should_continue = self._handle_parsed_command(parsed_command)
+        should_continue = _handle_parsed_command_from_host(host, parsed_command)
         if not should_continue:
             return None
         if self._pending_resume is not None:
@@ -356,7 +387,8 @@ class RunHelpersMixin:
             await self._cancel_agent(agent_task)
             controller = None
             agent_task = None
-            result = await self._resume_session(
+            result = await _resume_session_from_host(
+                host,
                 target,
                 self._config,
                 create_controller,
