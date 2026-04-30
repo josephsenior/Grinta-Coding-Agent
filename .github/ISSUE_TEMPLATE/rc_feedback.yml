@@ -1,0 +1,102 @@
+name: RC Feedback
+description: Report onboarding, UX, or reliability feedback for the current release candidate
+title: "[RC Feedback]: "
+labels: ["feedback", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing the Grinta release candidate.
+        Use this template for real-world feedback that helps us decide GA readiness.
+
+  - type: dropdown
+    id: feedback_area
+    attributes:
+      label: Feedback Area
+      description: Which area best describes your feedback?
+      options:
+        - First-run onboarding (install/init/config)
+        - CLI UX and discoverability (commands, prompts, output clarity)
+        - Reliability/stability (timeouts, hangs, retries, crashes)
+        - Performance (latency, responsiveness, resource usage)
+        - Docs mismatch or unclear guidance
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: impact
+    attributes:
+      label: Impact Level
+      options:
+        - High (blocks task completion)
+        - Medium (significant friction but workable)
+        - Low (minor improvement suggestion)
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe what you expected and what actually happened.
+      placeholder: "I expected X, but Grinta did Y..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce (if applicable)
+      description: Include commands, prompts, and sequence of actions.
+      placeholder: |
+        1. pipx install grinta-ai
+        2. grinta init
+        3. grinta
+        4. Ask it to ...
+
+  - type: input
+    id: grinta_version
+    attributes:
+      label: Grinta version
+      description: Version tag or commit (for example v1.0.0-rc1, main@<sha>)
+      placeholder: "v1.0.0-rc1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation path
+      options:
+        - pipx install grinta-ai
+        - Source (uv run python -m backend.cli.entry)
+        - Docker
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Windows
+        - WSL on Windows
+        - Linux
+        - macOS
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model/provider used
+      description: Example: openai/gpt-4o-mini, anthropic/..., ollama/...
+      placeholder: "openai/gpt-4o-mini"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots (optional)
+      description: Paste relevant logs or add screenshots if they help explain the issue.
