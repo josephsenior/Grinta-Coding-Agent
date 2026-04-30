@@ -15,12 +15,14 @@ from backend.orchestration.autonomy import AutonomyController, AutonomyLevel
 # ---------------------------------------------------------------------------
 class TestAutonomyLevel:
     def test_values(self):
-        assert AutonomyLevel.SUPERVISED.value == 'supervised'
+        assert AutonomyLevel.CONSERVATIVE.value == 'conservative'
         assert AutonomyLevel.BALANCED.value == 'balanced'
         assert AutonomyLevel.FULL.value == 'full'
+        # Deprecated alias resolves to CONSERVATIVE.
+        assert AutonomyLevel.SUPERVISED is AutonomyLevel.CONSERVATIVE
 
     def test_from_string(self):
-        assert AutonomyLevel('supervised') is AutonomyLevel.SUPERVISED
+        assert AutonomyLevel('conservative') is AutonomyLevel.CONSERVATIVE
         assert AutonomyLevel('full') is AutonomyLevel.FULL
 
 

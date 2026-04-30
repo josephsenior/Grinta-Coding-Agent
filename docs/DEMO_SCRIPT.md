@@ -15,10 +15,12 @@ local LLM automatically, and solves a real bug end-to-end.
 1. Have **Ollama** running locally with `llama3.1:8b` (or any code-capable
    model) pulled. Grinta auto-detects it.
 2. Use a fresh demo workspace:
+
    ```bash
    mkdir grinta-demo && cd grinta-demo
    git init -q
    ```
+
 3. Drop a small broken Python file into the workspace:
 
    ```python
