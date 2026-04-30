@@ -48,9 +48,12 @@ def map_anthropic_error(client: Any, exc: Exception) -> Exception:
             str(exc), llm_provider='anthropic', model=client.model_name
         )
     if isinstance(exc, anthropic.RateLimitError):
-        return RateLimitError(
+        from backend.inference.rate_limit_parser import enrich_rate_limit_exception
+
+        mapped = RateLimitError(
             str(exc), llm_provider='anthropic', model=client.model_name
         )
+        return enrich_rate_limit_exception(exc, mapped)
     if isinstance(exc, anthropic.AuthenticationError):
         return AuthenticationError(
             str(exc), llm_provider='anthropic', model=client.model_name

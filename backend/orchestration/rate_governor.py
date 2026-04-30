@@ -43,10 +43,90 @@ class LLMRateGovernor:
         # LLM latency tracking for adaptive ceiling
         self._latencies: deque[float] = deque(maxlen=20)
         self._consecutive_throttles: int = 0
+        # Observed TPM ceiling per ``(provider, model)`` derived from past 429s
+        # tagged as ``RateLimitKind.TPM``. We learn the ceiling so we can
+        # pre-emptively throttle below it without waiting for another 429.
+        # Stores the *most conservative* (smallest) observed limit per key.
+        self._observed_tpm_ceiling: dict[tuple[str, str], int] = {}
 
-    async def check_and_wait(self, current_usage: TokenUsage) -> None:
-        """Check current rate and apply adaptive backoff if necessary."""
-        if self.max_tokens_per_minute <= 0:
+    def record_rate_limit_event(
+        self,
+        *,
+        provider: str | None,
+        model: str | None,
+        kind: Any,
+        tokens_in_last_window: int | None = None,
+    ) -> None:
+        """Learn from a provider 429 so future calls can throttle proactively.
+
+        Called by the LLM client layer after a ``RateLimitError`` is mapped.
+        Only TPM events update the observed ceiling; other kinds are ignored
+        because they are not bounded by the token budget this governor tracks.
+        ``tokens_in_last_window`` may be supplied when the caller knows the
+        actual window usage; otherwise the governor uses its own history.
+        """
+        try:
+            from backend.inference.exceptions import RateLimitKind
+        except Exception:
+            return
+        if kind is not RateLimitKind.TPM:
+            return
+        prov = (provider or '').lower()
+        mdl = (model or '').lower()
+        if not prov or not mdl:
+            return
+        if tokens_in_last_window is None and self._history:
+            _, oldest = self._history[0]
+            current = self._history[-1][1]
+            tokens_in_last_window = max(0, current - oldest)
+        if not tokens_in_last_window or tokens_in_last_window <= 0:
+            return
+        # Treat the observed usage at the time of the 429 as a soft ceiling.
+        # Apply a 5% safety margin so we throttle a touch earlier next time.
+        ceiling = max(1, int(tokens_in_last_window * 0.95))
+        key = (prov, mdl)
+        prev = self._observed_tpm_ceiling.get(key)
+        if prev is None or ceiling < prev:
+            self._observed_tpm_ceiling[key] = ceiling
+            logger.info(
+                'Learned TPM ceiling for %s/%s: %d tokens/%ds (was %s)',
+                prov,
+                mdl,
+                ceiling,
+                self.history_window_seconds,
+                prev,
+            )
+
+    def effective_tpm_limit(
+        self, *, provider: str | None = None, model: str | None = None
+    ) -> int:
+        """Return the effective TPM limit, applying any learned per-model ceiling."""
+        configured = self.max_tokens_per_minute
+        if not provider or not model:
+            return configured
+        learned = self._observed_tpm_ceiling.get((provider.lower(), model.lower()))
+        if learned is None:
+            return configured
+        if configured <= 0:
+            return learned
+        return min(configured, learned)
+
+    async def check_and_wait(
+        self,
+        current_usage: TokenUsage,
+        *,
+        provider: str | None = None,
+        model: str | None = None,
+    ) -> None:
+        """Check current rate and apply adaptive backoff if necessary.
+
+        ``provider`` and ``model`` are optional; when supplied, the governor
+        compares the sliding-window usage against the smaller of the
+        configured ``max_tokens_per_minute`` and any per-model TPM ceiling
+        learned from past 429s, throttling pre-emptively below that bound.
+        """
+        effective_limit = self.effective_tpm_limit(provider=provider, model=model)
+        if effective_limit <= 0:
             return
 
         now = time.time()
@@ -64,14 +144,15 @@ class LLMRateGovernor:
         _, oldest_total = self._history[0]
         usage_in_window = current_total - oldest_total
 
-        if usage_in_window > self.max_tokens_per_minute:
+        if usage_in_window > effective_limit:
             self._consecutive_throttles += 1
             wait_s = self._compute_backoff()
             logger.warning(
-                'Token rate limit exceeded (%d tokens in last %ds). Limit: %d/min. Throttling %.1fs (consecutive=%d)',
+                'Token rate limit exceeded (%d tokens in last %ds). Limit: %d/min%s. Throttling %.1fs (consecutive=%d)',
                 usage_in_window,
                 self.history_window_seconds,
-                self.max_tokens_per_minute,
+                effective_limit,
+                ' [learned]' if effective_limit != self.max_tokens_per_minute else '',
                 wait_s,
                 self._consecutive_throttles,
             )
@@ -96,6 +177,9 @@ class LLMRateGovernor:
             'consecutive_throttles': self._consecutive_throttles,
             'latency_p95_s': round(p95, 3) if p95 else None,
             'history_size': len(self._history),
+            'observed_tpm_ceilings': {
+                f'{p}/{m}': v for (p, m), v in self._observed_tpm_ceiling.items()
+            },
         }
 
     # ------------------------------------------------------------------ #

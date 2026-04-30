@@ -39,8 +39,6 @@ DEFAULT_LOCAL_DATA_ROOT = '~/.grinta/storage'
 DEFAULT_CONFIG_FILE = 'settings.json'
 
 # ── URLs ────────────────────────────────────────────────────────────
-GUIDE_URL = 'https://docs.app.dev/guide'
-TROUBLESHOOTING_URL = 'https://docs.app.dev/usage/troubleshooting'
 # Host:port for the internal MCP HTTP endpoint (same process as default dev API :3000)
 DEFAULT_MCP_HOST = 'localhost:3000'
 
@@ -54,11 +52,6 @@ SETTINGS_CACHE_TTL = 60  # seconds
 
 # ── Timeouts & Thresholds ───────────────────────────────────────────
 GENERAL_TIMEOUT = 15
-# Closing agent sessions during workspace / MCP teardown often exceeds GENERAL_TIMEOUT.
-WORKSPACE_SWITCH_SESSION_CLOSE_TIMEOUT = 180
-COMPLETION_TIMEOUT = 30.0
-# Sync bridge for metadata updates: title path sleeps 5s then calls an LLM; 15s is too tight.
-CONVERSATION_METADATA_UPDATE_SYNC_TIMEOUT = 180.0
 # Recall runs KB / vector search synchronously; cap wall time so pending RecallAction always resolves.
 RECALL_PIPELINE_TIMEOUT_SECONDS = 90.0
 # Max seconds waiting for an observation matching a tool call before timing out.
@@ -120,17 +113,15 @@ BROWSER_SCREENSHOT_TIMEOUT_SEC = 45.0
 BROWSER_TOOL_SYNC_TIMEOUT_SECONDS = 165.0
 
 # ── Threshold Constants ─────────────────────────────────────────────
-MAX_LINES_TO_EDIT = 300
 IDLE_RECLAIM_SPIKE_THRESHOLD = 3
 EVICTION_SPIKE_THRESHOLD = 1
 
 # ── Runtime Bootstrap ───────────────────────────────────────────────
-MICROMAMBA_ENV_NAME = 'App'
 DEFAULT_PYTHON_PREFIX = [
     '/App/micromamba/bin/micromamba',
     'run',
     '-n',
-    MICROMAMBA_ENV_NAME,
+    'App',
     'uv',
     'run',
 ]
@@ -163,7 +154,15 @@ DEFAULT_RUNTIME_KEEP_ALIVE = True
 # No default model until settings.json (llm_model) or env (LLM_MODEL) supplies one.
 # Flat settings.json llm_model overrides env when both are set (see load_from_json).
 DEFAULT_LLM_MODEL: str | None = None
+# Default cap on automatic LLM call retries. The retry decorator (see
+# ``backend/inference/retry_mixin.py``) treats this as the *minimum* number
+# of attempts: when the most recent failure is a :class:`RateLimitError`
+# carrying a server-supplied ``retry_after`` hint, the stop predicate
+# extends the budget by ``DEFAULT_LLM_NUM_RETRIES_BONUS_FOR_HINTED`` more
+# attempts so the agent honors clearly-bounded provider waits without
+# spinning forever on unbounded ones.
 DEFAULT_LLM_NUM_RETRIES = 5
+DEFAULT_LLM_NUM_RETRIES_BONUS_FOR_HINTED = 5
 DEFAULT_LLM_RETRY_MULTIPLIER = 2
 DEFAULT_LLM_RETRY_MIN_WAIT = 3
 DEFAULT_LLM_RETRY_MAX_WAIT = 30
@@ -174,8 +173,6 @@ DEFAULT_LLM_CORRECT_NUM = 5
 
 # ── File Upload ─────────────────────────────────────────────────────
 DEFAULT_MAX_FILE_UPLOAD_SIZE_MB = 100
-DEFAULT_FILE_UPLOAD_RESTRICT_TYPES = False
-DEFAULT_FILE_UPLOAD_ALLOWED_EXTENSIONS = {'.*'}
 FILES_TO_IGNORE = [
     '.git/',
     '.DS_Store',
@@ -205,7 +202,6 @@ DEFAULT_AGENT_AUTO_LINT_ENABLED = True
 DEFAULT_AGENT_CONFIRM_ACTIONS = False
 DEFAULT_AGENT_AUTO_RETRY_ON_ERROR = True
 DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
-DEFAULT_AGENT_CMD_ENABLED = True
 # Frontier models (Claude 3.5/4, GPT-5, Gemini 2.5/3) reason natively; the explicit
 # `think` tool duplicates that reasoning into an externally-visible tool call that
 # burns context without improving accuracy. Off by default; flip to True only for
@@ -313,11 +309,8 @@ DEFAULT_STUCK_CONTEXT_HIGH_GROWTH = 1000
 # N consecutive AgentThinkActions with no real tool use trips think-only.
 DEFAULT_STUCK_THINK_LOOP_DEPTH = 10
 # Read-only inspection loop: extreme cases only (true degenerate poll loop).
-DEFAULT_STUCK_READONLY_MIN_COUNT = 20
-DEFAULT_STUCK_READONLY_DIVERSITY_THRESHOLD = 0.10
-
-# Stuck-detection recovery: how much one progress signal decrements the
-# counter (game-able if too high; ignored if too low).
+ # Stuck-detection recovery: how much one progress signal decrements the
+ # counter (game-able if too high; ignored if too low).
 DEFAULT_STUCK_PROGRESS_SIGNAL_DECREMENT = 2
 
 # ── Knowledge Base Defaults ─────────────────────────────────────────
@@ -327,17 +320,6 @@ DEFAULT_KB_SEARCH_TOP_K = 5
 DEFAULT_KB_RELEVANCE_THRESHOLD = 0.7
 DEFAULT_KB_AUTO_SEARCH = True
 DEFAULT_KB_SEARCH_STRATEGY = 'hybrid'
-
-# ── Graph RAG Defaults ──────────────────────────────────────────────
-DEFAULT_GRAPH_RAG_ENABLED = False
-DEFAULT_GRAPH_RAG_PERSISTENCE_PATH = '~/.grinta/storage/graph_rag'
-DEFAULT_GRAPH_RAG_GRAPH_DEPTH = 2
-DEFAULT_GRAPH_RAG_MAX_SEED_RESULTS = 10
-
-# ── Trajectory / Replay Defaults ────────────────────────────────────
-DEFAULT_REPLAY_TRAJECTORY_PATH = None
-DEFAULT_SAVE_TRAJECTORY_PATH = None
-DEFAULT_SAVE_SCREENSHOTS_IN_TRAJECTORY = False
 
 # ── API & Server ────────────────────────────────────────────────────
 API_VERSION_V1 = 'v1'
@@ -353,34 +335,10 @@ ENFORCE_API_VERSIONING = os.getenv('APP_PERMISSIVE_API', '').strip().lower() not
     'yes',
 )
 
-ROOM_KEY_TEMPLATE = 'room_{sid}'
-DEFAULT_SESSION_WAIT_TIME_BEFORE_CLOSE = 90
-DEFAULT_SESSION_WAIT_TIME_BEFORE_CLOSE_INTERVAL = 5
-
-# ── Quota ────────────────────────────────────────────────────────────
-DEFAULT_QUOTA_HOUR_WINDOW = 3600
-DEFAULT_QUOTA_DAY_WINDOW = 86400
-DEFAULT_QUOTA_MONTH_WINDOW = 2592000
-QUOTA_EXEMPT_PATHS = {'/', '/api/monitoring/health'}
-QUOTA_EXEMPT_PATH_PREFIXES = ['/assets']
-
-
-# Quota limits (App is local-first / single-user — unlimited by default)
-
-# ── Circuit Breaker ─────────────────────────────────────────────────
-# CircuitState enum lives in backend.core.enums
-DEFAULT_CIRCUIT_FAILURE_THRESHOLD = 5
-DEFAULT_CIRCUIT_SUCCESS_THRESHOLD = 2
-DEFAULT_CIRCUIT_TIMEOUT_SECONDS = 60
-
-# ── Action Execution ────────────────────────────────────────────────
-ROOT_GID = 0
-
 # ── Logging & Debug (env-var driven) ────────────────────────────────
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 DEBUG = _parse_bool_env('DEBUG')
 DEBUG_LLM = _parse_bool_env('DEBUG_LLM', default='true')
-DEBUG_LLM_PROMPT = _parse_bool_env('DEBUG_LLM_PROMPT')
 LOG_JSON = _parse_bool_env('LOG_JSON', default='true')  # Default to JSON for production
 LOG_JSON_LEVEL_KEY = os.getenv('LOG_JSON_LEVEL_KEY', 'level')
 # Enable OTEL log correlation when explicitly requested, defaulting to OTEL_ENABLED
@@ -390,7 +348,6 @@ OTEL_LOG_CORRELATION = _parse_bool_env(
 )
 LOG_TO_FILE = _parse_bool_env('LOG_TO_FILE', default='true')
 LOG_ALL_EVENTS = _parse_bool_env('LOG_ALL_EVENTS')
-DEBUG_RUNTIME = _parse_bool_env('DEBUG_RUNTIME')
 
 LOG_COLORS = {
     'ACTION': 'green',
@@ -410,7 +367,6 @@ FINISH_TOOL_NAME = 'finish'
 TASK_TRACKER_TOOL_NAME = 'task_tracker'
 NOTE_TOOL_NAME = 'note'
 RECALL_TOOL_NAME = 'recall'
-SEMANTIC_RECALL_TOOL_NAME = 'semantic_recall'
 # ── Security Risk ───────────────────────────────────────────────────
 SECURITY_RISK_DESC = (
     "Required. Your assessment of this action's safety risk (LOW/MEDIUM/HIGH). "
@@ -491,19 +447,6 @@ MAX_FILENAME_LENGTH = 255
 MAX_PATH_LENGTH = 4096  # Maximum path length (POSIX limit)
 MAX_FILE_SIZE_FOR_GIT_DIFF = 1024 * 1024
 
-# ── Server & Middleware ─────────────────────────────────────────────
-MIN_COMPRESS_SIZE = 1024  # 1KB
-KNOWLEDGE_BASE_MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-KNOWLEDGE_BASE_NAME_MAX_LENGTH = 200
-KNOWLEDGE_BASE_DESCRIPTION_MAX_LENGTH = 1000
-KNOWLEDGE_BASE_SEARCH_TOP_K_DEFAULT = 5
-KNOWLEDGE_BASE_SEARCH_TOP_K_MAX = 100
-KNOWLEDGE_BASE_RELEVANCE_THRESHOLD_DEFAULT = 0.7
-CACHE_LONG = 31536000  # 1 year
-CACHE_MEDIUM = 3600  # 1 hour
-CACHE_SHORT = 300  # 5 minutes
-CACHE_NONE = 0  # No cache
-
 # ── MCP Client ──────────────────────────────────────────────────────
 DEFAULT_MCP_CACHE_TTL_SECONDS = 600
 MAX_MCP_CACHE_ENTRY_BYTES = 5 * 1024 * 1024
@@ -514,10 +457,6 @@ MCP_CACHEABLE_TOOLS = {
     'get_block',
     'get_component_metadata',
 }
-
-# ── Integrations ────────────────────────────────────────────────────
-MAX_GITHUB_BRANCHES = 5000
-MAX_GITHUB_REPOS = 1000
 
 # ── Whitespace Handling ─────────────────────────────────────────────
 DEFAULT_INDENT_SIZES = {
@@ -556,7 +495,6 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
     'LOG_LEVEL': ('INFO', 'Root log level (DEBUG / INFO / WARNING / ERROR)'),
     'DEBUG': ('false', 'Enable general debug mode'),
     'DEBUG_LLM': ('true', 'Log raw LLM request/response payloads'),
-    'DEBUG_LLM_PROMPT': ('false', 'Log full prompt text sent to LLMs'),
     'APP_CLI_SHOW_REASONING_TEXT': (
         'true',
         'Render reasoning/thinking text in CLI panels; set false/0 to suppress provider reasoning leakage',
@@ -570,7 +508,6 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
         'Append structured logs under repo logs/app.log; set LOG_TO_FILE=false to disable — when off the CLI keeps the app logger at ERROR on the console',
     ),
     'LOG_ALL_EVENTS': ('True', 'Log every event processed by the event stream'),
-    'DEBUG_RUNTIME': ('false', 'Extra runtime container debug output'),
     'APP_DEBUG_PROMPT_ROLES': (
         'false',
         'Per astep: log message role histogram after build_messages (condensed event count, '

@@ -857,7 +857,6 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             # Set a metadata flag the orchestrator can check during next step()
             if hasattr(self.state, 'turn_signals'):
                 self.state.set_memory_pressure(level, source='SessionOrchestrator')
-
     async def _run_control_flags_safely(self) -> bool:
         """Run control flags with exception handling."""
         try:

@@ -95,6 +95,8 @@ def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
     try:
         import openai as _oai
 
+        from backend.inference.rate_limit_parser import enrich_rate_limit_exception
+
         simple_map: list[tuple[type, type, str]] = [
             (_oai.AuthenticationError, AuthenticationError, 'openai'),
             (_oai.RateLimitError, RateLimitError, 'openai'),
@@ -104,9 +106,12 @@ def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
         ]
         for sdk_cls, our_cls, prov in simple_map:
             if isinstance(exc, sdk_cls):
-                return our_cls(
+                mapped = our_cls(
                     _safe_exception_text(exc), model=model, llm_provider=prov
                 )
+                if isinstance(mapped, RateLimitError):
+                    enrich_rate_limit_exception(exc, mapped)
+                return mapped
 
         if isinstance(exc, _oai.BadRequestError):
             return _map_bad_request_with_context_check(exc, model, 'openai')
@@ -122,6 +127,8 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
     try:
         import anthropic as _anth
 
+        from backend.inference.rate_limit_parser import enrich_rate_limit_exception
+
         simple_map: list[tuple[type, type, str]] = [
             (_anth.AuthenticationError, AuthenticationError, 'anthropic'),
             (_anth.RateLimitError, RateLimitError, 'anthropic'),
@@ -131,9 +138,12 @@ def _map_anthropic_exception(exc: Exception, model: str) -> Exception | None:
         ]
         for sdk_cls, our_cls, prov in simple_map:
             if isinstance(exc, sdk_cls):
-                return our_cls(
+                mapped = our_cls(
                     _safe_exception_text(exc), model=model, llm_provider=prov
                 )
+                if isinstance(mapped, RateLimitError):
+                    enrich_rate_limit_exception(exc, mapped)
+                return mapped
 
         if isinstance(exc, _anth.BadRequestError):
             return _map_bad_request_with_context_check(exc, model, 'anthropic')
@@ -155,9 +165,13 @@ def _try_google_exception_mapping(
             _safe_exception_text(exc), model=model, llm_provider='google'
         )
     if 'quota' in exc_str or 'rate' in exc_str:
-        return RateLimitError(
+        from backend.inference.rate_limit_parser import enrich_rate_limit_exception
+
+        mapped = RateLimitError(
             _safe_exception_text(exc), model=model, llm_provider='google'
         )
+        enrich_rate_limit_exception(exc, mapped)
+        return mapped
     return APIError(_safe_exception_text(exc), model=model, llm_provider='google')
 
 

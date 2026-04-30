@@ -12,7 +12,7 @@ The following short walkthroughs show \_how* to reach for the right tool. They a
 
 ## Example 2 — Add a small feature
 
-1. `explore_tree_structure` to see where the related module lives.
+1. `analyze_project_structure` (`command='tree'`) to see where the related module lives.
 2. Read the closest neighbour file to learn the project's conventions.
 3. Implement the change with the smallest editor surface possible (`text_editor` for additions, `symbol_editor` for symbol replacement).
 4. Run linters / tests for the touched files.
@@ -21,8 +21,8 @@ The following short walkthroughs show \_how* to reach for the right tool. They a
 ## Example 3 — Investigation / "what does X do?"
 
 1. `search_code` for the entry point or class name.
-2. `explore_tree_structure` for callers / callees.
-3. Use `read_symbol_definition` (or editor `read_file`) to read the actual code — never guess.
+2. `analyze_project_structure` (`command='dependencies'`, `direction='both'`) for upstream callers / downstream callees.
+3. Use `analyze_project_structure` (`command='symbols'` or `'file_outline'`) or editor `read_file` to read the actual code — never guess.
 4. Answer the user with file:line citations.
 
 ## Example 4 — Destructive or repo-wide operation

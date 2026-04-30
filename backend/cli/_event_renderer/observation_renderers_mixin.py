@@ -387,7 +387,24 @@ class ObservationRenderersMixin:
         )
         self._hud.update_ledger('Backoff')
         prefix = 'Auto Retry' if status_type == 'retry_pending' else 'Retrying'
-        self._hud.update_agent_state(f'{prefix} {attempt}/{max_attempts}')
+        # Sticky HUD line: include rate-limit kind + ETA so the user sees *why*
+        # we're waiting and *how long* the provider asked for.
+        suffix_parts: list[str] = []
+        kind = extras.get('rate_limit_kind')
+        if kind:
+            suffix_parts.append(str(kind).upper())
+        retry_after = extras.get('retry_after')
+        if not retry_after:
+            retry_after = extras.get('delay_seconds')
+        try:
+            if retry_after is not None:
+                eta = float(retry_after)
+                if eta > 0:
+                    suffix_parts.append(f'ETA {eta:.0f}s' if eta >= 1 else 'ETA <1s')
+        except (TypeError, ValueError):
+            pass
+        suffix = f' [{" · ".join(suffix_parts)}]' if suffix_parts else ''
+        self._hud.update_agent_state(f'{prefix} {attempt}/{max_attempts}{suffix}')
 
     @staticmethod
     def _coerce_positive_int(value: Any, *, default: int, floor: int = 1) -> int:

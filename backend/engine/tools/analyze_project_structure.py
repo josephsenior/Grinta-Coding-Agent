@@ -40,6 +40,7 @@ def create_analyze_project_structure_tool() -> dict:
                 "'recent' (recently modified files in the repo), "
                 "'callers' (find all files that reference a symbol/function), "
                 "'test_coverage' (find test files that cover a given source file), "
+                "'dependencies' (transitive upstream/downstream dependency tree for a file), "
                 "'file_outline' (compact signatures for a source file — less context than a full read). "
                 'Use this BEFORE multi-file edits to understand dependencies.'
             ),
@@ -57,24 +58,28 @@ def create_analyze_project_structure_tool() -> dict:
                             'callers',
                             'test_coverage',
                             'semantic_search',
+                            'dependencies',
                         ],
                         'description': (
                             'tree: directory tree (depth-limited). '
-                            'imports: show what a file imports and what imports it. '
+                            'imports: show what a file imports and what imports it (1 hop). '
                             'symbols: list classes/functions/top-level names in a file. '
                             'file_outline: AST signatures only (Python) or line-based heads (fallback) — '
                             'for large files before read_file. '
                             'recent: git log of recently modified files. '
                             'callers: find all files referencing a given symbol name. '
                             'test_coverage: find test files that likely test a given source file. '
-                            'semantic_search: robust AST-based search for symbol references.'
+                            'semantic_search: robust AST-based search for symbol references. '
+                            'dependencies: transitive upstream/downstream dependency tree '
+                            'for a file (multi-hop import graph, on-demand, no index).'
                         ),
                     },
                     'path': {
                         'type': 'string',
                         'description': (
                             "For 'tree': root directory to scan (default '.'). "
-                            "For 'imports'/'symbols'/'file_outline'/'test_coverage': path to the file to analyze."
+                            "For 'imports'/'symbols'/'file_outline'/'test_coverage'/'dependencies': "
+                            'path to the file to analyze.'
                         ),
                         'default': '.',
                     },
@@ -86,8 +91,20 @@ def create_analyze_project_structure_tool() -> dict:
                     },
                     'depth': {
                         'type': 'integer',
-                        'description': "For 'tree': max depth (default 1).",
+                        'description': (
+                            "For 'tree': max depth (default 1). "
+                            "For 'dependencies': max transitive hops (default 2, capped at 4)."
+                        ),
                         'default': 1,
+                    },
+                    'direction': {
+                        'type': 'string',
+                        'enum': ['upstream', 'downstream', 'both'],
+                        'description': (
+                            "For 'dependencies': 'upstream' = files that import this one; "
+                            "'downstream' = files this one imports; 'both' = union. Default 'both'."
+                        ),
+                        'default': 'both',
                     },
                 },
                 'required': ['command'],
@@ -103,6 +120,36 @@ def _analyze_depth(arguments: dict) -> int:
         return 1
 
 
+def _diag(
+    *,
+    reason: str,
+    command: str,
+    params: dict[str, Any] | None = None,
+    next_steps: list[str] | None = None,
+) -> str:
+    """Render a structured diagnostic block for empty/missing-input results.
+
+    Replaces opaque ``"(no symbols found)"`` style messages with a small
+    block that tells the model *why* the result was empty, *what arguments*
+    it actually used, and *what to try next*. The shape is stable enough
+    for downstream agents to scan but still human-readable.
+    """
+    lines: list[str] = ['[ANALYZE_PROJECT_STRUCTURE] no_results']
+    lines.append(f'  command: {command}')
+    lines.append(f'  reason: {reason}')
+    if params:
+        flat = ', '.join(
+            f'{k}={v!r}' for k, v in params.items() if v is not None and v != ''
+        )
+        if flat:
+            lines.append(f'  params_used: {flat}')
+    if next_steps:
+        lines.append('  next_steps:')
+        for step in next_steps:
+            lines.append(f'    - {step}')
+    return '\n'.join(lines)
+
+
 def build_analyze_project_structure_action(
     arguments: dict,
 ) -> AgentThinkAction:
@@ -114,14 +161,29 @@ def build_analyze_project_structure_action(
     if command == 'callers':
         if not (symbol := arguments.get('symbol', '')):
             return AgentThinkAction(
-                thought="[ANALYZE_PROJECT_STRUCTURE] 'callers' requires the 'symbol' parameter (function/class name to search for)."
+                thought=_diag(
+                    reason="missing required parameter 'symbol'",
+                    command='callers',
+                    params={'path': path},
+                    next_steps=[
+                        "Re-call with symbol='<name>' (function or class to find references for).",
+                        'Tip: pair with command=imports to first see what a file exports.',
+                    ],
+                )
             )
         return _build_callers_action(symbol, path)
 
     if command == 'semantic_search':
         if not (symbol := arguments.get('symbol', '')):
             return AgentThinkAction(
-                thought="[ANALYZE_PROJECT_STRUCTURE] 'semantic_search' requires the 'symbol' parameter."
+                thought=_diag(
+                    reason="missing required parameter 'symbol'",
+                    command='semantic_search',
+                    params={'path': path},
+                    next_steps=[
+                        "Re-call with symbol='<name>' to AST-search for references.",
+                    ],
+                )
             )
         return _build_semantic_search_action(symbol, path)
 
@@ -132,15 +194,25 @@ def build_analyze_project_structure_action(
         'file_outline': lambda: _build_file_outline_action(path),
         'recent': lambda: _build_recent_action(),
         'test_coverage': lambda: _build_test_coverage_action(path),
+        'dependencies': lambda: _build_dependencies_action(
+            path,
+            depth=depth,
+            direction=str(arguments.get('direction', 'both') or 'both'),
+        ),
     }
 
     if command in handlers:
         return handlers[command]()
 
     return AgentThinkAction(
-        thought=(
-            f'[ANALYZE_PROJECT_STRUCTURE] Unknown command: {command}. '
-            'Use tree/imports/symbols/file_outline/recent/callers/test_coverage/semantic_search.'
+        thought=_diag(
+            reason=f'unknown command {command!r}',
+            command=command,
+            params={'path': path, 'depth': depth},
+            next_steps=[
+                'Use one of: tree, imports, symbols, file_outline, recent, '
+                'callers, test_coverage, semantic_search, dependencies.',
+            ],
         )
     )
 
@@ -666,7 +738,18 @@ def _build_imports_action(path: str) -> AgentThinkAction:
     if walk_hits:
         out.extend(walk_hits)
     else:
-        out.append('(no reverse imports found)')
+        out.append(
+            _diag(
+                reason='no other files import this module',
+                command='imports',
+                params={'path': path, 'basename_searched': basename},
+                next_steps=[
+                    'Confirm the file path is correct and committed to the repo.',
+                    'Try command=callers with a public symbol name from this file.',
+                    'Try command=search_code (separate tool) for non-import references.',
+                ],
+            )
+        )
     return AgentThinkAction(thought='\n'.join(out))
 
 
@@ -675,7 +758,17 @@ def _build_file_outline_action(path: str) -> AgentThinkAction:
     base = os.path.basename(path)
     out: list[str] = [f'=== FILE OUTLINE: {base} ===']
     if not os.path.isfile(path):
-        out.append('(file not found)')
+        out.append(
+            _diag(
+                reason='file not found at given path',
+                command='file_outline',
+                params={'path': path},
+                next_steps=[
+                    'Pass a path relative to the workspace root.',
+                    'Run command=tree first to discover the actual file location.',
+                ],
+            )
+        )
         return AgentThinkAction(thought='\n'.join(out))
 
     if path.endswith('.py'):
@@ -690,7 +783,17 @@ def _build_file_outline_action(path: str) -> AgentThinkAction:
 
         out.extend(_python_outline_lines_from_ast(tree))
         if len(out) <= 1:
-            out.append('(no outline entries)')
+            out.append(
+                _diag(
+                    reason='no top-level definitions in file',
+                    command='file_outline',
+                    params={'path': path},
+                    next_steps=[
+                        'Use command=symbols for a regex-based listing.',
+                        'Use read_file directly — the file may be small or data-only.',
+                    ],
+                )
+            )
         return AgentThinkAction(thought='\n'.join(out))
 
     out.extend(_file_outline_fallback_lines(path))
@@ -731,11 +834,31 @@ def _build_symbols_action(path: str) -> AgentThinkAction:
                         if count >= 100:
                             break
                 if count == 0:
-                    out.append('(no symbols found)')
+                    out.append(
+                        _diag(
+                            reason='no top-level class/def/CONST symbols matched',
+                            command='symbols',
+                            params={'path': path},
+                            next_steps=[
+                                'Try command=file_outline for AST-level signatures.',
+                                'The file may be plain data or have non-standard formatting.',
+                            ],
+                        )
+                    )
         except Exception as e:
             out.append(f'(error reading file: {e})')
     else:
-        out.append('(file not found)')
+        out.append(
+            _diag(
+                reason='file not found at given path',
+                command='symbols',
+                params={'path': path},
+                next_steps=[
+                    'Pass a path relative to the workspace root.',
+                    'Run command=tree first to discover the actual file location.',
+                ],
+            )
+        )
     return AgentThinkAction(thought='\n'.join(out))
 
 
@@ -752,7 +875,17 @@ def _build_recent_action() -> AgentThinkAction:
         if res.stdout.strip():
             out.extend(res.stdout.splitlines()[:100])
         else:
-            out.append('(no commits or not a git repository)')
+            out.append(
+                _diag(
+                    reason='no commits or current directory is not a git repository',
+                    command='recent',
+                    params={'cwd': os.getcwd()},
+                    next_steps=[
+                        'Run from inside a git repository, or skip command=recent.',
+                        'Use command=tree for a directory listing instead.',
+                    ],
+                )
+            )
     except Exception:
         out.append('(git not available or error running git)')
     return AgentThinkAction(thought='\n'.join(out))
@@ -775,7 +908,18 @@ def _build_callers_action(symbol: str, scope: str) -> AgentThinkAction:
     )
     out.extend(walk_lines)
     if count == 0:
-        out.append(f'(no references found for {trunc_sym})')
+        out.append(
+            _diag(
+                reason=f'no references found for symbol {trunc_sym!r}',
+                command='callers',
+                params={'symbol': symbol, 'path': scope},
+                next_steps=[
+                    'Verify the symbol name is spelled exactly as in source.',
+                    'Try command=semantic_search for AST-aware matching.',
+                    'Broaden the search by passing path=. (workspace root).',
+                ],
+            )
+        )
     return AgentThinkAction(thought='\n'.join(out))
 
 
@@ -858,7 +1002,273 @@ def _build_semantic_search_action(symbol: str, path: str) -> AgentThinkAction:
         return AgentThinkAction(
             thought=res.stdout
             if res.stdout.strip()
-            else f'(no output from semantic search for {symbol})'
+            else _diag(
+                reason='AST search returned no output',
+                command='semantic_search',
+                params={'symbol': symbol, 'path': path},
+                next_steps=[
+                    'Confirm path points to a parseable source file.',
+                    'Try command=callers for a faster regex-based scan.',
+                ],
+            )
         )
     except Exception as e:
         return AgentThinkAction(thought=f'(error running semantic search: {e})')
+
+
+# --------------------------------------------------------------------------- #
+# Dependencies mode (transitive upstream/downstream walk, on-demand, no index).
+#
+# This resurrects the capability that used to live in the (removed) GraphRAG
+# ``explore_tree_structure`` tool, but without a persistent graph: every call
+# does a bounded, cycle-safe BFS using the existing AST + ripgrep + ignore
+# plumbing. Results are useful for "what would break if I touch this file?"
+# (upstream) and "what files do I need to read to understand this one?"
+# (downstream).
+# --------------------------------------------------------------------------- #
+
+_DEPENDENCY_MAX_DEPTH = 4
+_DEPENDENCY_MAX_NODES = 200
+
+
+def _module_to_candidate_paths(module: str, root: str) -> list[str]:
+    """Map a dotted Python module to candidate workspace file paths.
+
+    ``foo.bar.baz`` → ``[foo/bar/baz.py, foo/bar/baz/__init__.py]``. Returns
+    only paths that actually exist; empty list when the module is external
+    (stdlib, site-packages) or unresolvable in this workspace.
+    """
+    if not module or module.startswith('.'):
+        # Relative imports cannot be resolved from module text alone; skip.
+        return []
+    parts = module.split('.')
+    rel_module = os.path.join(*parts) + '.py'
+    rel_pkg = os.path.join(*parts, '__init__.py')
+    candidates: list[str] = []
+    for rel in (rel_module, rel_pkg):
+        full = os.path.join(root, rel)
+        if os.path.isfile(full):
+            candidates.append(rel.replace('\\', '/'))
+    return candidates
+
+
+def _downstream_imports(file_path: str, root: str) -> list[str]:
+    """Return workspace-relative paths that ``file_path`` imports (best-effort).
+
+    Only Python files are walked via AST. Non-Python files return an empty
+    list; the dependency walk silently skips them.
+    """
+    abs_path = file_path if os.path.isabs(file_path) else os.path.join(root, file_path)
+    if not abs_path.endswith('.py') or not os.path.isfile(abs_path):
+        return []
+    try:
+        src = Path(abs_path).read_text(encoding='utf-8', errors='ignore')
+        tree = ast.parse(src)
+    except (OSError, SyntaxError, ValueError):
+        return []
+    targets: list[str] = []
+    for node in ast.walk(tree):
+        modules: list[str] = []
+        if isinstance(node, ast.Import):
+            modules = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            # ``from pkg import sub_a, sub_b`` may pull in either symbols *or*
+            # sub-modules. Probe both ``pkg`` and each ``pkg.<name>`` so the
+            # walk follows real sub-module imports.
+            modules = [node.module]
+            modules.extend(f'{node.module}.{alias.name}' for alias in node.names)
+        for module in modules:
+            for cand in _module_to_candidate_paths(module, root):
+                if cand not in targets:
+                    targets.append(cand)
+    return targets
+
+
+def _upstream_importers(file_path: str, root: str) -> list[str]:
+    """Return workspace-relative paths that import ``file_path`` (best-effort)."""
+    basename = os.path.splitext(os.path.basename(file_path))[0]
+    if not basename:
+        return []
+    rg_hits = _imports_reverse_via_rg(basename)
+    raw = rg_hits if rg_hits is not None else _imports_reverse_via_walk(basename)
+    cleaned: list[str] = []
+    abs_target = os.path.abspath(
+        file_path if os.path.isabs(file_path) else os.path.join(root, file_path)
+    )
+    for hit in raw:
+        norm = hit.lstrip('./').replace('\\', '/')
+        if not norm:
+            continue
+        # Skip self-references; scanners match on basename so the file itself
+        # often appears in its own importer list.
+        if os.path.abspath(os.path.join(root, norm)) == abs_target:
+            continue
+        if norm not in cleaned:
+            cleaned.append(norm)
+    return cleaned
+
+
+def _walk_dependency_graph(
+    start: str,
+    *,
+    direction: str,
+    max_depth: int,
+    root: str,
+) -> tuple[dict[str, list[str]], set[str], bool]:
+    """BFS over the import graph. Returns (edges, visited, truncated)."""
+    edges: dict[str, list[str]] = {}
+    visited: set[str] = {start}
+    queue: list[tuple[str, int]] = [(start, 0)]
+    truncated = False
+    while queue:
+        node, depth = queue.pop(0)
+        if depth >= max_depth:
+            continue
+        if direction == 'downstream':
+            neighbors = _downstream_imports(node, root)
+        elif direction == 'upstream':
+            neighbors = _upstream_importers(node, root)
+        else:  # both
+            neighbors = list(
+                dict.fromkeys(
+                    _downstream_imports(node, root)
+                    + _upstream_importers(node, root)
+                )
+            )
+        edges[node] = neighbors
+        for n in neighbors:
+            if n in visited:
+                continue
+            if len(visited) >= _DEPENDENCY_MAX_NODES:
+                truncated = True
+                break
+            visited.add(n)
+            queue.append((n, depth + 1))
+        if truncated:
+            break
+    return edges, visited, truncated
+
+
+def _render_dependency_tree(
+    start: str,
+    edges: dict[str, list[str]],
+    *,
+    max_depth: int,
+) -> list[str]:
+    """ASCII tree rendering with cycle-aware ``(↺)`` markers."""
+    lines: list[str] = []
+    seen_on_path: set[str] = set()
+
+    def _walk(node: str, depth: int, prefix: str) -> None:
+        if depth > max_depth:
+            return
+        children = edges.get(node, [])
+        for i, child in enumerate(children):
+            is_last = i == len(children) - 1
+            connector = '└── ' if is_last else '├── '
+            cycle_marker = ' (↺)' if child in seen_on_path else ''
+            lines.append(f'{prefix}{connector}{child}{cycle_marker}')
+            if child in seen_on_path or child not in edges:
+                continue
+            seen_on_path.add(child)
+            extension = '    ' if is_last else '│   '
+            _walk(child, depth + 1, prefix + extension)
+            seen_on_path.discard(child)
+
+    lines.append(start)
+    seen_on_path.add(start)
+    _walk(start, 0, '')
+    return lines
+
+
+def _build_dependencies_action(
+    path: str,
+    *,
+    depth: int,
+    direction: str,
+) -> AgentThinkAction:
+    """Render an on-demand transitive import-graph for ``path``.
+
+    Resurrects the removed GraphRAG ``explore_tree_structure`` capability
+    without re-introducing a persistent index. The walk is bounded by both
+    depth (capped at :data:`_DEPENDENCY_MAX_DEPTH`) and a hard node cap so
+    a fan-out hub cannot explode the result.
+    """
+    direction = direction.lower().strip() or 'both'
+    if direction not in ('upstream', 'downstream', 'both'):
+        return AgentThinkAction(
+            thought=_diag(
+                reason=f'invalid direction {direction!r}',
+                command='dependencies',
+                params={'path': path, 'direction': direction, 'depth': depth},
+                next_steps=["Use direction='upstream', 'downstream', or 'both'."],
+            )
+        )
+
+    root = os.path.abspath('.')
+    abs_path = path if os.path.isabs(path) else os.path.join(root, path)
+    if not os.path.isfile(abs_path):
+        return AgentThinkAction(
+            thought=_diag(
+                reason='anchor file not found',
+                command='dependencies',
+                params={'path': path, 'direction': direction, 'depth': depth},
+                next_steps=[
+                    'Pass a file path relative to the workspace root.',
+                    'Run command=tree to discover the actual file location.',
+                ],
+            )
+        )
+
+    effective_depth = max(1, min(int(depth or 2), _DEPENDENCY_MAX_DEPTH))
+    rel_start = os.path.relpath(abs_path, root).replace('\\', '/')
+
+    edges, visited, truncated = _walk_dependency_graph(
+        rel_start,
+        direction=direction,
+        max_depth=effective_depth,
+        root=root,
+    )
+
+    out: list[str] = [
+        '=== DEPENDENCY TREE ===',
+        f'anchor: {rel_start}',
+        f'direction: {direction}',
+        f'depth: {effective_depth} (max={_DEPENDENCY_MAX_DEPTH})',
+        f'nodes: {len(visited)} (cap={_DEPENDENCY_MAX_NODES}'
+        f'{", TRUNCATED" if truncated else ""})',
+        '',
+    ]
+    out.extend(_render_dependency_tree(rel_start, edges, max_depth=effective_depth))
+
+    total_edges = sum(len(v) for v in edges.values())
+    if total_edges == 0:
+        out.append('')
+        out.append(
+            _diag(
+                reason='no dependency edges found at this depth',
+                command='dependencies',
+                params={'path': path, 'direction': direction, 'depth': depth},
+                next_steps=[
+                    'Increase depth (capped at 4) for a wider view.',
+                    "Try direction='both' to include upstream and downstream.",
+                    'Verify the file actually contains/uses imports of in-workspace modules.',
+                ],
+            )
+        )
+
+    # Compact JSON edge sidecar for downstream tooling.
+    import json
+
+    edge_payload = {
+        'anchor': rel_start,
+        'direction': direction,
+        'depth': effective_depth,
+        'truncated': truncated,
+        'edges': {k: list(v) for k, v in edges.items()},
+    }
+    out.append('')
+    out.append('=== EDGES (json) ===')
+    out.append(json.dumps(edge_payload, indent=2, sort_keys=True))
+
+    return AgentThinkAction(thought='\n'.join(out))
