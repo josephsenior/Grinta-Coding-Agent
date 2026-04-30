@@ -39,7 +39,7 @@ def _agent_debug_log(
     hypothesis_id: str, location: str, message: str, data: dict
 ) -> None:
     try:
-        log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+        log_path = Path(__file__).resolve().parents[2] / 'logs' / 'debug-fee086.log'
         payload = {
             'sessionId': 'fee086',
             'runId': 'pre-fix',

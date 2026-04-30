@@ -38,7 +38,7 @@ def _agent_debug_log(
             'data': data,
             'timestamp': int(time.time() * 1000),
         }
-        log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
+        log_path = Path(__file__).resolve().parents[2] / 'logs' / 'debug-fee086.log'
         with open(log_path, 'a', encoding='utf-8') as _f:
             _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
     except Exception:

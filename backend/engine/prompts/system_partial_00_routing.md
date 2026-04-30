@@ -38,10 +38,6 @@ Loop: reason briefly → use tools → advance.
 **Exploration discipline:** get one overview, then specific reads/tests. Read the candidate file before another broad scan.
 
 **Native-first:** Use the shell for environment actions, not as a second repo search/edit path.
-
-**Context budget:** When `memory_pressure=high` appears in `<APP_CONTEXT_STATUS>`, stop broad exploration immediately — finish the current sub-task{context_budget_sync_clause}, then {context_budget_next_step}. Do not open new reads or run new searches.
-
-**Repetition signal:** When `repetition_score` ≥ 0.6 in `<APP_CONTEXT_STATUS>`, you are near a loop. Change strategy: {repetition_recovery_options} Do not repeat the same tool call.
 </EXECUTION_DISCIPLINE>
 
 <SECURITY>
