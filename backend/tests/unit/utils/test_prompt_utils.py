@@ -151,8 +151,8 @@ class TestOrchestratorPromptManager:
         result = opm.get_system_message()
         # cli_mode=True triggers CLI-specific security risk block
         assert 'Security Risk Policy' in result
-        # Full autonomy should be reflected
-        assert 'FULL AUTONOMOUS MODE' in result
+        # Autonomy block is now mode-agnostic; just confirm it rendered.
+        assert '<AUTONOMY>' in result
 
     def test_build_playbook_info(self, tmp_path):
         from backend.utils.prompt import PromptManager
@@ -813,7 +813,12 @@ class TestBuildSystemPromptRenders:
             config=_base_config(autonomy_level='full'),
             function_calling_mode='native',
         )
-        assert 'FULL AUTONOMOUS MODE' in result
+        # The autonomy block is now mode-agnostic; only one neutral block is
+        # rendered regardless of autonomy_level.
+        assert '<AUTONOMY>' in result
+        assert 'runtime may interrupt' in result
+        # Old mode-specific copy must no longer leak through.
+        assert 'FULL AUTONOMOUS MODE' not in result
 
     def test_task_tracker_enabled(self) -> None:
         result = self._assert_renders_cleanly(

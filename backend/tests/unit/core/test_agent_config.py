@@ -47,7 +47,7 @@ class TestAgentConfigDefaults:
 
     def test_default_autonomy_level(self):
         cfg = AgentConfig()
-        assert cfg.autonomy_level in {'supervised', 'balanced', 'full'}
+        assert cfg.autonomy_level in {'conservative', 'balanced', 'full'}
 
     def test_default_circuit_breaker(self):
         cfg = AgentConfig()
@@ -169,6 +169,12 @@ class TestAgentConfigCustom:
         assert 'normal task-completion signal' in warning_message
 
     def test_non_full_autonomy_warns_on_full_autonomy_only_knobs(self):
+        """As of 1.0.0-rc1 iteration limits are no longer coupled to autonomy mode.
+
+        Setting ``max_autonomous_iterations`` or ``stuck_threshold_iterations``
+        outside of full autonomy must NOT emit a warning anymore — the limits
+        apply universally.
+        """
         from unittest.mock import patch
 
         with patch('backend.core.config.agent_config.logger.warning') as mock_warning:
@@ -180,8 +186,19 @@ class TestAgentConfigCustom:
 
         assert cfg.autonomy_level == 'balanced'
         messages = [call.args[0] for call in mock_warning.call_args_list]
-        assert any('max_autonomous_iterations=%s' in msg for msg in messages)
-        assert any('stuck_threshold_iterations=%s' in msg for msg in messages)
+        assert not any('max_autonomous_iterations=%s' in msg for msg in messages)
+        assert not any('stuck_threshold_iterations=%s' in msg for msg in messages)
+
+    def test_supervised_input_is_accepted_with_deprecation_warning(self):
+        """Legacy 'supervised' string must be silently rewritten to 'conservative'."""
+        from unittest.mock import patch
+
+        with patch('backend.core.config.agent_config.logger.warning') as mock_warning:
+            cfg = AgentConfig(autonomy_level='supervised')
+
+        assert cfg.autonomy_level == 'conservative'
+        messages = [call.args[0] for call in mock_warning.call_args_list]
+        assert any('deprecated' in msg.lower() for msg in messages)
 
     def test_dynamic_iteration_specific_knobs_warn_when_feature_disabled(self):
         from unittest.mock import patch

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm
+from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
@@ -25,6 +27,19 @@ from backend.ledger.action import (
     FileEditAction,
     FileWriteAction,
 )
+
+
+@dataclass(frozen=True)
+class ConfirmationDecision:
+    """Outcome of a single confirmation prompt.
+
+    ``approved`` is the y/n answer. ``remember`` is True when the user
+    asked to whitelist this exact action signature for the rest of the
+    session (the "always allow" choice).
+    """
+
+    approved: bool
+    remember: bool = False
 
 
 def _risk_label(action: Action) -> tuple[str, str]:
@@ -79,8 +94,13 @@ def _confirmation_frame_style(risk_text: str) -> str:
 def render_confirmation(
     console: Console,
     pending_action: Action,
-) -> bool:
-    """Render a confirmation table and return True if the user approves."""
+) -> ConfirmationDecision:
+    """Render a confirmation table and return the user's decision.
+
+    Returns a :class:`ConfirmationDecision` describing whether the action
+    was approved and whether the user asked to remember the choice for
+    the rest of the session.
+    """
     risk_text, risk_style = _risk_label(pending_action)
     frame_style = _confirmation_frame_style(risk_text)
 
@@ -128,12 +148,20 @@ def render_confirmation(
             ),
         )
 
-    return Confirm.ask(
-        '  [bold]Approve?[/bold] [dim]\\[y/n][/dim]',
+    # y = approve once, n = reject, a = always allow this exact action
+    # signature for the remainder of the session.
+    answer = Prompt.ask(
+        '  [bold]Approve?[/bold] [dim]\\[y/n/a=always][/dim]',
         console=console,
+        choices=['y', 'n', 'a'],
+        default='n',
         show_choices=False,
         show_default=False,
     )
+    answer = (answer or 'n').strip().lower()
+    if answer == 'a':
+        return ConfirmationDecision(approved=True, remember=True)
+    return ConfirmationDecision(approved=answer == 'y', remember=False)
 
 
 def build_confirmation_action(approved: bool) -> ChangeAgentStateAction:

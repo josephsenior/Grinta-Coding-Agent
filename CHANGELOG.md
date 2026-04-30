@@ -51,6 +51,46 @@ before the final `1.0.0` cut.
 
 - **Wheel size**: stable at ~1.4 MB on the base install (see `0.56.0`).
 - **Issue template** version hint bumped to `1.0.0rc1`.
+- **Autonomy is now a single-axis knob**. The three modes
+  (`conservative` / `balanced` / `full`) share identical execution,
+  prompting, and retry behaviour. The *only* difference between them is
+  *when* the runtime stops to ask the user before running an action:
+  conservative asks for every action, balanced asks only for high-risk
+  actions, full never asks. The system prompt no longer branches on the
+  mode (the previous "FULL AUTONOMOUS MODE" block has been replaced by a
+  single mode-agnostic sentence so the prompt stays correct when the
+  user toggles modes mid-session via `/autonomy`).
+- **Cost caps and iteration limits decoupled from autonomy**.
+  `max_cost_per_task`, `warn_at_cost`, `max_autonomous_iterations`, and
+  `stuck_threshold_iterations` are now standalone config keys with
+  global defaults; they apply universally regardless of autonomy mode.
+  `PermissionsConfig.get_preset()` no longer pre-fills cost caps per
+  mode, and the "this knob only applies in full autonomy" warning has
+  been removed.
+
+### Added
+
+- **Per-session "always allow" memory** for the confirmation gate. The
+  approval prompt now offers `[y/n/a=always]`; choosing `a` whitelists
+  that exact action signature (e.g. the literal command string) for the
+  remainder of the session so the agent does not re-ask for the same
+  `pytest -q`, `git status`, or `ls` over and over. The whitelist is
+  in-memory only and is cleared on process exit.
+
+### Migration
+
+- **`autonomy_level: supervised` is renamed to `conservative`** to
+  better describe the behaviour ("confirm every action") and to avoid
+  implying extra oversight features that don't exist. The string
+  `supervised` is still accepted in config files and on the `/autonomy`
+  slash command — it is silently rewritten to `conservative` and a
+  one-time deprecation warning is logged. The alias will be removed in
+  a future release; please update your configs.
+- If you previously relied on **per-mode cost caps** (`$5` for
+  supervised, `$10` for balanced, `$15` warn for full) being applied
+  automatically by `PermissionsConfig.get_preset()`, set
+  `max_cost_per_task` and `warn_at_cost` explicitly in your permissions
+  config — they are no longer derived from the autonomy mode.
 
 ## [0.56.0] - 2026-04-29
 

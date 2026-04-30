@@ -703,6 +703,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     _FAKE_PROMPT_LEDGER_WARN: frozenset[str] = frozenset({'Review', 'Paused'})
     _FAKE_PROMPT_AUTONOMY_STYLES: dict[str, str] = {
         'full': CLR_AUTONOMY_FULL,
+        'conservative': CLR_AUTONOMY_SUPERVISED,
         'supervised': CLR_AUTONOMY_SUPERVISED,
     }
     _FAKE_PROMPT_SEP: tuple[str, str] = (' · ', CLR_SEP)

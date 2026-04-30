@@ -483,12 +483,15 @@ class SessionLifecycleMixin:
             logger.debug('get_pending_action() failed, trying fallback', exc_info=True)
             pending = getattr(controller, '_pending_action', None)
 
+        remember_always = False
         if pending is not None:
             if self._renderer is not None:
                 with self._renderer.suspend_live():
-                    approved = render_confirmation(self._console, pending)
+                    decision = render_confirmation(self._console, pending)
             else:
-                approved = render_confirmation(self._console, pending)
+                decision = render_confirmation(self._console, pending)
+            approved = decision.approved
+            remember_always = decision.remember
         else:
             # Fallback: generic prompt if we can't get the pending action.
             from rich.prompt import Confirm
@@ -504,6 +507,19 @@ class SessionLifecycleMixin:
                     '[bold yellow]The agent wants to execute an action. Approve?[/bold yellow]',
                     console=self._console,
                 )
+
+        if remember_always and approved and pending is not None:
+            ac = getattr(controller, 'autonomy_controller', None)
+            if ac is not None and hasattr(ac, 'remember_always_allow'):
+                try:
+                    ac.remember_always_allow(pending)
+                    if self._renderer is not None:
+                        self._renderer.add_system_message(
+                            'Remembered for this session — will not ask again for this exact action.',
+                            title='autonomy',
+                        )
+                except Exception:
+                    logger.debug('remember_always_allow failed', exc_info=True)
 
         action = build_confirmation_action(approved)
         if self._event_stream:

@@ -394,7 +394,6 @@ def _render_security(cli_mode: bool = True) -> str:
 
 
 def _render_autonomy(render_partial: Callable[..., str], config: Any, is_windows: bool) -> str:
-    level = getattr(config, 'autonomy_level', 'balanced')
     checkpoints = getattr(config, 'enable_checkpoints', False)
     code_intelligence_available = _code_intelligence_available(config)
     cp_line = (
@@ -403,16 +402,21 @@ def _render_autonomy(render_partial: Callable[..., str], config: Any, is_windows
         else ''
     )
 
-    autonomy = ''
-    if level == 'full':
-        autonomy = (
-            f'<AUTONOMY>\nFULL AUTONOMOUS MODE: Execute all planned steps end-to-end without '
-            f'confirmation. On tool failure, pivot to an alternative tool in the same turn '
-            f'(e.g. symbol_editor → text_editor). Auto-retry recoverable errors. '
-            f'Report back only after completing the plan or exhausting tool alternatives on a '
-            f'blocking sub-task. '
-            f'{cp_line}\n</AUTONOMY>'
-        )
+    # Single mode-agnostic instruction. The runtime confirmation gate decides
+    # whether to interrupt for user approval based on the configured autonomy
+    # level — the agent should not branch on that knob in its prompt logic,
+    # because the prompt would be wrong as soon as the user toggles modes
+    # mid-session via /autonomy. Treat any user decision surfaced by the
+    # gate as authoritative and continue from where you stopped.
+    autonomy = (
+        '<AUTONOMY>\n'
+        'Plan, execute, and verify the user\'s task end-to-end. The runtime may '
+        'interrupt a tool call to surface a user decision; treat that decision as '
+        'authoritative and continue from where you stopped. On tool failure, pivot '
+        'to an alternative tool in the same turn (e.g. symbol_editor \u2192 text_editor) '
+        'and auto-retry recoverable errors before reporting back.'
+        f'{cp_line}\n</AUTONOMY>'
+    )
 
     path_hint = _choose(
         is_windows,

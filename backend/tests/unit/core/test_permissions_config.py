@@ -92,21 +92,27 @@ class TestPermissionsConfigDefaults:
 
 
 class TestPresets:
-    def test_supervised_preset(self):
-        config = PermissionsConfig.get_preset('supervised')
-        assert config.autonomy_level == 'supervised'
+    def test_conservative_preset(self):
+        config = PermissionsConfig.get_preset('conservative')
+        assert config.autonomy_level == 'conservative'
         assert config.git_allow_force_push is False
         assert config.git_allow_branch_delete is False
         assert config.shell_allow_sudo is False
         assert config.system_operations_enabled is False
-        assert config.max_cost_per_task == 5.0
-        assert config.warn_at_cost == 3.0
+        # Cost caps are no longer coupled to autonomy_level (1.0.0-rc1).
+        assert config.max_cost_per_task is None
+        assert config.warn_at_cost is None
+
+    def test_supervised_alias_maps_to_conservative(self):
+        """Legacy 'supervised' input still works and yields a conservative preset."""
+        config = PermissionsConfig.get_preset('supervised')
+        assert config.autonomy_level == 'conservative'
 
     def test_balanced_preset(self):
         config = PermissionsConfig.get_preset('balanced')
         assert config.autonomy_level == 'balanced'
-        assert config.max_cost_per_task == 10.0
-        assert config.warn_at_cost == 7.0
+        assert config.max_cost_per_task is None
+        assert config.warn_at_cost is None
 
     def test_full_preset(self):
         config = PermissionsConfig.get_preset('full')
@@ -115,7 +121,7 @@ class TestPresets:
         assert config.git_allow_force_push is False  # Still denied for safety
         assert config.shell_allow_sudo is False
         assert config.max_cost_per_task is None
-        assert config.warn_at_cost == 15.0
+        assert config.warn_at_cost is None
 
 
 # ── check_permission ─────────────────────────────────────────────────
