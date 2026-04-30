@@ -70,6 +70,7 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
     styles = {
         'ok': '#86efac',
         'err': '#fca5a5',
+        'warn': '#fcd34d',
         'neutral': '#93c5fd',
     }
     line.append(message, style=styles.get(kind, styles['neutral']))

@@ -328,14 +328,15 @@ def _help_for_specific_command(command_name: str) -> str:
 
 
 def _help_section_lines(specs: list['SlashCommandSpec']) -> list[str]:
-    lines: list[str] = []
+    lines: list[str] = ['| Command | Purpose |', '| --- | --- |']
     for spec in specs:
         alias_text = (
-            ' _(aliases: ' + ', '.join(f'`{alias}`' for alias in spec.aliases) + ')_'
+            '; aliases: ' + ', '.join(f'`{alias}`' for alias in spec.aliases)
             if spec.aliases
             else ''
         )
-        lines.append(f'- `{spec.usage}` — {spec.description}{alias_text}')
+        usage = spec.usage.replace('|', r'\|')
+        lines.append(f'| `{usage}` | {spec.description}{alias_text} |')
     return lines
 
 
@@ -346,7 +347,8 @@ _HELP_INPUT_TIPS: tuple[str, ...] = (
     '- `Tab` — autocomplete slash commands and arguments',
     '- `↑` / `↓` — search prompt history',
     '- `Alt+Enter` — insert a newline (multi-line input)',
-    '- `Ctrl+C` — interrupt the current run',
+    '- `Ctrl+C` — interrupt a running agent turn',
+    '- `Ctrl+D` — close piped or terminal input',
     '- `/help <command>` — detailed help for a single command',
 )
 
@@ -362,7 +364,10 @@ def _build_help_markdown(command_name: str | None = None) -> str:
     for spec in _SLASH_COMMANDS:
         by_section[spec.help_section].append(spec)
 
-    lines: list[str] = []
+    lines: list[str] = [
+        'Send plain-language tasks at the prompt. Slash commands are for session control, inspection, and settings.',
+        '',
+    ]
     first_section = True
     for section_key, title in _HELP_SECTIONS_ORDER:
         specs = by_section.get(section_key)
@@ -1209,7 +1214,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
     async def _read_non_interactive_input(self) -> str:
         if self._queued_input:
             return self._queued_input.pop(0)
-        self._console.print('>>> ', end='')
+        self._console.print('grinta> ', end='')
         return await asyncio.to_thread(sys.stdin.readline)
 
     # -- public entry point ------------------------------------------------

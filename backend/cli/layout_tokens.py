@@ -29,9 +29,17 @@ CALLOUT_PANEL_PADDING = (1, 2)
 # Inner padding for compact activity/live panels so rows align across sections.
 ACTIVITY_PANEL_PADDING = (0, 1)
 
-# Space below each activity block (tool rows) for scanability. Slightly increased
-# to provide a small visual gap between adjacent activity cards.
-ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 2, 0)
+# Space below each activity block (tool rows) for scanability. A single blank
+# row keeps adjacent cards visually separated without making rapid tool
+# sequences feel sluggish or "loose".
+ACTIVITY_BLOCK_BOTTOM_PAD = (0, 0, 1, 0)
+
+# Horizontal chrome added by ``format_callout_panel`` and rounded activity
+# panels: 2 border characters + ``CALLOUT_PANEL_PADDING`` horizontal cells on
+# each side. Exported so wrappers (e.g. the reasoning thought-line wrap) can
+# compute interior widths from a single source of truth instead of guessing.
+CALLOUT_PANEL_CHROME_WIDTH = 2 + 2 * CALLOUT_PANEL_PADDING[1]
+ACTIVITY_PANEL_CHROME_WIDTH = 2 + 2 * ACTIVITY_PANEL_PADDING[1]
 
 # Shared palette for the transcript chrome. Centralizing these keeps live panels,
 # activity cards, and decision callouts visually consistent during long sessions.

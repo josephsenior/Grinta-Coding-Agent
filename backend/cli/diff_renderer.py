@@ -70,19 +70,17 @@ class DiffPanel:
             return
 
         parts.append(format_activity_result_secondary('updated', kind='ok'))
-        # Filter out syntax check messages if they exist to reduce visual clutter
-        filtered_parts = [
-            p
-            for p in parts
-            if not (isinstance(p, Text) and 'CRITICAL: Syntax Error' in p.plain)
-        ]
-        yield self._build_panel(filtered_parts)
+        yield self._build_panel(parts)
 
     def _append_secondary(self, parts: list[Any]) -> None:
-        # Hide syntax error messages from UI to reduce clutter
+        # Surface syntax checker output as a clearly-marked secondary line
+        # rather than silently swallowing it — these warnings are actionable
+        # (the agent just touched the file) but should read as a hint, not a
+        # blocking error, so they sit alongside the diff with a warn tint.
         if not self._secondary:
             return
         if 'Syntax Error' in self._secondary or 'Syntax Check' in self._secondary:
+            parts.append(format_activity_secondary(self._secondary, kind='warn'))
             return
         parts.append(format_activity_secondary(self._secondary, kind='neutral'))
 

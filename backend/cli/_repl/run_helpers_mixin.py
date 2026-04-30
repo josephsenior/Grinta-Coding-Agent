@@ -10,10 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
-import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from backend.cli.event_renderer import CLIEventRenderer
@@ -49,7 +46,7 @@ class RunHelpersMixin:
 
         def _create_prompt_session(self) -> Any: ...
         def _set_footer_system_line(self, text: str, *, kind: str = ...) -> None: ...
-        def _read_non_interactive_input(self) -> Any: ...
+        async def _read_non_interactive_input(self) -> Any: ...
         def _handle_parsed_command(self, *args: Any, **kwargs: Any) -> Any: ...
         def _cancel_agent(self, *args: Any, **kwargs: Any) -> Any: ...
         def _resume_session(self, *args: Any, **kwargs: Any) -> Any: ...
@@ -106,8 +103,8 @@ class RunHelpersMixin:
         if 'AuthenticationError' in exc_name or 'api_key' in str(exc).lower():
             renderer.add_system_message(
                 'No API key or model configured.\n'
-                'Run grinta again and complete onboarding, '
-                'or edit settings.json directly.\n'
+                'Run `grinta init` to configure a provider, '
+                'or edit `settings.json` directly.\n'
                 f'{exc}',
                 title='error',
             )
@@ -269,7 +266,7 @@ class RunHelpersMixin:
             msg = 'Chat ready. MCP tools warming in background.'
         else:
             self._hud.update_mcp_servers(0)
-            msg = 'Ready.'
+            msg = 'Ready. Describe a task or type /help.'
         if session is not None:
             self._set_footer_system_line(msg)
         else:
@@ -288,26 +285,6 @@ class RunHelpersMixin:
         try:
             if session is None:
                 user_input = await self._read_non_interactive_input()
-                # #region agent log
-                try:
-                    payload = {
-                        'sessionId': 'fee086',
-                        'runId': 'pre-fix',
-                        'hypothesisId': 'H12_noninteractive_input_flow',
-                        'location': 'backend/cli/_repl/run_helpers_mixin.py:_read_repl_input',
-                        'message': 'noninteractive-read',
-                        'data': {
-                            'input_repr': repr(user_input),
-                            'input_len': len(user_input),
-                        },
-                        'timestamp': int(time.time() * 1000),
-                    }
-                    lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
-                    with open(lp, 'a', encoding='utf-8') as _f:
-                        _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-                except Exception:
-                    pass
-                # #endregion
                 if user_input == '':
                     raise EOFError
             else:
@@ -315,38 +292,18 @@ class RunHelpersMixin:
         except KeyboardInterrupt:
             if not self._prompt_ctrl_c_hint_shown:
                 self._console.print(
-                    '[dim]Ctrl+C at the prompt does not exit the REPL; '
-                    'type /quit or exit. While the agent is running, '
-                    'Ctrl+C cancels the run (on some terminals you may need '
-                    'to press it more than once).[/dim]'
+                    '[dim]At the prompt, type /quit to exit. During a run, '
+                    'Ctrl+C asks the agent to stop; some terminals may need '
+                    'a second press.[/dim]'
                 )
                 self._prompt_ctrl_c_hint_shown = True
             return ''
         except EOFError:
-            # #region agent log
-            try:
-                payload = {
-                    'sessionId': 'fee086',
-                    'runId': 'pre-fix',
-                    'hypothesisId': 'H12_noninteractive_input_flow',
-                    'location': 'backend/cli/_repl/run_helpers_mixin.py:_read_repl_input',
-                    'message': 'prompt-loop-eof',
-                    'data': {'session_is_none': session is None},
-                    'timestamp': int(time.time() * 1000),
-                }
-                lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
-                with open(lp, 'a', encoding='utf-8') as _f:
-                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-            except Exception:
-                pass
-            # #endregion
-            self._console.print('EOF Error received in prompt loop.')
+            self._console.print('[dim]Input closed. Exiting.[/dim]')
             return None
         except Exception as e:
-            self._console.print(f'CRASH: {e}')
-            import traceback
-
-            traceback.print_exc()
+            logger.exception('Prompt input failed')
+            self._console.print(f'[red]Prompt input failed:[/red] {e}')
             return None
 
         if not self._running:
@@ -471,26 +428,6 @@ class RunHelpersMixin:
         )
 
         event_stream.add_event(initial_action, EventSource.USER)
-        # #region agent log
-        try:
-            payload = {
-                'sessionId': 'fee086',
-                'runId': 'pre-fix',
-                'hypothesisId': 'H16_cli_task_dispatch',
-                'location': 'backend/cli/_repl/run_helpers_mixin.py:_dispatch_user_turn',
-                'message': 'user-action-dispatched',
-                'data': {
-                    'action_type': type(initial_action).__name__,
-                    'text': text[:120],
-                },
-                'timestamp': int(time.time() * 1000),
-            }
-            lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
-            with open(lp, 'a', encoding='utf-8') as _f:
-                _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-        except Exception:
-            pass
-        # #endregion
         try:
             controller.step()
         except Exception:

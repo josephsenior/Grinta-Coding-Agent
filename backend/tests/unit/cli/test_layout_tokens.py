@@ -57,4 +57,7 @@ def test_callout_padding_tuple() -> None:
 
 
 def test_activity_block_bottom_pad() -> None:
-    assert ACTIVITY_BLOCK_BOTTOM_PAD == (0, 0, 2, 0)
+    # A single trailing blank row keeps adjacent activity cards visually
+    # separated without padding the transcript out and making rapid tool
+    # sequences read as sluggish.
+    assert ACTIVITY_BLOCK_BOTTOM_PAD == (0, 0, 1, 0)
