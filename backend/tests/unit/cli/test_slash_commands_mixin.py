@@ -488,7 +488,7 @@ class TestCmdAutonomy:
         assert result is True
         assert mock_ac.autonomy_level == 'conservative'
 
-    def test_supervised_alias_maps_to_conservative(self) -> None:
+    def test_supervised_level_is_rejected(self) -> None:
         r = _repl()
         mock_ac = MagicMock()
         mock_ac.autonomy_level = 'balanced'
@@ -497,7 +497,10 @@ class TestCmdAutonomy:
         r._controller = mock_ctrl
         result = r._cmd_autonomy(_parse('/autonomy supervised'))
         assert result is True
-        assert mock_ac.autonomy_level == 'conservative'
+        assert mock_ac.autonomy_level == 'balanced'
+        assert r._renderer is not None
+        messages = [m for _, m in r._renderer.messages]
+        assert any('supervised' in m.lower() or 'invalid' in m.lower() for m in messages)
 
     def test_invalid_level(self) -> None:
         r = _repl()

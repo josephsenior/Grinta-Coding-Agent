@@ -124,6 +124,6 @@ Before running Grinta against an unfamiliar repository:
 
 1. Read [docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md).
 2. Set `security.execution_profile = "hardened_local"` in `settings.json`.
-3. Lower autonomy with `/autonomy supervised` for the first few interactions.
+3. Lower autonomy with `/autonomy conservative` for the first few interactions.
 4. Confirm a clean `git status` so the post-session diff is meaningful.
 5. Review the audit log after the session ends.

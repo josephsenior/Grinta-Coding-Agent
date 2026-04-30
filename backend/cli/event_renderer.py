@@ -44,7 +44,7 @@ from backend.cli.layout_tokens import (
 from backend.cli.theme import (
     CLR_AUTONOMY_BALANCED,
     CLR_AUTONOMY_FULL,
-    CLR_AUTONOMY_SUPERVISED,
+    CLR_AUTONOMY_CONSERVATIVE,
     CLR_BRAND,
     CLR_HUD_DETAIL,
     CLR_HUD_MODEL,
@@ -703,8 +703,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     _FAKE_PROMPT_LEDGER_WARN: frozenset[str] = frozenset({'Review', 'Paused'})
     _FAKE_PROMPT_AUTONOMY_STYLES: dict[str, str] = {
         'full': CLR_AUTONOMY_FULL,
-        'conservative': CLR_AUTONOMY_SUPERVISED,
-        'supervised': CLR_AUTONOMY_SUPERVISED,
+        'conservative': CLR_AUTONOMY_CONSERVATIVE,
     }
     _FAKE_PROMPT_SEP: tuple[str, str] = (' · ', CLR_SEP)
     _FAKE_PROMPT_UNKNOWN_PROVIDERS: frozenset[str] = frozenset(

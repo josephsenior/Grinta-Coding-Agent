@@ -250,7 +250,7 @@ The system prompt is composed from five static Markdown partials:
 
 1. **`routing`** — Tool routing strategy. This tells the model when to prefer `search_code` over `bash grep`, when to reach for the LSP query tool for precise symbol references, and when to batch commands instead of running them one at a time. It encodes the lessons I learned from watching early agents make terrible tool choices.
 
-2. **`autonomy`** — The operating mode. Grinta supports three levels: `full` (execute all steps without asking), `balanced` (ask for risky actions), and `supervised` (confirm everything). Each level gets a different block injected into the prompt with explicit behavioral instructions and checkpoint hints.
+2. **`autonomy`** — The operating mode. Grinta supports three levels: `full` (execute all steps without asking), `balanced` (ask for risky actions), and `conservative` (confirm everything). Each level gets a different block injected into the prompt with explicit behavioral instructions and checkpoint hints.
 
 3. **`tools`** — Tool usage discipline and fallback patterns. This is where the prompt enforces the philosophy: prefer structured tools over raw shell commands for file operations, do not use `cat` or `grep` for source code reading, do not create files with shell redirection when `str_replace_editor` exists.
 

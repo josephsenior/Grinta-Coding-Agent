@@ -97,6 +97,8 @@ graph TB
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the deep dive.
 
+Contributors: CI runs the full unit corpus on Linux and Windows ([docs/CI.md](docs/CI.md)); match that locally before opening a PR ([CONTRIBUTING.md](CONTRIBUTING.md#testing-before-a-pull-request)).
+
 ## The story behind Grinta
 
 Grinta is a single-author project, written and rewritten in public. The journey — what was killed, what was wrong, what got rebuilt — lives in the **Book of Grinta**:

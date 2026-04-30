@@ -12,7 +12,7 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 - [ ] You trust the repository you are pointing Grinta at (no malicious `package.json` lifecycle scripts, no rogue `Makefile`, no `.envrc` you didn't write).
 - [ ] Your `settings.json` does **not** contain the only copy of any secret — secrets should live in your OS keychain or `.env` files referenced via `${VAR}` syntax.
 - [ ] You have a clean git working tree (so `git diff` is meaningful as an audit trail at the end).
-- [ ] You know your autonomy level (`/autonomy`). Use `supervised` for unfamiliar repos; `balanced` (default) for normal work.
+- [ ] You know your autonomy level (`/autonomy`). Use **conservative** for unfamiliar repos (confirm before every action); **balanced** (default) for normal work.
 
 ## Built-in protections
 
@@ -31,7 +31,7 @@ Grinta is **local-first** and runs with **your** user privileges. It is **not** 
 ## Hardening recommendations
 
 1. **Run untrusted repos inside a VM or container.** Use a disposable Docker container or a fresh user account with limited home-directory ACLs.
-2. **Stay on `supervised` autonomy** the first time you point Grinta at a new repo.
+2. **Stay on `conservative` autonomy** the first time you point Grinta at a new repo.
 3. **Review the audit log** (`~/.grinta/workspaces/<id>/storage/<session>/audit/`) at the end of each long session.
 4. **Keep your provider API keys scoped.** Use per-project keys with low spend limits where supported.
 5. **Pin Grinta to a known version** in production-adjacent workflows; track `CHANGELOG.md`.

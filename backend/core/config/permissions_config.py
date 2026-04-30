@@ -230,19 +230,13 @@ class PermissionsConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
         Args:
             autonomy_level: One of 'conservative', 'balanced', or 'full'.
-                The legacy value 'supervised' is accepted as an alias for
-                'conservative'.
 
         Returns:
             PermissionsConfig configured for the specified autonomy level
 
         """
-        # Accept the deprecated alias silently here; the AgentConfig
-        # validator already emits the deprecation warning.
-        if autonomy_level == 'supervised':
-            autonomy_level = 'conservative'
-
-        if autonomy_level == 'conservative':
+        normalized = autonomy_level.strip().lower()
+        if normalized == 'conservative':
             return cls(
                 autonomy_level='conservative',
                 git_allow_force_push=False,
@@ -250,7 +244,7 @@ class PermissionsConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 shell_allow_sudo=False,
                 system_operations_enabled=False,
             )
-        if autonomy_level == 'balanced':
+        if normalized == 'balanced':
             return cls(
                 autonomy_level='balanced',
                 git_allow_force_push=False,
@@ -258,13 +252,16 @@ class PermissionsConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 shell_allow_sudo=False,
                 system_operations_enabled=False,
             )
-        # full
-        return cls(
-            autonomy_level='full',
-            git_allow_force_push=False,  # Still deny by default for safety
-            git_allow_branch_delete=True,
-            shell_allow_sudo=False,  # Still deny sudo for safety
-            system_operations_enabled=False,  # Still deny system ops
+        if normalized == 'full':
+            return cls(
+                autonomy_level='full',
+                git_allow_force_push=False,  # Still deny by default for safety
+                git_allow_branch_delete=True,
+                shell_allow_sudo=False,  # Still deny sudo for safety
+                system_operations_enabled=False,  # Still deny system ops
+            )
+        raise ValueError(
+            f'autonomy_level must be conservative, balanced, or full; got {autonomy_level!r}',
         )
 
     def check_permission(

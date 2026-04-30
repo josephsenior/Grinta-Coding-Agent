@@ -6,6 +6,8 @@ Related docs:
 
 - User documentation: `docs/USER_GUIDE.md`
 - Architecture overview: `docs/ARCHITECTURE.md`
+- CI tiers (what PRs gate): `docs/CI.md`
+- Regression test placement: `docs/REGRESSION_TESTS.md`
 - Terminology contract: `docs/VOCABULARY.md`
 - Historical rationale: `docs/journey/README.md`
 
@@ -158,7 +160,7 @@ uv run ruff check backend launch scripts
 uv run mypy --config-file mypy.ini
 ```
 
-If a change touches orchestration, run at least one focused orchestration suite and one end-to-end style test path when available.
+If a change touches orchestration, run at least one focused orchestration suite and one end-to-end style test path when available. Bugfixes should add a targeted regression test per `docs/REGRESSION_TESTS.md`; release QA follows `docs/RELEASE_CHECKLIST.md`.
 
 ---
 

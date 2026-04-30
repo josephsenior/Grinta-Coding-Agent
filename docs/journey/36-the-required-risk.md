@@ -54,7 +54,7 @@ The collapse: autonomy is now a **single-axis knob** that controls *exactly one 
 
 Execution is identical across modes. Prompting is identical across modes — the system prompt no longer branches on autonomy. Retry logic is identical. Cost caps and iteration limits were extracted into their own standalone config keys (`max_cost_per_task`, `warn_at_cost`, `max_autonomous_iterations`, `stuck_threshold_iterations`) with global defaults that apply universally regardless of mode.
 
-The `supervised` string is still accepted as a legacy alias and silently rewritten to `conservative`, with a one-time deprecation warning in the log. That is the only backward-compat seam, and it will come out in a future release.
+Later, the `supervised` spelling was removed from config and the CLI entirely — only `conservative`, `balanced`, and `full` remain.
 
 The whole rename took about an evening. Most of that time was deleting the per-mode behavior branches and convincing myself I was not *losing* a feature by doing so. I wasn’t. I was deleting a feature that had only ever been a bug surface.
 

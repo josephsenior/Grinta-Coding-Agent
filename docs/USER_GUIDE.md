@@ -199,6 +199,16 @@ Grinta executes locally on your host machine.
 
 Use Grinta in trusted repositories and environments.
 
+### Autonomy levels (`/autonomy`)
+
+There are three stored levels: **conservative**, **balanced**, and **full**. They differ only in **when the agent asks you before running an action**; execution, retries, and prompts are otherwise the same.
+
+- **Conservative** — confirm before every runnable action.
+- **Balanced** (default) — confirm only for high-risk actions.
+- **Full** — never prompt for confirmation; hard safety blocks (for example CRITICAL-classified commands) still apply.
+
+See also [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md).
+
 ---
 
 ## Useful Commands

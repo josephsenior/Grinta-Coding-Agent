@@ -189,16 +189,13 @@ class TestAgentConfigCustom:
         assert not any('max_autonomous_iterations=%s' in msg for msg in messages)
         assert not any('stuck_threshold_iterations=%s' in msg for msg in messages)
 
-    def test_supervised_input_is_accepted_with_deprecation_warning(self):
-        """Legacy 'supervised' string must be silently rewritten to 'conservative'."""
-        from unittest.mock import patch
+    def test_supervised_autonomy_level_is_rejected(self):
+        """The removed 'supervised' spelling must fail validation with a clear hint."""
+        with pytest.raises(ValidationError) as exc_info:
+            AgentConfig(autonomy_level='supervised')  # type: ignore[call-arg]
 
-        with patch('backend.core.config.agent_config.logger.warning') as mock_warning:
-            cfg = AgentConfig(autonomy_level='supervised')
-
-        assert cfg.autonomy_level == 'conservative'
-        messages = [call.args[0] for call in mock_warning.call_args_list]
-        assert any('deprecated' in msg.lower() for msg in messages)
+        err_text = str(exc_info.value).lower()
+        assert 'conservative' in err_text
 
     def test_dynamic_iteration_specific_knobs_warn_when_feature_disabled(self):
         from unittest.mock import patch
