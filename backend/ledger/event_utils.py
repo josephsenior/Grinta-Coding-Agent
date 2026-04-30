@@ -60,6 +60,7 @@ def _add_orphaned_observations(
             if not isinstance(observation, CmdOutputObservation):
                 logger.debug('Observation %s has no cause', observation)
             from backend.ledger.action.empty import NullActionReason
+
             tuples.append((NullAction(reason=NullActionReason.SENTINEL), observation))
 
 

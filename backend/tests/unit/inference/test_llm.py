@@ -1,4 +1,4 @@
-﻿"""Comprehensive tests for backend.inference.llm - LLM integration and exception mapping."""
+"""Comprehensive tests for backend.inference.llm - LLM integration and exception mapping."""
 
 from types import SimpleNamespace
 from typing import cast
@@ -820,7 +820,7 @@ class TestInbandDisconnectDetection:
             timeout=None,
             seed=None,
             reasoning_effort=None,
-            num_retries=1,        # one attempt only â†’ no retries
+            num_retries=1,  # one attempt only â†’ no retries
             retry_min_wait=0,
             retry_max_wait=0,
             on_cancel_requested_fn=None,
@@ -864,7 +864,9 @@ class TestInbandDisconnectDetection:
 
     def test_disconnect_across_two_chunks_raises(self):
         """Phrase split across consecutive chunks is still detected."""
-        llm = self._make_llm([self._make_chunk('ç½‘ç»œä¸­æ–­'), self._make_chunk('ï¼Œè¯·é‡æ–°è¿žæŽ¥')])
+        llm = self._make_llm(
+            [self._make_chunk('ç½‘ç»œä¸­æ–­'), self._make_chunk('ï¼Œè¯·é‡æ–°è¿žæŽ¥')]
+        )
         with pytest.raises(APIConnectionError):
             self._run(llm)
 

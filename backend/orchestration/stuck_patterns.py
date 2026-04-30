@@ -24,13 +24,13 @@ from backend.ledger.observation.observation import Observation
 _DYNAMIC_CONTENT_RE = re.compile(
     r'(?:'
     r'\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?'  # ISO timestamps
-    r'|(?<!\w)\d{10,}(?!\w)'          # Unix epoch integers (10+ digits)
-    r'|0x[0-9a-fA-F]+'               # hex memory addresses
-    r'|/tmp/[^\s,;"\')]*'            # /tmp/... paths
-    r'|\\[Tt]emp\\[^\s,;"\')]*'      # Windows \Temp\... paths
-    r'|(?:line|col(?:umn)?)\s+\d+'   # "line N" / "column N"
-    r'|:\d+(?::\d+)?(?=\D|$)'        # :42 or :42:8 (file:line:col)
-    r'|in \d+\.\d+s'                 # "in 0.12s" timing
+    r'|(?<!\w)\d{10,}(?!\w)'  # Unix epoch integers (10+ digits)
+    r'|0x[0-9a-fA-F]+'  # hex memory addresses
+    r'|/tmp/[^\s,;"\')]*'  # /tmp/... paths
+    r'|\\[Tt]emp\\[^\s,;"\')]*'  # Windows \Temp\... paths
+    r'|(?:line|col(?:umn)?)\s+\d+'  # "line N" / "column N"
+    r'|:\d+(?::\d+)?(?=\D|$)'  # :42 or :42:8 (file:line:col)
+    r'|in \d+\.\d+s'  # "in 0.12s" timing
     r')',
     re.IGNORECASE,
 )

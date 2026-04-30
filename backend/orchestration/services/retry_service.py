@@ -411,9 +411,7 @@ class RetryService:
             iteration_flag is not None and iteration_flag.reached_limit()
         )
 
-    async def _abort_retry_resume_for_limits(
-        self, controller, task: RetryTask
-    ) -> bool:
+    async def _abort_retry_resume_for_limits(self, controller, task: RetryTask) -> bool:
         if not self._retry_resume_limit_exceeded(controller):
             return False
 

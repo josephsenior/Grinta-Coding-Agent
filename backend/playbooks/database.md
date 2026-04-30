@@ -24,7 +24,7 @@ Offer **SQLite (dev)** vs **user-managed server** (Postgres, MySQL, Mongo, etc.)
 
 ## Snippets (reference)
 
-**SQLite (Node):** `better-sqlite3` — open file, `CREATE TABLE IF NOT EXISTS`, parameterized queries.  
+**SQLite (Node):** `better-sqlite3` — open file, `CREATE TABLE IF NOT EXISTS`, parameterized queries.
 **Postgres (Node):** `pg` `Pool` — never hardcode passwords; use env vars.
 
 ## Rules

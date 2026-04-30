@@ -497,9 +497,7 @@ class RollbackManager:
     # ``before_destructive`` records a known-dangerous shell command; losing
     # it would defeat the purpose of recording it in the first place.
     # ``phase_boundary`` records a lifecycle transition snapshot.
-    PROTECTED_CHECKPOINT_TYPES = frozenset(
-        {'before_destructive', 'phase_boundary'}
-    )
+    PROTECTED_CHECKPOINT_TYPES = frozenset({'before_destructive', 'phase_boundary'})
 
     def _cleanup_old_checkpoints(self) -> None:
         """Remove old checkpoints to stay within max_checkpoints limit.
@@ -511,7 +509,8 @@ class RollbackManager:
             return
 
         evictable = [
-            cp for cp in self.checkpoints
+            cp
+            for cp in self.checkpoints
             if cp.checkpoint_type not in self.PROTECTED_CHECKPOINT_TYPES
         ]
         protected_count = len(self.checkpoints) - len(evictable)

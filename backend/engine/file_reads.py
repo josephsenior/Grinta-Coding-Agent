@@ -44,7 +44,9 @@ def _build_partial_file_read_command(
         )
 
     safe = shlex.quote(path)
-    unix_header = f'echo {shlex.quote("=== FILE: " + path + " (" + header + ") ===")} && '
+    unix_header = (
+        f'echo {shlex.quote("=== FILE: " + path + " (" + header + ") ===")} && '
+    )
     if end == -1:
         return unix_header + f'tail -n +{start + 1} {safe}'
     return unix_header + f'sed -n "{start + 1},{end}p" {safe}'

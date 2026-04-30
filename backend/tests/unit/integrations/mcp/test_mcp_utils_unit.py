@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -16,7 +15,9 @@ from backend.integrations.mcp.mcp_bootstrap_status import (
 )
 
 
-def test_get_mcp_connect_timeout_sec_invalid_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_get_mcp_connect_timeout_sec_invalid_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv('APP_MCP_CONNECT_TIMEOUT_SEC', 'not-a-float')
     assert mu._get_mcp_connect_timeout_sec() == 60.0
     monkeypatch.setenv('APP_MCP_CONNECT_TIMEOUT_SEC', '-1')
@@ -29,7 +30,9 @@ def test_resolve_server_env_none_empty_and_literals() -> None:
     assert mu._resolve_server_env({'X': 123}) == {'X': '123'}
 
 
-def test_resolve_server_env_empty_string_uses_os(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_server_env_empty_string_uses_os(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv('TOKEN', 'secret')
     out = mu._resolve_server_env({'TOKEN': ''})
     assert out == {'TOKEN': 'secret'}

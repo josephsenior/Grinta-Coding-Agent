@@ -380,7 +380,9 @@ class TestHysteresis:
         breaker = CircuitBreaker(config)
 
         for _ in range(3):
-            breaker.record_error(RuntimeError('bad edit'), tool_name=TEXT_EDITOR_TOOL_NAME)
+            breaker.record_error(
+                RuntimeError('bad edit'), tool_name=TEXT_EDITOR_TOOL_NAME
+            )
         assert breaker.get_tool_error_count(TEXT_EDITOR_TOOL_NAME) == 3
 
         breaker.record_success(tool_name=TEXT_EDITOR_TOOL_NAME)
@@ -647,9 +649,7 @@ class TestTextEditorTaxonomy:
                 RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME
             )
         assert breaker.check(MagicMock()).tripped is False
-        breaker.record_error(
-            RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME
-        )
+        breaker.record_error(RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME)
         result = breaker.check(MagicMock())
         assert result.tripped is True
         assert result.action == 'switch_context'
@@ -666,9 +666,7 @@ class TestTextEditorTaxonomy:
                 RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME
             )
         assert breaker.check(MagicMock()).action == 'switch_context'
-        breaker.record_error(
-            RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME
-        )
+        breaker.record_error(RuntimeError('x'), tool_name=TEXT_EDITOR_SYNTAX_TOOL_NAME)
         result = breaker.check(MagicMock())
         assert result.tripped is True
         assert result.action == 'pause'
@@ -680,13 +678,9 @@ class TestTextEditorTaxonomy:
             max_stuck_detections=100,
         )
         breaker = CircuitBreaker(config)
-        breaker.record_error(
-            RuntimeError('no match'), tool_name=TEXT_EDITOR_TOOL_NAME
-        )
+        breaker.record_error(RuntimeError('no match'), tool_name=TEXT_EDITOR_TOOL_NAME)
         assert breaker.check(MagicMock()).tripped is False
-        breaker.record_error(
-            RuntimeError('no match'), tool_name=TEXT_EDITOR_TOOL_NAME
-        )
+        breaker.record_error(RuntimeError('no match'), tool_name=TEXT_EDITOR_TOOL_NAME)
         result = breaker.check(MagicMock())
         assert result.tripped is True
         assert result.action == 'switch_context'

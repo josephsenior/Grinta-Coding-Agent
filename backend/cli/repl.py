@@ -24,8 +24,8 @@ from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.theme import (
     CLR_AUTONOMY_BALANCED,
-    CLR_AUTONOMY_FULL,
     CLR_AUTONOMY_CONSERVATIVE,
+    CLR_AUTONOMY_FULL,
     CLR_BRAND,
     CLR_HUD_DETAIL,
     CLR_HUD_MODEL,
@@ -310,7 +310,9 @@ def _help_for_specific_command(command_name: str) -> str:
         suffix = ''
         if suggestions:
             suffix = (
-                '\n\nDid you mean ' + ' or '.join(f'`{item}`' for item in suggestions) + '?'
+                '\n\nDid you mean '
+                + ' or '.join(f'`{item}`' for item in suggestions)
+                + '?'
             )
         return f'No help topic for `{command_name}`.{suffix}'
     detail_lines = [
@@ -329,9 +331,7 @@ def _help_section_lines(specs: list['SlashCommandSpec']) -> list[str]:
     lines: list[str] = []
     for spec in specs:
         alias_text = (
-            ' _(aliases: '
-            + ', '.join(f'`{alias}`' for alias in spec.aliases)
-            + ')_'
+            ' _(aliases: ' + ', '.join(f'`{alias}`' for alias in spec.aliases) + ')_'
             if spec.aliases
             else ''
         )
@@ -1264,18 +1264,27 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
                 renderer.add_system_message('Initializing engine...', title='system')
             bootstrap_task = asyncio.create_task(
                 self._engine_bootstrap(
-                    session, renderer, chat_ready_done,
-                    engine_init_done, engine_init_exc,
+                    session,
+                    renderer,
+                    chat_ready_done,
+                    engine_init_done,
+                    engine_init_exc,
                 ),
                 name='grinta-engine-bootstrap',
             )
 
             while self._running:
                 stop = await self._repl_iteration(
-                    session, controller, agent_task,
-                    chat_ready_done, engine_init_done, engine_init_exc,
-                    create_controller, _create_early_status_callback,
-                    run_agent_until_done, end_states,
+                    session,
+                    controller,
+                    agent_task,
+                    chat_ready_done,
+                    engine_init_done,
+                    engine_init_exc,
+                    create_controller,
+                    _create_early_status_callback,
+                    run_agent_until_done,
+                    end_states,
                 )
                 if stop is None:
                     break
@@ -1308,10 +1317,15 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
         if text.startswith('/'):
             handled = await self._process_slash_command(
-                text, agent_task, controller,
-                engine_init_done, engine_init_exc,
-                create_controller, create_status_callback,
-                run_agent_until_done, end_states,
+                text,
+                agent_task,
+                controller,
+                engine_init_done,
+                engine_init_exc,
+                create_controller,
+                create_status_callback,
+                run_agent_until_done,
+                end_states,
             )
             if handled is None:
                 return None
@@ -1328,9 +1342,13 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             return None
 
         controller, agent_task = await self._dispatch_user_turn(
-            text, controller, agent_task,
-            create_controller, create_status_callback,
-            run_agent_until_done, end_states, session,
+            text,
+            controller,
+            agent_task,
+            create_controller,
+            create_status_callback,
+            run_agent_until_done,
+            end_states,
+            session,
         )
         return controller, agent_task
-

@@ -11,7 +11,9 @@ import pytest
 @pytest.fixture
 def rm():
     fake_asyncpg = type('FakeAsyncPg', (), {'connect': AsyncMock()})()
-    sys.modules.pop('backend.persistence.knowledge_base.migrations.run_migrations', None)
+    sys.modules.pop(
+        'backend.persistence.knowledge_base.migrations.run_migrations', None
+    )
     with patch.dict(sys.modules, {'asyncpg': fake_asyncpg}):
         mod = importlib.import_module(
             'backend.persistence.knowledge_base.migrations.run_migrations'
@@ -60,7 +62,9 @@ async def test_run_migrations_executes_sql_files(rm, tmp_path: Path) -> None:
 async def test_run_migrations_connection_failure_exits(rm, tmp_path: Path) -> None:
     with (
         patch.object(rm, '__file__', str(tmp_path / 'run_migrations.py')),
-        patch.object(rm.asyncpg, 'connect', AsyncMock(side_effect=RuntimeError('db down'))),
+        patch.object(
+            rm.asyncpg, 'connect', AsyncMock(side_effect=RuntimeError('db down'))
+        ),
         patch('sys.exit', side_effect=SystemExit(1)),
     ):
         with pytest.raises(SystemExit):
@@ -81,4 +85,3 @@ async def test_run_migrations_file_execution_failure_exits(rm, tmp_path: Path) -
         with pytest.raises(SystemExit):
             await rm.run_migrations()
     conn.close.assert_awaited_once()
-

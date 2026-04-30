@@ -65,7 +65,9 @@ async def test_progress_policy_ignores_error_observations_for_progress() -> None
 
 
 @pytest.mark.asyncio
-async def test_progress_policy_blocks_repeated_terminal_input_without_progress() -> None:
+async def test_progress_policy_blocks_repeated_terminal_input_without_progress() -> (
+    None
+):
     mw = ProgressPolicyMiddleware()
     act = TerminalInputAction(session_id='s', control='enter')
     ctx = _ctx_for(act)

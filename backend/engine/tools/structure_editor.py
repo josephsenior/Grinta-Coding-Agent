@@ -87,9 +87,9 @@ class StructureEditor:
         self.refactor = AtomicRefactor()
         self.errors = SmartErrorHandler()
 
-        self._undo_history: dict[str, list[tuple[str, str]]] = (
-            {}
-        )  # path -> [(hash, content)]
+        self._undo_history: dict[
+            str, list[tuple[str, str]]
+        ] = {}  # path -> [(hash, content)]
 
         logger.info('🚀 Ultimate Editor initialized')
         logger.info(

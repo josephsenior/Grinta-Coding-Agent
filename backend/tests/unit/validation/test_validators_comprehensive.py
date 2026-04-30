@@ -126,7 +126,9 @@ class TestTestPassingValidatorExt(unittest.IsolatedAsyncioTestCase):
 class TestDiffValidatorExt(unittest.IsolatedAsyncioTestCase):
     async def test_no_diff(self):
         v = DiffValidator()
-        result = await v.validate_completion(Task('change login behavior'), _make_state([]))
+        result = await v.validate_completion(
+            Task('change login behavior'), _make_state([])
+        )
         self.assertFalse(result.passed)
 
     async def test_substantial_diff(self):
@@ -154,7 +156,9 @@ class TestDiffValidatorExt(unittest.IsolatedAsyncioTestCase):
 
     async def test_read_only_task_without_diff(self):
         v = DiffValidator()
-        result = await v.validate_completion(Task('review the architecture'), _make_state([]))
+        result = await v.validate_completion(
+            Task('review the architecture'), _make_state([])
+        )
         self.assertTrue(result.passed)
 
     def test_meaningful_change_detection(self):

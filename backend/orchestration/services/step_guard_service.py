@@ -35,7 +35,9 @@ if TYPE_CHECKING:
     from backend.orchestration.state.state import State
 
 
-def _pending_action_for_observation_cause(controller: "SessionOrchestrator") -> object | None:
+def _pending_action_for_observation_cause(
+    controller: 'SessionOrchestrator',
+) -> object | None:
     """Current pending action (if any) for correlating guard observations."""
     services = getattr(controller, 'services', None)
     svc = getattr(services, 'pending_action', None) if services is not None else None
@@ -46,7 +48,7 @@ def _pending_action_for_observation_cause(controller: "SessionOrchestrator") -> 
     return getattr(controller, '_pending_action', None)
 
 
-def _clear_agent_queued_actions(controller: "SessionOrchestrator", reason: str) -> None:
+def _clear_agent_queued_actions(controller: 'SessionOrchestrator', reason: str) -> None:
     """Clear queued agent actions when recovery requires a hard strategy reset."""
     agent = getattr(controller, 'agent', None)
     clear_fn = getattr(agent, 'clear_queued_actions', None)
@@ -86,8 +88,10 @@ class StepGuardService:
         action = str(getattr(result, 'action', 'unknown') or 'unknown')
         return f'{action}:{reason}'
 
-    def _record_warning_trip(self, controller: "SessionOrchestrator", result: Any) -> int:
-        state: "State | None" = getattr(controller, 'state', None)
+    def _record_warning_trip(
+        self, controller: 'SessionOrchestrator', result: Any
+    ) -> int:
+        state: 'State | None' = getattr(controller, 'state', None)
         if state is None:
             return 1
 
@@ -108,7 +112,11 @@ class StepGuardService:
         return count
 
     def _emit_warning_trip_observation(
-        self, controller: "SessionOrchestrator", result: Any, warning_count: int, limit: int
+        self,
+        controller: 'SessionOrchestrator',
+        result: Any,
+        warning_count: int,
+        limit: int,
     ) -> None:
         reason = str(getattr(result, 'reason', 'unknown') or 'unknown')
         action = str(getattr(result, 'action', 'pause') or 'pause').upper()
@@ -143,15 +151,15 @@ class StepGuardService:
             return False
         return True
 
-    def _get_replan_flag(self, controller: "SessionOrchestrator") -> bool:
-        state: "State | None" = getattr(controller, 'state', None)
+    def _get_replan_flag(self, controller: 'SessionOrchestrator') -> bool:
+        state: 'State | None' = getattr(controller, 'state', None)
         if state is None:
             return False
         extra: dict[str, Any] = getattr(state, 'extra_data', {})
         return bool(extra.get(self._REPLAN_REQUIRED_KEY, False))
 
-    def _set_replan_flag(self, controller: "SessionOrchestrator", value: bool) -> None:
-        state: "State | None" = getattr(controller, 'state', None)
+    def _set_replan_flag(self, controller: 'SessionOrchestrator', value: bool) -> None:
+        state: 'State | None' = getattr(controller, 'state', None)
         if state is None:
             return
         state.extra_data[self._REPLAN_REQUIRED_KEY] = bool(value)
@@ -161,9 +169,9 @@ class StepGuardService:
             )
 
     def _set_verification_requirement(
-        self, controller: "SessionOrchestrator", requirement: dict[str, Any] | None
+        self, controller: 'SessionOrchestrator', requirement: dict[str, Any] | None
     ) -> None:
-        state: "State | None" = getattr(controller, 'state', None)
+        state: 'State | None' = getattr(controller, 'state', None)
         if state is None:
             return
         state.extra_data[self._VERIFICATION_REQUIRED_KEY] = requirement
@@ -174,7 +182,9 @@ class StepGuardService:
                 source='StepGuardService',
             )
 
-    async def _check_circuit_breaker(self, controller: "SessionOrchestrator") -> bool | None:
+    async def _check_circuit_breaker(
+        self, controller: 'SessionOrchestrator'
+    ) -> bool | None:
         cb_service = getattr(controller, 'circuit_breaker_service', None)
         if not cb_service:
             return True
@@ -246,7 +256,7 @@ class StepGuardService:
         await controller.set_agent_state_to(target_state)
         return False
 
-    async def _handle_stuck_detection(self, controller: "SessionOrchestrator") -> bool:
+    async def _handle_stuck_detection(self, controller: 'SessionOrchestrator') -> bool:
         stuck_service = getattr(controller, 'stuck_service', None)
         if not stuck_service:
             return True
@@ -269,7 +279,7 @@ class StepGuardService:
         self._trigger_stuck_recovery(controller)
         return False
 
-    def _consume_replan_turn(self, controller: "SessionOrchestrator") -> bool:
+    def _consume_replan_turn(self, controller: 'SessionOrchestrator') -> bool:
         # Deterministic control-state transition: once stuck is detected,
         # force one planner re-entry turn before normal action flow resumes.
         if not self._get_replan_flag(controller):
@@ -277,14 +287,16 @@ class StepGuardService:
         self._set_replan_flag(controller, False)
         return True
 
-    def _consume_stuck_cooldown(self, state: "State | None") -> bool:
+    def _consume_stuck_cooldown(self, state: 'State | None') -> bool:
         # Cooldown: after a stuck detection the model needs N uninterrupted turns
         # to act on the recovery directive.  Do not re-evaluate is_stuck() until
         # the cooldown has elapsed.
         if state is None:
             return False
 
-        cooldown = int((getattr(state, 'extra_data', {}) or {}).get(self._STUCK_COOLDOWN_KEY, 0))
+        cooldown = int(
+            (getattr(state, 'extra_data', {}) or {}).get(self._STUCK_COOLDOWN_KEY, 0)
+        )
         if cooldown <= 0:
             return False
 
@@ -300,17 +312,17 @@ class StepGuardService:
         return True
 
     @staticmethod
-    def _set_repetition_score(state: "State | None", rep_score: float) -> None:
+    def _set_repetition_score(state: 'State | None', rep_score: float) -> None:
         if state is not None and hasattr(state, 'turn_signals'):
             state.turn_signals.repetition_score = rep_score
 
     @staticmethod
-    def _record_stuck_detection(controller: "SessionOrchestrator") -> None:
+    def _record_stuck_detection(controller: 'SessionOrchestrator') -> None:
         cb_service = getattr(controller, 'circuit_breaker_service', None)
         if cb_service:
             cb_service.record_stuck_detection()
 
-    def _arm_stuck_cooldown(self, state: "State | None") -> None:
+    def _arm_stuck_cooldown(self, state: 'State | None') -> None:
         if state is None:
             return
         state.extra_data[self._STUCK_COOLDOWN_KEY] = DEFAULT_STUCK_COOLDOWN_TURNS
@@ -321,7 +333,7 @@ class StepGuardService:
                 source='StepGuardService',
             )
 
-    def _trigger_stuck_recovery(self, controller: "SessionOrchestrator") -> None:
+    def _trigger_stuck_recovery(self, controller: 'SessionOrchestrator') -> None:
         logger.warning('Stuck detected — injecting replan directive')
         self._set_replan_flag(controller, True)
         self._inject_replan_directive(controller)
@@ -334,7 +346,7 @@ class StepGuardService:
             p = p[len('workspace/') :]
         return p.strip('/')
 
-    def _inject_replan_directive(self, controller: "SessionOrchestrator") -> None:
+    def _inject_replan_directive(self, controller: 'SessionOrchestrator') -> None:
         """Inject a directive that forces the LLM to take real action.
 
         Uses ErrorObservation (rendered as role='user') so the message actually
@@ -410,7 +422,9 @@ class StepGuardService:
             None,
         )
 
-    def _build_verification_requirement(self, history: list[Any]) -> dict[str, Any] | None:
+    def _build_verification_requirement(
+        self, history: list[Any]
+    ) -> dict[str, Any] | None:
         """Detect stale-state churn after a recent file mutation plus failing feedback."""
         return StepGuardService._build_verification_requirement_from_history(history)
 
@@ -501,7 +515,9 @@ class StepGuardService:
             path = getattr(event, 'path', '') or ''
             return True, StepGuardService._normalize_path(path) if path else None
 
-        if isinstance(event, (FileWriteAction, FileEditObservation, FileWriteObservation)):
+        if isinstance(
+            event, (FileWriteAction, FileEditObservation, FileWriteObservation)
+        ):
             path = getattr(event, 'path', '') or ''
             return True, StepGuardService._normalize_path(path) if path else None
 
@@ -625,9 +641,11 @@ class StepGuardService:
         if last_mutation_index < 0:
             return None
 
-        failing_feedback, last_failure_index = StepGuardService._collect_failing_feedback(
-            recent_history,
-            last_mutation_index,
+        failing_feedback, last_failure_index = (
+            StepGuardService._collect_failing_feedback(
+                recent_history,
+                last_mutation_index,
+            )
         )
 
         if not mutated_paths or not failing_feedback:

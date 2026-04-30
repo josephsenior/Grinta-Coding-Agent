@@ -730,8 +730,7 @@ class BashSession(BaseShellSession):
         splited_commands = split_bash_commands(command)
         if len(splited_commands) > 1:
             provided_commands = '\n'.join(
-                f'({index + 1}) {cmd}'
-                for index, cmd in enumerate(splited_commands)
+                f'({index + 1}) {cmd}' for index, cmd in enumerate(splited_commands)
             )
             msg = (
                 'ERROR: Cannot execute multiple commands at once.\n'
@@ -1010,9 +1009,7 @@ class BashSession(BaseShellSession):
 
         # Get initial state
         initial_pane_output = self._get_pane_content()
-        initial_ps1_matches = _matches_ps1_metadata(
-            initial_pane_output
-        )
+        initial_ps1_matches = _matches_ps1_metadata(initial_pane_output)
         initial_ps1_count = len(initial_ps1_matches)
         logger.debug('Initial PS1 count: %s', initial_ps1_count)
 

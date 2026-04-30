@@ -216,8 +216,7 @@ class CircuitBreaker:
         return CircuitBreakerResult(
             tripped=True,
             reason=(
-                'Repeated text_editor deterministic failures '
-                f'({str_replace_hard})'
+                f'Repeated text_editor deterministic failures ({str_replace_hard})'
             ),
             action='pause'
             if str_replace_hard >= DEFAULT_TEXT_EDITOR_HARD_PAUSE
@@ -268,9 +267,7 @@ class CircuitBreaker:
 
         # 2.5 Deterministic same-tool failures (text_editor taxonomy)
         str_replace_hard = self.get_tool_error_count(TEXT_EDITOR_TOOL_NAME)
-        str_replace_syntax = self.get_tool_error_count(
-            TEXT_EDITOR_SYNTAX_TOOL_NAME
-        )
+        str_replace_syntax = self.get_tool_error_count(TEXT_EDITOR_SYNTAX_TOOL_NAME)
 
         # Syntax rejects: much higher budget than match-not-found / path /
         # guard failures. Since the default write path now downgrades the

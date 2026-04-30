@@ -1,4 +1,4 @@
-﻿"""Tests for backend.context.compactor.strategies.smart_compactor - SmartCompactor."""
+"""Tests for backend.context.compactor.strategies.smart_compactor - SmartCompactor."""
 
 from __future__ import annotations
 

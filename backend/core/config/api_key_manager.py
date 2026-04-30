@@ -277,7 +277,9 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
             )
             return None
 
-        matched_key, fallback_key = self._resolve_provided_api_key(provider, provided_key)
+        matched_key, fallback_key = self._resolve_provided_api_key(
+            provider, provided_key
+        )
         if matched_key:
             return matched_key
 

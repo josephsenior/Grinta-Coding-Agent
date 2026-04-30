@@ -25,7 +25,9 @@ _PYLSP_AVAILABLE: bool | None = None  # None = not yet detected
 
 
 # #region agent log
-def _agent_debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
+def _agent_debug_log(
+    hypothesis_id: str, location: str, message: str, data: dict
+) -> None:
     try:
         payload = {
             'sessionId': 'fee086',
@@ -70,7 +72,10 @@ def _detect_pylsp() -> bool:
             'H4_lsp_detection_path',
             'backend/utils/lsp_client.py:_detect_pylsp',
             'pylsp-detection-result',
-            {'cached_value': _PYLSP_AVAILABLE, 'server_keys': sorted(servers.keys())[:4]},
+            {
+                'cached_value': _PYLSP_AVAILABLE,
+                'server_keys': sorted(servers.keys())[:4],
+            },
         )
         # #endregion
     except Exception:
@@ -123,7 +128,9 @@ class LspCodeAction:
     def __str__(self) -> str:
         prefix = '★ ' if self.is_preferred else '  '
         kind_tag = f' [{self.kind}]' if self.kind else ''
-        suffix = f' — fixes: {self.diagnostic_message}' if self.diagnostic_message else ''
+        suffix = (
+            f' — fixes: {self.diagnostic_message}' if self.diagnostic_message else ''
+        )
         return f'{prefix}{self.title}{kind_tag}{suffix}'
 
 
@@ -540,9 +547,7 @@ class LspClient:
                 },
             }
         )
-        msgs.append(
-            {'jsonrpc': '2.0', 'method': 'shutdown', 'id': 31, 'params': {}}
-        )
+        msgs.append({'jsonrpc': '2.0', 'method': 'shutdown', 'id': 31, 'params': {}})
 
         responses = self._rpc(msgs, server_cmd)
         for resp in responses:

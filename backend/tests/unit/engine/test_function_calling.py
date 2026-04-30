@@ -101,15 +101,21 @@ class TestHandleCmdRunTool:
         assert action.command == 'ls -la'
 
     def test_with_is_input(self):
-        action = _handle_cmd_run_tool({'command': 'y', 'is_input': 'true', 'security_risk': 'LOW'})
+        action = _handle_cmd_run_tool(
+            {'command': 'y', 'is_input': 'true', 'security_risk': 'LOW'}
+        )
         assert action.is_input is True
 
     def test_is_input_false(self):
-        action = _handle_cmd_run_tool({'command': 'ls', 'is_input': 'false', 'security_risk': 'LOW'})
+        action = _handle_cmd_run_tool(
+            {'command': 'ls', 'is_input': 'false', 'security_risk': 'LOW'}
+        )
         assert action.is_input is False
 
     def test_with_timeout(self):
-        action = _handle_cmd_run_tool({'command': 'sleep 10', 'timeout': '5.0', 'security_risk': 'LOW'})
+        action = _handle_cmd_run_tool(
+            {'command': 'sleep 10', 'timeout': '5.0', 'security_risk': 'LOW'}
+        )
         assert action.timeout == 5.0
 
     def test_missing_command_raises(self):
@@ -118,17 +124,24 @@ class TestHandleCmdRunTool:
 
     def test_invalid_timeout_raises(self):
         with pytest.raises(FunctionCallValidationError, match='Invalid float'):
-            _handle_cmd_run_tool({'command': 'ls', 'timeout': 'not_a_number', 'security_risk': 'LOW'})
+            _handle_cmd_run_tool(
+                {'command': 'ls', 'timeout': 'not_a_number', 'security_risk': 'LOW'}
+            )
 
     def test_glued_windows_drive_sets_thought_hint(self):
         action = _handle_cmd_run_tool(
-            {'command': 'ls -F app/dashboard/ && ls -F componentsC:/Users/x/foo/', 'security_risk': 'LOW'}
+            {
+                'command': 'ls -F app/dashboard/ && ls -F componentsC:/Users/x/foo/',
+                'security_risk': 'LOW',
+            }
         )
         assert isinstance(action, CmdRunAction)
         assert '[SHELL]' in (action.thought or '')
 
     def test_separated_windows_drive_no_glue_hint(self):
-        action = _handle_cmd_run_tool({'command': 'ls -F components/C:/Users/x/foo/', 'security_risk': 'LOW'})
+        action = _handle_cmd_run_tool(
+            {'command': 'ls -F components/C:/Users/x/foo/', 'security_risk': 'LOW'}
+        )
         assert isinstance(action, CmdRunAction)
         assert not (action.thought or '').strip()
 

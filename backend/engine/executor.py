@@ -307,9 +307,7 @@ class OrchestratorExecutor:
         if event_stream:
             ev = StreamingChunkAction(
                 chunk='',
-                accumulated=redact_streamed_tool_call_markers(
-                    state.content_accumulate
-                ),
+                accumulated=redact_streamed_tool_call_markers(state.content_accumulate),
                 is_final=False,
                 thinking_chunk=text_piece,
                 thinking_accumulated=state.thinking_accumulate,
@@ -472,7 +470,9 @@ class OrchestratorExecutor:
             return first_choice.get('message')
         return getattr(first_choice, 'message', None)
 
-    def _extract_fallback_content(self, fallback: Any, fallback_message: Any | None) -> str:
+    def _extract_fallback_content(
+        self, fallback: Any, fallback_message: Any | None
+    ) -> str:
         fallback_content_raw = getattr(fallback, 'content', None)
         fallback_content = (
             self._content_to_str(fallback_content_raw)
@@ -557,10 +557,13 @@ class OrchestratorExecutor:
 
         fallback_params = dict(call_params)
         fallback_params['stream'] = False
-        fallback_timeout = self._timeout_from_env(
-            'APP_LLM_FALLBACK_TIMEOUT_SECONDS',
-            60.0,
-        ) or 60.0
+        fallback_timeout = (
+            self._timeout_from_env(
+                'APP_LLM_FALLBACK_TIMEOUT_SECONDS',
+                60.0,
+            )
+            or 60.0
+        )
         logger.warning(
             'Attempting non-streaming fallback with %.1fs timeout',
             fallback_timeout,
@@ -686,10 +689,13 @@ class OrchestratorExecutor:
         if not should_continue:
             return
 
-        stream_chunk_timeout = self._timeout_from_env(
-            'APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS',
-            90.0,
-        ) or 90.0
+        stream_chunk_timeout = (
+            self._timeout_from_env(
+                'APP_LLM_STREAM_CHUNK_TIMEOUT_SECONDS',
+                90.0,
+            )
+            or 90.0
+        )
         await self._consume_remaining_stream_chunks(
             stream_aiter,
             event_stream,

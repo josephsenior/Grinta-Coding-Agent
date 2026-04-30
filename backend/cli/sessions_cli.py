@@ -70,15 +70,16 @@ def _build_session_table() -> Table:
 
 
 def _format_session_row(
-    index: int, sid: str, meta: dict[str, Any], count: int,
+    index: int,
+    sid: str,
+    meta: dict[str, Any],
+    count: int,
 ) -> tuple[str, str, str, str, str, str, str]:
     title = str(meta.get('title') or meta.get('name') or '—')
     model = str(meta.get('llm_model') or '—')[:24]
     cost = meta.get('accumulated_cost') or 0
     cost_str = f'${cost:.4f}' if cost else '—'
-    updated = str(
-        meta.get('last_updated_at') or meta.get('created_at') or '—'
-    )[:19]
+    updated = str(meta.get('last_updated_at') or meta.get('created_at') or '—')[:19]
     return str(index), sid[:12], title, model, str(count), cost_str, updated
 
 
@@ -99,7 +100,8 @@ def _resolve(
 
 
 def _resolve_by_index(
-    rows: list[tuple[str, dict[str, Any], int, Path]], index: int,
+    rows: list[tuple[str, dict[str, Any], int, Path]],
+    index: int,
 ) -> tuple[str, dict[str, Any], int, Path] | None:
     if 1 <= index <= len(rows):
         return rows[index - 1]
@@ -107,7 +109,8 @@ def _resolve_by_index(
 
 
 def _resolve_by_prefix(
-    rows: list[tuple[str, dict[str, Any], int, Path]], cleaned: str,
+    rows: list[tuple[str, dict[str, Any], int, Path]],
+    cleaned: str,
 ) -> tuple[str, dict[str, Any], int, Path] | _SessionResolveFailure | None:
     matches = [row for row in rows if row[0].startswith(cleaned)]
     if len(matches) == 1:
@@ -218,7 +221,9 @@ def cmd_prune(console: Console, *, days: int = 30, yes: bool = False) -> int:
 
 
 def _session_older_than_cutoff(
-    meta: dict[str, Any], path: Path, cutoff: datetime,
+    meta: dict[str, Any],
+    path: Path,
+    cutoff: datetime,
 ) -> bool:
     ts = meta.get('last_updated_at') or meta.get('created_at')
     if not ts:

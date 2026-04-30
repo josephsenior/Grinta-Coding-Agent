@@ -37,7 +37,6 @@ from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 from backend.core.enums import ActionSecurityRisk, AgentState, EventSource
 from backend.inference.metrics import Metrics, ResponseLatency, TokenUsage
 from backend.ledger.action import (
-    AgentThinkAction,
     CmdRunAction,
     FileEditAction,
     FileReadAction,
@@ -704,7 +703,9 @@ async def test_renderer_notice_panel_does_not_repeat_summary_under_next_steps() 
 
 
 @pytest.mark.asyncio
-async def test_renderer_timeout_error_with_autonomous_retry_uses_recovery_copy() -> None:
+async def test_renderer_timeout_error_with_autonomous_retry_uses_recovery_copy() -> (
+    None
+):
     from backend.ledger.observation import ErrorObservation
 
     console = _make_console()
@@ -745,7 +746,10 @@ async def test_renderer_null_action_loop_uses_notice_panel_copy() -> None:
     output = _console_output(console)
     assert 'Paused safely' in output
     assert 'Grinta paused to avoid a no-progress loop.' in output
-    assert 'No action is required unless you want the task to continue immediately.' in output
+    assert (
+        'No action is required unless you want the task to continue immediately.'
+        in output
+    )
 
 
 @pytest.mark.asyncio
@@ -770,8 +774,14 @@ async def test_renderer_verification_required_uses_notice_panel_copy() -> None:
     )
     output = _console_output(console)
     assert 'Need fresh evidence' in output
-    assert 'Grinta blocked another blind write because recent edits were followed by failing feedback.' in output
-    assert 'Read the affected file or rerun the focused failing check to get fresh evidence.' in output
+    assert (
+        'Grinta blocked another blind write because recent edits were followed by failing feedback.'
+        in output
+    )
+    assert (
+        'Read the affected file or rerun the focused failing check to get fresh evidence.'
+        in output
+    )
 
 
 @pytest.mark.asyncio
@@ -825,11 +835,11 @@ async def test_renderer_syntax_validation_error_panel_is_compact() -> None:
     )
 
     noisy = (
-        "ERROR:\nSyntax validation failed: Syntax error at "
-        "C:\\proj\\demo.test.ts:8:3: node=ERROR\n"
+        'ERROR:\nSyntax validation failed: Syntax error at '
+        'C:\\proj\\demo.test.ts:8:3: node=ERROR\n'
         "  Node text: 'it'\n"
         "    it('x', () => {\n"
-        "    ^\n"
+        '    ^\n'
     )
     error_obs = ErrorObservation(content=noisy)
     await renderer.handle_event(error_obs)
@@ -1461,7 +1471,9 @@ async def test_wait_for_agent_idle_default_timeout_disabled(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
-async def test_wait_for_agent_idle_uses_controller_idle_state_when_renderer_is_stale() -> None:
+async def test_wait_for_agent_idle_uses_controller_idle_state_when_renderer_is_stale() -> (
+    None
+):
     repl = Repl(_make_config(), _make_console())
     renderer = CLIEventRenderer(
         _make_console(),
@@ -2355,7 +2367,9 @@ def test_renderer_summarizes_plain_ripgrep_match_lines() -> None:
 
 
 def test_renderer_ignores_non_match_plain_lines() -> None:
-    assert CLIEventRenderer._summarize_plain_match_lines('no structured matches') is None
+    assert (
+        CLIEventRenderer._summarize_plain_match_lines('no structured matches') is None
+    )
 
 
 @pytest.mark.asyncio
@@ -2600,9 +2614,7 @@ async def test_renderer_shows_retry_pending_status_in_hud() -> None:
 
     await renderer.handle_event(
         StatusObservation(
-            content=(
-                'Waiting on autonomous recovery: retry 1/3 in 5s after Timeout.'
-            ),
+            content=('Waiting on autonomous recovery: retry 1/3 in 5s after Timeout.'),
             status_type='retry_pending',
             extras={
                 'attempt': 1,
@@ -2634,9 +2646,7 @@ async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> 
 
     await renderer.handle_event(
         StatusObservation(
-            content=(
-                'Waiting on autonomous recovery: retry 1/3 in 5s after Timeout.'
-            ),
+            content=('Waiting on autonomous recovery: retry 1/3 in 5s after Timeout.'),
             status_type='retry_pending',
             extras={'attempt': 1, 'max_attempts': 3, 'reason': 'Timeout'},
         )
@@ -2724,7 +2734,9 @@ async def test_renderer_handles_task_tracking_action() -> None:
 
 
 @pytest.mark.asyncio
-async def test_renderer_syncs_task_panel_from_update_action_before_observation() -> None:
+async def test_renderer_syncs_task_panel_from_update_action_before_observation() -> (
+    None
+):
     from backend.ledger.action import TaskTrackingAction
 
     console = _make_console()
@@ -3110,11 +3122,11 @@ async def test_renderer_prefers_actionable_npm_error_line() -> None:
     )
     obs = CmdOutputObservation(
         content=(
-            "npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, "
+            'npm error enoent Could not read package.json: Error: ENOENT: no such file or directory, '
             "open 'C:\\Users\\GIGABYTE\\Desktop\\react-app\\package.json'\n"
-            "npm error enoent This is related to npm not being able to find a file.\n"
-            "npm error A complete log of this run can be found in: "
-            "C:\\Users\\GIGABYTE\\AppData\\Local\\npm-cache\\_logs\\debug.log"
+            'npm error enoent This is related to npm not being able to find a file.\n'
+            'npm error A complete log of this run can be found in: '
+            'C:\\Users\\GIGABYTE\\AppData\\Local\\npm-cache\\_logs\\debug.log'
         ),
         command='npm create vite@latest . -- --template react && npm install',
         metadata={'exit_code': 38},

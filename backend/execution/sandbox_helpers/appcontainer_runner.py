@@ -156,7 +156,9 @@ DeleteAppContainerProfile = userenv.DeleteAppContainerProfile
 DeleteAppContainerProfile.argtypes = [wintypes.LPCWSTR]
 DeleteAppContainerProfile.restype = HRESULT
 
-DeriveAppContainerSidFromAppContainerName = userenv.DeriveAppContainerSidFromAppContainerName
+DeriveAppContainerSidFromAppContainerName = (
+    userenv.DeriveAppContainerSidFromAppContainerName
+)
 DeriveAppContainerSidFromAppContainerName.argtypes = [
     wintypes.LPCWSTR,
     ctypes.POINTER(wintypes.LPVOID),
@@ -186,7 +188,9 @@ def _check_hresult(result: int, context: str) -> None:
 
 def _sid_to_string(sid: wintypes.LPVOID) -> str:
     string_ptr = wintypes.LPWSTR()
-    _check_bool(ConvertSidToStringSidW(sid, ctypes.byref(string_ptr)), 'ConvertSidToStringSidW')
+    _check_bool(
+        ConvertSidToStringSidW(sid, ctypes.byref(string_ptr)), 'ConvertSidToStringSidW'
+    )
     try:
         return str(string_ptr.value)
     finally:
@@ -211,7 +215,9 @@ def _grant_workspace_access(workspace: Path, sid_string: str) -> None:
         check=False,
     )
     if grant.returncode != 0:
-        raise RuntimeError(f'icacls grant failed: {grant.stderr.strip() or grant.stdout.strip()}')
+        raise RuntimeError(
+            f'icacls grant failed: {grant.stderr.strip() or grant.stdout.strip()}'
+        )
 
 
 def _revoke_workspace_access(workspace: Path, sid_string: str) -> None:
@@ -232,7 +238,9 @@ def _revoke_workspace_access(workspace: Path, sid_string: str) -> None:
     )
 
 
-def _make_capabilities(allow_network: bool) -> tuple[ctypes.Array[SID_AND_ATTRIBUTES] | None, list[wintypes.LPVOID]]:
+def _make_capabilities(
+    allow_network: bool,
+) -> tuple[ctypes.Array[SID_AND_ATTRIBUTES] | None, list[wintypes.LPVOID]]:
     if not allow_network:
         return None, []
 
@@ -249,7 +257,9 @@ def _make_capabilities(allow_network: bool) -> tuple[ctypes.Array[SID_AND_ATTRIB
 
 def _create_appcontainer(name: str) -> wintypes.LPVOID:
     sid = wintypes.LPVOID()
-    result = CreateAppContainerProfile(name, name, 'Grinta sandbox', None, 0, ctypes.byref(sid))
+    result = CreateAppContainerProfile(
+        name, name, 'Grinta sandbox', None, 0, ctypes.byref(sid)
+    )
     if result == ERROR_ALREADY_EXISTS:
         _check_hresult(
             DeriveAppContainerSidFromAppContainerName(name, ctypes.byref(sid)),
@@ -408,7 +418,9 @@ def main(argv: list[str] | None = None) -> int:
 
     workspace = Path(ns.workspace).resolve()
     cwd = str(Path(ns.cwd).resolve())
-    return _launch(command, cwd=cwd, workspace=workspace, allow_network=ns.network == '1')
+    return _launch(
+        command, cwd=cwd, workspace=workspace, allow_network=ns.network == '1'
+    )
 
 
 if __name__ == '__main__':

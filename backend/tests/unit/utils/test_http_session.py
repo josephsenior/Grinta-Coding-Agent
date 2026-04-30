@@ -12,6 +12,7 @@ from backend.utils.http_session import HttpSession, SessionClosedError
 def _raise_session_closed(message: str) -> None:
     raise SessionClosedError(message)
 
+
 # ── HttpSession ────────────────────────────────────────────────────────
 
 

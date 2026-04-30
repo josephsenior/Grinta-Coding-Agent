@@ -221,7 +221,9 @@ class DAPClient:
         try:
             self._reader = threading.Thread(target=self._reader_loop, daemon=True)
             self._reader.start()
-            self._stderr_reader = threading.Thread(target=self._stderr_loop, daemon=True)
+            self._stderr_reader = threading.Thread(
+                target=self._stderr_loop, daemon=True
+            )
             self._stderr_reader.start()
         except Exception:
             # Reader thread creation failure is exotic but recoverable: kill
@@ -507,7 +509,9 @@ class DAPDebugSession:
         self.launch_config = launch_config
         self.initialize_options = initialize_options
         self.python = python
-        self.client = DAPClient(adapter_command, cwd=self.cwd or str(self.workspace_root))
+        self.client = DAPClient(
+            adapter_command, cwd=self.cwd or str(self.workspace_root)
+        )
         self.current_thread_id: int | None = None
         self.debuggee_process_ids: set[int] = set()
         self.start_request_seq: int | None = None
@@ -606,7 +610,9 @@ class DAPDebugSession:
             self._remember_thread(event)
         return self._snapshot(state=command, extra={'event': event})
 
-    def pause(self, thread_id: int | None = None, timeout: float = 10.0) -> dict[str, Any]:
+    def pause(
+        self, thread_id: int | None = None, timeout: float = 10.0
+    ) -> dict[str, Any]:
         """Pause a running thread."""
         effective_thread = self._resolve_thread_id(thread_id, timeout=timeout)
         self.client.request('pause', {'threadId': effective_thread}, timeout=timeout)
@@ -874,7 +880,9 @@ class DAPDebugSession:
                 return str(value)
         return None
 
-    def _snapshot(self, state: str, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _snapshot(
+        self, state: str, extra: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         events = self.client.drain_events()
         for event in events:
             self._remember_event(event)

@@ -27,8 +27,10 @@ def _executor_for_workspace(root: Path) -> SimpleNamespace:
     ex._terminal_read_cursor = {}
     ex._workspace_root = lambda: root.resolve()
     ex._is_workspace_restricted_profile = lambda: True
-    ex._resolve_effective_cwd = lambda requested_cwd, base_cwd=None: h.resolve_effective_cwd(
-        ex, requested_cwd, base_cwd
+    ex._resolve_effective_cwd = (
+        lambda requested_cwd, base_cwd=None: h.resolve_effective_cwd(
+            ex, requested_cwd, base_cwd
+        )
     )
     ex._clear_terminal_read_cursor = MagicMock()
     ex._normalize_terminal_command = h.normalize_terminal_command
@@ -39,7 +41,10 @@ def _executor_for_workspace(root: Path) -> SimpleNamespace:
 def test_resolve_effective_cwd_nested_relative_to_workspace(tmp_path: Path) -> None:
     (tmp_path / 'pkg' / 'inner').mkdir(parents=True)
     ex = _executor_for_workspace(tmp_path)
-    assert h.resolve_effective_cwd(ex, 'pkg/inner') == (tmp_path / 'pkg' / 'inner').resolve()
+    assert (
+        h.resolve_effective_cwd(ex, 'pkg/inner')
+        == (tmp_path / 'pkg' / 'inner').resolve()
+    )
 
 
 @pytest.mark.integration
@@ -49,7 +54,9 @@ def test_resolve_effective_cwd_none_is_workspace_root(tmp_path: Path) -> None:
 
 
 @pytest.mark.integration
-def test_validate_workspace_scoped_cwd_errors_when_outside_workspace(tmp_path: Path) -> None:
+def test_validate_workspace_scoped_cwd_errors_when_outside_workspace(
+    tmp_path: Path,
+) -> None:
     ex = _executor_for_workspace(tmp_path)
     with patch(
         'backend.execution.action_execution_server_helpers.path_is_within_workspace',

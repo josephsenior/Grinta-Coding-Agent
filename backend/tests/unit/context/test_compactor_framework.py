@@ -1,4 +1,4 @@
-﻿"""Tests for backend.context.compactor.compactor - compactor framework classes."""
+"""Tests for backend.context.compactor.compactor - compactor framework classes."""
 
 from __future__ import annotations
 
@@ -313,13 +313,17 @@ class TestBaseLLMCompactor:
         llm_registry.config.get_llm_config.return_value = LLMConfig.model_validate(
             {'model': 'openai/gpt-4o'}
         )
-        llm_registry.get_llm.return_value = MagicMock(config=MagicMock(max_input_tokens=None))
+        llm_registry.get_llm.return_value = MagicMock(
+            config=MagicMock(max_input_tokens=None)
+        )
 
         compactor = ConcreteLLMCompactor.from_config(cfg, llm_registry)
 
         assert compactor.token_budget == 123
         llm_registry.config.get_llm_config.assert_called_once_with('planner')
-        assert llm_registry.get_llm.call_args.kwargs['service_id'] == 'compactor_planner'
+        assert (
+            llm_registry.get_llm.call_args.kwargs['service_id'] == 'compactor_planner'
+        )
 
     def test_get_extra_config_args_includes_max_event_length(self):
         cfg = MagicMock()
@@ -360,15 +364,24 @@ class TestBaseLLMCompactor:
         assert precise == 'paths: [project] and [project]'
 
         monkeypatch.delenv('APP_WORKSPACE_DIR', raising=False)
-        assert BaseLLMCompactor._sanitize_workspace_paths('nothing to replace') == 'nothing to replace'
-        assert BaseLLMCompactor._sanitize_workspace_paths('app_workspace_sid_123/file.txt') == '[project]'
+        assert (
+            BaseLLMCompactor._sanitize_workspace_paths('nothing to replace')
+            == 'nothing to replace'
+        )
+        assert (
+            BaseLLMCompactor._sanitize_workspace_paths('app_workspace_sid_123/file.txt')
+            == '[project]'
+        )
 
     def test_estimate_view_tokens_falls_back_when_serialization_fails(self):
         view = View(events=_make_events(1))
-        with patch(
-            'backend.context.compactor.compactor.event_to_dict',
-            side_effect=RuntimeError('boom'),
-        ), patch.object(BaseLLMCompactor, '_get_tokenizer', return_value=None):
+        with (
+            patch(
+                'backend.context.compactor.compactor.event_to_dict',
+                side_effect=RuntimeError('boom'),
+            ),
+            patch.object(BaseLLMCompactor, '_get_tokenizer', return_value=None),
+        ):
             assert BaseLLMCompactor.estimate_view_tokens(view) >= 1
 
     def test_estimate_view_tokens_falls_back_when_tokenizer_encode_fails(self):
@@ -408,7 +421,9 @@ class TestBaseLLMCompactor:
     def test_exceeds_token_budget_false_when_under_limit(self):
         c = ConcreteLLMCompactor(llm=None, max_size=10)
         c.token_budget = 100
-        with patch.object(ConcreteLLMCompactor, 'estimate_view_tokens', return_value=10):
+        with patch.object(
+            ConcreteLLMCompactor, 'estimate_view_tokens', return_value=10
+        ):
             assert c._exceeds_token_budget(View(events=_make_events(2))) is False
 
     def test_compact_returns_view_or_compaction_based_on_thresholds(self):
@@ -416,9 +431,11 @@ class TestBaseLLMCompactor:
         compacted_events = _make_events(2)
         view = View(events=_make_events(3))
 
-        with patch.object(c._compactor, 'compact', return_value=compacted_events), patch.object(
-            c, 'should_compact', return_value=False
-        ), patch.object(c, '_exceeds_token_budget', return_value=False):
+        with (
+            patch.object(c._compactor, 'compact', return_value=compacted_events),
+            patch.object(c, 'should_compact', return_value=False),
+            patch.object(c, '_exceeds_token_budget', return_value=False),
+        ):
             result = c.compact(view)
             assert isinstance(result, View)
             assert result.events == compacted_events
@@ -429,10 +446,11 @@ class TestBaseLLMCompactor:
                 pruned_events_end_id=1,
             )
         )
-        with patch.object(c._compactor, 'compact', return_value=view.events), patch.object(
-            c, 'should_compact', return_value=True
-        ), patch.object(c, '_exceeds_token_budget', return_value=False), patch.object(
-            c, 'get_compaction', return_value=compaction
+        with (
+            patch.object(c._compactor, 'compact', return_value=view.events),
+            patch.object(c, 'should_compact', return_value=True),
+            patch.object(c, '_exceeds_token_budget', return_value=False),
+            patch.object(c, 'get_compaction', return_value=compaction),
         ):
             assert c.compact(view) is compaction
 

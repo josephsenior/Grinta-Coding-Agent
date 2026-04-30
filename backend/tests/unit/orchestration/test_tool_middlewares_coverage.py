@@ -39,7 +39,9 @@ def _controller() -> MagicMock:
 def _ctx(controller: MagicMock, action: object | None = None) -> ToolInvocationContext:
     if action is None:
         action = MagicMock(runnable=True)
-    return ToolInvocationContext(controller=controller, action=action, state=controller.state)
+    return ToolInvocationContext(
+        controller=controller, action=action, state=controller.state
+    )
 
 
 @pytest.mark.asyncio
@@ -82,7 +84,9 @@ async def test_blackboard_middleware_ignores_non_blackboard_action() -> None:
 async def test_context_window_middleware_emits_alerts_and_sets_pressure() -> None:
     controller = _controller()
     usage = SimpleNamespace(prompt_tokens=900, context_window=1000)
-    controller.agent.llm = SimpleNamespace(metrics=SimpleNamespace(token_usages=[usage]))
+    controller.agent.llm = SimpleNamespace(
+        metrics=SimpleNamespace(token_usages=[usage])
+    )
     controller.state.set_memory_pressure = MagicMock()
     middleware = ContextWindowMiddleware(controller)
 

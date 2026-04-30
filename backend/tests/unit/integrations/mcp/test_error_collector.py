@@ -28,4 +28,3 @@ def test_error_collector_disable_enable() -> None:
     c.enable_collection()
     c.add_error('s2', 'http', 'e2')
     assert c.get_error_count() == 1
-

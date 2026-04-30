@@ -1,4 +1,4 @@
-﻿"""Tests for backend.core.tracing â€“ initialization, exporters, shutdown."""
+"""Tests for backend.core.tracing â€“ initialization, exporters, shutdown."""
 
 from __future__ import annotations
 
@@ -184,9 +184,12 @@ class TestConfigureExporter(_TracingTestBase):
 class TestExporterHelpers(_TracingTestBase):
     @patch('backend.core.tracing.logger')
     def test_try_jaeger_otlp_returns_none_on_import_error(self, mock_logger):
-        with patch('builtins.__import__', side_effect=_import_with_missing(
-            'opentelemetry.exporter.otlp.proto.http.trace_exporter'
-        )):
+        with patch(
+            'builtins.__import__',
+            side_effect=_import_with_missing(
+                'opentelemetry.exporter.otlp.proto.http.trace_exporter'
+            ),
+        ):
             self.assertIsNone(tracing_mod._try_jaeger_otlp(None))
 
         mock_logger.warning.assert_called_once()
@@ -204,9 +207,7 @@ class TestExporterHelpers(_TracingTestBase):
             {
                 'opentelemetry': _package('opentelemetry'),
                 'opentelemetry.exporter': _package('opentelemetry.exporter'),
-                'opentelemetry.exporter.otlp': _package(
-                    'opentelemetry.exporter.otlp'
-                ),
+                'opentelemetry.exporter.otlp': _package('opentelemetry.exporter.otlp'),
                 'opentelemetry.exporter.otlp.proto': _package(
                     'opentelemetry.exporter.otlp.proto'
                 ),
@@ -228,9 +229,10 @@ class TestExporterHelpers(_TracingTestBase):
 
     @patch('backend.core.tracing.logger')
     def test_try_jaeger_thrift_returns_none_on_import_error(self, mock_logger):
-        with patch('builtins.__import__', side_effect=_import_with_missing(
-            'opentelemetry.exporter.jaeger.thrift'
-        )):
+        with patch(
+            'builtins.__import__',
+            side_effect=_import_with_missing('opentelemetry.exporter.jaeger.thrift'),
+        ):
             self.assertIsNone(tracing_mod._try_jaeger_thrift(None))
 
         mock_logger.warning.assert_called_once()
@@ -297,9 +299,7 @@ class TestExporterHelpers(_TracingTestBase):
 
     @patch('backend.core.tracing._configure_console', return_value='console_exporter')
     @patch('backend.core.tracing._try_jaeger_otlp', side_effect=RuntimeError('boom'))
-    def test_configure_jaeger_handles_unexpected_errors(
-        self, mock_otlp, mock_console
-    ):
+    def test_configure_jaeger_handles_unexpected_errors(self, mock_otlp, mock_console):
         result = tracing_mod._configure_jaeger('http://collector:4318')
 
         self.assertEqual(result, 'console_exporter')
@@ -329,19 +329,20 @@ class TestExporterHelpers(_TracingTestBase):
         exporter_ctor.assert_called_once_with(endpoint='http://zipkin/api/v2/spans')
 
     @patch('backend.core.tracing._configure_console', return_value='console_exporter')
-    def test_configure_zipkin_falls_back_to_console_on_import_error(
-        self, mock_console
-    ):
-        with patch('builtins.__import__', side_effect=_import_with_missing(
-            'opentelemetry.exporter.zipkin.json'
-        )):
+    def test_configure_zipkin_falls_back_to_console_on_import_error(self, mock_console):
+        with patch(
+            'builtins.__import__',
+            side_effect=_import_with_missing('opentelemetry.exporter.zipkin.json'),
+        ):
             result = tracing_mod._configure_zipkin(None)
 
         self.assertEqual(result, 'console_exporter')
         mock_console.assert_called_once()
 
     def test_configure_otlp_uses_endpoint(self):
-        otlp_module = ModuleType('opentelemetry.exporter.otlp.proto.grpc.trace_exporter')
+        otlp_module = ModuleType(
+            'opentelemetry.exporter.otlp.proto.grpc.trace_exporter'
+        )
         exporter_ctor = MagicMock(return_value='grpc_exporter')
         otlp_module.OTLPSpanExporter = exporter_ctor  # type: ignore[attr-defined]
 
@@ -350,18 +351,14 @@ class TestExporterHelpers(_TracingTestBase):
             {
                 'opentelemetry': _package('opentelemetry'),
                 'opentelemetry.exporter': _package('opentelemetry.exporter'),
-                'opentelemetry.exporter.otlp': _package(
-                    'opentelemetry.exporter.otlp'
-                ),
+                'opentelemetry.exporter.otlp': _package('opentelemetry.exporter.otlp'),
                 'opentelemetry.exporter.otlp.proto': _package(
                     'opentelemetry.exporter.otlp.proto'
                 ),
                 'opentelemetry.exporter.otlp.proto.grpc': _package(
                     'opentelemetry.exporter.otlp.proto.grpc'
                 ),
-                'opentelemetry.exporter.otlp.proto.grpc.trace_exporter': (
-                    otlp_module
-                ),
+                'opentelemetry.exporter.otlp.proto.grpc.trace_exporter': (otlp_module),
             },
             clear=False,
         ):
@@ -371,12 +368,13 @@ class TestExporterHelpers(_TracingTestBase):
         exporter_ctor.assert_called_once_with(endpoint='http://collector:4317')
 
     @patch('backend.core.tracing._configure_console', return_value='console_exporter')
-    def test_configure_otlp_falls_back_to_console_on_import_error(
-        self, mock_console
-    ):
-        with patch('builtins.__import__', side_effect=_import_with_missing(
-            'opentelemetry.exporter.otlp.proto.grpc.trace_exporter'
-        )):
+    def test_configure_otlp_falls_back_to_console_on_import_error(self, mock_console):
+        with patch(
+            'builtins.__import__',
+            side_effect=_import_with_missing(
+                'opentelemetry.exporter.otlp.proto.grpc.trace_exporter'
+            ),
+        ):
             result = tracing_mod._configure_otlp(None)
 
         self.assertEqual(result, 'console_exporter')
@@ -427,7 +425,9 @@ class TestGetTracer(_TracingTestBase):
         tracing_mod._state.initialized = True
         tracing_mod._state.tracer = None
 
-        with patch('builtins.__import__', side_effect=_import_with_missing('opentelemetry')):
+        with patch(
+            'builtins.__import__', side_effect=_import_with_missing('opentelemetry')
+        ):
             self.assertIsNone(tracing_mod.get_tracer())
 
         mock_logger.warning.assert_called_once()

@@ -198,9 +198,7 @@ def _consume_orphan_step(src: str, start: int) -> tuple[int, str | None] | None:
     return start if next_index is None else next_index, carry_out
 
 
-def _consume_sanitizer_step(
-    src: str, start: int
-) -> tuple[int, str | None, str | None]:
+def _consume_sanitizer_step(src: str, start: int) -> tuple[int, str | None, str | None]:
     escape_result = _consume_escape_step(src, start)
     if escape_result is not None:
         next_index, carry_out = escape_result

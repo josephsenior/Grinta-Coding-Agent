@@ -20,7 +20,9 @@ from backend.inference.mappers.gemini import (
 )
 
 
-def _assert_text_history_part(entry: dict[str, object], *, role: str, text: str) -> None:
+def _assert_text_history_part(
+    entry: dict[str, object], *, role: str, text: str
+) -> None:
     assert entry['role'] == role
     part = entry['parts'][0]  # type: ignore[index]
     assert part['text'] == text
@@ -52,6 +54,7 @@ def _assert_function_response_history_part(
     part = entry['parts'][0]  # type: ignore[index]
     assert part['function_response']['name'] == name
     assert part['function_response']['response']['output'] == output
+
 
 # ---------------------------------------------------------------------------
 # Stub objects mimicking google-genai SDK shape

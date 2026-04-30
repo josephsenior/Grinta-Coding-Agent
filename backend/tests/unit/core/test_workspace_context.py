@@ -565,7 +565,9 @@ class TestWorkspaceAnchorFallbacks:
     def test_returns_unresolved_provided_cwd_when_resolution_fails(
         self, tmp_path: Path
     ) -> None:
-        with patch.object(workspace_context.Path, 'resolve', side_effect=OSError('boom')):
+        with patch.object(
+            workspace_context.Path, 'resolve', side_effect=OSError('boom')
+        ):
             assert _workspace_anchor(tmp_path) == tmp_path
 
     def test_returns_unresolved_workspace_root_when_resolution_fails(
@@ -647,10 +649,30 @@ class TestTodayTotalCost:
         _write_changelog_entries(
             tmp_path,
             [
-                {'event': 'cost_update', 'conversation_id': 'a', 'cost': 1.25, 'date': today},
-                {'event': 'cost_update', 'conversation_id': 'a', 'cost': 2.5, 'date': today},
-                {'event': 'cost_update', 'conversation_id': 'b', 'cost': 3.75, 'date': today},
-                {'event': 'file_edit', 'conversation_id': 'a', 'path': '/tmp/x.py', 'date': today},
+                {
+                    'event': 'cost_update',
+                    'conversation_id': 'a',
+                    'cost': 1.25,
+                    'date': today,
+                },
+                {
+                    'event': 'cost_update',
+                    'conversation_id': 'a',
+                    'cost': 2.5,
+                    'date': today,
+                },
+                {
+                    'event': 'cost_update',
+                    'conversation_id': 'b',
+                    'cost': 3.75,
+                    'date': today,
+                },
+                {
+                    'event': 'file_edit',
+                    'conversation_id': 'a',
+                    'path': '/tmp/x.py',
+                    'date': today,
+                },
             ],
         )
 
@@ -665,7 +687,12 @@ class TestTodayTotalCost:
             [
                 {'event': 'cost_update', 'cost': 1.0, 'date': today},
                 {'event': 'cost_update', 'cost': 2.5, 'date': today},
-                {'event': 'cost_update', 'conversation_id': 'named', 'cost': 4.0, 'date': today},
+                {
+                    'event': 'cost_update',
+                    'conversation_id': 'named',
+                    'cost': 4.0,
+                    'date': today,
+                },
             ],
         )
 
@@ -719,8 +746,12 @@ class TestConversationTags:
     def test_set_conversation_tags_updates_project_and_lists_unique_values(
         self, tmp_path: Path, grinta_home: None
     ) -> None:
-        set_conversation_tags('conv-a', ['#beta', 'alpha'], project=' Zebra ', cwd=tmp_path)
-        set_conversation_tags('conv-b', ['alpha', 'gamma'], project='Alpha', cwd=tmp_path)
+        set_conversation_tags(
+            'conv-a', ['#beta', 'alpha'], project=' Zebra ', cwd=tmp_path
+        )
+        set_conversation_tags(
+            'conv-b', ['alpha', 'gamma'], project='Alpha', cwd=tmp_path
+        )
         set_conversation_tags('conv-c', ['gamma'], project='Alpha', cwd=tmp_path)
 
         assert get_conversation_meta('conv-a', cwd=tmp_path) == {

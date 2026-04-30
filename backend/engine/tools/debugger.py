@@ -177,6 +177,8 @@ def create_debugger_tool() -> dict[str, Any]:
             },
         },
     }
+
+
 def _list_str(value: object) -> list[str]:
     if value is None:
         return []

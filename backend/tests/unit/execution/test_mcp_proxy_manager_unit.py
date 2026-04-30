@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -20,9 +20,7 @@ def test_mcp_proxy_manager_initialize_with_server_calls_as_proxy() -> None:
     srv = MCPServerConfig(name='t', type='sse', url='http://127.0.0.1:9/sse')
     mgr = MCPProxyManager()
     fake_proxy = MagicMock()
-    with patch(
-        'backend.execution.mcp.proxy.mcp_proxy_manager.FastMCP'
-    ) as FM:
+    with patch('backend.execution.mcp.proxy.mcp_proxy_manager.FastMCP') as FM:
         FM.as_proxy.return_value = fake_proxy
         mgr.initialize([srv])
     FM.as_proxy.assert_called_once()

@@ -646,7 +646,9 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             # a pending action exists), do NOT lose the request — keep
             # _step_pending True so the next trigger retries correctly.
             drain_attempts = 0
-            while self._step_pending and drain_attempts < DEFAULT_AGENT_STEP_DRAIN_LIMIT:
+            while (
+                self._step_pending and drain_attempts < DEFAULT_AGENT_STEP_DRAIN_LIMIT
+            ):
                 drain_attempts += 1
                 self._step_pending = False
                 if not self.step_prerequisites.can_step():
@@ -729,7 +731,10 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             # _step_inner can queue the next LLM call before the event router
             # moves the agent to AWAITING_USER_INPUT.
             await asyncio.sleep(0)
-            if not self._pending_action and self.get_agent_state() == AgentState.RUNNING:
+            if (
+                not self._pending_action
+                and self.get_agent_state() == AgentState.RUNNING
+            ):
                 self.step()
 
     async def _try_parallel_read_batch(self) -> bool:
@@ -919,9 +924,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         )
         self.state_tracker._init_history(self.event_stream)  # type: ignore[attr-defined]  # bootstrap wiring
 
-    def get_transcript(
-        self, include_screenshots: bool = False
-    ) -> list[dict[str, Any]]:
+    def get_transcript(self, include_screenshots: bool = False) -> list[dict[str, Any]]:
         """Get the complete transcript of agent operations and outcomes.
 
         Must be called after controller is closed.

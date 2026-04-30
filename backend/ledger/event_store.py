@@ -116,7 +116,9 @@ class EventStore(EventStoreABC):
             try:
                 self._sqlite_store.close()
             except Exception:
-                logger.debug('Error closing EventStore SQLite accelerator', exc_info=True)
+                logger.debug(
+                    'Error closing EventStore SQLite accelerator', exc_info=True
+                )
             self._sqlite_store = None
 
     @property

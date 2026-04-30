@@ -284,7 +284,9 @@ def _outline_append_assign_targets(node: ast.Assign) -> list[str]:
     return lines
 
 
-def _outline_class_body_lines(class_node: ast.ClassDef, start_count: int, max_lines: int) -> tuple[list[str], int]:
+def _outline_class_body_lines(
+    class_node: ast.ClassDef, start_count: int, max_lines: int
+) -> tuple[list[str], int]:
     out: list[str] = [f'class {class_node.name}']
     count = start_count + 1
     for item in class_node.body:

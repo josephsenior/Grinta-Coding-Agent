@@ -206,9 +206,7 @@ class TestCircuitBreakerMiddlewarePipeline:
         controller.circuit_breaker_service = service
         mw = CircuitBreakerMiddleware(controller)
         action = MagicMock()
-        action.tool_call_metadata = MagicMock(
-            function_name=TEXT_EDITOR_TOOL_NAME
-        )
+        action.tool_call_metadata = MagicMock(function_name=TEXT_EDITOR_TOOL_NAME)
         ctx = ToolInvocationContext(
             controller=controller, action=action, state=MagicMock()
         )
@@ -232,17 +230,14 @@ class TestCircuitBreakerMiddlewarePipeline:
         controller.circuit_breaker_service = service
         mw = CircuitBreakerMiddleware(controller)
         action = MagicMock()
-        action.tool_call_metadata = MagicMock(
-            function_name=TEXT_EDITOR_TOOL_NAME
-        )
+        action.tool_call_metadata = MagicMock(function_name=TEXT_EDITOR_TOOL_NAME)
         ctx = ToolInvocationContext(
             controller=controller, action=action, state=MagicMock()
         )
         obs = ErrorObservation(content='old_str not found')
         await mw.observe(ctx, obs)
         assert (
-            service.record_error.call_args.kwargs['tool_name']
-            == TEXT_EDITOR_TOOL_NAME
+            service.record_error.call_args.kwargs['tool_name'] == TEXT_EDITOR_TOOL_NAME
         )
 
     @pytest.mark.asyncio

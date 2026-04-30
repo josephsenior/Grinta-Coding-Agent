@@ -79,7 +79,9 @@ def _infinite_pending_timeout(_base: float, _action: Action) -> float:
 _TIMEOUT_POLICY_BY_ACTION_NAME = {
     'DelegateTaskAction': _infinite_pending_timeout,
     'CmdRunAction': _cmd_run_pending_timeout,
-    'MCPAction': lambda base, _action: max(float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR),
+    'MCPAction': lambda base, _action: max(
+        float(base), MCP_PENDING_ACTION_TIMEOUT_FLOOR
+    ),
     'BrowserToolAction': lambda base, _action: max(
         float(base), float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS)
     ),
@@ -119,7 +121,9 @@ class PendingActionService:
             return math.inf
 
         action_name = type(action).__name__
-        policy = _TIMEOUT_POLICY_BY_ACTION_NAME.get(action_name, _identity_pending_timeout)
+        policy = _TIMEOUT_POLICY_BY_ACTION_NAME.get(
+            action_name, _identity_pending_timeout
+        )
         return policy(base, action)
 
     @staticmethod

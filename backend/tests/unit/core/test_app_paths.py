@@ -34,7 +34,9 @@ def test_installed_package_falls_back_to_user_grinta_root(tmp_path, monkeypatch)
     home.mkdir()
 
     with (
-        patch('backend.core.app_paths._source_checkout_root', return_value=package_root),
+        patch(
+            'backend.core.app_paths._source_checkout_root', return_value=package_root
+        ),
         patch('backend.core.app_paths.Path.home', return_value=home),
     ):
         assert app_paths.get_app_settings_root() == str((home / '.grinta').resolve())

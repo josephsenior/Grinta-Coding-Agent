@@ -93,10 +93,15 @@ def _is_filesystem_inspection_command(lower: list[str]) -> bool:
 
 
 def _is_fetch_code_command(lower: list[str]) -> bool:
-    return len(lower) >= 2 and lower[0] == 'git' and lower[1] in (
-        'clone',
-        'pull',
-        'fetch',
+    return (
+        len(lower) >= 2
+        and lower[0] == 'git'
+        and lower[1]
+        in (
+            'clone',
+            'pull',
+            'fetch',
+        )
     )
 
 
@@ -124,7 +129,9 @@ def _is_delete_file_command(lower: list[str]) -> bool:
 
 
 def _is_execute_code_command(lower: list[str], joined: str) -> bool:
-    return lower[0] in ('python', 'node', 'cargo', 'ruby', 'php') and 'test' not in joined
+    return (
+        lower[0] in ('python', 'node', 'cargo', 'ruby', 'php') and 'test' not in joined
+    )
 
 
 def is_test_run_command(command: str) -> bool:
@@ -143,7 +150,11 @@ def is_test_run_command(command: str) -> bool:
         return True
     if _is_test_executable(tokens, lower_all):
         return True
-    if len(tokens) >= 2 and lower_all[0] == 'make' and lower_all[1] in ('test', 'check'):
+    if (
+        len(tokens) >= 2
+        and lower_all[0] == 'make'
+        and lower_all[1] in ('test', 'check')
+    ):
         return True
     return _is_build_tool_test_command(joined, first_base)
 
@@ -161,9 +172,7 @@ def is_git_diff_command(command: str) -> bool:
     return verb in ('diff', 'show', 'log')
 
 
-def _classify_non_test_shell_intent(
-    lower: list[str], joined: str, command: str
-) -> str:
+def _classify_non_test_shell_intent(lower: list[str], joined: str, command: str) -> str:
     checks = (
         ('inspect_filesystem', _is_filesystem_inspection_command(lower)),
         ('fetch_code', _is_fetch_code_command(lower)),

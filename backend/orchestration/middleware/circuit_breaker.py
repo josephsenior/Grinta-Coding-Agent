@@ -71,7 +71,9 @@ def _append_tool_fallback_hint(observation: Observation, tool_name: str) -> None
     observation.content = base_content + hint
 
 
-def _record_success_progress(service: object, tool_name: str, observation: Observation) -> None:
+def _record_success_progress(
+    service: object, tool_name: str, observation: Observation
+) -> None:
     record_success = getattr(service, 'record_success')
     record_success(tool_name=tool_name)
     obs_type = type(observation).__name__

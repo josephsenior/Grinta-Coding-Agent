@@ -57,9 +57,7 @@ def normalize_quotes(s: str) -> str:
 
 def _compose_create_file_success_message(content: str) -> str:
     preview_lines = content.splitlines()[:20]
-    preview_str = '\n'.join(
-        f'{i + 1}\t{line}' for i, line in enumerate(preview_lines)
-    )
+    preview_str = '\n'.join(f'{i + 1}\t{line}' for i, line in enumerate(preview_lines))
     if len(content.splitlines()) > 20:
         preview_str += '\n...\n(File truncated)'
     line_end_desc = '\\r\\n' if '\r\n' in content else '\\n'
@@ -103,9 +101,7 @@ def _attempt_escape_repair_at_disk_write(content: str, file_path: Path) -> str:
         try:
             from backend.core.logger import app_logger as _disk_logger
 
-            _disk_logger.debug(
-                'escape_repair disk safety-net failed', exc_info=True
-            )
+            _disk_logger.debug('escape_repair disk safety-net failed', exc_info=True)
         except Exception:
             pass
     return content

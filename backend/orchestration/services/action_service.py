@@ -61,7 +61,9 @@ def _event_stream_has_pre_dispatch_hook(event_stream) -> bool:
     )
 
 
-def _bind_action_context_if_present(controller, action: Action, ctx: ToolInvocationContext | None) -> None:
+def _bind_action_context_if_present(
+    controller, action: Action, ctx: ToolInvocationContext | None
+) -> None:
     if ctx is None:
         return
     ctx.action_id = action.id

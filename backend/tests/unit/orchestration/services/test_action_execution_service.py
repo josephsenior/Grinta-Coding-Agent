@@ -472,7 +472,9 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(blocked_obs.error_id, 'VERIFICATION_REQUIRED')
 
     @patch('backend.core.plugin.get_plugin_registry')
-    async def test_execute_action_blocks_finish_until_grounded(self, mock_get_registry: MagicMock):
+    async def test_execute_action_blocks_finish_until_grounded(
+        self, mock_get_registry: MagicMock
+    ):
         state = MagicMock()
         state.extra_data = {
             '__step_guard_verification_required': {
@@ -496,7 +498,9 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
     @patch(
         'backend.orchestration.services.action_execution_service.is_context_window_error'
     )
-    async def test_handle_context_window_error_with_truncation(self, mock_is_ctx_error: MagicMock):
+    async def test_handle_context_window_error_with_truncation(
+        self, mock_is_ctx_error: MagicMock
+    ):
         """Test _handle_context_window_error emits condensation request."""
         exc = ContextWindowExceededError('Context too large')
         mock_is_ctx_error.return_value = True
@@ -623,7 +627,16 @@ class TestActionExecutionService(unittest.IsolatedAsyncioTestCase):
         sentinel = NullAction(reason=NullActionReason.SENTINEL)
         untagged = NullAction()
         # 5 untagged with SENTINEL noise between them
-        actions = [untagged, sentinel, untagged, sentinel, untagged, sentinel, untagged, untagged]
+        actions = [
+            untagged,
+            sentinel,
+            untagged,
+            sentinel,
+            untagged,
+            sentinel,
+            untagged,
+            untagged,
+        ]
         self.mock_context.agent.astep = AsyncMock(side_effect=actions)
 
         results = []

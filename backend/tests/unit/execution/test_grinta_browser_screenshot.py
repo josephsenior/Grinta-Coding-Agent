@@ -100,7 +100,9 @@ def _assert_retry_screenshot_result(
     assert obs.content.strip().endswith('.jpg (7 bytes)')
 
     capture_params = [p for name, p in state.log if name == 'captureScreenshot']
-    assert [(params['fromSurface'], params['quality']) for params in capture_params] == [
+    assert [
+        (params['fromSurface'], params['quality']) for params in capture_params
+    ] == [
         (True, 80),
         (False, 80),
     ]

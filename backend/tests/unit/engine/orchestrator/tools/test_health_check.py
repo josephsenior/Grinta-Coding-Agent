@@ -72,8 +72,14 @@ class TestRunProductionHealthCheck:
 
     def test_all_checks_pass(self):
         """Test health check when all dependencies are satisfied."""
-        with patch('backend.engine.tools.health_check.check_structure_editor_dependencies', return_value=(True, 'UE OK')):
-            with patch('backend.engine.tools.health_check.check_atomic_refactor_dependencies', return_value=(True, 'AR OK')):
+        with patch(
+            'backend.engine.tools.health_check.check_structure_editor_dependencies',
+            return_value=(True, 'UE OK'),
+        ):
+            with patch(
+                'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
+                return_value=(True, 'AR OK'),
+            ):
                 res = _run_hc()
 
         assert res['overall_status'] == 'HEALTHY'
@@ -87,8 +93,14 @@ class TestRunProductionHealthCheck:
 
     def test_non_critical_component_failure(self):
         """Test health check when only non-critical component fails."""
-        with patch('backend.engine.tools.health_check.check_structure_editor_dependencies', return_value=(True, 'UE OK')):
-            with patch('backend.engine.tools.health_check.check_atomic_refactor_dependencies', return_value=(False, 'AR failed')):
+        with patch(
+            'backend.engine.tools.health_check.check_structure_editor_dependencies',
+            return_value=(True, 'UE OK'),
+        ):
+            with patch(
+                'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
+                return_value=(False, 'AR failed'),
+            ):
                 res = _run_hc()
 
         assert res['overall_status'] == 'HEALTHY'
@@ -98,8 +110,14 @@ class TestRunProductionHealthCheck:
 
     def test_critical_component_failure(self):
         """Test health check when critical component fails."""
-        with patch('backend.engine.tools.health_check.check_structure_editor_dependencies', return_value=(False, 'UE failed')):
-            with patch('backend.engine.tools.health_check.check_atomic_refactor_dependencies', return_value=(True, 'AR OK')):
+        with patch(
+            'backend.engine.tools.health_check.check_structure_editor_dependencies',
+            return_value=(False, 'UE failed'),
+        ):
+            with patch(
+                'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
+                return_value=(True, 'AR OK'),
+            ):
                 res = _run_hc()
 
         # pylint: disable=unsubscriptable-object
@@ -109,23 +127,41 @@ class TestRunProductionHealthCheck:
 
     def test_critical_failure_raises_with_flag(self):
         """Test that critical failure raises RuntimeError when raise_on_failure=True."""
-        with patch('backend.engine.tools.health_check.check_structure_editor_dependencies', return_value=(False, 'UE failed')):
-            with patch('backend.engine.tools.health_check.check_atomic_refactor_dependencies', return_value=(True, 'AR OK')):
+        with patch(
+            'backend.engine.tools.health_check.check_structure_editor_dependencies',
+            return_value=(False, 'UE failed'),
+        ):
+            with patch(
+                'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
+                return_value=(True, 'AR OK'),
+            ):
                 with pytest.raises(RuntimeError, match='health check failed'):
                     run_production_health_check(raise_on_failure=True)
 
     def test_critical_failure_no_raise_when_disabled(self):
         """Test critical failure returns result when raise_on_failure=False."""
-        with patch('backend.engine.tools.health_check.check_structure_editor_dependencies', return_value=(False, 'UE failed')):
-            with patch('backend.engine.tools.health_check.check_atomic_refactor_dependencies', return_value=(True, 'AR OK')):
+        with patch(
+            'backend.engine.tools.health_check.check_structure_editor_dependencies',
+            return_value=(False, 'UE failed'),
+        ):
+            with patch(
+                'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
+                return_value=(True, 'AR OK'),
+            ):
                 res = _run_hc()
 
         assert res['overall_status'] == 'CRITICAL_FAILURE'
 
     def test_all_components_fail(self):
         """Test health check when all components fail."""
-        with patch('backend.engine.tools.health_check.check_structure_editor_dependencies', return_value=(False, 'UE failed')):
-            with patch('backend.engine.tools.health_check.check_atomic_refactor_dependencies', return_value=(False, 'AR failed')):
+        with patch(
+            'backend.engine.tools.health_check.check_structure_editor_dependencies',
+            return_value=(False, 'UE failed'),
+        ):
+            with patch(
+                'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
+                return_value=(False, 'AR failed'),
+            ):
                 res = _run_hc()
 
         # pylint: disable=unsubscriptable-object
@@ -135,8 +171,14 @@ class TestRunProductionHealthCheck:
 
     def test_result_structure_complete(self):
         """Test that res has complete expected structure."""
-        with patch('backend.engine.tools.health_check.check_structure_editor_dependencies', return_value=(True, 'OK')):
-            with patch('backend.engine.tools.health_check.check_atomic_refactor_dependencies', return_value=(True, 'OK')):
+        with patch(
+            'backend.engine.tools.health_check.check_structure_editor_dependencies',
+            return_value=(True, 'OK'),
+        ):
+            with patch(
+                'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
+                return_value=(True, 'OK'),
+            ):
                 res = _run_hc()
 
         assert 'overall_status' in res
@@ -156,13 +198,25 @@ class TestRunProductionHealthCheck:
 
     def test_overall_status_values(self):
         """Test that overall_status has expected values."""
-        with patch('backend.engine.tools.health_check.check_structure_editor_dependencies', return_value=(True, 'OK')):
-            with patch('backend.engine.tools.health_check.check_atomic_refactor_dependencies', return_value=(True, 'OK')):
+        with patch(
+            'backend.engine.tools.health_check.check_structure_editor_dependencies',
+            return_value=(True, 'OK'),
+        ):
+            with patch(
+                'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
+                return_value=(True, 'OK'),
+            ):
                 res = _run_hc()
                 assert res['overall_status'] == 'HEALTHY'
 
-        with patch('backend.engine.tools.health_check.check_structure_editor_dependencies', return_value=(False, 'FAIL')):
-            with patch('backend.engine.tools.health_check.check_atomic_refactor_dependencies', return_value=(True, 'OK')):
+        with patch(
+            'backend.engine.tools.health_check.check_structure_editor_dependencies',
+            return_value=(False, 'FAIL'),
+        ):
+            with patch(
+                'backend.engine.tools.health_check.check_atomic_refactor_dependencies',
+                return_value=(True, 'OK'),
+            ):
                 res = _run_hc()
                 assert res['overall_status'] == 'CRITICAL_FAILURE'
 

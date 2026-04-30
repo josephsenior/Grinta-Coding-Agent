@@ -29,9 +29,8 @@ from backend.execution.plugins.agent_skills.utils.config import (
     _get_openai_model,
 )
 
-
 _DOCUMENTS_EXTRA_HINT = (
-    "Document parsing requires the optional [documents] extra. "
+    'Document parsing requires the optional [documents] extra. '
     "Install with: pip install 'grinta-ai[documents]'"
 )
 
@@ -96,7 +95,9 @@ def parse_latex(file_path: str) -> None:
 
     """
     try:
-        from pylatexenc.latex2text import LatexNodes2Text  # type: ignore[import-untyped]
+        from pylatexenc.latex2text import (
+            LatexNodes2Text,  # type: ignore[import-untyped]
+        )
     except ImportError as exc:
         raise RuntimeError(_DOCUMENTS_EXTRA_HINT) from exc
     with open(file_path, encoding='utf-8') as f:

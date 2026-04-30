@@ -31,6 +31,7 @@ def _quiet_console() -> Console:
 # _risk_label
 # ---------------------------------------------------------------------------
 
+
 class TestRiskLabel:
     def test_high_risk(self) -> None:
         action = CmdRunAction(command='rm -rf /')
@@ -73,6 +74,7 @@ class TestRiskLabel:
 # _action_label
 # ---------------------------------------------------------------------------
 
+
 class TestActionLabel:
     def test_cmd_run_short(self) -> None:
         action = CmdRunAction(command='git status')
@@ -108,6 +110,7 @@ class TestActionLabel:
 # _file_label
 # ---------------------------------------------------------------------------
 
+
 class TestFileLabel:
     def test_file_edit(self) -> None:
         action = FileEditAction(path='/foo/bar.py', content='x')
@@ -129,6 +132,7 @@ class TestFileLabel:
 # ---------------------------------------------------------------------------
 # _confirmation_frame_style
 # ---------------------------------------------------------------------------
+
 
 class TestConfirmationFrameStyle:
     def test_high_risk(self) -> None:
@@ -156,6 +160,7 @@ class TestConfirmationFrameStyle:
 # ---------------------------------------------------------------------------
 # render_confirmation
 # ---------------------------------------------------------------------------
+
 
 class TestRenderConfirmation:
     def test_returns_true_on_approve(self) -> None:
@@ -210,6 +215,7 @@ class TestRenderConfirmation:
 # ---------------------------------------------------------------------------
 # build_confirmation_action
 # ---------------------------------------------------------------------------
+
 
 class TestBuildConfirmationAction:
     def test_approved(self) -> None:

@@ -43,7 +43,9 @@ def _assert_services_wired(services: OrchestrationServices) -> None:
         assert getattr(services, attr) is not None
 
 
-def _assert_config_attrs(config: OrchestrationConfig, expected: dict[str, object]) -> None:
+def _assert_config_attrs(
+    config: OrchestrationConfig, expected: dict[str, object]
+) -> None:
     for attr, value in expected.items():
         assert getattr(config, attr) == value
 

@@ -146,7 +146,9 @@ class GuardBus:
         state = getattr(controller, 'state', None)
         event_stream = getattr(controller, 'event_stream', None)
         if state is None or event_stream is None:
-            logger.debug('GuardBus.emit: missing state/event_stream, skipping %s', error_id)
+            logger.debug(
+                'GuardBus.emit: missing state/event_stream, skipping %s', error_id
+            )
             return False
 
         slot = _get_slot(state)

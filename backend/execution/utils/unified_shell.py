@@ -296,9 +296,7 @@ class BaseShellSession(UnifiedShellSession, ABC):
 
             if now - wall_start >= hard_limit:
                 # Hard wall-clock safety-net — kill (same as original behaviour).
-                logger.warning(
-                    'Hard timeout after %ss; killing subprocess', hard_limit
-                )
+                logger.warning('Hard timeout after %ss; killing subprocess', hard_limit)
                 try:
                     process.kill()
                 except Exception:
@@ -313,9 +311,8 @@ class BaseShellSession(UnifiedShellSession, ABC):
                     stderr_cap._thread.join(timeout=2.0)
                 partial_out = stdout_cap.read_all()
                 partial_err = stderr_cap.read_all() if stderr_cap else ''
-                err_msg = (
-                    f'Command exceeded hard timeout of {int(hard_limit)}s\n'
-                    + (partial_err or '')
+                err_msg = f'Command exceeded hard timeout of {int(hard_limit)}s\n' + (
+                    partial_err or ''
                 )
                 return partial_out, err_msg, 124
 
@@ -365,14 +362,10 @@ class BaseShellSession(UnifiedShellSession, ABC):
         """
         combined = stdout or ''
         if stderr:
-            combined = (
-                combined + '\n[stderr]:\n' + stderr if combined else stderr
-            )
+            combined = combined + '\n[stderr]:\n' + stderr if combined else stderr
         if len(combined) > self._MAX_OUTPUT_BUFFER_BYTES:
             keep = self._MAX_OUTPUT_BUFFER_BYTES
-            combined = (
-                '\n[... earlier output truncated ...]\n' + combined[-keep:]
-            )
+            combined = '\n[... earlier output truncated ...]\n' + combined[-keep:]
         self._last_output_buffer = combined
         self._last_interaction_at = time.time()
 
@@ -564,8 +557,10 @@ def create_shell_session(
     # isolation is applied by wrapping each subprocess. Interactive sessions are
     # intentionally unsandboxed, so tmux remains a valid fallback when the PTY
     # backend is unavailable.
-    if resolved_tools.has_tmux and resolved_tools.has_bash and (
-        interactive or not sandboxed_local
+    if (
+        resolved_tools.has_tmux
+        and resolved_tools.has_bash
+        and (interactive or not sandboxed_local)
     ):
         from backend.execution.utils.bash import BashSession
 

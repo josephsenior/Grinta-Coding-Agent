@@ -121,9 +121,7 @@ class TestRuntimeOrchestrator(unittest.TestCase):
             agent=mock_agent,
             headless_mode=True,
             vcs_provider_tokens={
-                ProviderType.ENTERPRISE_SSO: ProviderToken(
-                    token=SecretStr('token')
-                )
+                ProviderType.ENTERPRISE_SSO: ProviderToken(token=SecretStr('token'))
             },
             env_vars={'VAR': 'value'},
             user_id='user-123',

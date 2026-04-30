@@ -23,9 +23,12 @@ from backend.execution.security_enforcement import (
 )
 from backend.execution.utils.diff import get_diff
 from backend.ledger.action import CmdRunAction
-from backend.ledger.observation import ErrorObservation, FileEditObservation, FileReadObservation
+from backend.ledger.observation import (
+    ErrorObservation,
+    FileEditObservation,
+    FileReadObservation,
+)
 from backend.utils.regex_limits import try_compile_user_regex
-
 
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m')
 _POWERSHELL_BUILTIN_COMMANDS = frozenset(
@@ -47,7 +50,9 @@ _POWERSHELL_BUILTIN_COMMANDS = frozenset(
 def resolve_workspace_path(path: str, working_dir: str, workspace_root: str) -> Path:
     base = Path(working_dir).resolve()
     candidate = Path(path)
-    return candidate.resolve() if candidate.is_absolute() else (base / candidate).resolve()
+    return (
+        candidate.resolve() if candidate.is_absolute() else (base / candidate).resolve()
+    )
 
 
 def init_shell_commands(executor: Any) -> None:
@@ -84,24 +89,24 @@ def build_shell_git_config_command(executor: Any, use_powershell: bool) -> str:
 def build_env_check_command(use_powershell: bool) -> str:
     if use_powershell:
         return (
-            "function global:env_check { "
+            'function global:env_check { '
             "Write-Output '=== PYTHON ==='; "
-            "if (Get-Command python -ErrorAction SilentlyContinue) { python --version } "
-            "elseif (Get-Command python3 -ErrorAction SilentlyContinue) { python3 --version } "
+            'if (Get-Command python -ErrorAction SilentlyContinue) { python --version } '
+            'elseif (Get-Command python3 -ErrorAction SilentlyContinue) { python3 --version } '
             "else { Write-Output 'python not found' }; "
             "Write-Output '=== KEY PACKAGES ==='; "
-            "if (Get-Command pip -ErrorAction SilentlyContinue) { "
-            "pip list --format=freeze | Select-Object -First 30 "
-            "}; "
+            'if (Get-Command pip -ErrorAction SilentlyContinue) { '
+            'pip list --format=freeze | Select-Object -First 30 '
+            '}; '
             "Write-Output '=== DISK ==='; "
-            "Get-PSDrive -PSProvider FileSystem; "
+            'Get-PSDrive -PSProvider FileSystem; '
             "Write-Output '=== MEMORY ==='; "
-            "if (Get-Command Get-CimInstance -ErrorAction SilentlyContinue) { "
-            "Get-CimInstance Win32_OperatingSystem | Select-Object "
+            'if (Get-Command Get-CimInstance -ErrorAction SilentlyContinue) { '
+            'Get-CimInstance Win32_OperatingSystem | Select-Object '
             "@{Name='FreeMemoryMB';Expression={[math]::Round($_.FreePhysicalMemory / 1024, 1)}}, "
             "@{Name='TotalMemoryMB';Expression={[math]::Round($_.TotalVisibleMemorySize / 1024, 1)}} "
-            "} "
-            "}"
+            '} '
+            '}'
         )
 
     return (
@@ -211,7 +216,9 @@ def predict_interactive_cwd_change(
         )
 
     target = Path(tokens[1])
-    predicted = target.resolve() if target.is_absolute() else (current_cwd / target).resolve()
+    predicted = (
+        target.resolve() if target.is_absolute() else (current_cwd / target).resolve()
+    )
     if not path_is_within_workspace(predicted, executor._workspace_root()):
         return (
             None,
@@ -298,7 +305,9 @@ def validate_workspace_scoped_cwd(
 def resolve_workspace_file_path(executor: Any, path: str, working_dir: str) -> str:
     resolved = resolve_workspace_path(path, working_dir, executor._initial_cwd)
     root = executor._workspace_root()
-    if executor._is_workspace_restricted_profile() and not path_is_within_workspace(resolved, root):
+    if executor._is_workspace_restricted_profile() and not path_is_within_workspace(
+        resolved, root
+    ):
         raise PermissionError(path)
     return str(resolved)
 
@@ -330,12 +339,8 @@ def annotate_environment_errors(executor: Any, observation: Any) -> None:
 
 def _looks_like_bash_command_failure(content: str) -> bool:
     lower_content = content.lower()
-    return (
-        ('/bin/bash' in lower_content or 'bash:' in lower_content)
-        and (
-            'command not found' in lower_content
-            or 'not recognized as' in lower_content
-        )
+    return ('/bin/bash' in lower_content or 'bash:' in lower_content) and (
+        'command not found' in lower_content or 'not recognized as' in lower_content
     )
 
 
@@ -521,7 +526,7 @@ def missing_terminal_session_error(
     )
     if active_ids:
         suggestion = (
-            f"Active session IDs: {', '.join(active_ids[:8])}. "
+            f'Active session IDs: {", ".join(active_ids[:8])}. '
             'Use one returned by terminal_manager action=open.'
         )
     else:
@@ -577,7 +582,11 @@ def _delta_terminal_read(
     if callable(read_since):
         try:
             result = read_since(safe_offset)
-            if isinstance(result, tuple) and len(result) == 3 and isinstance(result[0], str):
+            if (
+                isinstance(result, tuple)
+                and len(result) == 3
+                and isinstance(result[0], str)
+            ):
                 content, next_offset, dropped_chars = result
                 return content, int(next_offset), bool(content), dropped_chars
             raise ValueError('invalid read_output_since result shape')
@@ -625,6 +634,7 @@ def resolve_path(executor: Any, path: str, working_dir: str) -> str:
 
 def handle_aci_file_read(executor: Any, action: Any) -> Any:
     from backend.execution.file_operations import execute_file_editor
+
     result_str, _ = execute_file_editor(
         executor.file_editor,
         command='read_file',
@@ -640,8 +650,11 @@ def edit_try_directory_view(
     executor: Any, filepath: str, path_for_obs: str, action: Any
 ) -> Any:
     from backend.execution.file_operations import handle_directory_view
+
     try:
-        if os.path.isdir(filepath) and (action.command == 'read_file' or not action.command):
+        if os.path.isdir(filepath) and (
+            action.command == 'read_file' or not action.command
+        ):
             return handle_directory_view(filepath, path_for_obs)
     except Exception:
         pass
@@ -654,6 +667,7 @@ def edit_via_file_editor(executor: Any, action: Any) -> Any:
         get_max_edit_observation_chars,
         truncate_large_text,
     )
+
     command = action.command or 'write'
     enable_lint = executor._is_auto_lint_enabled()
     result_str, (old_content, new_content) = execute_file_editor(

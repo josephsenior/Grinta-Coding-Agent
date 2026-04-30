@@ -44,9 +44,7 @@ class TestToolNames(TestCase):
         """Test TEXT_EDITOR_TOOL_NAME has expected value from constants."""
         from backend.core.constants import TEXT_EDITOR_TOOL_NAME
 
-        self.assertEqual(
-            tool_names.TEXT_EDITOR_TOOL_NAME, TEXT_EDITOR_TOOL_NAME
-        )
+        self.assertEqual(tool_names.TEXT_EDITOR_TOOL_NAME, TEXT_EDITOR_TOOL_NAME)
 
     def test_task_tracker_tool_name_value(self):
         """Test TASK_TRACKER_TOOL_NAME has expected value from constants."""

@@ -35,11 +35,15 @@ async def test_test_llm_call_routes_through_direct_client() -> None:
         (NotFoundError('missing'), 'Model not found: gemini-3-flash-preview'),
     ],
 )
-async def test_test_llm_call_maps_direct_client_errors(exc: Exception, message: str) -> None:
+async def test_test_llm_call_maps_direct_client_errors(
+    exc: Exception, message: str
+) -> None:
     client = AsyncMock()
     client.acompletion.side_effect = exc
 
-    with patch('backend.inference.direct_clients.get_direct_client', return_value=client):
+    with patch(
+        'backend.inference.direct_clients.get_direct_client', return_value=client
+    ):
         result = await _test_llm_call('google/gemini-3-flash-preview', 'key', None)
 
     assert isinstance(result, str)

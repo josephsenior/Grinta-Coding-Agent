@@ -152,10 +152,15 @@ class TestRepairLiteralEscapes:
             def sub(self, repl, content: str) -> str:
                 return content
 
-        with patch(
-            'backend.core.content_escape_repair.has_literal_escape_residue',
-            return_value=True,
-        ), patch('backend.core.content_escape_repair._LITERAL_ESCAPE_RE', _RegexNoOp()):
+        with (
+            patch(
+                'backend.core.content_escape_repair.has_literal_escape_residue',
+                return_value=True,
+            ),
+            patch(
+                'backend.core.content_escape_repair._LITERAL_ESCAPE_RE', _RegexNoOp()
+            ),
+        ):
             report = repair_literal_escapes('keep me', 'demo.py')
 
         assert not report.changed

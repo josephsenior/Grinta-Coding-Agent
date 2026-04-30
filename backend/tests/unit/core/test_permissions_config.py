@@ -14,6 +14,7 @@ def _assert_attrs(obj: object, expected: dict[str, object]) -> None:
     for attr, value in expected.items():
         assert getattr(obj, attr) == value
 
+
 # ── Enums ────────────────────────────────────────────────────────────
 
 

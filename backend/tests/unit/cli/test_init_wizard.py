@@ -42,6 +42,7 @@ def _clear_llm_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
 # _http_ok
 # ---------------------------------------------------------------------------
 
+
 class TestHttpOk:
     def test_non_http_scheme_returns_false(self) -> None:
         assert _http_ok('ftp://example.com') is False
@@ -82,23 +83,31 @@ class TestLmstudioRunning:
 
 class TestDetectLocal:
     def test_none_detected(self) -> None:
-        with patch('backend.cli.init_wizard._ollama_running', return_value=False), \
-             patch('backend.cli.init_wizard._lmstudio_running', return_value=False):
+        with (
+            patch('backend.cli.init_wizard._ollama_running', return_value=False),
+            patch('backend.cli.init_wizard._lmstudio_running', return_value=False),
+        ):
             assert _detect_local() == []
 
     def test_ollama_detected(self) -> None:
-        with patch('backend.cli.init_wizard._ollama_running', return_value=True), \
-             patch('backend.cli.init_wizard._lmstudio_running', return_value=False):
+        with (
+            patch('backend.cli.init_wizard._ollama_running', return_value=True),
+            patch('backend.cli.init_wizard._lmstudio_running', return_value=False),
+        ):
             assert _detect_local() == ['ollama']
 
     def test_lmstudio_detected(self) -> None:
-        with patch('backend.cli.init_wizard._ollama_running', return_value=False), \
-             patch('backend.cli.init_wizard._lmstudio_running', return_value=True):
+        with (
+            patch('backend.cli.init_wizard._ollama_running', return_value=False),
+            patch('backend.cli.init_wizard._lmstudio_running', return_value=True),
+        ):
             assert _detect_local() == ['lmstudio']
 
     def test_both_detected(self) -> None:
-        with patch('backend.cli.init_wizard._ollama_running', return_value=True), \
-             patch('backend.cli.init_wizard._lmstudio_running', return_value=True):
+        with (
+            patch('backend.cli.init_wizard._ollama_running', return_value=True),
+            patch('backend.cli.init_wizard._lmstudio_running', return_value=True),
+        ):
             result = _detect_local()
             assert 'ollama' in result
             assert 'lmstudio' in result
@@ -134,13 +143,17 @@ class TestConfirmOverwriteExisting:
     def test_confirm_yes(self) -> None:
         console = _quiet_console()
         with patch('rich.prompt.Confirm.ask', return_value=True):
-            result = _confirm_overwrite_existing(console, {'llm_model': 'x', 'llm_provider': 'y'})
+            result = _confirm_overwrite_existing(
+                console, {'llm_model': 'x', 'llm_provider': 'y'}
+            )
         assert result is True
 
     def test_confirm_no(self) -> None:
         console = _quiet_console()
         with patch('rich.prompt.Confirm.ask', return_value=False):
-            result = _confirm_overwrite_existing(console, {'llm_model': 'x', 'llm_provider': 'y'})
+            result = _confirm_overwrite_existing(
+                console, {'llm_model': 'x', 'llm_provider': 'y'}
+            )
         assert result is False
 
 
@@ -195,7 +208,10 @@ class TestRunInit:
         """Return a context-manager-like patch stack for Prompt/Confirm."""
         return [
             patch('backend.cli.init_wizard._detect_local', return_value=[]),
-            patch('rich.prompt.Prompt.ask', side_effect=[provider, model, api_key, base_url]),
+            patch(
+                'rich.prompt.Prompt.ask',
+                side_effect=[provider, model, api_key, base_url],
+            ),
         ]
 
     def test_new_settings_written(
@@ -204,9 +220,14 @@ class TestRunInit:
         console = _quiet_console()
         settings_file = tmp_path / 'settings.json'
         monkeypatch.delenv('OPENAI_API_KEY', raising=False)
-        with patch('backend.cli.init_wizard._detect_local', return_value=[]), \
-             patch('rich.prompt.Prompt.ask', side_effect=['openai', 'openai/gpt-4o-mini', 'sk-test', '']), \
-             _patch_settings_path(settings_file):
+        with (
+            patch('backend.cli.init_wizard._detect_local', return_value=[]),
+            patch(
+                'rich.prompt.Prompt.ask',
+                side_effect=['openai', 'openai/gpt-4o-mini', 'sk-test', ''],
+            ),
+            _patch_settings_path(settings_file),
+        ):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
         assert settings_file.exists()
@@ -214,7 +235,9 @@ class TestRunInit:
         assert data['llm_provider'] == 'openai'
         assert data['llm_model'] == 'openai/gpt-4o-mini'
         assert data['llm_api_key'] == '${LLM_API_KEY}'
-        assert (tmp_path / '.env').read_text(encoding='utf-8') == 'LLM_API_KEY=sk-test\n'
+        assert (tmp_path / '.env').read_text(
+            encoding='utf-8'
+        ) == 'LLM_API_KEY=sk-test\n'
 
     def test_existing_settings_declined(self, tmp_path: Path) -> None:
         console = _quiet_console()
@@ -222,8 +245,10 @@ class TestRunInit:
         settings_file.write_text(
             json.dumps({'llm_model': 'x', 'llm_provider': 'y'}), encoding='utf-8'
         )
-        with patch('rich.prompt.Confirm.ask', return_value=False), \
-             _patch_settings_path(settings_file):
+        with (
+            patch('rich.prompt.Confirm.ask', return_value=False),
+            _patch_settings_path(settings_file),
+        ):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
         # Original file untouched
@@ -239,10 +264,20 @@ class TestRunInit:
         settings_file.write_text(
             json.dumps({'llm_model': 'old', 'llm_provider': 'old'}), encoding='utf-8'
         )
-        with patch('rich.prompt.Confirm.ask', return_value=True), \
-             patch('backend.cli.init_wizard._detect_local', return_value=[]), \
-             patch('rich.prompt.Prompt.ask', side_effect=['anthropic', 'anthropic/claude-sonnet-4-20250514', 'key123', '']), \
-             _patch_settings_path(settings_file):
+        with (
+            patch('rich.prompt.Confirm.ask', return_value=True),
+            patch('backend.cli.init_wizard._detect_local', return_value=[]),
+            patch(
+                'rich.prompt.Prompt.ask',
+                side_effect=[
+                    'anthropic',
+                    'anthropic/claude-sonnet-4-20250514',
+                    'key123',
+                    '',
+                ],
+            ),
+            _patch_settings_path(settings_file),
+        ):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
         data = json.loads(settings_file.read_text(encoding='utf-8'))
@@ -251,9 +286,14 @@ class TestRunInit:
     def test_ollama_detected_as_default(self, tmp_path: Path) -> None:
         console = _quiet_console()
         settings_file = tmp_path / 'settings.json'
-        with patch('backend.cli.init_wizard._detect_local', return_value=['ollama']), \
-             patch('rich.prompt.Prompt.ask', side_effect=['ollama', 'ollama/llama3.2', '', 'http://localhost:11434']), \
-             _patch_settings_path(settings_file):
+        with (
+            patch('backend.cli.init_wizard._detect_local', return_value=['ollama']),
+            patch(
+                'rich.prompt.Prompt.ask',
+                side_effect=['ollama', 'ollama/llama3.2', '', 'http://localhost:11434'],
+            ),
+            _patch_settings_path(settings_file),
+        ):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
 
@@ -266,19 +306,31 @@ class TestRunInit:
         docs = tmp_path / 'docs'
         docs.mkdir()
         (docs / 'SECURITY_CHECKLIST.md').write_text('checklist', encoding='utf-8')
-        with patch('backend.cli.init_wizard._detect_local', return_value=[]), \
-             patch('rich.prompt.Prompt.ask', side_effect=['openai', 'openai/gpt-4o-mini', 'sk', '']), \
-             _patch_settings_path(settings_file):
+        with (
+            patch('backend.cli.init_wizard._detect_local', return_value=[]),
+            patch(
+                'rich.prompt.Prompt.ask',
+                side_effect=['openai', 'openai/gpt-4o-mini', 'sk', ''],
+            ),
+            _patch_settings_path(settings_file),
+        ):
             rc = run_init(project_root=tmp_path, console=console)
         assert rc == 0
 
-    def test_default_project_root_is_cwd(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_default_project_root_is_cwd(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         monkeypatch.chdir(tmp_path)
         console = _quiet_console()
         settings_file = tmp_path / 'settings.json'
-        with patch('backend.cli.init_wizard._detect_local', return_value=[]), \
-             patch('rich.prompt.Prompt.ask', side_effect=['openai', 'openai/gpt-4o-mini', 'sk', '']), \
-             _patch_settings_path(settings_file):
+        with (
+            patch('backend.cli.init_wizard._detect_local', return_value=[]),
+            patch(
+                'rich.prompt.Prompt.ask',
+                side_effect=['openai', 'openai/gpt-4o-mini', 'sk', ''],
+            ),
+            _patch_settings_path(settings_file),
+        ):
             rc = run_init(console=console)
         assert rc == 0
         assert settings_file.exists()

@@ -63,7 +63,10 @@ class ConversationWindowCompactor(RollingCompactor):
             return True
         if isinstance(event, (FileWriteAction, FileEditAction)):
             return True
-        return isinstance(event, Observation) and getattr(event, 'cause', None) in file_action_ids
+        return (
+            isinstance(event, Observation)
+            and getattr(event, 'cause', None) in file_action_ids
+        )
 
     def _protected_ids(self, events: list[Any], file_action_ids: set[int]) -> set[int]:
         return {

@@ -62,7 +62,10 @@ def resolve_workspace_path(path: str, working_dir: str, workspace_root: str) -> 
     """Resolve a workspace-relative path against *working_dir* (session cwd)."""
     base = Path(working_dir).resolve()
     candidate = Path(path)
-    return candidate.resolve() if candidate.is_absolute() else (base / candidate).resolve()
+    return (
+        candidate.resolve() if candidate.is_absolute() else (base / candidate).resolve()
+    )
+
 
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;]*m')
 _POWERSHELL_BUILTIN_COMMANDS = frozenset(
@@ -81,7 +84,9 @@ _POWERSHELL_BUILTIN_COMMANDS = frozenset(
 )
 
 
-def try_compile_user_regex(pattern_str: str) -> tuple[re.Pattern[str] | None, str | None]:
+def try_compile_user_regex(
+    pattern_str: str,
+) -> tuple[re.Pattern[str] | None, str | None]:
     """Compile a user-provided regex pattern safely."""
     return _try_compile_user_regex(pattern_str)
 
@@ -281,7 +286,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
             return ErrorObservation(
                 content=(
                     f"MCP tool call failed for '{action.name}': {type(e).__name__}: {e}. "
-                    "Use non-MCP tools as a fallback or check MCP configuration."
+                    'Use non-MCP tools as a fallback or check MCP configuration.'
                 )
             )
 
@@ -529,5 +534,3 @@ def get_uvicorn_json_log_config() -> dict[str, Any]:
             'uvicorn.access': {'handlers': ['default'], 'level': 'INFO'},
         },
     }
-
-

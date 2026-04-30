@@ -537,7 +537,9 @@ class TestBundledHelpers:
 
         assert mcp_config_mod._bundled_mcp_json_path() == resolved_path
 
-    def test_bundled_json_path_returns_none_after_second_try_exception(self, monkeypatch):
+    def test_bundled_json_path_returns_none_after_second_try_exception(
+        self, monkeypatch
+    ):
         original_resolve = Path.resolve
         module_file = str(Path(mcp_config_mod.__file__)).replace('\\', '/')
 
@@ -562,7 +564,9 @@ class TestBundledHelpers:
         self, monkeypatch
     ):
         _disable_bundled_mcp_defaults(monkeypatch)
-        monkeypatch.setattr(mcp_config_mod, '_bundled_mcp_defaults_disabled', lambda: False)
+        monkeypatch.setattr(
+            mcp_config_mod, '_bundled_mcp_defaults_disabled', lambda: False
+        )
         monkeypatch.setattr(mcp_config_mod, '_bundled_mcp_json_path', lambda: None)
 
         assert load_bundled_mcp_server_configs() == []
@@ -575,8 +579,12 @@ class TestBundledHelpers:
             '{"mcpServers": {"default": {"command": "npx"}, "skip": "x", "keep": {"command": "npx"}}}',
             encoding='utf-8',
         )
-        monkeypatch.setattr(mcp_config_mod, '_bundled_mcp_defaults_disabled', lambda: False)
-        monkeypatch.setattr(mcp_config_mod, '_bundled_mcp_json_path', lambda: config_json)
+        monkeypatch.setattr(
+            mcp_config_mod, '_bundled_mcp_defaults_disabled', lambda: False
+        )
+        monkeypatch.setattr(
+            mcp_config_mod, '_bundled_mcp_json_path', lambda: config_json
+        )
 
         servers = load_bundled_mcp_server_configs()
 
@@ -617,7 +625,9 @@ class TestDefaultServerHelpers:
         servers = [MCPServerConfig(name='s1', type='stdio', command='npx')]
         assert _filter_windows_stdio_servers(servers) is servers
 
-    def test_ensure_default_mcp_http_server_returns_when_default_missing(self, monkeypatch):
+    def test_ensure_default_mcp_http_server_returns_when_default_missing(
+        self, monkeypatch
+    ):
         config = AppConfig()
         monkeypatch.setattr(
             mcp_config_mod.AppMCPConfigImpl,
@@ -650,7 +660,9 @@ class TestDefaultServerHelpers:
         config = AppConfig()
         config.mcp_host = 'localhost:3000'
         config.mcp.servers.append(
-            MCPServerConfig(name='other', type='shttp', url='http://localhost:3000/mcp/mcp')
+            MCPServerConfig(
+                name='other', type='shttp', url='http://localhost:3000/mcp/mcp'
+            )
         )
         monkeypatch.setattr(mcp_config_mod, '_get_local_app_mcp_tool_count', lambda: 2)
 
@@ -660,7 +672,9 @@ class TestDefaultServerHelpers:
 
     def test_ensure_default_mcp_http_server_appends_stdio_extra(self, monkeypatch):
         config = AppConfig()
-        default = MCPServerConfig(name='app-mcp', type='shttp', url='http://localhost:3000/mcp/mcp')
+        default = MCPServerConfig(
+            name='app-mcp', type='shttp', url='http://localhost:3000/mcp/mcp'
+        )
         extra = [MCPServerConfig(name='stdio-extra', type='stdio', command='npx')]
         monkeypatch.setattr(mcp_config_mod, '_get_local_app_mcp_tool_count', lambda: 2)
         monkeypatch.setattr(
@@ -671,7 +685,10 @@ class TestDefaultServerHelpers:
 
         ensure_default_mcp_http_server(config)
 
-        assert [server.name for server in config.mcp.servers] == ['app-mcp', 'stdio-extra']
+        assert [server.name for server in config.mcp.servers] == [
+            'app-mcp',
+            'stdio-extra',
+        ]
 
 
 # ── AppMCPConfig ─────────────────────────────────────────────────────

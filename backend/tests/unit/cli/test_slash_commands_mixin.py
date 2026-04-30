@@ -1,4 +1,4 @@
-﻿"""Tests for backend.cli._repl.slash_commands_mixin.SlashCommandsMixin."""
+"""Tests for backend.cli._repl.slash_commands_mixin.SlashCommandsMixin."""
 
 from __future__ import annotations
 
@@ -111,6 +111,7 @@ def _parse(cmd: str):
 # _handle_command / _handle_parsed_command
 # ---------------------------------------------------------------------------
 
+
 class TestHandleCommand:
     def test_exit_command(self) -> None:
         r = _repl()
@@ -138,6 +139,7 @@ class TestHandleCommand:
 # _cmd_exit
 # ---------------------------------------------------------------------------
 
+
 class TestCmdExit:
     def test_returns_false(self) -> None:
         r = _repl()
@@ -162,6 +164,7 @@ class TestCmdExit:
 # _cmd_clear
 # ---------------------------------------------------------------------------
 
+
 class TestCmdClear:
     def test_clears_history(self) -> None:
         r = _repl()
@@ -185,6 +188,7 @@ class TestCmdClear:
 # _cmd_status
 # ---------------------------------------------------------------------------
 
+
 class TestCmdStatus:
     def test_shows_hud_text(self) -> None:
         r = _repl()
@@ -204,6 +208,7 @@ class TestCmdStatus:
 # _cmd_cost
 # ---------------------------------------------------------------------------
 
+
 class TestCmdCost:
     def test_shows_cost(self) -> None:
         r = _repl()
@@ -222,6 +227,7 @@ class TestCmdCost:
 # ---------------------------------------------------------------------------
 # _cmd_think
 # ---------------------------------------------------------------------------
+
 
 class TestCmdThink:
     def test_toggle_on(self) -> None:
@@ -278,6 +284,7 @@ class TestCmdThink:
 # _cmd_resume
 # ---------------------------------------------------------------------------
 
+
 class TestCmdResume:
     def test_valid_arg_sets_pending(self) -> None:
         r = _repl()
@@ -305,6 +312,7 @@ class TestCmdResume:
 # _cmd_retry
 # ---------------------------------------------------------------------------
 
+
 class TestCmdRetry:
     def test_retry_with_last_message(self) -> None:
         r = _repl()
@@ -313,6 +321,7 @@ class TestCmdRetry:
         assert result is True
         assert r._next_action is not None
         from backend.ledger.action import MessageAction
+
         assert isinstance(r._next_action, MessageAction)
         assert r._next_action.content == 'do the thing'
 
@@ -336,6 +345,7 @@ class TestCmdRetry:
 # _cmd_compact
 # ---------------------------------------------------------------------------
 
+
 class TestCmdCompact:
     def test_sets_condensation_action(self) -> None:
         r = _repl()
@@ -343,6 +353,7 @@ class TestCmdCompact:
         assert result is True
         assert r._next_action is not None
         from backend.ledger.action.agent import CondensationRequestAction
+
         assert isinstance(r._next_action, CondensationRequestAction)
 
     def test_rejects_extra_args(self) -> None:
@@ -355,6 +366,7 @@ class TestCmdCompact:
 # ---------------------------------------------------------------------------
 # _cmd_checkpoint
 # ---------------------------------------------------------------------------
+
 
 class TestCmdCheckpoint:
     def test_list_sub_command(self) -> None:
@@ -377,6 +389,7 @@ class TestCmdCheckpoint:
         assert result is True
         assert r._next_action is not None
         from backend.ledger.action import MessageAction
+
         assert isinstance(r._next_action, MessageAction)
         assert 'my label' in r._next_action.content
 
@@ -391,10 +404,13 @@ class TestCmdCheckpoint:
 # _cmd_copy
 # ---------------------------------------------------------------------------
 
+
 class TestCmdCopy:
     def test_copy_ok(self) -> None:
         r = _repl()
-        with patch('backend.cli.repl._copy_to_system_clipboard', return_value=(True, 'Copied!')):
+        with patch(
+            'backend.cli.repl._copy_to_system_clipboard', return_value=(True, 'Copied!')
+        ):
             result = r._cmd_copy(_parse('/copy'))
         assert result is True
         assert r._renderer is not None
@@ -403,7 +419,10 @@ class TestCmdCopy:
 
     def test_copy_fail(self) -> None:
         r = _repl()
-        with patch('backend.cli.repl._copy_to_system_clipboard', return_value=(False, 'Failed!')):
+        with patch(
+            'backend.cli.repl._copy_to_system_clipboard',
+            return_value=(False, 'Failed!'),
+        ):
             result = r._cmd_copy(_parse('/copy'))
         assert result is True
         assert r._renderer is not None
@@ -414,6 +433,7 @@ class TestCmdCopy:
 # ---------------------------------------------------------------------------
 # _cmd_sessions
 # ---------------------------------------------------------------------------
+
 
 class TestCmdSessions:
     def test_calls_list_sessions(self) -> None:
@@ -459,6 +479,7 @@ class TestCmdSessions:
 # _cmd_autonomy
 # ---------------------------------------------------------------------------
 
+
 class TestCmdAutonomy:
     def test_no_args_shows_current(self) -> None:
         r = _repl()
@@ -475,7 +496,9 @@ class TestCmdAutonomy:
         assert result is True
         assert r._renderer is not None
         messages = [m for _, m in r._renderer.messages]
-        assert any('controller' in m.lower() or 'warning' in m.lower() for m in messages)
+        assert any(
+            'controller' in m.lower() or 'warning' in m.lower() for m in messages
+        )
 
     def test_valid_level_with_controller(self) -> None:
         r = _repl()
@@ -500,7 +523,9 @@ class TestCmdAutonomy:
         assert mock_ac.autonomy_level == 'balanced'
         assert r._renderer is not None
         messages = [m for _, m in r._renderer.messages]
-        assert any('supervised' in m.lower() or 'invalid' in m.lower() for m in messages)
+        assert any(
+            'supervised' in m.lower() or 'invalid' in m.lower() for m in messages
+        )
 
     def test_invalid_level(self) -> None:
         r = _repl()
@@ -520,10 +545,13 @@ class TestCmdAutonomy:
 # _cmd_model
 # ---------------------------------------------------------------------------
 
+
 class TestCmdModel:
     def test_no_args_shows_current(self) -> None:
         r = _repl()
-        with patch('backend.cli.config_manager.get_current_model', return_value='openai/gpt-4o'):
+        with patch(
+            'backend.cli.config_manager.get_current_model', return_value='openai/gpt-4o'
+        ):
             result = r._cmd_model(_parse('/model'))
         assert result is True
         assert r._renderer is not None
@@ -532,8 +560,13 @@ class TestCmdModel:
 
     def test_valid_model_switch(self) -> None:
         r = _repl()
-        with patch('backend.cli.config_manager.update_model') as mock_update, \
-             patch('backend.cli.config_manager.get_current_model', return_value='anthropic/claude-haiku-4'):
+        with (
+            patch('backend.cli.config_manager.update_model') as mock_update,
+            patch(
+                'backend.cli.config_manager.get_current_model',
+                return_value='anthropic/claude-haiku-4',
+            ),
+        ):
             result = r._cmd_model(_parse('/model anthropic/claude-haiku-4'))
         assert result is True
         mock_update.assert_called_once_with('anthropic/claude-haiku-4')
@@ -567,6 +600,7 @@ class TestCmdModel:
 # _cmd_help
 # ---------------------------------------------------------------------------
 
+
 class TestCmdHelp:
     def test_help_no_args(self) -> None:
         r = _repl()
@@ -592,6 +626,7 @@ class TestCmdHelp:
 # ---------------------------------------------------------------------------
 # _cmd_diff
 # ---------------------------------------------------------------------------
+
 
 class TestCmdDiff:
     def test_diff_no_git(self, tmp_path: Path) -> None:
@@ -648,13 +683,16 @@ class TestCmdDiff:
 # _handle_checkpoint_list
 # ---------------------------------------------------------------------------
 
+
 class TestHandleCheckpointList:
     def test_no_rollback_manager(self) -> None:
         r = _repl()
         r._handle_checkpoint_list([])
         assert r._renderer is not None
         messages = [m for _, m in r._renderer.messages]
-        assert any('rollback' in m.lower() or 'checkpoint' in m.lower() for m in messages)
+        assert any(
+            'rollback' in m.lower() or 'checkpoint' in m.lower() for m in messages
+        )
 
     def test_empty_checkpoints(self) -> None:
         r = _repl()
@@ -669,9 +707,20 @@ class TestHandleCheckpointList:
     def test_lists_checkpoints(self) -> None:
         r = _repl()
         import time
+
         entries = [
-            {'id': 'cp-abc123', 'timestamp': time.time(), 'checkpoint_type': 'manual', 'description': 'Before refactor'},
-            {'id': 'cp-def456', 'timestamp': time.time() - 60, 'checkpoint_type': 'auto', 'description': ''},
+            {
+                'id': 'cp-abc123',
+                'timestamp': time.time(),
+                'checkpoint_type': 'manual',
+                'description': 'Before refactor',
+            },
+            {
+                'id': 'cp-def456',
+                'timestamp': time.time() - 60,
+                'checkpoint_type': 'auto',
+                'description': '',
+            },
         ]
         mock_mgr = MagicMock()
         mock_mgr.list_checkpoints.return_value = entries
@@ -692,6 +741,7 @@ class TestHandleCheckpointList:
 # ---------------------------------------------------------------------------
 # _handle_checkpoint_diff
 # ---------------------------------------------------------------------------
+
 
 class TestHandleCheckpointDiff:
     def test_no_args_warns(self) -> None:
@@ -729,8 +779,10 @@ class TestHandleCheckpointDiff:
         mock_proc.stdout = 'diff --git a/foo b/foo'
         mock_proc.stderr = ''
         mock_proc.returncode = 0
-        with patch.object(r, '_resolve_rollback_manager', return_value=mock_mgr), \
-             patch('subprocess.run', return_value=mock_proc):
+        with (
+            patch.object(r, '_resolve_rollback_manager', return_value=mock_mgr),
+            patch('subprocess.run', return_value=mock_proc),
+        ):
             r._handle_checkpoint_diff(['cp-abc'])
         assert r._renderer is not None
         assert len(r._renderer.markdown_blocks) > 0
@@ -740,9 +792,11 @@ class TestHandleCheckpointDiff:
 # _format_checkpoint_entry
 # ---------------------------------------------------------------------------
 
+
 class TestFormatCheckpointEntry:
     def test_full_entry(self) -> None:
         import time
+
         entry = {
             'id': 'cp-abc123def456',
             'timestamp': time.time(),
@@ -763,6 +817,7 @@ class TestFormatCheckpointEntry:
 # _compute_checkpoint_diff_text
 # ---------------------------------------------------------------------------
 
+
 class TestComputeCheckpointDiffText:
     def test_no_sha(self) -> None:
         result = SlashCommandsMixin._compute_checkpoint_diff_text(None, '/some/path')
@@ -773,7 +828,9 @@ class TestComputeCheckpointDiffText:
         mock_proc.stdout = 'diff output'
         mock_proc.stderr = ''
         with patch('subprocess.run', return_value=mock_proc):
-            result = SlashCommandsMixin._compute_checkpoint_diff_text('abc123', str(tmp_path))
+            result = SlashCommandsMixin._compute_checkpoint_diff_text(
+                'abc123', str(tmp_path)
+            )
         assert 'diff output' in result
 
     def test_with_sha_empty_output(self, tmp_path: Path) -> None:
@@ -781,18 +838,23 @@ class TestComputeCheckpointDiffText:
         mock_proc.stdout = ''
         mock_proc.stderr = ''
         with patch('subprocess.run', return_value=mock_proc):
-            result = SlashCommandsMixin._compute_checkpoint_diff_text('abc123', str(tmp_path))
+            result = SlashCommandsMixin._compute_checkpoint_diff_text(
+                'abc123', str(tmp_path)
+            )
         assert 'empty diff' in result
 
     def test_git_exception(self, tmp_path: Path) -> None:
         with patch('subprocess.run', side_effect=OSError('git not found')):
-            result = SlashCommandsMixin._compute_checkpoint_diff_text('abc123', str(tmp_path))
+            result = SlashCommandsMixin._compute_checkpoint_diff_text(
+                'abc123', str(tmp_path)
+            )
         assert 'failed' in result.lower()
 
 
 # ---------------------------------------------------------------------------
 # _render_unknown_command
 # ---------------------------------------------------------------------------
+
 
 class TestRenderUnknownCommand:
     def test_suggests_close_match(self) -> None:

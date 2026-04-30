@@ -174,7 +174,9 @@ class StreamingCheckpoint:
                     f'exceeded {self._max_checkpoint_age_sec:.1f}s max age '
                     'with auto-discard disabled'
                 )
-                logger.warning('Streaming checkpoint requires manual recovery: %s', reason)
+                logger.warning(
+                    'Streaming checkpoint requires manual recovery: %s', reason
+                )
                 return RecoveryInspection(
                     status='blocked_stale',
                     record=record,

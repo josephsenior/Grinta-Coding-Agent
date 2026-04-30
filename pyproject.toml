@@ -18,49 +18,69 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
+  "aiofiles>=25.1",
   "aiohttp>=3.9,!=3.11.13",
   "anthropic>=0.40,<1",
   "anyio>=4.9,<5",
   "bashlex>=0.18,<0.19",
+  "binaryornot>=0.4.4,<0.5",
   "debugpy>=1.8,<2",
   "diff-match-patch>=20241021,<20260000",
   "fastapi>=0.115,<1",
   "fastmcp>=2.13,<3",
   "google-genai>=0.1",
-  "websockets>=15.0.1,<16",
   "html2text>=2025.4.15,<2026",
   "httpx>=0.27,<1",
   "json-repair>=0.48,<1",
-  "orjson>=3.10,<4",
   "libtmux>=0.37,<0.40",
   "mcp>=1.10,<2",
   "openai>=1.40,<3",
+  "orjson>=3.10,<4",
   "pathspec>=0.12,<1",
   "pillow>=11.3,<13",
+  "prompt-toolkit>=3.0.50,<4",
   "psutil>=7,<8",
+  "ptyprocess>=0.7,<1; sys_platform!='win32'",
+  "pyfiglet>=1.0.4",
   "python-dotenv>=1.1.1,<2",
   "python-frontmatter>=1.1,<2",
   "python-json-logger>=3.2.1,<4",
   "python-multipart>=0.0.20,<1",
+  "pywinpty>=2,<3; sys_platform=='win32'",
   "rapidfuzz>=3.9,<4",
+  "rich>=14,<15",
+  "ripgrep==14.1",
   "starlette>=0.49.1,<0.50",
   "tenacity>=8.5,<10",
   "termcolor>=3.1,<4",
+  "tomli-w>=1.1,<2",
   "tree-sitter>=0.24,<0.25",
   "tree-sitter-language-pack>=0.7.3,<0.8",
   "uvicorn>=0.30,<1",
+  "websockets>=15.0.1,<16",
   "whatthepatch>=1.0.6,<2",
-  "binaryornot (>=0.4.4,<0.5.0)",
-  "tomli-w>=1.1.0,<2",
-  "aiofiles>=25.1.0",
-  "rich>=14.0,<15",
-  "prompt_toolkit>=3.0.50,<4",
-  "pyfiglet>=1.0.4",
-  "ripgrep==14.1.0",
-  "ptyprocess>=0.7,<1; sys_platform != 'win32'",
-  "pywinpty>=2.0,<3; sys_platform == 'win32'",
 ]
 
+optional-dependencies.all = [
+  "browser-use>=0.12,<0.15",
+  "chromadb>=1.4,<2",
+  "pylatexenc>=2.10,<3",
+  "pypdf2>=3,<4",
+  "python-docx>=1.1,<2",
+  "python-pptx>=1,<2",
+]
+optional-dependencies.browser = [
+  "browser-use>=0.12,<0.15",
+]
+optional-dependencies.documents = [
+  "pylatexenc>=2.10,<3",
+  "pypdf2>=3,<4",
+  "python-docx>=1.1,<2",
+  "python-pptx>=1,<2",
+]
+optional-dependencies.rag = [
+  "chromadb>=1.4,<2",
+]
 urls = { Repository = "https://github.com/josephsenior/Grinta-Coding-Agent", Issues = "https://github.com/josephsenior/Grinta-Coding-Agent/issues", Documentation = "https://github.com/josephsenior/Grinta-Coding-Agent/tree/main/docs" }
 
 # User-installable extras. Default install stays lean (~150 MB).
@@ -68,30 +88,39 @@ urls = { Repository = "https://github.com/josephsenior/Grinta-Coding-Agent", Iss
 # pip install "grinta-ai[documents]"  — PDF / DOCX / PPTX / LaTeX parsers
 # pip install "grinta-ai[browser]"    — native browser automation (browser-use)
 # pip install "grinta-ai[all]"        — kitchen sink
-[project.optional-dependencies]
-rag = [
-  "chromadb>=1.4,<2",
+scripts.grinta = "launch.entry:main"
+
+[dependency-groups]
+dev = [
+  "bandit>=1.9.3",
+  "build>=1.2.2",
+  "grpcio>=1.70",
+  "grpcio-tools>=1.70",
+  "mypy==1.17",
+  "pre-commit==4.2",
+  "pylint>=4.0.5,<5",
+  "pytest>=8.4",
+  "ruff==0.12.5",
+  "tiktoken>=0.12",
+  "types-pyyaml>=6.0.12.20250516",
+  "types-requests>=2.32.4.20260107",
+  "types-setuptools>=80.9.0.20250529",
+  "types-toml>=0.10.8.20240310",
 ]
-documents = [
-  "python-docx>=1.1,<2",
-  "PyPDF2>=3.0,<4",
-  "python-pptx>=1.0,<2",
-  "pylatexenc>=2.10,<3",
+test = [
+  "pytest>=8.4",
+  "pytest-asyncio>=0.21.1,<1",
+  "pytest-cov>=4.1,<7",
+  "pytest-timeout>=2.4",
+  "pytest-xdist>=3.8,<4",
+  "requests>=2.32.4,<3",
 ]
+
+runtime = [  ]
+
 browser = [
   "browser-use>=0.12,<0.15",
 ]
-all = [
-  "chromadb>=1.4,<2",
-  "python-docx>=1.1,<2",
-  "PyPDF2>=3.0,<4",
-  "python-pptx>=1.0,<2",
-  "pylatexenc>=2.10,<3",
-  "browser-use>=0.12,<0.15",
-]
-
-[project.scripts]
-grinta = "launch.entry:main"
 
 [tool.hatch.build.targets.wheel]
 packages = [
@@ -130,38 +159,6 @@ exclude = [
   "scripts/__pycache__",
 ]
 
-[dependency-groups]
-dev = [
-  "ruff==0.12.5",
-  "pylint>=4.0.5,<5",
-  "mypy==1.17.0",
-  "pre-commit==4.2.0",
-  "build>=1.2.2",
-  "types-PyYAML>=6.0.12.20250516",
-  "types-toml>=0.10.8.20240310",
-  "types-setuptools>=80.9.0.20250529",
-  "pytest>=8.4.0",
-  "grpcio>=1.70.0",
-  "grpcio-tools>=1.70.0",
-  "bandit>=1.9.3",
-  "types-requests>=2.32.4.20260107",
-  "tiktoken>=0.12.0",
-]
-test = [
-  "pytest>=8.4.0",
-  "pytest-cov>=4.1.0,<7.0.0",
-  "pytest-asyncio>=0.21.1,<1.0.0",
-  "pytest-xdist>=3.8.0,<4.0.0",
-  "pytest-timeout>=2.4.0",
-  "requests>=2.32.4,<3",
-]
-
-runtime = []
-
-browser = [
-  "browser-use>=0.12,<0.15",
-]
-
 [tool.hatch.version]
 path = "backend/__init__.py"
 
@@ -187,16 +184,16 @@ lint.ignore = [
   "B010",
   "B018",
   "B904",
-  "D1",       # Ignore warnings for missing docstrings
+  "D1",   # Ignore warnings for missing docstrings
   "E501",
 ]
-lint.flake8-bugbear.extend-immutable-calls = [ "Depends", "fastapi.Depends", "fastapi.params.Depends" ]
-lint.flake8-quotes.docstring-quotes = "double"
-lint.flake8-quotes.inline-quotes = "single"
-lint.pydocstyle.convention = "google"
-
-[tool.ruff.lint.per-file-ignores]
-"backend/tests/**" = [
+lint.per-file-ignores."backend/cli/config_manager.py" = [ "E402" ]
+lint.per-file-ignores."backend/cli/event_renderer.py" = [ "E402" ]
+lint.per-file-ignores."backend/cli/repl.py" = [ "E402" ]
+lint.per-file-ignores."backend/integrations/mcp/mcp_utils.py" = [ "E402" ]
+lint.per-file-ignores."backend/persistence/data_models/settings.py" = [ "E402" ]
+lint.per-file-ignores."backend/scripts/**" = [ "ASYNC" ]
+lint.per-file-ignores."backend/tests/**" = [
   "ASYNC",
   "B017",
   "B028",
@@ -206,12 +203,10 @@ lint.pydocstyle.convention = "google"
   "E402",
   "F841",
 ]
-"backend/scripts/**" = ["ASYNC"]
-"backend/cli/config_manager.py" = ["E402"]
-"backend/cli/event_renderer.py" = ["E402"]
-"backend/cli/repl.py" = ["E402"]
-"backend/integrations/mcp/mcp_utils.py" = ["E402"]
-"backend/persistence/data_models/settings.py" = ["E402"]
+lint.flake8-bugbear.extend-immutable-calls = [ "Depends", "fastapi.Depends", "fastapi.params.Depends" ]
+lint.flake8-quotes.docstring-quotes = "double"
+lint.flake8-quotes.inline-quotes = "single"
+lint.pydocstyle.convention = "google"
 
 [tool.coverage.run]
 source = [
@@ -243,10 +238,11 @@ fail_under = 95
 # B101: assert used — acceptable in tests and internal assertions
 # B110: try/except/pass — used intentionally for graceful degradation
 # B404: import subprocess — needed for runtime command execution
-skips = ["B101", "B110", "B404"]
-exclude_dirs = ["backend/tests"]
+skips = [ "B101", "B110", "B404" ]
+exclude_dirs = [ "backend/tests" ]
 
 # Use a project-local environment only: run `uv sync` in this repo, then `uv run …`.
 # Avoid `pip install` into the global Python alongside unrelated agent stacks; that causes resolver conflicts.
+
 [tool.uv]
-constraint-dependencies = ["transformers<4.47.0"]
+constraint-dependencies = [ "transformers<4.47.0" ]

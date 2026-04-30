@@ -427,7 +427,9 @@ class SecurityEnforcementMixin:
                 analyzer_risk = None
 
         if declared == ActionSecurityRisk.UNKNOWN:
-            effective = analyzer_risk if analyzer_risk is not None else ActionSecurityRisk.LOW
+            effective = (
+                analyzer_risk if analyzer_risk is not None else ActionSecurityRisk.LOW
+            )
         else:
             effective = declared
             if analyzer_risk is not None and analyzer_risk > declared:

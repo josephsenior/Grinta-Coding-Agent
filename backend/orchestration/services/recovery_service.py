@@ -135,9 +135,7 @@ class RecoveryService:
         if _recovery_may_set_state(controller, AgentState.AWAITING_USER_INPUT):
             await self._context.set_agent_state(AgentState.AWAITING_USER_INPUT)
 
-    async def _handle_hard_stop_exception(
-        self, controller, exc: Exception
-    ) -> bool:
+    async def _handle_hard_stop_exception(self, controller, exc: Exception) -> bool:
         if not isinstance(exc, _HARD_STOP_EXCEPTIONS):
             return False
         await self._set_awaiting_user_input_if_allowed(controller)
@@ -174,9 +172,7 @@ class RecoveryService:
             logger.debug('schedule_retry_after_failure failed', exc_info=True)
             return False
 
-    async def _handle_queued_retry_exception(
-        self, controller, exc: Exception
-    ) -> bool:
+    async def _handle_queued_retry_exception(self, controller, exc: Exception) -> bool:
         if not isinstance(exc, _QUEUED_RETRY_EXCEPTIONS):
             return False
 
@@ -315,8 +311,7 @@ class RecoveryService:
 
         recent = self._recent_history_slice(state)
         if any(
-            self._event_is_mcp_validation_failure(event)
-            for event in reversed(recent)
+            self._event_is_mcp_validation_failure(event) for event in reversed(recent)
         ):
             self._inject_timeout_planning_directive(state)
 

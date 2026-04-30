@@ -164,7 +164,9 @@ def strip_unsupported_params(profile: Any, kwargs: dict[str, Any]) -> dict[str, 
     return kwargs
 
 
-def clean_messages(profile: Any, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def clean_messages(
+    profile: Any, messages: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     from backend.inference import direct_clients as dc
 
     cleaned = []

@@ -79,5 +79,7 @@ def test_real_debugpy_cold_start_and_stop(tmp_path) -> None:
     assert session_id not in manager.sessions
 
     progress_messages = captured
-    assert any('DAP: spawning adapter' in m for m in progress_messages), progress_messages
+    assert any('DAP: spawning adapter' in m for m in progress_messages), (
+        progress_messages
+    )
     assert any('DAP: ready in' in m for m in progress_messages), progress_messages

@@ -28,7 +28,8 @@ class TestSimpleBashSession:
         # Use a sub-path that doesn't exist to trigger makedirs
         work_dir = tmp_path / 'new_bash_dir'
         s = SimpleBashSession(
-            work_dir=str(work_dir), cancellation_service=cast('TaskCancellationService', mock_cancellation)
+            work_dir=str(work_dir),
+            cancellation_service=cast('TaskCancellationService', mock_cancellation),
         )
         s.initialize()
         return s
@@ -40,7 +41,8 @@ class TestSimpleBashSession:
         work_dir = tmp_path / 'sub' / 'new'
         assert not work_dir.exists()
         s = SimpleBashSession(
-            work_dir=str(work_dir), cancellation_service=cast('TaskCancellationService', mock_cancellation)
+            work_dir=str(work_dir),
+            cancellation_service=cast('TaskCancellationService', mock_cancellation),
         )
         s.initialize()
         assert work_dir.exists()
@@ -49,7 +51,8 @@ class TestSimpleBashSession:
         self, tmp_path: pathlib.Path, mock_cancellation: MagicMock
     ) -> None:
         s = SimpleBashSession(
-            work_dir=str(tmp_path), cancellation_service=cast('TaskCancellationService', mock_cancellation)
+            work_dir=str(tmp_path),
+            cancellation_service=cast('TaskCancellationService', mock_cancellation),
         )
         action = CmdRunAction(command='ls')
         result = s.execute(action)
@@ -123,12 +126,18 @@ class TestSimpleBashSession:
         # First call (nohup) returns non-digit, second (fallback) returns text
         mock_bc.side_effect = [
             BoundedResult(
-                stdout='error\n', stderr='', returncode=0,
-                truncated=False, timed_out=False,
+                stdout='error\n',
+                stderr='',
+                returncode=0,
+                truncated=False,
+                timed_out=False,
             ),
             BoundedResult(
-                stdout='stdout\n', stderr='', returncode=0,
-                truncated=False, timed_out=False,
+                stdout='stdout\n',
+                stderr='',
+                returncode=0,
+                truncated=False,
+                timed_out=False,
             ),
         ]
 
@@ -148,13 +157,18 @@ class TestSimpleBashSession:
 
         mock_popen.return_value = MagicMock(pid=1234)
         mock_bc.return_value = BoundedResult(
-            stdout='123\n', stderr='', returncode=0,
-            truncated=False, timed_out=False,
+            stdout='123\n',
+            stderr='',
+            returncode=0,
+            truncated=False,
+            timed_out=False,
         )
 
         # Mock register_pid to fail
         # session._cancellation is TaskCancellationService
-        cast(MagicMock, session._cancellation.register_pid).side_effect = Exception('Reg fail')
+        cast(MagicMock, session._cancellation.register_pid).side_effect = Exception(
+            'Reg fail'
+        )
 
         action = CmdRunAction(command='sleep 100 &')
         action.set_hard_timeout(10.0)
@@ -177,8 +191,11 @@ class TestSimpleBashSession:
 
         mock_popen.return_value = MagicMock(pid=1234)
         mock_bc.return_value = BoundedResult(
-            stdout='', stderr='', returncode=124,
-            truncated=False, timed_out=True,
+            stdout='',
+            stderr='',
+            returncode=124,
+            truncated=False,
+            timed_out=True,
         )
 
         action = CmdRunAction(command='ls')

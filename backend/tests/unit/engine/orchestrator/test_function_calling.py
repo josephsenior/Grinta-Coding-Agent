@@ -118,15 +118,21 @@ class TestHandleCmdRunTool:
             _handle_cmd_run_tool({})
 
     def test_timeout_set(self):
-        action = _handle_cmd_run_tool({'command': 'sleep 2', 'timeout': '5.5', 'security_risk': 'LOW'})
+        action = _handle_cmd_run_tool(
+            {'command': 'sleep 2', 'timeout': '5.5', 'security_risk': 'LOW'}
+        )
         assert isinstance(action, CmdRunAction)
 
     def test_invalid_timeout_raises(self):
         with pytest.raises(FunctionCallValidationError, match='timeout'):
-            _handle_cmd_run_tool({'command': 'echo', 'timeout': 'not-a-number', 'security_risk': 'LOW'})
+            _handle_cmd_run_tool(
+                {'command': 'echo', 'timeout': 'not-a-number', 'security_risk': 'LOW'}
+            )
 
     def test_is_input_flag(self):
-        action = _handle_cmd_run_tool({'command': 'y', 'is_input': 'true', 'security_risk': 'LOW'})
+        action = _handle_cmd_run_tool(
+            {'command': 'y', 'is_input': 'true', 'security_risk': 'LOW'}
+        )
         assert action.is_input is True
 
     def test_is_input_false_default(self):
@@ -169,7 +175,9 @@ class TestHandleStrReplaceEditorTool:
 
     def test_legacy_view_alias_is_rejected(self):
         with pytest.raises(FunctionCallValidationError, match='Unknown command'):
-            _handle_text_editor_tool({'command': 'view', 'path': 'f.py', 'security_risk': 'LOW'})
+            _handle_text_editor_tool(
+                {'command': 'view', 'path': 'f.py', 'security_risk': 'LOW'}
+            )
 
     def test_file_path_alias_is_rejected(self):
         with pytest.raises(FunctionCallValidationError, match='path'):
@@ -179,7 +187,12 @@ class TestHandleStrReplaceEditorTool:
 
     def test_view_with_range(self):
         action = _handle_text_editor_tool(
-            {'command': 'read_file', 'path': 'f.py', 'view_range': [1, 10], 'security_risk': 'LOW'}
+            {
+                'command': 'read_file',
+                'path': 'f.py',
+                'view_range': [1, 10],
+                'security_risk': 'LOW',
+            }
         )
         assert isinstance(action, FileReadAction)
 
@@ -193,7 +206,12 @@ class TestHandleStrReplaceEditorTool:
 
     def test_create_file_command_returns_file_edit_action(self):
         action = _handle_text_editor_tool(
-            {'command': 'create_file', 'path': 'new.py', 'file_text': 'content', 'security_risk': 'LOW'}
+            {
+                'command': 'create_file',
+                'path': 'new.py',
+                'file_text': 'content',
+                'security_risk': 'LOW',
+            }
         )
         assert isinstance(action, FileEditAction)
 
@@ -418,7 +436,9 @@ class TestProcessSingleToolCall:
 
         tool_name = create_cmd_run_tool()['function']['name']
         tc = self._make_tool_call(tool_name)
-        action = _process_single_tool_call(tc, {'command': 'ls', 'security_risk': 'LOW'})
+        action = _process_single_tool_call(
+            tc, {'command': 'ls', 'security_risk': 'LOW'}
+        )
         assert isinstance(action, CmdRunAction)
 
     def test_dispatches_finish(self):
@@ -506,7 +526,11 @@ class TestValidateStructureEditorArgs:
 
         with pytest.raises(FunctionCallValidationError, match='Unknown command'):
             _handle_symbol_editor_tool(
-                {'command': 'totally_unknown_cmd', 'path': 'x.py', 'security_risk': 'LOW'}
+                {
+                    'command': 'totally_unknown_cmd',
+                    'path': 'x.py',
+                    'security_risk': 'LOW',
+                }
             )
 
     def test_str_replace_alias_is_rejected(self):

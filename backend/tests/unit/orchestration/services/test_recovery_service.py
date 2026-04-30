@@ -51,9 +51,7 @@ class TestRecoveryService:
         assert err_obs.error_id == 'LLM_TIMEOUT'
         assert 'Timeout' in err_obs.content
         ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
-        mock_context.set_agent_state.assert_awaited_once_with(
-            AgentState.RATE_LIMITED
-        )
+        mock_context.set_agent_state.assert_awaited_once_with(AgentState.RATE_LIMITED)
 
     @pytest.mark.asyncio
     async def test_timeout_without_retry_queue_returns_to_user_input(

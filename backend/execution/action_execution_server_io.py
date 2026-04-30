@@ -372,7 +372,9 @@ class RuntimeExecutorIOAndTerminalMixin:
             )
 
             command = getattr(action, 'command', '') or ''
-            if not getattr(action, 'blocking', False) and is_known_slow_command(command):
+            if not getattr(action, 'blocking', False) and is_known_slow_command(
+                command
+            ):
                 action.blocking = True  # type: ignore[attr-defined]
                 logger.info(
                     'Auto-promoted blocking=True for slow command: %s',
@@ -398,11 +400,7 @@ class RuntimeExecutorIOAndTerminalMixin:
     ) -> Any:
         detached_pane = getattr(bash_session, '_detached_pane', None)
         detached_window = getattr(bash_session, '_detached_window', None)
-        if (
-            detached_pane is None
-            or detached_window is None
-            or registered_bg_id is None
-        ):
+        if detached_pane is None or detached_window is None or registered_bg_id is None:
             return detached_pane
 
         from backend.execution.utils.bash import BackgroundPaneSession
@@ -560,9 +558,7 @@ class RuntimeExecutorIOAndTerminalMixin:
     def _terminal_read_empty_hints(
         *, mode: str, has_new_output: bool
     ) -> dict[str, Any]:
-        return _terminal_read_empty_hints_impl(
-            mode=mode, has_new_output=has_new_output
-        )
+        return _terminal_read_empty_hints_impl(mode=mode, has_new_output=has_new_output)
 
     def _read_terminal_with_mode(
         self,
@@ -584,9 +580,7 @@ class RuntimeExecutorIOAndTerminalMixin:
     def _advance_terminal_read_cursor(
         self, session_id: str, next_offset: int | None, *, mode: str = 'delta'
     ) -> None:
-        _advance_terminal_read_cursor_impl(
-            self, session_id, next_offset, mode=mode
-        )
+        _advance_terminal_read_cursor_impl(self, session_id, next_offset, mode=mode)
 
     def _clear_terminal_read_cursor(self, session_id: str) -> None:
         _clear_terminal_read_cursor_impl(self, session_id)
@@ -674,9 +668,11 @@ class RuntimeExecutorIOAndTerminalMixin:
                 return resize_err
 
             if action.command:
-                predicted_cwd, policy_error = self._evaluate_interactive_terminal_command(
-                    action.command,
-                    Path(cwd).resolve(),
+                predicted_cwd, policy_error = (
+                    self._evaluate_interactive_terminal_command(
+                        action.command,
+                        Path(cwd).resolve(),
+                    )
                 )
                 if policy_error is not None:
                     self.session_manager.close_session(session_id)
@@ -710,10 +706,12 @@ class RuntimeExecutorIOAndTerminalMixin:
                     if _probe:
                         break
 
-            content, next_offset, has_new_output, dropped_chars = self._read_terminal_with_mode(
-                session=session,
-                mode='delta',
-                offset=0,
+            content, next_offset, has_new_output, dropped_chars = (
+                self._read_terminal_with_mode(
+                    session=session,
+                    mode='delta',
+                    offset=0,
+                )
             )
             self._terminal_sessions_awaiting_interaction.append(session_id)
             self._terminal_open_commands_no_interaction.append(
@@ -796,9 +794,11 @@ class RuntimeExecutorIOAndTerminalMixin:
             if write_content:
                 if not action.is_control:
                     policy_line = write_content.rstrip('\r\n')
-                    predicted_cwd, policy_error = self._evaluate_interactive_terminal_command(
-                        policy_line,
-                        Path(getattr(session, 'cwd', self._initial_cwd)).resolve(),
+                    predicted_cwd, policy_error = (
+                        self._evaluate_interactive_terminal_command(
+                            policy_line,
+                            Path(getattr(session, 'cwd', self._initial_cwd)).resolve(),
+                        )
                     )
                     if policy_error is not None:
                         return policy_error
@@ -841,10 +841,12 @@ class RuntimeExecutorIOAndTerminalMixin:
                     )
                     if _probe:
                         break
-            content, next_offset, has_new_output, dropped_chars = self._read_terminal_with_mode(
-                session=session,
-                mode='delta',
-                offset=read_offset,
+            content, next_offset, has_new_output, dropped_chars = (
+                self._read_terminal_with_mode(
+                    session=session,
+                    mode='delta',
+                    offset=read_offset,
+                )
             )
             # #region agent log
             try:
@@ -901,7 +903,9 @@ class RuntimeExecutorIOAndTerminalMixin:
             }
             return obs
         except Exception as exc:
-            logger.error('Error sending input to terminal %s: %s', action.session_id, exc)
+            logger.error(
+                'Error sending input to terminal %s: %s', action.session_id, exc
+            )
             return ErrorObservation(f'Failed to send input: {exc}')
 
     async def terminal_read(self, action: TerminalReadAction) -> Observation:
@@ -934,10 +938,12 @@ class RuntimeExecutorIOAndTerminalMixin:
                     else 0
                 )
             )
-            content, next_offset, has_new_output, dropped_chars = self._read_terminal_with_mode(
-                session=session,
-                mode=mode,
-                offset=read_offset,
+            content, next_offset, has_new_output, dropped_chars = (
+                self._read_terminal_with_mode(
+                    session=session,
+                    mode=mode,
+                    offset=read_offset,
+                )
             )
             self._advance_terminal_read_cursor(
                 action.session_id, next_offset, mode=mode
@@ -946,7 +952,9 @@ class RuntimeExecutorIOAndTerminalMixin:
             empty_hints = self._terminal_read_empty_hints(
                 mode=mode, has_new_output=has_new_output
             )
-            state = 'SESSION_OUTPUT_DELTA' if mode == 'delta' else 'SESSION_OUTPUT_SNAPSHOT'
+            state = (
+                'SESSION_OUTPUT_DELTA' if mode == 'delta' else 'SESSION_OUTPUT_SNAPSHOT'
+            )
             obs = TerminalObservation(
                 session_id=action.session_id,
                 content=content,

@@ -402,9 +402,7 @@ class ContextMemory:
     def _memory_record_user_message(
         self, event: Event
     ) -> tuple[str, str, str, dict[str, Any]] | None:
-        if not (
-            isinstance(event, MessageAction) and event.source == EventSource.USER
-        ):
+        if not (isinstance(event, MessageAction) and event.source == EventSource.USER):
             return None
         content = (event.content or '').strip()
         if not content:
@@ -470,7 +468,10 @@ class ContextMemory:
     def _memory_record_mcp_observation(
         self, event: Event
     ) -> tuple[str, str, str, dict[str, Any]] | None:
-        if not isinstance(event, Observation) or type(event).__name__ != 'MCPObservation':
+        if (
+            not isinstance(event, Observation)
+            or type(event).__name__ != 'MCPObservation'
+        ):
             return None
         content = (getattr(event, 'content', '') or '').strip()
         if not content:

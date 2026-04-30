@@ -321,18 +321,24 @@ class TestParseFile:
         assert isinstance(file_bytes, bytes)
         assert b'def greet' in file_bytes
 
-    def test_parse_javascript_file(self, editor: TreeSitterEditor, js_file: str) -> None:
+    def test_parse_javascript_file(
+        self, editor: TreeSitterEditor, js_file: str
+    ) -> None:
         result = editor.parse_file(js_file)
         assert result is not None
         _tree, _file_bytes, language = result
         assert language == 'javascript'
 
-    def test_parse_unknown_extension_returns_none(self, editor: TreeSitterEditor, tmp_path: Path) -> None:
+    def test_parse_unknown_extension_returns_none(
+        self, editor: TreeSitterEditor, tmp_path: Path
+    ) -> None:
         f = tmp_path / 'file.zzz'
         f.write_text('content')
         assert editor.parse_file(str(f)) is None
 
-    def test_parse_nonexistent_file_returns_none(self, editor: TreeSitterEditor) -> None:
+    def test_parse_nonexistent_file_returns_none(
+        self, editor: TreeSitterEditor
+    ) -> None:
         assert editor.parse_file('/nonexistent/path/file.py') is None
 
     def test_parse_uses_cache(self, editor: TreeSitterEditor, py_file: str) -> None:
@@ -343,7 +349,9 @@ class TestParseFile:
         tree2, _, _ = result2
         assert tree1 is tree2  # same cached object
 
-    def test_parse_no_cache_returns_fresh(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_parse_no_cache_returns_fresh(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         result1 = editor.parse_file(py_file, use_cache=False)
         result2 = editor.parse_file(py_file, use_cache=False)
         # Both should succeed even without cache
@@ -368,29 +376,41 @@ class TestFindSymbol:
         assert loc is not None
         assert loc.symbol_name == 'Calculator'
 
-    def test_find_method_dot_notation(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_find_method_dot_notation(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         loc = editor.find_symbol(py_file, 'Calculator.multiply')
         assert loc is not None
         assert loc.symbol_name == 'multiply'
         assert loc.parent_name == 'Calculator'
 
-    def test_find_nonexistent_symbol_returns_none(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_find_nonexistent_symbol_returns_none(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         assert editor.find_symbol(py_file, 'nonexistent_xyz') is None
 
-    def test_find_with_function_type_filter(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_find_with_function_type_filter(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         loc = editor.find_symbol(py_file, 'greet', symbol_type='function')
         assert loc is not None
 
-    def test_find_with_class_type_filter(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_find_with_class_type_filter(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         loc = editor.find_symbol(py_file, 'Calculator', symbol_type='class')
         assert loc is not None
 
-    def test_find_function_with_wrong_type_returns_none(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_find_function_with_wrong_type_returns_none(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         # greet is a function, not a class
         loc = editor.find_symbol(py_file, 'greet', symbol_type='class')
         assert loc is None
 
-    def test_find_in_nonexistent_file_returns_none(self, editor: TreeSitterEditor) -> None:
+    def test_find_in_nonexistent_file_returns_none(
+        self, editor: TreeSitterEditor
+    ) -> None:
         assert editor.find_symbol('/nonexistent.py', 'func') is None
 
 
@@ -400,7 +420,9 @@ class TestFindSymbol:
 
 
 class TestEditFunction:
-    def test_edit_existing_function(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_edit_existing_function(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         result = editor.edit_function(py_file, 'greet', '    return f"Hi, {name}!"')
         assert result.success is True
         assert 'greet' in result.message
@@ -408,7 +430,9 @@ class TestEditFunction:
         content = open(py_file, encoding='utf-8').read()
         assert 'Hi, ' in content
 
-    def test_edit_nonexistent_function(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_edit_nonexistent_function(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         result = editor.edit_function(py_file, 'nonexistent_func', '    pass')
         assert result.success is False
         assert 'not found' in result.message.lower()
@@ -423,13 +447,17 @@ class TestEditFunction:
         editor.edit_function(py_file, 'greet', '    return "hello"')
         assert py_file not in editor.tree_cache
 
-    def test_edit_preserves_other_functions(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_edit_preserves_other_functions(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         editor.edit_function(py_file, 'greet', '    return "modified"')
         content = open(py_file, encoding='utf-8').read()
         # add function should still exist
         assert 'def add' in content
 
-    def test_edit_function_unknown_extension(self, editor: TreeSitterEditor, tmp_path: Path) -> None:
+    def test_edit_function_unknown_extension(
+        self, editor: TreeSitterEditor, tmp_path: Path
+    ) -> None:
         f = tmp_path / 'file.zzz'
         f.write_text('content')
         result = editor.edit_function(str(f), 'func', 'body')
@@ -449,7 +477,9 @@ class TestRenameSymbol:
         assert 'def welcome' in content
         assert 'def greet' not in content
 
-    def test_rename_nonexistent_symbol(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_rename_nonexistent_symbol(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         result = editor.rename_symbol(py_file, 'no_such_sym', 'new_name')
         assert result.success is False
         assert 'not found' in result.message.lower()
@@ -463,7 +493,9 @@ class TestRenameSymbol:
         editor.rename_symbol(py_file, 'add', 'sum_values')
         assert py_file not in editor.tree_cache
 
-    def test_rename_returns_occurrence_count(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_rename_returns_occurrence_count(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         result = editor.rename_symbol(py_file, 'greet', 'helloo')
         assert result.success is True
         # lines_changed is the count of occurrences
@@ -515,7 +547,9 @@ class TestHasSyntaxErrors:
 
 
 class TestClearCache:
-    def test_clears_tree_and_file_cache(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_clears_tree_and_file_cache(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         editor.parse_file(py_file)
         assert editor.tree_cache
         assert editor.file_cache
@@ -533,7 +567,9 @@ class TestClearCache:
 
 
 class TestFindAllSymbolOccurrences:
-    def test_finds_multiple_occurrences(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_finds_multiple_occurrences(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         result = editor.parse_file(py_file)
         assert result is not None
         tree, file_bytes, _ = result
@@ -543,7 +579,9 @@ class TestFindAllSymbolOccurrences:
         # "greet" appears in def statement
         assert occurrences
 
-    def test_no_occurrences_returns_empty(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_no_occurrences_returns_empty(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         result = editor.parse_file(py_file)
         assert result is not None
         tree, file_bytes, _ = result
@@ -559,7 +597,9 @@ class TestFindAllSymbolOccurrences:
 
 
 class TestCoverageGaps:
-    def test_get_name_node_recursion(self, editor: TreeSitterEditor, tmp_path: Path) -> None:
+    def test_get_name_node_recursion(
+        self, editor: TreeSitterEditor, tmp_path: Path
+    ) -> None:
         """Test recursive name node extraction (e.g. in C)."""
         content = 'int foo() { return 1; }'
         f = tmp_path / 'test.c'
@@ -569,7 +609,9 @@ class TestCoverageGaps:
         assert loc is not None
         assert loc.symbol_name == 'foo'
 
-    def test_edit_function_syntax_error(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_edit_function_syntax_error(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         """Test edit_function when result has syntax error."""
         # Providing invalid python code
         result = editor.edit_function(py_file, 'greet', '    def invalid syntax:')
@@ -577,7 +619,9 @@ class TestCoverageGaps:
         assert 'Syntax error' in result.message
         assert result.syntax_valid is False
 
-    def test_rename_symbol_syntax_error(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_rename_symbol_syntax_error(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         """Test rename_symbol when result has syntax error (e.g. renaming to invalid identifier)."""
         # Renaming to something that breaks syntax
         result = editor.rename_symbol(py_file, 'greet', '123invalid')
@@ -599,17 +643,23 @@ class TestCoverageGaps:
             assert is_valid is True
             assert 'Validation skipped' in msg
 
-    def test_find_method_in_class_node_not_found(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_find_method_in_class_node_not_found(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         """Test method search when method doesn't exist in class."""
         loc = editor.find_symbol(py_file, 'Calculator.nonexistent')
         assert loc is None
 
-    def test_find_method_in_nonexistent_class(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_find_method_in_nonexistent_class(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         """Test method search when class doesn't exist."""
         loc = editor.find_symbol(py_file, 'NonexistentClass.method')
         assert loc is None
 
-    def test_search_tree_for_symbol_not_found(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_search_tree_for_symbol_not_found(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         """Test generic symbol search when not found."""
         # Using internal method to ensure we hit the return None
         result = editor.parse_file(py_file)
@@ -620,7 +670,9 @@ class TestCoverageGaps:
         )
         assert loc is None
 
-    def test_get_function_body_node_not_found(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_get_function_body_node_not_found(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         """Test body extraction when no body is found."""
         # This is hard to trigger with valid code, but we can mock or use weird edge case
         result = editor.parse_file(py_file)
@@ -639,32 +691,42 @@ class TestCoverageGaps:
             mp.setattr(tse, '_get_language', None)
             assert editor.get_parser('python') is None
 
-    def test_parse_file_no_language(self, editor: TreeSitterEditor, tmp_path: Path) -> None:
+    def test_parse_file_no_language(
+        self, editor: TreeSitterEditor, tmp_path: Path
+    ) -> None:
         """Test parse_file when language detection fails."""
         f = tmp_path / 'no_ext'
         f.write_text('content', encoding='utf-8')
         assert editor.parse_file(str(f)) is None
 
-    def test_find_symbol_invalid_dot_notation(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_find_symbol_invalid_dot_notation(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         """Test find_symbol with deep dot notation (unsupported)."""
         # Only Class.method (2 parts) is supported
         assert editor.find_symbol(py_file, 'A.B.C') is None
 
-    def test_edit_function_parse_failure(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_edit_function_parse_failure(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         """Test edit_function when parsing fails."""
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(editor, 'parse_file', lambda *args, **kwargs: None)  # type: ignore
             result = editor.edit_function(py_file, 'func', 'body')
             assert result.success is False
 
-    def test_rename_symbol_parse_failure(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_rename_symbol_parse_failure(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         """Test rename_symbol when parsing fails."""
         with pytest.MonkeyPatch.context() as mp:
             mp.setattr(editor, 'parse_file', lambda *args, **kwargs: None)  # type: ignore
             result = editor.rename_symbol(py_file, 'old', 'new')
             assert result.success is False
 
-    def test_find_function_node_default_types(self, editor: TreeSitterEditor, py_file: str) -> None:
+    def test_find_function_node_default_types(
+        self, editor: TreeSitterEditor, py_file: str
+    ) -> None:
         """Test _find_function_node with an unknown language."""
         result = editor.parse_file(py_file)
         assert result is not None

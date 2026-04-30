@@ -17,6 +17,7 @@ def _assert_event_runtime_attrs(
     for attr, value in expected.items():
         assert getattr(defaults, attr) == value
 
+
 # ── EventRuntimeDefaults dataclass ─────────────────────────────────────
 
 

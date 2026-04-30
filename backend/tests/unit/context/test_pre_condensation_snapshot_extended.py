@@ -1,4 +1,4 @@
-﻿"""Tests for pre_condensation_snapshot covering attempted approaches extraction."""
+"""Tests for pre_condensation_snapshot covering attempted approaches extraction."""
 
 from __future__ import annotations
 
@@ -193,7 +193,7 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         snapshot_module._extract_decisions(
             _fake_event(
                 'AgentThinkObservation',
-                thought='\U0001F50D SELF-REFLECTION: boilerplate',
+                thought='\U0001f50d SELF-REFLECTION: boilerplate',
             ),
             snapshot,
         )
@@ -211,7 +211,9 @@ class TestPreCondensationSnapshot(unittest.TestCase):
         assert full_snapshot['decisions'] == ['d'] * snapshot_module._MAX_DECISIONS
 
     def test_extract_commands_honors_limit_and_truncates_long_output(self):
-        full_snapshot: dict[str, Any] = {'recent_commands': [{}] * snapshot_module._MAX_COMMANDS}
+        full_snapshot: dict[str, Any] = {
+            'recent_commands': [{}] * snapshot_module._MAX_COMMANDS
+        }
         snapshot_module._extract_commands(
             _fake_event('CmdRunAction', command='pytest'), full_snapshot
         )
@@ -235,7 +237,10 @@ class TestPreCondensationSnapshot(unittest.TestCase):
             [_fake_event('CmdRunAction', command='pytest')], snapshot
         )
 
-        assert len(snapshot['attempted_approaches']) == snapshot_module._MAX_ATTEMPTED_APPROACHES
+        assert (
+            len(snapshot['attempted_approaches'])
+            == snapshot_module._MAX_ATTEMPTED_APPROACHES
+        )
 
     def test_process_event_for_approaches_returns_pending_for_unhandled_event(self):
         pending = {'type': 'command', 'detail': 'pytest'}
@@ -248,10 +253,16 @@ class TestPreCondensationSnapshot(unittest.TestCase):
 
     def test_save_load_and_delete_snapshot(self):
         snapshot_path = Path(self.id().replace('.', '_') + '.json')
-        snapshot = {'files_touched': {'a.py': {'action': 'edit'}}, 'recent_errors': [], 'decisions': []}
+        snapshot = {
+            'files_touched': {'a.py': {'action': 'edit'}},
+            'recent_errors': [],
+            'decisions': [],
+        }
 
         try:
-            with patch.object(snapshot_module, '_snapshot_path', return_value=snapshot_path):
+            with patch.object(
+                snapshot_module, '_snapshot_path', return_value=snapshot_path
+            ):
                 snapshot_module.save_snapshot(snapshot)
                 assert snapshot_path.exists()
                 assert snapshot_module.load_snapshot() == snapshot
@@ -275,9 +286,11 @@ class TestPreCondensationSnapshot(unittest.TestCase):
     def test_delete_snapshot_swallows_oserror(self):
         snapshot_path = Path('delete_snapshot_oserror.json')
 
-        with patch.object(snapshot_module, '_snapshot_path', return_value=snapshot_path), patch.object(
-            Path, 'exists', return_value=True
-        ), patch.object(Path, 'unlink', side_effect=OSError('locked')):
+        with (
+            patch.object(snapshot_module, '_snapshot_path', return_value=snapshot_path),
+            patch.object(Path, 'exists', return_value=True),
+            patch.object(Path, 'unlink', side_effect=OSError('locked')),
+        ):
             snapshot_module.delete_snapshot()
 
     def test_format_helpers_cover_empty_and_populated_sections(self):

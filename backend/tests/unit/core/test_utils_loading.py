@@ -1,4 +1,4 @@
-﻿"""Tests for backend.core.config.config_loader â€” primary config loading entry points."""
+"""Tests for backend.core.config.config_loader â€” primary config loading entry points."""
 
 from __future__ import annotations
 
@@ -257,7 +257,9 @@ class TestNamedGroupLoaders:
                 result = get_compactor_config_arg('keep_first_cfg')
 
         assert result is mock_cfg
-        mock_create.assert_called_once_with('recent', {'type': 'recent', 'keep_first': 3})
+        mock_create.assert_called_once_with(
+            'recent', {'type': 'recent', 'keep_first': 3}
+        )
 
 
 # â”€â”€ Agent Registration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -402,17 +404,27 @@ class TestMainEntryPoints:
         fake_manager = _FakeAPIKeyManager()
 
         with (
-            patch('backend.core.config.config_loader.get_canonical_settings_path', return_value='canonical.json'),
+            patch(
+                'backend.core.config.config_loader.get_canonical_settings_path',
+                return_value='canonical.json',
+            ),
             patch('backend.core.config.config_loader.rebuild_config_models'),
-            patch('backend.core.config.config_loader.load_from_env', side_effect=_seed_env),
+            patch(
+                'backend.core.config.config_loader.load_from_env', side_effect=_seed_env
+            ),
             patch('backend.core.config.config_loader.load_from_json'),
             patch('backend.core.config.config_loader.finalize_config'),
             patch('backend.core.config.config_loader.export_llm_api_keys'),
             patch('backend.core.config.config_loader.register_custom_agents'),
             patch('backend.core.config.api_key_manager.api_key_manager', fake_manager),
             patch('backend.core.config.llm_config.api_key_manager', fake_manager),
-            patch('backend.core.config.config_loader.logger.app_logger.warning') as mock_warn,
-            patch('backend.core.config.llm_config.LLMConfig.model_validate', side_effect=_validate_llm),
+            patch(
+                'backend.core.config.config_loader.logger.app_logger.warning'
+            ) as mock_warn,
+            patch(
+                'backend.core.config.llm_config.LLMConfig.model_validate',
+                side_effect=_validate_llm,
+            ),
         ):
             cfg = load_app_config(set_logging_levels=False, config_file='custom.json')
 
@@ -423,9 +435,7 @@ class TestMainEntryPoints:
             'canonical.json',
         )
         assert fake_manager.set_api_key_calls == [(llm_cfg.model, llm_cfg.api_key)]
-        assert fake_manager.set_environment_calls == [
-            (llm_cfg.model, llm_cfg.api_key)
-        ]
+        assert fake_manager.set_environment_calls == [(llm_cfg.model, llm_cfg.api_key)]
 
     def test_load_app_config_backfills_api_key_from_provider_env(self):
         original_model_validate = LLMConfig.model_validate
@@ -472,14 +482,19 @@ class TestMainEntryPoints:
 
         with (
             patch('backend.core.config.config_loader.rebuild_config_models'),
-            patch('backend.core.config.config_loader.load_from_env', side_effect=_seed_env),
+            patch(
+                'backend.core.config.config_loader.load_from_env', side_effect=_seed_env
+            ),
             patch('backend.core.config.config_loader.load_from_json'),
             patch('backend.core.config.config_loader.finalize_config'),
             patch('backend.core.config.config_loader.export_llm_api_keys'),
             patch('backend.core.config.config_loader.register_custom_agents'),
             patch('backend.core.config.api_key_manager.api_key_manager', fake_manager),
             patch('backend.core.config.llm_config.api_key_manager', fake_manager),
-            patch('backend.core.config.llm_config.LLMConfig.model_validate', side_effect=_validate_llm),
+            patch(
+                'backend.core.config.llm_config.LLMConfig.model_validate',
+                side_effect=_validate_llm,
+            ),
         ):
             cfg = load_app_config(set_logging_levels=False)
 
@@ -487,9 +502,7 @@ class TestMainEntryPoints:
         assert llm_cfg.api_key is not None
         assert llm_cfg.api_key.get_secret_value() == 'env-secret-long-enough-123456'
         assert fake_manager.set_api_key_calls == [(llm_cfg.model, llm_cfg.api_key)]
-        assert fake_manager.set_environment_calls == [
-            (llm_cfg.model, llm_cfg.api_key)
-        ]
+        assert fake_manager.set_environment_calls == [(llm_cfg.model, llm_cfg.api_key)]
 
 
 # â”€â”€ Config load (load_from_json) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -712,7 +725,11 @@ class TestLoadFromJson:
                     'mcp_config': {
                         'servers': [
                             {'name': 'existing', 'type': 'stdio', 'command': 'python'},
-                            {'name': 'remote', 'type': 'shttp', 'url': 'https://example.com'},
+                            {
+                                'name': 'remote',
+                                'type': 'shttp',
+                                'url': 'https://example.com',
+                            },
                             'not-a-dict',
                             {'name': 'broken', 'type': 'stdio'},
                         ]
@@ -725,7 +742,9 @@ class TestLoadFromJson:
             MCPServerConfig(name='existing', type='stdio', command='python')
         ]
 
-        with patch('backend.core.config.config_loader.logger.app_logger.debug') as mock_debug:
+        with patch(
+            'backend.core.config.config_loader.logger.app_logger.debug'
+        ) as mock_debug:
             load_from_json(cfg, str(json_file))
 
         assert cfg.project_root == str(project_root)
@@ -751,7 +770,9 @@ class TestLoadFromJson:
         )
         cfg = AppConfig()
 
-        with patch('backend.core.config.config_loader.logger.app_logger.warning') as mock_warn:
+        with patch(
+            'backend.core.config.config_loader.logger.app_logger.warning'
+        ) as mock_warn:
             load_from_json(cfg, str(json_file))
 
         assert cfg.agents['custom'].name == 'customized'

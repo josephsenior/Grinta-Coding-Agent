@@ -22,9 +22,9 @@
   " fill="#CC1836" stroke="#CC1836" stroke-width="4" stroke-linejoin="round"/>
 
   <line x1="120" y1="135" x2="120" y2="190" stroke="#1A1C20" stroke-width="8" stroke-linecap="round"/>
-  
+
   <line x1="148" y1="285" x2="185" y2="285" stroke="#1A1C20" stroke-width="8" stroke-linecap="round"/>
-  
+
   <line x1="315" y1="285" x2="352" y2="285" stroke="#1A1C20" stroke-width="8" stroke-linecap="round"/>
 
   <path d="M 190 170 C 185 130, 235 130, 235 170 C 220 180, 200 180, 190 170 Z" fill="#1A1C20"/>

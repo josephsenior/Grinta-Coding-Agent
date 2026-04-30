@@ -261,7 +261,9 @@ class OrchestratorPlanner:
 
             tools.append(create_execute_mcp_tool_tool())
 
-    def _refresh_checked_tools_cache(self, tools: list[ChatCompletionToolParam]) -> None:
+    def _refresh_checked_tools_cache(
+        self, tools: list[ChatCompletionToolParam]
+    ) -> None:
         current_model = self._llm.config.model if self._llm else ''
         tool_fingerprint = ','.join(
             str(

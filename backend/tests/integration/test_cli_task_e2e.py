@@ -96,7 +96,9 @@ def _sitecustomize_source() -> str:
 def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
     project_root = tmp_path / 'project'
     project_root.mkdir()
-    (project_root / 'README.md').write_text('CLI task regression target\n', encoding='utf-8')
+    (project_root / 'README.md').write_text(
+        'CLI task regression target\n', encoding='utf-8'
+    )
 
     hook_dir = tmp_path / 'hooks'
     hook_dir.mkdir()
@@ -140,5 +142,7 @@ def test_launch_entry_completes_one_task_via_subprocess(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr or result.stdout
     assert 'Summarize README.md in one sentence.' in result.stdout
-    assert 'Task complete: summarized README.md for the CLI regression.' in result.stdout
+    assert (
+        'Task complete: summarized README.md for the CLI regression.' in result.stdout
+    )
     assert 'Initialization failed' not in result.stdout

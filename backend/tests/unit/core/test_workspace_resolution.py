@@ -1,4 +1,4 @@
-﻿"""Tests for backend/core/workspace_resolution.py helpers."""
+"""Tests for backend/core/workspace_resolution.py helpers."""
 
 from __future__ import annotations
 
@@ -162,7 +162,9 @@ def test_load_persisted_workspace_path_returns_none_when_reserved_check_errors(
     def _raise_oserror(_path: Path) -> bool:
         raise OSError('boom')
 
-    monkeypatch.setattr(workspace_resolution, 'is_reserved_user_app_data_dir', _raise_oserror)
+    monkeypatch.setattr(
+        workspace_resolution, 'is_reserved_user_app_data_dir', _raise_oserror
+    )
 
     assert load_persisted_workspace_path() is None
 
@@ -358,9 +360,7 @@ def test_apply_workspace_to_config_uses_project_local_storage(
     assert config.local_data_root == str(expected)
 
 
-def test_apply_workspace_to_config_rejects_reserved_dir(
-    tmp_path, monkeypatch
-) -> None:
+def test_apply_workspace_to_config_rejects_reserved_dir(tmp_path, monkeypatch) -> None:
     fake_home = _set_fake_home(monkeypatch, tmp_path)
     reserved = fake_home / '.grinta'
     reserved.mkdir(exist_ok=True)

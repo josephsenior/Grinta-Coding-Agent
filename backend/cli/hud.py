@@ -391,12 +391,8 @@ class HUDBar:
 
     def _apply_object_accumulated_usage(self, accumulated_usage: Any) -> None:
         prompt_tokens = int(getattr(accumulated_usage, 'prompt_tokens', 0) or 0)
-        completion_tokens = int(
-            getattr(accumulated_usage, 'completion_tokens', 0) or 0
-        )
-        cache_read_tokens = int(
-            getattr(accumulated_usage, 'cache_read_tokens', 0) or 0
-        )
+        completion_tokens = int(getattr(accumulated_usage, 'completion_tokens', 0) or 0)
+        cache_read_tokens = int(getattr(accumulated_usage, 'cache_read_tokens', 0) or 0)
         cache_write_tokens = int(
             getattr(accumulated_usage, 'cache_write_tokens', 0) or 0
         )
@@ -411,9 +407,9 @@ class HUDBar:
         )
 
     def _apply_object_latest_usage(self, latest: Any) -> None:
-        self.state.context_tokens = int(
-            getattr(latest, 'prompt_tokens', 0) or 0
-        ) + int(getattr(latest, 'completion_tokens', 0) or 0)
+        self.state.context_tokens = int(getattr(latest, 'prompt_tokens', 0) or 0) + int(
+            getattr(latest, 'completion_tokens', 0) or 0
+        )
         self.state.context_limit = int(getattr(latest, 'context_window', 0) or 0)
         self.state.token_usage_estimated = bool(
             getattr(latest, 'usage_estimated', False)
@@ -443,7 +439,8 @@ class HUDBar:
                 self._apply_dict_latest_usage(latest)
 
     def _apply_dict_accumulated_usage(
-        self, accumulated_usage: dict[str, Any],
+        self,
+        accumulated_usage: dict[str, Any],
     ) -> bool:
         total = (
             int(accumulated_usage.get('prompt_tokens', 0) or 0)
@@ -454,9 +451,7 @@ class HUDBar:
         if total <= 0 and int(accumulated_usage.get('context_window', 0) or 0) <= 0:
             return False
         self.state.context_tokens = total
-        self.state.context_limit = int(
-            accumulated_usage.get('context_window', 0) or 0
-        )
+        self.state.context_limit = int(accumulated_usage.get('context_window', 0) or 0)
         self.state.token_usage_estimated = bool(
             accumulated_usage.get('usage_estimated', False)
         )
@@ -468,9 +463,7 @@ class HUDBar:
         )
         self.state.context_tokens = total
         self.state.context_limit = int(latest.get('context_window', 0) or 0)
-        self.state.token_usage_estimated = bool(
-            latest.get('usage_estimated', False)
-        )
+        self.state.token_usage_estimated = bool(latest.get('usage_estimated', False))
 
     def plain_text(self) -> str:
         return self._format().plain

@@ -440,9 +440,7 @@ async def _disconnect_probe_mcps(mcps: list[MCPClient]) -> None:
             await client.disconnect()
         except asyncio.CancelledError:
             raise
-        except (
-            BaseExceptionGroup
-        ) as error_group:  # noqa: F821  # pylint: disable=undefined-variable
+        except BaseExceptionGroup as error_group:  # noqa: F821  # pylint: disable=undefined-variable
             logger.debug('MCP probe disconnect (exception group): %s', error_group)
         except Exception as error:
             logger.debug('MCP probe disconnect: %s', error, exc_info=True)
@@ -874,8 +872,8 @@ async def _execute_direct_tool(
                     action_name=action.name,
                     message=(
                         f"MCP tool '{action.name}' rejected arguments with validation error ({code}).\n"
-                        "Attempted schema-aware repair and single retry where possible.\n"
-                        "Next step: call the same tool with arguments matching its input schema exactly."
+                        'Attempted schema-aware repair and single retry where possible.\n'
+                        'Next step: call the same tool with arguments matching its input schema exactly.'
                     ),
                     code='MCP_TOOL_VALIDATION_ERROR',
                     retryable=True,
@@ -888,9 +886,9 @@ async def _execute_direct_tool(
                 action_name=action.name,
                 message=(
                     f"MCP tool '{action.name}' returned an error: {e}\n"
-                    "You can try:\n"
-                    "  1. Re-call the tool with corrected arguments\n"
-                    f"  2. Use {_terminal_tool()} as a fallback to accomplish the same task"
+                    'You can try:\n'
+                    '  1. Re-call the tool with corrected arguments\n'
+                    f'  2. Use {_terminal_tool()} as a fallback to accomplish the same task'
                 ),
                 code='MCP_TOOL_ERROR',
                 retryable=False,
@@ -904,9 +902,9 @@ async def _execute_direct_tool(
                 action_name=action.name,
                 message=(
                     f"MCP tool '{action.name}' timed out (server did not respond in time).\n"
-                    "The tool may be waiting on a slow network call or the MCP server may be stuck.\n"
-                    "Try: a narrower query, or fall back to a non-MCP tool.\n"
-                    "Tune limits: APP_MCP_CALL_TOTAL_BUDGET_SEC, APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC."
+                    'The tool may be waiting on a slow network call or the MCP server may be stuck.\n'
+                    'Try: a narrower query, or fall back to a non-MCP tool.\n'
+                    'Tune limits: APP_MCP_CALL_TOTAL_BUDGET_SEC, APP_MCP_RECONNECT_SESSION_TIMEOUT_SEC.'
                 ),
                 code='MCP_TOOL_TIMEOUT',
                 retryable=True,
@@ -923,11 +921,11 @@ async def _execute_direct_tool(
                 action_name=action.name,
                 message=(
                     f"MCP server for tool '{action.name}' is unavailable (reason: "
-                    f"{type(e).__name__}: {e}).\n"
-                    "The MCP server may be disconnected or experiencing issues.\n"
-                    "Fallback options:\n"
-                    f"  1. Use {_terminal_tool()} to accomplish the same task\n"
-                    "  2. Continue with non-MCP tools"
+                    f'{type(e).__name__}: {e}).\n'
+                    'The MCP server may be disconnected or experiencing issues.\n'
+                    'Fallback options:\n'
+                    f'  1. Use {_terminal_tool()} to accomplish the same task\n'
+                    '  2. Continue with non-MCP tools'
                 ),
                 code='MCP_SERVER_UNAVAILABLE',
                 retryable=True,
@@ -985,10 +983,10 @@ async def call_tool_mcp(
                 action_name=action.name,
                 message=(
                     f"MCP tool '{action.name}' is not available in this session.\n"
-                    "Only the tool names listed in your active tool schema are valid — "
-                    "pass them verbatim to `call_mcp_tool(tool_name=...)` with no "
-                    "`server:` / `server/` / `server__` prefix.\n"
-                    f"If none fit, use {_terminal_tool()} or another non-MCP tool."
+                    'Only the tool names listed in your active tool schema are valid — '
+                    'pass them verbatim to `call_mcp_tool(tool_name=...)` with no '
+                    '`server:` / `server/` / `server__` prefix.\n'
+                    f'If none fit, use {_terminal_tool()} or another non-MCP tool.'
                 ),
                 code='MCP_TOOL_UNAVAILABLE',
                 retryable=False,
@@ -1021,9 +1019,9 @@ async def add_mcp_tools_to_agent(
     agent: Agent, runtime: Runtime, memory: Memory
 ) -> MCPConfig | None:
     """Add MCP tools to an agent."""
-    assert (
-        runtime.runtime_initialized
-    ), 'Runtime must be initialized before adding MCP tools'
+    assert runtime.runtime_initialized, (
+        'Runtime must be initialized before adding MCP tools'
+    )
     extra_servers = []
     playbook_mcp_configs = memory.get_playbook_mcp_tools()
     for mcp_config in playbook_mcp_configs:

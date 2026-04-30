@@ -177,7 +177,8 @@ def resolve_session_id(
 
 
 def _resolve_session_index(
-    sessions: list[tuple[str, dict[str, Any], int]], cleaned: str,
+    sessions: list[tuple[str, dict[str, Any], int]],
+    cleaned: str,
 ) -> tuple[str | None, str | None]:
     index = int(cleaned)
     if 1 <= index <= len(sessions):
@@ -186,15 +187,14 @@ def _resolve_session_index(
 
 
 def _resolve_session_by_id_or_prefix(
-    sessions: list[tuple[str, dict[str, Any], int]], cleaned: str,
+    sessions: list[tuple[str, dict[str, Any], int]],
+    cleaned: str,
 ) -> tuple[str | None, str | None]:
     exact = [sid for sid, _meta, _event_count in sessions if sid == cleaned]
     if exact:
         return exact[0], None
 
-    matches = [
-        sid for sid, _meta, _event_count in sessions if sid.startswith(cleaned)
-    ]
+    matches = [sid for sid, _meta, _event_count in sessions if sid.startswith(cleaned)]
     if len(matches) == 1:
         return matches[0], None
     if len(matches) > 1:

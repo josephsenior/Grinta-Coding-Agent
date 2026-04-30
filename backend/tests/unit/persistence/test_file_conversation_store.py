@@ -21,7 +21,9 @@ class _FS:
         self.listing: dict[str, list[str]] = {}
 
     def write(self, path: str, content: str) -> None:
-        self.data[path] = content.decode('utf-8') if isinstance(content, bytes) else content
+        self.data[path] = (
+            content.decode('utf-8') if isinstance(content, bytes) else content
+        )
 
     def read(self, path: str) -> str:
         if path not in self.data:
@@ -141,4 +143,3 @@ def test_sort_key_handles_missing_created_at() -> None:
     meta = _metadata('c10')
     meta.created_at = None  # type: ignore[assignment]
     assert _sort_key(meta) == ''
-

@@ -76,7 +76,9 @@ class SessionLifecycleMixin:
 
     @staticmethod
     def _active_timeout(
-        controller: Any, hard_timeout: int, cmd_timeout: int,
+        controller: Any,
+        hard_timeout: int,
+        cmd_timeout: int,
     ) -> int:
         active = hard_timeout
         pending_action = getattr(controller, '_pending_action', None)
@@ -136,7 +138,9 @@ class SessionLifecycleMixin:
             state = controller.get_agent_state()
 
             if await self._handle_idle_or_confirmation(
-                controller, renderer, state,
+                controller,
+                renderer,
+                state,
             ):
                 break
 
@@ -203,16 +207,23 @@ class SessionLifecycleMixin:
             # hanging forever (e.g. LLM API unresponsive). Allow a longer
             # budget while a foreground command action is still pending.
             active_timeout = self._active_timeout(
-                controller, hard_timeout, cmd_timeout,
+                controller,
+                hard_timeout,
+                cmd_timeout,
             )
             if active_timeout > 0 and time.monotonic() - start > active_timeout:
                 await self._handle_agent_hard_timeout(
-                    renderer, agent_task, active_timeout,
+                    renderer,
+                    agent_task,
+                    active_timeout,
                 )
                 break
 
     async def _handle_idle_or_confirmation(
-        self, controller: Any, renderer: Any, state: AgentState,
+        self,
+        controller: Any,
+        renderer: Any,
+        state: AgentState,
     ) -> bool:
         """Return True when the wait loop should break out (agent is idle)."""
         if state in self._IDLE_AGENT_STATES:
@@ -320,19 +331,31 @@ class SessionLifecycleMixin:
             return None
 
         runtime_bundle = self._setup_resume_runtime(
-            config, llm_registry, agent, resolved_id,
+            config,
+            llm_registry,
+            agent,
+            resolved_id,
         )
         if runtime_bundle is None:
             return None
         runtime, repo_directory, acquire_result, event_stream = runtime_bundle
 
         await self._wire_resume_runtime_state(
-            config, runtime, agent, resolved_id, repo_directory,
-            acquire_result, event_stream,
+            config,
+            runtime,
+            agent,
+            resolved_id,
+            repo_directory,
+            acquire_result,
+            event_stream,
         )
         controller = self._build_resume_controller(
-            agent, runtime, config, conversation_stats,
-            create_controller, create_status_callback,
+            agent,
+            runtime,
+            config,
+            conversation_stats,
+            create_controller,
+            create_status_callback,
         )
         agent_task = asyncio.create_task(
             run_agent_until_done(controller, runtime, self._memory, end_states),
@@ -361,7 +384,9 @@ class SessionLifecycleMixin:
         return llm_registry, agent, conversation_stats
 
     def _resolve_resume_target(
-        self, target: str, config: AppConfig,
+        self,
+        target: str,
+        config: AppConfig,
     ) -> str | None:
         from backend.cli.session_manager import resolve_session_id
 
@@ -379,7 +404,11 @@ class SessionLifecycleMixin:
         return resolved_id
 
     def _setup_resume_runtime(
-        self, config: AppConfig, llm_registry: Any, agent: Any, resolved_id: str,
+        self,
+        config: AppConfig,
+        llm_registry: Any,
+        agent: Any,
+        resolved_id: str,
     ) -> tuple[Any, Any, Any, Any] | None:
         from backend.core.bootstrap.main import _setup_runtime_for_controller
 
@@ -433,7 +462,13 @@ class SessionLifecycleMixin:
         self._acquire_result = acquire_result
 
         memory = await _setup_memory_and_mcp(
-            config, runtime, resolved_id, repo_directory, None, None, agent,
+            config,
+            runtime,
+            resolved_id,
+            repo_directory,
+            None,
+            None,
+            agent,
         )
         self._memory = memory
         mcp_status = getattr(agent, 'mcp_capability_status', None) or {}
@@ -459,7 +494,10 @@ class SessionLifecycleMixin:
         create_status_callback: Any,
     ) -> Any:
         controller, _ = create_controller(
-            agent, runtime, config, conversation_stats,
+            agent,
+            runtime,
+            config,
+            conversation_stats,
         )
         runtime_for_controller = cast(Any, runtime)
         runtime_for_controller.controller = controller

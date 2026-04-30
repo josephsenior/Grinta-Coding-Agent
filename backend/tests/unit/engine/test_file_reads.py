@@ -79,6 +79,7 @@ def _is_safe_unix_command(cmd: str, path: str) -> bool:
     # After removing all single-quoted segments, dangerous metacharacters
     # from the path must not remain unquoted
     import re
+
     without_quoted = re.sub(r"'(?:[^'\\]|\\.)*'", '', cmd)
     for meta in ['$(', '`']:
         if meta in path and meta in without_quoted:
@@ -97,7 +98,9 @@ def test_full_file_read_command_escapes_dangerous_unix_paths():
 def test_partial_file_read_command_escapes_dangerous_unix_paths():
     for path in _DANGEROUS_PATHS:
         for start, end in [(0, 10), (5, -1)]:
-            cmd = _build_partial_file_read_command(path, start, end, use_powershell=False)
+            cmd = _build_partial_file_read_command(
+                path, start, end, use_powershell=False
+            )
             assert _is_safe_unix_command(cmd, path), (
                 f'Unsafe command for path {path!r} ({start},{end}): {cmd!r}'
             )

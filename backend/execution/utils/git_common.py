@@ -19,7 +19,9 @@ def _split_git_cmd(cmd: str) -> list[str]:
     if not args or args[0] != 'git':
         msg = 'unsafe_git_cmd'
         raise RuntimeError(msg)
-    if any(fragment in arg for arg in args for fragment in DISALLOWED_GIT_ARG_FRAGMENTS):
+    if any(
+        fragment in arg for arg in args for fragment in DISALLOWED_GIT_ARG_FRAGMENTS
+    ):
         msg = 'unsafe_git_cmd'
         raise RuntimeError(msg)
     return args
@@ -80,9 +82,13 @@ def get_valid_git_ref(repo_dir: str) -> str | None:
     except RuntimeError:
         pass
     try:
-        default_branch = run_git_cmd(
-            'git --no-pager symbolic-ref refs/remotes/origin/HEAD', repo_dir
-        ).rsplit('/', maxsplit=1)[-1].strip()
+        default_branch = (
+            run_git_cmd(
+                'git --no-pager symbolic-ref refs/remotes/origin/HEAD', repo_dir
+            )
+            .rsplit('/', maxsplit=1)[-1]
+            .strip()
+        )
         ref_non_default_branch = run_git_cmd(
             f'git --no-pager merge-base HEAD origin/{default_branch}', repo_dir
         )

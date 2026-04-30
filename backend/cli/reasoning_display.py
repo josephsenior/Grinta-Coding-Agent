@@ -253,7 +253,9 @@ class ReasoningDisplay:
         return ' · '.join(elapsed_bits) if elapsed_bits else ''
 
     def _format_action_label(
-        self, meta_right: str, max_width: int | None,
+        self,
+        meta_right: str,
+        max_width: int | None,
     ) -> str:
         action_label = self._current_action or 'Thinking'
         # Reserve room for the right-side meta + separators when trimming.
@@ -288,11 +290,7 @@ class ReasoningDisplay:
             wrapped_rows.extend(_thought_lines_for_display(line, max_width))
 
         clipped = False
-        if (
-            max_lines is not None
-            and max_lines >= 0
-            and len(wrapped_rows) > max_lines
-        ):
+        if max_lines is not None and max_lines >= 0 and len(wrapped_rows) > max_lines:
             wrapped_rows = wrapped_rows[-max_lines:]
             clipped = True
 

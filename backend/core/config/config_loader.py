@@ -316,7 +316,9 @@ def _apply_json_mcp_servers(cfg: AppConfig, data: dict[str, object]) -> None:
         return
 
     raw_servers = mcp_config.get('servers') or []
-    parsed = [server for entry in raw_servers if (server := _parse_mcp_server_entry(entry))]
+    parsed = [
+        server for entry in raw_servers if (server := _parse_mcp_server_entry(entry))
+    ]
     if not parsed:
         return
 
@@ -331,7 +333,9 @@ def _filter_agent_updates(raw_updates: object) -> dict[str, object] | None:
     if not isinstance(raw_updates, dict):
         return None
     allowed_fields = set(AgentConfig.model_fields)
-    filtered = {key: value for key, value in raw_updates.items() if key in allowed_fields}
+    filtered = {
+        key: value for key, value in raw_updates.items() if key in allowed_fields
+    }
     if not filtered:
         return None
     return filtered
@@ -464,8 +468,7 @@ def finalize_config(cfg: AppConfig) -> None:
     # In-process native browser (browser-use) needs AppConfig.enable_browser on the runtime.
     # Do not clobber agent enable_browsing here — respect loaded defaults / settings.
     cfg.enable_browser = bool(
-        agent_cfg.enable_browsing
-        and getattr(agent_cfg, 'enable_native_browser', False)
+        agent_cfg.enable_browsing and getattr(agent_cfg, 'enable_native_browser', False)
     )
     extend_mcp_servers_with_bundled_defaults(cfg.mcp.servers)
     _configure_llm_logging(cfg)

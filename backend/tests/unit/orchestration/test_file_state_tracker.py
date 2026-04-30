@@ -88,6 +88,7 @@ def test_invalidate_read_snapshot(tmp_path, monkeypatch: pytest.MonkeyPatch) -> 
 # FileStateMiddleware enforcement tests
 # ---------------------------------------------------------------------------
 
+
 def _make_ctx(action, *, controller=None, state=None) -> ToolInvocationContext:
     """Build a minimal ToolInvocationContext for middleware tests."""
     from unittest.mock import MagicMock

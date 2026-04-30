@@ -155,9 +155,7 @@ class ChromaDBBackend(VectorBackend):
         with self._model_lock:
             if self._model is not None:
                 return
-            logger.info(
-                "Loading bundled ONNX embedding model '%s'…", self._model_name
-            )
+            logger.info("Loading bundled ONNX embedding model '%s'…", self._model_name)
             from chromadb.utils import embedding_functions
 
             with (

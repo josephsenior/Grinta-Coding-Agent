@@ -50,7 +50,10 @@ async def test_execute_handles_checkpoint_creation_failure() -> None:
 
     with (
         patch('os.path.isdir', return_value=True),
-        patch('backend.core.rollback.rollback_manager.RollbackManager', return_value=manager),
+        patch(
+            'backend.core.rollback.rollback_manager.RollbackManager',
+            return_value=manager,
+        ),
     ):
         await mw.execute(ctx)
 
@@ -67,10 +70,12 @@ async def test_execute_uses_runtime_workspace_when_not_provided() -> None:
 
     with (
         patch('os.path.isdir', return_value=True),
-        patch('backend.core.rollback.rollback_manager.RollbackManager', return_value=manager),
+        patch(
+            'backend.core.rollback.rollback_manager.RollbackManager',
+            return_value=manager,
+        ),
     ):
         await mw.execute(ctx)
 
     assert ctx.metadata['destructive_checkpoint_id'] == 'cp-9'
     assert ctx.metadata['rollback_checkpoint_id'] == 'cp-9'
-

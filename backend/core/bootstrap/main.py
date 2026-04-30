@@ -238,9 +238,7 @@ def _create_early_status_callback(
             )
             try:
                 state = controller.state
-                state.set_last_error(
-                    msg, source='main._early_status_callback'
-                )
+                state.set_last_error(msg, source='main._early_status_callback')
                 if runtime_status == RuntimeStatus.ERROR_MEMORY:
                     logger.info(
                         'MAIN._early_status_callback: recording memory error boundary at iteration %s',
@@ -545,9 +543,7 @@ def _detach_and_close_event_stream(runtime: Runtime, event_stream: EventStream) 
         )
 
 
-def _attach_status_callback(
-    memory: Memory, controller: SessionOrchestrator
-) -> None:
+def _attach_status_callback(memory: Memory, controller: SessionOrchestrator) -> None:
     _early_status_callback = _create_early_status_callback(controller)
     try:
         memory.status_callback = _early_status_callback
@@ -670,6 +666,7 @@ if __name__ == '__main__':
     config_main: AppConfig = setup_config_from_args(args)
     task_str = read_task(args, config_main.cli_multiline_input)
     from backend.ledger.action.empty import NullActionReason
+
     initial_action_main: Action = NullAction(reason=NullActionReason.SENTINEL)
     if config_main.replay_trajectory_path:
         if task_str:

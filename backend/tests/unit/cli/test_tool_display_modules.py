@@ -111,26 +111,35 @@ class TestToolActivityStatsHint(unittest.TestCase):
         self.assertIn('/mydir', hint)  # type: ignore[arg-type]
 
     def test_text_editor_read_with_range(self) -> None:
-        hint = tool_activity_stats_hint('text_editor', {
-            'command': 'read_file',
-            'path': 'foo.py',
-            'view_range_start': 10,
-            'view_range_end': 20,
-        })
+        hint = tool_activity_stats_hint(
+            'text_editor',
+            {
+                'command': 'read_file',
+                'path': 'foo.py',
+                'view_range_start': 10,
+                'view_range_end': 20,
+            },
+        )
         self.assertIsNotNone(hint)
         self.assertIn('10', hint)  # type: ignore[arg-type]
 
     def test_text_editor_replace_with_path(self) -> None:
-        hint = tool_activity_stats_hint('text_editor', {
-            'command': 'replace_text',
-            'path': 'myfile.py',
-        })
+        hint = tool_activity_stats_hint(
+            'text_editor',
+            {
+                'command': 'replace_text',
+                'path': 'myfile.py',
+            },
+        )
         self.assertIsNotNone(hint)
 
     def test_task_tracker_with_list(self) -> None:
-        hint = tool_activity_stats_hint('task_tracker', {
-            'task_list': [{'title': 'A'}, {'title': 'B'}],
-        })
+        hint = tool_activity_stats_hint(
+            'task_tracker',
+            {
+                'task_list': [{'title': 'A'}, {'title': 'B'}],
+            },
+        )
         self.assertIsNotNone(hint)
         self.assertIn('2', hint)  # type: ignore[arg-type]
 
@@ -139,18 +148,24 @@ class TestToolActivityStatsHint(unittest.TestCase):
         self.assertIsNone(hint)
 
     def test_terminal_manager_stats(self) -> None:
-        hint = tool_activity_stats_hint('terminal_manager', {
-            'action': 'read',
-            'session_id': 'sess-abc',
-        })
+        hint = tool_activity_stats_hint(
+            'terminal_manager',
+            {
+                'action': 'read',
+                'session_id': 'sess-abc',
+            },
+        )
         self.assertIsNotNone(hint)
         self.assertIn('sess-abc', hint)  # type: ignore[arg-type]
 
     def test_terminal_manager_open_no_stats(self) -> None:
-        hint = tool_activity_stats_hint('terminal_manager', {
-            'action': 'open',
-            'session_id': 'sess-abc',
-        })
+        hint = tool_activity_stats_hint(
+            'terminal_manager',
+            {
+                'action': 'open',
+                'session_id': 'sess-abc',
+            },
+        )
         self.assertIsNone(hint)
 
     def test_lsp_with_command(self) -> None:
@@ -264,7 +279,9 @@ class TestSummarizeToolArguments(unittest.TestCase):
         self.assertIn('ls -la', s)
 
     def test_text_editor_create(self) -> None:
-        s = summarize_tool_arguments('text_editor', {'command': 'create_file', 'path': 'foo.py'})
+        s = summarize_tool_arguments(
+            'text_editor', {'command': 'create_file', 'path': 'foo.py'}
+        )
         self.assertIn('foo.py', s)
         self.assertIn('new file', s)
 
@@ -277,22 +294,31 @@ class TestSummarizeToolArguments(unittest.TestCase):
         self.assertIn('All done', s)
 
     def test_memory_manager(self) -> None:
-        s = summarize_tool_arguments('memory_manager', {'operation': 'store', 'key': 'my_key'})
+        s = summarize_tool_arguments(
+            'memory_manager', {'operation': 'store', 'key': 'my_key'}
+        )
         self.assertIn('store', s)
 
     def test_task_tracker(self) -> None:
-        s = summarize_tool_arguments('task_tracker', {
-            'operation': 'update',
-            'task_list': [1, 2, 3],
-        })
+        s = summarize_tool_arguments(
+            'task_tracker',
+            {
+                'operation': 'update',
+                'task_list': [1, 2, 3],
+            },
+        )
         self.assertIn('3', s)
 
     def test_search_code(self) -> None:
-        s = summarize_tool_arguments('search_code', {'query': 'parse_args', 'path': '/src'})
+        s = summarize_tool_arguments(
+            'search_code', {'query': 'parse_args', 'path': '/src'}
+        )
         self.assertIn('parse_args', s)
 
     def test_code_intelligence(self) -> None:
-        s = summarize_tool_arguments('code_intelligence', {'command': 'hover', 'symbol': 'Foo'})
+        s = summarize_tool_arguments(
+            'code_intelligence', {'command': 'hover', 'symbol': 'Foo'}
+        )
         self.assertIn('Foo', s)
 
     def test_analyze_project(self) -> None:
@@ -328,18 +354,24 @@ class TestSummarizeToolArguments(unittest.TestCase):
         self.assertEqual(s, 'compress conversation')
 
     def test_symbol_editor_edit_symbols(self) -> None:
-        s = summarize_tool_arguments('symbol_editor', {
-            'command': 'edit_symbols',
-            'path': 'foo.py',
-            'edits': [1, 2],
-        })
+        s = summarize_tool_arguments(
+            'symbol_editor',
+            {
+                'command': 'edit_symbols',
+                'path': 'foo.py',
+                'edits': [1, 2],
+            },
+        )
         self.assertIn('2 symbols', s)
 
     def test_symbol_editor_other_command(self) -> None:
-        s = summarize_tool_arguments('symbol_editor', {
-            'command': 'rename',
-            'path': 'bar.py',
-        })
+        s = summarize_tool_arguments(
+            'symbol_editor',
+            {
+                'command': 'rename',
+                'path': 'bar.py',
+            },
+        )
         self.assertIn('rename', s)
 
     def test_shared_task_board(self) -> None:
@@ -409,7 +441,9 @@ class TestParseToolArgumentsJson(unittest.TestCase):
 
 class TestFormatToolActivityRows(unittest.TestCase):
     def test_bash(self) -> None:
-        verb, detail, stats = format_tool_activity_rows('execute_bash', {'command': 'ls'})
+        verb, detail, stats = format_tool_activity_rows(
+            'execute_bash', {'command': 'ls'}
+        )
         self.assertEqual(verb, 'Ran')
         self.assertIn('ls', detail)
 
@@ -442,15 +476,21 @@ class TestStreamingArgsHint(unittest.TestCase):
         self.assertEqual(streaming_args_hint('execute_bash', ''), '')
 
     def test_terminal_manager_open(self) -> None:
-        hint = streaming_args_hint('terminal_manager', '{"action": "open", "command": "bash"}')
+        hint = streaming_args_hint(
+            'terminal_manager', '{"action": "open", "command": "bash"}'
+        )
         self.assertIn('open', hint)
 
     def test_terminal_manager_read(self) -> None:
-        hint = streaming_args_hint('terminal_manager', '{"action": "read", "session_id": "sess-x"}')
+        hint = streaming_args_hint(
+            'terminal_manager', '{"action": "read", "session_id": "sess-x"}'
+        )
         self.assertIn('read', hint)
 
     def test_terminal_manager_input_ctrl(self) -> None:
-        hint = streaming_args_hint('terminal_manager', '{"action": "input", "control": "C"}')
+        hint = streaming_args_hint(
+            'terminal_manager', '{"action": "input", "control": "C"}'
+        )
         self.assertIn('ctrl', hint)
 
 
@@ -498,9 +538,7 @@ class TestStripProtocolEchoBlocks(unittest.TestCase):
         self.assertEqual(strip_protocol_echo_blocks(text), text)
 
     def test_strips_tool_result_block(self) -> None:
-        text = (
-            'Done.\n\n[Tool result from execute_bash]\n[CMD_OUTPUT exit=0]\nfiles\n\nNext.'
-        )
+        text = 'Done.\n\n[Tool result from execute_bash]\n[CMD_OUTPUT exit=0]\nfiles\n\nNext.'
         result = strip_protocol_echo_blocks(text)
         self.assertIn('Done.', result)
         self.assertNotIn('[Tool result from', result)
@@ -597,6 +635,7 @@ class TestExtractToolCallsFromTextMarkers(unittest.TestCase):
         result = extract_tool_calls_from_text_markers(text)
         self.assertEqual(len(result), 1)
         import json
+
         args = json.loads(result[0]['function']['arguments'])
         self.assertEqual(args['command'], 'git status')
 
@@ -653,7 +692,9 @@ class TestMcpSearchCodeSummary(unittest.TestCase):
         self.assertIn('2', result)  # type: ignore[arg-type]
 
     def test_tool_name_is_search_code(self) -> None:
-        result = _mcp_search_code_summary({'tool_name': 'search_code', 'total_count': 7}, '')
+        result = _mcp_search_code_summary(
+            {'tool_name': 'search_code', 'total_count': 7}, ''
+        )
         self.assertIsNotNone(result)
         self.assertIn('7', result)  # type: ignore[arg-type]
 

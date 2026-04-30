@@ -8,7 +8,9 @@ from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
 
 
 class TestPersistLlmApiKeyToDotenv:
-    def test_creates_env_file_and_updates_process_environment(self, tmp_path, monkeypatch):
+    def test_creates_env_file_and_updates_process_environment(
+        self, tmp_path, monkeypatch
+    ):
         settings_path = tmp_path / 'settings.json'
         settings_path.write_text('{}', encoding='utf-8')
         monkeypatch.delenv('LLM_API_KEY', raising=False)

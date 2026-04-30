@@ -34,7 +34,9 @@ def test_extract_symbol_file_not_found(tmp_path: Path) -> None:
     assert 'not found' in out.get('error', '').lower()
 
 
-def test_extract_symbol_whole_file_without_symbol(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_extract_symbol_whole_file_without_symbol(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     f = tmp_path / 'only.py'
     f.write_text('# hello\n', encoding='utf-8')
     monkeypatch.chdir(tmp_path)

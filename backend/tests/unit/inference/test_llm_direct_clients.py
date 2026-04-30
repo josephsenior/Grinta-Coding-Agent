@@ -133,7 +133,10 @@ class TestSharedHttpClients:
 
         await aclose_shared_http_clients()
 
-        assert get_shared_http_client('test_provider_close', 'http://test') is not sync_client
+        assert (
+            get_shared_http_client('test_provider_close', 'http://test')
+            is not sync_client
+        )
         assert (
             get_shared_async_http_client('test_provider_close_async', 'http://test')
             is not async_client
@@ -159,7 +162,9 @@ class TestSharedHttpClients:
         with (
             patch('backend.inference.direct_clients.Anthropic'),
             patch('backend.inference.direct_clients.AsyncAnthropic'),
-            patch('backend.inference.direct_clients._anthropic_completion') as completion,
+            patch(
+                'backend.inference.direct_clients._anthropic_completion'
+            ) as completion,
         ):
             client = AnthropicClient('claude-3', 'sk-test', timeout=9)
             client.completion(messages=[])

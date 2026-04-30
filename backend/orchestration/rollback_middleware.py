@@ -43,7 +43,7 @@ _TRIVIAL_CMD_PATTERN = re.compile(
     r'file|stat|du|df|ps|top|htop|free|lsof|netstat|ss|ip|ifconfig|history|alias|type|'
     # Git read-only
     r'git\s+(?:status|log|show|diff|branch(?!\s+-D)|remote(?:\s+-v)?|config\s+--get|'
-        r'rev-parse|describe|stash\s+list|tag(?:\s+-l)?|ls-files|ls-tree|blame)|'
+    r'rev-parse|describe|stash\s+list|tag(?:\s+-l)?|ls-files|ls-tree|blame)|'
     # Python / Node read-only invocations
     r'python(?:3)?\s+--version|node\s+--version|npm\s+(?:list|ls|view|info|outdated)|'
     r'pip\s+(?:list|show|freeze)|'
@@ -63,7 +63,7 @@ def _is_trivial_command(command: str) -> bool:
         m = re.match(r'^[A-Za-z_][A-Za-z0-9_]*=\S*\s+', head)
         if not m:
             break
-        head = head[m.end():]
+        head = head[m.end() :]
     return bool(_TRIVIAL_CMD_PATTERN.match(head))
 
 
@@ -152,7 +152,10 @@ class RollbackMiddleware(ToolInvocationMiddleware):
             try:
                 from backend.core.enums import ActionSecurityRisk
 
-                if getattr(ctx.action, 'security_risk', None) == ActionSecurityRisk.HIGH:
+                if (
+                    getattr(ctx.action, 'security_risk', None)
+                    == ActionSecurityRisk.HIGH
+                ):
                     risky = True
             except Exception:
                 pass

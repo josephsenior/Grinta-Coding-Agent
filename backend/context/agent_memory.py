@@ -16,6 +16,7 @@ import backend
 from backend.core.constants import RECALL_PIPELINE_TIMEOUT_SECONDS
 from backend.core.enums import RecallType, RuntimeStatus
 from backend.core.logger import app_logger as logger
+
 try:
     from backend.knowledge import KnowledgeBaseManager
 

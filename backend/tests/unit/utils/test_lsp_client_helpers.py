@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from backend.utils import lsp_client as lc
 
 
@@ -48,7 +46,9 @@ def test_lsp_code_action_str_variants() -> None:
 
 def test_lsp_result_format_text_branches() -> None:
     assert 'not available' in lc.LspResult(available=False).format_text('any')
-    assert lc.LspResult(error='e').format_text('find_definition').startswith('LSP error')
+    assert (
+        lc.LspResult(error='e').format_text('find_definition').startswith('LSP error')
+    )
     assert 'No results' in lc.LspResult().format_text('find_definition')
     loc = lc.LspLocation(file='f.py', line=1, column=1)
     body = lc.LspResult(locations=[loc]).format_text('find_definition')

@@ -17,11 +17,11 @@ One-line summary; then **Args**, **Returns**, **Raises** as needed. Explain **wh
 
 ## README outline
 
-1. What / why  
-2. Quick start (copy-paste commands)  
-3. Install / prerequisites  
-4. Usage & configuration  
-5. Contributing & tests  
+1. What / why
+2. Quick start (copy-paste commands)
+3. Install / prerequisites
+4. Usage & configuration
+5. Contributing & tests
 
 ## What to skip
 

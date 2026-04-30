@@ -18,11 +18,7 @@ def _make_result(content: str) -> SimpleNamespace:
     return SimpleNamespace(
         actions=[],
         response=SimpleNamespace(
-            choices=[
-                SimpleNamespace(
-                    message=SimpleNamespace(content=content)
-                )
-            ]
+            choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
         ),
         execution_time=0.0,
     )
@@ -90,5 +86,3 @@ class TestBuildFallbackAction:
             'Any text-only LLM response must continue the loop; '
             'use communicate_with_user to pause for real user input'
         )
-
-

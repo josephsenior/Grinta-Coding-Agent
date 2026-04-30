@@ -156,7 +156,12 @@ class TestSessionOlderThanCutoff:
         assert _session_older_than_cutoff({}, old_file, cutoff) is True
 
     def test_no_timestamp_missing_path_returns_false(self) -> None:
-        assert _session_older_than_cutoff({}, Path('/does-not-exist'), datetime.now(timezone.utc)) is False
+        assert (
+            _session_older_than_cutoff(
+                {}, Path('/does-not-exist'), datetime.now(timezone.utc)
+            )
+            is False
+        )
 
     def test_invalid_timestamp_format(self) -> None:
         meta = {'last_updated_at': 'not-a-date'}

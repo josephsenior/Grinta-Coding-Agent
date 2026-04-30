@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, cast
 
 from backend.execution.utils.process_registry import TaskCancellationService
 from backend.execution.utils.unified_shell import (
@@ -26,9 +26,9 @@ class SessionManager:
         self,
         work_dir: str,
         username: str,
-        tool_registry: Optional[ShellToolRegistryLike] = None,
-        max_memory_gb: Optional[int] = None,
-        cancellation_service: Optional[TaskCancellationService] = None,
+        tool_registry: ShellToolRegistryLike | None = None,
+        max_memory_gb: int | None = None,
+        cancellation_service: TaskCancellationService | None = None,
         security_config: object | None = None,
     ) -> None:
         """Initialize the session manager.
@@ -65,8 +65,8 @@ class SessionManager:
 
     def create_session(
         self,
-        session_id: Optional[str] = None,
-        cwd: Optional[str] = None,
+        session_id: str | None = None,
+        cwd: str | None = None,
         *,
         interactive: bool = False,
     ) -> UnifiedShellSession:
@@ -113,7 +113,7 @@ class SessionManager:
             logger.error('Failed to create session %s: %s', session_id, e)
             raise
 
-    def get_session(self, session_id: str) -> Optional[UnifiedShellSession]:
+    def get_session(self, session_id: str) -> UnifiedShellSession | None:
         """Retrieve an existing session by ID."""
         return self.sessions.get(session_id)
 
@@ -137,7 +137,7 @@ class SessionManager:
         self.sessions.clear()
 
     @property
-    def default_session(self) -> Optional[UnifiedShellSession]:
+    def default_session(self) -> UnifiedShellSession | None:
         """Get the default session if it exists."""
         return self.sessions.get('default')
 
@@ -190,9 +190,7 @@ class SessionManager:
             try:
                 self.close_session(sid)
                 closed.append(sid)
-                logger.info(
-                    'cleanup_idle_sessions: closed idle session %s', sid
-                )
+                logger.info('cleanup_idle_sessions: closed idle session %s', sid)
             except Exception:
                 logger.warning(
                     'cleanup_idle_sessions: failed to close %s',

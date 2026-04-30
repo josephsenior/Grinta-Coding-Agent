@@ -25,9 +25,7 @@ from backend.orchestration.session_orchestrator import (
 )
 
 
-def _noop_init(
-    self: SessionOrchestrator, *args: object, **kwargs: object
-) -> None:
+def _noop_init(self: SessionOrchestrator, *args: object, **kwargs: object) -> None:
     del self, args, kwargs
 
 
@@ -1211,7 +1209,9 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
             failed_action,
             overflow_action,
         ]
-        self.ctrl.action_scheduler = ActionScheduler(enabled=True, max_parallel_batch_size=2)
+        self.ctrl.action_scheduler = ActionScheduler(
+            enabled=True, max_parallel_batch_size=2
+        )
         self.ctrl.config.event_stream.add_event = MagicMock()
 
         async def _execute(action):
@@ -1219,9 +1219,13 @@ class TestSessionOrchestratorExtendedCoverage(unittest.IsolatedAsyncioTestCase):
                 raise RuntimeError('boom')
             return None
 
-        self.ctrl.services.action_execution.execute_action = AsyncMock(side_effect=_execute)
+        self.ctrl.services.action_execution.execute_action = AsyncMock(
+            side_effect=_execute
+        )
 
-        with patch.object(self.ctrl, '_handle_post_execution', new_callable=AsyncMock) as mock_post:
+        with patch.object(
+            self.ctrl, '_handle_post_execution', new_callable=AsyncMock
+        ) as mock_post:
             executed = await self.ctrl._try_parallel_read_batch()
 
             self.assertTrue(executed)

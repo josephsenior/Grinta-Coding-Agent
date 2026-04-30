@@ -30,7 +30,9 @@ _SANDBOX_TMP_DIR = Path('/').joinpath('tmp').as_posix()
 
 def is_sandboxed_local_profile(security_config: Any | None) -> bool:
     """Return True when the configured execution profile is ``sandboxed_local``."""
-    return getattr(security_config, 'execution_profile', 'standard') == 'sandboxed_local'
+    return (
+        getattr(security_config, 'execution_profile', 'standard') == 'sandboxed_local'
+    )
 
 
 def is_workspace_restricted_profile(security_config: Any | None) -> bool:
