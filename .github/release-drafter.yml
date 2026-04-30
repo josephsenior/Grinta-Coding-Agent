@@ -7,22 +7,18 @@ no-changes-template: '- No user-facing changes in this cycle.'
 categories:
   - title: 'Breaking Changes'
     labels:
-      - 'breaking'
       - 'breaking-change'
   - title: 'Features'
     labels:
       - 'feature'
       - 'enhancement'
-      - 'feat'
   - title: 'Fixes'
     labels:
       - 'fix'
       - 'bug'
-      - 'bugfix'
   - title: 'Performance'
     labels:
       - 'performance'
-      - 'perf'
   - title: 'Documentation'
     labels:
       - 'documentation'
@@ -42,20 +38,17 @@ version-resolver:
   major:
     labels:
       - 'major'
-      - 'breaking'
       - 'breaking-change'
   minor:
     labels:
       - 'minor'
       - 'feature'
       - 'enhancement'
-      - 'feat'
   patch:
     labels:
       - 'patch'
       - 'fix'
       - 'bug'
-      - 'bugfix'
       - 'chore'
       - 'dependencies'
   default: patch

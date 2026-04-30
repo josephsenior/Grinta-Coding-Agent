@@ -5,6 +5,7 @@ under the per-file LOC budget.  All methods rely on attributes/methods
 defined on ``CLIEventRenderer``; this mixin is meant to be combined with
 that class via multiple inheritance.
 """
+# pylint: disable=assignment-from-no-return,no-member
 
 from __future__ import annotations
 

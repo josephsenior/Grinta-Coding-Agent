@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import types
 import sys
+import types
 from unittest.mock import MagicMock, patch
 
 from backend.context.local_vector_store import ChromaDBBackend, SQLiteBM25Backend

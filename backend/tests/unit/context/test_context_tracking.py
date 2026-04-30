@@ -28,7 +28,7 @@ class TestContextTrackerInit:
         assert tracker.anchors == {}
 
 
-class TestStoreInMemory:
+class TestStoreInMemoryDeleteById:
     def test_store_in_memory_replaces_existing_step_id_when_supported(self):
         mock_store = MagicMock()
         tracker = ContextTracker(vector_store=mock_store)

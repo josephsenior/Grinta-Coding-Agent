@@ -2,13 +2,12 @@ import pathlib
 import re
 import sys
 
-
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 WORKFLOWS_DIR = REPO_ROOT / '.github' / 'workflows'
 LABELS_FILE = REPO_ROOT / '.github' / 'labels.yml'
 
 LABEL_EXPR_RE = re.compile(r"github\.event\.label\.name\s*==\s*'([^']+)'")
-REQUIRED_ARRAY_RE = re.compile(r"required=\(\s*(.*?)\s*\)", re.DOTALL)
+REQUIRED_ARRAY_RE = re.compile(r'required=\(\s*(.*?)\s*\)', re.DOTALL)
 QUOTED_PATH_RE = re.compile(r'"([^"]+)"')
 SKIP_DYNAMIC_PATHS = {'/tmp/requirements.txt'}
 AUTOMATIC_TRIGGER_KEYS = (
