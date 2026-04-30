@@ -77,4 +77,4 @@ The rest is plumbing — a sanitizer here, a mapper-level strip there, a runtime
 
 ---
 
-← [The Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md) | [The Book of Grinta](README.md) | [The Required Risk](36-the-required-risk.md) →
+← [The Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Required Risk](36-the-required-risk.md) →

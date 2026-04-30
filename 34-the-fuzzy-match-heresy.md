@@ -113,4 +113,4 @@ The model is the creative one. The editor is the receipt printer.
 
 ---
 
-← [The Small Async Wars](33-the-small-async-wars.md) | [The Book of Grinta](README.md) | [The Self-Knowing Agent](35-the-self-knowing-agent.md) →
+← [The Small Async Wars](33-the-small-async-wars.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Self-Knowing Agent](35-the-self-knowing-agent.md) →

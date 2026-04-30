@@ -293,4 +293,4 @@ It will look like what it really is:
 
 ---
 
-← [The Perfect Prompt Illusion](24-the-perfect-prompt-illusion.md) | [The Book of Grinta](BOOK_OF_GRINTA.md)
+← [The Vendor-Neutral Bench](38-the-vendor-neutral-bench.md) | [The Book of Grinta](BOOK_OF_GRINTA.md)

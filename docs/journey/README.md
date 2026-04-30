@@ -66,7 +66,7 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act VII — Incident Addenda and Prompt Discipline:** [24](25-the-parallelization-trap.md), [25](26-the-perfect-prompt-illusion.md)
 - **Act VIII — Operational Reality & Production:** [26](27-the-observability-black-hole.md), [27](28-token-economics-and-the-finops-trap.md), [28](29-the-latency-veil-and-human-trust.md), [29](30-the-weight-divide-local-vs-hosted.md), [30](31-the-myth-of-the-committee.md)
 - **Act IX — Addendum (The Terminal, Revisited):** [31](32-the-two-lives-of-the-terminal.md)
-- **Act X — The Editor, Honesty, and the Tools' Receipts:** [32](33-the-patch-that-refused-to-die.md), [33](34-the-fuzzy-match-heresy.md), [34](35-the-self-knowing-agent.md), [35](36-the-required-risk.md), [36](37-the-verbose-status.md), [37](38-the-vendor-neutral-bench.md)
+- **Act X — Reliability Receipts and Editor Honesty:** [32](33-the-small-async-wars.md), [33](34-the-fuzzy-match-heresy.md), [34](35-the-self-knowing-agent.md), [35](36-the-required-risk.md), [36](37-the-verbose-status.md), [37](38-the-vendor-neutral-bench.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
@@ -105,7 +105,7 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [29](30-the-weight-divide-local-vs-hosted.md) | **The Weight Divide: Local vs Hosted** | The operational realities of deploying heavy local weights vs. depending on frontier AI API latency. |
 | [30](31-the-myth-of-the-committee.md) | **The Myth of the Committee** | Why we killed the multi-agent swarm in favor of a single orchestrator with execution modes. |
 | [31](32-the-two-lives-of-the-terminal.md) | **The Two Lives of the Terminal** | Native PTY for opt-in interactive shells without Docker; why the default session stayed “batch first”; and how that decision sits on top of the Console Wars chapter instead of deleting it. |
-| [32](33-the-patch-that-refused-to-die.md) | **The Patch That Refused to Die** | Four serious rescue patterns for `apply_patch`, why none of them stuck, and the reframing that made the diff format the wrong contract for an LLM editor. |
+| [32](33-the-small-async-wars.md) | **The Small Async Wars** | Five reliability fights from the async / state-machine layer: the `NULL_ACTION_LOOP` cap, the `StepGuardService` grounding gate, overlap-aware streamed tool-call merging, the `_step_inner` tail-call race, and routing checkpoint handoffs through planning directives instead of error panels. With an honest note on what `sandboxed_local` does (and does not) claim on Windows. |
 | [33](34-the-fuzzy-match-heresy.md) | **The Fuzzy Match Heresy** | Why exact-match purity was a lie on real files, the three match modes (`exact` / `normalize_ws` / `fuzzy_safe`), the tree-sitter syntax check that is the receipt, and the lines I refuse to cross. |
 | [34](35-the-self-knowing-agent.md) | **The Self-Knowing Agent** | The runtime-truth capability block, default-on read parallelism, atomic `multi_edit`, and getting `parallel_tool_calls` to actually reach the SDK so the prompt's claims have receipts. |
 | [35](36-the-required-risk.md) | **The Required Risk** | Why optional security parameters are not security parameters, the autonomy-mode collapse to a single honest knob, and the per-session “always allow” memory that turned a confirmation gate from noise back into signal. |

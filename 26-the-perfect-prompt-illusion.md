@@ -91,4 +91,4 @@ There is no perfect prompt. There is only disciplined iteration.
 
 ---
 
-← [The Identity and Execution Crisis](24-the-identity-and-execution-crisis.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Road Ahead](07-the-road-ahead.md) →
+← [The Identity and Execution Crisis](24-the-identity-and-execution-crisis.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Observability Black Hole](27-the-observability-black-hole.md) →
