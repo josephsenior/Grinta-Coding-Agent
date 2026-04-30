@@ -22,8 +22,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from backend.engine.prompts.section_renderers import (
-    _lsp_available,
     _count_section_tokens,
+    _lsp_available,
     _render_permissions,
     _render_security,
     _resolve_terminal_command_tool,

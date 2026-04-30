@@ -11,6 +11,7 @@ The mixin assumes the host class provides:
 * helper methods: ``_warn``, ``_usage``, ``_reject_extra_args``,
   ``_command_project_root``.
 """
+# pylint: disable=assignment-from-no-return
 
 from __future__ import annotations
 
