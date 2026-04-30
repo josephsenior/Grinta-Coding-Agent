@@ -104,9 +104,29 @@ def test_serialize_normalize_error_helpers() -> None:
     norm = mu._normalize_mcp_success_payload({'isError': False})
     assert norm['ok'] is True
     err_pl = mu._build_mcp_error_payload(
-        action_name='x', message='bad', code='E1', retryable=True
+        action_name='x',
+        message='bad',
+        code='E1',
+        retryable=True,
+        category='bad_args',
     )
     assert err_pl['ok'] is False and err_pl['retryable'] is True
+    assert err_pl['category'] == 'bad_args'
+
+
+def test_make_mcp_observation_propagates_category() -> None:
+    action = SimpleNamespace(name='x', arguments={}, action='call_mcp_tool')
+    payload = mu._build_mcp_error_payload(
+        action_name='x',
+        message='nope',
+        code='MCP_TOOL_TIMEOUT',
+        retryable=True,
+        category='timeout',
+    )
+    obs = mu._make_mcp_observation(action, payload)  # type: ignore[arg-type]
+    assert obs.tool_result['category'] == 'timeout'
+    assert obs.tool_result['ok'] is False
+    assert obs.tool_result['retryable'] is True
 
 
 def test_looks_like_mcp_validation_error() -> None:

@@ -704,6 +704,12 @@ def _append_mcp_connected_catalog_sections(
             'Prefer **`call_mcp_tool`** over shell one-offs when an MCP tool covers the need. '
             'If asked what you can do or which models/tools you have, answer from **this** tool list, '
             '**MCP server hints** (if any), and your configured model id—**not** generic "no web / no docs" tropes.',
+            'On failure, MCP results carry a `category` field. Use it to pick the next move: '
+            '`bad_args` → fix arguments and retry once; '
+            '`timeout` → narrow the scope and retry; '
+            '`tool_bug` → switch to a different tool; '
+            '`env` → fall back to a non-MCP tool (e.g. terminal); '
+            '`not_found` → pick a tool name from the list above.',
             '</MCP_WHEN_TO_USE>',
         )
     )
