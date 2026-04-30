@@ -18,11 +18,11 @@ class TestAutonomyLevel:
         assert AutonomyLevel.CONSERVATIVE.value == 'conservative'
         assert AutonomyLevel.BALANCED.value == 'balanced'
         assert AutonomyLevel.FULL.value == 'full'
-        # Deprecated alias resolves to CONSERVATIVE.
-        assert AutonomyLevel.SUPERVISED is AutonomyLevel.CONSERVATIVE
+        assert len(AutonomyLevel) == 3
 
     def test_from_string(self):
         assert AutonomyLevel('conservative') is AutonomyLevel.CONSERVATIVE
+        assert AutonomyLevel('balanced') is AutonomyLevel.BALANCED
         assert AutonomyLevel('full') is AutonomyLevel.FULL
 
 
@@ -68,8 +68,8 @@ class TestShouldRequestConfirmation:
         action = CmdRunAction(command='echo hi')
         assert ctrl.should_request_confirmation(action) is False
 
-    def test_supervised_always_true(self):
-        ctrl = self._make('supervised')
+    def test_conservative_always_true(self):
+        ctrl = self._make('conservative')
         action = CmdRunAction(command='echo hi')
         assert ctrl.should_request_confirmation(action) is True
 

@@ -1,5 +1,7 @@
 """Tests for backend.core.config.permissions_config — PermissionsConfig and related models."""
 
+import pytest
+
 from backend.core.config.permissions_config import (
     PermissionCategory,
     PermissionRule,
@@ -103,10 +105,9 @@ class TestPresets:
         assert config.max_cost_per_task is None
         assert config.warn_at_cost is None
 
-    def test_supervised_alias_maps_to_conservative(self):
-        """Legacy 'supervised' input still works and yields a conservative preset."""
-        config = PermissionsConfig.get_preset('supervised')
-        assert config.autonomy_level == 'conservative'
+    def test_supervised_preset_is_rejected(self) -> None:
+        with pytest.raises(ValueError, match='conservative, balanced, or full'):
+            PermissionsConfig.get_preset('supervised')
 
     def test_balanced_preset(self):
         config = PermissionsConfig.get_preset('balanced')

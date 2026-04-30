@@ -75,11 +75,6 @@ else:
 
 
 _VALID_AUTONOMY_LEVELS = {'conservative', 'balanced', 'full'}
-# Legacy values that are silently normalised to a current level. ``supervised``
-# was renamed to ``conservative`` in 1.0.0-rc1 because the new name better
-# describes the behaviour ("confirm every action") and avoids implying
-# extra oversight features that don't exist.
-_DEPRECATED_AUTONOMY_ALIASES = {'supervised': 'conservative'}
 
 
 class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
@@ -155,7 +150,7 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     autonomy_level: str = Field(
         default=DEFAULT_AGENT_AUTONOMY_LEVEL,
         min_length=1,
-        description='Autonomy mode: supervised, balanced, or full',
+        description='Autonomy mode: conservative, balanced, or full',
     )
 
     # Core tool toggles
@@ -392,23 +387,14 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     @field_validator('autonomy_level')
     @classmethod
     def validate_autonomy_level_choice(cls, value: str) -> str:
-        """Normalize and validate autonomy levels against the supported set.
-
-        Deprecated values (currently only ``supervised``) are accepted and
-        silently rewritten to their replacement (``conservative``); a
-        warning is emitted so that operators notice the rename.
-        """
+        """Validate autonomy level against the supported set."""
         normalized = value.strip().lower()
-        if normalized in _DEPRECATED_AUTONOMY_ALIASES:
-            replacement = _DEPRECATED_AUTONOMY_ALIASES[normalized]
-            logger.warning(
-                "autonomy_level=%r is deprecated; use %r instead. "
-                "Behaviour is unchanged. This alias will be removed in a future release.",
-                normalized,
-                replacement,
-            )
-            normalized = replacement
         if normalized not in _VALID_AUTONOMY_LEVELS:
+            if normalized == 'supervised':
+                raise ValueError(
+                    "autonomy_level 'supervised' is not valid; use 'conservative' "
+                    '(confirm before every action).',
+                )
             allowed = ', '.join(sorted(_VALID_AUTONOMY_LEVELS))
             raise ValueError(f'autonomy_level must be one of: {allowed}')
         return normalized

@@ -35,7 +35,7 @@ class HUDState:
     mcp_servers: int | None = None
     #: Agent lifecycle state label shown in the branded row (e.g. 'Running', 'Ready').
     agent_state_label: str = 'Ready'
-    #: Autonomy level label (e.g. 'balanced', 'full', 'supervised').
+    #: Autonomy level label (e.g. 'balanced', 'full', 'conservative').
     autonomy_level: str = 'balanced'
     #: True when token usage shown in HUD is estimated rather than provider-reported.
     token_usage_estimated: bool = False

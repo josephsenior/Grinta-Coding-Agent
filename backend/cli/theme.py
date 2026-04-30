@@ -51,7 +51,7 @@ CLR_USER_BORDER = 'dim cyan'           # user message panel border
 CLR_STATE_RUNNING = '#93c5fd bold'     # running / active state badge
 CLR_AUTONOMY_BALANCED = '#8bd8ff'      # balanced autonomy tag
 CLR_AUTONOMY_FULL = '#f1bf63 bold'     # full autonomy tag
-CLR_AUTONOMY_SUPERVISED = '#f0a3ff bold'  # supervised autonomy tag
+CLR_AUTONOMY_CONSERVATIVE = '#f0a3ff bold'  # conservative autonomy (confirm every action)
 
 # ── Section divider ────────────────────────────────────────────────────────────
 CLR_SECTION_RULE = '#4a6b82'           # "Tools & commands" divider rule

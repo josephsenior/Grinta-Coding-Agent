@@ -132,7 +132,7 @@ That is why routing exists as its own first-class section. It encodes hard-earne
 Autonomy is not one slider buried in config.
 It is a behavioral contract.
 
-The autonomy partial makes that contract visible. Full, balanced, and supervised modes each produce a different block of instructions. That matters because the model should not be asked to infer the user's risk appetite from vibes.
+The autonomy partial makes that contract visible. Full, balanced, and conservative modes each produce a different block of instructions. That matters because the model should not be asked to infer the user's risk appetite from vibes.
 
 If the system is going to be more or less independent, say it clearly.
 

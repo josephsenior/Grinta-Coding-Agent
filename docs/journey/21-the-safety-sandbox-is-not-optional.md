@@ -47,7 +47,7 @@ That is why Grinta's safety validator evaluates each action with execution conte
 
 - session identity
 - iteration number
-- autonomous vs supervised mode
+- autonomous vs conservative mode
 - environment policy
 
 Then it decides whether to allow, block, or require review.

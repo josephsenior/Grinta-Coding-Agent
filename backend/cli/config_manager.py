@@ -281,7 +281,7 @@ def run_onboarding() -> AppConfig:
                 '[bold]Next steps[/bold]\n'
                 '  • Describe what you want in plain language, or type [bold]/help[/bold] for commands\n'
                 '  • [bold]grinta -p /path/to/repo[/bold] — pin a project directory (or stay in the current folder)\n'
-                '  • [bold]/autonomy[/bold] — choose supervised, balanced, or full autonomy\n'
+                '  • [bold]/autonomy[/bold] — choose conservative, balanced, or full autonomy\n'
                 '  • [bold]/sessions[/bold] — list past sessions; [bold]/resume[/bold] to continue one\n'
                 '  • [bold]/settings[/bold] — change model, API key, or MCP servers anytime\n\n'
                 f'[{CLR_META}]Tip: run [bold]grinta --help[/bold] for CLI flags.[/]'

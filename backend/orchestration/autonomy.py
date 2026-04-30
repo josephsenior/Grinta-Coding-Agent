@@ -36,16 +36,11 @@ class AutonomyLevel(str, Enum):
     - ``CONSERVATIVE``: ask for every runnable action.
     - ``BALANCED``: ask only for actions classified as high-risk.
     - ``FULL``: never ask; the safety validator still blocks forbidden ops.
-
-    ``SUPERVISED`` is a deprecated alias for ``CONSERVATIVE`` kept for
-    backwards-compatible config files. New code should use ``CONSERVATIVE``.
     """
 
     CONSERVATIVE = 'conservative'
     BALANCED = 'balanced'
     FULL = 'full'
-    # Deprecated alias — accepted as input but normalised to 'conservative'.
-    SUPERVISED = 'conservative'
 
 
 class AutonomyController:
@@ -65,10 +60,6 @@ class AutonomyController:
         self.autonomy_level = getattr(
             config, 'autonomy_level', AutonomyLevel.BALANCED.value
         )
-        # Defensive: normalise legacy 'supervised' string from old configs that
-        # bypass the AgentConfig validator (e.g. plain dicts).
-        if self.autonomy_level == 'supervised':
-            self.autonomy_level = AutonomyLevel.CONSERVATIVE.value
         self.auto_retry = getattr(config, 'auto_retry_on_error', False)
         self.max_iterations = getattr(config, 'max_autonomous_iterations', 0)
         self.stuck_detection = getattr(config, 'stuck_detection_enabled', False)

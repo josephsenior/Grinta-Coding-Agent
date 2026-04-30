@@ -23,13 +23,11 @@ class TestAutonomyLevel:
     """Test AutonomyLevel enum."""
 
     def test_autonomy_level_values(self):
-        """AutonomyLevel should have three canonical levels plus a deprecated alias."""
+        """AutonomyLevel should have three canonical levels."""
         assert AutonomyLevel.CONSERVATIVE.value == 'conservative'
         assert AutonomyLevel.BALANCED.value == 'balanced'
         assert AutonomyLevel.FULL.value == 'full'
-        # Backwards-compatible alias: SUPERVISED is now CONSERVATIVE.
-        assert AutonomyLevel.SUPERVISED is AutonomyLevel.CONSERVATIVE
-        assert AutonomyLevel.SUPERVISED.value == 'conservative'
+        assert len(AutonomyLevel) == 3
 
     def test_autonomy_level_is_string_enum(self):
         """AutonomyLevel should be a string enum."""
@@ -75,20 +73,6 @@ class TestAutonomyControllerInit:
         assert controller.stuck_detection is True
         assert controller.stuck_threshold == 5
 
-    def test_init_with_supervised_mode(self):
-        """Should normalise the deprecated 'supervised' string to 'conservative'."""
-        config = MagicMock()
-        config.autonomy_level = 'supervised'
-        config.auto_retry_on_error = False
-        config.max_autonomous_iterations = 1
-        config.stuck_detection_enabled = False
-        config.stuck_threshold_iterations = 3
-
-        controller = AutonomyController(config)
-
-        assert controller.autonomy_level == 'conservative'
-        assert controller.max_iterations == 1
-
     def test_init_with_conservative_mode(self):
         """Should initialize with CONSERVATIVE level."""
         config = MagicMock()
@@ -131,8 +115,8 @@ class TestShouldRequestConfirmation:
         safe_action = FileReadAction(path='/tmp/file.txt')
         assert controller.should_request_confirmation(safe_action) is False
 
-    def test_supervised_always_asks(self):
-        """CONSERVATIVE mode (legacy 'supervised') should always request confirmation."""
+    def test_conservative_always_asks(self):
+        """CONSERVATIVE mode should always request confirmation."""
         config = MagicMock()
         config.autonomy_level = 'conservative'
         controller = AutonomyController(config)

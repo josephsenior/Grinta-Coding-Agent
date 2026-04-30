@@ -42,9 +42,24 @@ uv run python -m backend.cli.entry
 1. **Fork** the repository
 2. **Branch** from `main`: `git checkout -b feature/your-feature`
 3. **Implement** your change following existing patterns
-4. **Test**: run `pytest` for backend
+4. **Test**: see [Testing before a pull request](#testing-before-a-pull-request)
 5. **Commit** with a clear message: `feat: add trajectory pagination`
 6. **Push** and open a Pull Request
+
+### Testing before a pull request
+
+This matches what **required** GitHub Actions jobs run (Linux and Windows full unit gates):
+
+```bash
+uv sync --group dev --group test --group runtime
+PYTHONPATH=. uv run pytest backend/tests/unit
+```
+
+Optional: same command with `uv run pytest backend/tests/unit -q` for quieter output. The default `pytest` invocation (per [`pytest.ini`](pytest.ini)) discovers `backend/tests/unit` only; tests marked `heavy`, `integration`, or `benchmark` are not selected by default and are covered on a [separate CI schedule](docs/CI.md#heavy--integration--benchmark-tier).
+
+If your change touches the CLI, REPL, or orchestration hot paths, also run the [CLI regression workflow](.github/workflows/e2e-tests.yml) locally when possible (it may also run on PRs when files under `backend/`, `launch/`, etc. change).
+
+For bugfix PRs, prefer adding a **regression test** next to the code you fixed (see [docs/REGRESSION_TESTS.md](docs/REGRESSION_TESTS.md)).
 
 ### Code Standards
 

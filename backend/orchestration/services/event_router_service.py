@@ -1001,7 +1001,7 @@ class EventRouterService:
         """Handle meta-cognition actions (clarification, proposal, uncertainty, escalation).
 
         In FULL autonomy mode, the agent continues without pausing.
-        In BALANCED or SUPERVISED mode, the agent pauses and waits for user input.
+        In BALANCED or CONSERVATIVE mode, the agent pauses and waits for user input.
         """
         from backend.orchestration.autonomy import AutonomyLevel
 

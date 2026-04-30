@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+
+- **CI:** `py-tests` required jobs on Linux and Windows now run the full
+  `backend/tests/unit` corpus (aligned with `pytest.ini`), not a fixed
+  nine-file slice. [docs/CI.md](docs/CI.md) documents the tiers.
+- **Docs:** [CONTRIBUTING.md](CONTRIBUTING.md) testing instructions match CI;
+  added [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md),
+  [docs/REGRESSION_TESTS.md](docs/REGRESSION_TESTS.md); user-facing autonomy
+  naming is **conservative** / **balanced** / **full** only
+  ([docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md),
+  [docs/USER_GUIDE.md](docs/USER_GUIDE.md)).
+
+### Removed
+
+- **`supervised` autonomy spelling:** Config, `/autonomy`, and
+  `PermissionsConfig.get_preset()` no longer accept `supervised`; use
+  `conservative` (same behaviour). A clear validation error points to
+  `conservative` if old configs still say `supervised`.
 
 ## [1.0.0-rc1] - 2026-04-29
 

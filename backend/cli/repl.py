@@ -25,7 +25,7 @@ from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.theme import (
     CLR_AUTONOMY_BALANCED,
     CLR_AUTONOMY_FULL,
-    CLR_AUTONOMY_SUPERVISED,
+    CLR_AUTONOMY_CONSERVATIVE,
     CLR_BRAND,
     CLR_HUD_DETAIL,
     CLR_HUD_MODEL,
@@ -98,8 +98,6 @@ _AUTONOMY_LEVEL_HINTS = {
     'balanced': 'Ask only for high-risk actions',
     'full': 'Run without confirmation prompts',
 }
-# Legacy values accepted by /autonomy. Each maps to its current canonical level.
-_AUTONOMY_LEVEL_ALIASES = {'supervised': 'conservative'}
 _SLASH_COMMANDS = (
     SlashCommandSpec(
         '/help',
@@ -125,8 +123,8 @@ _SLASH_COMMANDS = (
     ),
     SlashCommandSpec(
         '/autonomy',
-        'View or set autonomy (supervised/balanced/full)',
-        '/autonomy [supervised|balanced|full]',
+        'View or set autonomy (conservative/balanced/full)',
+        '/autonomy [conservative|balanced|full]',
         help_section='model',
     ),
     SlashCommandSpec(
@@ -893,8 +891,8 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         label = self._prompt_autonomy_label()
         if 'full' in label:
             return 'class:prompt.autonomy.full'
-        if 'conservative' in label or 'supervised' in label:
-            return 'class:prompt.autonomy.supervised'
+        if 'conservative' in label:
+            return 'class:prompt.autonomy.conservative'
         return 'class:prompt.autonomy.balanced'
 
     @staticmethod
@@ -1078,7 +1076,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
                 'prompt.badge.error': f'bold {CLR_STATUS_ERR}',
                 'prompt.autonomy.balanced': CLR_AUTONOMY_BALANCED,
                 'prompt.autonomy.full': CLR_AUTONOMY_FULL,
-                'prompt.autonomy.supervised': CLR_AUTONOMY_SUPERVISED,
+                'prompt.autonomy.conservative': CLR_AUTONOMY_CONSERVATIVE,
                 'prompt.health.good': f'bold {CLR_STATUS_OK}',
                 'prompt.health.warn': f'bold {CLR_STATUS_WARN}',
                 'prompt.health.bad': f'bold {CLR_STATUS_ERR}',
