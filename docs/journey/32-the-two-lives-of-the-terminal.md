@@ -67,4 +67,4 @@ That is not retreating from the console wars. It is surviving them without lying
 
 ---
 
-← [The Myth of the Committee](31-the-myth-of-the-committee.md) | [The Book of Grinta](README.md) | [The Road Ahead](07-the-road-ahead.md) →
+← [The Myth of the Committee](31-the-myth-of-the-committee.md) | [The Book of Grinta](README.md) | [The Patch That Refused to Die](33-the-patch-that-refused-to-die.md) →
