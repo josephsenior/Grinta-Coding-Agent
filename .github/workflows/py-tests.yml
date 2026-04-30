@@ -138,7 +138,7 @@ jobs:
       - name: Compile backend (syntax gate)
         run: uv run python -m compileall backend
       - name: Run heavy / integration tests
-        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest -m "heavy or integration or benchmark" -vv
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest backend/tests -m "heavy or integration or benchmark" -vv
 
   gates-on-macos:
     # Advisory only — failures should not block merge while macOS is being
