@@ -67,4 +67,4 @@ That is not retreating from the console wars. It is surviving them without lying
 
 ---
 
-← [The Myth of the Committee](31-the-myth-of-the-committee.md) | [The Book of Grinta](README.md) | [The Small Async Wars](33-the-small-async-wars.md) →
+← [The Myth of the Committee](31-the-myth-of-the-committee.md) | [The Book of Grinta](BOOK_OF_GRINTA.md) | [The Small Async Wars](33-the-small-async-wars.md) →

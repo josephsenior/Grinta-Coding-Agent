@@ -65,7 +65,7 @@ The file names stay stable for repository sanity, but the strongest reading arc 
 - **Act VI — Reliability Under Fire:** [18](19-surviving-the-crash.md), [19](20-circuit-breakers-and-hallucinations.md), [20](21-the-safety-sandbox-is-not-optional.md), [21](22-who-grades-the-agent.md), [22](23-the-middleware-contract.md), [23](24-the-identity-and-execution-crisis.md)
 - **Act VII — Incident Addenda and Prompt Discipline:** [24](25-the-parallelization-trap.md), [25](26-the-perfect-prompt-illusion.md)
 - **Act VIII — Operational Reality & Production:** [26](27-the-observability-black-hole.md), [27](28-token-economics-and-the-finops-trap.md), [28](29-the-latency-veil-and-human-trust.md), [29](30-the-weight-divide-local-vs-hosted.md), [30](31-the-myth-of-the-committee.md)
-- **Act IX — Addendum (The Terminal, Revisited):** [31](32-the-two-lives-of-the-terminal.md)
+- **Act IX — Reliability Receipts and Editor Honesty:** [31](32-the-two-lives-of-the-terminal.md), [32](33-the-small-async-wars.md), [33](34-the-fuzzy-match-heresy.md), [34](35-the-self-knowing-agent.md), [35](36-the-required-risk.md), [36](37-the-verbose-status.md), [37](38-the-vendor-neutral-bench.md)
 - **Epilogue:** [07](07-the-road-ahead.md)
 
 Chapter 07 was written earlier in the repo's life, but it now reads best as the closing chapter after the rest of the system has been laid bare.
@@ -104,6 +104,12 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [29](30-the-weight-divide-local-vs-hosted.md) | **The Weight Divide: Local vs Hosted** | The operational realities of deploying heavy local weights vs. depending on frontier AI API latency. |
 | [30](31-the-myth-of-the-committee.md) | **The Myth of the Committee** | Why we killed the multi-agent swarm in favor of a single orchestrator with execution modes. |
 | [31](32-the-two-lives-of-the-terminal.md) | **The Two Lives of the Terminal** | Native PTY for opt-in interactive shells without Docker; why the default session stayed “batch first”; and how that decision sits on top of the Console Wars chapter instead of deleting it. |
+| [32](33-the-small-async-wars.md) | **The Small Async Wars** | Five reliability fights from the async / state-machine layer: the `NULL_ACTION_LOOP` cap, the `StepGuardService` grounding gate, overlap-aware streamed tool-call merging, the `_step_inner` tail-call race, and routing checkpoint handoffs through planning directives. With an honest note on what `sandboxed_local` does — and does not — claim on Windows. |
+| [33](34-the-fuzzy-match-heresy.md) | **The Fuzzy Match Heresy** | The match-mode ladder (`exact`, `normalize_ws`, bounded `fuzzy_safe`), the tree-sitter syntax check as the editor's receipt, and the non-code edit protocol that keeps writes byte-faithful even when matches are forgiving. |
+| [34](35-the-self-knowing-agent.md) | **The Self-Knowing Agent** | The runtime-truth System Capabilities prompt block, default-on parallel reads, atomic `multi_edit`, and the rule that every capability statement must have a runtime receipt. |
+| [35](36-the-required-risk.md) | **The Required Risk** | The mandatory `security_risk` field, the collapse of autonomy to a single axis, the renaming of `supervised` to `conservative`, and the in-memory per-session whitelist for `[y/n/a=always]` confirmations. |
+| [36](37-the-verbose-status.md) | **The Verbose Status** | The `/status verbose` diagnostics surface, the `DO_NOT_TRACK` and `GRINTA_DISABLE_METRICS` opt-outs, and the in-band disconnect probe that turns truncated streams into clean retryable errors. |
+| [37](38-the-vendor-neutral-bench.md) | **The Vendor-Neutral Bench** | The agent evaluation pack format, the five qualitative metrics plus binary success, the failure cap and recovery scoring rules, and the principled refusal to drive other agents from the same harness. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
 ---
