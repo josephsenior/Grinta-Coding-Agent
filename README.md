@@ -196,11 +196,14 @@ Task validation can block finish calls when tracked work is incomplete.
 - [User Guide](docs/USER_GUIDE.md)
 - [Quick Start](docs/QUICK_START.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
+- [Support Matrix](docs/SUPPORT_MATRIX.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Developer Guide](docs/DEVELOPER.md)
 - [Vocabulary](docs/VOCABULARY.md)
 - [The Book of Grinta](docs/journey/README.md)
 - [Contributing](CONTRIBUTING.md)
+- [Governance](GOVERNANCE.md)
+- [Maintainers](MAINTAINERS.md)
 
 ## Contributing
 
@@ -209,3 +212,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Third-party Notices
+
+Dependency attribution and notice policy: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

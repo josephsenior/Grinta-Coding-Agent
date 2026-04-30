@@ -30,8 +30,16 @@ Examples of unacceptable behavior:
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the project maintainers. All complaints will be reviewed and
-investigated promptly and fairly.
+reported to the project maintainers at:
+
+- conduct@app.ai
+
+Security issues should be reported through the private channels in `SECURITY.md`,
+not through Code of Conduct channels.
+
+All complaints will be reviewed and investigated promptly and fairly. Maintainers
+will respect reporter confidentiality to the extent possible and communicate follow-up
+status when an investigation is closed.
 
 ## Attribution
 

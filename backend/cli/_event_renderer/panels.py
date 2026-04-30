@@ -15,6 +15,14 @@ from backend.cli.layout_tokens import (
     ACTIVITY_PANEL_PADDING,
     LIVE_PANEL_ACCENT_STYLE,
 )
+from backend.cli.theme import (
+    CLR_INFO_BODY,
+    CLR_INFO_ICON,
+    CLR_OK_BODY,
+    CLR_OK_ICON,
+    CLR_WARN_BODY,
+    CLR_WARN_ICON,
+)
 from backend.cli.transcript import format_callout_panel
 from backend.core.task_status import (
     TASK_STATUS_PANEL_STYLES,
@@ -220,9 +228,9 @@ def normalize_system_title(title: str) -> str:
 
 
 _SYSTEM_TONES: dict[str, tuple[str, str]] = {
-    'warning': ('#f59e0b', 'yellow'),
-    'success': ('#10b981', '#86efac'),
-    'info': ('#38bdf8', '#93c5fd'),
+    'warning': (CLR_WARN_ICON, CLR_WARN_BODY),
+    'success': (CLR_OK_ICON, CLR_OK_BODY),
+    'info': (CLR_INFO_ICON, CLR_INFO_BODY),
 }
 
 
@@ -234,14 +242,18 @@ def build_system_notice_panel(
 ) -> Panel:
     """Unified panel chrome for non-error system messages."""
     normalized_title = normalize_system_title(title)
-    border_style, body_style = _SYSTEM_TONES.get(tone, _SYSTEM_TONES['info'])
-    panel_title = Text(normalized_title, style=f'bold {border_style}')
+    accent_style, body_style = _SYSTEM_TONES.get(tone, _SYSTEM_TONES['info'])
+    # ``accent_style`` is a "bold #hex" pair: use the colour-only suffix for
+    # the border (Rich draws border characters; bold has no visible effect)
+    # and keep the bolded version for the title text.
+    border_color = accent_style.split(' ', 1)[1] if ' ' in accent_style else accent_style
+    panel_title = Text(normalized_title, style=accent_style)
     body = Text((text or '').strip(), style=body_style)
     return Panel(
         body,
         title=panel_title,
         title_align='left',
-        border_style=border_style,
+        border_style=border_color,
         box=box.ROUNDED,
         padding=(0, 1),
     )

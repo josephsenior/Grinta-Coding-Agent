@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   naming is **conservative** / **balanced** / **full** only
   ([docs/SECURITY_CHECKLIST.md](docs/SECURITY_CHECKLIST.md),
   [docs/USER_GUIDE.md](docs/USER_GUIDE.md)).
+- **OSS readiness:** added governance and ownership policy docs
+  ([GOVERNANCE.md](GOVERNANCE.md), [MAINTAINERS.md](MAINTAINERS.md)),
+  published [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md), expanded
+  [SUPPORT.md](SUPPORT.md) with response targets, and added
+  [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ### Removed
 

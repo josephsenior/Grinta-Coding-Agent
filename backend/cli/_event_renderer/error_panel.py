@@ -34,7 +34,13 @@ from backend.cli.layout_tokens import (
     CALLOUT_PANEL_PADDING,
     LIVE_PANEL_ACCENT_STYLE,
 )
-from backend.cli.theme import CLR_META
+from backend.cli.theme import (
+    CLR_META,
+    CLR_RECOVERY_HINT,
+    CLR_RECOVERY_HINT_DIM,
+    CLR_WARN_BODY,
+    CLR_WARN_ICON,
+)
 
 
 def use_recoverable_notice_style(error_text: str) -> bool:
@@ -438,13 +444,13 @@ def build_recovery_text(
     """Render a guidance block for the error / notice panel."""
     recovery = Text()
     if for_notice:
-        recovery.append('Next steps\n', style='bold dim cyan')
-        sum_style = 'cyan'
-        step_style = 'dim cyan'
+        recovery.append('Next steps\n', style=f'bold dim {CLR_RECOVERY_HINT}')
+        sum_style = CLR_RECOVERY_HINT
+        step_style = CLR_RECOVERY_HINT_DIM
     else:
-        recovery.append('What you can try\n', style='yellow bold')
-        sum_style = 'yellow'
-        step_style = 'yellow'
+        recovery.append('What you can try\n', style=CLR_WARN_ICON)
+        sum_style = CLR_WARN_BODY
+        step_style = CLR_WARN_BODY
     if guidance.summary and not guidance.omit_summary_in_recovery and not for_notice:
         sum_block = wrap_panel_text_block(guidance.summary, wrap_width=wrap_width)
         recovery.append(sum_block, style=sum_style)

@@ -1,4 +1,11 @@
 # CODEOWNERS
 
-/evaluation/ @xingyaoww @neubig
-/docs/ @mamoodi
+* @josephsenior
+
+/backend/ @josephsenior
+/launch/ @josephsenior
+/docs/ @josephsenior
+/.github/workflows/ @josephsenior
+/packaging/ @josephsenior
+/scripts/ @josephsenior
+/evaluation/ @josephsenior

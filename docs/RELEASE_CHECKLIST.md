@@ -15,8 +15,9 @@ Use this list before declaring a **1.0.0** (or any major) release and before pub
 1. Set `version = "x.y.z"` in [`pyproject.toml`](../pyproject.toml).
 2. Mirror the fallback strings in [`backend/__init__.py`](../backend/__init__.py) if the install path cannot read metadata.
 3. Update [packaging/scoop/grinta.json](../packaging/scoop/grinta.json) and [packaging/homebrew/grinta.rb](../packaging/homebrew/grinta.rb) with the **published** sdist URL and checksums from PyPI **after** upload (not before the artifact exists).
-4. Update the version hint in [bug report template](../.github/ISSUE_TEMPLATE/bug_report.md) if you maintain it per release.
+4. Update the version hint in the bug issue form ([`bug_template.yml`](../.github/ISSUE_TEMPLATE/bug_template.yml)) if you maintain it per release.
 5. Record changes in `CHANGELOG.md` and tag the release in Git.
+6. Review and update [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) to reflect current dependency attribution workflow.
 
 **Note:** Bumping `pyproject.toml` to `1.0.0` without updating Scoop/Homebrew URLs to a real `grinta-ai-1.0.0` sdist will break those manifests until PyPI has that artifact.
 

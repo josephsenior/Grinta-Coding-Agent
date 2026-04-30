@@ -54,6 +54,12 @@ from backend.cli._event_renderer.text_utils import (
     strip_pty_echo as _strip_pty_echo,
 )
 from backend.cli.layout_tokens import ACTIVITY_BLOCK_BOTTOM_PAD
+from backend.cli.theme import (
+    CLR_OUTPUT_PANEL_BORDER,
+    CLR_OUTPUT_PANEL_TITLE,
+    CLR_QUESTION_TEXT,
+    CLR_STATUS_WARN,
+)
 from backend.cli.tool_call_display import mcp_result_user_preview
 from backend.cli.transcript import (
     format_activity_delta_secondary,
@@ -330,8 +336,8 @@ class ObservationRenderersMixin:
         self._append_history(
             format_callout_panel(
                 'Rejected',
-                Text(content or 'Action rejected.', style='yellow'),
-                accent_style='yellow',
+                Text(content or 'Action rejected.', style=CLR_QUESTION_TEXT),
+                accent_style=CLR_STATUS_WARN,
             )
         )
 
@@ -579,7 +585,7 @@ class ObservationRenderersMixin:
             title_parts.append('truncated')
         panel_title = Text(
             '  ·  '.join(title_parts) if title_parts else 'output',
-            style='dim #9ca3af',
+            style=CLR_OUTPUT_PANEL_TITLE,
         )
         self._append_history(
             Padding(
@@ -587,7 +593,7 @@ class ObservationRenderersMixin:
                     Syntax(body, 'text', word_wrap=True, theme='ansi_dark'),
                     title=panel_title,
                     title_align='left',
-                    border_style='#1e3a4a',
+                    border_style=CLR_OUTPUT_PANEL_BORDER,
                     box=box.ROUNDED,
                     padding=(0, 1),
                 ),
