@@ -23,14 +23,17 @@ class TestAutonomyLevel:
     """Test AutonomyLevel enum."""
 
     def test_autonomy_level_values(self):
-        """AutonomyLevel should have three levels."""
-        assert AutonomyLevel.SUPERVISED.value == 'supervised'
+        """AutonomyLevel should have three canonical levels plus a deprecated alias."""
+        assert AutonomyLevel.CONSERVATIVE.value == 'conservative'
         assert AutonomyLevel.BALANCED.value == 'balanced'
         assert AutonomyLevel.FULL.value == 'full'
+        # Backwards-compatible alias: SUPERVISED is now CONSERVATIVE.
+        assert AutonomyLevel.SUPERVISED is AutonomyLevel.CONSERVATIVE
+        assert AutonomyLevel.SUPERVISED.value == 'conservative'
 
     def test_autonomy_level_is_string_enum(self):
         """AutonomyLevel should be a string enum."""
-        assert isinstance(AutonomyLevel.SUPERVISED, str)
+        assert isinstance(AutonomyLevel.CONSERVATIVE, str)
         assert isinstance(AutonomyLevel.BALANCED, str)
         assert isinstance(AutonomyLevel.FULL, str)
 
@@ -73,7 +76,7 @@ class TestAutonomyControllerInit:
         assert controller.stuck_threshold == 5
 
     def test_init_with_supervised_mode(self):
-        """Should initialize with SUPERVISED level."""
+        """Should normalise the deprecated 'supervised' string to 'conservative'."""
         config = MagicMock()
         config.autonomy_level = 'supervised'
         config.auto_retry_on_error = False
@@ -83,7 +86,21 @@ class TestAutonomyControllerInit:
 
         controller = AutonomyController(config)
 
-        assert controller.autonomy_level == 'supervised'
+        assert controller.autonomy_level == 'conservative'
+        assert controller.max_iterations == 1
+
+    def test_init_with_conservative_mode(self):
+        """Should initialize with CONSERVATIVE level."""
+        config = MagicMock()
+        config.autonomy_level = 'conservative'
+        config.auto_retry_on_error = False
+        config.max_autonomous_iterations = 1
+        config.stuck_detection_enabled = False
+        config.stuck_threshold_iterations = 3
+
+        controller = AutonomyController(config)
+
+        assert controller.autonomy_level == 'conservative'
         assert controller.max_iterations == 1
 
     def test_init_uses_getattr_with_defaults(self):
@@ -115,9 +132,9 @@ class TestShouldRequestConfirmation:
         assert controller.should_request_confirmation(safe_action) is False
 
     def test_supervised_always_asks(self):
-        """SUPERVISED mode should always request confirmation."""
+        """CONSERVATIVE mode (legacy 'supervised') should always request confirmation."""
         config = MagicMock()
-        config.autonomy_level = 'supervised'
+        config.autonomy_level = 'conservative'
         controller = AutonomyController(config)
 
         # High-risk action
@@ -287,6 +304,38 @@ class TestHighRiskDetection:
 
         action = FileReadAction(path='/tmp/test.txt')
         assert controller._is_high_risk_action(action) is False
+
+
+class TestAlwaysAllowMemory:
+    """Per-session 'always allow' memory short-circuits the confirmation gate."""
+
+    def test_remembered_command_skips_confirmation_in_conservative(self):
+        config = MagicMock()
+        config.autonomy_level = 'conservative'
+        controller = AutonomyController(config)
+
+        action = CmdRunAction(command='pytest -q')
+        # Conservative would normally always ask.
+        assert controller.should_request_confirmation(action) is True
+        controller.remember_always_allow(action)
+        assert controller.should_request_confirmation(action) is False
+
+    def test_remembered_signature_is_command_specific(self):
+        config = MagicMock()
+        config.autonomy_level = 'conservative'
+        controller = AutonomyController(config)
+
+        controller.remember_always_allow(CmdRunAction(command='pytest -q'))
+        # A different command must still be gated.
+        assert (
+            controller.should_request_confirmation(CmdRunAction(command='pytest -v'))
+            is True
+        )
+
+    def test_action_signature_is_stable(self):
+        sig_a = AutonomyController.action_signature(CmdRunAction(command='ls -la'))
+        sig_b = AutonomyController.action_signature(CmdRunAction(command='ls -la'))
+        assert sig_a == sig_b == 'cmd:ls -la'
 
 
 class TestShouldRetryOnError:

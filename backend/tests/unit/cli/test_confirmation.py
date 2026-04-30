@@ -161,40 +161,50 @@ class TestRenderConfirmation:
     def test_returns_true_on_approve(self) -> None:
         console = _quiet_console()
         action = CmdRunAction(command='git status')
-        with patch('rich.prompt.Confirm.ask', return_value=True):
+        with patch('rich.prompt.Prompt.ask', return_value='y'):
             result = render_confirmation(console, action)
-        assert result is True
+        assert result.approved is True
+        assert result.remember is False
 
     def test_returns_false_on_reject(self) -> None:
         console = _quiet_console()
         action = CmdRunAction(command='rm -rf /')
         action.security_risk = ActionSecurityRisk.HIGH
-        with patch('rich.prompt.Confirm.ask', return_value=False):
+        with patch('rich.prompt.Prompt.ask', return_value='n'):
             result = render_confirmation(console, action)
-        assert result is False
+        assert result.approved is False
+        assert result.remember is False
+
+    def test_always_choice_sets_remember(self) -> None:
+        console = _quiet_console()
+        action = CmdRunAction(command='pytest')
+        with patch('rich.prompt.Prompt.ask', return_value='a'):
+            result = render_confirmation(console, action)
+        assert result.approved is True
+        assert result.remember is True
 
     def test_shows_thought_panel(self) -> None:
         console = _quiet_console()
         action = CmdRunAction(command='pip install x')
         action.thought = 'Installing required library'
-        with patch('rich.prompt.Confirm.ask', return_value=True):
+        with patch('rich.prompt.Prompt.ask', return_value='y'):
             result = render_confirmation(console, action)
-        assert result is True
+        assert result.approved is True
 
     def test_file_edit_action(self) -> None:
         console = _quiet_console()
         action = FileEditAction(path='/etc/hosts', content='x')
         action.security_risk = ActionSecurityRisk.MEDIUM
-        with patch('rich.prompt.Confirm.ask', return_value=False):
+        with patch('rich.prompt.Prompt.ask', return_value='n'):
             result = render_confirmation(console, action)
-        assert result is False
+        assert result.approved is False
 
     def test_file_write_action(self) -> None:
         console = _quiet_console()
         action = FileWriteAction(path='/tmp/test.txt', content='hello')
-        with patch('rich.prompt.Confirm.ask', return_value=True):
+        with patch('rich.prompt.Prompt.ask', return_value='y'):
             result = render_confirmation(console, action)
-        assert result is True
+        assert result.approved is True
 
 
 # ---------------------------------------------------------------------------

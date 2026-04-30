@@ -27,11 +27,25 @@ logger = logging.getLogger(__name__)
 
 
 class AutonomyLevel(str, Enum):
-    """Agent autonomy levels."""
+    """Agent autonomy levels.
 
-    SUPERVISED = 'supervised'  # Always ask for confirmation
-    BALANCED = 'balanced'  # Ask for high-risk actions only
-    FULL = 'full'  # Never ask for confirmation
+    All levels share identical execution, prompting, and retry behaviour.
+    The only difference is *when* the agent stops to ask the user before
+    running an action:
+
+    - ``CONSERVATIVE``: ask for every runnable action.
+    - ``BALANCED``: ask only for actions classified as high-risk.
+    - ``FULL``: never ask; the safety validator still blocks forbidden ops.
+
+    ``SUPERVISED`` is a deprecated alias for ``CONSERVATIVE`` kept for
+    backwards-compatible config files. New code should use ``CONSERVATIVE``.
+    """
+
+    CONSERVATIVE = 'conservative'
+    BALANCED = 'balanced'
+    FULL = 'full'
+    # Deprecated alias — accepted as input but normalised to 'conservative'.
+    SUPERVISED = 'conservative'
 
 
 class AutonomyController:
@@ -51,16 +65,47 @@ class AutonomyController:
         self.autonomy_level = getattr(
             config, 'autonomy_level', AutonomyLevel.BALANCED.value
         )
+        # Defensive: normalise legacy 'supervised' string from old configs that
+        # bypass the AgentConfig validator (e.g. plain dicts).
+        if self.autonomy_level == 'supervised':
+            self.autonomy_level = AutonomyLevel.CONSERVATIVE.value
         self.auto_retry = getattr(config, 'auto_retry_on_error', False)
         self.max_iterations = getattr(config, 'max_autonomous_iterations', 0)
         self.stuck_detection = getattr(config, 'stuck_detection_enabled', False)
         self.stuck_threshold = getattr(config, 'stuck_threshold_iterations', 0)
+        # Per-session "always allow" memory: signatures of actions the user
+        # has chosen to whitelist for the remainder of the session. Cleared
+        # on process exit; never persisted to disk.
+        self._always_allow: set[str] = set()
 
         logger.info(
             'AutonomyController initialized with level=%s, auto_retry=%s',
             self.autonomy_level,
             self.auto_retry,
         )
+
+    @staticmethod
+    def action_signature(action: Action) -> str:
+        """Stable per-session key used by the always-allow memory.
+
+        For commands we use the exact command string; for file actions we
+        use ``<type>:<path>``. Anything else falls back to the type name.
+        """
+        if isinstance(action, CmdRunAction):
+            return f'cmd:{action.command}'
+        if isinstance(action, FileWriteAction | FileEditAction):
+            path = getattr(action, 'path', '') or ''
+            return f'{type(action).__name__}:{path}'
+        return type(action).__name__
+
+    def remember_always_allow(self, action: Action) -> None:
+        """Whitelist this exact action signature for the rest of the session."""
+        sig = self.action_signature(action)
+        self._always_allow.add(sig)
+        logger.info('Always-allow registered for session: %s', sig)
+
+    def is_always_allowed(self, action: Action) -> bool:
+        return self.action_signature(action) in self._always_allow
 
     def should_request_confirmation(self, action: Action) -> bool:
         """Determine if an action requires user confirmation.
@@ -72,11 +117,15 @@ class AutonomyController:
             True if confirmation is needed, False otherwise
 
         """
+        # Per-session whitelist always wins (except for full mode which
+        # already bypasses confirmation entirely).
+        if self.is_always_allowed(action):
+            return False
         if self.autonomy_level == AutonomyLevel.FULL.value:
             # Full autonomy: never ask
             return False
-        if self.autonomy_level == AutonomyLevel.SUPERVISED.value:
-            # Supervised: always ask
+        if self.autonomy_level == AutonomyLevel.CONSERVATIVE.value:
+            # Conservative: always ask
             return True
         # Balanced: ask only for high-risk actions
         return self._is_high_risk_action(action)

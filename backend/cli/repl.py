@@ -94,10 +94,12 @@ class SlashCommandParseError(ValueError):
 
 
 _AUTONOMY_LEVEL_HINTS = {
-    'supervised': 'Always ask before actions',
+    'conservative': 'Always ask before actions',
     'balanced': 'Ask only for high-risk actions',
     'full': 'Run without confirmation prompts',
 }
+# Legacy values accepted by /autonomy. Each maps to its current canonical level.
+_AUTONOMY_LEVEL_ALIASES = {'supervised': 'conservative'}
 _SLASH_COMMANDS = (
     SlashCommandSpec(
         '/help',
@@ -891,7 +893,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         label = self._prompt_autonomy_label()
         if 'full' in label:
             return 'class:prompt.autonomy.full'
-        if 'supervised' in label:
+        if 'conservative' in label or 'supervised' in label:
             return 'class:prompt.autonomy.supervised'
         return 'class:prompt.autonomy.balanced'
 

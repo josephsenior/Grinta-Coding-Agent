@@ -218,6 +218,17 @@ class SlashCommandsMixin:
             return
 
         new_level = parsed.args[0].lower()
+        # Translate deprecated input (currently only 'supervised').
+        from backend.cli.repl import _AUTONOMY_LEVEL_ALIASES
+
+        if new_level in _AUTONOMY_LEVEL_ALIASES:
+            replacement = _AUTONOMY_LEVEL_ALIASES[new_level]
+            if self._renderer is not None:
+                self._renderer.add_system_message(
+                    f"'{new_level}' is deprecated; using '{replacement}' instead.",
+                    title='autonomy',
+                )
+            new_level = replacement
         if new_level not in valid_levels:
             if self._renderer is not None:
                 self._renderer.add_system_message(

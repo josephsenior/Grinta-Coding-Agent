@@ -221,22 +221,34 @@ class PermissionsConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     def get_preset(cls, autonomy_level: str) -> PermissionsConfig:
         """Get a preset permissions configuration for an autonomy level.
 
+        Permission *flags* (sudo, force-push, system ops, branch deletion)
+        are still tied to autonomy mode because they describe what the
+        agent is allowed to do at all. Resource limits — ``max_cost_per_task``,
+        ``warn_at_cost``, iteration caps — are intentionally **not** coupled
+        to the mode here: set them explicitly in your config if you want
+        them, regardless of autonomy level.
+
         Args:
-            autonomy_level: One of 'supervised', 'balanced', or 'full'
+            autonomy_level: One of 'conservative', 'balanced', or 'full'.
+                The legacy value 'supervised' is accepted as an alias for
+                'conservative'.
 
         Returns:
             PermissionsConfig configured for the specified autonomy level
 
         """
+        # Accept the deprecated alias silently here; the AgentConfig
+        # validator already emits the deprecation warning.
         if autonomy_level == 'supervised':
+            autonomy_level = 'conservative'
+
+        if autonomy_level == 'conservative':
             return cls(
-                autonomy_level='supervised',
+                autonomy_level='conservative',
                 git_allow_force_push=False,
                 git_allow_branch_delete=False,
                 shell_allow_sudo=False,
                 system_operations_enabled=False,
-                max_cost_per_task=5.0,
-                warn_at_cost=3.0,
             )
         if autonomy_level == 'balanced':
             return cls(
@@ -245,8 +257,6 @@ class PermissionsConfig(BaseModel, metaclass=CanonicalModelMetaclass):
                 git_allow_branch_delete=False,
                 shell_allow_sudo=False,
                 system_operations_enabled=False,
-                max_cost_per_task=10.0,
-                warn_at_cost=7.0,
             )
         # full
         return cls(
@@ -255,8 +265,6 @@ class PermissionsConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             git_allow_branch_delete=True,
             shell_allow_sudo=False,  # Still deny sudo for safety
             system_operations_enabled=False,  # Still deny system ops
-            max_cost_per_task=None,  # No limit
-            warn_at_cost=15.0,
         )
 
     def check_permission(

@@ -74,7 +74,12 @@ else:
     LLMConfig = Any  # For runtime when TYPE_CHECKING is False
 
 
-_VALID_AUTONOMY_LEVELS = {'supervised', 'balanced', 'full'}
+_VALID_AUTONOMY_LEVELS = {'conservative', 'balanced', 'full'}
+# Legacy values that are silently normalised to a current level. ``supervised``
+# was renamed to ``conservative`` in 1.0.0-rc1 because the new name better
+# describes the behaviour ("confirm every action") and avoids implying
+# extra oversight features that don't exist.
+_DEPRECATED_AUTONOMY_ALIASES = {'supervised': 'conservative'}
 
 
 class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
@@ -387,26 +392,26 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     @field_validator('autonomy_level')
     @classmethod
     def validate_autonomy_level_choice(cls, value: str) -> str:
-        """Normalize and validate autonomy levels against the supported set."""
+        """Normalize and validate autonomy levels against the supported set.
+
+        Deprecated values (currently only ``supervised``) are accepted and
+        silently rewritten to their replacement (``conservative``); a
+        warning is emitted so that operators notice the rename.
+        """
         normalized = value.strip().lower()
+        if normalized in _DEPRECATED_AUTONOMY_ALIASES:
+            replacement = _DEPRECATED_AUTONOMY_ALIASES[normalized]
+            logger.warning(
+                "autonomy_level=%r is deprecated; use %r instead. "
+                "Behaviour is unchanged. This alias will be removed in a future release.",
+                normalized,
+                replacement,
+            )
+            normalized = replacement
         if normalized not in _VALID_AUTONOMY_LEVELS:
             allowed = ', '.join(sorted(_VALID_AUTONOMY_LEVELS))
             raise ValueError(f'autonomy_level must be one of: {allowed}')
         return normalized
-
-    def _warn_for_non_full_autonomy_knobs(self) -> None:
-        if self.max_autonomous_iterations > 0:
-            logger.warning(
-                'Agent config sets max_autonomous_iterations=%s while autonomy_level=%s; this limit only applies in full autonomy.',
-                self.max_autonomous_iterations,
-                self.autonomy_level,
-            )
-        if self.stuck_threshold_iterations > 0:
-            logger.warning(
-                'Agent config sets stuck_threshold_iterations=%s while autonomy_level=%s; stuck-threshold tuning only applies in full autonomy.',
-                self.stuck_threshold_iterations,
-                self.autonomy_level,
-            )
 
     def _warn_for_disabled_dynamic_iterations(self) -> None:
         if self.max_iterations_override is not None:
@@ -446,8 +451,6 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
             logger.warning(
                 'Agent config sets streaming_checkpoint_discard_stale_on_recovery=False; stale streaming WAL recovery will block the next LLM call until the checkpoint is inspected or discarded.'
             )
-        if self.autonomy_level != 'full':
-            self._warn_for_non_full_autonomy_knobs()
         if not self.enable_dynamic_iterations:
             self._warn_for_disabled_dynamic_iterations()
         return self

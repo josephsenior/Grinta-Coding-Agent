@@ -484,9 +484,20 @@ class TestCmdAutonomy:
         mock_ctrl = MagicMock()
         mock_ctrl.autonomy_controller = mock_ac
         r._controller = mock_ctrl
+        result = r._cmd_autonomy(_parse('/autonomy conservative'))
+        assert result is True
+        assert mock_ac.autonomy_level == 'conservative'
+
+    def test_supervised_alias_maps_to_conservative(self) -> None:
+        r = _repl()
+        mock_ac = MagicMock()
+        mock_ac.autonomy_level = 'balanced'
+        mock_ctrl = MagicMock()
+        mock_ctrl.autonomy_controller = mock_ac
+        r._controller = mock_ctrl
         result = r._cmd_autonomy(_parse('/autonomy supervised'))
         assert result is True
-        assert mock_ac.autonomy_level == 'supervised'
+        assert mock_ac.autonomy_level == 'conservative'
 
     def test_invalid_level(self) -> None:
         r = _repl()
@@ -498,7 +509,7 @@ class TestCmdAutonomy:
 
     def test_too_many_args(self) -> None:
         r = _repl()
-        result = r._cmd_autonomy(_parse('/autonomy supervised full'))
+        result = r._cmd_autonomy(_parse('/autonomy conservative full'))
         assert result is True
 
 
