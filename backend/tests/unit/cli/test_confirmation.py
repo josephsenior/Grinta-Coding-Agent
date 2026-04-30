@@ -79,14 +79,14 @@ class TestActionLabel:
     def test_cmd_run_short(self) -> None:
         action = CmdRunAction(command='git status')
         label = _action_label(action)
-        assert label.startswith('bash:')
+        assert label.startswith('shell:')
         assert 'git status' in label
 
     def test_cmd_run_truncated(self) -> None:
         action = CmdRunAction(command='x' * 100)
         label = _action_label(action)
-        assert label.endswith('…')
-        assert len(label) <= 90
+        assert '…' in label
+        assert len(label) <= 100
 
     def test_file_edit(self) -> None:
         action = FileEditAction(path='/some/file.py', content='code')

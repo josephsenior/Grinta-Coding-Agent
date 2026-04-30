@@ -1,20 +1,10 @@
 # Workflow that validates the VSCode extension builds correctly
 name: VSCode Extension CI
 
-# * Always run on "main"
-# * Run on PRs that have changes in the VSCode extension folder or this workflow
-# * Run on tags that start with "ext-v"
+# Disabled by default: repository no longer contains VSCode extension assets.
+# Keep manual trigger for maintainers who may reintroduce those assets.
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - 'ext-v*'
-  pull_request:
-    paths:
-      - 'app/integrations/vscode/**'
-      - 'build_vscode.py'
-      - '.github/workflows/vscode-extension-build.yml'
+  workflow_dispatch:
 
 # If triggered by a PR, it will be in the same group. However, each commit on main will be in its own unique group
 concurrency:

@@ -47,6 +47,18 @@ jobs:
       - name: Run version consistency check
         run: .github/scripts/check_version_consistency.py
 
+  check-workflow-config-consistency:
+    name: Check workflow config consistency
+    runs-on: blacksmith-4vcpu-ubuntu-2204
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up python
+        uses: useblacksmith/setup-python@v6
+        with:
+          python-version: 3.12
+      - name: Run workflow config consistency check
+        run: python .github/scripts/check_workflow_config_consistency.py
+
   # Run mypy type checks on the backend
   type-check:
     name: Type check (mypy)

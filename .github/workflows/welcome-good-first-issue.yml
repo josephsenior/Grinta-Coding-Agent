@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   comment-on-good-first-issue:
-    if: github.event.label.name == 'good first issue'
+    if: github.event.label.name == 'good-first-issue'
     runs-on: ubuntu-latest
     steps:
       - name: Check if welcome comment already exists
@@ -42,7 +42,7 @@ jobs:
               ...context.repo,
               issue_number: context.issue.number,
               body: "🙌 **Hey there, future contributor!** 🙌\n\n" +
-                  "This issue has been labeled as **good first issue**, which means it's a great place to get started with the Grinta project.\n\n" +
+                  "This issue has been labeled as **good-first-issue**, which means it's a great place to get started with the Grinta project.\n\n" +
                     "If you're interested in working on it, feel free to! No need to ask for permission.\n\n" +
                   "Be sure to check out our [quick start guide](" + repoUrl + "/blob/main/docs/QUICK_START.md) to get your environment set up, and follow our [contribution guidelines](" + repoUrl + "/blob/main/CONTRIBUTING.md) when you're ready to submit a fix.\n\n" +
                   "Need help or want feedback? Leave a comment on this issue.\n\n" +

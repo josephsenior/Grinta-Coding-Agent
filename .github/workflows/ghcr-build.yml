@@ -1,17 +1,9 @@
 # Workflow that builds, tests and then pushes the App and runtime docker images to the ghcr.io repository
 name: Docker
 
-# Always run on "main"
-# Always run on tags
-# Always run on PRs
-# Can also be triggered manually
+# Disabled by default: repository no longer contains the required Docker assets.
+# Keep manual trigger for maintainers who may reintroduce those assets.
 on:
-  push:
-    branches:
-      - main
-    tags:
-      - '*'
-  pull_request:
   workflow_dispatch:
     inputs:
       reason:

@@ -495,6 +495,27 @@ def test_command_completer_suggests_matching_commands() -> None:
     assert {completion.text for completion in completions} >= {'/status', '/settings'}
 
 
+def test_command_completer_suggests_ci_and_release_playbook_commands() -> None:
+    from prompt_toolkit.document import Document
+
+    completer = _build_command_completer()
+    ci_completions = list(
+        completer.get_completions(
+            Document('/c', cursor_position=len('/c')),
+            None,
+        )
+    )
+    release_completions = list(
+        completer.get_completions(
+            Document('/rel', cursor_position=len('/rel')),
+            None,
+        )
+    )
+
+    assert '/ci' in {completion.text for completion in ci_completions}
+    assert '/release' in {completion.text for completion in release_completions}
+
+
 def test_command_completer_suggests_autonomy_levels() -> None:
     from prompt_toolkit.document import Document
 
@@ -962,6 +983,13 @@ def test_help_markdown_is_scannable_without_adding_commands() -> None:
     assert '| Command | Purpose |' in markdown
     assert '/settings' in markdown
     assert 'Input shortcuts' in markdown
+
+
+def test_help_markdown_lists_ci_and_release_playbook_commands() -> None:
+    markdown = _build_help_markdown()
+
+    assert '/ci' in markdown
+    assert '/release' in markdown
 
 
 def test_model_command_rejects_unqualified_model() -> None:
