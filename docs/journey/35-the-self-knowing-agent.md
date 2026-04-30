@@ -33,7 +33,7 @@ There is a small principle hiding here that I keep coming back to: **the prompt 
 
 Once the capability block was honest, the next problem was that one of the things it would honestly say was *“parallel scheduling is OFF in this run.”* Which the model would then dutifully obey — issuing reads sequentially even when the task obviously wanted them parallel.
 
-So the default flipped. `enable_parallel_tool_scheduling` is on by default, and the parallel set is intentionally narrow: `read_file`, `search_code`, `code_intelligence`, `symbol_editor` (read commands only), and `think`. Every one of these is read-only. None of them touches disk in a way that another concurrent call could race against.
+So the default flipped. `enable_parallel_tool_scheduling` is on by default, and the parallel set is intentionally narrow: `read_file`, `search_code`, `lsp`, `symbol_editor` (read commands only), and `think`. Every one of these is read-only. None of them touches disk in a way that another concurrent call could race against.
 
 What is *not* in the parallel set is just as deliberate: shell commands, file edits, file writes, `multi_edit`, terminal_manager I/O. Anything that mutates state runs sequentially, full stop. The chapter on parallelization went through *why* (chapter 25 — “The Parallelization Trap”). This chapter is about how the boundary survived being crossed under pressure, because the moment you turn parallel reads on by default, every PR that adds a new read-style tool comes with a thirty-second internal argument about whether to add it to the parallel allowlist. The answer has to be a structured one: only if the tool is genuinely read-only, only if its observation order does not matter, only if it cannot fail in a way that contaminates the others. That gate is small but real.
 
@@ -47,7 +47,7 @@ This was the unglamorous part. The capability block said *“provider-side paral
 
 The fix lives in `backend.inference.catalog_loader`. Each model entry in the catalog carries a `supports_parallel_tool_calls` flag. The sanitizer that builds final SDK call kwargs reads that flag and, when the model supports it and the caller has not explicitly disabled it, injects `parallel_tool_calls=True` into the kwargs before the SDK is invoked. The Gemini mapper has its own pass that strips the kwarg cleanly when routing to the native Google SDK (which does not accept it). One catalog flag, one sanitizer pass, one mapper-level strip — and the prompt’s claim is no longer aspirational.
 
-The pattern matters more than the kwarg. **Every line in the runtime-truth block must have a *receipt* somewhere in the runtime.** If the block says “parallel tool_calls are enabled,” the kwarg has to actually land in the SDK call. If the block says “LSP server `pylsp` is available,” the planner has to actually expose `code_intelligence` for that language. If the prompt and the runtime drift, the model trusts the prompt, the runtime trusts the code, and the user gets stuck in the gap.
+The pattern matters more than the kwarg. **Every line in the runtime-truth block must have a *receipt* somewhere in the runtime.** If the block says “parallel tool_calls are enabled,” the kwarg has to actually land in the SDK call. If the block says “LSP server `pylsp` is available,” the planner has to actually expose `lsp` for that language. If the prompt and the runtime drift, the model trusts the prompt, the runtime trusts the code, and the user gets stuck in the gap.
 
 ---
 

@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from backend.engine.prompts.section_renderers import (
-    _code_intelligence_available,
+    _lsp_available,
     _count_section_tokens,
     _render_permissions,
     _render_security,
@@ -191,7 +191,7 @@ def _render_examples(
     tracker_on: bool,
     enable_think: bool,
     meta_cognition_on: bool,
-    code_intelligence_available: bool,
+    lsp_available: bool,
     checkpoints_on: bool,
 ) -> str:
     return _render_examples_impl(
@@ -199,7 +199,7 @@ def _render_examples(
         tracker_on=tracker_on,
         enable_think=enable_think,
         meta_cognition_on=meta_cognition_on,
-        code_intelligence_available=code_intelligence_available,
+        lsp_available=lsp_available,
         checkpoints_on=checkpoints_on,
     )
 
@@ -340,7 +340,7 @@ def _collect_system_prompt_sections(
         terminal_tool_name=terminal_tool_name,
     )
     shell_is_powershell = resolved_terminal_tool == 'execute_powershell'
-    code_intelligence_available = _code_intelligence_available(config)
+    lsp_available = _lsp_available(config)
 
     identity_line = (
         agent_identity.strip()
@@ -419,7 +419,7 @@ def _collect_system_prompt_sections(
                     meta_cognition_on=bool(
                         getattr(config, 'enable_meta_cognition', False)
                     ),
-                    code_intelligence_available=code_intelligence_available,
+                    lsp_available=lsp_available,
                     checkpoints_on=bool(getattr(config, 'enable_checkpoints', False)),
                 ),
             )

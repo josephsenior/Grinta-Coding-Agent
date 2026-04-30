@@ -24,7 +24,7 @@ _TOOL_HEADLINE: dict[str, tuple[str, str]] = {
     'memory_manager': ('', 'Memory'),
     'task_tracker': ('', 'Tasks'),
     'search_code': ('', 'Search code'),
-    'code_intelligence': ('', 'Code intelligence'),
+    'lsp': ('', 'Code intelligence'),
     'analyze_project_structure': ('', 'Analyze project'),
     'read_symbol_definition': ('', 'Read symbol'),
     'apply_patch': ('', 'Apply patch'),

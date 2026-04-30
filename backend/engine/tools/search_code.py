@@ -38,7 +38,7 @@ Modes:
 1. Text/regex search — set `pattern` to a regex pattern to find matching lines inside files.
 2. File discovery — omit `pattern` entirely, and set `file_pattern` to a glob pattern to list matching files.
 
-Use this when target location is unknown. For symbol-aware navigation (definitions, references) use `code_intelligence`.
+Use this when target location is unknown. For symbol-aware navigation (definitions, references) use `lsp`.
 """
 
 SEARCH_CODE_TOOL_NAME = 'search_code'

@@ -132,7 +132,7 @@ before the final `1.0.0` cut.
 ### Changed
 
 - `enable_lsp_query` now defaults to **`True`** — the planner enables the
-  `code_intelligence` tool whenever any supported LSP server is on `PATH`.
+  `lsp` tool whenever any supported LSP server is on `PATH`.
 - DAP `start` no longer requires the model to supply `adapter_command` for
   languages whose adapter is auto-discoverable.
 - **Massive install slim-down**: base wheel dropped from ~1.6GB to ~1.4MB.
@@ -152,7 +152,7 @@ before the final `1.0.0` cut.
   `graph_store.py`) and its dependent tools (`explore_tree_structure`,
   `read_symbol_definition`). The four remaining retrieval primitives
   (`search_code` via ripgrep, `symbol_editor` via tree-sitter,
-  `code_intelligence` via LSP, `read_file`) cover the same surface
+  `lsp` via LSP, `read_file`) cover the same surface
   without the index-maintenance cost.
 - **`ReRanker`** class and the cross-encoder rerank step from
   `EnhancedVectorStore` — over-engineered for a CLI agent's recall

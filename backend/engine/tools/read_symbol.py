@@ -33,7 +33,7 @@ Python, JS/TS, Go, Rust, Java, C/C++, Ruby, PHP, and more.
 
 Prefer this over `read_file` when you know the symbol name and want its definition without
 loading the entire file. For text/regex search use `search_code`. For LSP-grade go-to-def,
-hover, or references, use `code_intelligence`.
+hover, or references, use `lsp`.
 """.strip()
 
 

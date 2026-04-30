@@ -205,7 +205,7 @@ class TestFeatureFlagToolPresence:
             'backend.utils.runtime_detect.has_any_lsp_server', return_value=True
         ):
             names = _build_toolset(enable_lsp_query=True)
-        assert 'code_intelligence' in names
+        assert 'lsp' in names
         self._assert_dispatch_covered(names)
 
     def test_lsp_query_absent_without_pylsp(self):
@@ -215,7 +215,7 @@ class TestFeatureFlagToolPresence:
             'backend.utils.runtime_detect.has_any_lsp_server', return_value=False
         ):
             names = _build_toolset(enable_lsp_query=True)
-        assert 'code_intelligence' not in names
+        assert 'lsp' not in names
 
     def test_all_flags_off_still_has_dispatch_coverage(self):
         """Minimal toolset (most features disabled) must still be dispatch-covered."""

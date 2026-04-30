@@ -311,7 +311,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
                 available=bool(result.available),
             )
             obs.tool_result = {
-                'tool': 'code_intelligence',
+                'tool': 'lsp',
                 'command': action.command,
                 'file': action.file,
                 'latency_ms': latency_ms,
@@ -332,7 +332,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
                 f'LSP query failed: {e}. Check if python-lsp-server is installed.'
             )
             err.tool_result = {
-                'tool': 'code_intelligence',
+                'tool': 'lsp',
                 'command': action.command,
                 'file': action.file,
                 'latency_ms': latency_ms,

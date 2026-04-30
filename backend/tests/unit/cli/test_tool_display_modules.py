@@ -169,7 +169,7 @@ class TestToolActivityStatsHint(unittest.TestCase):
         self.assertIsNone(hint)
 
     def test_lsp_with_command(self) -> None:
-        hint = tool_activity_stats_hint('code_intelligence', {'command': 'goto_def'})
+        hint = tool_activity_stats_hint('lsp', {'command': 'goto_def'})
         self.assertEqual(hint, 'goto_def')
 
     def test_unknown_tool_returns_none(self) -> None:
@@ -315,9 +315,9 @@ class TestSummarizeToolArguments(unittest.TestCase):
         )
         self.assertIn('parse_args', s)
 
-    def test_code_intelligence(self) -> None:
+    def test_lsp(self) -> None:
         s = summarize_tool_arguments(
-            'code_intelligence', {'command': 'hover', 'symbol': 'Foo'}
+            'lsp', {'command': 'hover', 'symbol': 'Foo'}
         )
         self.assertIn('Foo', s)
 
