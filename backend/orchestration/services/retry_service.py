@@ -104,11 +104,19 @@ class RetryService:
         )
 
     def _compute_initial_delay(self, exc: Exception, queue: RetryQueue) -> float:
-        """Compute initial retry delay, accounting for RateLimitError and circuit breaker."""
+        """Compute initial retry delay, accounting for RateLimitError and circuit breaker.
+
+        When the provider supplied a ``Retry-After`` (or equivalent reset
+        header) we honor that hint verbatim — clipped by the queue's
+        ``max_delay`` so a single bad header cannot stall the worker.
+        """
         from backend.inference.exceptions import RateLimitError
 
         delay = queue.base_delay
         if isinstance(exc, RateLimitError):
+            retry_after = getattr(exc, 'retry_after', None)
+            if retry_after and retry_after > 0:
+                return min(float(retry_after), queue.max_delay)
             delay = max(delay, queue.base_delay * 2)
         circuit_breaker = getattr(
             self.controller.circuit_breaker_service, 'circuit_breaker', None
@@ -198,6 +206,11 @@ class RetryService:
                 'max_attempts': task.max_attempts,
                 'delay_seconds': initial_delay,
                 'reason': type(exc).__name__,
+                'rate_limit_kind': getattr(
+                    getattr(exc, 'kind', None), 'value', None
+                ),
+                'retry_after': getattr(exc, 'retry_after', None),
+                'provider': getattr(exc, 'llm_provider', None),
             },
         )
         logger.warning(

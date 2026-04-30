@@ -59,6 +59,7 @@ def _rate_limit_error_details(exc: Exception) -> tuple[str, Any, Any, int]:
 
 def _map_rate_limit_error(client: Any, exc: Exception) -> Exception:
     from backend.inference.exceptions import AuthenticationError, RateLimitError
+    from backend.inference.rate_limit_parser import enrich_rate_limit_exception
 
     message, code, body, status_code = _rate_limit_error_details(exc)
     lowered = message.lower()
@@ -71,7 +72,7 @@ def _map_rate_limit_error(client: Any, exc: Exception) -> Exception:
             code=code,
             body=body,
         )
-    return RateLimitError(
+    mapped = RateLimitError(
         message,
         llm_provider='openai',
         model=client.model_name,
@@ -79,6 +80,7 @@ def _map_rate_limit_error(client: Any, exc: Exception) -> Exception:
         code=code,
         body=body,
     )
+    return enrich_rate_limit_exception(exc, mapped)
 
 
 def _map_bad_request_error(client: Any, exc: Exception) -> Exception:

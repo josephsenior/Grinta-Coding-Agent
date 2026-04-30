@@ -94,6 +94,31 @@ class TestRecoveryService:
         mock_context.set_agent_state.assert_awaited_once_with(AgentState.RATE_LIMITED)
 
     @pytest.mark.asyncio
+    async def test_rate_limit_does_not_pollute_agent_context(
+        self, mock_context, ctrl
+    ):
+        """Silent-rate-limit policy: transient 429s must NOT add an
+        ``AgentThinkObservation`` to the event stream. The agent has no
+        rate-limit mitigation tools; the inner Tenacity loop + outer retry
+        queue handle recovery autonomously. Only terminal failures (after
+        all retries are exhausted) should reach the agent.
+        """
+        ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
+        ctrl.event_stream = MagicMock()
+        ctrl.event_stream.add_event = MagicMock()
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(RateLimitError('rate limited'))
+
+        # No AgentThinkObservation may have been pushed by the recovery service.
+        for call in ctrl.event_stream.add_event.call_args_list:
+            event = call.args[0] if call.args else call.kwargs.get('event')
+            assert type(event).__name__ != 'AgentThinkObservation', (
+                'Rate-limit handling must be silent in the agent context; '
+                f'got AgentThinkObservation: {event!r}'
+            )
+
+    @pytest.mark.asyncio
     async def test_rate_limit_after_user_stop_skips_state_transition(
         self, mock_context, ctrl
     ):

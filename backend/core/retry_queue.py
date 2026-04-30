@@ -242,7 +242,13 @@ def get_retry_queue() -> RetryQueue | None:
     backend_name = os.getenv('RETRY_QUEUE_BACKEND', 'memory').lower()
     base_delay = float(os.getenv('RETRY_QUEUE_RETRY_DELAY_SECONDS', '5.0'))
     max_delay = float(os.getenv('RETRY_QUEUE_MAX_DELAY_SECONDS', '30.0'))
-    max_retries = int(os.getenv('RETRY_QUEUE_MAX_RETRIES', '2'))
+    # Generous default: the system is autonomous, so prefer many quiet retries
+    # over surfacing transient infrastructure errors to the agent. Combined
+    # with the inner Tenacity loop (DEFAULT_LLM_NUM_RETRIES = 5, plus the
+    # provider-hint bonus), this yields ~25 underlying attempts before the
+    # agent ever sees a rate-limit failure. See ``recovery_service`` for the
+    # context-suppression policy.
+    max_retries = int(os.getenv('RETRY_QUEUE_MAX_RETRIES', '5'))
     poll_interval = float(os.getenv('RETRY_QUEUE_POLL_INTERVAL', '5.0'))
 
     if backend_name not in ('', 'memory'):

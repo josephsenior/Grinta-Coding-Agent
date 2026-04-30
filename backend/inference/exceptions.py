@@ -4,6 +4,25 @@ These are used to provide a consistent error interface regardless of the
 underlying provider SDK.
 """
 
+from enum import Enum
+
+
+class RateLimitKind(str, Enum):
+    """Classification of rate-limit error subtypes.
+
+    Provider 429s are not all alike: some are per-minute request budgets,
+    some are per-minute token budgets, some are per-day quotas, some are
+    concurrency caps. Different kinds want different backoff shapes.
+    ``UNKNOWN`` is the safe default when the provider payload does not let
+    us classify confidently.
+    """
+
+    RPM = 'rpm'
+    TPM = 'tpm'
+    RPD = 'rpd'
+    CONCURRENCY = 'concurrency'
+    UNKNOWN = 'unknown'
+
 
 class LLMError(Exception):
     """Base exception for all LLM-related errors."""
@@ -118,7 +137,35 @@ class NotFoundError(LLMError):
 
 
 class RateLimitError(LLMError):
-    """API rate limit exceeded."""
+    """API rate limit exceeded.
+
+    Optional ``kind`` and ``retry_after`` attributes describe the subtype
+    of limit and the server-supplied wait hint (in seconds) when present.
+    Both default to ``None`` / :attr:`RateLimitKind.UNKNOWN` so older
+    call-sites that do not populate them keep working unchanged.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        llm_provider: str | None = None,
+        model: str | None = None,
+        status_code: int | None = None,
+        *args: object,
+        kind: 'RateLimitKind | None' = None,
+        retry_after: float | None = None,
+        **kwargs: object,
+    ) -> None:
+        super().__init__(
+            message,
+            llm_provider=llm_provider,
+            model=model,
+            status_code=status_code,
+            *args,
+            **kwargs,
+        )
+        self.kind: RateLimitKind = kind or RateLimitKind.UNKNOWN
+        self.retry_after: float | None = retry_after
 
 
 class ServiceUnavailableError(LLMError):
@@ -145,6 +192,7 @@ __all__ = [
     'NotFoundError',
     'OpenAIError',
     'RateLimitError',
+    'RateLimitKind',
     'ServiceUnavailableError',
     'Timeout',
     'format_html_api_error_response',

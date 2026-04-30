@@ -153,20 +153,57 @@ class RecoveryService:
         await self._set_awaiting_user_input_if_allowed(controller)
         return True
 
-    def _emit_rate_limit_think_observation(self, controller) -> None:
-        from backend.ledger.observation import AgentThinkObservation
+    def _emit_rate_limit_think_observation(self, controller, exc: Exception) -> None:
+        """Record a rate-limit event WITHOUT polluting the agent's context.
 
-        controller.event_stream.add_event(
-            AgentThinkObservation(
-                content='⚠️ API Rate Limit hit. Pausing execution for exponential backoff...'
-            ),
-            EventSource.ENVIRONMENT,
+        The agent has no rate-limit mitigation tools — the system handles
+        recovery automatically via the inner Tenacity loop and the outer
+        retry queue (see ``backend/core/retry_queue.py``). Emitting an
+        ``AgentThinkObservation`` here costs ~50–100 tokens per event for
+        information the agent cannot act on, and risks making the agent
+        believe a hard failure has already occurred.
+
+        Policy (per design discussion 2026-05):
+          * Silent on transient rate-limits (this method is now a no-op for
+            the LLM context).
+          * The CLI HUD still shows ``[TPM · ETA Xs]`` because the retry
+            service emits a separate ``StatusObservation`` that is UI-only.
+          * Final, unrecoverable failures bubble up through the normal
+            exception path and reach the agent as an error observation.
+
+        We keep a structured DEBUG log so operators can still trace events.
+        """
+        kind = getattr(exc, 'kind', None)
+        retry_after = getattr(exc, 'retry_after', None)
+        logger.debug(
+            'rate_limit_event suppressed_from_agent_context kind=%s retry_after=%s exc=%s',
+            getattr(kind, 'value', kind),
+            retry_after,
+            type(exc).__name__,
         )
+        # Reference ``controller`` to keep the signature stable for callers
+        # that pass it positionally.
+        _ = controller
+
+    def _record_rate_limit_to_governor(self, controller, exc: Exception) -> None:
+        """Teach the rate governor about an observed 429 (TPM only, best-effort)."""
+        governor = getattr(controller, 'rate_governor', None)
+        if governor is None or not hasattr(governor, 'record_rate_limit_event'):
+            return
+        try:
+            governor.record_rate_limit_event(
+                provider=getattr(exc, 'llm_provider', None),
+                model=getattr(exc, 'model', None),
+                kind=getattr(exc, 'kind', None),
+            )
+        except Exception:
+            logger.debug('record_rate_limit_event failed', exc_info=True)
 
     async def _schedule_queued_retry(self, controller, exc: Exception) -> bool:
         try:
             if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
-                self._emit_rate_limit_think_observation(controller)
+                self._emit_rate_limit_think_observation(controller, exc)
+                self._record_rate_limit_to_governor(controller, exc)
             return await controller.retry_service.schedule_retry_after_failure(exc)
         except Exception:
             logger.debug('schedule_retry_after_failure failed', exc_info=True)
