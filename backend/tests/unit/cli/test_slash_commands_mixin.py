@@ -341,6 +341,18 @@ class TestCmdRetry:
         assert result is True
 
 
+class TestCmdPlaybookPassthrough:
+    def test_playbook_slash_queues_message_action(self) -> None:
+        r = _repl()
+        result = r._handle_command('/debug')
+        assert result is True
+        assert r._next_action is not None
+        from backend.ledger.action import MessageAction
+
+        assert isinstance(r._next_action, MessageAction)
+        assert r._next_action.content == '/debug'
+
+
 # ---------------------------------------------------------------------------
 # _cmd_compact
 # ---------------------------------------------------------------------------

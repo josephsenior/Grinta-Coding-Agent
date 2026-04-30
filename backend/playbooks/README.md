@@ -28,6 +28,7 @@
 | `agent_memory.md` | `/remember` — lessons.md vs vector recall |
 | `api.md` | `/api` — REST/FastAPI patterns |
 | `audit.md` | `/audit` — inspect event streams and session traces |
+| `ci.md` | `/ci` — CI triage and stabilization workflow |
 | `code-review.md` | `/codereview` and `/codereview-roasted` |
 | `compress.md` | `/compress` — context window and compaction decisions |
 | `database.md` | `/database` |
@@ -39,6 +40,7 @@
 | `perf.md` | `/perf` — token, cost, and performance workflow |
 | `react.md` | `/react` |
 | `recover.md` | `/recover` — recover after stuck/circuit-breaker events |
+| `release.md` | `/release` — release readiness and rollout workflow |
 | `refactoring.md` | `/refactor` |
 | `testing.md` | `/testing` |
 | `tool.md` | `/tool` — tool authoring and MCP integration |

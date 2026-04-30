@@ -305,6 +305,32 @@ class SlashCommandsMixin:
         '/compact': '_cmd_compact',
         '/retry': '_cmd_retry',
         '/health': '_cmd_health',
+        '/add_repo_inst': '_cmd_playbook_passthrough',
+        '/address_pr_comments': '_cmd_playbook_passthrough',
+        '/api': '_cmd_playbook_passthrough',
+        '/audit': '_cmd_playbook_passthrough',
+        '/ci': '_cmd_playbook_passthrough',
+        '/codereview': '_cmd_playbook_passthrough',
+        '/codereview-roasted': '_cmd_playbook_passthrough',
+        '/compress': '_cmd_playbook_passthrough',
+        '/database': '_cmd_playbook_passthrough',
+        '/debug': '_cmd_playbook_passthrough',
+        '/docs': '_cmd_playbook_passthrough',
+        '/feature': '_cmd_playbook_passthrough',
+        '/hardened': '_cmd_playbook_passthrough',
+        '/orch-debug': '_cmd_playbook_passthrough',
+        '/owasp': '_cmd_playbook_passthrough',
+        '/perf': '_cmd_playbook_passthrough',
+        '/react': '_cmd_playbook_passthrough',
+        '/recover': '_cmd_playbook_passthrough',
+        '/refactor': '_cmd_playbook_passthrough',
+        '/release': '_cmd_playbook_passthrough',
+        '/remember': '_cmd_playbook_passthrough',
+        '/security': '_cmd_playbook_passthrough',
+        '/testing': '_cmd_playbook_passthrough',
+        '/tool': '_cmd_playbook_passthrough',
+        '/update_pr_description': '_cmd_playbook_passthrough',
+        '/update_test': '_cmd_playbook_passthrough',
     }
 
     def _handle_parsed_command(self, parsed) -> bool:
@@ -770,4 +796,14 @@ class SlashCommandsMixin:
                     'No previous message to retry.',
                     title='warning',
                 )
+        return True
+
+    def _cmd_playbook_passthrough(self, parsed) -> bool:
+        """Queue a playbook slash command as a normal user turn.
+
+        Playbook slash triggers are matched by memory-level trigger logic, not
+        by the REPL command handler itself.
+        """
+        suffix = f" {' '.join(parsed.args)}" if parsed.args else ''
+        self._next_action = MessageAction(content=f'{parsed.name}{suffix}')
         return True

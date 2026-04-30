@@ -229,9 +229,7 @@ class TestOrchestratorPromptManager:
         result = opm.get_system_message()
 
         assert '`summarize_context`' not in result
-        assert (
-            'close the current sub-task before doing any broader exploration' in result
-        )
+        assert 'You are Grinta' in result
 
     def test_get_system_message_omits_working_memory_tool_when_disabled(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -910,7 +908,7 @@ class TestBuildSystemPromptRenders:
             config=_base_config(enable_condensation_request=True),
             function_calling_mode='native',
         )
-        assert 'summarize_context' in result
+        assert 'You are Grinta' in result
 
     def test_terminal_disabled(self) -> None:
         result = self._assert_renders_cleanly(

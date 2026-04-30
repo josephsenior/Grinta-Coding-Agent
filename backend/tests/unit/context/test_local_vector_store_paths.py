@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import types
+import sys
 from unittest.mock import MagicMock, patch
 
 from backend.context.local_vector_store import ChromaDBBackend, SQLiteBM25Backend
@@ -18,22 +19,25 @@ def test_chromadb_backend_defaults_to_project_storage_memory_chroma(tmp_path) ->
         DefaultEmbeddingFunction=MagicMock(return_value=MagicMock())
     )
 
+    fake_chromadb = types.ModuleType('chromadb')
+    fake_chromadb.PersistentClient = MagicMock(return_value=fake_client)
+    fake_chromadb_config = types.ModuleType('chromadb.config')
+    fake_chromadb_config.Settings = lambda **kwargs: kwargs
+    fake_chromadb_utils = types.ModuleType('chromadb.utils')
+    fake_chromadb_utils.embedding_functions = fake_ef_module
+
     with (
+        patch.dict(
+            sys.modules,
+            {
+                'chromadb': fake_chromadb,
+                'chromadb.config': fake_chromadb_config,
+                'chromadb.utils': fake_chromadb_utils,
+            },
+        ),
         patch(
             'backend.context.local_vector_store.get_active_local_data_root',
             return_value=str(tmp_path / '.grinta' / 'storage'),
-        ),
-        patch(
-            'chromadb.PersistentClient',
-            return_value=fake_client,
-        ),
-        patch(
-            'chromadb.config.Settings',
-            side_effect=lambda **kwargs: kwargs,
-        ),
-        patch(
-            'chromadb.utils.embedding_functions',
-            fake_ef_module,
         ),
     ):
         backend = ChromaDBBackend(warm_model_in_background=False)

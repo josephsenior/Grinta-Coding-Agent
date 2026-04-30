@@ -199,3 +199,78 @@
 - name: dependencies
   color: "0366d6"
   description: "Pull request that updates a dependency."
+
+- name: ci
+  color: "5319e7"
+  description: "Changes to CI workflows, checks, or automation."
+
+- name: refactor
+  color: "c2e0c6"
+  description: "Internal code restructuring without behavior change."
+
+- name: chore
+  color: "fef2c0"
+  description: "Maintenance work that is not a feature or fix."
+
+- name: performance
+  color: "fbca04"
+  description: "Performance improvements."
+
+- name: feature
+  color: "a2eeef"
+  description: "Net-new user-facing capability."
+
+- name: fix
+  color: "d73a4a"
+  description: "Bug fix."
+
+- name: docs
+  color: "0075ca"
+  description: "Documentation changes."
+
+- name: major
+  color: "b60205"
+  description: "Release bump: major version."
+
+- name: minor
+  color: "fbca04"
+  description: "Release bump: minor version."
+
+- name: patch
+  color: "0e8a16"
+  description: "Release bump: patch version."
+
+# ---------------------------------------------------------------------------
+# Workflow trigger labels
+# ---------------------------------------------------------------------------
+- name: lint-fix
+  color: "1d76db"
+  description: "Trigger automatic lint-fix workflow."
+
+- name: integration-test
+  color: "1d76db"
+  description: "Trigger integration test workflow."
+
+- name: run-eval-1
+  color: "5319e7"
+  description: "Run evaluation suite with 1 sample."
+
+- name: run-eval-2
+  color: "5319e7"
+  description: "Run evaluation suite with 2 samples."
+
+- name: run-eval-50
+  color: "5319e7"
+  description: "Run evaluation suite with 50 samples."
+
+- name: run-eval-100
+  color: "5319e7"
+  description: "Run evaluation suite with 100 samples."
+
+- name: fix-me
+  color: "b60205"
+  description: "Trigger autonomous issue-fix workflow."
+
+- name: fix-me-experimental
+  color: "d93f0b"
+  description: "Trigger experimental autonomous issue-fix workflow."

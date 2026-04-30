@@ -98,6 +98,164 @@ _AUTONOMY_LEVEL_HINTS = {
     'balanced': 'Ask only for high-risk actions',
     'full': 'Run without confirmation prompts',
 }
+_PLAYBOOK_SLASH_COMMANDS: tuple[SlashCommandSpec, ...] = (
+    SlashCommandSpec(
+        '/add_repo_inst',
+        'Scaffold repository playbook instructions',
+        '/add_repo_inst',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/address_pr_comments',
+        'Apply a PR-comment resolution workflow',
+        '/address_pr_comments',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/api',
+        'Use API implementation guidance',
+        '/api',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/audit',
+        'Run an audit-oriented review workflow',
+        '/audit',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/ci',
+        'Use CI triage and stabilization workflow',
+        '/ci',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/codereview',
+        'Apply pragmatic code-review checklist',
+        '/codereview',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/codereview-roasted',
+        'Apply strict code-review checklist',
+        '/codereview-roasted',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/compress',
+        'Use context compression workflow',
+        '/compress',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/database',
+        'Use database and schema guidance',
+        '/database',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/debug',
+        'Use systematic debugging workflow',
+        '/debug',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/docs',
+        'Use documentation authoring guidance',
+        '/docs',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/feature',
+        'Use structured feature delivery workflow',
+        '/feature',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/hardened',
+        'Use hardened execution workflow',
+        '/hardened',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/orch-debug',
+        'Debug orchestration-level issues',
+        '/orch-debug',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/owasp',
+        'Use OWASP-oriented security review guidance',
+        '/owasp',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/perf',
+        'Use performance and cost optimization workflow',
+        '/perf',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/react',
+        'Use React implementation guidance',
+        '/react',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/recover',
+        'Recover from failed or stuck runs',
+        '/recover',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/refactor',
+        'Use refactoring workflow guidance',
+        '/refactor',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/release',
+        'Use release readiness and rollout workflow',
+        '/release',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/remember',
+        'Capture durable lessons and memory signals',
+        '/remember',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/security',
+        'Use security hardening guidance',
+        '/security',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/testing',
+        'Use test planning and authoring workflow',
+        '/testing',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/tool',
+        'Use tool and MCP authoring workflow',
+        '/tool',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/update_pr_description',
+        'Refresh PR summary and test plan',
+        '/update_pr_description',
+        help_section='control',
+    ),
+    SlashCommandSpec(
+        '/update_test',
+        'Regenerate tests after implementation changes',
+        '/update_test',
+        help_section='control',
+    ),
+)
 _SLASH_COMMANDS = (
     SlashCommandSpec(
         '/help',
@@ -190,6 +348,7 @@ _SLASH_COMMANDS = (
     SlashCommandSpec(
         '/exit', 'Quit grinta', '/exit', aliases=('/quit',), help_section='system'
     ),
+    *_PLAYBOOK_SLASH_COMMANDS,
 )
 
 # Known models surfaced in `/model` tab-completion.
