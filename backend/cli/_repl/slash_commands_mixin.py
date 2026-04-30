@@ -11,14 +11,13 @@ The mixin assumes the host class provides:
 * helper methods: ``_warn``, ``_usage``, ``_reject_extra_args``,
   ``_command_project_root``.
 """
-# pylint: disable=assignment-from-no-return
-
 from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+from backend.cli._typing import SlashCommandsHost
 from backend.cli.config_manager import get_current_model
 from backend.cli.hud import HUDBar
 from backend.cli.settings_tui import open_settings
@@ -29,6 +28,25 @@ if TYPE_CHECKING:
     from rich.console import Console
 
     from backend.core.config import AppConfig
+
+
+def _command_project_root_from_host(host: SlashCommandsHost) -> Path:
+    return host._command_project_root()
+
+
+def _parse_diff_args_from_host(
+    host: SlashCommandsHost,
+    parsed: Any,
+) -> tuple[str, list[str]] | None:
+    return host._parse_diff_args(parsed)
+
+
+def _run_git_diff_from_host(
+    host: SlashCommandsHost,
+    git_args: list[str],
+    cwd: Path,
+) -> str | None:
+    return host._run_git_diff(git_args, cwd)
 
 
 class SlashCommandsMixin:
@@ -555,13 +573,14 @@ class SlashCommandsMixin:
         return True
 
     def _cmd_diff(self, parsed) -> bool:
-        parsed_diff = self._parse_diff_args(parsed)
-        if parsed_diff is None:
+        host = cast(SlashCommandsHost, self)
+        parsed_diff = _parse_diff_args_from_host(host, parsed)
+        if not isinstance(parsed_diff, tuple) or len(parsed_diff) != 2:
             return True
         mode, paths = parsed_diff
-        cwd = self._command_project_root()
+        cwd = _command_project_root_from_host(host)
         git_args = self._build_diff_git_args(mode, paths)
-        body = self._run_git_diff(git_args, cwd)
+        body = _run_git_diff_from_host(host, git_args, cwd)
         if body is None:
             return True
         if self._renderer is not None:

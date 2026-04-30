@@ -70,7 +70,8 @@ class EventStreamConfig(BaseModel):
     hwm_ratio: float = Field(default=0.8)
     block_timeout: float = Field(default=0.1)
     rate_window_seconds: int = Field(default=60)
-    workers: int = Field(default=8)
+    # Single worker preserves FIFO delivery to subscribers and avoids stale UI frames.
+    workers: int = Field(default=1)
     async_write: bool = Field(default=False)
     coalesce: bool = Field(default=False)
     coalesce_window_ms: float = Field(default=100.0)

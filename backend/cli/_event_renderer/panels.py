@@ -22,6 +22,8 @@ from backend.cli.theme import (
     CLR_OK_ICON,
     CLR_WARN_BODY,
     CLR_WARN_ICON,
+    STYLE_DEFAULT,
+    STYLE_DIM,
 )
 from backend.cli.transcript import format_callout_panel
 from backend.core.task_status import (
@@ -106,17 +108,17 @@ def build_task_panel(task_list: list[dict[str, Any]]) -> Any:
 
     for task_id, status, desc in task_panel_signature(task_list):
         badge = Text()
-        badge.append('[', style='dim')
+        badge.append('[', style=STYLE_DIM)
         badge.append(
             status.upper(),
             style=f'bold {TASK_STATUS_PANEL_STYLES.get(status, "dim")}',
         )
-        badge.append(']', style='dim')
+        badge.append(']', style=STYLE_DIM)
 
         body = Text()
         if task_id and task_id != '?':
-            body.append(f'{task_id}  ', style='dim')
-        body.append(desc, style='default')
+            body.append(f'{task_id}  ', style=STYLE_DIM)
+        body.append(desc, style=STYLE_DEFAULT)
         table.add_row(badge, body)
 
     empty_state: Any = (
@@ -124,7 +126,7 @@ def build_task_panel(task_list: list[dict[str, Any]]) -> Any:
         if task_list
         else Text(
             'No tasks in the tracker yet — the agent may add some as it works.',
-            style='dim',
+            style=STYLE_DIM,
         )
     )
     return format_callout_panel(
@@ -143,19 +145,19 @@ def build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
 
     for _order, label, status, task, detail in delegate_worker_panel_signature(workers):
         badge = Text()
-        badge.append('[', style='dim')
+        badge.append('[', style=STYLE_DIM)
         badge.append(
             status.upper(),
             style=f'bold {DELEGATE_WORKER_STATUS_STYLES.get(status, "dim")}',
         )
-        badge.append(']', style='dim')
+        badge.append(']', style=STYLE_DIM)
 
         body = Text()
         if label:
-            body.append(f'{label}  ', style='dim')
-        body.append(task or 'subtask', style='default')
+            body.append(f'{label}  ', style=STYLE_DIM)
+        body.append(task or 'subtask', style=STYLE_DEFAULT)
         if detail and detail != task:
-            body.append(f'\n{detail}', style='dim')
+            body.append(f'\n{detail}', style=STYLE_DIM)
         table.add_row(badge, body)
 
     empty_state: Any = (
@@ -163,7 +165,7 @@ def build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
         if workers
         else Text(
             'No parallel workers — subtasks appear here when the agent delegates.',
-            style='dim',
+            style=STYLE_DIM,
         )
     )
     return format_callout_panel(

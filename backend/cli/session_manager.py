@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console
 from rich.table import Table
 
-from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE
+from backend.cli.theme import CLR_CARD_BORDER, CLR_CARD_TITLE, STYLE_DIM
 
 logger = logging.getLogger(__name__)
 
@@ -88,12 +88,12 @@ def list_sessions(
     """Display a table of past sessions."""
     root = _find_sessions_root(config)
     if root is None:
-        console.print('[dim]No session storage found.[/dim]')
+        console.print(f'[{STYLE_DIM}]No session storage found.[/{STYLE_DIM}]')
         return
 
     sessions = _list_session_entries(root)
     if not sessions:
-        console.print('[dim]No past sessions found.[/dim]')
+        console.print(f'[{STYLE_DIM}]No past sessions found.[/{STYLE_DIM}]')
         return
 
     sessions = sessions[:limit]
@@ -104,13 +104,13 @@ def list_sessions(
         border_style=CLR_CARD_BORDER,
         show_lines=False,
     )
-    table.add_column('#', style='dim')
-    table.add_column('Session ID', style='dim')
+    table.add_column('#', style=STYLE_DIM)
+    table.add_column('Session ID', style=STYLE_DIM)
     table.add_column('Title')
-    table.add_column('Model', style='dim')
-    table.add_column('Events', justify='right', style='dim')
-    table.add_column('Cost', justify='right', style='dim')
-    table.add_column('Updated', style='dim')
+    table.add_column('Model', style=STYLE_DIM)
+    table.add_column('Events', justify='right', style=STYLE_DIM)
+    table.add_column('Cost', justify='right', style=STYLE_DIM)
+    table.add_column('Updated', style=STYLE_DIM)
 
     for i, (sid, meta, event_count) in enumerate(sessions, 1):
         title = meta.get('title', meta.get('name', '—'))
@@ -133,7 +133,7 @@ def list_sessions(
 
     console.print(table)
     console.print(
-        '[dim]Use /resume <N> or /resume <session_id> to resume a session.[/dim]'
+        f'[{STYLE_DIM}]Use /resume <N> or /resume <session_id> to resume a session.[/{STYLE_DIM}]'
     )
 
 

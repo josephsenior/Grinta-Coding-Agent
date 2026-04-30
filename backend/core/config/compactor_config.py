@@ -200,23 +200,19 @@ CompactorConfig = (
 def compactor_config_from_toml_section(
     data: dict, llm_configs: dict | None = None
 ) -> dict[str, CompactorConfig]:
-    """Create a CompactorConfig instance from a TOML dictionary representing the [compactor] section.
+    """Create a CompactorConfig instance from a compactor settings dictionary.
 
     For CompactorConfig, the handling is different since it's a union type. The type of compactor
     is determined by the 'type' field in the section.
 
     Example:
-    Parse compactor config like:
-        [compactor]
-        type = "noop"
+        {"type": "noop"}
 
-    For compactors that require an LLM config, you can specify the name of an LLM config:
-        [compactor]
-        type = "smart"
-        llm_config = "my_llm"  # References [llm.my_llm] section
+    For compactors that require an LLM config, you can specify the key of an LLM config:
+        {"type": "smart", "llm_config": "my_llm"}
 
     Args:
-        data: The TOML dictionary representing the [compactor] section.
+        data: Compactor settings dictionary.
         llm_configs: Optional dictionary of LLMConfig objects keyed by name.
 
     Returns:

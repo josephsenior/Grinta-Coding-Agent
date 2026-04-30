@@ -50,6 +50,21 @@ CLR_WARN_ICON = 'bold #f59e0b'  # warning icon / accent
 CLR_INFO_BODY = '#93c5fd'  # info body text
 CLR_INFO_ICON = 'bold #38bdf8'  # info icon / accent
 
+# ── Shared UI markers (keep iconography consistent) ───────────────────────────
+# One canonical set used across transcript cards and prompt affordances.
+MARK_OK = '✓'
+MARK_ERR = '✗'
+MARK_INFO = '•'
+MARK_PROMPT = '❯'
+
+# ── Shared Rich style aliases (avoid scattered literals) ─────────────────────
+STYLE_DIM = 'dim'
+STYLE_DEFAULT = 'default'
+STYLE_BOLD = 'bold'
+STYLE_BOLD_DIM = 'bold dim'
+STYLE_ITALIC_DIM = 'dim italic'
+STYLE_EMPTY = ''
+
 # ── Activity card chrome ──────────────────────────────────────────────────────
 CLR_CARD_TITLE = 'bold #8fa5b6'  # panel title text (gray-blue)
 

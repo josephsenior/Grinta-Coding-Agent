@@ -14,7 +14,6 @@ from backend.core.config.arg_utils import (
 )
 from backend.core.config.config_loader import (
     finalize_config,
-    get_agent_config_arg,
     get_llm_config_arg,
     load_app_config,
     load_from_env,
@@ -50,7 +49,6 @@ __all__ = [
     'RuntimeConfig',
     'SecurityConfig',
     'finalize_config',
-    'get_agent_config_arg',
     'get_cli_parser',
     'get_field_info',
     'get_headless_parser',

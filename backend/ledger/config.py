@@ -7,6 +7,15 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 
+def _get_env(*names: str, default: str) -> str:
+    """Read first non-empty value from preferred env names."""
+    for name in names:
+        value = os.getenv(name)
+        if value is not None and value != '':
+            return value
+    return default
+
+
 @dataclass(frozen=True)
 class EventRuntimeDefaults:
     max_queue_size: int = 2000
@@ -54,19 +63,60 @@ def get_event_runtime_defaults() -> EventRuntimeDefaults:
         pass
 
     return EventRuntimeDefaults(
-        max_queue_size=int(os.getenv('APP_EVENTSTREAM_MAX_QUEUE', '2000')),
-        drop_policy=os.getenv('APP_EVENTSTREAM_POLICY', 'drop_oldest').lower(),
-        hwm_ratio=float(os.getenv('APP_EVENTSTREAM_HWM_RATIO', '0.8')),
-        block_timeout=float(os.getenv('APP_EVENTSTREAM_BLOCK_TIMEOUT', '0.1')),
-        rate_window_seconds=int(os.getenv('APP_EVENTSTREAM_RATE_WINDOW_SECONDS', '60')),
-        workers=max(1, int(os.getenv('APP_EVENTSTREAM_WORKERS', '1'))),
-        async_write=os.getenv('APP_EVENTSTREAM_ASYNC_WRITE', 'false').lower()
+        max_queue_size=int(
+            _get_env('EVENT_STREAM_MAX_QUEUE_SIZE', 'APP_EVENTSTREAM_MAX_QUEUE', default='2000')
+        ),
+        drop_policy=_get_env(
+            'EVENT_STREAM_DROP_POLICY', 'APP_EVENTSTREAM_POLICY', default='drop_oldest'
+        ).lower(),
+        hwm_ratio=float(
+            _get_env('EVENT_STREAM_HWM_RATIO', 'APP_EVENTSTREAM_HWM_RATIO', default='0.8')
+        ),
+        block_timeout=float(
+            _get_env(
+                'EVENT_STREAM_BLOCK_TIMEOUT',
+                'APP_EVENTSTREAM_BLOCK_TIMEOUT',
+                default='0.1',
+            )
+        ),
+        rate_window_seconds=int(
+            _get_env(
+                'EVENT_STREAM_RATE_WINDOW_SECONDS',
+                'APP_EVENTSTREAM_RATE_WINDOW_SECONDS',
+                default='60',
+            )
+        ),
+        workers=max(
+            1,
+            int(_get_env('EVENT_STREAM_WORKERS', 'APP_EVENTSTREAM_WORKERS', default='1')),
+        ),
+        async_write=_get_env(
+            'EVENT_STREAM_ASYNC_WRITE',
+            'APP_EVENTSTREAM_ASYNC_WRITE',
+            default='false',
+        ).lower()
         in ('1', 'true', 'yes'),
-        coalesce=os.getenv('APP_EVENT_COALESCE', 'false').lower()
+        coalesce=_get_env(
+            'EVENT_STREAM_COALESCE',
+            'APP_EVENT_COALESCE',
+            default='false',
+        ).lower()
         in ('1', 'true', 'yes'),
-        coalesce_window_ms=float(os.getenv('APP_EVENT_COALESCE_WINDOW_MS', '100')),
+        coalesce_window_ms=float(
+            _get_env(
+                'EVENT_STREAM_COALESCE_WINDOW_MS',
+                'APP_EVENT_COALESCE_WINDOW_MS',
+                default='100',
+            )
+        ),
         coalesce_max_batch=max(
             1,
-            int(os.getenv('APP_EVENT_COALESCE_MAX_BATCH', '20')),
+            int(
+                _get_env(
+                    'EVENT_STREAM_COALESCE_MAX_BATCH',
+                    'APP_EVENT_COALESCE_MAX_BATCH',
+                    default='20',
+                )
+            ),
         ),
     )

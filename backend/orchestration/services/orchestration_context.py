@@ -151,7 +151,7 @@ class OrchestrationContext:
             ctx = self.pop_action_context(int(aid))
         if ctx is None:
             mapping = getattr(ctrl, '_action_contexts_by_event_id', None)
-            if isinstance(mapping, dict) and aid in mapping:
+            with contextlib.suppress(AttributeError, TypeError):
                 ctx = mapping.pop(aid, None)
         if ctx is not None:
             ctrl._cleanup_action_context(ctx)

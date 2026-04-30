@@ -183,7 +183,7 @@ class Settings(BaseModel):
         try:
             import os
 
-            env_key = os.environ.get('APP_API_KEY')
+            env_key = os.environ.get('LLM_API_KEY')
             if (
                 env_key
                 and isinstance(explicit_api_key, SecretStr)
@@ -280,19 +280,15 @@ class Settings(BaseModel):
 
     @staticmethod
     def _build_settings_from_app_config(app_config, llm_config: LLMConfig) -> Settings:
-        security = app_config.security
         mcp_config = app_config.mcp if hasattr(app_config, 'mcp') else None
         return Settings(
             language='en',
             agent=app_config.default_agent,
             max_iterations=app_config.max_iterations,
-            security_analyzer=security.security_analyzer,
-            confirmation_mode=security.confirmation_mode,
             llm_model=llm_config.model,
             llm_api_key=llm_config.api_key,
             llm_base_url=llm_config.base_url,
             mcp_config=mcp_config,
-            max_budget_per_task=app_config.max_budget_per_task,
         )
 
     @staticmethod

@@ -14,6 +14,7 @@ from backend.cli.theme import (
     CLR_CARD_TITLE,
     CLR_DIFF_ADD,
     CLR_DIFF_REM,
+    STYLE_DIM,
 )
 from backend.cli.transcript import (
     format_activity_delta_secondary,
@@ -150,7 +151,7 @@ class DiffPanel:
         result = Text()
         for i, group in enumerate(groups):
             if i > 0:
-                result.append('  ···\n', style='dim')
+                result.append('  ···\n', style=STYLE_DIM)
             for line in group.get('before_edits', []):
                 result.append(line + '\n', style=CLR_DIFF_REM)
             for line in group.get('after_edits', []):
@@ -158,5 +159,5 @@ class DiffPanel:
         # Truncate if too long
         if len(result.plain) > 3000:
             result.truncate(3000)
-            result.append('\n… (truncated)', style='dim')
+            result.append('\n… (truncated)', style=STYLE_DIM)
         return result

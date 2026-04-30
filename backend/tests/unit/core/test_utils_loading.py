@@ -9,18 +9,14 @@ from typing import Any, cast
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import SecretStr, ValidationError
+from pydantic import SecretStr
 
-from backend.core.config.agent_config import AgentConfig
 from backend.core.config.api_key_manager import api_key_manager
 from backend.core.config.app_config import AppConfig
 from backend.core.config.compactor_config import AutoCompactorConfig
 from backend.core.config.config_loader import (
     ConfigLoadSummary,
-    _to_posix_workspace_path,
     finalize_config,
-    get_agent_config_arg,
-    get_compactor_config_arg,
     get_or_create_jwt_secret,
     load_app_config,
     load_from_json,
@@ -66,21 +62,6 @@ class TestConfigLoadSummary:
         with patch('backend.core.logger.app_logger.warning') as mock_warn:
             summary.emit()
             mock_warn.assert_not_called()
-
-
-# â”€â”€ Path Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-
-class TestPathHelpers:
-    def test_to_posix_workspace_path(self):
-        assert _to_posix_workspace_path('C:\\Users\\test') == '/Users/test'
-        assert _to_posix_workspace_path('relative/path') == '/relative/path'
-        assert _to_posix_workspace_path('/already/posix') == '/already/posix'
-        assert _to_posix_workspace_path('') == ''
-        assert _to_posix_workspace_path('') is not None
-
-    def test_to_posix_with_double_slashes(self):
-        assert _to_posix_workspace_path('path//with///slashes') == '/path/with/slashes'
 
 
 # â”€â”€ JWT Secret â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -190,78 +171,6 @@ class TestFinalization:
         assert compactor_cfg.llm_config.model == 'openai/gpt-4.1'  # type: ignore[union-attr]
 
 
-# â”€â”€ Named Group Loaders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-
-class TestNamedGroupLoaders:
-    def test_get_agent_config_arg_success(self, tmp_path):
-        json_file = tmp_path / 'settings.json'
-
-        with patch('backend.core.config.config_loader._load_json_config') as mock_load:
-            mock_load.return_value = {'agent': {'my_agent': {'name': 'custom_name'}}}
-            config = get_agent_config_arg('agent.my_agent', str(json_file))
-            assert isinstance(config, AgentConfig)
-            assert config.name == 'custom_name'
-
-    def test_get_agent_config_arg_missing(self, tmp_path):
-        with patch(
-            'backend.core.config.config_loader._load_json_config', return_value={}
-        ):
-            assert get_agent_config_arg('nonexistent') is None
-
-    def test_get_agent_config_arg_returns_none_when_json_missing(self):
-        with patch(
-            'backend.core.config.config_loader._load_json_config', return_value=None
-        ):
-            assert get_agent_config_arg('agent.anything') is None
-
-    def test_get_compactor_config_arg_success(self, tmp_path):
-        json_file = tmp_path / 'settings.json'
-        # Mocking to avoid complex dependencies
-        with patch('backend.core.config.config_loader._load_json_config') as mock_load:
-            mock_load.return_value = {
-                'compactor_type': 'recent',
-                'compactor_max_events': 10,
-            }
-            with patch(
-                'backend.core.config.compactor_config.create_compactor_config'
-            ) as mock_create:
-                mock_cfg = MagicMock()
-                mock_create.return_value = mock_cfg
-                result = get_compactor_config_arg('my_compactor', str(json_file))
-                assert result is mock_cfg
-
-    def test_get_compactor_config_arg_missing_type(self, tmp_path):
-        with patch('backend.core.config.config_loader._load_json_config') as mock_load:
-            mock_load.return_value = {'compactor_type': None}
-            assert get_compactor_config_arg('bad') is None
-
-    def test_get_compactor_config_arg_returns_none_when_json_missing(self):
-        with patch(
-            'backend.core.config.config_loader._load_json_config', return_value=None
-        ):
-            assert get_compactor_config_arg('missing') is None
-
-    def test_get_compactor_config_arg_passes_keep_first(self):
-        with patch('backend.core.config.config_loader._load_json_config') as mock_load:
-            mock_load.return_value = {
-                'compactor_type': 'recent',
-                'compactor_keep_first': 3,
-            }
-            with patch(
-                'backend.core.config.compactor_config.create_compactor_config'
-            ) as mock_create:
-                mock_cfg = MagicMock()
-                mock_create.return_value = mock_cfg
-
-                result = get_compactor_config_arg('keep_first_cfg')
-
-        assert result is mock_cfg
-        mock_create.assert_called_once_with(
-            'recent', {'type': 'recent', 'keep_first': 3}
-        )
-
-
 # â”€â”€ Agent Registration â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
@@ -341,16 +250,15 @@ class TestMainEntryPoints:
 
     def test_setup_config_from_args_execution(self):
         args = MagicMock()
-        args.config_file = 'settings.json'
         with patch('backend.core.config.config_loader.load_app_config') as mock_load:
             with patch('backend.core.config.config_loader.apply_llm_config_override'):
                 with patch(
                     'backend.core.config.config_loader.apply_additional_overrides'
                 ):
                     setup_config_from_args(args)
-                    mock_load.assert_called_with(config_file='settings.json')
+                    mock_load.assert_called_with()
 
-    def test_load_app_config_warns_on_external_file_and_syncs_explicit_api_key(self):
+    def test_load_app_config_syncs_explicit_api_key(self):
         original_model_validate = LLMConfig.model_validate
 
         class _FakeAPIKeyManager:
@@ -419,21 +327,13 @@ class TestMainEntryPoints:
             patch('backend.core.config.api_key_manager.api_key_manager', fake_manager),
             patch('backend.core.config.llm_config.api_key_manager', fake_manager),
             patch(
-                'backend.core.config.config_loader.logger.app_logger.warning'
-            ) as mock_warn,
-            patch(
                 'backend.core.config.llm_config.LLMConfig.model_validate',
                 side_effect=_validate_llm,
             ),
         ):
-            cfg = load_app_config(set_logging_levels=False, config_file='custom.json')
+            cfg = load_app_config(set_logging_levels=False)
 
         llm_cfg = cfg.get_llm_config()
-        mock_warn.assert_any_call(
-            'Ignoring external config_file=%s; using canonical settings=%s',
-            'custom.json',
-            'canonical.json',
-        )
         assert fake_manager.set_api_key_calls == [(llm_cfg.model, llm_cfg.api_key)]
         assert fake_manager.set_environment_calls == [(llm_cfg.model, llm_cfg.api_key)]
 
@@ -780,53 +680,6 @@ class TestLoadFromJson:
         mock_warn.assert_called()
 
 
-# â”€â”€ Compactor Loader Extra â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-
-class TestCompactorLoaderExtra:
-    def test_get_compactor_config_missing_section(self, tmp_path):
-        with patch(
-            'backend.core.config.config_loader._load_json_config', return_value={}
-        ):
-            assert get_compactor_config_arg('my_compactor') is None
-
-    def test_get_compactor_config_arg_validation_error(self, tmp_path):
-        with patch(
-            'backend.core.config.config_loader._load_json_config',
-            return_value={'compactor_type': 'recent'},
-        ):
-            with patch(
-                'backend.core.config.compactor_config.create_compactor_config',
-                side_effect=ValidationError.from_exception_data('test', []),
-            ):
-                assert get_compactor_config_arg('my_compactor') is None
-
-    def test_process_llm_compactor_success(self):
-        from backend.core.config.config_loader import _process_llm_compactor
-
-        compactor_data = {'llm_config': 'my_llm'}
-        with patch('backend.core.config.config_loader.get_llm_config_arg') as mock_get:
-            mock_llm = MagicMock()
-            mock_get.return_value = mock_llm
-            result = _process_llm_compactor(compactor_data, 'arg', 'file.toml')
-            assert result is not None
-            assert result['llm_config'] is mock_llm
-
-    def test_process_llm_compactor_fail(self):
-        from backend.core.config.config_loader import _process_llm_compactor
-
-        compactor_data = {'llm_config': 'my_llm'}
-        with patch(
-            'backend.core.config.config_loader.get_llm_config_arg', return_value=None
-        ):
-            assert _process_llm_compactor(compactor_data, 'arg', 'file.toml') is None
-
-    def test_process_llm_compactor_without_llm_config(self):
-        from backend.core.config.config_loader import _process_llm_compactor
-
-        assert _process_llm_compactor({}, 'arg', 'file.toml') is None
-
-
 # â”€â”€ Agent Registration Extra â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
@@ -863,62 +716,6 @@ class TestCoverageGapsV2:
         formatted = summary.format_fatal_issues()
         assert 'core: invalid: err1' in formatted
         assert 'agent: invalid: err2' in formatted
-
-    def test_get_agent_config_arg_debug_log(self, tmp_path):
-        with patch(
-            'backend.core.config.config_loader._load_json_config',
-            return_value={'agent': {}},
-        ):
-            with patch('backend.core.logger.app_logger.debug') as mock_debug:
-                assert get_agent_config_arg('my_agent') is None
-                mock_debug.assert_any_call(
-                    'Loading from toml failed for %s', 'my_agent'
-                )
-
-    def test_get_compactor_config_arg_logs(self, tmp_path):
-        # Test success log (roughly line 315)
-        with patch(
-            'backend.core.config.config_loader._load_json_config',
-            return_value={'compactor_type': 'recent'},
-        ):
-            with patch(
-                'backend.core.config.compactor_config.create_compactor_config'
-            ) as mock_create:
-                mock_cfg = MagicMock()
-                mock_create.return_value = mock_cfg
-                with patch('backend.core.logger.app_logger.info') as mock_info:
-                    get_compactor_config_arg('c1')
-                    mock_info.assert_called()
-
-        # Test error log missing type (roughly line 330)
-        with patch(
-            'backend.core.config.config_loader._load_json_config',
-            return_value={'compactor_type': None},
-        ):
-            with patch('backend.core.logger.app_logger.error') as mock_error:
-                get_compactor_config_arg('c2')
-                mock_error.assert_called_with(
-                    'Missing "type" field in [compactor.%s] section of %s',
-                    'c2',
-                    'settings.json',
-                )
-
-        # Test error log for failed LLM load (roughly line 351/304)
-        with patch(
-            'backend.core.config.config_loader._load_json_config',
-            return_value={'compactor_type': 'llm', 'compactor_llm_config': 'missing'},
-        ):
-            with patch(
-                'backend.core.config.config_loader.get_llm_config_arg',
-                return_value=None,
-            ):
-                with patch('backend.core.logger.app_logger.error') as mock_error:
-                    get_compactor_config_arg('c3')
-                    mock_error.assert_any_call(
-                        "Failed to load required LLM config '%s' for compactor '%s'.",
-                        'missing',
-                        'c3',
-                    )
 
     def test_parse_arguments_version(self):
         with patch('backend.core.config.arg_utils.get_headless_parser') as mock_get:
