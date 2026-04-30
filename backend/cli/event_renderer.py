@@ -46,6 +46,8 @@ from backend.cli.theme import (
     CLR_AUTONOMY_CONSERVATIVE,
     CLR_AUTONOMY_FULL,
     CLR_BRAND,
+    CLR_ERR_BODY,
+    CLR_ERR_ICON,
     CLR_HUD_DETAIL,
     CLR_HUD_MODEL,
     CLR_META,
@@ -56,6 +58,8 @@ from backend.cli.theme import (
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
     CLR_USER_BORDER,
+    CLR_WARN_BODY,
+    CLR_WARN_ICON,
 )
 from backend.cli.tool_call_display import (
     looks_like_streaming_tool_arguments,
@@ -1085,7 +1089,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             self._append_history(
                 Text(
                     '  approval required — review the pending action.',
-                    style='yellow',
+                    style=CLR_WARN_BODY,
                 )
             )
         self.refresh()
@@ -1115,7 +1119,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._stop_reasoning()
         self._clear_streaming_preview()
         self._append_history(
-            Text('  error — send a follow-up to retry.', style='red dim'),
+            Text('  error — send a follow-up to retry.', style=f'dim {CLR_ERR_BODY}'),
         )
 
     def _after_state_stopped(self, *, previous_state: Any) -> None:
@@ -1586,10 +1590,11 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
                 Panel(
                     Text(
                         f'Budget limit reached: ${cost:.4f} / ${self._max_budget:.4f}',
-                        style='red bold',
+                        style=CLR_ERR_ICON,
                     ),
-                    title='[red bold]Budget Exceeded[/red bold]',
-                    border_style='red',
+                    title=Text('Budget Exceeded', style=CLR_ERR_ICON),
+                    title_align='left',
+                    border_style=CLR_STATUS_ERR,
                     padding=(1, 2),
                 )
             )
@@ -1599,10 +1604,11 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
                 Panel(
                     Text(
                         f'Approaching budget: ${cost:.4f} / ${self._max_budget:.4f} (80%)',
-                        style='yellow',
+                        style=CLR_WARN_BODY,
                     ),
-                    title='[yellow]Budget Warning[/yellow]',
-                    border_style='yellow',
+                    title=Text('Budget Warning', style=CLR_WARN_ICON),
+                    title_align='left',
+                    border_style=CLR_STATUS_WARN,
                     padding=(1, 2),
                 )
             )

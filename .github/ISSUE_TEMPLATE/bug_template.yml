@@ -32,7 +32,7 @@ body:
       description: How are you running Grinta?
       options:
         - Local CLI (uv run python -m backend.cli.entry)
-        - API server (python start_server.py)
+        - Installed CLI (grinta)
         - Docker
         - GitHub Actions workflow
         - Other

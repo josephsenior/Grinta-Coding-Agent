@@ -259,7 +259,9 @@ def _build_splash_lines() -> list[Any]:
         pad = max(0, width - len(t))
         lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
     for ln in raw:
-        t = Text(ln, style='bold red')
+        from backend.cli.theme import CLR_SPLASH_FIGLET
+
+        t = Text(ln, style=CLR_SPLASH_FIGLET)
         pad = max(0, width - len(t))
         lines.append(Text(' ' * (pad // 2)) + t + Text(' ' * (pad - pad // 2)))
     return lines

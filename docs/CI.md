@@ -29,3 +29,10 @@ Markers are defined in `pytest.ini`. Default local `pytest` does **not** include
 ## What to run before opening a PR
 
 See [Contributing — testing](../CONTRIBUTING.md#testing-before-a-pull-request).
+
+## Support stance for announcement copy
+
+For public release messaging, align claims with [Support Matrix](SUPPORT_MATRIX.md):
+
+- Linux and Windows are officially supported (required CI gates).
+- macOS is best-effort until promoted from advisory to required.

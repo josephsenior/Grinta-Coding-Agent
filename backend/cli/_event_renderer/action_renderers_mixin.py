@@ -51,6 +51,11 @@ from backend.cli.layout_tokens import (
     ACTIVITY_CARD_TITLE_TOOL,
     DECISION_PANEL_ACCENT_STYLE,
 )
+from backend.cli.theme import (
+    CLR_OPTION_RECOMMENDED,
+    CLR_OPTION_TEXT,
+    CLR_QUESTION_TEXT,
+)
 from backend.cli.tool_call_display import (
     format_tool_activity_rows,
     tool_headline,
@@ -585,12 +590,12 @@ class ActionRenderersMixin:
         help_needed = getattr(action, 'specific_help_needed', '')
         escalate_parts: list[Any] = []
         if reason:
-            escalate_parts.append(Text(reason, style='yellow'))
+            escalate_parts.append(Text(reason, style=CLR_QUESTION_TEXT))
         if help_needed:
-            escalate_parts.append(Text(f'Help needed: {help_needed}', style='yellow'))
+            escalate_parts.append(Text(f'Help needed: {help_needed}', style=CLR_QUESTION_TEXT))
         if not escalate_parts:
             escalate_parts.append(
-                Text('The agent needs your input to continue.', style='yellow')
+                Text('The agent needs your input to continue.', style=CLR_QUESTION_TEXT)
             )
         self._append_history(
             format_callout_panel(
@@ -610,11 +615,11 @@ class ActionRenderersMixin:
         options = getattr(action, 'options', []) or []
         clarify_parts: list[Any] = []
         if question:
-            clarify_parts.append(Text(question, style='yellow'))
+            clarify_parts.append(Text(question, style=CLR_QUESTION_TEXT))
         for i, opt in enumerate(options, 1):
             option_line = Text()
-            option_line.append(f'{i}. ', style='bold #f1bf63')
-            option_line.append(str(opt), style='#e2e8f0')
+            option_line.append(f'{i}. ', style=f'bold {CLR_OPTION_RECOMMENDED}')
+            option_line.append(str(opt), style=CLR_OPTION_TEXT)
             clarify_parts.append(option_line)
         if clarify_parts:
             self._append_history(
@@ -637,7 +642,7 @@ class ActionRenderersMixin:
             concern_line.append(str(concern), style='dim')
             uncertainty_parts.append(concern_line)
         if info_needed:
-            uncertainty_parts.append(Text(f'Need: {info_needed}', style='yellow'))
+            uncertainty_parts.append(Text(f'Need: {info_needed}', style=CLR_QUESTION_TEXT))
         if uncertainty_parts:
             self._append_history(
                 format_callout_panel(
@@ -668,7 +673,7 @@ class ActionRenderersMixin:
             )
             proposal_line.append(
                 f'{label}{marker}',
-                style='bold #f1bf63' if i == recommended else 'bold #e2e8f0',
+                style=f'bold {CLR_OPTION_RECOMMENDED}' if i == recommended else f'bold {CLR_OPTION_TEXT}',
             )
             proposal_parts.append(proposal_line)
             if desc:

@@ -2,6 +2,7 @@
 
 ## Getting Help
 
+- Grinta is supported as a **CLI-first** tool. See [docs/SUPPORT_MATRIX.md](docs/SUPPORT_MATRIX.md) for platform and installation support scope.
 - Read the docs first:
   - docs/QUICK_START.md
   - docs/USER_GUIDE.md
@@ -24,3 +25,9 @@ Do not open public issues for vulnerabilities.
 - LLM provider/model and relevant settings (without secrets)
 - Exact steps to reproduce
 - Relevant logs from logs/llm/default (with sensitive values removed)
+
+## Response Targets (Best Effort)
+
+- Bug reports: initial triage within 5 business days.
+- General support questions: response target within 7 business days.
+- Security reports: acknowledgement within 48 hours (see `SECURITY.md`).
