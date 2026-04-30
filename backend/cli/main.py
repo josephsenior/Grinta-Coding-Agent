@@ -277,10 +277,8 @@ def show_grinta_splash(console: Any | None = None) -> None:
     _figlet_lines = _build_splash_lines()
     _D = 'dim'
 
-    _TAGLINE = 'AI agent. Pure grit.'
-    _HINT = (
-        'Type /help for commands · Ctrl+C interrupts the agent · /quit or exit to leave'
-    )
+    _TAGLINE = 'AI coding agent for the terminal.'
+    _HINT = 'Describe a task in plain language · /help for commands · /quit to leave'
 
     def _body(visible: int, *, tagline: bool = False) -> Group:
         figlet = Text()

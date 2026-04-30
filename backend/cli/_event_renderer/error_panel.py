@@ -71,8 +71,12 @@ def split_error_text(error_text: str) -> tuple[str, str]:
         return 'Unknown error', ''
     summary = lines[idx].strip() or 'Unknown error'
     detail = '\n'.join(line.rstrip() for line in lines[idx + 1 :]).strip()
-    if len(detail) > 2000:
-        detail = detail[:2000] + '\n... (truncated)'
+    if len(detail) > 3000:
+        omitted = len(detail) - 3000
+        detail = (
+            detail[:3000]
+            + f'\n… ({omitted:,} more characters omitted — full output in logs)'
+        )
     return summary, detail
 
 

@@ -15,11 +15,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
 import logging
 import os
 import time
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from backend.cli.confirmation import build_confirmation_action, render_confirmation
@@ -106,7 +104,6 @@ class SessionLifecycleMixin:
         # to a positive value to re-enable limits.
         hard_timeout, cmd_timeout = self._resolve_hard_timeouts()
         start = time.monotonic()
-        _last_probe = 0.0
 
         while True:
             renderer = cast(Any, self._renderer)
@@ -114,27 +111,7 @@ class SessionLifecycleMixin:
             # Drain queued events and render — this is the ONLY place
             # where Live.update() happens during agent execution.
             if renderer is not None:
-                _drain_t0 = time.monotonic()
                 renderer.drain_events()
-                _drain_dt = time.monotonic() - _drain_t0
-                if _drain_dt > 0.5:
-                    # #region agent log
-                    try:
-                        payload = {
-                            'sessionId': 'fee086',
-                            'runId': 'pre-fix',
-                            'hypothesisId': 'H18_renderer_drain_block',
-                            'location': 'backend/cli/_repl/session_lifecycle_mixin.py:_wait_for_agent_idle',
-                            'message': 'renderer-drain-slow',
-                            'data': {'drain_seconds': round(_drain_dt, 3)},
-                            'timestamp': int(time.time() * 1000),
-                        }
-                        lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
-                        with open(lp, 'a', encoding='utf-8') as _f:
-                            _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-                    except Exception:
-                        pass
-                    # #endregion
             state = controller.get_agent_state()
 
             if await self._handle_idle_or_confirmation(
@@ -156,52 +133,7 @@ class SessionLifecycleMixin:
             if renderer is None:
                 await asyncio.sleep(0.1)
             else:
-                _wait_t0 = time.monotonic()
                 await renderer.wait_for_state_change(wait_timeout_sec=0.1)
-                _wait_dt = time.monotonic() - _wait_t0
-                if _wait_dt > 0.5:
-                    # #region agent log
-                    try:
-                        payload = {
-                            'sessionId': 'fee086',
-                            'runId': 'pre-fix',
-                            'hypothesisId': 'H19_renderer_wait_block',
-                            'location': 'backend/cli/_repl/session_lifecycle_mixin.py:_wait_for_agent_idle',
-                            'message': 'renderer-wait-slow',
-                            'data': {'wait_seconds': round(_wait_dt, 3)},
-                            'timestamp': int(time.time() * 1000),
-                        }
-                        lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
-                        with open(lp, 'a', encoding='utf-8') as _f:
-                            _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-                    except Exception:
-                        pass
-                    # #endregion
-
-            now = time.monotonic()
-            if now - _last_probe >= 1.0:
-                _last_probe = now
-                # #region agent log
-                try:
-                    payload = {
-                        'sessionId': 'fee086',
-                        'runId': 'pre-fix',
-                        'hypothesisId': 'H17_cli_wait_idle_loop',
-                        'location': 'backend/cli/_repl/session_lifecycle_mixin.py:_wait_for_agent_idle',
-                        'message': 'wait-loop-probe',
-                        'data': {
-                            'state': str(controller.get_agent_state()),
-                            'agent_task_done': bool(agent_task and agent_task.done()),
-                            'elapsed_sec': round(now - start, 2),
-                        },
-                        'timestamp': int(time.time() * 1000),
-                    }
-                    lp = Path(__file__).resolve().parents[3] / 'debug-fee086.log'
-                    with open(lp, 'a', encoding='utf-8') as _f:
-                        _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-                except Exception:
-                    pass
-                # #endregion
 
             # Hard timeout — surface error and return to prompt instead of
             # hanging forever (e.g. LLM API unresponsive). Allow a longer

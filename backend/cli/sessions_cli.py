@@ -14,7 +14,17 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
+
+from backend.cli.theme import (
+    CLR_CARD_BORDER,
+    CLR_CARD_TITLE,
+    CLR_META,
+    CLR_STATUS_ERR,
+    CLR_STATUS_OK,
+)
 
 
 @dataclass(frozen=True)
@@ -44,21 +54,33 @@ def _entries() -> list[tuple[str, dict[str, Any], int, Path]]:
 
 def cmd_list(console: Console, limit: int = 50) -> int:
     if limit < 1:
-        console.print('[red]--limit must be 1 or greater.[/red]')
+        console.print(f'[{CLR_STATUS_ERR}]--limit must be 1 or greater.[/]')
         return 2
     rows = _entries()[:limit]
     if not rows:
-        console.print('[dim]No sessions found.[/dim]')
+        console.print(
+            f'[{CLR_META}]No sessions yet. Start a conversation with '
+            '[bold]grinta[/bold], then use this view to resume or export it.[/]'
+        )
         return 0
     table = _build_session_table()
     for i, (sid, meta, count, _path) in enumerate(rows, 1):
         table.add_row(*_format_session_row(i, sid, meta, count))
     console.print(table)
+    console.print(
+        f'[{CLR_META}]Use [bold]grinta sessions show <N|id>[/bold] for details, '
+        'or [bold]grinta sessions export <N|id> <path>[/bold] to save one.[/]'
+    )
     return 0
 
 
 def _build_session_table() -> Table:
-    table = Table(title='Sessions', border_style='dim')
+    table = Table(
+        title='Sessions',
+        title_style=CLR_CARD_TITLE,
+        border_style=CLR_CARD_BORDER,
+        show_lines=False,
+    )
     table.add_column('#', style='dim')
     table.add_column('ID')
     table.add_column('Title')
@@ -126,52 +148,91 @@ def _resolve_by_prefix(
 
 
 def _report_resolve_failure(console: Console, target: str) -> int:
-    console.print(f'[red]No session matches:[/red] {target}')
+    console.print(f'[{CLR_STATUS_ERR}]No session matches:[/] {target}')
+    console.print(
+        f'[{CLR_META}]Run [bold]grinta sessions list[/bold] to see recent sessions.[/]'
+    )
     return 2
+
+
+def _print_resolve_failure(console: Console, failure: _SessionResolveFailure) -> None:
+    console.print(f'[{CLR_STATUS_ERR}]{failure.message}[/]')
+    console.print(
+        f'[{CLR_META}]Run [bold]grinta sessions list[/bold] to copy a longer id.[/]'
+    )
+
+
+def _session_summary_table(
+    sid: str,
+    meta: dict[str, Any],
+    count: int,
+    path: Path,
+) -> Table:
+    table = Table.grid(padding=(0, 2))
+    table.add_column(style=CLR_CARD_TITLE, no_wrap=True)
+    table.add_column(overflow='fold')
+
+    table.add_row('ID', sid)
+    table.add_row('Path', str(path))
+    table.add_row('Events', str(count))
+    for key in (
+        'title',
+        'name',
+        'llm_model',
+        'accumulated_cost',
+        'created_at',
+        'last_updated_at',
+    ):
+        value = meta.get(key)
+        if value not in (None, ''):
+            table.add_row(key.replace('_', ' ').title(), str(value))
+    return table
 
 
 def cmd_show(console: Console, target: str) -> int:
     row = _resolve(target)
     if isinstance(row, _SessionResolveFailure):
-        console.print(f'[red]{row.message}[/red]')
+        _print_resolve_failure(console, row)
         return 2
     if row is None:
         return _report_resolve_failure(console, target)
     sid, meta, count, path = row
-    console.print(f'[bold]Session[/bold] {sid}')
-    console.print(f'  path:   {path}')
-    console.print(f'  events: {count}')
-    if meta:
-        console.print('  metadata:')
-        for k, v in meta.items():
-            console.print(f'    {k}: {v}')
+    console.print(
+        Panel(
+            _session_summary_table(sid, meta, count, path),
+            title=Text('Session', style=CLR_CARD_TITLE),
+            title_align='left',
+            border_style=CLR_CARD_BORDER,
+            padding=(1, 2),
+        )
+    )
     return 0
 
 
 def cmd_export(console: Console, target: str, out_path: str) -> int:
     row = _resolve(target)
     if isinstance(row, _SessionResolveFailure):
-        console.print(f'[red]{row.message}[/red]')
+        _print_resolve_failure(console, row)
         return 2
     if row is None:
         return _report_resolve_failure(console, target)
-    sid, _meta, _count, path = row
+    _sid, _meta, _count, path = row
     out = Path(out_path).resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
     if out.suffix.lower() == '.zip':
         archive = shutil.make_archive(str(out.with_suffix('')), 'zip', root_dir=path)
-        console.print(f'Wrote [bold]{archive}[/bold]')
+        console.print(f'[{CLR_STATUS_OK}]✓[/] Wrote [bold]{archive}[/bold]')
     else:
         # Tree copy.
         shutil.copytree(path, out, dirs_exist_ok=True)
-        console.print(f'Copied to [bold]{out}[/bold]')
+        console.print(f'[{CLR_STATUS_OK}]✓[/] Copied to [bold]{out}[/bold]')
     return 0
 
 
 def cmd_delete(console: Console, target: str, *, yes: bool = False) -> int:
     row = _resolve(target)
     if isinstance(row, _SessionResolveFailure):
-        console.print(f'[red]{row.message}[/red]')
+        _print_resolve_failure(console, row)
         return 2
     if row is None:
         return _report_resolve_failure(console, target)
@@ -182,17 +243,17 @@ def cmd_delete(console: Console, target: str, *, yes: bool = False) -> int:
         if not Confirm.ask(
             f'Delete session {sid}? This cannot be undone.', default=False
         ):
-            console.print('[dim]Aborted.[/dim]')
+            console.print(f'[{CLR_META}]Aborted.[/]')
             return 0
     shutil.rmtree(path, ignore_errors=True)
-    console.print(f'Deleted [bold]{sid}[/bold]')
+    console.print(f'[{CLR_STATUS_OK}]✓[/] Deleted [bold]{sid}[/bold]')
     return 0
 
 
 def cmd_prune(console: Console, *, days: int = 30, yes: bool = False) -> int:
     """Delete sessions older than ``days``."""
     if days < 0:
-        console.print('[red]--days must be 0 or greater.[/red]')
+        console.print(f'[{CLR_STATUS_ERR}]--days must be 0 or greater.[/]')
         return 2
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     to_delete = [
@@ -202,7 +263,7 @@ def cmd_prune(console: Console, *, days: int = 30, yes: bool = False) -> int:
     ]
 
     if not to_delete:
-        console.print(f'[dim]No sessions older than {days} days.[/dim]')
+        console.print(f'[{CLR_META}]No sessions older than {days} days.[/]')
         return 0
 
     console.print(
@@ -212,11 +273,11 @@ def cmd_prune(console: Console, *, days: int = 30, yes: bool = False) -> int:
         from rich.prompt import Confirm
 
         if not Confirm.ask('Proceed?', default=False):
-            console.print('[dim]Aborted.[/dim]')
+            console.print(f'[{CLR_META}]Aborted.[/]')
             return 0
     for sid, path in to_delete:
         shutil.rmtree(path, ignore_errors=True)
-        console.print(f'  deleted {sid}')
+        console.print(f'  [{CLR_STATUS_OK}]✓[/] deleted {sid}')
     return 0
 
 

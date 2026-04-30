@@ -23,7 +23,10 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
-from backend.cli.layout_tokens import LIVE_PANEL_ACCENT_STYLE
+from backend.cli.layout_tokens import (
+    CALLOUT_PANEL_CHROME_WIDTH,
+    LIVE_PANEL_ACCENT_STYLE,
+)
 from backend.cli.theme import CLR_ACTION, CLR_META, CLR_SPINNER, CLR_THOUGHT_BODY
 from backend.cli.transcript import format_callout_panel
 from backend.engine import prompt_role_debug as _prompt_role_debug
@@ -35,11 +38,11 @@ _THOUGHT_LINE_PREFIX_CHARS = 0
 _MAX_STORED_THOUGHT_LINES = 50_000
 
 
-# Panel chrome overhead: ``╭─ Thinking ─╮`` borders + left/right padding added
-# by ``format_callout_panel``. Subtract from ``max_width`` before handing the
-# width to ``textwrap.wrap`` so wrapped rows fit inside the panel instead of
-# being clipped by Rich when the rendered row exceeds the interior width.
-_PANEL_CHROME_WIDTH = 6
+# Panel chrome overhead: ``╭─ Thinking ─╮`` borders + horizontal padding added
+# by ``format_callout_panel``. Sourced from ``layout_tokens`` so the wrap
+# width tracks the actual rendered panel and never desynchronises if the
+# padding token is retuned in one place but forgotten here.
+_PANEL_CHROME_WIDTH = CALLOUT_PANEL_CHROME_WIDTH
 
 # Character used at the end of the latest thought while streaming is active.
 # Rich spinner in the header already conveys "thinking" — this cursor conveys

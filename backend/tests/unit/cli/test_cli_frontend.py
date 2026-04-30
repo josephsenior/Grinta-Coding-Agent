@@ -28,6 +28,7 @@ from backend.cli.reasoning_display import ReasoningDisplay
 from backend.cli.repl import (
     Repl,
     _build_command_completer,
+    _build_help_markdown,
     _parse_slash_command,
     _prompt_toolkit_available,
     _supports_prompt_session,
@@ -441,10 +442,10 @@ def test_show_grinta_splash_renders_logo_text() -> None:
     output = _console_output(console)
 
     # Non-TTY StringIO console: static frame with tagline + hint (see show_grinta_splash).
-    assert 'AI agent' in output
-    assert 'Pure grit' in output
-    assert 'Type /help' in output
-    assert 'Ctrl+C' in output
+    assert 'AI coding agent' in output
+    assert 'Describe a task in plain language' in output
+    assert '/help for commands' in output
+    assert '/quit to leave' in output
 
 
 def test_prompt_session_requires_tty_streams() -> None:
@@ -952,6 +953,15 @@ def test_help_command_can_show_single_command_topic() -> None:
     mock_renderer.add_markdown_block.assert_called_once()
     markdown = mock_renderer.add_markdown_block.call_args[0][1]
     assert '/diff [--stat|--name-only|--patch] [path]' in markdown
+
+
+def test_help_markdown_is_scannable_without_adding_commands() -> None:
+    markdown = _build_help_markdown()
+
+    assert 'Send plain-language tasks at the prompt' in markdown
+    assert '| Command | Purpose |' in markdown
+    assert '/settings' in markdown
+    assert 'Input shortcuts' in markdown
 
 
 def test_model_command_rejects_unqualified_model() -> None:

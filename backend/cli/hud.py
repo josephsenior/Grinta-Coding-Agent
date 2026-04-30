@@ -88,10 +88,29 @@ class HUDBar:
 
     @staticmethod
     def ellipsize_path(path: str, max_len: int) -> str:
-        """Shorten *path* for narrow terminals; keep the tail (folder name)."""
+        """Shorten *path* for narrow terminals.
+
+        Strategy: keep the first path segment (drive / repo root) **and** the
+        tail (current directory) so users can recognise both the project they
+        are in and where they are inside it. ``a/b/c/d/e/f`` shortens to
+        ``a/…/e/f`` rather than ``…c/d/e/f`` which loses the project anchor.
+        Falls back to a tail-only ellipsis when the budget is too tight to
+        preserve both ends.
+        """
         if max_len < 8 or not path or len(path) <= max_len:
             return path
-        # Prefer single ellipsis + tail so the leaf directory stays visible.
+        # Pick the canonical separator already used in the path so Windows
+        # paths don't suddenly grow forward slashes.
+        sep = '\\' if '\\' in path and '/' not in path else '/'
+        parts = path.split(sep)
+        if len(parts) >= 3:
+            head = parts[0] or sep  # preserve leading sep on POSIX absolute paths
+            for tail_take in range(min(3, len(parts) - 1), 0, -1):
+                tail = sep.join(parts[-tail_take:])
+                candidate = f'{head}{sep}…{sep}{tail}'
+                if len(candidate) <= max_len:
+                    return candidate
+        # Fallback: ellipsis + tail keeps the leaf directory visible.
         tail = max_len - 1
         return '…' + path[-tail:]
 
