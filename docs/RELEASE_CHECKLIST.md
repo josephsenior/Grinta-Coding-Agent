@@ -24,3 +24,14 @@ Use this list before declaring a **1.0.0** (or any major) release and before pub
 ## macOS stance
 
 macOS CI is **informational** until the team promotes it to a required check. Document any known gaps in the release notes rather than treating a green Linux/Windows matrix as macOS certification.
+
+## GA promotion criteria (RC -> 1.0.0)
+
+Use this gate when deciding whether to move from a public RC to an official GA tag:
+
+- [ ] **Required CI stays green for a sustained window:** Linux + Windows required jobs and lint are green on `main` for at least 7 consecutive days.
+- [ ] **CLI onboarding confidence:** at least 3 fresh-machine install + `grinta init` + first-task reports complete successfully across supported install paths (`pipx` required; source `uv run` required; Docker optional).
+- [ ] **RC feedback triage complete:** all high-severity RC feedback issues are either fixed and verified or explicitly documented as post-GA follow-up.
+- [ ] **Docs match real behavior:** `README.md`, `docs/USER_GUIDE.md`, `docs/TROUBLESHOOTING.md`, and `docs/SUPPORT_MATRIX.md` reflect the exact current CLI UX and platform support stance.
+- [ ] **Packaging artifacts validated:** PyPI package install path, Scoop, and Homebrew metadata are verified against the published artifacts for the target version.
+- [ ] **Known limitations are explicit:** any remaining gaps (for example macOS best-effort caveats) are clearly listed in release notes and support docs.
