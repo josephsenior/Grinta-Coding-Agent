@@ -4,9 +4,13 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
-from backend.core.constants import BROWSER_TOOL_SYNC_TIMEOUT_SECONDS
+from backend.core.constants import (
+    BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
+    DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR,
+)
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.commands import CmdRunAction
+from backend.ledger.action.debugger import DebuggerAction
 from backend.orchestration.services.pending_action_service import PendingActionService
 
 
@@ -310,6 +314,16 @@ class TestPendingActionService(unittest.TestCase):
         service = PendingActionService(self.mock_context, timeout=60.0)
 
         self.assertEqual(service._timeout, 60.0)
+
+    def test_debugger_pending_timeout_uses_floor(self):
+        """Debugger actions should never use a timeout below the debugger floor."""
+        action = DebuggerAction(
+            debug_action='start',
+            session_id='dbg-1',
+            timeout=5,
+        )
+        timeout = self.service._effective_timeout_seconds(20.0, action)
+        self.assertGreaterEqual(timeout, float(DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR))
 
     def test_shutdown_clears_pending_and_cancels_watchdog(self):
         """shutdown() should clear pending state and cancel watchdog."""

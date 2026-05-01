@@ -466,11 +466,9 @@ class RuntimeExecutorIOAndTerminalMixin:
             self.session_manager.cleanup_idle_sessions(max_idle_seconds=3600)
         except Exception:
             logger.debug('cleanup_idle_sessions failed', exc_info=True)
-        bash_session = self.session_manager.get_session('default')
-        if bash_session is None:
-            return ErrorObservation('Default shell session not initialized')
-        if not isinstance(bash_session, BaseShellSession):
-            return ErrorObservation('Default shell session is not a foreground shell')
+        bash_session, shell_err = self._get_or_recreate_default_shell_session()
+        if shell_err is not None:
+            return shell_err
 
         self._maybe_promote_blocking_action(action)
 
@@ -584,6 +582,30 @@ class RuntimeExecutorIOAndTerminalMixin:
 
     def _clear_terminal_read_cursor(self, session_id: str) -> None:
         _clear_terminal_read_cursor_impl(self, session_id)
+
+    def _get_or_recreate_default_shell_session(
+        self,
+    ) -> tuple[BaseShellSession | None, ErrorObservation | None]:
+        session = self.session_manager.get_session('default')
+        if isinstance(session, BaseShellSession):
+            return session, None
+        if session is not None:
+            return None, ErrorObservation('Default shell session is not a foreground shell')
+
+        try:
+            recreated = self.session_manager.create_session(session_id='default')
+        except Exception as exc:
+            logger.error('Failed to recreate default shell session: %s', exc, exc_info=True)
+            return (
+                None,
+                ErrorObservation(
+                    'Default shell session not initialized (recreation failed).'
+                ),
+            )
+        if not isinstance(recreated, BaseShellSession):
+            return None, ErrorObservation('Default shell session is not a foreground shell')
+        logger.warning('Recreated missing default shell session')
+        return recreated, None
 
     async def terminal_run(self, action: TerminalRunAction) -> Observation:
         try:
@@ -993,9 +1015,9 @@ class RuntimeExecutorIOAndTerminalMixin:
         return _handle_aci_file_read_impl(self, action)
 
     async def read(self, action: FileReadAction) -> Observation:
-        bash_session = self.session_manager.get_session('default')
-        if bash_session is None:
-            return ErrorObservation('Default shell session not initialized')
+        bash_session, shell_err = self._get_or_recreate_default_shell_session()
+        if shell_err is not None:
+            return shell_err
 
         if os.path.isfile(action.path) and is_binary(action.path):
             return ErrorObservation('ERROR_BINARY_FILE')
@@ -1023,9 +1045,9 @@ class RuntimeExecutorIOAndTerminalMixin:
             return handle_file_read_errors(filepath, working_dir)
 
     async def write(self, action: FileWriteAction) -> Observation:
-        bash_session = self.session_manager.get_session('default')
-        if bash_session is None:
-            return ErrorObservation('Default shell session not initialized')
+        bash_session, shell_err = self._get_or_recreate_default_shell_session()
+        if shell_err is not None:
+            return shell_err
 
         working_dir = bash_session.cwd
         try:
@@ -1075,9 +1097,9 @@ class RuntimeExecutorIOAndTerminalMixin:
         return _is_auto_lint_enabled_impl(self)
 
     async def edit(self, action: FileEditAction) -> Observation:
-        bash_session = self.session_manager.get_session('default')
-        if bash_session is None:
-            return ErrorObservation('Default shell session not initialized')
+        bash_session, shell_err = self._get_or_recreate_default_shell_session()
+        if shell_err is not None:
+            return shell_err
         working_dir = bash_session.cwd
         try:
             filepath = self._resolve_workspace_file_path(action.path, working_dir)

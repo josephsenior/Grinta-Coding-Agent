@@ -177,3 +177,34 @@ class TestStepGuardService(unittest.IsolatedAsyncioTestCase):
         self.assertIn(
             'Do NOT emit another write/edit or finish action', emitted.content
         )
+
+    async def test_handle_stuck_detection_skips_verification_for_shell_init_failure(
+        self,
+    ):
+        stuck_svc = MagicMock()
+        stuck_svc.compute_repetition_score.return_value = 1.0
+        stuck_svc.is_stuck.return_value = True
+        self.controller.stuck_service = stuck_svc
+
+        state = MagicMock()
+        state.extra_data = {}
+        state.set_extra = MagicMock()
+        state.set_planning_directive = MagicMock()
+        state.history = [
+            FileEditAction(
+                path='backend/context/schemas.py',
+                command='replace_text',
+                old_str='old',
+                new_str='new',
+            ),
+            ErrorObservation(content='Default shell session not initialized'),
+        ]
+        self.controller.state = state
+        self.controller.event_stream = MagicMock()
+        self.controller.agent = MagicMock()
+        self.controller.agent.clear_queued_actions = MagicMock(return_value=1)
+
+        result = await self.service._handle_stuck_detection(self.controller)
+
+        self.assertFalse(result)
+        self.assertNotIn('__step_guard_verification_required', state.extra_data)

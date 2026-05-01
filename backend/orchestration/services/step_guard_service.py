@@ -576,6 +576,18 @@ class StepGuardService:
         return None
 
     @staticmethod
+    def _is_infrastructure_feedback(feedback_line: str) -> bool:
+        normalized = feedback_line.strip().lower()
+        if not normalized:
+            return False
+        infra_markers = (
+            'default shell session not initialized',
+            'default shell session not initialized (recreation failed)',
+            'runtime not initialized',
+        )
+        return any(marker in normalized for marker in infra_markers)
+
+    @staticmethod
     def _collect_failing_feedback(
         recent_history: list[Any],
         last_mutation_index: int,
@@ -585,6 +597,8 @@ class StepGuardService:
         for rel_idx, event in enumerate(recent_history[last_mutation_index + 1 :]):
             failure_line = StepGuardService._failure_feedback_from_event(event)
             if not failure_line:
+                continue
+            if StepGuardService._is_infrastructure_feedback(failure_line):
                 continue
             abs_idx = last_mutation_index + 1 + rel_idx
             failing_feedback.append(failure_line)

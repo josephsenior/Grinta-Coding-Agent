@@ -431,7 +431,7 @@ class TestOrchestratorPromptManager:
             result = opm.get_system_message()
 
         assert 'Tool-call batching mode:' in result
-        assert 'Native function-calling mode is active.' in result
+        assert '- **Function-calling mode**: `native`.' in result
 
     def test_function_calling_mode_string_guidance_when_disabled(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
@@ -943,4 +943,5 @@ class TestBuildSystemPromptRenders:
             config=_base_config(),
             function_calling_mode=None,
         )
-        assert 'Mode is unknown' in result
+        assert 'Tool-call batching mode:' in result
+        assert '- **Function-calling mode**: `unknown`.' in result

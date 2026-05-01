@@ -820,6 +820,22 @@ async def test_renderer_verification_required_uses_notice_panel_copy() -> None:
 
 
 @pytest.mark.asyncio
+async def test_renderer_default_shell_session_error_uses_recovery_copy() -> None:
+    from backend.ledger.observation import ErrorObservation
+
+    console = _make_console()
+    renderer = CLIEventRenderer(
+        console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    await renderer.handle_event(
+        ErrorObservation(content='Default shell session not initialized')
+    )
+    output = _console_output(console)
+    assert 'The runtime shell session is missing or was interrupted.' in output
+    assert 'Retry once to let Grinta recreate the default shell session.' in output
+
+
+@pytest.mark.asyncio
 async def test_reasoning_transcript_skips_duplicate_prefix_between_tool_steps() -> None:
     """CoT segments often restate the same opening; only new lines print after each flush."""
     console = _make_console()
@@ -2268,6 +2284,28 @@ def test_error_guidance_routes_browser_timeouts_to_browser_branch() -> None:
     )
     assert guidance2 is not None
     assert 'browser' in guidance2.summary.lower()
+
+
+def test_error_guidance_routes_debugger_start_timeout_to_debugger_branch() -> None:
+    from backend.cli._event_renderer.error_panel import (
+        error_guidance as _error_guidance,
+    )
+
+    guidance = _error_guidance(
+        'Debugger error: DAPStartPhaseError: debugger start failed during initialized event after 15.0s: DAP adapter did not send initialized event'
+    )
+    assert guidance is not None
+    assert 'debugger startup' in guidance.summary.lower()
+
+
+@pytest.mark.asyncio
+async def test_wait_for_state_change_returns_immediately_when_events_are_pending() -> None:
+    renderer = CLIEventRenderer(
+        _make_console(), HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    renderer._pending_events.append(object())
+    state = await renderer.wait_for_state_change(wait_timeout_sec=1.0)
+    assert state is None
 
 
 # ── New tests: Session resume command ────────────────────────────────────

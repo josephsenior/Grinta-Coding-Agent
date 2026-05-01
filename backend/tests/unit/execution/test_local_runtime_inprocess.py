@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from backend.execution.drivers.local.local_runtime_inprocess import (
     LocalRuntimeInProcess,
 )
+from backend.core.constants import TOOL_BRIDGE_TIMEOUT_DEBUGGER
+from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.debugger import DebuggerAction
@@ -137,3 +141,44 @@ def test_close_shuts_down_persistent_browser_runner() -> None:
     runtime.close()
 
     runner.close.assert_called_once()
+
+
+def test_hard_kill_marks_runtime_uninitialized_and_drops_executor() -> None:
+    runtime = _make_runtime()
+    executor = MagicMock()
+    executor.hard_kill = AsyncMock()
+    runtime._executor = executor
+
+    runtime.hard_kill()
+
+    assert runtime.runtime_initialized is False
+    assert runtime._executor is None
+    executor.hard_kill.assert_awaited_once()
+
+
+def test_run_after_hard_kill_requires_reconnect() -> None:
+    from backend.ledger.action import CmdRunAction
+
+    runtime = _make_runtime()
+    runtime._executor = MagicMock()
+    runtime.hard_kill()
+
+    with pytest.raises(AgentRuntimeDisconnectedError, match='Runtime not initialized'):
+        runtime.run(CmdRunAction(command='pwd'))
+
+
+def test_debugger_bridge_timeout_respects_floor_when_action_timeout_is_small() -> None:
+    runtime = _make_runtime()
+    obs = NullObservation(content='debug')
+    executor = MagicMock()
+    executor.debugger = AsyncMock(return_value=obs)
+    runtime._executor = executor
+    action = DebuggerAction(debug_action='status', session_id='dbg-1', timeout=5)
+    with patch(
+        'backend.execution.drivers.local.local_runtime_inprocess.call_async_from_sync',
+        return_value=obs,
+    ) as call_sync:
+        result = runtime.debugger(action)
+    assert result is obs
+    call_sync.assert_called_once()
+    assert float(call_sync.call_args.args[1]) >= float(TOOL_BRIDGE_TIMEOUT_DEBUGGER)

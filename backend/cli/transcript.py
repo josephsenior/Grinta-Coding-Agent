@@ -14,7 +14,6 @@ from typing import Any
 from rich import box
 from rich.console import Group
 from rich.panel import Panel
-from rich.rule import Rule
 from rich.text import Text
 
 from backend.cli.layout_tokens import (
@@ -196,7 +195,7 @@ def format_activity_block(
     extra_lines: list[Any] | None = None,
     title: str | None = None,
 ) -> Any:
-    """Primary row plus optional secondary dim row, optionally wrapped in a titled card."""
+    """Primary row plus optional secondary rows, optionally prefixed with a title."""
     parts: list[Any] = [format_activity_primary(verb, detail)]
     if secondary:
         parts.append(format_activity_secondary(secondary, kind=secondary_kind))
@@ -206,21 +205,19 @@ def format_activity_block(
         parts.extend(extra_lines)
     content = Group(*parts)
     if title is not None:
-        panel_title = Text(title, style=ACTIVITY_CARD_TITLE_STYLE)
-        return Panel(
-            content,
-            title=panel_title,
-            title_align='left',
-            border_style=ACTIVITY_CARD_BORDER_STYLE,
-            box=box.ROUNDED,
-            padding=ACTIVITY_PANEL_PADDING,
-        )
+        title_line = Text()
+        title_line.append('  ', style=STYLE_EMPTY)
+        title_line.append((title or '').strip(), style=ACTIVITY_CARD_TITLE_STYLE)
+        return Group(title_line, content)
     return content
 
 
-def format_activity_turn_header() -> Rule:
-    """Section divider before the first tool/shell row each agent turn."""
-    return Rule(title=ACTIVITY_SECTION_TITLE, style=CLR_TURN_RULE, align='left')
+def format_activity_turn_header() -> Text:
+    """Section heading before the first tool/shell row each agent turn."""
+    line = Text()
+    line.append('  ', style=STYLE_EMPTY)
+    line.append(ACTIVITY_SECTION_TITLE, style=CLR_TURN_RULE)
+    return line
 
 
 _REASONING_SENTENCE_ENDERS = ('.', '!', '?', ':', ';', '"', "'", ')', ']', '…')
