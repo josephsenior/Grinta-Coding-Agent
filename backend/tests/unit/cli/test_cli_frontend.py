@@ -758,7 +758,7 @@ async def test_renderer_timeout_error_with_autonomous_retry_uses_recovery_copy()
     )
     output = _console_output(console)
     assert 'Autonomous recovery' in output
-    assert 'No action needed. Grinta already scheduled a retry.' in output
+    assert 'Automatic retry in progress. No action needed.' in output
     assert 'Confirm your network' not in output
 
 

@@ -2,7 +2,6 @@ name: Run Integration Tests
 
 on:
   pull_request:
-    types: [labeled]
   schedule:
     - cron: '30 3 * * *'
   workflow_dispatch:
@@ -31,7 +30,7 @@ jobs:
         shell: bash
         run: |
           required=(
-            "evaluation/integration_tests/scripts/run_infer.sh"
+            "backend/evaluation/agent_eval_pack.py"
           )
 
           missing=()
@@ -66,7 +65,7 @@ jobs:
 
   run-integration-tests:
     needs: detect-integration-assets
-    if: needs.detect-integration-assets.outputs.available == 'true' && (github.event.label.name == 'integration-test' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
+    if: needs.detect-integration-assets.outputs.available == 'true' && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
     permissions:
       contents: "read"
@@ -95,8 +94,8 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: Comment on PR if 'integration-test' label is present
-        if: github.event_name == 'pull_request' && github.event.label.name == 'integration-test'
+      - name: Comment on PR when integration tests start
+        if: github.event_name == 'pull_request'
         uses: KeisukeYamashita/create-comment@1d95d97d7b1b73ab66e5ca931610e4e10ddc5eed
         with:
           unique: false
@@ -221,7 +220,7 @@ jobs:
           number: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || 9745 }}
           unique: false
           comment: |
-              Trigger by: ${{ github.event_name == 'pull_request' && format('Pull Request (integration-test label on PR #{0})', github.event.pull_request.number) || (github.event_name == 'workflow_dispatch' && format('Manual Trigger: {0}', github.event.inputs.reason)) || 'Nightly Scheduled Run' }}
+              Trigger by: ${{ github.event_name == 'pull_request' && format('Pull Request #{0}', github.event.pull_request.number) || (github.event_name == 'workflow_dispatch' && format('Manual Trigger: {0}', github.event.inputs.reason)) || 'Nightly Scheduled Run' }}
               Commit: ${{ github.sha }}
               **Integration Tests Report (Haiku)**
               Haiku LLM Test Results:

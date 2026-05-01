@@ -5,17 +5,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    paths:
-      - 'backend/**'
-      - 'launch/**'
-      - 'packaging/**'
-      - 'pyproject.toml'
-      - 'README.md'
-      - 'docs/INSTALL.md'
-      - 'docs/USER_GUIDE.md'
-      - 'docs/PERFORMANCE.md'
-      - 'docs/SECURITY_CHECKLIST.md'
-      - '.github/workflows/e2e-tests.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -26,9 +15,6 @@ jobs:
     name: CLI Regression (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
-    # macOS is advisory until validated for a release; failures on macos-latest
-    # do not block the merge while Linux + Windows remain required.
-    continue-on-error: ${{ matrix.os == 'macos-latest' }}
     strategy:
       fail-fast: false
       matrix:

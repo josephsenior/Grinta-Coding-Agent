@@ -80,17 +80,14 @@ def _routing_tool_batching_paragraph(function_calling_mode: str | None) -> str:
     mode = (function_calling_mode or 'unknown').strip().lower()
     if mode == 'native':
         return (
-            'Native function-calling mode is active. You may batch independent tool calls '
-            'in one assistant turn when it improves latency; keep dependent calls sequential.'
+            'You may batch independent code search/reads in one turn if it improves latency. Dependent edits/runs must be sequential.'
         )
     if mode == 'string':
         return (
-            'Fallback string-parsing mode is active. Emit exactly one tool call per assistant '
-            'message and continue step-by-step.'
+            'Fallback string-parsing mode is active. Only emit one tool call per message.'
         )
     return (
-        'Mode is unknown. Use conservative single tool-call turns unless runtime capability '
-        'signals explicitly confirm native multi-call support.'
+        'Use single tool-calls unless multi-call is clearly supported.'
     )
 
 
@@ -235,8 +232,7 @@ def _render_system_capabilities(
     else:
         parallel_line = (
             '- **Parallel tool scheduling**: DISABLED in this run.\n'
-            '  - **Constraint**: You MUST emit exactly one tool_call per assistant message. '
-            'Batching multiple function calls in one turn is not supported by this model or configuration.'
+            '  - Only emit one tool call at a time; batching is not supported.'
         )
         provider_line = ''
 
@@ -379,12 +375,9 @@ def _render_security(cli_mode: bool = True) -> str:
         '**Global Rules**\n'
         '- Always escalate to **HIGH** if sensitive data leaves the environment.\n'
         '- Long-running shell commands: pass an explicit `timeout` (seconds) instead of '
-        'guessing — the server enforces a generous floor for interactive/debugger flows so '
-        'legitimate slow steps are not killed.\n'
-        '- Interactive terminals (`terminal_manager`): an empty result with '
-        '`has_new_output=false` is the normal "still warming up" signal — wait for the next '
-        'tick rather than spamming repeated reads. For servers and log tails, use '
-        '`is_background=true` on `execute_bash`/`execute_powershell`.'
+        'guessing.\n'
+        '- For servers and log tails, use `is_background=true` on shell executors.\n'
+        '- Interactive terminals (`terminal_manager`): wait for response before sending identical inputs.'
     )
 
 
@@ -431,8 +424,7 @@ def _render_autonomy(
             '<TASK_TRACKING>\n'
             '**task_tracker**: For multi-step tasks, use `view` to inspect the plan and `update` to replace the full `task_list`.\n'
             'Allowed statuses: `todo`, `doing`, `done`, `skipped`, `blocked`.\n'
-            '**Syncing**: Update the tracker as statuses change; piggyback updates when possible.\n'
-            '**Completion (CRITICAL)**: Do NOT call `finish` if any steps are still in `todo` or `doing`.'
+            '**Completion**: Put waiting tasks to `blocked` before calling `finish`.'
             '</TASK_TRACKING>'
         )
     else:
@@ -507,12 +499,8 @@ def _render_critical(
     )
     if terminal_manager_available:
         terminal_manager_rule = (
-            '**Interactive terminal discipline**:\n'
-            '   - For `terminal_manager action=open`, reuse only the returned `session_id`; never invent one. The `open` command already runs; later commands use `action=input`.\n'
-            '   - Prefer `action=read` with `mode=delta`; reuse `next_offset` or omit `offset`.\n'
-            '   - If output stalls, stop repeating the same `read` / `input` / `control`; send a different command or pivot tools.\n'
-            '   - Read an opened session before opening another similar one.\n'
-            '   - If the latest user message is about your behavior rather than more terminal work, answer in natural language first.'
+            '**Interactive terminal state diagram**: `open` (spawns process and returns session id) -> `read` -> `input` -> `read`.\n'
+            '**Rules**: 1) Reuse `session_id`, 2) Use `mode=delta` when reading, 3) Wait for output instead of repeating inputs.'
         )
     else:
         terminal_manager_rule = f'**Interactive terminal sessions are unavailable in this run** — do not refer to `terminal_manager`; use `{terminal_command_tool}` for non-interactive command execution only.'

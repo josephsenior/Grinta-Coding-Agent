@@ -20,12 +20,14 @@ from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
+from backend.cli.config_manager import DEFAULT_MODEL_BY_PROVIDER
 from backend.cli.theme import (
     CLR_BRAND,
     CLR_CARD_BORDER,
     CLR_CARD_TITLE,
     CLR_META,
     CLR_STATUS_OK,
+    no_color_enabled,
 )
 from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.dotenv_keys import persist_llm_api_key_to_dotenv
@@ -34,19 +36,19 @@ from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 _PROVIDER_PRESETS: dict[str, dict[str, str]] = {
     'openai': {
         'env': 'OPENAI_API_KEY',
-        'default_model': 'openai/gpt-4o-mini',
+        'default_model': DEFAULT_MODEL_BY_PROVIDER['openai'],
         'base_url': '',
         'help': 'OpenAI / compatible (gpt-4o, gpt-4.1, o1, o3, ...)',
     },
     'anthropic': {
         'env': 'ANTHROPIC_API_KEY',
-        'default_model': 'anthropic/claude-sonnet-4-20250514',
+        'default_model': DEFAULT_MODEL_BY_PROVIDER['anthropic'],
         'base_url': '',
         'help': 'Anthropic (claude-sonnet-4, claude-opus-4, claude-haiku-4)',
     },
     'google': {
         'env': 'GEMINI_API_KEY',
-        'default_model': 'google/gemini-2.5-pro',
+        'default_model': DEFAULT_MODEL_BY_PROVIDER['google'],
         'base_url': '',
         'help': 'Google Gemini (gemini-2.5-pro, gemini-2.5-flash)',
     },
@@ -64,7 +66,7 @@ _PROVIDER_PRESETS: dict[str, dict[str, str]] = {
     },
     'openrouter': {
         'env': 'OPENROUTER_API_KEY',
-        'default_model': 'openrouter/anthropic/claude-3.5-sonnet',
+        'default_model': DEFAULT_MODEL_BY_PROVIDER['openrouter'],
         'base_url': 'https://openrouter.ai/api/v1',
         'help': 'OpenRouter (proxy to many providers)',
     },
@@ -172,7 +174,7 @@ def _collect_api_key(console: Console, preset: dict[str, Any]) -> str:
 
 def run_init(project_root: Path | None = None, console: Console | None = None) -> int:
     """Run the wizard. Returns shell-style exit code."""
-    console = console or Console()
+    console = console or Console(no_color=no_color_enabled())
     project_root = (project_root or Path.cwd()).resolve()
     settings_file = _settings_path()
     existing = _load_existing(settings_file)
@@ -232,7 +234,7 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
             f'Provider: [bold]{provider}[/bold]\n'
             f'Model: [bold]{model}[/bold]\n\n'
             f'Start the agent with: [{CLR_BRAND}]grinta[/]\n'
-            f'Slash commands inside the REPL: [{CLR_BRAND}]/help[/]',
+            f'REPL commands: [{CLR_BRAND}]/help[/] · shell commands: [{CLR_BRAND}]grinta sessions ...[/]',
             title='Setup complete',
             border_style=CLR_STATUS_OK,
         )

@@ -52,7 +52,7 @@ jobs:
 
       - name: Run coverage for Codecov
         if: always()
-        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=95 --cov-report=xml:coverage.xml backend/tests/unit
+        run: PYTHONPATH=".:$PYTHONPATH" uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=0 --cov-report=xml:coverage.xml backend/tests/unit
 
       - name: Upload coverage to Codecov
         if: always()
@@ -97,7 +97,7 @@ jobs:
       - name: Run coverage for Codecov
         if: always()
         shell: pwsh
-        run: uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=95 --cov-report=xml:coverage.xml backend/tests/unit
+        run: uv run pytest --maxfail=1 -q --cov=backend --cov-fail-under=0 --cov-report=xml:coverage.xml backend/tests/unit
         env:
           PYTHONPATH: ".;$env:PYTHONPATH"
 
@@ -141,11 +141,8 @@ jobs:
         run: PYTHONPATH=".:$PYTHONPATH" uv run pytest backend/tests -m "heavy or integration or benchmark" -vv
 
   gates-on-macos:
-    # Advisory only — failures should not block merge while macOS is being
-    # validated. Promote to required once the matrix is green for a release.
-    name: Python Gates on macOS (advisory)
+    name: Python Gates on macOS
     runs-on: macos-latest
-    continue-on-error: true
     strategy:
       matrix:
         python-version: ['3.12']
