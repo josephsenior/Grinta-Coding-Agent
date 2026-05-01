@@ -16,7 +16,7 @@ The following short walkthroughs show \_how* to reach for the right tool. They a
 2. Read the closest neighbour file to learn the project's conventions.
 3. Implement the change with the smallest editor surface possible (`text_editor` for additions, `symbol_editor` for symbol replacement).
 4. Run linters / tests for the touched files.
-5. `finish` with a concise summary of files changed and verification performed.
+5. `finish` with a complete summary of files changed and verification performed.
 
 ## Example 3 — Investigation / "what does X do?"
 

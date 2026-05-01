@@ -355,6 +355,9 @@ def test_active_tool_registry_visible_from_worker_thread():
     from concurrent.futures import ThreadPoolExecutor
     from unittest.mock import MagicMock
 
+    from dataclasses import replace
+
+    from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
     from backend.engine.tools import prompt as prompt_mod
 
     prompt_mod.set_active_tool_registry(None)
@@ -368,8 +371,9 @@ def test_active_tool_registry_visible_from_worker_thread():
         def read_prefers_powershell():
             return prompt_mod._runtime_prefers_powershell()
 
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            assert pool.submit(read_prefers_powershell).result() is True
+        with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                assert pool.submit(read_prefers_powershell).result() is True
     finally:
         prompt_mod.set_active_tool_registry(None)
         prompt_mod._get_global_tool_registry.cache_clear()

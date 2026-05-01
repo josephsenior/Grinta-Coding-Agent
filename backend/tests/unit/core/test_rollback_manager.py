@@ -399,23 +399,16 @@ class TestRollbackManager:
     def test_save_checkpoints_exception(self, workspace, monkeypatch):
         """Test exception handling when saving manifest."""
         rm = RollbackManager(str(workspace))
+        monkeypatch.setattr(
+            rm,
+            '_save_manifest',
+            lambda: (_ for _ in ()).throw(PermissionError('simulated write failure')),
+        )
 
-        # Make checkpoints_dir read-only to trigger write error
-        import stat
-
-        original_mode = rm.checkpoints_dir.stat().st_mode
-
-        try:
-            # Make directory read-only
-            rm.checkpoints_dir.chmod(stat.S_IRUSR | stat.S_IXUSR)
-
-            # This should handle the exception gracefully
-            # (but may still add checkpoint to list)
-            cp_id = rm.create_checkpoint('save error')
-            assert cp_id.startswith('cp_')
-        finally:
-            # Restore permissions
-            rm.checkpoints_dir.chmod(original_mode)
+        # This should handle the exception gracefully
+        # (but may still add checkpoint to list)
+        cp_id = rm.create_checkpoint('save error')
+        assert cp_id.startswith('cp_')
 
     def test_cleanup_old_checkpoints_limits(self, workspace):
         """Test cleanup enforces max_checkpoints limit."""

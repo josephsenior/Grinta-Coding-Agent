@@ -221,11 +221,11 @@ async def test_event_renderer_repeat_command_after_error_still_two_rows() -> Non
 
 def test_hud_shows_mcp_server_count_when_set() -> None:
     hud = HUDBar()
-    assert 'MCP·?' in hud._format().plain
+    assert 'MCP: ?' in hud._format().plain
     hud.update_mcp_servers(3)
-    assert 'MCP·3' in hud._format().plain
+    assert 'MCP: 3' in hud._format().plain
     n_skills = HUDBar.count_bundled_playbook_skills()
-    assert f'sk·{min(n_skills, 99)}' in hud._format().plain
+    assert f'Skills: {min(n_skills, 99)}' in hud._format().plain
 
 
 def test_hud_shows_provider_and_model_combined() -> None:
@@ -247,6 +247,25 @@ def test_hud_shows_provider_and_model_combined() -> None:
     # The raw "openai/google/..." with the provider prefix still should not leak.
     assert 'openai/google/gemini-3-flash-preview' not in bar
     assert hud._format_compact().plain == bar
+
+
+def test_hud_prefers_model_provider_over_client_prefix() -> None:
+    hud = HUDBar()
+    hud.update_model('openai/lightning-ai/kimi-k2.5')
+
+    bar = hud._format().plain
+
+    assert 'lightning-ai/kimi-k2.5' in bar
+    assert 'openai/lightning-ai/kimi-k2.5' not in bar
+
+
+def test_hud_uses_client_when_model_has_no_provider_prefix() -> None:
+    hud = HUDBar()
+    hud.update_model('openai/gpt-4o')
+
+    bar = hud._format().plain
+
+    assert 'openai/gpt-4o' in bar
 
 
 def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
@@ -276,7 +295,7 @@ def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
 def test_hud_singular_mcp_label() -> None:
     hud = HUDBar()
     hud.update_mcp_servers(1)
-    assert 'MCP·1' in hud._format().plain
+    assert 'MCP: 1' in hud._format().plain
 
 
 def test_confirmation_uses_backend_security_risk() -> None:
@@ -3615,7 +3634,7 @@ async def test_fake_prompt_single_path_narrow_and_wide_match() -> None:
         assert 'GRINTA' in blob
         assert 'RUNNING' in blob or 'Running' in blob
         assert 'google/gemini-3-flash-preview' in blob
-        assert 'MCP·' in blob
+        assert 'MCP:' in blob
 
 
 def test_hud_single_bar_format_all_widths() -> None:
@@ -3634,8 +3653,8 @@ def test_hud_single_bar_format_all_widths() -> None:
     assert a.plain == b.plain == c.plain
     assert '●' in a.plain
     assert '5.0K/128.0K' in a.plain or '5000' in a.plain
-    assert 'MCP·?' in a.plain
-    assert '3c' in a.plain
+    assert 'MCP: ?' in a.plain
+    assert 'Calls: 3' in a.plain
 
 
 def test_hud_ledger_icon() -> None:

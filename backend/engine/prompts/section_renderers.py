@@ -109,9 +109,9 @@ def _routing_memory_tool_placeholders(
     if working_memory_on:
         memory_and_context_section = (
             '<MEMORY_AND_CONTEXT_TOOLS>\n'
-            '- Disk facts: `note(key, value)` / `recall(key)`.\n'
-            '- Session state: `memory_manager(action="working_memory", ...)` and `memory_manager(action="semantic_recall", key=...)`.\n'
-            'Rule: long-lived facts → `note`; task-local state → `memory_manager`.\n'
+            '- Disk facts: `note(key, value)` / `recall(key)`. Use for long-lived facts (e.g., user preferences, architectural rules, common commands).\n'
+            '- Session state: `memory_manager(action="working_memory", ...)` and `memory_manager(action="semantic_recall", key=...)`. Use for ephemeral task-local state (e.g., current bug hypotheses, "step 2 of 5").\n'
+            'Rule: cross-session knowledge → `note`; within-session state → `memory_manager`.\n'
             '</MEMORY_AND_CONTEXT_TOOLS>'
         )
         post_condensation_retrieval = 'Call `memory_manager(action="working_memory")` after condensation to restore plan/findings before acting.'
@@ -223,26 +223,22 @@ def _render_system_capabilities(
     checkpoints_on = bool(getattr(config, 'enable_checkpoints', False))
     fc_mode = (function_calling_mode or 'unknown').strip().lower()
 
-    if parallel_enabled:
+    if parallel_enabled and parallel_tool_calls_provider_flag and fc_mode == 'native':
         parallel_line = (
             '- **Parallel tool scheduling**: ENABLED for read-only batches '
-            '(`read_file`, `search_code`, `lsp`, `symbol_editor`, `think`). '
-            'Emit independent reads in a single assistant turn — the scheduler will run them concurrently. '
-            'Writes/edits/shell commands always run sequentially.'
+            '(`read_file`, `search_code`, `lsp`, `symbol_editor`, `think`).\n'
+            '  - **Usage**: Emitting multiple tool_calls in one assistant message is supported. '
+            'Emit independent reads in a single assistant turn to run them concurrently.\n'
+            '  - **Constraint**: Writes, edits, and shell commands always run sequentially.'
         )
+        provider_line = ''
     else:
-        parallel_line = '- **Parallel tool scheduling**: DISABLED in this run. All tool calls run sequentially.'
-
-    if parallel_enabled and parallel_tool_calls_provider_flag and fc_mode == 'native':
-        provider_line = (
-            '- **Provider-side parallel function calls**: enabled for this model. '
-            'Emitting multiple tool_calls in one assistant message is supported by the API.'
+        parallel_line = (
+            '- **Parallel tool scheduling**: DISABLED in this run.\n'
+            '  - **Constraint**: You MUST emit exactly one tool_call per assistant message. '
+            'Batching multiple function calls in one turn is not supported by this model or configuration.'
         )
-    else:
-        provider_line = (
-            '- **Provider-side parallel function calls**: emit one tool_call per assistant message '
-            'unless you have explicit confirmation the model supports parallel tool_calls.'
-        )
+        provider_line = ''
 
     if multi_edit_available:
         multi_edit_line = (

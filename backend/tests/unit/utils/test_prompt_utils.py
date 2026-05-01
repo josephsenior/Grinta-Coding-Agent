@@ -782,12 +782,21 @@ class TestBuildSystemPromptRenders:
         )
 
     def test_windows_powershell(self) -> None:
-        self._assert_renders_cleanly(
+        result = self._assert_renders_cleanly(
             active_llm_model='gpt-4o',
             is_windows=True,
             config=_base_config(),
             function_calling_mode='native',
         )
+        assert (
+            'Be thorough and direct; prefer completeness and verification details over brevity.'
+            in result
+        )
+        assert (
+            'When brevity conflicts with correctness or verification, prefer correctness and verification.'
+            in result
+        )
+        assert 'Be terse and direct.' not in result
 
     def test_windows_git_bash(self) -> None:
         self._assert_renders_cleanly(

@@ -107,6 +107,8 @@ class TestResolvePath:
 
     def test_resolve_path_fallback_for_different_drives(self):
         """Test fallback check for paths on different drives (Windows)."""
+        if os.name != 'nt':
+            pytest.skip('Windows-only different-drive path behavior')
         # Simulate ValueError in is_relative_to (different drives on Windows)
         with patch.object(Path, 'is_relative_to', side_effect=ValueError):
             workspace = 'C:\\workspace'

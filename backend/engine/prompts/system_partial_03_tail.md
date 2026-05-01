@@ -7,7 +7,8 @@ Summarize meaningful changes in chat. Avoid duplicate docs unless requested.
 </DOCUMENTATION>
 
 <RESPONSE_STYLE>
-Be terse and direct.
+Be thorough and direct; prefer completeness and verification details over brevity.
+When brevity conflicts with correctness or verification, prefer correctness and verification.
 
 - Prose is the default; use lists only when the content is list-shaped.
 - No future-tense or tool-call narration, and no post-tool recap unless the user asked for one.
