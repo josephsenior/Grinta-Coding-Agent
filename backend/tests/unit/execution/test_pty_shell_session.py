@@ -254,10 +254,10 @@ class TestNonPs1Execute:
 class TestFactoryWiring:
     def _make_tools(self) -> MagicMock:
         tools = MagicMock()
-        tools.has_bash = False
-        tools.has_powershell = True
+        tools.has_bash = not IS_WINDOWS
+        tools.has_powershell = IS_WINDOWS
         tools.has_tmux = False
-        tools.shell_type = 'powershell'
+        tools.shell_type = 'powershell' if IS_WINDOWS else 'bash'
         tools.is_container_runtime = False
         tools.is_wsl_runtime = False
         return tools

@@ -226,7 +226,8 @@ class TestDetectCapabilities:
         assert caps.can_mcp is True
 
     @patch('sys.platform', 'win32')
-    def test_mcp_config_http_on_windows(self):
+    @patch('shutil.which', return_value='C:\\Git\\bin\\git.exe')
+    def test_mcp_config_http_on_windows(self, _mock_which):
         """Test that MCP is enabled on Windows if HTTP/SSE servers are configured."""
 
         class MockServer:
@@ -248,7 +249,8 @@ class TestDetectCapabilities:
         assert caps.can_mcp is True
 
     @patch('sys.platform', 'win32')
-    def test_mcp_config_exception(self):
+    @patch('shutil.which', return_value='C:\\Git\\bin\\git.exe')
+    def test_mcp_config_exception(self, _mock_which):
         """Test that MCP config exceptions are handled gracefully."""
 
         class BadConfig:

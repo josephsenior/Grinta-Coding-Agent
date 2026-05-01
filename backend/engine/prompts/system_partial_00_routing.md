@@ -22,7 +22,7 @@ On workspace-modifying tasks, call `recall(key="lessons")` once. Skip for pure Q
 {memory_and_context_section}
 
 <EXECUTION_DISCIPLINE>
-Loop: reason briefly → use tools → advance.
+Loop: reason clearly → use tools → advance.
 
 **Re-read policy:**
 

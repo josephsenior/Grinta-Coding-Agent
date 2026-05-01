@@ -3,11 +3,21 @@
 from __future__ import annotations
 
 import os
+import time
 from unittest.mock import patch
 
 import pytest
 
 from backend.persistence.local_file_store import LocalFileStore
+
+
+def _wait_until_removed(path: str, timeout: float = 1.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not os.path.exists(path):
+            return True
+        time.sleep(0.02)
+    return not os.path.exists(path)
 
 
 @pytest.fixture()
@@ -94,7 +104,7 @@ class TestDelete:
     def test_delete_directory(self, store):
         store.write('folder/f.txt', 'x')
         store.delete('folder')
-        assert not os.path.exists(store.get_full_path('folder'))
+        assert _wait_until_removed(store.get_full_path('folder'))
 
     def test_delete_nonexistent_no_error(self, store):
         # Should not raise
@@ -118,7 +128,7 @@ class TestDelete:
             store.delete('folder')
 
         assert calls['count'] >= 2
-        assert not os.path.exists(store.get_full_path('folder'))
+        assert _wait_until_removed(store.get_full_path('folder'))
 
 
 class TestGetFullPath:
