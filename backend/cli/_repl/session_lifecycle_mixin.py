@@ -223,8 +223,11 @@ class SessionLifecycleMixin:
             if runtime_client is not None:
                 await runtime_client.hard_kill()
 
-        # Stop orchestrator cleanly
+        # Stop orchestrator cleanly (no ErrorObservation for interrupted tools)
         if self._controller is not None:
+            mark = getattr(self._controller, 'mark_user_interrupt_stop', None)
+            if callable(mark):
+                mark()
             with contextlib.suppress(Exception):
                 await self._controller.stop()
 

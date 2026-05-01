@@ -140,3 +140,124 @@ CLR_RECOVERY_HINT_DIM = 'dim cyan'  # recovery body / numbered steps
 # ── Splash branding ──────────────────────────────────────────────────────────
 CLR_SPLASH_LOGO_ACCENT = 'red'  # logo block art (intentional brand mark)
 CLR_SPLASH_FIGLET = 'bold red'  # large GRINTA wordmark on the splash
+
+# ── prompt_toolkit (``Style.from_dict``) — keep in sync with Rich tokens above ---
+PT_DEFAULT_FG = '#e6eef7'
+PT_PLACEHOLDER_DIM = '#5d7286'
+PT_FOOTER_BADGE_BRACKET = '#0e7490'
+PT_FOOTER_BADGE_CORE = 'bold #22d3ee'
+PT_FOOTER_KICKER = 'bold #a5f3fc'
+PT_FOOTER_WARN_BRACKET = '#a16207'
+PT_FOOTER_WARN_CORE = 'bold #facc15'
+PT_FOOTER_WARN_KICKER = 'bold #fde68a'
+PT_FOOTER_WARN_SEP = '#92400e'
+PT_COMPLETION_MENU_BG = 'bg:#0d1f30 #b8c7d8'
+PT_COMPLETION_MENU_CURRENT = 'bg:#1e4976 bold #ffffff'
+PT_COMPLETION_META_BG = 'bg:#0a1929 #5c7fa0'
+PT_COMPLETION_META_CURRENT = 'bg:#163350 #93c5fd'
+PT_SCROLLBAR_BG = 'bg:#0d1f30'
+PT_SCROLLBAR_BUTTON = 'bg:#1e4976'
+
+
+def prompt_toolkit_style_dict() -> dict[str, str]:
+    """Return ``Style.from_dict`` mapping; respects :func:`no_color_enabled`."""
+    if no_color_enabled():
+        return _prompt_toolkit_style_dict_no_color()
+    return _prompt_toolkit_style_dict_color()
+
+
+def _prompt_toolkit_style_dict_color() -> dict[str, str]:
+    return {
+        '': f'noreverse {PT_DEFAULT_FG}',
+        'bottom-toolbar': 'noreverse',
+        'bottom-toolbar.text': 'noreverse',
+        'placeholder': f'italic {PT_PLACEHOLDER_DIM}',
+        'prompt.border': CLR_THINKING_BORDER,
+        'prompt.frame.border': f'bold {CLR_STATUS_OK}',
+        'prompt.brand': CLR_BRAND,
+        'prompt.dim': CLR_META,
+        'prompt.model': CLR_HUD_MODEL,
+        'prompt.value': CLR_HUD_DETAIL,
+        'prompt.sep': CLR_SEP,
+        'prompt.arrow': CLR_BRAND,
+        'prompt.hint': CLR_AUTONOMY_FULL,
+        'prompt.badge.ready': f'bold {CLR_STATUS_OK}',
+        'prompt.badge.running': CLR_STATE_RUNNING,
+        'prompt.badge.review': f'bold {CLR_STATUS_WARN}',
+        'prompt.badge.paused': f'bold {CLR_STATUS_WARN}',
+        'prompt.badge.error': f'bold {CLR_STATUS_ERR}',
+        'prompt.autonomy.balanced': CLR_AUTONOMY_BALANCED,
+        'prompt.autonomy.full': CLR_AUTONOMY_FULL,
+        'prompt.autonomy.conservative': CLR_AUTONOMY_CONSERVATIVE,
+        'prompt.health.good': f'bold {CLR_STATUS_OK}',
+        'prompt.health.warn': f'bold {CLR_STATUS_WARN}',
+        'prompt.health.bad': f'bold {CLR_STATUS_ERR}',
+        'prompt.footer.badge_bracket': PT_FOOTER_BADGE_BRACKET,
+        'prompt.footer.badge_core': PT_FOOTER_BADGE_CORE,
+        'prompt.footer.kicker': PT_FOOTER_KICKER,
+        'prompt.footer.sep': CLR_META,
+        'prompt.footer.body': CLR_MUTED_TEXT,
+        'prompt.footer.warn_bracket': PT_FOOTER_WARN_BRACKET,
+        'prompt.footer.warn_core': PT_FOOTER_WARN_CORE,
+        'prompt.footer.warn_kicker': PT_FOOTER_WARN_KICKER,
+        'prompt.footer.warn_sep': PT_FOOTER_WARN_SEP,
+        'prompt.footer.warn_body': CLR_STATUS_WARN,
+        'completion-menu': PT_COMPLETION_MENU_BG,
+        'completion-menu.completion': PT_COMPLETION_MENU_BG,
+        'completion-menu.completion.current': PT_COMPLETION_MENU_CURRENT,
+        'completion-menu.meta': PT_COMPLETION_META_BG,
+        'completion-menu.meta.completion': PT_COMPLETION_META_BG,
+        'completion-menu.meta.completion.current': PT_COMPLETION_META_CURRENT,
+        'completion-menu.multi-column-meta': PT_COMPLETION_META_BG,
+        'scrollbar.background': PT_SCROLLBAR_BG,
+        'scrollbar.button': PT_SCROLLBAR_BUTTON,
+    }
+
+
+def _prompt_toolkit_style_dict_no_color() -> dict[str, str]:
+    """ANSI-only styles when ``NO_COLOR`` is set (no hex in output)."""
+    return {
+        '': 'noreverse',
+        'bottom-toolbar': 'noreverse',
+        'bottom-toolbar.text': 'noreverse',
+        'placeholder': 'italic dim',
+        'prompt.border': 'bold',
+        'prompt.frame.border': 'bold',
+        'prompt.brand': 'bold',
+        'prompt.dim': 'dim',
+        'prompt.model': 'bold',
+        'prompt.value': 'dim',
+        'prompt.sep': 'dim',
+        'prompt.arrow': 'bold',
+        'prompt.hint': 'bold',
+        'prompt.badge.ready': 'bold',
+        'prompt.badge.running': 'bold',
+        'prompt.badge.review': 'bold',
+        'prompt.badge.paused': 'bold',
+        'prompt.badge.error': 'bold',
+        'prompt.autonomy.balanced': 'dim',
+        'prompt.autonomy.full': 'bold',
+        'prompt.autonomy.conservative': 'bold',
+        'prompt.health.good': 'bold',
+        'prompt.health.warn': 'bold',
+        'prompt.health.bad': 'bold',
+        'prompt.footer.badge_bracket': 'dim',
+        'prompt.footer.badge_core': 'bold',
+        'prompt.footer.kicker': 'bold',
+        'prompt.footer.sep': 'dim',
+        'prompt.footer.body': 'dim',
+        'prompt.footer.warn_bracket': 'dim',
+        'prompt.footer.warn_core': 'bold',
+        'prompt.footer.warn_kicker': 'bold',
+        'prompt.footer.warn_sep': 'dim',
+        'prompt.footer.warn_body': 'bold',
+        'completion-menu': 'noreverse',
+        'completion-menu.completion': 'noreverse',
+        'completion-menu.completion.current': 'bold underline',
+        'completion-menu.meta': 'dim',
+        'completion-menu.meta.completion': 'dim',
+        'completion-menu.meta.completion.current': 'bold',
+        'completion-menu.multi-column-meta': 'dim',
+        'scrollbar.background': 'dim',
+        'scrollbar.button': 'bold',
+    }

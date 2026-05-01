@@ -25,10 +25,10 @@ from rich.markdown import Markdown
 from rich.padding import Padding
 from rich.panel import Panel
 from rich.style import Style
-from rich.table import Table
 from rich.text import Text
 
 from backend.cli.hud import HUDBar
+from backend.cli.status_chrome import rich_fake_prompt_group, status_fields_from_hud
 from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
     ACTIVITY_CARD_TITLE_SHELL,
@@ -44,9 +44,6 @@ from backend.cli.layout_tokens import (
 )
 from backend.cli.path_links import file_uri_for_path, linkify_plain
 from backend.cli.theme import (
-    CLR_AUTONOMY_BALANCED,
-    CLR_AUTONOMY_CONSERVATIVE,
-    CLR_AUTONOMY_FULL,
     CLR_BRAND,
     CLR_ERR_BODY,
     CLR_ERR_ICON,
@@ -64,7 +61,6 @@ from backend.cli.theme import (
     STYLE_BOLD_DIM,
     STYLE_DEFAULT,
     STYLE_DIM,
-    STYLE_EMPTY,
     STYLE_ITALIC_DIM,
 )
 from backend.cli.tool_call_display import (
@@ -607,7 +603,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             body_items.append(spacer_live_section())
         # Render a fake prompt bar at the bottom so the input area, stats, and
         # HUD remain visually present while the agent works.
-        body_items.append(self._render_fake_prompt(options.max_width))
+        body_items.append(
+            self._render_fake_prompt(options.max_width or self._console.width)
+        )
         yield Group(*body_items)
 
     def _collect_live_sections(self) -> list[Any]:
@@ -703,29 +701,6 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
     # -- fake prompt (matches prompt_toolkit bottom toolbar) ----------------
 
-    # ``_render_fake_prompt`` shared constants -------------------------------
-    _FAKE_PROMPT_BADGE_STYLES: dict[str, str] = {
-        'Running': CLR_STATE_RUNNING,
-        'Ready': CLR_STATUS_OK + ' bold',
-        'Done': CLR_STATUS_OK + ' bold',
-        'Finished': CLR_STATUS_OK + ' bold',
-        'Needs approval': CLR_STATUS_WARN + ' bold',
-        'Needs attention': CLR_STATUS_ERR + ' bold',
-        'Stopped': CLR_STATUS_ERR + ' bold',
-    }
-    _FAKE_PROMPT_LEDGER_OK: frozenset[str] = frozenset(
-        {'Healthy', 'Ready', 'Idle', 'Starting'}
-    )
-    _FAKE_PROMPT_LEDGER_WARN: frozenset[str] = frozenset({'Review', 'Paused'})
-    _FAKE_PROMPT_AUTONOMY_STYLES: dict[str, str] = {
-        'full': CLR_AUTONOMY_FULL,
-        'conservative': CLR_AUTONOMY_CONSERVATIVE,
-    }
-    _FAKE_PROMPT_SEP: tuple[str, str] = (' · ', CLR_SEP)
-    _FAKE_PROMPT_UNKNOWN_PROVIDERS: frozenset[str] = frozenset(
-        {'(not set)', '(unknown)'}
-    )
-
     def _render_fake_prompt(self, width: int) -> Any:
         """Render a prompt look-alike anchored at the bottom of the Live display.
 
@@ -733,116 +708,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         between Live (agent executing) and prompt_toolkit (user input) is
         seamless — the input area and stats bar never appear to disappear.
         """
-        hud = self._hud.state
-        provider, model = HUDBar.describe_model(hud.model)
-        items: list[Any] = [
-            self._fake_prompt_input_row(hud),
-            Text('─' * width, style=CLR_SEP),
-            self._fake_prompt_row1(hud),
-        ]
-        items.extend(self._fake_prompt_metrics_rows(hud, provider, model))
-        return Group(*items)
-
-    @staticmethod
-    def _fake_prompt_input_row(hud: Any) -> Any:
-        from rich.spinner import Spinner
-
-        state_l = (hud.agent_state_label or 'Running').strip()
-        if state_l.lower() == 'running':
-            subline = 'Agent working · ctrl+c to interrupt'
-            spin_style = CLR_BRAND
-        else:
-            subline = f'{state_l} · ctrl+c if you need to interrupt'
-            spin_style = f'dim {CLR_META}'
-        text_style = f'italic {CLR_META}'
-        input_row = Table.grid()
-        input_row.add_column(width=3)
-        input_row.add_column()
-        input_row.add_row(
-            Spinner('dots', style=spin_style),
-            Text(subline, style=text_style),
-        )
-        return input_row
-
-    @classmethod
-    def _fake_prompt_row1(cls, hud: Any) -> Text:
-        state_label = hud.agent_state_label or 'Running'
-        autonomy = hud.autonomy_level or 'balanced'
-        row1 = Text()
-        row1.append('GRINTA', style=CLR_BRAND)
-        row1.append('  ', style=STYLE_EMPTY)
-        row1.append(
-            f' {state_label.upper()} ',
-            style=cls._FAKE_PROMPT_BADGE_STYLES.get(
-                state_label, CLR_STATUS_OK + ' bold'
-            ),
-        )
-        row1.append('  ', style=STYLE_EMPTY)
-        auto_style = CLR_AUTONOMY_BALANCED
-        for needle, style in cls._FAKE_PROMPT_AUTONOMY_STYLES.items():
-            if needle in autonomy:
-                auto_style = style
-                break
-        row1.append(f'autonomy:{autonomy}', style=auto_style)
-        return row1
-
-    @classmethod
-    def _fake_prompt_token_display(cls, hud: Any) -> str:
-        ctx = HUDBar._format_tokens(hud.context_tokens)
-        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
-        if hud.context_tokens == 0 and hud.context_limit == 0:
-            token_display = '0t'
-        elif hud.context_limit == 0:
-            token_display = f'{ctx}t'
-        else:
-            token_display = f'{ctx}/{lim}' if lim else f'{ctx}t'
-        if getattr(hud, 'token_usage_estimated', False):
-            token_display += '~'
-        return token_display
-
-    @classmethod
-    def _fake_prompt_ledger_style(cls, ledger_status: str) -> str:
-        if ledger_status in cls._FAKE_PROMPT_LEDGER_WARN:
-            return CLR_STATUS_WARN + ' bold'
-        if ledger_status not in cls._FAKE_PROMPT_LEDGER_OK:
-            return CLR_STATUS_ERR + ' bold'
-        return CLR_STATUS_OK + ' bold'
-
-    def _fake_prompt_metrics_rows(
-        self,
-        hud: Any,
-        provider: str,
-        model: str,
-    ) -> list[Text]:
-        sep = self._FAKE_PROMPT_SEP
-        token_display = self._fake_prompt_token_display(hud)
-        mcp_short = '?' if hud.mcp_servers is None else str(min(hud.mcp_servers, 99))
-        sk_short = str(min(self._hud.bundled_skill_count, 99))
-        ledger_style = self._fake_prompt_ledger_style(hud.ledger_status)
-        if provider in self._FAKE_PROMPT_UNKNOWN_PROVIDERS:
-            model_display = model
-        else:
-            model_display = f'{provider}/{model}'
-        primary_parts: list[tuple[str, str]] = [
-            (model_display, CLR_HUD_MODEL),
-            sep,
-            (f'Tokens: {token_display}', CLR_HUD_DETAIL),
-            sep,
-            (f'Cost: ${hud.cost_usd:.3f}', CLR_HUD_DETAIL),
-            sep,
-            (f'Calls: {hud.llm_calls}', CLR_HUD_DETAIL),
-            sep,
-            (f'MCP: {mcp_short}', CLR_HUD_DETAIL),
-            sep,
-            (f'Skills: {sk_short}', CLR_HUD_DETAIL),
-            sep,
-            (hud.ledger_status, ledger_style),
-        ]
-        parts: list[tuple[str, str]] = list(primary_parts)
-        row = Text()
-        for content, style in parts:
-            row.append(content, style=style)
-        return [row]
+        w = max(1, int(width or self._console.width or 80))
+        fields = status_fields_from_hud(self._hud.state, self._hud.bundled_skill_count)
+        return rich_fake_prompt_group(fields, w)
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         raw = action.accumulated

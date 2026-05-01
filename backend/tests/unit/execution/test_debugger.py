@@ -117,6 +117,36 @@ def test_manager_requires_adapter_command_for_non_python(tmp_path) -> None:
     assert 'adapter_command' in obs.content
 
 
+def test_manager_maps_pwa_node_adapter_to_js_recipe(monkeypatch, tmp_path) -> None:
+    instances: list[Any] = []
+
+    class FakeSession:
+        def __init__(self, session_id: str, **kwargs: Any) -> None:
+            self.session_id = session_id
+            self.kwargs = kwargs
+            instances.append(self)
+
+        def start(self, timeout: float = 15.0) -> dict[str, Any]:
+            return {'session_id': self.session_id, 'state': 'started'}
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr('backend.execution.debugger.DAPDebugSession', FakeSession)
+    monkeypatch.setattr(
+        'backend.execution.debugger.shutil.which',
+        lambda cmd: '/fake/js-debug-adapter' if cmd == 'js-debug-adapter' else None,
+    )
+
+    manager = DAPDebugManager(str(tmp_path))
+    start_obs = manager.handle(
+        DebuggerAction(debug_action='start', adapter='pwa-node', session_id='dbg-pwa')
+    )
+    assert isinstance(start_obs, DebuggerObservation)
+    assert instances[0].kwargs['adapter_command'] == ['/fake/js-debug-adapter']
+    assert instances[0].kwargs['adapter_id'] == 'javascript'
+
+
 def test_manager_start_error_includes_startup_phase_metadata(monkeypatch, tmp_path) -> None:
     class FakeSession:
         def __init__(self, session_id: str, **kwargs: Any) -> None:

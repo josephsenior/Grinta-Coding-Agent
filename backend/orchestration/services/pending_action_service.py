@@ -10,11 +10,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 from backend.core.constants import (
     BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
-    CMD_PENDING_ACTION_TIMEOUT_FLOOR,
     DEBUGGER_PENDING_ACTION_TIMEOUT_FLOOR,
     MCP_PENDING_ACTION_TIMEOUT_FLOOR,
     TERMINAL_PENDING_ACTION_TIMEOUT_FLOOR,
 )
+from backend.core.timeout_policy import effective_cmd_run_pending_timeout_seconds
 from backend.core.logger import app_logger as logger
 from backend.ledger import EventSource
 from backend.ledger.action import Action
@@ -28,18 +28,7 @@ if TYPE_CHECKING:
 
 
 def _cmd_run_pending_timeout(base: float, action: Action) -> float:
-    action_timeout = getattr(action, 'timeout', None)
-    try:
-        parsed_action_timeout = (
-            float(action_timeout) if action_timeout is not None else None
-        )
-    except (TypeError, ValueError):
-        parsed_action_timeout = None
-
-    candidates = [float(base), CMD_PENDING_ACTION_TIMEOUT_FLOOR]
-    if parsed_action_timeout is not None and parsed_action_timeout > 0:
-        candidates.append(parsed_action_timeout)
-    return max(candidates)
+    return effective_cmd_run_pending_timeout_seconds(base, action)
 
 
 def _terminal_pending_timeout(base: float, _action: Action) -> float:
@@ -314,6 +303,7 @@ class PendingActionService:
                 f'stale assumptions.'
             ),
             error_id='PENDING_ACTION_TIMEOUT',
+            timeout_kind='pending_action',
         )
         attach_observation_cause(
             timeout_obs, action, context='pending_action_service.timeout'

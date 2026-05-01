@@ -7,7 +7,11 @@ import pytest
 from backend.execution.drivers.local.local_runtime_inprocess import (
     LocalRuntimeInProcess,
 )
-from backend.core.constants import TOOL_BRIDGE_TIMEOUT_DEBUGGER
+from backend.core.constants import (
+    CMD_PENDING_ACTION_TIMEOUT_FLOOR,
+    TOOL_BRIDGE_TIMEOUT_BUFFER,
+    TOOL_BRIDGE_TIMEOUT_DEBUGGER,
+)
 from backend.core.errors import AgentRuntimeDisconnectedError
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
@@ -17,6 +21,7 @@ from backend.ledger.action.terminal import (
     TerminalReadAction,
     TerminalRunAction,
 )
+from backend.ledger.action import CmdRunAction
 from backend.ledger.observation import NullObservation
 from backend.ledger.observation.code_nav import LspQueryObservation
 from backend.ledger.observation.commands import CmdOutputObservation
@@ -165,6 +170,24 @@ def test_run_after_hard_kill_requires_reconnect() -> None:
 
     with pytest.raises(AgentRuntimeDisconnectedError, match='Runtime not initialized'):
         runtime.run(CmdRunAction(command='pwd'))
+
+
+def test_cmd_run_bridge_timeout_aligns_with_default_cmd_floor() -> None:
+    """Sync bridge must match CMD_PENDING_ACTION_TIMEOUT_FLOOR + buffer when unset."""
+    runtime = _make_runtime()
+    obs = CmdOutputObservation(content='ok', command='pwd', metadata={'exit_code': 0})
+    executor = MagicMock()
+    executor.run = AsyncMock(return_value=obs)
+    runtime._executor = executor
+    action = CmdRunAction(command='pwd')
+    with patch(
+        'backend.execution.drivers.local.local_runtime_inprocess.call_async_from_sync',
+        return_value=obs,
+    ) as call_sync:
+        result = runtime.run(action)
+    assert result is obs
+    expected = float(CMD_PENDING_ACTION_TIMEOUT_FLOOR) + float(TOOL_BRIDGE_TIMEOUT_BUFFER)
+    assert float(call_sync.call_args.args[1]) == pytest.approx(expected)
 
 
 def test_debugger_bridge_timeout_respects_floor_when_action_timeout_is_small() -> None:

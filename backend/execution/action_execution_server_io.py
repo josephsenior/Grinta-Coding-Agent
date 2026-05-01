@@ -235,9 +235,15 @@ class RuntimeExecutorIOAndTerminalMixin:
 
     @staticmethod
     def _append_debug_trace(payload: dict[str, Any]) -> None:
-        log_path = Path(__file__).resolve().parents[2] / 'debug-fee086.log'
-        with open(log_path, 'a', encoding='utf-8') as _f:
-            _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
+        logger.debug(
+            payload.get('message', 'exec_trace'),
+            extra={
+                'msg_type': 'EXEC_TRACE',
+                'hypothesis_id': payload.get('hypothesisId'),
+                'location': payload.get('location'),
+                'trace_data': payload.get('data'),
+            },
+        )
 
     def _workspace_root(self) -> Path:
         return _workspace_root_impl(self)
@@ -363,6 +369,14 @@ class RuntimeExecutorIOAndTerminalMixin:
         # waits on DAP responses. Running it directly on the event loop
         # blocks every other coroutine for the duration of the cold start.
         # Off-load to a worker thread so the loop stays responsive.
+        logger.debug(
+            'Runtime debugger bridge invoking handle',
+            extra={
+                'msg_type': 'DEBUGGER_BRIDGE',
+                'debug_action': getattr(action, 'debug_action', None),
+                'cwd': str(Path.cwd()),
+            },
+        )
         return await asyncio.to_thread(self.debug_manager.handle, action)
 
     def _maybe_promote_blocking_action(self, action: CmdRunAction) -> None:
@@ -622,7 +636,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                         'data': {'command': action.command or ''},
                         'timestamp': int(time.time() * 1000),
                     }
-                    await asyncio.to_thread(self._append_debug_trace, payload)
+                    self._append_debug_trace(payload)
                 except Exception:
                     pass
                 # #endregion
@@ -654,7 +668,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                         'data': {'command': action.command or '', 'cwd': cwd},
                         'timestamp': int(time.time() * 1000),
                     }
-                    await asyncio.to_thread(self._append_debug_trace, payload)
+                    self._append_debug_trace(payload)
                 except Exception:
                     pass
                 # #endregion
@@ -683,7 +697,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                         'data': {'rows': action.rows, 'cols': action.cols},
                         'timestamp': int(time.time() * 1000),
                     }
-                    await asyncio.to_thread(self._append_debug_trace, payload)
+                    self._append_debug_trace(payload)
                 except Exception:
                     pass
                 # #endregion
@@ -781,7 +795,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                     'data': {'error': str(exc), 'error_type': type(exc).__name__},
                     'timestamp': int(time.time() * 1000),
                 }
-                await asyncio.to_thread(self._append_debug_trace, payload)
+                self._append_debug_trace(payload)
             except Exception:
                 pass
             # #endregion
@@ -887,7 +901,7 @@ class RuntimeExecutorIOAndTerminalMixin:
                     },
                     'timestamp': int(time.time() * 1000),
                 }
-                await asyncio.to_thread(self._append_debug_trace, payload)
+                self._append_debug_trace(payload)
             except Exception:
                 pass
             # #endregion

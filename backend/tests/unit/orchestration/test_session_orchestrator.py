@@ -1007,6 +1007,24 @@ class TestReset(unittest.TestCase):
         )
         self.ctrl.config.event_stream.add_event.assert_called()
 
+    def test_reset_suppresses_error_after_mark_user_interrupt_stop(self):
+        mock_action = MagicMock()
+        mock_action.tool_call_metadata = MagicMock()
+        mock_action.id = 5
+        self.ctrl.services.pending_action.get.return_value = mock_action
+        self.ctrl.state_tracker.state.history = []
+        self.ctrl.state_tracker.state.agent_state = AgentState.STOPPED
+        self.ctrl.config.agent.reset = MagicMock()
+
+        with patch(
+            'backend.orchestration.session_orchestrator.ErrorObservation'
+        ) as mock_obs_cls:
+            self.ctrl.mark_user_interrupt_stop()
+            self.ctrl._reset()
+
+        mock_obs_cls.assert_not_called()
+        self.ctrl.config.event_stream.add_event.assert_not_called()
+
     def test_reset_dropped_agent_actions(self):
         """Test ErrorObservations for dropped agent actions (393-403)."""
         self.ctrl.services.pending_action.get.return_value = None

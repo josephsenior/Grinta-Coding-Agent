@@ -59,6 +59,20 @@ def _safe_exception_text(exc: Exception) -> str:
 def _map_api_status_error(exc: Exception, model: str, provider: str) -> Exception:
     """Map APIStatusError by status code."""
     status = getattr(exc, 'status_code', None)
+    if status in (401, 403):
+        from backend.inference.direct_clients_openai_ops import (
+            simplify_openai_unauthorized_message,
+        )
+
+        msg = _safe_exception_text(exc)
+        if provider == 'openai' and isinstance(status, int):
+            msg = simplify_openai_unauthorized_message(exc, status)
+        return AuthenticationError(
+            msg,
+            model=model,
+            llm_provider=provider,
+            status_code=status,
+        )
     if status == 408:
         return Timeout(_safe_exception_text(exc), model=model, llm_provider=provider)
     if status == 503:
@@ -95,7 +109,20 @@ def _map_openai_exception(exc: Exception, model: str) -> Exception | None:
     try:
         import openai as _oai
 
+        from backend.inference.direct_clients_openai_ops import (
+            extract_openai_http_status,
+            simplify_openai_unauthorized_message,
+        )
         from backend.inference.rate_limit_parser import enrich_rate_limit_exception
+
+        status_early = extract_openai_http_status(exc)
+        if status_early in (401, 403):
+            return AuthenticationError(
+                simplify_openai_unauthorized_message(exc, status_early),
+                model=model,
+                llm_provider='openai',
+                status_code=status_early,
+            )
 
         simple_map: list[tuple[type, type, str]] = [
             (_oai.AuthenticationError, AuthenticationError, 'openai'),
@@ -730,49 +757,20 @@ class LLM(RetryMixin, DebugMixin):
                                 prefix = ''.join(_inband_prefix)
                                 if len(prefix) <= _INBAND_PREFIX_LIMIT:
                                     lower = prefix.lower()
-                                    # #region agent log
-                                    try:
-                                        payload = {
-                                            'sessionId': 'fee086',
-                                            'runId': 'pre-fix',
-                                            'hypothesisId': 'H10_inband_disconnect_encoding',
-                                            'location': 'backend/inference/llm.py:astream',
-                                            'message': 'inband-prefix-probe',
-                                            'data': {
-                                                'prefix': prefix[:120],
-                                                'prefix_repr': repr(prefix[:120]),
-                                                'lower_preview': lower[:120],
-                                                'matched_phrases': [
-                                                    p
-                                                    for p in _INBAND_DISCONNECT_PHRASES
-                                                    if p in lower
-                                                ][:5],
-                                            },
-                                            'timestamp': int(time.time() * 1000),
-                                        }
-                                        from pathlib import Path as _P
-
-                                        _lp = (
-                                            _P(__file__).resolve().parents[2]
-                                            / 'logs'
-                                            / 'debug-fee086.log'
-                                        )
-                                        _serialized_payload = (
-                                            json.dumps(payload, ensure_ascii=True)
-                                            + '\n'
-                                        )
-
-                                        def _append_log_line(
-                                            path: '_P' = _lp,
-                                            line: str = _serialized_payload,
-                                        ) -> None:
-                                            with path.open('a', encoding='utf-8') as _f:
-                                                _f.write(line)
-
-                                        await _asyncio.to_thread(_append_log_line)
-                                    except Exception:
-                                        pass
-                                    # #endregion
+                                    logger.debug(
+                                        'LLM in-band disconnect prefix probe',
+                                        extra={
+                                            'msg_type': 'LLM_INBAND_PROBE',
+                                            'prefix_preview': prefix[:120],
+                                            'prefix_repr': repr(prefix[:120]),
+                                            'lower_preview': lower[:120],
+                                            'matched_phrases': [
+                                                p
+                                                for p in _INBAND_DISCONNECT_PHRASES
+                                                if p in lower
+                                            ][:5],
+                                        },
+                                    )
                                     if any(
                                         p in lower for p in _INBAND_DISCONNECT_PHRASES
                                     ):

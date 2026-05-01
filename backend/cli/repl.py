@@ -22,23 +22,15 @@ from backend.cli._repl.slash_commands_mixin import SlashCommandsMixin
 from backend.cli.config_manager import get_current_model
 from backend.cli.hud import HUDBar
 from backend.cli.reasoning_display import ReasoningDisplay
-from backend.cli.theme import (
-    CLR_AUTONOMY_BALANCED,
-    CLR_AUTONOMY_CONSERVATIVE,
-    CLR_AUTONOMY_FULL,
-    CLR_BRAND,
-    CLR_HUD_DETAIL,
-    CLR_HUD_MODEL,
-    CLR_META,
-    CLR_MUTED_TEXT,
-    CLR_SEP,
-    CLR_STATE_RUNNING,
-    CLR_STATUS_ERR,
-    CLR_STATUS_OK,
-    CLR_STATUS_WARN,
-    CLR_THINKING_BORDER,
-    MARK_PROMPT,
+from backend.cli.status_chrome import (
+    STATUS_CHROME_COMPACT_WIDTH,
+    autonomy_chrome_suffix,
+    pt_compact_line_plain,
+    pt_stats_row1_fragments,
+    pt_stats_row2_fragments,
+    status_fields_from_hud,
 )
+from backend.cli.theme import MARK_PROMPT, prompt_toolkit_style_dict
 from backend.core.config import (
     AppConfig,
 )
@@ -983,11 +975,9 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         return f'{label}{MARK_PROMPT} '
 
     def _prompt_placeholder(self) -> Any:
-        from prompt_toolkit.formatted_text import HTML
+        from prompt_toolkit.formatted_text import FormattedText
 
-        return HTML(
-            '<style fg="#5d7286"><i>Describe the task, or type /help</i></style>'
-        )
+        return FormattedText([('class:placeholder', 'Describe the task, or type /help')])
 
     def _prompt_state_label(self) -> str:
         state = self._current_prompt_state()
@@ -1014,32 +1004,34 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         return 'autonomy:balanced'
 
     def _prompt_panel_data(self) -> dict[str, str]:
+        """Sync agent/autonomy labels into the HUD, then return telemetry dict."""
         hud = self._hud.state
-        provider, model = HUDBar.describe_model(hud.model)
-        tokens = (
-            HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
+        state_label = self._prompt_state_label()
+        self._hud.update_agent_state(state_label)
+        ac = (
+            getattr(self._controller, 'autonomy_controller', None)
+            if self._controller is not None
+            else None
         )
-        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else '?'
-        if hud.context_tokens == 0 and hud.context_limit == 0:
-            token_display = '0 tokens'
-        elif hud.context_limit == 0:
-            token_display = f'{tokens} tokens'
-        else:
-            token_display = f'{tokens}/{lim}'
+        if ac is not None:
+            level = str(getattr(ac, 'autonomy_level', 'balanced')).strip().lower()
+            if level in _AUTONOMY_LEVEL_HINTS:
+                self._hud.update_autonomy(level)
+        fields = status_fields_from_hud(self._hud.state, self._hud.bundled_skill_count)
         mcp_txt = HUDBar._format_mcp_servers_label(hud.mcp_servers)
         skills_txt = HUDBar._format_skills_label(self._hud.bundled_skill_count)
         return {
-            'state_label': self._prompt_state_label(),
-            'autonomy_label': self._prompt_autonomy_label(),
-            'workspace': (hud.workspace_path or '').strip(),
-            'provider': provider,
-            'model': model,
-            'token_display': token_display,
-            'cost': f'${hud.cost_usd:.4f}',
-            'calls': f'{hud.llm_calls} calls',
+            'state_label': fields.agent_state_label,
+            'autonomy_label': autonomy_chrome_suffix(fields.autonomy_level),
+            'workspace': fields.workspace_path,
+            'provider': fields.provider,
+            'model': fields.model,
+            'token_display': fields.token_display_compact,
+            'cost': f'${fields.cost_usd:.3f}',
+            'calls': f'{fields.llm_calls} calls',
             'mcp': mcp_txt,
             'skills': skills_txt,
-            'ledger': hud.ledger_status,
+            'ledger': fields.ledger_status,
         }
 
     def _prompt_state_style(self) -> str:
@@ -1079,124 +1071,39 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         )
         return f' {controls}\n {telemetry} '
 
-    def _prompt_stats_row1_fragments(
-        self, data: dict[str, str]
-    ) -> list[tuple[str, str]]:
-        frags: list[tuple[str, str]] = []
-        frags.append(('class:prompt.brand', 'GRINTA'))
-        frags.append(('class:prompt.dim', '  '))
-        frags.append((self._prompt_state_style(), f' {data["state_label"].upper()} '))
-        frags.append(('class:prompt.dim', '  '))
-        frags.append((self._prompt_autonomy_style(), data['autonomy_label']))
-        return frags
-
-    def _prompt_stats_row2_fragments(
-        self, data: dict[str, str], width: int = 120
-    ) -> list[tuple[str, str]]:
-        """Build row-2 fragments, wrapping to a second line when content exceeds width."""
-        sep = '  \u2022  '
-
-        ws_raw = (data.get('workspace') or '').strip()
-        # Required prefix: optional workspace, then provider + model + tokens + cost
-        base: list[tuple[str, str]] = []
-        if ws_raw:
-            ws_max = max(18, min(72, width - 50))
-            ws_show = HUDBar.ellipsize_path(ws_raw, ws_max)
-            base.extend(
-                [
-                    ('class:prompt.dim', 'workspace:'),
-                    ('class:prompt.sep', ' '),
-                    ('class:prompt.model', ws_show),
-                    ('class:prompt.sep', sep),
-                ]
-            )
-        base.extend(
-            [
-                ('class:prompt.dim', 'provider:'),
-                ('class:prompt.sep', ' '),
-                ('class:prompt.model', data['provider']),
-                ('class:prompt.sep', sep),
-                ('class:prompt.dim', 'model:'),
-                ('class:prompt.sep', ' '),
-                ('class:prompt.model', data['model']),
-                ('class:prompt.sep', sep),
-                ('class:prompt.value', data['token_display']),
-                ('class:prompt.sep', sep),
-                ('class:prompt.value', data['cost']),
-            ]
-        )
-
-        # Optional fields in priority order.
-        # Keep the default prompt compact: surface only ledger + calls.
-        # MCP server and bundled skill counts remain available via `/status`.
-        optionals: list[tuple[str, str]] = [
-            (self._prompt_ledger_style(data['ledger']), data['ledger']),
-            ('class:prompt.value', data['calls']),
-        ]
-
-        def _len(frags: list[tuple[str, str]]) -> int:
-            return sum(len(t) for _, t in frags)
-
-        # Build the full single-line version first.
-        opt_frags: list[tuple[str, str]] = []
-        for item_style, item_text in optionals:
-            opt_frags.extend([('class:prompt.sep', sep), (item_style, item_text)])
-
-        all_frags = list(base) + opt_frags
-        if _len(all_frags) <= width:
-            return all_frags
-
-        # Overflow → wrap: required fields on line 1, optionals on line 2.
-        result = list(base)
-        result.append(('', '\n'))
-        indent = ' ' * 10  # width of "provider: " to align the wrapped row
-        result.append(('class:prompt.dim', indent))
-        for idx, (item_style, item_text) in enumerate(optionals):
-            if idx > 0:
-                result.append(('class:prompt.sep', sep))
-            result.append((item_style, item_text))
-
-        return result
-
     def _prompt_bottom_toolbar(self) -> Any:
         """Two-line status under the input; no filled backgrounds (terminal default)."""
         width = shutil.get_terminal_size((110, 24)).columns
-        data = self._prompt_panel_data()
-
-        # Keep HUD state/autonomy in sync so the Live-mode HUD matches.
-        self._hud.update_agent_state(data['state_label'])
-        level = data['autonomy_label'].replace('autonomy:', '')
-        self._hud.update_autonomy(level)
-
-        # Keep the compact line readable by folding provider/model into one token.
-        model = (
-            data['model']
-            if data['provider'] in {'(not set)', '(unknown)'}
-            else f'{data["provider"]}/{data["model"]}'
-        )
+        self._prompt_panel_data()
+        fields = status_fields_from_hud(self._hud.state, self._hud.bundled_skill_count)
 
         fragments: list[tuple[str, str]] = []
 
         def add(style: str, text: str) -> None:
             fragments.append((style, text))
 
-        if width < 72:
-            ws = (data.get('workspace') or '').strip()
-            ws_prefix = f'{HUDBar.ellipsize_path(ws, 28)} · ' if ws else ''
-            line = (
-                f'{ws_prefix}{data["state_label"]} · {data["autonomy_label"]} · '
-                f'{model} · {data["token_display"]} · {data["cost"]}'
-            )
-            add('class:prompt.dim', line)
+        if width < STATUS_CHROME_COMPACT_WIDTH:
+            add('class:prompt.dim', pt_compact_line_plain(fields))
             self._append_footer_system_fragments(fragments, add)
             return fragments
 
         add('class:prompt.dim', '\u2500' * width)
         add('', '\n')
-        fragments.extend(self._prompt_stats_row1_fragments(data))
+        fragments.extend(
+            pt_stats_row1_fragments(
+                fields,
+                self._prompt_state_style(),
+                self._prompt_autonomy_style(),
+            )
+        )
         add('', '\n')
-        # Pass actual terminal width so row 2 never overflows.
-        fragments.extend(self._prompt_stats_row2_fragments(data, width=width))
+        fragments.extend(
+            pt_stats_row2_fragments(
+                fields,
+                width=width,
+                ledger_style=self._prompt_ledger_style(fields.ledger_status),
+            )
+        )
         self._append_footer_system_fragments(fragments, add)
         return fragments
 
@@ -1214,54 +1121,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
         from backend.cli.session_manager import get_session_suggestions
 
-        prompt_style = Style.from_dict(
-            {
-                # Default prompt text; no bg so the terminal background shows through.
-                '': 'noreverse #e6eef7',
-                # PT defaults bottom-toolbar to reverse — disable without adding a fill color.
-                'bottom-toolbar': 'noreverse',
-                'bottom-toolbar.text': 'noreverse',
-                'prompt.border': CLR_THINKING_BORDER,
-                'prompt.frame.border': f'bold {CLR_STATUS_OK}',
-                'prompt.brand': CLR_BRAND,
-                'prompt.dim': CLR_META,
-                'prompt.model': CLR_HUD_MODEL,
-                'prompt.value': CLR_HUD_DETAIL,
-                'prompt.sep': CLR_SEP,
-                'prompt.arrow': CLR_BRAND,
-                'prompt.hint': CLR_AUTONOMY_FULL,
-                'prompt.badge.ready': f'bold {CLR_STATUS_OK}',
-                'prompt.badge.running': CLR_STATE_RUNNING,
-                'prompt.badge.review': f'bold {CLR_STATUS_WARN}',
-                'prompt.badge.paused': f'bold {CLR_STATUS_WARN}',
-                'prompt.badge.error': f'bold {CLR_STATUS_ERR}',
-                'prompt.autonomy.balanced': CLR_AUTONOMY_BALANCED,
-                'prompt.autonomy.full': CLR_AUTONOMY_FULL,
-                'prompt.autonomy.conservative': CLR_AUTONOMY_CONSERVATIVE,
-                'prompt.health.good': f'bold {CLR_STATUS_OK}',
-                'prompt.health.warn': f'bold {CLR_STATUS_WARN}',
-                'prompt.health.bad': f'bold {CLR_STATUS_ERR}',
-                'prompt.footer.badge_bracket': '#0e7490',
-                'prompt.footer.badge_core': 'bold #22d3ee',
-                'prompt.footer.kicker': 'bold #a5f3fc',
-                'prompt.footer.sep': CLR_META,
-                'prompt.footer.body': CLR_MUTED_TEXT,
-                'prompt.footer.warn_bracket': '#a16207',
-                'prompt.footer.warn_core': 'bold #facc15',
-                'prompt.footer.warn_kicker': 'bold #fde68a',
-                'prompt.footer.warn_sep': '#92400e',
-                'prompt.footer.warn_body': CLR_STATUS_WARN,
-                'completion-menu': 'bg:#0d1f30 #b8c7d8',
-                'completion-menu.completion': 'bg:#0d1f30 #b8c7d8',
-                'completion-menu.completion.current': 'bg:#1e4976 bold #ffffff',
-                'completion-menu.meta': 'bg:#0a1929 #5c7fa0',
-                'completion-menu.meta.completion': 'bg:#0a1929 #5c7fa0',
-                'completion-menu.meta.completion.current': 'bg:#163350 #93c5fd',
-                'completion-menu.multi-column-meta': 'bg:#0a1929 #5c7fa0',
-                'scrollbar.background': 'bg:#0d1f30',
-                'scrollbar.button': 'bg:#1e4976',
-            }
-        )
+        prompt_style = Style.from_dict(prompt_toolkit_style_dict())
 
         return PromptSession(
             message=self._prompt_panel_message,

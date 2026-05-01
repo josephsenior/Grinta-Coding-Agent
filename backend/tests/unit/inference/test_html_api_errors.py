@@ -89,3 +89,45 @@ def test_map_provider_exception_html_fallback() -> None:
         'my-model',
     )
     assert 'HTML' in str(mapped)
+
+
+def test_openai_client_maps_plain_text_401_body_to_authentication_error() -> None:
+    """401 with non-JSON body used to map to InternalServerError and retried; should be auth."""
+    from backend.inference.exceptions import AuthenticationError, InternalServerError
+
+    @patch('backend.inference.direct_clients.AsyncOpenAI')
+    @patch('backend.inference.direct_clients.OpenAI')
+    @patch(
+        'backend.inference.direct_clients.get_shared_async_http_client',
+        return_value=MagicMock(),
+    )
+    @patch(
+        'backend.inference.direct_clients.get_shared_http_client',
+        return_value=MagicMock(),
+    )
+    def _run(_h, _ah, _oai, _aoai):
+        client = OpenAIClient('m', 'k', base_url='https://api.openai.com/v1')
+        exc = Exception(
+            "Error: error, status code: 401, status: 401 Unauthorized, message: "
+            "invalid character 'U' looking for beginning of value, body: Unauthorized"
+        )
+        mapped = client._map_openai_error(exc)
+        assert isinstance(mapped, AuthenticationError)
+        assert not isinstance(mapped, InternalServerError)
+        text = str(mapped)
+        assert 'HTTP 401 Unauthorized' in text
+        assert 'artifact' in text.lower()
+
+    _run()
+
+
+def test_map_provider_exception_extracts_401_from_embedded_status_string() -> None:
+    from backend.inference.exceptions import AuthenticationError
+
+    exc = Exception(
+        "error, status code: 401, message: invalid character 'U' looking for beginning of value, "
+        'body: Unauthorized'
+    )
+    mapped = _map_provider_exception(exc, 'my-model')
+    assert isinstance(mapped, AuthenticationError)
+    assert 'HTTP 401 Unauthorized' in str(mapped)
