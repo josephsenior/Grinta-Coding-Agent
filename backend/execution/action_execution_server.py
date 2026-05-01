@@ -303,13 +303,16 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
 
         start = time.perf_counter()
         try:
-            client = LspClient()
-            result = client.query(
-                command=action.command,
-                file=action.file,
-                line=action.line,
-                column=action.column,
-                symbol=getattr(action, 'symbol', ''),
+            # Same pattern as :meth:`RuntimeExecutorIOAndTerminalMixin.debugger`:
+            # ``LspClient.query`` blocks on subprocess I/O; keep the event loop responsive.
+            result = await asyncio.to_thread(
+                lambda: LspClient().query(
+                    command=action.command,
+                    file=action.file,
+                    line=action.line,
+                    column=action.column,
+                    symbol=getattr(action, 'symbol', ''),
+                )
             )
 
             latency_ms = int((time.perf_counter() - start) * 1000)

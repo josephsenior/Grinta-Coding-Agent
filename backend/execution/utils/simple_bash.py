@@ -92,7 +92,12 @@ class SimpleBashSession(BaseShellSession):
                     CmdOutputObservation,
                 )
 
+                from backend.execution.utils.shell_utils import (
+                    apply_cmd_output_timeout_metadata,
+                )
+
                 metadata = CmdOutputMetadata(exit_code=-2, working_dir=self._cwd)
+                apply_cmd_output_timeout_metadata(metadata, -2)
                 metadata.suffix = (
                     f'\n[The command has no new output after {self.NO_CHANGE_TIMEOUT_SECONDS} seconds. '
                     f'It is still running in background session "{pending_bg_id}". '

@@ -9,12 +9,12 @@ from __future__ import annotations
 
 import json
 import subprocess
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from backend.core.logger import app_logger as logger
+from backend.utils.stdio_json_rpc import parse_content_length_json_messages
 
 # ── Soft pylsp detection — delegates to the unified runtime detector ──────
 # ``_PYLSP_AVAILABLE`` is kept for backward-compatibility with tests that
@@ -24,28 +24,18 @@ from backend.core.logger import app_logger as logger
 _PYLSP_AVAILABLE: bool | None = None  # None = not yet detected
 
 
-# #region agent log
 def _agent_debug_log(
     hypothesis_id: str, location: str, message: str, data: dict
 ) -> None:
-    try:
-        payload = {
-            'sessionId': 'fee086',
-            'runId': 'pre-fix',
-            'hypothesisId': hypothesis_id,
+    logger.debug(
+        message,
+        extra={
+            'msg_type': 'LSP_TRACE',
+            'hypothesis_id': hypothesis_id,
             'location': location,
-            'message': message,
-            'data': data,
-            'timestamp': int(time.time() * 1000),
-        }
-        log_path = Path(__file__).resolve().parents[2] / 'logs' / 'debug-fee086.log'
-        with open(log_path, 'a', encoding='utf-8') as _f:
-            _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-    except Exception:
-        pass
-
-
-# #endregion
+            'trace_data': data,
+        },
+    )
 
 
 def _detect_pylsp() -> bool:
@@ -348,48 +338,16 @@ class LspClient:
                 capture_output=True,
                 timeout=15,
             )
-            return self._parse_lsp_responses(proc.stdout.decode(errors='replace'))
+            return parse_content_length_json_messages(
+                proc.stdout.decode(errors='replace')
+            )
         except subprocess.TimeoutExpired:
             logger.warning('%s subprocess timed out', server_cmd[0])
             return []
 
-    def _parse_lsp_responses(self, raw: str) -> list[dict]:
-        """Parse LSP stream using Content-Length framing (LSP spec)."""
-        responses: list[dict] = []
-        buf = raw
-        i = 0
-        n = len(buf)
-        while i < n:
-            cl_pos = buf.find('Content-Length:', i)
-            if cl_pos == -1:
-                break
-            line_end = buf.find('\r\n', cl_pos)
-            if line_end == -1:
-                break
-            header_line = buf[cl_pos:line_end]
-            lower = header_line.strip().lower()
-            if not lower.startswith('content-length:'):
-                i = cl_pos + 1
-                continue
-            try:
-                length = int(header_line.split(':', 1)[1].strip())
-            except ValueError:
-                i = line_end + 2
-                continue
-            sep = buf.find('\r\n\r\n', line_end)
-            if sep == -1:
-                break
-            body_start = sep + 4
-            body_end = body_start + length
-            if body_end > n:
-                break
-            chunk = buf[body_start:body_end]
-            try:
-                responses.append(json.loads(chunk))
-            except Exception:
-                pass
-            i = body_end
-        return responses
+    def _parse_lsp_responses(self, raw: str) -> list[dict[str, Any]]:
+        """Delegate to :func:`parse_content_length_json_messages` (tests, compat)."""
+        return parse_content_length_json_messages(raw)
 
     def _build_init_msgs(self, uri: str, file_path: str) -> list[dict]:
         ext = Path(file_path).suffix.lower()

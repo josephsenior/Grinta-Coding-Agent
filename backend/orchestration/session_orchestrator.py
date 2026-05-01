@@ -150,6 +150,8 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         # Suppresses memory-pressure condensation signalling during batch drain
         # so that pending actions are not disrupted mid-batch.
         self._draining_batch = False
+        # CLI Ctrl+C: skip pending-unmatched ErrorObservation on next _reset().
+        self._suppress_pending_unmatched_error_on_reset: bool = False
 
         # Initialize core state via lifecycle service
         self.services.lifecycle.initialize_core_attributes(
@@ -524,8 +526,15 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         if hasattr(self, '_action_contexts_by_event_id'):
             self._action_contexts_by_event_id.clear()
 
+    def mark_user_interrupt_stop(self) -> None:
+        """Next `_reset` should not emit unmatched-pending ErrorObservation (REPL Ctrl+C)."""
+        self._suppress_pending_unmatched_error_on_reset = True
+
     def _emit_pending_action_error_if_unmatched(self) -> None:
         """Emit ErrorObservation if pending action has no matching observation."""
+        if getattr(self, '_suppress_pending_unmatched_error_on_reset', False):
+            self._suppress_pending_unmatched_error_on_reset = False
+            return
         if not self._pending_action or not hasattr(
             self._pending_action, 'tool_call_metadata'
         ):

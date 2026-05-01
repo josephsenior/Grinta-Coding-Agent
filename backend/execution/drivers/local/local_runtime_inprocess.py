@@ -27,6 +27,7 @@ from backend.core.constants import (
 )
 from backend.core.enums import RuntimeStatus
 from backend.core.errors import AgentRuntimeDisconnectedError
+from backend.core.timeout_policy import cmd_run_sync_bridge_timeout_seconds
 from backend.core.logger import app_logger as logger
 from backend.core.os_capabilities import OS_CAPS
 from backend.execution.action_execution_server import RuntimeExecutor
@@ -342,10 +343,9 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         """Execute command via RuntimeExecutor."""
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        # Use the action's own timeout (set by _set_action_timeout) plus a
-        # buffer for thread-pool scheduling, instead of the fixed 15s which
-        # was too short for commands with larger timeouts.
-        timeout = (action.timeout or 120) + 10
+        # Align with ``CommandTimeoutMixin`` / pending floors (see
+        # :func:`backend.core.timeout_policy.cmd_run_sync_bridge_timeout_seconds`).
+        timeout = cmd_run_sync_bridge_timeout_seconds(action)
         return call_async_from_sync(self._executor.run, timeout, action)
 
     def read(self, action: FileReadAction) -> Observation:

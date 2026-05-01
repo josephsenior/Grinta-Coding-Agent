@@ -11,6 +11,10 @@ Two registries are exposed:
 * ``LSP_SERVERS``   — language servers (pylsp, gopls, rust-analyzer, …)
 * ``DEBUG_ADAPTERS`` — DAP adapters (debugpy, delve, codelldb, js-debug, …)
 
+IDE-style debugger labels (e.g. ``pwa-node``) are normalized via
+:func:`backend.utils.language_tool_aliases.normalize_debug_adapter_name` and
+re-exported from this module for convenience.
+
 Detection follows a cheap-to-expensive ladder:
 
 1. ``shutil.which`` for an executable on PATH (fast, no subprocess).
@@ -32,6 +36,7 @@ from dataclasses import dataclass, field
 from typing import Sequence
 
 from backend.core.logger import app_logger as logger
+from backend.utils.language_tool_aliases import normalize_debug_adapter_name
 
 # Probe timeout — kept tight; missing tools should fail-fast.
 _PROBE_TIMEOUT_SEC = 3.0
@@ -305,5 +310,6 @@ __all__ = [
     'has_any_debug_adapter',
     'has_any_lsp_server',
     'lsp_command_for_extension',
+    'normalize_debug_adapter_name',
     'reset_detection_cache',
 ]

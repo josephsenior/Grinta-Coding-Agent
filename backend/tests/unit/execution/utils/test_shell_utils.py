@@ -70,6 +70,18 @@ class TestFormatShellOutput:
         assert '42' in result.metadata.suffix
         assert 'exit code' in result.metadata.suffix.lower()
 
+    def test_timeout_metadata_hard_wall_exit_124(self) -> None:
+        result = format_shell_output('slow', 'partial', '', 124, '/tmp')
+        assert result.metadata.timeout_kind == 'hard_wall'
+        assert result.metadata.partial_output is True
+        assert result.metadata.command_still_running is False
+
+    def test_timeout_metadata_idle_detach_exit_neg2(self) -> None:
+        result = format_shell_output('x', 'y', '', -2, '/tmp')
+        assert result.metadata.timeout_kind == 'idle_detach'
+        assert result.metadata.partial_output is True
+        assert result.metadata.command_still_running is True
+
     # ── Command is stored ────────────────────────────────────────────
 
     def test_command_stored_in_observation(self) -> None:

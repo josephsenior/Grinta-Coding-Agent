@@ -29,6 +29,7 @@ class ErrorObservation(Observation):
     error_id: str = ''
     notify_ui_only: bool = False
     agent_only: bool = False
+    timeout_kind: str | None = None
     observation: ClassVar[str] = ObservationType.ERROR
 
     @property
@@ -38,4 +39,7 @@ class ErrorObservation(Observation):
 
     def __str__(self) -> str:
         """Return a readable summary of the error message."""
-        return f'**ErrorObservation**\n{self.content}'
+        base = f'**ErrorObservation**\n{self.content}'
+        if self.timeout_kind:
+            return f'{base}\n[timeout_kind={self.timeout_kind}]'
+        return base

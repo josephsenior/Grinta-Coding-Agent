@@ -2,8 +2,59 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import AsyncIterator
 from typing import Any
+
+
+def extract_openai_http_status(exc: Exception) -> int | None:
+    """Best-effort HTTP status from an OpenAI SDK (or compatible) exception.
+
+    Gateways sometimes return **401** with a plain-text body ``Unauthorized``.
+    The Python SDK then fails JSON decoding and may surface the failure as
+    ``InternalServerError`` with ``status code: 401`` embedded in ``str(exc)``
+    instead of ``AuthenticationError``. This helper recovers the status so we can
+    map to :class:`~backend.inference.exceptions.AuthenticationError` and avoid
+    treating auth failures as retryable server errors.
+    """
+    code = getattr(exc, 'status_code', None)
+    if isinstance(code, int) and 100 <= code <= 599:
+        return code
+    response = getattr(exc, 'response', None)
+    if response is not None:
+        sc = getattr(response, 'status_code', None)
+        if isinstance(sc, int) and 100 <= sc <= 599:
+            return sc
+    try:
+        text = str(exc)
+    except Exception:
+        return None
+    m = re.search(r'status code:\s*(\d{3})\b', text, re.IGNORECASE)
+    if m:
+        return int(m.group(1))
+    return None
+
+
+def simplify_openai_unauthorized_message(exc: Exception, status_code: int) -> str:
+    """User-facing text for 401/403; drops misleading JSON-decode noise."""
+    try:
+        raw = str(exc)
+    except Exception:
+        raw = f'{type(exc).__name__} (unprintable exception)'
+    if status_code != 401:
+        return raw
+    low = raw.lower()
+    if 'invalid character' in low and (
+        'unauthorized' in low or 'body: unauthorized' in low
+    ):
+        return (
+            'HTTP 401 Unauthorized: the API rejected this request (missing key, wrong key, '
+            'key for another provider, or llm_base_url does not match that provider). '
+            'The server returned plain text instead of JSON—the '
+            '"invalid character \'U\'" / JSON parse line is an artifact from the word '
+            '"Unauthorized", not a typo in your API key.'
+        )
+    return raw
 
 
 def extract_openai_tool_calls(message: Any) -> list[dict[str, Any]] | None:
@@ -123,6 +174,15 @@ def map_openai_error(client: Any, exc: Exception) -> Exception:
     raw_msg = str(exc)
     if is_html_api_body(raw_msg):
         return _map_html_api_error(client, exc, raw_msg)
+
+    status_from_wire = extract_openai_http_status(exc)
+    if status_from_wire in (401, 403):
+        return AuthenticationError(
+            simplify_openai_unauthorized_message(exc, status_from_wire),
+            llm_provider='openai',
+            model=client.model_name,
+            status_code=status_from_wire,
+        )
 
     if isinstance(exc, (openai.APITimeoutError, httpx.TimeoutException)):
         return Timeout(str(exc), llm_provider='openai', model=client.model_name)

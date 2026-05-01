@@ -307,4 +307,11 @@ class CmdOutputObservation(Observation):
             ret += f'\n[Python interpreter: {self.metadata.py_interpreter_path}]'
         if self.metadata.exit_code != -1:
             ret += f'\n[Command finished with exit code {self.metadata.exit_code}]'
+        if self.metadata.timeout_kind:
+            ret += (
+                '\n[timeout_kind='
+                f'{self.metadata.timeout_kind} '
+                f'partial_output={self.metadata.partial_output} '
+                f'command_still_running={self.metadata.command_still_running}]'
+            )
         return ret

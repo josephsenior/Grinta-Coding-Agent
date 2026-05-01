@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import cast
 from unittest.mock import MagicMock
 
-from backend.cli.hud import HUDBar
 from backend.cli.repl import Repl
+from backend.cli.status_chrome import StatusFields, pt_stats_row2_fragments
 from backend.cli.theme import MARK_ERR, MARK_INFO, MARK_OK, MARK_PROMPT
 from backend.cli.transcript import format_activity_result_secondary
 from backend.core.config import AppConfig
@@ -31,31 +31,36 @@ def test_prompt_marker_uses_theme_constant() -> None:
 
 
 def test_prompt_stats_row2_omits_mcp_and_skills_by_default() -> None:
-    repl = _make_repl()
-    repl._hud = HUDBar()
-    data = {
-        'workspace': '',
-        'provider': 'openai',
-        'model': 'gpt-4o-mini',
-        'token_display': '123/128k',
-        'cost': '$0.1234',
-        'calls': '4 calls',
-        'mcp': '2 mcp',
-        'skills': '5 skills',
-        'ledger': 'Healthy',
-    }
+    fields = StatusFields(
+        provider='openai',
+        model='gpt-4o-mini',
+        model_display='openai/gpt-4o-mini',
+        token_display_compact='123/128k',
+        cost_usd=0.1234,
+        llm_calls=4,
+        mcp_short='2',
+        skills_short='5',
+        ledger_status='Healthy',
+        agent_state_label='Ready',
+        autonomy_level='balanced',
+        workspace_path='',
+    )
 
-    fragments = repl._prompt_stats_row2_fragments(data, width=160)
+    fragments = pt_stats_row2_fragments(
+        fields,
+        width=160,
+        ledger_style='class:prompt.health.good',
+    )
     rendered = ''.join(text for _, text in fragments)
 
     assert 'provider:' in rendered
     assert 'model:' in rendered
     assert '123/128k' in rendered
-    assert '$0.1234' in rendered
+    assert '$0.123' in rendered
     assert 'Healthy' in rendered
     assert '4 calls' in rendered
-    assert '2 mcp' not in rendered
-    assert '5 skills' not in rendered
+    assert 'MCP:' not in rendered
+    assert 'Skills:' not in rendered
 
 
 def test_core_cli_renderers_avoid_raw_style_literals() -> None:

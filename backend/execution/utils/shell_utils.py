@@ -10,6 +10,18 @@ if TYPE_CHECKING:
     pass
 
 
+def apply_cmd_output_timeout_metadata(metadata: CmdOutputMetadata, exit_code: int) -> None:
+    """Set structured timeout fields for subprocess-backed shells (idle detach / hard kill)."""
+    if exit_code == -2:
+        metadata.timeout_kind = 'idle_detach'
+        metadata.partial_output = True
+        metadata.command_still_running = True
+    elif exit_code == 124:
+        metadata.timeout_kind = 'hard_wall'
+        metadata.partial_output = True
+        metadata.command_still_running = False
+
+
 def format_shell_output(
     command: str,
     stdout: str,
@@ -46,6 +58,7 @@ def format_shell_output(
         exit_code=exit_code,
         working_dir=normalized_cwd,
     )
+    apply_cmd_output_timeout_metadata(metadata, exit_code)
     metadata.prefix = '[Below is the output of the previous command.]\n'
     metadata.suffix = f'\n[The command completed with exit code {exit_code}.]'
 

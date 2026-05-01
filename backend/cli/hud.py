@@ -10,18 +10,7 @@ from rich.console import Console, ConsoleOptions, RenderResult
 from rich.text import Text
 
 import backend
-from backend.cli.theme import (
-    CLR_AUTONOMY_BALANCED,
-    CLR_AUTONOMY_CONSERVATIVE,
-    CLR_AUTONOMY_FULL,
-    CLR_HUD_DETAIL,
-    CLR_HUD_MODEL,
-    CLR_SEP,
-    CLR_STATUS_ERR,
-    CLR_STATUS_OK,
-    CLR_STATUS_WARN,
-    HUD_BG,
-)
+from backend.cli.theme import HUD_BG
 
 
 @dataclass
@@ -161,11 +150,6 @@ class HUDBar:
     ) -> RenderResult:
         yield self._format_bar()
 
-    # Shared tight bullet separator. Matches the live branded row so the
-    # committed footer and the in-progress footer feel like the same bar.
-    _SEP_TEXT = ' · '
-    _SEP_STYLE = CLR_SEP
-
     def _format(self) -> Text:
         """Single HUD layout (alias for :meth:`_format_bar`)."""
         return self._format_bar()
@@ -176,90 +160,16 @@ class HUDBar:
 
     def _format_bar(self) -> Text:
         """One dense status line: model, tokens, cost, MCP, skills, ledger icon."""
-        provider, model = self.describe_model(self.state.model)
-        ctx = self._format_tokens(self.state.context_tokens)
-        lim_tok = (
-            self._format_tokens(self.state.context_limit)
-            if self.state.context_limit
-            else None
-        )
-        if self.state.context_tokens == 0 and self.state.context_limit == 0:
-            token_display = '0t'
-        elif self.state.context_limit == 0:
-            token_display = f'{ctx}t'
-        else:
-            token_display = f'{ctx}/{lim_tok}' if lim_tok else f'{ctx}t'
-        if self.state.token_usage_estimated:
-            token_display += '~'
-        mcp_short = (
-            '?'
-            if self.state.mcp_servers is None
-            else str(min(self.state.mcp_servers, 99))
-        )
-        sk_short = str(min(self._bundled_skill_count, 99))
-        if provider in {'(not set)', '(unknown)'}:
-            model_display = model
-        else:
-            model_display = f'{provider}/{model}'
+        from backend.cli.status_chrome import rich_compact_hud_line, status_fields_from_hud
 
-        group_sep = ('  │  ', CLR_SEP)
-        item_sep = (' · ', CLR_SEP)
-
-        autonomy = self.state.autonomy_level or 'balanced'
-        if autonomy == 'full':
-            auto_style = CLR_AUTONOMY_FULL
-            auto_lbl = 'Full'
-        elif autonomy == 'conservative':
-            auto_style = CLR_AUTONOMY_CONSERVATIVE
-            auto_lbl = 'Conservative'
-        else:
-            auto_style = CLR_AUTONOMY_BALANCED
-            auto_lbl = 'Balanced'
-
-        parts: list[tuple[str, str]] = [
-            (' ', ''),
-            (auto_lbl, auto_style),
-            (' ', ''),
-            (model_display, CLR_HUD_MODEL),
-            item_sep,
-            (token_display, CLR_HUD_DETAIL),
-            group_sep,
-            (f'Cost: ${self.state.cost_usd:.3f}', CLR_HUD_DETAIL),
-            item_sep,
-            (f'Calls: {self.state.llm_calls}', CLR_HUD_DETAIL),
-            group_sep,
-            (f'MCP: {mcp_short}', CLR_HUD_DETAIL),
-            item_sep,
-            (f'Skills: {sk_short}', CLR_HUD_DETAIL),
-            group_sep,
-            (self._ledger_icon(), self._ledger_style()),
-        ]
-        txt = Text()
-        for content, style in parts:
-            txt.append(content, style=style)
-        return txt
+        fields = status_fields_from_hud(self.state, self._bundled_skill_count)
+        return rich_compact_hud_line(fields)
 
     def _ledger_icon(self) -> str:
-        """Single-char status icon for compact mode."""
-        mapping = {
-            'Healthy': '●',
-            'Ready': '○',
-            'Idle': '○',
-            'Starting': '◌',
-            'Review': '◆',
-            'Paused': '⏸',
-            'Error': '✗',
-        }
-        return mapping.get(self.state.ledger_status, '?')
+        """Single-char ledger glyph (tests and callers that inspect HUD state)."""
+        from backend.cli.status_chrome import ledger_icon
 
-    def _ledger_style(self) -> str:
-        if self.state.ledger_status in {'Healthy', 'Ready', 'Idle', 'Starting'}:
-            return f'{CLR_STATUS_OK} bold'
-        if self.state.ledger_status == 'Review':
-            return f'{CLR_STATUS_WARN} bold'
-        if self.state.ledger_status == 'Paused':
-            return CLR_STATUS_WARN
-        return f'{CLR_STATUS_ERR} bold'
+        return ledger_icon(self.state.ledger_status)
 
     @staticmethod
     def _format_tokens(n: int) -> str:

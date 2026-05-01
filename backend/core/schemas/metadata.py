@@ -36,6 +36,21 @@ class CmdOutputMetadataSchema(BaseModel):
     suffix: str = Field(
         default='', description='Suffix text to append to command output'
     )
+    timeout_kind: str | None = Field(
+        default=None,
+        description=(
+            "Machine-readable timeout class: 'idle_detach' (no output, detached), "
+            "'hard_wall' (wall-clock safety net killed process), or None"
+        ),
+    )
+    partial_output: bool | None = Field(
+        default=None,
+        description='True when output may be incomplete (timeout path)',
+    )
+    command_still_running: bool | None = Field(
+        default=None,
+        description='True when the process continues after this observation (e.g. idle detach)',
+    )
 
     @field_validator('username', 'hostname', 'working_dir', 'py_interpreter_path')
     @classmethod

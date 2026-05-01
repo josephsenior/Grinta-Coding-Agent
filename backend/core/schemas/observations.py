@@ -84,6 +84,10 @@ class ErrorObservationSchema(ObservationSchemaV1):
     observation_type: Literal['error'] = Field(ObservationType.ERROR.value, frozen=True)
     content: str = Field(..., min_length=1, description='Error message')
     error_id: str | None = Field(default=None, description='Error identifier')
+    timeout_kind: str | None = Field(
+        default=None,
+        description="Structured timeout class e.g. 'pending_action'",
+    )
 
     @field_validator('content')
     @classmethod

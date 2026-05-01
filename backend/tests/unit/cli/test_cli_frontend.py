@@ -3668,7 +3668,7 @@ async def test_fake_prompt_uses_tight_separator_and_combined_model_slug() -> Non
 
 @pytest.mark.asyncio
 async def test_fake_prompt_single_path_narrow_and_wide_match() -> None:
-    """Live fake prompt uses the same rows at all widths (no compact-only layout)."""
+    """Wide Live footer shows full chrome; narrow matches the compact toolbar tier."""
 
     async def _output_for(w: int) -> str:
         console = _make_console(width=w)
@@ -3686,11 +3686,15 @@ async def test_fake_prompt_single_path_narrow_and_wide_match() -> None:
 
     narrow = await _output_for(40)
     wide = await _output_for(120)
-    for blob in (narrow, wide):
-        assert 'GRINTA' in blob
-        assert 'RUNNING' in blob or 'Running' in blob
-        assert 'google/gemini-3-flash-preview' in blob
-        assert 'MCP:' in blob
+    assert 'GRINTA' in wide
+    assert 'RUNNING' in wide or 'Running' in wide
+    assert 'google/gemini-3-flash-preview' in wide
+    assert 'MCP:' in wide
+    assert 'Running' in narrow
+    assert 'google/gemini-3-flash-preview' in narrow
+    assert 'autonomy:balanced' in narrow
+    assert 'GRINTA' not in narrow
+    assert 'MCP:' not in narrow
 
 
 def test_hud_single_bar_format_all_widths() -> None:

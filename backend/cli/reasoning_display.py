@@ -290,7 +290,7 @@ class ReasoningDisplay:
         header.add_column(ratio=1)
         header.add_column(justify='right', no_wrap=True)
         header.add_row(
-            Spinner('bouncingBar', style=f'bold {CLR_SPINNER}'),
+            Spinner('dots', style=f'bold {CLR_SPINNER}'),
             Text(action_label, style=CLR_ACTION),
             Text(meta_right, style=CLR_META) if meta_right else Text(''),
         )

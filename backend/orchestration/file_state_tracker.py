@@ -12,7 +12,6 @@ if disk changes after a read, edits can be blocked until the model re-reads.
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import re
 import time
@@ -140,29 +139,17 @@ class FileStateTracker:
                 return None
             st = p.stat()
             digest = hashlib.sha256(p.read_bytes()).hexdigest()
-            # #region agent log
-            try:
-                payload = {
-                    'sessionId': 'fee086',
-                    'runId': 'pre-fix',
-                    'hypothesisId': 'H11_stale_mtime_resolution',
-                    'location': 'backend/orchestration/file_state_tracker.py:check_read_stale',
-                    'message': 'stale-check-compare',
-                    'data': {
-                        'path': path_str,
-                        'current_mtime': st.st_mtime,
-                        'snapshot_mtime': snap.mtime,
-                        'mtime_advanced': st.st_mtime > snap.mtime,
-                        'digest_equal': digest == snap.content_sha256,
-                    },
-                    'timestamp': int(time.time() * 1000),
-                }
-                lp = Path(__file__).resolve().parents[2] / 'logs' / 'debug-fee086.log'
-                with open(lp, 'a', encoding='utf-8') as _f:
-                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-            except Exception:
-                pass
-            # #endregion
+            logger.debug(
+                'File read stale check compare',
+                extra={
+                    'msg_type': 'FILE_STALE_CHECK',
+                    'path': path_str,
+                    'current_mtime': st.st_mtime,
+                    'snapshot_mtime': snap.mtime,
+                    'mtime_advanced': st.st_mtime > snap.mtime,
+                    'digest_equal': digest == snap.content_sha256,
+                },
+            )
             if digest == snap.content_sha256:
                 return None
         except OSError:

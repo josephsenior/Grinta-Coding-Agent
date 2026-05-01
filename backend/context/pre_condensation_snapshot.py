@@ -34,28 +34,18 @@ _MAX_COMMANDS = 10
 _MAX_CONTENT_LENGTH = 500
 
 
-# #region agent log
 def _agent_debug_log(
     hypothesis_id: str, location: str, message: str, data: dict
 ) -> None:
-    try:
-        log_path = Path(__file__).resolve().parents[2] / 'logs' / 'debug-fee086.log'
-        payload = {
-            'sessionId': 'fee086',
-            'runId': 'pre-fix',
-            'hypothesisId': hypothesis_id,
+    logger.debug(
+        message,
+        extra={
+            'msg_type': 'PRE_CONDENSATION_TRACE',
+            'hypothesis_id': hypothesis_id,
             'location': location,
-            'message': message,
-            'data': data,
-            'timestamp': int(time.time() * 1000),
-        }
-        with open(log_path, 'a', encoding='utf-8') as _f:
-            _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-    except Exception:
-        pass
-
-
-# #endregion
+            'trace_data': data,
+        },
+    )
 
 
 def _snapshot_path() -> Path:

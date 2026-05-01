@@ -15,7 +15,34 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import logging
+
 from backend.core.logger import app_logger as logger
+
+
+def _dap_log(
+    level: int,
+    message: str,
+    *,
+    msg_type: str,
+    **fields: Any,
+) -> None:
+    """Structured DAP trace for ``app.log`` (JSON formatter picks up ``extra``).
+
+    INFO is promoted to WARNING so traces survive ``LOG_LEVEL=WARNING`` and match
+    how operators grep ``app.log`` for hangs (startup lines are never silently dropped).
+    """
+    extra: dict[str, Any] = {'msg_type': msg_type}
+    for key, val in fields.items():
+        if val is not None:
+            extra[key] = val
+    effective = logging.WARNING if level == logging.INFO else level
+    # Prefix so plain-text grep on app.log ``message`` finds traces even if JSON
+    # formatting or tooling only surfaces the main record message.
+    logger.log(effective, f'[{msg_type}] {message}', extra=extra)
+
+
+from backend.utils.language_tool_aliases import normalize_debug_adapter_name
 from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.debugger import DebuggerObservation
@@ -316,33 +343,18 @@ class DAPClient:
         try:
             response = response_queue.get(timeout=timeout)
         except queue.Empty as exc:
-            # #region agent log
-            try:
-                payload = {
-                    'sessionId': 'fee086',
-                    'runId': 'pre-fix',
-                    'hypothesisId': 'H14_dap_initialize_timeout',
-                    'location': 'backend/execution/debugger.py:wait_for_response',
-                    'message': 'dap-wait-timeout',
-                    'data': {
-                        'request_seq': request_seq,
-                        'timeout': timeout,
-                        'pending_count': len(self._pending),
-                        'stderr_tail': self.stderr_tail(10),
-                        'process_alive': (
-                            self.process is not None and self.process.poll() is None
-                        ),
-                    },
-                    'timestamp': int(time.time() * 1000),
-                }
-                from pathlib import Path as _P
-
-                _lp = _P(__file__).resolve().parents[2] / 'debug-fee086.log'
-                with open(_lp, 'a', encoding='utf-8') as _f:
-                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-            except Exception:
-                pass
-            # #endregion
+            _dap_log(
+                logging.WARNING,
+                'DAP wait_for_response timed out',
+                msg_type='DAP_RESPONSE_TIMEOUT',
+                request_seq=request_seq,
+                timeout_seconds=timeout,
+                pending_count=len(self._pending),
+                stderr_tail=self.stderr_tail(10),
+                process_alive=(
+                    self.process is not None and self.process.poll() is None
+                ),
+            )
             raise DAPError(f'DAP request {request_seq} timed out') from exc
         finally:
             with self._lock:
@@ -372,6 +384,21 @@ class DAPClient:
                 seen = len(self._events)
                 remaining = end_time - time.monotonic()
                 if remaining <= 0:
+                    ev_names = [str(m.get('event') or '?') for m in self._events]
+                    proc = self.process
+                    alive = proc is not None and proc.poll() is None
+                    poll = proc.poll() if proc is not None else None
+                    _dap_log(
+                        logging.WARNING,
+                        'DAP wait_for_event timed out',
+                        msg_type='DAP_EVENT_TIMEOUT',
+                        wanted_event=event,
+                        buffered_event_count=len(self._events),
+                        buffered_events_tail=ev_names[-15:],
+                        process_alive=alive,
+                        process_poll=poll,
+                        stderr_tail=self.stderr_tail(5),
+                    )
                     return None
                 self._event_condition.wait(timeout=remaining)
 
@@ -408,6 +435,17 @@ class DAPClient:
                     logger.debug('DAP reader stopped: %s', exc, exc_info=True)
                 return
             if message is None:
+                _dap_log(
+                    logging.INFO,
+                    'DAP adapter stdout closed (EOF)',
+                    msg_type='DAP_ADAPTER_EOF',
+                    process_alive=(
+                        self.process is not None and self.process.poll() is None
+                    ),
+                    process_poll=(
+                        None if self.process is None else self.process.poll()
+                    ),
+                )
                 return
             self._handle_message(message)
 
@@ -448,35 +486,20 @@ class DAPClient:
     def _handle_message(self, message: dict[str, Any]) -> None:
         message_type = message.get('type')
         if message_type == 'response':
-            # #region agent log
-            try:
-                payload = {
-                    'sessionId': 'fee086',
-                    'runId': 'pre-fix',
-                    'hypothesisId': 'H15_dap_response_arrival',
-                    'location': 'backend/execution/debugger.py:_handle_message',
-                    'message': 'dap-response-received',
-                    'data': {
-                        'request_seq': message.get('request_seq'),
-                        'command': message.get('command'),
-                        'success': bool(message.get('success', False)),
-                    },
-                    'timestamp': int(time.time() * 1000),
-                }
-                from pathlib import Path as _P
-
-                _lp = _P(__file__).resolve().parents[2] / 'debug-fee086.log'
-                with open(_lp, 'a', encoding='utf-8') as _f:
-                    _f.write(json.dumps(payload, ensure_ascii=True) + '\n')
-            except Exception:
-                pass
-            # #endregion
             request_seq = int(message.get('request_seq', -1))
             response_queue = self._pending.get(request_seq)
             if response_queue is not None:
                 response_queue.put(message)
             return
         if message_type == 'event':
+            ev = str(message.get('event') or '')
+            if ev in {'initialized', 'stopped', 'terminated', 'process'}:
+                logger.debug(
+                    'DAP event: %s seq=%s',
+                    ev,
+                    message.get('seq'),
+                    extra={'msg_type': 'DAP_EVENT', 'dap_event': ev},
+                )
             with self._event_condition:
                 self._events.append(message)
                 self._event_condition.notify_all()
@@ -528,21 +551,69 @@ class DAPDebugSession:
         self._set_initial_breakpoints(breakpoints)
 
     def start(self, timeout: float = 15.0) -> dict[str, Any]:
-        """Start the adapter, send launch/attach, and configure breakpoints."""
+        """Start the adapter, send launch/attach, and configure breakpoints.
+
+        ``timeout`` is a **wall-clock budget for the entire startup sequence**
+        (initialize, launch/attach, breakpoints, configurationDone). Individual
+        DAP calls use the remaining slice so a large value cannot be spent
+        independently on every phase (which previously allowed one stuck phase
+        to burn the full budget and race the pending-action watchdog).
+        """
         session_started = time.monotonic()
+        wall_budget = max(float(timeout), 15.0)
+        deadline = session_started + wall_budget
+
+        def time_left() -> float:
+            return max(0.05, deadline - time.monotonic())
+
         phase = 'spawn adapter'
+        target = str(self.program) if self.program is not None else None
+        _dap_log(
+            logging.INFO,
+            'DAP session start entering',
+            msg_type='DAP_START_PHASE',
+            dap_phase='enter',
+            dap_session_id=self.session_id,
+            wall_budget_seconds=wall_budget,
+            launch_request=self.request,
+            program=target,
+            adapter_argv0=(
+                self.adapter_command[0] if self.adapter_command else None
+            ),
+            adapter_id=self.adapter_id,
+            cwd=self.client.cwd,
+        )
         try:
             self.client.start()
+            proc = self.client.process
+            _dap_log(
+                logging.INFO,
+                'DAP adapter subprocess spawned',
+                msg_type='DAP_START_PHASE',
+                dap_phase='adapter_spawned',
+                dap_session_id=self.session_id,
+                adapter_pid=getattr(proc, 'pid', None) if proc else None,
+                process_poll=proc.poll() if proc is not None else None,
+                elapsed_seconds=round(time.monotonic() - session_started, 3),
+            )
             logger.info('DAP: sending initialize (session=%s)', self.session_id)
             phase = 'initialize request'
             try:
                 self.client.request(
-                    'initialize', self._initialize_arguments(), timeout=timeout
+                    'initialize', self._initialize_arguments(), timeout=time_left()
                 )
             except DAPError as exc:
                 raise DAPStartPhaseError(
-                    phase, str(exc), timeout=timeout
+                    phase, str(exc), timeout=wall_budget
                 ) from exc
+            _dap_log(
+                logging.INFO,
+                'DAP initialize acknowledged',
+                msg_type='DAP_START_PHASE',
+                dap_phase='initialize_ok',
+                dap_session_id=self.session_id,
+                elapsed_seconds=round(time.monotonic() - session_started, 3),
+            )
 
             logger.info(
                 'DAP: sending %s request (session=%s)', self.request, self.session_id
@@ -551,24 +622,41 @@ class DAPDebugSession:
             self.start_request_seq = self.client.request_nowait(
                 self.request, self._start_arguments()
             )
+            _dap_log(
+                logging.INFO,
+                'DAP launch/attach request sent',
+                msg_type='DAP_START_PHASE',
+                dap_phase='launch_attach_sent',
+                dap_session_id=self.session_id,
+                start_request_seq=self.start_request_seq,
+                elapsed_seconds=round(time.monotonic() - session_started, 3),
+            )
             phase = 'initialized event'
-            initialized = self.client.wait_for_event('initialized', timeout=timeout)
+            initialized = self.client.wait_for_event('initialized', timeout=time_left())
             if initialized is None:
                 raise DAPStartPhaseError(
                     phase,
                     'DAP adapter did not send initialized event',
-                    timeout=timeout,
+                    timeout=wall_budget,
                 )
+            _dap_log(
+                logging.INFO,
+                'DAP initialized event received',
+                msg_type='DAP_START_PHASE',
+                dap_phase='initialized_event',
+                dap_session_id=self.session_id,
+                elapsed_seconds=round(time.monotonic() - session_started, 3),
+            )
 
             logger.info('DAP: initialized event received (session=%s)', self.session_id)
             phase = 'set breakpoints'
-            breakpoint_results = self._sync_all_breakpoints(timeout=timeout)
+            breakpoint_results = self._sync_all_breakpoints(time_left)
             phase = 'configurationDone request'
             try:
-                self.client.request('configurationDone', {}, timeout=timeout)
+                self.client.request('configurationDone', {}, timeout=time_left())
             except DAPError as exc:
                 raise DAPStartPhaseError(
-                    phase, str(exc), timeout=timeout
+                    phase, str(exc), timeout=wall_budget
                 ) from exc
             logger.info(
                 'DAP: configurationDone ack (session=%s, breakpoints=%d)',
@@ -578,32 +666,72 @@ class DAPDebugSession:
             if self.start_request_seq is not None:
                 try:
                     self.client.wait_for_response(
-                        self.start_request_seq, timeout=min(timeout, 1.0)
+                        self.start_request_seq, timeout=min(1.0, time_left())
                     )
                 except DAPError:
                     logger.debug('DAP start response was not available yet', exc_info=True)
-            event = self._wait_for_pause_or_exit(timeout=0.5)
+            event = self._wait_for_pause_or_exit(timeout=min(0.5, time_left()))
+            elapsed_total = time.monotonic() - session_started
             logger.info(
                 'DAP: ready in %.2fs (session=%s)',
-                time.monotonic() - session_started,
+                elapsed_total,
                 self.session_id,
+            )
+            _dap_log(
+                logging.INFO,
+                'DAP session started successfully',
+                msg_type='DAP_START_COMPLETE',
+                dap_session_id=self.session_id,
+                elapsed_seconds=round(elapsed_total, 3),
+                wall_budget_seconds=wall_budget,
+                program=target,
+                adapter_argv0=(
+                    self.adapter_command[0] if self.adapter_command else None
+                ),
             )
             return self._snapshot(
                 state='started',
                 extra={'breakpoints': breakpoint_results, 'event': event},
             )
-        except DAPStartPhaseError:
+        except DAPStartPhaseError as exc:
+            _dap_log(
+                logging.WARNING,
+                'DAP session start failed',
+                msg_type='DAP_START_FAILED',
+                dap_session_id=self.session_id,
+                failure_phase=getattr(exc, 'phase', phase),
+                detail=str(exc),
+                stderr_tail=self.client.stderr_tail(12),
+                program=target,
+                adapter_argv0=(
+                    self.adapter_command[0] if self.adapter_command else None
+                ),
+            )
             try:
                 self.client.close()
             except Exception:
                 logger.debug('DAP client close after start-phase failure', exc_info=True)
             raise
         except Exception as exc:
+            _dap_log(
+                logging.WARNING,
+                'DAP session start failed (unexpected)',
+                msg_type='DAP_START_FAILED',
+                dap_session_id=self.session_id,
+                failure_phase=phase,
+                exception_type=type(exc).__name__,
+                detail=str(exc),
+                stderr_tail=self.client.stderr_tail(12),
+                program=target,
+                adapter_argv0=(
+                    self.adapter_command[0] if self.adapter_command else None
+                ),
+            )
             try:
                 self.client.close()
             except Exception:
                 logger.debug('DAP client close after startup failure', exc_info=True)
-            raise DAPStartPhaseError(phase, str(exc), timeout=timeout) from exc
+            raise DAPStartPhaseError(phase, str(exc), timeout=wall_budget) from exc
 
     def set_breakpoints(
         self,
@@ -794,7 +922,7 @@ class DAPDebugSession:
                 self._normalize_breakpoint(entry)
             )
 
-    def _sync_all_breakpoints(self, timeout: float) -> dict[str, Any]:
+    def _sync_all_breakpoints(self, time_left: Callable[[], float]) -> dict[str, Any]:
         results: dict[str, Any] = {}
         for source_path, breakpoints in self.breakpoints_by_file.items():
             response = self.client.request(
@@ -804,7 +932,7 @@ class DAPDebugSession:
                     'breakpoints': breakpoints,
                     'sourceModified': False,
                 },
-                timeout=timeout,
+                timeout=time_left(),
             )
             results[source_path] = response.get('body', {}).get('breakpoints', [])
         return results
@@ -981,6 +1109,17 @@ class DAPDebugManager:
         timeout = float(action.timeout or 10.0)
         try:
             if debug_action == 'start':
+                _dap_log(
+                    logging.INFO,
+                    'Debugger tool: start',
+                    msg_type='DEBUGGER_TOOL',
+                    debug_action='start',
+                    program=action.program,
+                    workspace_root=str(self.workspace_root),
+                    process_cwd=str(Path.cwd()),
+                    adapter_hint=action.adapter_id or action.language,
+                    timeout_seconds=max(timeout, 15.0),
+                )
                 payload = self._start(action, timeout=max(timeout, 15.0))
             else:
                 session = self._get_session(action.session_id)
@@ -1053,6 +1192,15 @@ class DAPDebugManager:
 
         adapter = self._adapter_name(action)
         adapter_command = self._adapter_command(action, adapter)
+        _dap_log(
+            logging.INFO,
+            'DAP adapter command resolved',
+            msg_type='DAP_ADAPTER_RESOLVED',
+            dap_session_id=session_id,
+            adapter=adapter,
+            adapter_argv0=adapter_command[0] if adapter_command else None,
+            program=action.program,
+        )
         adapter_id = action.adapter_id or adapter or 'generic'
         language = action.language or adapter
 
@@ -1131,7 +1279,7 @@ class DAPDebugManager:
     def _adapter_name(self, action: DebuggerAction) -> str | None:
         adapter = action.adapter or action.language
         if adapter:
-            return adapter.strip().lower()
+            return normalize_debug_adapter_name(adapter)
         if action.program:
             return self._EXTENSION_ADAPTERS.get(Path(action.program).suffix.lower())
         return None
