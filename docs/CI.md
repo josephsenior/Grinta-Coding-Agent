@@ -10,9 +10,11 @@ This document describes what runs in GitHub Actions and how it relates to local 
 | **Run Python Tests** | `gates-on-windows` | Same full unit corpus on `windows-latest`. |
 | **Run Python Tests** | `gates-on-macos` | Same full unit corpus on `macos-latest` — **advisory only** (`continue-on-error: true`) until the matrix is promoted to required. |
 | **Lint** | pre-commit, mypy, version check | See [`.github/workflows/lint.yml`](../.github/workflows/lint.yml). |
+| **Dependency Review** | `dependency-review` | Blocks high-severity dependency risk on pull requests. |
+| **CodeQL** | `analyze` | Static security analysis for Python on PRs and main. |
 | **CLI Regression Tests** | (when paths match) | CLI integration smoke and selected orchestration tests; see [`.github/workflows/e2e-tests.yml`](../.github/workflows/e2e-tests.yml). |
 
-Codecov upload is best-effort (`fail_ci_if_error: false`) so a registry outage does not block merges; the test step still fails on real test failures.
+Codecov upload is enforced (`fail_ci_if_error: true`) and coverage uses the same `fail_under` policy as the project configuration.
 
 ## Heavy / integration / benchmark tier
 

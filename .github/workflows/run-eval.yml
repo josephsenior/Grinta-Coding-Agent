@@ -43,7 +43,7 @@ jobs:
 
     steps:
       - name: Checkout branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || (github.event_name == 'workflow_dispatch' && github.event.inputs.branch) || github.ref }}
 
@@ -121,7 +121,7 @@ jobs:
             https://hooks.slack.com/services/${{ secrets.SLACK_TOKEN }}
 
       - name: Comment on issue/PR
-        uses: KeisukeYamashita/create-comment@v1
+        uses: KeisukeYamashita/create-comment@1d95d97d7b1b73ab66e5ca931610e4e10ddc5eed
         with:
           # For PR triggers, comment on the PR. For other triggers, comment on the master issue
           number: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || env.MASTER_EVAL_ISSUE_NUMBER }}

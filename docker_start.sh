@@ -32,8 +32,15 @@ if [ ! -f "settings.json" ]; then
     fi
 fi
 
-# Run docker compose
-echo "🐳 Running Docker Compose (local file-backed Grinta)..."
+# Run docker compose only when project provides a compose file.
+if [ ! -f "docker-compose.yml" ] && [ ! -f "compose.yml" ]; then
+    echo "⚠ No docker-compose file found in this repository."
+    echo "This path is community/experimental. Use the published image instead:"
+    echo 'docker run -it --rm -v "$PWD:/work" -w /work -e LLM_API_KEY=${LLM_API_KEY} ghcr.io/josephsenior/grinta:latest'
+    exit 1
+fi
+
+echo "🐳 Running Docker Compose..."
 
 if [ "$DETACHED" -eq 1 ]; then
     docker compose up --build -d

@@ -44,7 +44,7 @@ grinta init
 
 The manifest lives in [`packaging/scoop/grinta.json`](../packaging/scoop/grinta.json).
 
-## 5. Docker
+## 5. Docker (community / experimental)
 
 ```bash
 docker pull ghcr.io/josephsenior/grinta:latest
@@ -54,6 +54,9 @@ docker run -it --rm -v "$PWD:/work" -w /work \
 ```
 
 A Docker Hub mirror is published as `josephsenior/grinta:latest`.
+
+This repository does not currently ship a maintained `docker-compose.yml`. If you use
+Docker, run the container image directly and treat this path as community-supported.
 
 ## After installation
 

@@ -18,7 +18,7 @@ The following are *always wrong*. Avoid them even if they look like a shortcut.
 - **Inventing tool names or MCP tool prefixes.** Pass tool names exactly as listed; if a name is not in the list, the tool is not available — pick a different approach.
 - **Retrying the same failing tool call with the same arguments.** Read the error, change strategy, or escalate.
 - {user_question_antipattern}
-- **Running `rm`, `Remove-Item`, force pushes, or other destructive ops without confirmation** in non-`full` autonomy. Even in `full`, take a `checkpoint` first if available.
+- **Running `rm`, `Remove-Item`, force pushes, or other destructive ops without explicit confirmation from the confirmation gate.** If available, take a `checkpoint` first.
 - **Guessing file paths or symbol names** instead of discovering them with `search_code` / `analyze_project_structure`.
 - **Fabricating tool outputs or pretending an action succeeded.** If a tool errored, the work is not done.
 - **Emitting JSON planning blobs or structured analysis as plain text.** Never output JSON objects, task lists, plan arrays, or pseudo-tool-call structures as literal text. They produce no effect, render as raw noise in the terminal, and cause the agent loop to stall waiting for user input. Use actual tool calls — `task_tracker`, `{terminal_command_tool}`, `text_editor` — for every action including planning. Plain text is only for asking the user a question or delivering a final summary.

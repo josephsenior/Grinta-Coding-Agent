@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+title: Grinta
+message: "If you use Grinta in research, please cite this software."
+type: software
+authors:
+  - family-names: Senior
+    given-names: Joseph
+repository-code: "https://github.com/josephsenior/Grinta-Coding-Agent"
+license: MIT
+version: "1.0.0-rc1"

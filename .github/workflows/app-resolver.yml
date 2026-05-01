@@ -45,10 +45,6 @@ on:
         required: true
       LLM_BASE_URL:
         required: false
-      PAT_TOKEN:
-        required: false
-      PAT_USERNAME:
-        required: false
 
   issues:
     types: [labeled]
@@ -86,10 +82,10 @@ jobs:
     runs-on: "${{ inputs.runner || 'ubuntu-latest' }}"
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: "3.12"
       - name: Upgrade pip
@@ -124,7 +120,7 @@ jobs:
               (contains(github.event.review.body, '@grinta-agent-exp') || contains(github.event.review.body, '@App-agent-exp'))
             )
           )
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
         with:
           path: ${{ env.pythonLocation }}/lib/python3.12/site-packages/*
           key: ${{ runner.os }}-pip-grinta-resolver-${{ hashFiles('/tmp/requirements.txt') }}
@@ -137,8 +133,6 @@ jobs:
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
           LLM_API_VERSION: ${{ inputs.LLM_API_VERSION }}
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-          PAT_USERNAME: ${{ secrets.PAT_USERNAME }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           required_vars=("LLM_API_KEY")
@@ -152,14 +146,6 @@ jobs:
           # Check optional variables and warn about fallbacks
           if [ -z "$LLM_BASE_URL" ]; then
             echo "Warning: LLM_BASE_URL is not set, will use default API endpoint"
-          fi
-
-          if [ -z "$PAT_TOKEN" ]; then
-            echo "Warning: PAT_TOKEN is not set, falling back to GITHUB_TOKEN"
-          fi
-
-          if [ -z "$PAT_USERNAME" ]; then
-            echo "Warning: PAT_USERNAME is not set, will use grinta-agent"
           fi
 
       - name: Set environment variables
@@ -191,16 +177,16 @@ jobs:
           fi
 
           echo "MAX_ITERATIONS=${{ inputs.max_iterations || 50 }}" >> $GITHUB_ENV
-          echo "RUNTIME_ENV_GITHUB_TOKEN=${{ secrets.PAT_TOKEN || github.token }}" >> $GITHUB_ENV
+          echo "RUNTIME_ENV_GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
           echo "RUNTIME_BASE_CONTAINER_IMAGE=${{ inputs.base_container_image }}" >> $GITHUB_ENV
 
           # Set branch variables
           echo "TARGET_BRANCH=${{ inputs.target_branch || 'main' }}" >> $GITHUB_ENV
 
       - name: Comment on issue with start message
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
-          github-token: ${{ secrets.PAT_TOKEN || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const issueType = process.env.ISSUE_TYPE;
             github.rest.issues.createComment({
@@ -212,7 +198,7 @@ jobs:
 
       - name: Install Grinta
         id: install_app
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         env:
           COMMENT_BODY: ${{ github.event.comment.body || '' }}
           REVIEW_BODY: ${{ github.event.review.body || '' }}
@@ -249,9 +235,9 @@ jobs:
 
       - name: Attempt to resolve issue
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
-          GITHUB_USERNAME: ${{ secrets.PAT_USERNAME || 'grinta-agent' }}
-          GIT_USERNAME: ${{ secrets.PAT_USERNAME || 'grinta-agent' }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_USERNAME: ${{ github.actor }}
+          GIT_USERNAME: ${{ github.actor }}
           LLM_MODEL: ${{ secrets.LLM_MODEL || inputs.LLM_MODEL }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
@@ -276,7 +262,7 @@ jobs:
           fi
 
       - name: Upload output.jsonl as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always() # Upload even if the previous steps fail
         with:
           name: resolver-output
@@ -286,9 +272,9 @@ jobs:
       - name: Create draft PR or push branch
         if: always() # Create PR or branch even if the previous steps fail
         env:
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
-          GITHUB_USERNAME: ${{ secrets.PAT_USERNAME || 'grinta-agent' }}
-          GIT_USERNAME: ${{ secrets.PAT_USERNAME || 'grinta-agent' }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_USERNAME: ${{ github.actor }}
+          GIT_USERNAME: ${{ github.actor }}
           LLM_MODEL: ${{ secrets.LLM_MODEL || inputs.LLM_MODEL }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
           LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
@@ -312,13 +298,13 @@ jobs:
 
       # Step leaves comment for when agent is invoked on PR
       - name: Analyze Push Logs (Updated PR or No Changes) # Skip comment if PR update was successful OR leave comment if the agent made no code changes
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         if: always()
         env:
           AGENT_RESPONDED: ${{ env.AGENT_RESPONDED || 'false' }}
           ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
         with:
-          github-token: ${{ secrets.PAT_TOKEN || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const fs = require('fs');
             const issueNumber = process.env.ISSUE_NUMBER;
@@ -348,14 +334,14 @@ jobs:
 
       # Step leaves comment for when agent is invoked on issue
       - name: Comment on issue # Comment link to either PR or branch created by agent
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         if: always() # Comment on issue even if the previous steps fail
         env:
           AGENT_RESPONDED: ${{ env.AGENT_RESPONDED || 'false' }}
           ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
           RESOLUTION_SUCCESS: ${{ steps.check_result.outputs.RESOLUTION_SUCCESS }}
         with:
-          github-token: ${{ secrets.PAT_TOKEN || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const fs = require('fs');
             const path = require('path');
@@ -423,12 +409,12 @@ jobs:
 
       # Leave error comment when both PR/Issue comment handling fail
       - name: Fallback Error Comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         if: ${{ env.AGENT_RESPONDED == 'false' }} # Only run if no conditions were met in previous steps
         env:
           ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
         with:
-          github-token: ${{ secrets.PAT_TOKEN || github.token }}
+          github-token: ${{ github.token }}
           script: |
             const issueNumber = process.env.ISSUE_NUMBER;
 

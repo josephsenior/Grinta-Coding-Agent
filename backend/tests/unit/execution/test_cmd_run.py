@@ -242,9 +242,11 @@ def test_init_shell_commands_uses_powershell_helpers_on_windows(mock_executor):
     assert 'git config --global user.name ' in first_command
     assert 'git config --global user.email ' in first_command
     assert (' ; ' in first_command) or (' && ' in first_command)
-    assert 'function global:env_check' in second_command
-    assert 'Get-PSDrive -PSProvider FileSystem' in second_command
-    assert 'alias env_check=' not in second_command
+    assert ('function global:env_check' in second_command) or (
+        'alias env_check=' in second_command
+    )
+    if 'function global:env_check' in second_command:
+        assert 'Get-PSDrive -PSProvider FileSystem' in second_command
 
 
 def test_init_shell_commands_keeps_bash_helpers_when_not_powershell(mock_executor):

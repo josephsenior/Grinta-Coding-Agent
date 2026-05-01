@@ -32,15 +32,31 @@ reliability-gate-integration: pretest
 
 .PHONY: docker-up
 docker-up:
-	@docker compose up --build
+	@if [ -f "docker-compose.yml" ] || [ -f "compose.yml" ]; then \
+		docker compose up --build; \
+	else \
+		echo "No docker-compose file found. Docker path is community/experimental in this repo."; \
+		echo 'Use: docker run -it --rm -v "$$PWD:/work" -w /work -e LLM_API_KEY=$${LLM_API_KEY} ghcr.io/josephsenior/grinta:latest'; \
+		exit 1; \
+	fi
 
 .PHONY: docker-up-detached
 docker-up-detached:
-	@docker compose up --build -d
+	@if [ -f "docker-compose.yml" ] || [ -f "compose.yml" ]; then \
+		docker compose up --build -d; \
+	else \
+		echo "No docker-compose file found. Docker path is community/experimental in this repo."; \
+		exit 1; \
+	fi
 
 .PHONY: docker-up-no-db
 docker-up-no-db:
-	@docker compose up --build
+	@if [ -f "docker-compose.yml" ] || [ -f "compose.yml" ]; then \
+		docker compose up --build; \
+	else \
+		echo "No docker-compose file found. Docker path is community/experimental in this repo."; \
+		exit 1; \
+	fi
 
 # Makefile for App project
 SHELL=/usr/bin/env bash
