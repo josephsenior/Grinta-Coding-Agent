@@ -1,7 +1,7 @@
 """Run database migrations for knowledge base storage.
 
 Usage:
-    python -m app.storage.knowledge_base.migrations.run_migrations
+    python -m backend.persistence.knowledge_base.migrations.run_migrations
 """
 
 import asyncio
@@ -20,8 +20,7 @@ try:
     import asyncpg
 except ImportError as _exc:
     raise ImportError(
-        'asyncpg is required for database migrations. '
-        "Install with:  uv pip install 'app-ai[database]'"
+        'asyncpg is required for database migrations. Install with: pip install asyncpg'
     ) from _exc
 
 

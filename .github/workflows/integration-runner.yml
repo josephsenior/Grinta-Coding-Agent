@@ -63,7 +63,7 @@ jobs:
   run-integration-tests:
     needs: detect-integration-assets
     if: needs.detect-integration-assets.outputs.available == 'true' && (github.event.label.name == 'integration-test' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     permissions:
       contents: "read"
       id-token: "write"
@@ -82,12 +82,12 @@ jobs:
           enable-cache: true
 
       - name: Set up Python
-        uses: useblacksmith/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Setup Node.js
-        uses: useblacksmith/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version: '22.x'
 

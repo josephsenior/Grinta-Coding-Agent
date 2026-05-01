@@ -353,9 +353,8 @@ def test_build_python_exec_command_includes_shell_fallbacks_for_powershell():
 def test_active_tool_registry_visible_from_worker_thread():
     """Regression: ThreadPoolExecutor workers must see the runtime ToolRegistry."""
     from concurrent.futures import ThreadPoolExecutor
-    from unittest.mock import MagicMock
-
     from dataclasses import replace
+    from unittest.mock import MagicMock
 
     from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
     from backend.engine.tools import prompt as prompt_mod

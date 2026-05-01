@@ -1,4 +1,4 @@
-"""App automation framework package."""
+"""Grinta package."""
 
 import warnings
 
@@ -17,7 +17,7 @@ from importlib.metadata import PackageNotFoundError, version  # noqa: E402
 from pathlib import Path  # noqa: E402
 
 __version__ = '1.0.0rc1'
-__package_name__ = 'app-ai'
+__package_name__ = 'grinta-ai'
 
 
 def get_version() -> str:
@@ -59,7 +59,7 @@ try:
     __version__ = get_version()
 except Exception as _exc:
     warnings.warn(
-        f"App: could not determine package version ({_exc!r}); reporting '1.0.0rc1'.",
+        f"Grinta: could not determine package version ({_exc!r}); reporting '1.0.0rc1'.",
         stacklevel=1,
     )
 __version__ = '1.0.0rc1'

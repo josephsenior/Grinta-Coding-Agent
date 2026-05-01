@@ -19,13 +19,13 @@ jobs:
   # Run lint on the python code
   lint-python:
     name: Lint python
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Set up python
-        uses: useblacksmith/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: 3.12
           cache: "pip"
@@ -37,11 +37,11 @@ jobs:
   # Check version consistency across documentation
   check-version-consistency:
     name: Check version consistency
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Set up python
-        uses: useblacksmith/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: 3.12
       - name: Run version consistency check
@@ -49,11 +49,11 @@ jobs:
 
   check-workflow-config-consistency:
     name: Check workflow config consistency
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Set up python
-        uses: useblacksmith/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: 3.12
       - name: Run workflow config consistency check
@@ -62,7 +62,7 @@ jobs:
   # Run mypy type checks on the backend
   type-check:
     name: Type check (mypy)
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
@@ -70,7 +70,7 @@ jobs:
         with:
           enable-cache: true
       - name: Set up python
-        uses: useblacksmith/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: 3.12
       - name: Install dependencies

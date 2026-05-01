@@ -1131,8 +1131,7 @@ def _walk_dependency_graph(
         else:  # both
             neighbors = list(
                 dict.fromkeys(
-                    _downstream_imports(node, root)
-                    + _upstream_importers(node, root)
+                    _downstream_imports(node, root) + _upstream_importers(node, root)
                 )
             )
         edges[node] = neighbors

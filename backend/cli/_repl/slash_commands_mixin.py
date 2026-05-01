@@ -11,6 +11,7 @@ The mixin assumes the host class provides:
 * helper methods: ``_warn``, ``_usage``, ``_reject_extra_args``,
   ``_command_project_root``.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -824,6 +825,6 @@ class SlashCommandsMixin:
         Playbook slash triggers are matched by memory-level trigger logic, not
         by the REPL command handler itself.
         """
-        suffix = f" {' '.join(parsed.args)}" if parsed.args else ''
+        suffix = f' {" ".join(parsed.args)}' if parsed.args else ''
         self._next_action = MessageAction(content=f'{parsed.name}{suffix}')
         return True

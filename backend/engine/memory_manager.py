@@ -146,7 +146,7 @@ class ContextMemoryManager:
             turn_signals.prewarmed_compaction = None
             logger.info('Utilizing background pre-warmed condensation result.')
             condensation_result = prewarmed
-            
+
             # Tag the CondensationAction to identify it as prewarmed
             action = getattr(condensation_result, 'action', None)
             if action:

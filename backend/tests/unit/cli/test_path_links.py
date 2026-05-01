@@ -19,6 +19,4 @@ def test_file_uri_for_path_relative_resolves() -> None:
 def test_linkify_plain_includes_link_span_for_existing_file() -> None:
     t = linkify_plain('see backend/cli/path_links.py for logic', link_files=True)
     assert 'backend/cli/path_links.py' in t.plain
-    assert any(
-        getattr(s.style, 'link', None) is not None for s in t.spans if s.style
-    )
+    assert any(getattr(s.style, 'link', None) is not None for s in t.spans if s.style)

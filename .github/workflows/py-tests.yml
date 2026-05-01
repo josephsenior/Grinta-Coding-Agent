@@ -25,7 +25,7 @@ concurrency:
 jobs:
   gates-on-linux:
     name: Python Gates on Linux
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         python-version: ['3.12']
@@ -36,7 +36,7 @@ jobs:
         with:
           enable-cache: true
       - name: Set up Python
-        uses: useblacksmith/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Lockfile validation
@@ -126,7 +126,7 @@ jobs:
         with:
           enable-cache: true
       - name: Set up Python
-        uses: useblacksmith/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Python dependencies

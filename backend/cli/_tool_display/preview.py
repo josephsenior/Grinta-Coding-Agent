@@ -48,7 +48,9 @@ def looks_like_streaming_tool_arguments(text: str) -> bool:
 # MCP preview
 # ---------------------------------------------------------------------------
 
-_VERBOSE_MCP_JSON = os.environ.get('GRINTA_CLI_VERBOSE_MCP_JSON', '').strip().lower() in {
+_VERBOSE_MCP_JSON = os.environ.get(
+    'GRINTA_CLI_VERBOSE_MCP_JSON', ''
+).strip().lower() in {
     '1',
     'true',
     'yes',

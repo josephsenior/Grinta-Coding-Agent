@@ -33,20 +33,19 @@ from backend.cli.theme import (
     CLR_ERR_ICON,
     CLR_INFO_BODY,
     CLR_INFO_ICON,
+    CLR_OK_BODY,
+    CLR_OK_ICON,
+    CLR_REASONING_COMMITTED,
     CLR_STATUS_WARN,
+    CLR_TURN_RULE,
     CLR_WARN_BODY,
     CLR_WARN_ICON,
     MARK_ERR,
     MARK_INFO,
     MARK_OK,
     MARK_WARN,
-    STYLE_DEFAULT,
     STYLE_DIM,
     STYLE_EMPTY,
-    CLR_OK_BODY,
-    CLR_OK_ICON,
-    CLR_REASONING_COMMITTED,
-    CLR_TURN_RULE,
 )
 
 # Stripped from user-visible transcripts (still present on stored observations for the LLM).
@@ -79,7 +78,7 @@ def format_activity_primary(verb: str, detail: str | Text) -> Text:
     terminals can open them via OSC-8 hyperlinks.
     """
     from backend.cli.theme import CLR_VERB
-    
+
     line = Text()
     line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
     line.append(

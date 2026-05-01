@@ -12,9 +12,6 @@ from rich.text import Text
 from backend.cli.theme import (
     CLR_CARD_BORDER,
     CLR_CARD_TITLE,
-    CLR_DIFF_ADD,
-    CLR_DIFF_REM,
-    STYLE_DIM,
 )
 from backend.cli.transcript import (
     format_activity_delta_secondary,
@@ -169,7 +166,7 @@ class DiffPanel:
     def _render_groups(groups: list[dict[str, list[str]]]) -> Any:
         """Build a Rich Syntax from edit groups with colored +/- lines."""
         from rich.syntax import Syntax
-        
+
         lines = []
         for i, group in enumerate(groups):
             if i > 0:
@@ -178,17 +175,17 @@ class DiffPanel:
                 lines.append(line + '\n')
             for line in group.get('after_edits', []):
                 lines.append(line + '\n')
-                
-        diff_str = "".join(lines)
+
+        diff_str = ''.join(lines)
         if len(diff_str) > 3000:
             diff_str = diff_str[:3000] + '\n… (truncated)'
-            
+
         return Syntax(
             diff_str,
-            lexer="diff",
-            theme="monokai",
+            lexer='diff',
+            theme='monokai',
             word_wrap=True,
             padding=(1, 2),
-            background_color="default",
-            line_numbers=False
+            background_color='default',
+            line_numbers=False,
         )

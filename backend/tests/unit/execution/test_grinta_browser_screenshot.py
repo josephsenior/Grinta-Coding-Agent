@@ -226,9 +226,7 @@ async def test_screenshot_retries_with_from_surface_false_on_failure(
 
     obs = await shot_tool.execute('screenshot', {})
 
-    assert isinstance(obs, BrowserScreenshotObservation), getattr(
-        obs, 'content', obs
-    )
+    assert isinstance(obs, BrowserScreenshotObservation), getattr(obs, 'content', obs)
     _assert_retry_screenshot_result(obs, state, tmp_path)
 
 

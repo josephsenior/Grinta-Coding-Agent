@@ -316,8 +316,8 @@ DEFAULT_STUCK_CONTEXT_HIGH_GROWTH = 1000
 # N consecutive AgentThinkActions with no real tool use trips think-only.
 DEFAULT_STUCK_THINK_LOOP_DEPTH = 10
 # Read-only inspection loop: extreme cases only (true degenerate poll loop).
- # Stuck-detection recovery: how much one progress signal decrements the
- # counter (game-able if too high; ignored if too low).
+# Stuck-detection recovery: how much one progress signal decrements the
+# counter (game-able if too high; ignored if too low).
 DEFAULT_STUCK_PROGRESS_SIGNAL_DECREMENT = 2
 
 # ── Knowledge Base Defaults ─────────────────────────────────────────

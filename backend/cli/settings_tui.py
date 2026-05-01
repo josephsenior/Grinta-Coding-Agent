@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from rich.console import Console
 from rich import box
+from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.rule import Rule

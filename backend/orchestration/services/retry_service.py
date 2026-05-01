@@ -206,9 +206,7 @@ class RetryService:
                 'max_attempts': task.max_attempts,
                 'delay_seconds': initial_delay,
                 'reason': type(exc).__name__,
-                'rate_limit_kind': getattr(
-                    getattr(exc, 'kind', None), 'value', None
-                ),
+                'rate_limit_kind': getattr(getattr(exc, 'kind', None), 'value', None),
                 'retry_after': getattr(exc, 'retry_after', None),
                 'provider': getattr(exc, 'llm_provider', None),
             },
