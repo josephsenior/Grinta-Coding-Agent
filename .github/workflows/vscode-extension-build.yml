@@ -127,7 +127,7 @@ jobs:
           fi
 
       - name: Upload VSCode extension artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: vscode-extension
           path: ${{ steps.discover_vsix.outputs.vsix_path }}
