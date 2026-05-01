@@ -6,6 +6,7 @@ All changes succeed together or fail together - no partial corrupted state.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import tempfile
@@ -14,6 +15,26 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from backend.core.logger import app_logger as logger
+
+
+def _ensure_parent_dir(file_path: str) -> None:
+    parent = os.path.dirname(file_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+
+def _backup_relative_slug(full_path: str) -> str:
+    """Stable relative path for backup filenames; handles cross-volume ``relpath``."""
+    try:
+        rel = os.path.relpath(full_path)
+    except ValueError:
+        abspath = os.path.abspath(full_path)
+        digest = hashlib.sha256(
+            abspath.encode('utf-8', errors='surrogateescape')
+        ).hexdigest()[:16]
+        base = os.path.basename(abspath) or 'file'
+        return f'__vol_{digest}__{base}'
+    return rel.replace('..', '__parent__')
 
 
 @dataclass
@@ -255,9 +276,9 @@ class AtomicRefactor:
         for edit in transaction.edits:
             if edit.original_content and transaction.backup_dir:
                 # Preserve directory structure to avoid basename collisions
-                safe_rel = os.path.relpath(edit.path).replace('..', '__parent__')
+                safe_rel = _backup_relative_slug(edit.path)
                 backup_path = os.path.join(transaction.backup_dir, safe_rel)
-                os.makedirs(os.path.dirname(backup_path), exist_ok=True)
+                _ensure_parent_dir(backup_path)
                 try:
                     with open(backup_path, 'w', encoding='utf-8') as f:
                         f.write(edit.original_content)
@@ -275,7 +296,7 @@ class AtomicRefactor:
             validator: Validation function
 
         """
-        os.makedirs(os.path.dirname(edit.path), exist_ok=True)
+        _ensure_parent_dir(edit.path)
 
         with open(edit.path, 'w', encoding='utf-8') as f:
             f.write(edit.new_content or '')

@@ -89,7 +89,9 @@ class SafePath:
         validated_path = validate_and_sanitize_path(
             path, workspace_root, must_exist, must_be_relative
         )
-        workspace_path = Path(workspace_root) if workspace_root else None
+        workspace_path = (
+            Path(workspace_root).resolve() if workspace_root else None
+        )
         return cls(validated_path, workspace_path)
 
     @property
@@ -113,11 +115,13 @@ class SafePath:
         """
         if self._workspace_root is None:
             raise ValueError('Workspace root not set')
+        workspace = self._workspace_root.resolve()
+        path = self._path.resolve()
         try:
-            return str(self._path.relative_to(self._workspace_root))
+            return str(path.relative_to(workspace))
         except ValueError:
             # Path is not relative to workspace
-            return str(self._path)
+            return str(path)
 
     def exists(self) -> bool:
         """Check if path exists."""
