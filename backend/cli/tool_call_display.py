@@ -21,6 +21,7 @@ from backend.cli._tool_display.headline import (
 from backend.cli._tool_display.preview import (
     flatten_tool_call_for_history,
     looks_like_streaming_tool_arguments,
+    mcp_result_syntax_extras,
     mcp_result_user_preview,
     try_format_message_as_tool_json,
 )
@@ -47,6 +48,7 @@ __all__ = [
     'format_tool_invocation_line',
     'friendly_verb_for_tool',
     'looks_like_streaming_tool_arguments',
+    'mcp_result_syntax_extras',
     'mcp_result_user_preview',
     'parse_tool_arguments_json',
     'redact_internal_result_markers',

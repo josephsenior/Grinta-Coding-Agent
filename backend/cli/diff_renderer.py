@@ -21,7 +21,31 @@ from backend.cli.transcript import (
     format_activity_primary,
     format_activity_result_secondary,
     format_activity_secondary,
+    format_activity_validation_callout,
 )
+
+
+def _is_validation_secondary(text: str) -> bool:
+    """True for syntax / lint / type feedback bundled with file edits."""
+    low = (text or '').lower()
+    return any(
+        frag in low
+        for frag in (
+            'syntax error',
+            'syntax check',
+            'lint error',
+            'linter',
+            'eslint',
+            'ruff:',
+            'ruff ',
+            'flake8',
+            'pylint',
+            'mypy',
+            'pyright',
+            'type error',
+            'typecheck',
+        )
+    )
 
 
 class DiffPanel:
@@ -74,14 +98,10 @@ class DiffPanel:
         yield self._build_panel(parts)
 
     def _append_secondary(self, parts: list[Any]) -> None:
-        # Surface syntax checker output as a clearly-marked secondary line
-        # rather than silently swallowing it — these warnings are actionable
-        # (the agent just touched the file) but should read as a hint, not a
-        # blocking error, so they sit alongside the diff with a warn tint.
         if not self._secondary:
             return
-        if 'Syntax Error' in self._secondary or 'Syntax Check' in self._secondary:
-            parts.append(format_activity_secondary(self._secondary, kind='warn'))
+        if _is_validation_secondary(self._secondary):
+            parts.append(format_activity_validation_callout(self._secondary))
             return
         parts.append(format_activity_secondary(self._secondary, kind='neutral'))
 

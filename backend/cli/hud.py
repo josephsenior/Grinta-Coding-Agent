@@ -140,104 +140,36 @@ class HUDBar:
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        width = options.max_width
-        # Use compact if terminal is narrow or if the full bar would overflow.
-        use_compact = width < 80 or self._full_bar_length() > width - 2
-        bar = self._format_compact() if use_compact else self._format()
-        yield bar
+        yield self._format_bar()
 
     # Shared tight bullet separator. Matches the live branded row so the
     # committed footer and the in-progress footer feel like the same bar.
     _SEP_TEXT = ' · '
     _SEP_STYLE = CLR_SEP
 
-    def _full_bar_length(self) -> int:
-        """Approximate character length of the full-format HUD bar."""
-        provider, model = self.describe_model(self.state.model)
-        ctx = self._format_tokens(self.state.context_tokens)
-        lim = (
-            self._format_tokens(self.state.context_limit)
-            if self.state.context_limit
-            else '?'
-        )
-        token_display = (
-            f'{ctx} tokens' if self.state.context_limit == 0 else f'{ctx}/{lim}'
-        )
-        if self.state.token_usage_estimated:
-            token_display += ' est'
-        mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
-        skills_label = self._format_skills_label(self._bundled_skill_count)
-        model_display = (
-            model if provider in {'(not set)', '(unknown)'} else f'{provider}/{model}'
-        )
-        parts = [
-            f' {model_display}',
-            f'{self._SEP_TEXT}{token_display}',
-            f'{self._SEP_TEXT}${self.state.cost_usd:.4f}',
-            f'{self._SEP_TEXT}{self.state.llm_calls} calls',
-            f'{self._SEP_TEXT}{mcp_label}',
-            f'{self._SEP_TEXT}{skills_label}',
-            f'{self._SEP_TEXT}{self.state.ledger_status}',
-        ]
-        return sum(len(p) for p in parts) + 1  # +1 for leading space
-
     def _format(self) -> Text:
-        provider, model = self.describe_model(self.state.model)
-        ctx = self._format_tokens(self.state.context_tokens)
-        lim = (
-            self._format_tokens(self.state.context_limit)
-            if self.state.context_limit
-            else '?'
-        )
-        # Show a clean placeholder before the first LLM call.
-        if self.state.context_tokens == 0 and self.state.context_limit == 0:
-            token_display = '0 tokens'
-        elif self.state.context_limit == 0:
-            token_display = f'{ctx} tokens'
-        else:
-            token_display = f'{ctx}/{lim}'
-        if self.state.token_usage_estimated:
-            token_display += ' est'
-        mcp_label = self._format_mcp_servers_label(self.state.mcp_servers)
-        skills_label = self._format_skills_label(self._bundled_skill_count)
-        # Combined "provider/model" — the explicit "provider:" and "model:"
-        # labels were visual weight without information gain.
-        if provider in {'(not set)', '(unknown)'}:
-            model_display = model
-        else:
-            model_display = f'{provider}/{model}'
-        SEP = (self._SEP_TEXT, self._SEP_STYLE)
-        parts = [
-            (' ', ''),
-            (model_display, CLR_HUD_MODEL),
-            SEP,
-            (token_display, CLR_HUD_DETAIL),
-            SEP,
-            (f'${self.state.cost_usd:.4f}', CLR_HUD_DETAIL),
-            SEP,
-            (f'{self.state.llm_calls} calls', CLR_HUD_DETAIL),
-            SEP,
-            (mcp_label, CLR_HUD_DETAIL),
-            SEP,
-            (skills_label, CLR_HUD_DETAIL),
-            SEP,
-            (self.state.ledger_status, self._ledger_style()),
-        ]
-        txt = Text()
-        for content, style in parts:
-            txt.append(content, style=style)
-        return txt
+        """Single HUD layout (alias for :meth:`_format_bar`)."""
+        return self._format_bar()
 
     def _format_compact(self) -> Text:
-        """Compact format for narrow terminals (< 80 cols)."""
+        """Deprecated alias for :meth:`_format_bar` — one bar at all widths."""
+        return self._format_bar()
+
+    def _format_bar(self) -> Text:
+        """One dense status line: model, tokens, cost, MCP, skills, ledger icon."""
         provider, model = self.describe_model(self.state.model)
         ctx = self._format_tokens(self.state.context_tokens)
+        lim_tok = (
+            self._format_tokens(self.state.context_limit)
+            if self.state.context_limit
+            else None
+        )
         if self.state.context_tokens == 0 and self.state.context_limit == 0:
             token_display = '0t'
         elif self.state.context_limit == 0:
             token_display = f'{ctx}t'
         else:
-            token_display = ctx
+            token_display = f'{ctx}/{lim_tok}' if lim_tok else f'{ctx}t'
         if self.state.token_usage_estimated:
             token_display += '~'
         mcp_short = (
@@ -250,21 +182,20 @@ class HUDBar:
             model_display = model
         else:
             model_display = f'{provider}/{model}'
-        # Compact glyphs: ``MCP·N`` / ``sk·N`` read faster than ``mN`` / ``kN``.
         sep = (' · ', CLR_SEP)
-        parts = [
-            (
-                model_display,
-                'dim',
-            ),
+        parts: list[tuple[str, str]] = [
+            (' ', ''),
+            (model_display, CLR_HUD_MODEL),
             sep,
-            (token_display, 'dim'),
+            (token_display, CLR_HUD_DETAIL),
             sep,
-            (f'${self.state.cost_usd:.3f}', 'dim'),
+            (f'${self.state.cost_usd:.3f}', CLR_HUD_DETAIL),
             sep,
-            (f'MCP·{mcp_short}', 'dim'),
+            (f'{self.state.llm_calls}c', CLR_HUD_DETAIL),
             sep,
-            (f'sk·{sk_short}', 'dim'),
+            (f'MCP·{mcp_short}', CLR_HUD_DETAIL),
+            sep,
+            (f'sk·{sk_short}', CLR_HUD_DETAIL),
             sep,
             (self._ledger_icon(), self._ledger_style()),
         ]
@@ -485,12 +416,12 @@ class HUDBar:
         self.state.token_usage_estimated = bool(latest.get('usage_estimated', False))
 
     def plain_text(self) -> str:
-        return self._format().plain
+        return self._format_bar().plain
 
     def render_line(self, console: Console) -> None:
         """Print the HUD as a single bottom-of-screen line."""
         width = console.width
-        bar = self._format_compact() if width < 80 else self._format()
+        bar = self._format_bar()
         pad = max(0, width - len(bar.plain) - 2)
         console.print(
             Text('  ') + bar + Text(' ' * pad),

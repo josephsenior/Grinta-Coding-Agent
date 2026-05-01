@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
+
+from rich.syntax import Syntax
 
 from backend.cli._tool_display.constants import _TOOL_CALL_PREFIX
 from backend.cli._tool_display.summarize import (
@@ -44,6 +47,122 @@ def looks_like_streaming_tool_arguments(text: str) -> bool:
 # ---------------------------------------------------------------------------
 # MCP preview
 # ---------------------------------------------------------------------------
+
+_VERBOSE_MCP_JSON = os.environ.get('GRINTA_CLI_VERBOSE_MCP_JSON', '').strip().lower() in {
+    '1',
+    'true',
+    'yes',
+}
+
+
+def _mcp_try_json_blob(blob: str) -> Any | None:
+    s = blob.strip()
+    if not s:
+        return None
+    try:
+        return json.loads(s)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
+def _mcp_summarize_github_repo_payload(
+    payload: dict[str, Any], *, max_len: int
+) -> str | None:
+    items = payload.get('items')
+    if not isinstance(items, list) or not items:
+        return None
+    first = items[0]
+    if not isinstance(first, dict):
+        return None
+    if 'full_name' not in first and not (
+        'name' in first and isinstance(first.get('owner'), dict)
+    ):
+        return None
+    total = payload.get('total_count')
+    if not isinstance(total, int):
+        total = len(items)
+    names: list[str] = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        fn = it.get('full_name') or it.get('name')
+        if isinstance(fn, str) and fn.strip():
+            names.append(fn.strip())
+        if len(names) >= 4:
+            break
+    head = ', '.join(names)
+    rest = max(0, total - len(names))
+    msg = f'{total} repos'
+    if head:
+        msg += f' · {head}'
+    if rest > 0:
+        msg += f' (+{rest})'
+    return _trunc(msg, max_len)
+
+
+def _mcp_summarize_path_entries(items: list[Any], *, max_len: int) -> str | None:
+    if not items or not isinstance(items[0], dict):
+        return None
+    first = items[0]
+    t = first.get('type')
+    if t not in {'file', 'dir', 'symlink'}:
+        return None
+    labels: list[str] = []
+    for it in items[:6]:
+        if not isinstance(it, dict):
+            continue
+        p = it.get('path') or it.get('name')
+        if isinstance(p, str) and p.strip():
+            labels.append(p.strip())
+    if not labels:
+        return None
+    n = len(items)
+    extra = max(0, n - len(labels))
+    msg = f'{n} paths · ' + ', '.join(labels)
+    if extra:
+        msg += f' (+{extra})'
+    return _trunc(msg, max_len)
+
+
+def _mcp_summarize_inner_value(inner: Any, *, max_len: int) -> str | None:
+    if isinstance(inner, dict):
+        gh = _mcp_summarize_github_repo_payload(inner, max_len=max_len)
+        if gh:
+            return gh
+        err = inner.get('error') or inner.get('message') or inner.get('detail')
+        if isinstance(err, str) and err.strip():
+            return _trunc(err.strip(), max_len)
+        return None
+    if isinstance(inner, list):
+        tree = _mcp_summarize_path_entries(inner, max_len=max_len)
+        if tree:
+            return tree
+        return _summarize_result_collection(inner, max_len=max_len)
+    return None
+
+
+def _mcp_envelope_tool_summary(data: dict[str, Any], *, max_len: int) -> str | None:
+    """Summarize MCP tool JSON envelopes (``content[]`` blocks with embedded JSON text)."""
+    blocks = data.get('content')
+    if not isinstance(blocks, list) or not blocks:
+        return None
+    parts: list[str] = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        raw = block.get('text')
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        inner = _mcp_try_json_blob(raw)
+        if inner is not None:
+            line = _mcp_summarize_inner_value(inner, max_len=min(380, max_len))
+            if line:
+                parts.append(line)
+                continue
+        parts.append(_summarize_raw_mcp_text(raw, max_len=min(240, max_len)))
+    if not parts:
+        return None
+    return _trunc(' · '.join(parts), max_len)
 
 
 def _mcp_count_summary(data: dict[str, Any]) -> str | None:
@@ -102,6 +221,7 @@ def _mcp_error_summary(data: dict[str, Any], *, max_len: int) -> str | None:
 
 def _mcp_dict_preview(data: dict[str, Any], *, content: str, max_len: int) -> str:
     for builder in (
+        lambda d: _mcp_envelope_tool_summary(d, max_len=max_len),
         _mcp_count_summary,
         lambda d: _mcp_search_code_summary(d, content),
         lambda d: _mcp_collection_summary(d, max_len=max_len),
@@ -138,6 +258,43 @@ def mcp_result_user_preview(content: str, *, max_len: int = 400) -> str:
         return _trunc(json.dumps(data, ensure_ascii=False), max_len)
     except (TypeError, ValueError):
         return _summarize_raw_mcp_text(s, max_len=max_len)
+
+
+def mcp_result_syntax_extras(
+    content: str, *, max_chars: int = 14_000
+) -> list[Any] | None:
+    """Rich JSON Syntax for MCP payloads — opt-in via ``GRINTA_CLI_VERBOSE_MCP_JSON``.
+
+    Default transcripts stay one-line summaries to avoid megabyte-high cards.
+    """
+    if not _VERBOSE_MCP_JSON:
+        return None
+    s = (content or '').strip()
+    if len(s) < 220 or not (s.startswith('{') or s.startswith('[')):
+        return None
+    try:
+        data = json.loads(s)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return None
+    try:
+        pretty = json.dumps(data, ensure_ascii=False, indent=2)
+    except (TypeError, ValueError):
+        return None
+    if len(pretty) < 400:
+        return None
+    if len(pretty) > max_chars:
+        body = pretty[:max_chars] + '…'
+    else:
+        body = pretty
+    return [
+        Syntax(
+            body,
+            'json',
+            word_wrap=True,
+            theme='ansi_dark',
+            line_numbers=False,
+        )
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +422,7 @@ def try_format_message_as_tool_json(
 __all__ = [
     'flatten_tool_call_for_history',
     'looks_like_streaming_tool_arguments',
+    'mcp_result_syntax_extras',
     'mcp_result_user_preview',
     'try_format_message_as_tool_json',
     '_preview_result_item',

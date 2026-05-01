@@ -7,6 +7,7 @@ that class via multiple inheritance.
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, cast
 
@@ -60,7 +61,7 @@ from backend.cli.theme import (
     CLR_QUESTION_TEXT,
     CLR_STATUS_WARN,
 )
-from backend.cli.tool_call_display import mcp_result_user_preview
+from backend.cli.tool_call_display import mcp_result_syntax_extras, mcp_result_user_preview
 from backend.cli.transcript import (
     format_activity_delta_secondary,
     format_activity_result_secondary,
@@ -93,6 +94,50 @@ from backend.ledger.observation import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _terminal_output_lexer(body: str) -> str:
+    """Pick a Pygments lexer for PTY/shell output (JSON, tracebacks, plain)."""
+    raw = body or ''
+    head = raw.lstrip()
+    if not head:
+        return 'text'
+    if head[0] in '{[':
+        try:
+            json.loads(raw[: min(len(raw), 500_000)])
+            return 'json'
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+    low = raw.lower()
+    if 'traceback (most recent call last)' in low:
+        return 'pytb'
+    return 'text'
+
+
+def _cmd_stdout_syntax_extras(content: str) -> list[Any] | None:
+    """Rich Syntax block for bulky structured shell stdout (JSON, tracebacks, …).
+
+    Plain prose/log lines stay hidden on success — only non-``text`` lexers
+    (JSON, Python tracebacks, …) get an inline preview.
+    """
+    c = (content or '').strip()
+    if len(c) < 120:
+        return None
+    n_lines = len([ln for ln in c.splitlines() if ln.strip()])
+    lex = _terminal_output_lexer(c)
+    if lex == 'text':
+        return None
+    cap = 12_000
+    body = c[:cap] + ('…' if len(c) > cap else '')
+    return [
+        Syntax(
+            body,
+            lex,
+            word_wrap=True,
+            theme='ansi_dark',
+            line_numbers=n_lines > 10,
+        )
+    ]
 
 
 class ObservationRenderersMixin:
@@ -240,7 +285,7 @@ class ObservationRenderersMixin:
         )
         msg: str | None = 'done' if (raw_lines or exit_code == 0) else None
         result_kind = 'ok' if exit_code == 0 else 'neutral'
-        return msg, result_kind, None
+        return msg, result_kind, _cmd_stdout_syntax_extras(content)
 
     def _render_file_edit_observation(self, obs: FileEditObservation) -> None:
         self._stop_reasoning()
@@ -481,12 +526,14 @@ class ObservationRenderersMixin:
         self._stop_reasoning()
         content = getattr(obs, 'content', '')
         friendly = mcp_result_user_preview(content)
+        extras = mcp_result_syntax_extras(content)
         pending = cast(Any, self._take_pending_activity_card('mcp'))
         if pending is not None:
             self._render_pending_activity_card(
                 pending,
                 result_message=friendly or None,
                 result_kind='neutral',
+                extra_lines=extras,
             )
         elif friendly:
             self._append_history(
@@ -580,14 +627,19 @@ class ObservationRenderersMixin:
         self._append_history(
             Padding(
                 Panel(
-                    Syntax(body, 'text', word_wrap=True, theme='ansi_dark'),
+                    Syntax(
+                        body,
+                        _terminal_output_lexer(body),
+                        word_wrap=True,
+                        theme='ansi_dark',
+                    ),
                     title=panel_title,
                     title_align='left',
                     border_style=CLR_OUTPUT_PANEL_BORDER,
                     box=box.ROUNDED,
                     padding=(0, 1),
                 ),
-                pad=(0, 0, 1, 0),
+                pad=ACTIVITY_BLOCK_BOTTOM_PAD,
             )
         )
 

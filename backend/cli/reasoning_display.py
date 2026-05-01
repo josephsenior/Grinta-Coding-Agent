@@ -66,20 +66,29 @@ def _truncate_action_line(label: str, max_len: int) -> str:
     return f'{chunk}…'
 
 
-def _thought_lines_for_display(line: str, max_width: int | None) -> list[str]:
+def _thought_lines_for_display(
+    line: str,
+    max_width: int | None,
+    *,
+    stable_wrap_width: int | None = None,
+) -> list[str]:
     """One logical thought line → one or more panel rows (wrap when width is known).
 
     Never truncates with an ellipsis — we prefer to wrap across multiple
     rows so the user can read the full thought. When the terminal is too
     narrow to meaningfully wrap, we fall back to returning the line as-is
     (Rich will then soft-wrap the row itself).
+
+    *stable_wrap_width* pins the wrap column during streaming so rapid token
+    updates do not change the line break positions (wrap jitter).
     """
     stripped = (line or '').strip()
     if not stripped:
         return []
     if max_width is None or max_width <= _PANEL_CHROME_WIDTH + 12:
         return [stripped]
-    wrap_width = max(12, max_width - _PANEL_CHROME_WIDTH - _THOUGHT_LINE_PREFIX_CHARS)
+    computed = max(12, max_width - _PANEL_CHROME_WIDTH - _THOUGHT_LINE_PREFIX_CHARS)
+    wrap_width = stable_wrap_width if stable_wrap_width is not None else computed
     wrapped = textwrap.wrap(
         stripped,
         width=wrap_width,
@@ -113,6 +122,8 @@ class ReasoningDisplay:
         # True when ``set_streaming_thought`` has written content since the
         # last non-streaming update — drives the trailing stream cursor.
         self._streaming: bool = False
+        # First computed wrap width while streaming — kept stable until streaming ends.
+        self._stream_wrap_width: int | None = None
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -130,6 +141,7 @@ class ReasoningDisplay:
         self._current_action = ''
         self._start_time = None
         self._streaming = False
+        self._stream_wrap_width = None
         _prompt_role_debug.log_reasoning_transition('reasoning.stop', '')
 
     @property
@@ -154,6 +166,7 @@ class ReasoningDisplay:
             self._thought_lines = self._thought_lines[-self._max_lines :]
         # A non-streaming thought snapshot turns the cursor off again.
         self._streaming = False
+        self._stream_wrap_width = None
 
     def set_streaming_thought(self, text: str) -> None:
         """Replace thought lines with new content (for cumulative streaming updates)."""
@@ -185,6 +198,7 @@ class ReasoningDisplay:
             # Action changes end any prior streaming run — the model is
             # committing to a next step, not still generating text.
             self._streaming = False
+            self._stream_wrap_width = None
 
     def snapshot_thoughts(self) -> list[str]:
         """Return a copy of current thought lines without clearing them."""
@@ -288,9 +302,19 @@ class ReasoningDisplay:
         max_width: int | None,
         max_lines: int | None,
     ) -> None:
+        stable: int | None = None
+        if self._streaming and max_width and max_width > _PANEL_CHROME_WIDTH + 12:
+            inner = max(12, max_width - _PANEL_CHROME_WIDTH - _THOUGHT_LINE_PREFIX_CHARS)
+            if self._stream_wrap_width is None:
+                self._stream_wrap_width = inner
+            stable = self._stream_wrap_width
         wrapped_rows: list[str] = []
         for line in self._thought_lines:
-            wrapped_rows.extend(_thought_lines_for_display(line, max_width))
+            wrapped_rows.extend(
+                _thought_lines_for_display(
+                    line, max_width, stable_wrap_width=stable
+                )
+            )
 
         clipped = False
         if max_lines is not None and max_lines >= 0 and len(wrapped_rows) > max_lines:

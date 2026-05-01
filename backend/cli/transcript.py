@@ -25,6 +25,7 @@ from backend.cli.layout_tokens import (
     ACTIVITY_SECTION_TITLE,
     CALLOUT_PANEL_PADDING,
 )
+from backend.cli.path_links import linkify_plain
 from backend.cli.theme import (
     CLR_DIFF_ADD,
     CLR_DIFF_REM,
@@ -32,9 +33,13 @@ from backend.cli.theme import (
     CLR_ERR_ICON,
     CLR_INFO_BODY,
     CLR_INFO_ICON,
+    CLR_STATUS_WARN,
+    CLR_WARN_BODY,
+    CLR_WARN_ICON,
     MARK_ERR,
     MARK_INFO,
     MARK_OK,
+    MARK_WARN,
     STYLE_DEFAULT,
     STYLE_DIM,
     STYLE_EMPTY,
@@ -42,7 +47,6 @@ from backend.cli.theme import (
     CLR_OK_ICON,
     CLR_REASONING_COMMITTED,
     CLR_TURN_RULE,
-    CLR_WARN_BODY,
 )
 
 # Stripped from user-visible transcripts (still present on stored observations for the LLM).
@@ -68,18 +72,27 @@ _ACTIVITY_SECONDARY_INDENT = (
 )
 
 
-def format_activity_primary(verb: str, detail: str) -> Text:
-    """Bold verb + detail on one line (no ``>`` prefix)."""
+def format_activity_primary(verb: str, detail: str | Text) -> Text:
+    """Bold verb + detail on one line (no ``>`` prefix).
+
+    Plain-string *detail* is linkified for ``file://`` and workspace paths so
+    terminals can open them via OSC-8 hyperlinks.
+    """
     line = Text()
     line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
     line.append(
         f'{(verb or "Did").strip():<{_ACTIVITY_VERB_WIDTH}}',
         style=STYLE_DIM,
     )
+    if isinstance(detail, Text):
+        if detail.plain.strip():
+            line.append(_ACTIVITY_GAP, style=STYLE_EMPTY)
+            line.append(detail)
+        return line
     d = (detail or '').strip()
     if d:
         line.append(_ACTIVITY_GAP, style=STYLE_EMPTY)
-        line.append(d, style=STYLE_DEFAULT)
+        line.append_text(linkify_plain(d, link_files=True, link_urls=False))
     return line
 
 
@@ -92,7 +105,15 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
         'warn': CLR_WARN_BODY,
         'neutral': CLR_INFO_BODY,
     }
-    line.append(message, style=styles.get(kind, styles['neutral']))
+    body_style = styles.get(kind, styles['neutral'])
+    line.append_text(
+        linkify_plain(
+            (message or '').strip(),
+            plain_style=body_style,
+            link_files=True,
+            link_urls=False,
+        )
+    )
     return line
 
 
@@ -106,7 +127,14 @@ def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> 
     icon, icon_style, text_style = styles.get(kind, styles['neutral'])
     line = Text(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
     line.append(f'{icon} ', style=icon_style)
-    line.append((message or '').strip(), style=text_style)
+    line.append_text(
+        linkify_plain(
+            (message or '').strip(),
+            plain_style=text_style,
+            link_files=True,
+            link_urls=False,
+        )
+    )
     return line
 
 
@@ -133,9 +161,32 @@ def format_activity_delta_secondary(
     return line
 
 
+def format_activity_validation_callout(message: str) -> Panel:
+    """Bordered callout for post-edit syntax / lint feedback (distinct from shell errors)."""
+    body = Text()
+    body.append(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)
+    body.append(f'{MARK_WARN} ', style=CLR_WARN_ICON)
+    body.append('Validation', style=f'bold {CLR_WARN_BODY}')
+    body.append(' — ', style=STYLE_DIM)
+    body.append_text(
+        linkify_plain(
+            (message or '').strip(),
+            plain_style=CLR_WARN_BODY,
+            link_files=True,
+            link_urls=False,
+        )
+    )
+    return Panel(
+        body,
+        border_style=CLR_STATUS_WARN,
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+
+
 def format_activity_block(
     verb: str,
-    detail: str,
+    detail: str | Text,
     *,
     secondary: str | None = None,
     secondary_kind: str = 'neutral',
@@ -145,7 +196,7 @@ def format_activity_block(
     title: str | None = None,
 ) -> Any:
     """Primary row plus optional secondary dim row, optionally wrapped in a titled card."""
-    parts: list[Text] = [format_activity_primary(verb, detail)]
+    parts: list[Any] = [format_activity_primary(verb, detail)]
     if secondary:
         parts.append(format_activity_secondary(secondary, kind=secondary_kind))
     if result_message is not None:
@@ -202,7 +253,7 @@ def format_reasoning_snapshot(lines: list[str]) -> Group:
 
 def format_activity_shell_block(
     verb: str,
-    detail: str,
+    detail: str | Text,
     *,
     secondary: str | None = None,
     secondary_kind: str = 'neutral',

@@ -221,14 +221,11 @@ async def test_event_renderer_repeat_command_after_error_still_two_rows() -> Non
 
 def test_hud_shows_mcp_server_count_when_set() -> None:
     hud = HUDBar()
-    assert 'MCP servers —' in hud._format().plain
+    assert 'MCP·?' in hud._format().plain
     hud.update_mcp_servers(3)
-    assert '3 MCP servers' in hud._format().plain
+    assert 'MCP·3' in hud._format().plain
     n_skills = HUDBar.count_bundled_playbook_skills()
-    assert (
-        f'{n_skills} skill' in hud._format().plain
-        or f'{n_skills} skills' in hud._format().plain
-    )
+    assert f'sk·{min(n_skills, 99)}' in hud._format().plain
 
 
 def test_hud_shows_provider_and_model_combined() -> None:
@@ -241,16 +238,15 @@ def test_hud_shows_provider_and_model_combined() -> None:
     hud = HUDBar()
     hud.update_model('openai/google/gemini-3-flash-preview')
 
-    full = hud._format().plain
-    compact = hud._format_compact().plain
+    bar = hud._format().plain
 
-    assert 'google/gemini-3-flash-preview' in full
+    assert 'google/gemini-3-flash-preview' in bar
     # The redundant separate labels must be gone.
-    assert 'provider:' not in full
-    assert 'model:' not in full
+    assert 'provider:' not in bar
+    assert 'model:' not in bar
     # The raw "openai/google/..." with the provider prefix still should not leak.
-    assert 'openai/google/gemini-3-flash-preview' not in full
-    assert 'google/gemini-3-flash-preview' in compact
+    assert 'openai/google/gemini-3-flash-preview' not in bar
+    assert hud._format_compact().plain == bar
 
 
 def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
@@ -280,8 +276,7 @@ def test_settings_ai_tab_shows_provider_and_model_separately() -> None:
 def test_hud_singular_mcp_label() -> None:
     hud = HUDBar()
     hud.update_mcp_servers(1)
-    assert '1 MCP server' in hud._format().plain
-    assert '1 MCP servers' not in hud._format().plain
+    assert 'MCP·1' in hud._format().plain
 
 
 def test_confirmation_uses_backend_security_risk() -> None:
@@ -359,8 +354,7 @@ def test_hud_marks_estimated_token_usage() -> None:
     hud.update_from_llm_metrics(metrics)
 
     assert hud.state.token_usage_estimated is True
-    assert 'est' in hud._format().plain
-    assert '~' in hud._format_compact().plain
+    assert '~' in hud._format().plain
 
 
 def test_hud_does_not_mark_provider_reported_usage_as_estimated() -> None:
@@ -380,7 +374,7 @@ def test_hud_does_not_mark_provider_reported_usage_as_estimated() -> None:
     hud.update_from_llm_metrics(metrics)
 
     assert hud.state.token_usage_estimated is False
-    assert ' est' not in hud._format().plain
+    assert '~' not in hud._format().plain
 
 
 def test_hud_falls_back_to_response_latencies_for_call_count() -> None:
@@ -2666,7 +2660,7 @@ async def test_renderer_shows_retry_pending_status_in_hud() -> None:
     output = _console_output(console)
     assert 'autonomous recovery' in output.lower()
     assert hud.state.ledger_status == 'Backoff'
-    assert hud.state.agent_state_label == 'Auto Retry 1/3'
+    assert hud.state.agent_state_label.startswith('Auto Retry 1/3')
 
 
 @pytest.mark.asyncio
@@ -2694,7 +2688,7 @@ async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> 
     )
 
     assert hud.state.ledger_status == 'Backoff'
-    assert hud.state.agent_state_label == 'Auto Retry 1/3'
+    assert hud.state.agent_state_label.startswith('Auto Retry 1/3')
 
 
 @pytest.mark.asyncio
@@ -3597,8 +3591,35 @@ async def test_fake_prompt_uses_tight_separator_and_combined_model_slug() -> Non
     assert 'Agent working · ctrl+c to interrupt' in output
 
 
-def test_hud_compact_format_for_narrow_terminal() -> None:
-    """HUD should use compact format for narrow terminals."""
+@pytest.mark.asyncio
+async def test_fake_prompt_single_path_narrow_and_wide_match() -> None:
+    """Live fake prompt uses the same rows at all widths (no compact-only layout)."""
+
+    async def _output_for(w: int) -> str:
+        console = _make_console(width=w)
+        hud = HUDBar()
+        hud.update_model('openai/google/gemini-3-flash-preview')
+        hud.update_agent_state('Running')
+        renderer = CLIEventRenderer(
+            console,
+            hud,
+            ReasoningDisplay(),
+            loop=asyncio.get_running_loop(),
+        )
+        console.print(renderer._render_fake_prompt(w))
+        return _console_output(console)
+
+    narrow = await _output_for(40)
+    wide = await _output_for(120)
+    for blob in (narrow, wide):
+        assert 'GRINTA' in blob
+        assert 'RUNNING' in blob or 'Running' in blob
+        assert 'google/gemini-3-flash-preview' in blob
+        assert 'MCP·' in blob
+
+
+def test_hud_single_bar_format_all_widths() -> None:
+    """HUD uses one dense bar (no wide/narrow mode split)."""
     hud = HUDBar()
     hud.state.model = 'openai/gpt-4.1'
     hud.state.context_tokens = 5000
@@ -3607,12 +3628,14 @@ def test_hud_compact_format_for_narrow_terminal() -> None:
     hud.state.llm_calls = 3
     hud.state.ledger_status = 'Healthy'
 
-    full = hud._format()
-    compact = hud._format_compact()
-    # Compact should be shorter
-    assert len(compact.plain) < len(full.plain)
-    # Compact should have the status icon
-    assert '●' in compact.plain
+    a = hud._format()
+    b = hud._format_compact()
+    c = hud._format_bar()
+    assert a.plain == b.plain == c.plain
+    assert '●' in a.plain
+    assert '5.0K/128.0K' in a.plain or '5000' in a.plain
+    assert 'MCP·?' in a.plain
+    assert '3c' in a.plain
 
 
 def test_hud_ledger_icon() -> None:
