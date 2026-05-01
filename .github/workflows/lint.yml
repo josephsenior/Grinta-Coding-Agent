@@ -45,7 +45,7 @@ jobs:
         with:
           python-version: 3.12
       - name: Run version consistency check
-        run: .github/scripts/check_version_consistency.py
+        run: python .github/scripts/check_version_consistency.py
 
   check-workflow-config-consistency:
     name: Check workflow config consistency
