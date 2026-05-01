@@ -158,9 +158,10 @@ class TestObservationType:
         assert ObservationType.RUN.value == 'run'
         assert ObservationType.ERROR.value == 'error'
         assert ObservationType.MCP.value == 'mcp'
+        assert ObservationType.BROWSER_SCREENSHOT.value == 'browser_screenshot'
 
     def test_count(self):
-        assert len(ObservationType) == 25
+        assert len(ObservationType) == 26
 
 
 class TestExitReason:

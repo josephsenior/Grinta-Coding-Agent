@@ -10,8 +10,8 @@ The goals of these tests are:
   fromSurface), and ``from_surface=False`` must be honored for the retry
   path.
 - The high-level ``screenshot`` command must retry with ``fromSurface=False``
-  when the compositor path fails and still return a ``CmdOutputObservation``
-  with the saved file path.
+  when the compositor path fails and still return a ``BrowserScreenshotObservation``
+  with the saved file path (and base64 payload when allowed).
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ if 'browser_use' not in sys.modules:
 
 from backend.execution.browser import grinta_browser as gb  # noqa: E402
 from backend.ledger.observation import (  # noqa: E402
-    CmdOutputObservation,
+    BrowserScreenshotObservation,
     ErrorObservation,
 )
 
@@ -92,12 +92,13 @@ class _FakeCDPClient:
 
 
 def _assert_retry_screenshot_result(
-    obs: CmdOutputObservation,
+    obs: BrowserScreenshotObservation,
     state: _SharedMockState,
     tmp_path: Path,
 ) -> None:
     assert 'Screenshot saved to' in obs.content
     assert obs.content.strip().endswith('.jpg (7 bytes)')
+    assert obs.image_b64
 
     capture_params = [p for name, p in state.log if name == 'captureScreenshot']
     assert [
@@ -225,7 +226,9 @@ async def test_screenshot_retries_with_from_surface_false_on_failure(
 
     obs = await shot_tool.execute('screenshot', {})
 
-    assert isinstance(obs, CmdOutputObservation), getattr(obs, 'content', obs)
+    assert isinstance(obs, BrowserScreenshotObservation), getattr(
+        obs, 'content', obs
+    )
     _assert_retry_screenshot_result(obs, state, tmp_path)
 
 

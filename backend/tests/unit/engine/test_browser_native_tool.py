@@ -43,3 +43,27 @@ def test_handle_browser_tool_wraps_security():
     act = _handle_browser_tool({'command': 'snapshot', 'security_risk': 'HIGH'})
     assert isinstance(act, BrowserToolAction)
     assert act.security_risk == ActionSecurityRisk.HIGH
+
+
+def test_build_browser_tool_action_extract_is_medium_risk():
+    act = build_browser_tool_action(
+        {
+            'command': 'extract',
+            'schema': {'type': 'object', 'properties': {'x': {'type': 'string'}}},
+            'security_risk': 'HIGH',
+        }
+    )
+    assert act.command == 'extract'
+    assert act.security_risk == ActionSecurityRisk.MEDIUM
+
+
+def test_build_browser_tool_action_go_back_is_high_risk():
+    act = build_browser_tool_action({'command': 'go_back', 'security_risk': 'HIGH'})
+    assert act.security_risk == ActionSecurityRisk.HIGH
+
+
+def test_build_browser_tool_action_upload_is_high_risk():
+    act = build_browser_tool_action(
+        {'command': 'upload_file', 'index': 1, 'path': 'x.txt', 'security_risk': 'HIGH'}
+    )
+    assert act.security_risk == ActionSecurityRisk.HIGH

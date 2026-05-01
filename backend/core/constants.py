@@ -109,8 +109,15 @@ BROWSER_CDP_NAVIGATE_TIMEOUT_SEC = 20.0
 BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC = 45.0
 BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC = 40.0
 BROWSER_SCREENSHOT_TIMEOUT_SEC = 45.0
+# Inline JPEG bytes into LLM context only below this size (vision providers vary).
+BROWSER_SCREENSHOT_MAX_INJECT_BYTES = 1_500_000
+# Snapshot compaction (interactive / diff modes).
+BROWSER_SNAPSHOT_MAX_CHARS_FULL = 120_000
+BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE = 12_000
+BROWSER_WAIT_TIMEOUT_SEC = 40.0
+BROWSER_EXTRACT_TIMEOUT_SEC = 120.0
 # Worst single browser_tool call: cold session start + navigate (or snapshot). Not a "hang window".
-BROWSER_TOOL_SYNC_TIMEOUT_SECONDS = 165.0
+BROWSER_TOOL_SYNC_TIMEOUT_SECONDS = 300.0
 
 # ── Threshold Constants ─────────────────────────────────────────────
 IDLE_RECLAIM_SPIKE_THRESHOLD = 3

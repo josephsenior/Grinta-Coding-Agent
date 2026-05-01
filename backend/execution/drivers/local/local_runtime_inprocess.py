@@ -422,6 +422,12 @@ class LocalRuntimeInProcess(ActionExecutionClient):
             return fallback_ceiling
         return float(own) + TOOL_BRIDGE_TIMEOUT_BUFFER
 
+    def set_browser_structured_extract(self, fn: Any | None) -> None:
+        """Wire orchestrator LLM extract callback into RuntimeExecutor (``browser extract``)."""
+        if self._executor is None:
+            return
+        self._executor.set_browser_structured_extract(fn)
+
     def browser_tool(self, action: Any) -> Observation:
         """Native browser-use tool via RuntimeExecutor."""
         from backend.ledger.action.browser_tool import BrowserToolAction

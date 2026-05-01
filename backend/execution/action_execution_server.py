@@ -144,6 +144,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         self.browser: Any | None = None
         self.enable_browser = enable_browser
         self._native_browser: Any | None = None
+        self._browser_structured_extract: Any | None = None
 
         # Keep a separate cancellation service for non-session tasks if needed,
         # or just rely on session manager for shell tasks.
@@ -176,6 +177,12 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         self._mcp_clients: list[Any] | None = None
         # Same server list passed to create_mcps (after Windows stdio filter), for diagnostics.
         self._mcp_servers_resolved: list[Any] | None = None
+
+    def set_browser_structured_extract(self, fn: Any | None) -> None:
+        """Register async callback used by ``browser extract`` (same orchestrator LLM)."""
+        self._browser_structured_extract = fn
+        if self._native_browser is not None:
+            self._native_browser.set_structured_extract(fn)
 
     @property
     def initial_cwd(self) -> str:
@@ -353,8 +360,12 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
         from backend.execution.browser import GrintaNativeBrowser
 
         if self._native_browser is None:
-            self._native_browser = GrintaNativeBrowser(self.downloads_directory)
+            self._native_browser = GrintaNativeBrowser(
+                self.downloads_directory,
+                workspace_root=self.file_editor.workspace_root,
+            )
         ctl: GrintaNativeBrowser = self._native_browser
+        ctl.set_structured_extract(self._browser_structured_extract)
         return await ctl.execute(action.command, action.params)
 
     def close(self) -> None:

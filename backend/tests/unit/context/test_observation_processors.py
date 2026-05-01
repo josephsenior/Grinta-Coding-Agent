@@ -11,8 +11,9 @@ from backend.context.observation_processors import (
     convert_observation_to_message,
 )
 from backend.context.pre_condensation_snapshot import save_snapshot
-from backend.core.message import TextContent
+from backend.core.message import ImageContent, TextContent
 from backend.ledger.observation import (
+    BrowserScreenshotObservation,
     CmdOutputObservation,
     ErrorObservation,
     FileEditObservation,
@@ -108,6 +109,30 @@ class TestConvertObservation:
         )
         msg = convert_observation_to_message(obs, max_message_chars=None)
         assert msg.role == 'user'
+
+    def test_browser_screenshot_observation_injects_image_when_vision_active(self):
+        obs = BrowserScreenshotObservation(
+            content='Screenshot saved to: /tmp/a.jpg (4 bytes)',
+            image_path='/tmp/a.jpg',
+            image_b64='QUJDQw==',
+            image_mime='image/jpeg',
+        )
+        msg = convert_observation_to_message(
+            obs, max_message_chars=None, vision_is_active=True
+        )
+        assert msg.vision_enabled is True
+        assert any(isinstance(c, ImageContent) for c in msg.content)
+
+    def test_browser_screenshot_observation_text_only_when_vision_off(self):
+        obs = BrowserScreenshotObservation(
+            content='Screenshot saved to: /tmp/a.jpg (4 bytes)',
+            image_path='/tmp/a.jpg',
+            image_b64='QUJDQw==',
+        )
+        msg = convert_observation_to_message(
+            obs, max_message_chars=None, vision_is_active=False
+        )
+        assert all(isinstance(c, TextContent) for c in msg.content)
 
     def test_condensation_observation_restores_scratchpad_and_working_memory(
         self, monkeypatch

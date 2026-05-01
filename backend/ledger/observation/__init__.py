@@ -10,6 +10,7 @@ from backend.ledger.observation.agent import (
     RecallObservation,
 )
 from backend.ledger.observation.code_nav import LspQueryObservation
+from backend.ledger.observation.browser_screenshot import BrowserScreenshotObservation
 from backend.ledger.observation.commands import (
     CmdOutputMetadata,
     CmdOutputObservation,
@@ -36,6 +37,7 @@ __all__ = [
     'AgentCondensationObservation',
     'AgentStateChangedObservation',
     'AgentThinkObservation',
+    'BrowserScreenshotObservation',
     'CmdOutputMetadata',
     'CmdOutputObservation',
     'DebuggerObservation',

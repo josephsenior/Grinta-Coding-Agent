@@ -3,31 +3,47 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 import os
+import re
 import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
+
 from urllib.parse import urlparse
 
 from backend.core.constants import (
     BROWSER_CDP_NAVIGATE_TIMEOUT_SEC,
+    BROWSER_EXTRACT_TIMEOUT_SEC,
     BROWSER_NAVIGATE_TOTAL_TIMEOUT_SEC,
+    BROWSER_SCREENSHOT_MAX_INJECT_BYTES,
     BROWSER_SCREENSHOT_TIMEOUT_SEC,
     BROWSER_SESSION_START_TIMEOUT_SEC,
     BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC,
+    BROWSER_SNAPSHOT_MAX_CHARS_FULL,
+    BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE,
+    BROWSER_WAIT_TIMEOUT_SEC,
 )
 from backend.core.logger import app_logger as logger
 from backend.ledger.observation import (
+    BrowserScreenshotObservation,
     CmdOutputObservation,
     ErrorObservation,
     Observation,
 )
 
-_MAX_SNAPSHOT_CHARS = 120_000
 _MAX_URL_LEN = 2048
 _MAX_TYPE_LEN = 8000
+
+_INDEX_LINE_RE = re.compile(r'^\s*\[\d+\]')
+
+
+StructuredExtractFn = Callable[
+    [str, dict[str, Any], str | None], Awaitable[str]
+]
 
 
 def _browser_trace(msg: str) -> None:
@@ -86,6 +102,16 @@ async def _await_nav_event(nav: Any) -> None:
 async def _snapshot_text_chain(browser: Any) -> str:
     await browser.get_browser_state_summary(include_screenshot=False)
     return await browser.get_state_as_text()
+
+
+def _interactive_index_lines(full_text: str) -> list[str]:
+    """Lines that look like browser-use index markers ``[n]``."""
+    out: list[str] = []
+    for line in full_text.splitlines():
+        s = line.rstrip()
+        if _INDEX_LINE_RE.match(s):
+            out.append(s)
+    return out
 
 
 def _finalize_observation(cmd: str, obs: Observation) -> Observation:
@@ -192,8 +218,6 @@ async def _capture_via_cdp(
       when the tab isn't foregrounded or GPU is under pressure; window
       capture is simpler and much more reliable.
     """
-    import base64
-
     params: dict[str, Any] = {
         'format': 'jpeg',
         'quality': jpeg_quality,
@@ -216,10 +240,26 @@ async def _capture_via_cdp(
 class GrintaNativeBrowser:
     """Thin async wrapper around browser_use.Browser (BrowserSession)."""
 
-    def __init__(self, downloads_dir: Path | str) -> None:
+    def __init__(
+        self,
+        downloads_dir: Path | str,
+        *,
+        workspace_root: Path | str | None = None,
+    ) -> None:
         self._downloads = Path(downloads_dir)
         self._downloads.mkdir(parents=True, exist_ok=True)
         self._session: Any = None
+        self._workspace_root = (
+            Path(workspace_root).resolve()
+            if workspace_root is not None
+            else self._downloads.resolve().parent
+        )
+        self._last_diff_lines: set[str] | None = None
+        self._structured_extract: StructuredExtractFn | None = None
+
+    def set_structured_extract(self, fn: StructuredExtractFn | None) -> None:
+        """LLM-based JSON extract for ``browser extract`` (set by runtime bootstrap)."""
+        self._structured_extract = fn
 
     async def _ensure_session(self) -> Any:
         if self._session is not None:
@@ -272,6 +312,65 @@ class GrintaNativeBrowser:
         except Exception as exc:
             logger.debug('browser close: %s', exc)
         self._session = None
+
+    async def _snapshot_formatted(self, browser: Any, mode: str) -> str:
+        """Return DOM text for ``full`` / ``interactive`` / ``diff`` modes."""
+        try:
+            raw_text = await asyncio.wait_for(
+                _snapshot_text_chain(browser),
+                timeout=BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC,
+            )
+        except TimeoutError:
+            raise RuntimeError(
+                f'Snapshot timed out after {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s.'
+            ) from None
+
+        if mode == 'full':
+            cap = BROWSER_SNAPSHOT_MAX_CHARS_FULL
+            text = raw_text
+        elif mode == 'interactive':
+            lines = _interactive_index_lines(raw_text)
+            cap = BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE
+            text = '\n'.join(lines) if lines else raw_text[:cap]
+        elif mode == 'diff':
+            lines = _interactive_index_lines(raw_text)
+            cur_set = set(lines)
+            cap = BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE
+            if self._last_diff_lines is None:
+                text = '\n'.join(lines) if lines else raw_text[:cap]
+            else:
+                prev_set = self._last_diff_lines
+                added = sorted(cur_set - prev_set)
+                removed = sorted(prev_set - cur_set)
+                parts: list[str] = []
+                if added:
+                    parts.append('Added:\n' + '\n'.join(added))
+                if removed:
+                    parts.append('Removed:\n' + '\n'.join(removed))
+                text = '\n\n'.join(parts) if parts else '(no indexed element changes)'
+            self._last_diff_lines = cur_set
+        else:
+            cap = BROWSER_SNAPSHOT_MAX_CHARS_INTERACTIVE
+            text = raw_text[:cap]
+
+        if len(text) > cap:
+            text = text[:cap] + '\n… (truncated)'
+        return text
+
+    async def _maybe_append_page_state(
+        self,
+        browser: Any,
+        *,
+        params: dict[str, Any],
+        prefix: str,
+    ) -> str:
+        if not bool(params.get('return_state', True)):
+            return prefix
+        try:
+            snap = await self._snapshot_formatted(browser, 'interactive')
+        except RuntimeError as exc:
+            return f'{prefix}\n--- page state ---\nERROR: {exc}'
+        return f'{prefix}\n--- page state ---\n{snap}'
 
     async def _execute_start(self, cmd: str, params: dict[str, Any]) -> Observation:
         del params
@@ -359,46 +458,42 @@ class GrintaNativeBrowser:
         elapsed_ms = (time.monotonic() - t_nav) * 1000
         _browser_trace(f'navigate done in {elapsed_ms:.0f}ms')
         logger.info('browser navigate done in %.0fms', elapsed_ms)
+        base = f'Navigated to {url}.'
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
         return _finalize_observation(
             cmd,
             CmdOutputObservation(
-                content=f'Navigated to {url}.',
+                content=content,
                 command='browser navigate',
                 exit_code=0,
             ),
         )
 
     async def _execute_snapshot(self, cmd: str, params: dict[str, Any]) -> Observation:
-        del params
-        browser = await self._ensure_session()
-        t_snap = time.monotonic()
-        _browser_trace(
-            f'snapshot chain begin (budget {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s)'
-        )
-        try:
-            text = await asyncio.wait_for(
-                _snapshot_text_chain(browser),
-                timeout=BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC,
-            )
-        except TimeoutError:
-            _browser_trace(
-                f'snapshot timed out after {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s'
-            )
+        mode = str(params.get('mode') or 'interactive').strip().lower()
+        if mode not in ('full', 'interactive', 'diff'):
             return _finalize_observation(
                 cmd,
                 ErrorObservation(
-                    content=(
-                        f'ERROR: Snapshot timed out after {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s. '
-                        'The page may be hung; try navigate again or restart the browser session.'
-                    )
+                    content='ERROR: snapshot mode must be full, interactive, or diff.'
                 ),
             )
+        browser = await self._ensure_session()
+        t_snap = time.monotonic()
+        _browser_trace(
+            f'snapshot chain begin mode={mode} (budget {BROWSER_SNAPSHOT_CHAIN_TIMEOUT_SEC:.0f}s)'
+        )
+        try:
+            text = await self._snapshot_formatted(browser, mode)
+        except RuntimeError as e:
+            _browser_trace(f'snapshot failed: {e}')
+            return _finalize_observation(cmd, ErrorObservation(content=f'ERROR: {e}'))
 
         elapsed_ms = (time.monotonic() - t_snap) * 1000
         _browser_trace(f'snapshot done in {elapsed_ms:.0f}ms')
         logger.info('browser snapshot chain in %.0fms', elapsed_ms)
-        if len(text) > _MAX_SNAPSHOT_CHARS:
-            text = text[:_MAX_SNAPSHOT_CHARS] + '\n… (truncated)'
         return _finalize_observation(
             cmd,
             CmdOutputObservation(
@@ -512,6 +607,7 @@ class GrintaNativeBrowser:
     ) -> Observation:
         browser = await self._ensure_session()
         full_page = bool(params.get('full_page', False))
+        inject_image = bool(params.get('inject_image', True))
         jpeg_quality = 80
         primary_budget = max(8.0, BROWSER_SCREENSHOT_TIMEOUT_SEC * 0.55)
         retry_budget = max(8.0, BROWSER_SCREENSHOT_TIMEOUT_SEC * 0.45)
@@ -542,13 +638,27 @@ class GrintaNativeBrowser:
         name = f'browser_{uuid.uuid4().hex[:12]}.jpg'
         path = self._downloads / name
         path.write_bytes(raw or b'')
-        body = f'Screenshot saved to: {path} ({len(raw or b"")} bytes)'
+        raw_len = len(raw or b'')
+        body = f'Screenshot saved to: {path} ({raw_len} bytes)'
+        b64_payload = base64.b64encode(raw or b'').decode('ascii')
+        inject_skip: str | None = None
+        if not inject_image:
+            inject_skip = 'inject_image=false'
+            b64_payload = ''
+        elif raw_len > BROWSER_SCREENSHOT_MAX_INJECT_BYTES:
+            inject_skip = (
+                f'JPEG exceeds max inject size ({BROWSER_SCREENSHOT_MAX_INJECT_BYTES} bytes); '
+                'path-only caption preserved.'
+            )
+            b64_payload = ''
         return _finalize_observation(
             cmd,
-            CmdOutputObservation(
+            BrowserScreenshotObservation(
                 content=body,
-                command='browser screenshot',
-                exit_code=0,
+                image_path=str(path),
+                image_b64=b64_payload,
+                image_mime='image/jpeg',
+                inject_skipped_reason=inject_skip,
             ),
         )
 
@@ -571,6 +681,9 @@ class GrintaNativeBrowser:
     async def _get_browser_node(
         self, browser: Any, *, cmd: str, index: int
     ) -> tuple[Any | None, Observation | None]:
+        node = await browser.get_element_by_index(index)
+        if node is not None:
+            return node, None
         await browser.get_browser_state_summary(include_screenshot=False)
         node = await browser.get_element_by_index(index)
         if node is None:
@@ -605,10 +718,14 @@ class GrintaNativeBrowser:
         evt = browser.event_bus.dispatch(ClickElementEvent(node=node))
         await evt
         await evt.event_result(raise_if_any=True, raise_if_none=False)
+        base = f'Clicked element index {index}.'
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
         return _finalize_observation(
             cmd,
             CmdOutputObservation(
-                content=f'Clicked element index {index}.',
+                content=content,
                 command='browser click',
                 exit_code=0,
             ),
@@ -647,11 +764,442 @@ class GrintaNativeBrowser:
         )
         await evt
         await evt.event_result(raise_if_any=True, raise_if_none=False)
+        base = f'Typed into element index {index}.'
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
         return _finalize_observation(
             cmd,
             CmdOutputObservation(
-                content=f'Typed into element index {index}.',
+                content=content,
                 command='browser type',
+                exit_code=0,
+            ),
+        )
+
+    def _resolve_workspace_path(self, raw: str) -> tuple[Path | None, str | None]:
+        p = Path(raw).expanduser()
+        root = self._workspace_root.resolve()
+        candidate = (root / p).resolve() if not p.is_absolute() else p.resolve()
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            return None, f'Path must be under workspace root {root}'
+        if not candidate.is_file():
+            return None, f'Not a file: {candidate}'
+        return candidate, None
+
+    @staticmethod
+    def _page_targets_ordered(browser: Any) -> list[Any]:
+        try:
+            pages = browser.get_page_targets()
+        except Exception:
+            pages = []
+        return list(pages or [])
+
+    async def _dispatch_bus_event(self, browser: Any, event_obj: Any) -> None:
+        evt = browser.event_bus.dispatch(event_obj)
+        await evt
+        await evt.event_result(raise_if_any=True, raise_if_none=False)
+
+    async def _execute_scroll(self, cmd: str, params: dict[str, Any]) -> Observation:
+        from browser_use.browser.events import ScrollEvent, ScrollToTextEvent
+
+        direction = str(params.get('direction') or 'down').strip().lower()
+        browser = await self._ensure_session()
+        to_text = params.get('to_text')
+        if to_text:
+            text = str(to_text).strip()
+            if not text:
+                return _finalize_observation(
+                    cmd, ErrorObservation(content='ERROR: to_text is empty.')
+                )
+            await self._dispatch_bus_event(
+                browser, ScrollToTextEvent(text=text, direction='down')
+            )
+            base = 'Scrolled toward text match.'
+        elif direction in ('top', 'bottom'):
+            amt = 50_000
+            dir1 = 'up' if direction == 'top' else 'down'
+            await self._dispatch_bus_event(
+                browser, ScrollEvent(direction=dir1, amount=amt, node=None)
+            )
+            base = f'Scrolled {direction}.'
+        else:
+            if direction not in ('up', 'down', 'left', 'right'):
+                return _finalize_observation(
+                    cmd,
+                    ErrorObservation(content='ERROR: invalid direction for scroll.'),
+                )
+            px = params.get('pixels')
+            amount = int(px) if px is not None else 500
+            node = None
+            if params.get('scroll_index') is not None:
+                six, err = self._parse_browser_index(
+                    cmd, params.get('scroll_index'), action_name='scroll'
+                )
+                if err is not None:
+                    return err
+                node, err2 = await self._get_browser_node(
+                    browser, cmd=cmd, index=six or 0
+                )
+                if err2 is not None:
+                    return err2
+            await self._dispatch_bus_event(
+                browser,
+                ScrollEvent(direction=direction, amount=amount, node=node),
+            )
+            base = f'Scrolled {direction} by {amount}px.'
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=content, command='browser scroll', exit_code=0
+            ),
+        )
+
+    async def _execute_send_keys(self, cmd: str, params: dict[str, Any]) -> Observation:
+        from browser_use.browser.events import SendKeysEvent
+
+        keys = str(params.get('keys') or '').strip()
+        if not keys:
+            return _finalize_observation(
+                cmd, ErrorObservation(content='ERROR: keys required.')
+            )
+        browser = await self._ensure_session()
+        await self._dispatch_bus_event(browser, SendKeysEvent(keys=keys))
+        base = f'Sent keys: {keys!r}'
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=content, command='browser send_keys', exit_code=0
+            ),
+        )
+
+    async def _execute_wait(self, cmd: str, params: dict[str, Any]) -> Observation:
+        from browser_use.browser.events import WaitEvent
+
+        wait_kind = str(
+            params.get('wait_kind') or params.get('wait_for') or 'timeout'
+        ).strip().lower()
+        timeout_sec = float(params.get('timeout_sec') or 10.0)
+        timeout_sec = min(timeout_sec, BROWSER_WAIT_TIMEOUT_SEC)
+        browser = await self._ensure_session()
+
+        if wait_kind == 'timeout':
+            sec = min(float(params.get('seconds') or timeout_sec), 10.0)
+            await self._dispatch_bus_event(browser, WaitEvent(seconds=sec))
+            base = f'Waited {sec}s.'
+        elif wait_kind == 'text':
+            needle = str(params.get('value') or '').strip()
+            if not needle:
+                return _finalize_observation(
+                    cmd,
+                    ErrorObservation(content='ERROR: value required for text wait.'),
+                )
+            deadline = time.monotonic() + timeout_sec
+            found = False
+            while time.monotonic() < deadline:
+                txt = await _snapshot_text_chain(browser)
+                if needle in txt:
+                    found = True
+                    break
+                await asyncio.sleep(0.4)
+            if not found:
+                return _finalize_observation(
+                    cmd,
+                    ErrorObservation(
+                        content=(
+                            f'ERROR: Timeout waiting for text after {timeout_sec:.0f}s.'
+                        )
+                    ),
+                )
+            base = 'Text appeared.'
+        elif wait_kind in ('selector', 'css'):
+            needle = str(params.get('value') or '').strip()
+            if not needle:
+                return _finalize_observation(
+                    cmd,
+                    ErrorObservation(
+                        content='ERROR: value required for selector wait.'
+                    ),
+                )
+            deadline = time.monotonic() + timeout_sec
+            found = False
+            while time.monotonic() < deadline:
+                txt = await _snapshot_text_chain(browser)
+                if needle in txt:
+                    found = True
+                    break
+                await asyncio.sleep(0.4)
+            if not found:
+                return _finalize_observation(
+                    cmd,
+                    ErrorObservation(
+                        content=(
+                            f'ERROR: Timeout waiting for selector substring after '
+                            f'{timeout_sec:.0f}s.'
+                        )
+                    ),
+                )
+            base = 'Selector/text appeared in DOM dump.'
+        elif wait_kind == 'network_idle':
+            prev: str | None = None
+            deadline = time.monotonic() + timeout_sec
+            stable = False
+            while time.monotonic() < deadline:
+                cur = await _snapshot_text_chain(browser)
+                if prev is not None and cur == prev:
+                    stable = True
+                    break
+                prev = cur
+                await asyncio.sleep(0.5)
+            if not stable:
+                return _finalize_observation(
+                    cmd,
+                    ErrorObservation(
+                        content=(
+                            f'ERROR: Timeout waiting for stable DOM after '
+                            f'{timeout_sec:.0f}s.'
+                        )
+                    ),
+                )
+            base = 'DOM stable (network_idle heuristic).'
+        else:
+            return _finalize_observation(
+                cmd,
+                ErrorObservation(content=f'ERROR: unknown wait_kind {wait_kind!r}.'),
+            )
+
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(content=content, command='browser wait', exit_code=0),
+        )
+
+    async def _execute_switch_tab(self, cmd: str, params: dict[str, Any]) -> Observation:
+        from browser_use.browser.events import SwitchTabEvent
+
+        idx, err = self._parse_browser_index(
+            cmd, params.get('index'), action_name='switch_tab'
+        )
+        if err is not None:
+            return err
+        browser = await self._ensure_session()
+        pages = self._page_targets_ordered(browser)
+        if idx is None or idx < 0 or idx >= len(pages):
+            return _finalize_observation(
+                cmd,
+                ErrorObservation(content=f'ERROR: invalid tab index {idx}.'),
+            )
+        tid = pages[idx].target_id
+        await self._dispatch_bus_event(browser, SwitchTabEvent(target_id=tid))
+        base = f'Switched to tab index {idx}.'
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=content, command='browser switch_tab', exit_code=0
+            ),
+        )
+
+    async def _execute_close_tab(self, cmd: str, params: dict[str, Any]) -> Observation:
+        from browser_use.browser.events import CloseTabEvent
+
+        idx, err = self._parse_browser_index(
+            cmd, params.get('index'), action_name='close_tab'
+        )
+        if err is not None:
+            return err
+        browser = await self._ensure_session()
+        pages = self._page_targets_ordered(browser)
+        if idx is None or idx < 0 or idx >= len(pages):
+            return _finalize_observation(
+                cmd,
+                ErrorObservation(content=f'ERROR: invalid tab index {idx}.'),
+            )
+        tid = pages[idx].target_id
+        await self._dispatch_bus_event(browser, CloseTabEvent(target_id=tid))
+        base = f'Closed tab index {idx}.'
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=content, command='browser close_tab', exit_code=0
+            ),
+        )
+
+    async def _execute_list_tabs(self, cmd: str, params: dict[str, Any]) -> Observation:
+        del params
+        browser = await self._ensure_session()
+        pages = self._page_targets_ordered(browser)
+        rows: list[dict[str, Any]] = []
+        for i, p in enumerate(pages):
+            rows.append(
+                {
+                    'index': i,
+                    'url': getattr(p, 'url', '') or '',
+                    'title': getattr(p, 'title', '') or '',
+                }
+            )
+        body = json.dumps(rows, ensure_ascii=False, indent=2)
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=body, command='browser list_tabs', exit_code=0
+            ),
+        )
+
+    async def _execute_go_back(self, cmd: str, params: dict[str, Any]) -> Observation:
+        from browser_use.browser.events import GoBackEvent
+
+        del params
+        browser = await self._ensure_session()
+        await self._dispatch_bus_event(browser, GoBackEvent())
+        base = 'Navigated back in history.'
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=content, command='browser go_back', exit_code=0
+            ),
+        )
+
+    async def _execute_extract(self, cmd: str, params: dict[str, Any]) -> Observation:
+        if self._structured_extract is None:
+            return _finalize_observation(
+                cmd,
+                ErrorObservation(
+                    content=(
+                        'ERROR: Structured extract is not configured on this runtime.'
+                    )
+                ),
+            )
+        schema = params.get('schema')
+        if not isinstance(schema, dict):
+            return _finalize_observation(
+                cmd,
+                ErrorObservation(content='ERROR: extract requires schema object.'),
+            )
+        instruction = params.get('instruction')
+        inst_str = str(instruction).strip() if instruction else None
+        browser = await self._ensure_session()
+        page_text = await self._snapshot_formatted(browser, 'full')
+        try:
+            out = await asyncio.wait_for(
+                self._structured_extract(page_text, schema, inst_str),
+                timeout=BROWSER_EXTRACT_TIMEOUT_SEC,
+            )
+        except TimeoutError:
+            return _finalize_observation(
+                cmd,
+                ErrorObservation(
+                    content=(
+                        f'ERROR: extract timed out after {BROWSER_EXTRACT_TIMEOUT_SEC:.0f}s.'
+                    )
+                ),
+            )
+        except Exception as exc:
+            return _finalize_observation(
+                cmd, ErrorObservation(content=f'ERROR: extract failed: {exc}')
+            )
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=out, command='browser extract', exit_code=0
+            ),
+        )
+
+    async def _execute_upload_file(
+        self, cmd: str, params: dict[str, Any]
+    ) -> Observation:
+        from browser_use.browser.events import UploadFileEvent
+
+        raw_path = str(params.get('path') or '').strip()
+        resolved, perr = self._resolve_workspace_path(raw_path)
+        if perr:
+            return _finalize_observation(
+                cmd, ErrorObservation(content=f'ERROR: {perr}')
+            )
+        if resolved is None:
+            return _finalize_observation(
+                cmd, ErrorObservation(content='ERROR: could not resolve upload path.')
+            )
+        idx, err = self._parse_browser_index(
+            cmd, params.get('index'), action_name='upload_file'
+        )
+        if err is not None:
+            return err
+        browser = await self._ensure_session()
+        node, err2 = await self._get_browser_node(browser, cmd=cmd, index=idx or 0)
+        if err2 is not None:
+            return err2
+        await self._dispatch_bus_event(
+            browser, UploadFileEvent(node=node, file_path=str(resolved))
+        )
+        base = f'Uploaded {resolved.name} to element index {idx}.'
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=content, command='browser upload_file', exit_code=0
+            ),
+        )
+
+    async def _execute_select_dropdown(
+        self, cmd: str, params: dict[str, Any]
+    ) -> Observation:
+        from browser_use.browser.events import SelectDropdownOptionEvent
+
+        opt_text = params.get('option_text')
+        opt_val = params.get('option_value')
+        choice = (
+            (str(opt_text).strip() if opt_text else '')
+            or (str(opt_val).strip() if opt_val else '')
+        )
+        if not choice:
+            return _finalize_observation(
+                cmd,
+                ErrorObservation(
+                    content='ERROR: option_text or option_value required.'
+                ),
+            )
+        idx, err = self._parse_browser_index(
+            cmd, params.get('index'), action_name='select_dropdown_option'
+        )
+        if err is not None:
+            return err
+        browser = await self._ensure_session()
+        node, err2 = await self._get_browser_node(browser, cmd=cmd, index=idx or 0)
+        if err2 is not None:
+            return err2
+        await self._dispatch_bus_event(
+            browser, SelectDropdownOptionEvent(node=node, text=choice)
+        )
+        base = f'Selected dropdown option {choice!r} at index {idx}.'
+        content = await self._maybe_append_page_state(
+            browser, params=params, prefix=base
+        )
+        return _finalize_observation(
+            cmd,
+            CmdOutputObservation(
+                content=content,
+                command='browser select_dropdown_option',
                 exit_code=0,
             ),
         )
@@ -662,7 +1210,9 @@ class GrintaNativeBrowser:
             cmd,
             ErrorObservation(
                 content=f'ERROR: Unknown browser command {cmd!r}. '
-                'Use: start, close, navigate, snapshot, screenshot, click, type.'
+                'Use: start, close, navigate, snapshot, screenshot, click, type, '
+                'scroll, send_keys, wait, switch_tab, close_tab, list_tabs, go_back, '
+                'extract, upload_file, select_dropdown_option.'
             ),
         )
 
@@ -677,6 +1227,16 @@ class GrintaNativeBrowser:
                 'screenshot': self._execute_screenshot,
                 'click': self._execute_click,
                 'type': self._execute_type,
+                'scroll': self._execute_scroll,
+                'send_keys': self._execute_send_keys,
+                'wait': self._execute_wait,
+                'switch_tab': self._execute_switch_tab,
+                'close_tab': self._execute_close_tab,
+                'list_tabs': self._execute_list_tabs,
+                'go_back': self._execute_go_back,
+                'extract': self._execute_extract,
+                'upload_file': self._execute_upload_file,
+                'select_dropdown_option': self._execute_select_dropdown,
             }
             handler = handlers.get(cmd)
             if handler is None:

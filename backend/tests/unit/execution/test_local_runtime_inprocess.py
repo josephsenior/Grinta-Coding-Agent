@@ -118,7 +118,7 @@ def test_browser_tool_uses_persistent_loop_runner() -> None:
         assert result is obs
         runner.submit.assert_called_once_with(
             executor.browser_tool,
-            165.0,
+            300.0,
             action,
         )
 

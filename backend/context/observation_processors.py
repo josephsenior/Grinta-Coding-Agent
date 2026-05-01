@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from backend.core.message import Message, TextContent
+from backend.core.message import ImageContent, Message, TextContent
 from backend.ledger.observation import (
+    BrowserScreenshotObservation,
     CmdOutputObservation,
     ErrorObservation,
     FileDownloadObservation,
@@ -47,6 +48,10 @@ def convert_observation_to_message(
         return _handle_file_read_observation(event, max_message_chars)
     if isinstance(event, FileEditObservation):
         return _handle_file_edit_observation(event, max_message_chars)
+    if isinstance(event, BrowserScreenshotObservation):
+        return _handle_browser_screenshot_observation(
+            event, max_message_chars, vision_is_active
+        )
     if isinstance(event, CmdOutputObservation):
         return _handle_cmd_output_observation(event, max_message_chars)
     if isinstance(event, ErrorObservation):
@@ -290,6 +295,33 @@ _ERROR_CLASSIFIERS: list[tuple[str, list[str]]] = [
     ('MEMORY_ERROR', ['MemoryError', 'OutOfMemoryError', 'OOM']),
     ('DISK_ERROR', ['No space left on device', 'ENOSPC']),
 ]
+
+
+def _handle_browser_screenshot_observation(
+    obs: BrowserScreenshotObservation,
+    max_message_chars: int | None,
+    vision_is_active: bool,
+) -> Message:
+    """Attach JPEG as multimodal content when vision is enabled for the active LLM."""
+    cap = obs.content
+    if obs.inject_skipped_reason:
+        cap = f'{cap}\n[{obs.inject_skipped_reason}]'
+    cap = truncate_content(cap, max_message_chars, strategy='balanced')
+    tag = '[BROWSER_SCREENSHOT]'
+    if vision_is_active and getattr(obs, 'image_b64', ''):
+        data_url = f'data:{obs.image_mime};base64,{obs.image_b64}'
+        return Message(
+            role='user',
+            vision_enabled=True,
+            content=[
+                TextContent(text=f'{tag}\n{cap}'),
+                ImageContent(image_urls=[data_url]),
+            ],
+        )
+    return Message(
+        role='user',
+        content=[TextContent(text=f'{tag}\n{cap}')],
+    )
 
 
 def _classify_cmd_error(content: str) -> str | None:
