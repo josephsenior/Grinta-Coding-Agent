@@ -400,7 +400,7 @@ def _render_autonomy(
     )
 
     # Single mode-agnostic instruction. The runtime confirmation gate decides
-    # whether to interrupt for user approval based on the configured autonomy
+    # whether to interrupt for user confirmation based on the configured autonomy
     # level — the agent should not branch on that knob in its prompt logic,
     # because the prompt would be wrong as soon as the user toggles modes
     # mid-session via /autonomy. Treat any user decision surfaced by the

@@ -1,6 +1,10 @@
 name: Run Integration Tests
 
 on:
+  pull_request:
+    types: [labeled]
+  schedule:
+    - cron: '30 3 * * *'
   workflow_dispatch:
     inputs:
       reason:
@@ -20,7 +24,7 @@ jobs:
       missing: ${{ steps.detect.outputs.missing }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Detect required files
         id: detect
@@ -74,26 +78,26 @@ jobs:
         python-version: ["3.12"]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
         with:
           enable-cache: true
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '22.x'
 
       - name: Comment on PR if 'integration-test' label is present
         if: github.event_name == 'pull_request' && github.event.label.name == 'integration-test'
-        uses: KeisukeYamashita/create-comment@v1
+        uses: KeisukeYamashita/create-comment@1d95d97d7b1b73ab66e5ca931610e4e10ddc5eed
         with:
           unique: false
           comment: |
@@ -188,7 +192,7 @@ jobs:
           tar -czvf ../../../integration_tests_${TIMESTAMP}.tar.gz integration_tests/Orchestrator/* integration_tests/VisualNavigator/* # Only include the actual result directories
 
       - name: Upload evaluation results as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         id: upload_results_artifact
         with:
           name: integration-test-outputs-${{ github.run_id }}-${{ github.run_attempt }}
@@ -211,7 +215,7 @@ jobs:
 
       - name: Comment with results and artifact link
         id: create_comment
-        uses: KeisukeYamashita/create-comment@v1
+        uses: KeisukeYamashita/create-comment@1d95d97d7b1b73ab66e5ca931610e4e10ddc5eed
         with:
           # if triggered by PR, use PR number, otherwise use 9745 as fallback issue number for manual triggers
           number: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || 9745 }}

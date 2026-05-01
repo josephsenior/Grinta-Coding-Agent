@@ -62,7 +62,7 @@ pipx install "grinta-ai[browser]"    # adds browser-use for web automation
 pipx install "grinta-ai[all]"        # everything
 ```
 
-That is the whole setup. The `grinta init` wizard auto-detects local Ollama and LM Studio servers and writes a working settings file for you. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, Docker) are in [docs/INSTALL.md](docs/INSTALL.md).
+That is the whole setup. The `grinta init` wizard auto-detects local Ollama and LM Studio servers and writes a working settings file for you. Installed runs use `~/.grinta/settings.json`; source checkouts use the repository `settings.json`; `APP_ROOT` can intentionally override that root. Other install paths (uv, Homebrew, Scoop, and experimental Docker image usage) are in [docs/INSTALL.md](docs/INSTALL.md).
 
 ## What you get
 
@@ -147,16 +147,14 @@ uv run python -m backend.cli.entry
 
 If you previously installed `grinta-ai` with `pip` into a **global** interpreter, remove it (`pip uninstall grinta-ai`) and use `uv run` from this repository so dependencies stay isolated.
 
-### Docker (optional)
+### Docker (community / experimental)
+
+Use the container image directly (no official compose stack in this repo):
 
 ```bash
-./docker_start.sh
-```
-
-Windows:
-
-```powershell
-.\DOCKER_START.ps1
+docker run -it --rm -v "$PWD:/work" -w /work \
+  -e LLM_API_KEY=${LLM_API_KEY} \
+  ghcr.io/josephsenior/grinta:latest
 ```
 
 ## LLM Setup (`settings.json`)
@@ -214,6 +212,8 @@ Task validation can block finish calls when tracked work is incomplete.
 - [Contributing](CONTRIBUTING.md)
 - [Governance](GOVERNANCE.md)
 - [Maintainers](MAINTAINERS.md)
+- [Community](COMMUNITY.md)
+- [Roadmap](ROADMAP.md)
 
 ## Contributing
 

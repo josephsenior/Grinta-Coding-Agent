@@ -20,8 +20,15 @@ if (-not (Test-Path "settings.json")) {
     }
 }
 
-# Run docker compose
-Write-Host "🐳 Running Docker Compose (local file-backed Grinta)..." -ForegroundColor Green
+# Run docker compose only when project provides a compose file.
+if (-not (Test-Path "docker-compose.yml") -and -not (Test-Path "compose.yml")) {
+    Write-Host "⚠ No docker-compose file found in this repository." -ForegroundColor Yellow
+    Write-Host "This path is community/experimental. Use the published image instead:" -ForegroundColor Yellow
+    Write-Host 'docker run -it --rm -v "$PWD:/work" -w /work -e LLM_API_KEY=${LLM_API_KEY} ghcr.io/josephsenior/grinta:latest'
+    exit 1
+}
+
+Write-Host "🐳 Running Docker Compose..." -ForegroundColor Green
 
 if ($Detached) {
     docker compose up --build -d

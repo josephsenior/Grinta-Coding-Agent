@@ -20,15 +20,12 @@ jobs:
   lint-python:
     name: Lint python
     runs-on: ubuntu-latest
-    # Temporary advisory mode: repo currently carries a large historical
-    # pre-commit baseline (yaml/docstring/bandit) outside this fix scope.
-    continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
         with:
           fetch-depth: 0
       - name: Set up python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: 3.12
           cache: "pip"
@@ -42,9 +39,9 @@ jobs:
     name: Check version consistency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Set up python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: 3.12
       - name: Run version consistency check
@@ -54,9 +51,9 @@ jobs:
     name: Check workflow config consistency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Set up python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: 3.12
       - name: Run workflow config consistency check
@@ -66,17 +63,14 @@ jobs:
   type-check:
     name: Type check (mypy)
     runs-on: ubuntu-latest
-    # Temporary advisory mode: mypy baseline is currently large and
-    # unrelated to this CI unblocking change.
-    continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@e4db8464a088ece1b920f60402e813ea4de65b8f
         with:
           enable-cache: true
       - name: Set up python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: 3.12
       - name: Install dependencies

@@ -131,17 +131,35 @@ def main():
     """Main verification function."""
     print(f'{BLUE}Verifying API Versioning Support{RESET}\n')
 
-    routes_dir = project_root / 'app' / 'server' / 'routes'
-    if not routes_dir.exists():
-        print(f'{RED}❌ Routes directory not found: {routes_dir}{RESET}')
-        return 1
+    candidate_dirs = [
+        project_root / 'backend' / 'execution',
+        project_root / 'backend' / 'gateway',
+    ]
+    route_files: list[Path] = []
+    for directory in candidate_dirs:
+        if directory.exists():
+            route_files.extend(
+                [
+                    f
+                    for f in directory.glob('*.py')
+                    if f.name != '__init__.py'
+                    and ('route' in f.stem or 'server' in f.stem or 'api' in f.stem)
+                ]
+            )
 
-    route_files = [f for f in routes_dir.glob('*.py') if f.name != '__init__.py']
-    print(f'Found {len(route_files)} route files\n')
+    if not route_files:
+        print(
+            f'{YELLOW}⚠️  No HTTP route files detected. '
+            f'CLI-first architecture: API versioning verification not applicable.{RESET}'
+        )
+        return 0
 
-    results = [check_route_file(f) for f in sorted(route_files)]
+    route_files = sorted(route_files)
+    print(f'Found {len(route_files)} candidate route files\n')
+
+    results = [check_route_file(f) for f in route_files]
     versioned_count, non_versioned_count, needs_update = _process_route_results(
-        sorted(route_files), results
+        route_files, results
     )
 
     _print_summary(versioned_count, non_versioned_count, len(route_files))

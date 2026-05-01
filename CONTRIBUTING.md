@@ -28,7 +28,7 @@ uv run python -m backend.cli.entry
 
 ### Reporting Bugs
 
-- Use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.md)
+- Use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_template.yml)
 - Include: steps to reproduce, expected vs actual behavior, environment details
 - Attach logs from `backend/` console output if applicable
 
@@ -60,6 +60,12 @@ Optional: same command with `uv run pytest backend/tests/unit -q` for quieter ou
 If your change touches the CLI, REPL, or orchestration hot paths, also run the [CLI regression workflow](.github/workflows/e2e-tests.yml) locally when possible (it may also run on PRs when files under `backend/`, `launch/`, etc. change).
 
 For bugfix PRs, prefer adding a **regression test** next to the code you fixed (see [docs/REGRESSION_TESTS.md](docs/REGRESSION_TESTS.md)).
+
+For a one-command onboarding sanity check on Unix-like systems:
+
+```bash
+bash scripts/check_contributor_bootstrap.sh
+```
 
 ### Code Standards
 
