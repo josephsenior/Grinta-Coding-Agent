@@ -1061,11 +1061,15 @@ def _handle_multi_edit_command(_path: str, arguments: Mapping[str, Any]) -> Acti
         )
 
     if result.success:
-        affected = ', '.join(p for p, _ in parsed)
+        paths = [p for p, _ in parsed]
+        if len(paths) == 1:
+            file_lines = f'  • {paths[0]}'
+        else:
+            file_lines = '\n'.join(f'  • {p}' for p in paths)
         return MessageAction(
             content=(
-                f'✓ multi_edit committed {result.files_modified} file(s) atomically: '
-                f'{affected}'
+                f'✓ multi_edit committed {result.files_modified} file(s) atomically\n'
+                f'{file_lines}'
             )
         )
     err_lines = '\n'.join(f'  - {e}' for e in (result.errors or [result.message]))

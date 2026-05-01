@@ -139,7 +139,21 @@ class ContextMemoryManager:
         # Auto-extract critical context before compaction may discard events
         self._extract_pre_condensation_snapshot(list(history))
 
-        condensation_result = self.compactor.compacted_history(state)
+        # Check if we have a pre-warmed condensation from the background task
+        turn_signals = getattr(state, 'turn_signals', None)
+        prewarmed = getattr(turn_signals, 'prewarmed_compaction', None)
+        if prewarmed is not None:
+            turn_signals.prewarmed_compaction = None
+            logger.info('Utilizing background pre-warmed condensation result.')
+            condensation_result = prewarmed
+            
+            # Tag the CondensationAction to identify it as prewarmed
+            action = getattr(condensation_result, 'action', None)
+            if action:
+                action.is_prewarmed = True
+        else:
+            condensation_result = self.compactor.compacted_history(state)
+
         condensation_result = self._maybe_force_compaction_under_memory_pressure(  # type: ignore[assignment]
             state, list(history), condensation_result
         )

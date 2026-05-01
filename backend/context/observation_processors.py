@@ -234,8 +234,11 @@ def _handle_condensation_observation(
     restored_context = _load_restored_context_snapshot()
     scratchpad = _load_scratchpad_snapshot()
     working_memory = _load_working_memory_snapshot()
+    
+    banner = _CONDENSATION_BANNER if not getattr(obs, 'is_prewarmed', False) else ''
+    
     text = truncate_content(
-        _CONDENSATION_BANNER
+        banner
         + summary
         + restored_context
         + scratchpad

@@ -81,6 +81,16 @@ class TestToolInvocationContext:
         assert ctx.blocked is True
         assert ctx.block_reason is None
 
+    def test_block_agent_only_sets_metadata(self):
+        ctx = ToolInvocationContext(
+            controller=_mock_controller(),
+            action=_mock_action(),
+            state=_mock_state(),
+        )
+        ctx.block('internal guidance', agent_only=True)
+        assert ctx.block_reason == 'internal guidance'
+        assert ctx.metadata.get('block_agent_only') is True
+
     def test_metadata_storage(self):
         ctx = ToolInvocationContext(
             controller=_mock_controller(),

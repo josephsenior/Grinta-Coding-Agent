@@ -31,11 +31,19 @@ class ToolInvocationContext:
     block_reason: str | None = None
     action_id: int | None = None
 
-    def block(self, reason: str | None = None) -> None:
-        """Mark the invocation as blocked to stop subsequent stages."""
+    def block(self, reason: str | None = None, *, agent_only: bool = False) -> None:
+        """Mark the invocation as blocked to stop subsequent stages.
+
+        When ``agent_only`` is True, the block reason is guidance for the model
+        only (e.g. read-before-edit guards). The CLI suppresses the matching
+        :class:`~backend.ledger.observation.ErrorObservation` while the
+        observation still enters agent context.
+        """
         self.blocked = True
         if reason:
             self.block_reason = reason
+        if agent_only:
+            self.metadata['block_agent_only'] = True
 
 
 class ToolInvocationMiddleware:

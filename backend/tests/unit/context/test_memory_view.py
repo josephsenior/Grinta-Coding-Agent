@@ -95,24 +95,24 @@ class TestCollectPrunedEventIds:
 class TestFindSummaryInfo:
     def test_no_summary(self):
         events = [_make_event(1)]
-        summary, offset = View._find_summary_info(events)
+        summary, offset, is_prewarmed = View._find_summary_info(events)
         assert summary is None
         assert offset is None
 
     def test_with_summary(self):
         from backend.ledger.action.agent import CondensationAction
-
+    
         ca = CondensationAction(
             pruned_event_ids=[1],
             summary='AI decided to use X',
             summary_offset=0,
+            is_prewarmed=True,
         )
         events = [_make_event(1), ca]
-        summary, offset = View._find_summary_info(events)
+        summary, offset, is_prewarmed = View._find_summary_info(events)
         assert summary == 'AI decided to use X'
         assert offset == 0
-
-
+        assert is_prewarmed is True
 class TestCheckUnhandledCondensationRequest:
     def test_no_events(self):
         assert View._check_unhandled_condensation_request([]) is False

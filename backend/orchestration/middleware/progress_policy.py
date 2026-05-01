@@ -89,7 +89,8 @@ class ProgressPolicyMiddleware(ToolInvocationMiddleware):
                 reason=(
                     'POLICY_GATE_REPLAN_REQUIRED: repeated identical action signature '
                     'without measurable progress. Change strategy before retrying.'
-                )
+                ),
+                agent_only=True,
             )
 
     async def observe(

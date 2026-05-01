@@ -76,6 +76,84 @@ def _make_controller() -> SessionOrchestrator:
     return ctrl
 
 
+# ── handle_blocked_invocation ─────────────────────────────────────────
+
+
+class TestHandleBlockedInvocation(unittest.TestCase):
+    """Blocked tool pipeline paths and ErrorObservation shaping."""
+
+    def setUp(self):
+        self.ctrl = _make_controller()
+
+    def test_emits_agent_only_error_when_block_agent_only_metadata_set(self):
+        from backend.orchestration.tool_pipeline import ToolInvocationContext
+
+        mock_action = MagicMock()
+        state = MagicMock()
+        ctx = ToolInvocationContext(
+            controller=self.ctrl,
+            action=mock_action,
+            state=state,
+            metadata={'block_agent_only': True},
+        )
+        ctx.block_reason = '[FILE_STATE_GUARD] read first'
+
+        with (
+            patch(
+                'backend.orchestration.tool_telemetry.ToolTelemetry.get_instance'
+            ) as mock_tm,
+            patch('backend.ledger.observation_cause.attach_observation_cause'),
+            patch(
+                'backend.orchestration.session_orchestrator.ErrorObservation'
+            ) as mock_err_cls,
+        ):
+            mock_obs = MagicMock()
+            mock_err_cls.return_value = mock_obs
+            mock_tm.return_value.on_blocked = MagicMock()
+            self.ctrl.handle_blocked_invocation(mock_action, ctx)
+
+        mock_err_cls.assert_called_once_with(
+            content='[FILE_STATE_GUARD] read first',
+            error_id='TOOL_PIPELINE_BLOCKED',
+            agent_only=True,
+        )
+        self.ctrl.event_stream.add_event.assert_called_once_with(
+            mock_obs, EventSource.ENVIRONMENT
+        )
+
+    def test_emits_user_visible_error_when_agent_only_not_set(self):
+        from backend.orchestration.tool_pipeline import ToolInvocationContext
+
+        mock_action = MagicMock()
+        state = MagicMock()
+        ctx = ToolInvocationContext(
+            controller=self.ctrl,
+            action=mock_action,
+            state=state,
+        )
+        ctx.block_reason = 'safety_validator_blocked'
+
+        with (
+            patch(
+                'backend.orchestration.tool_telemetry.ToolTelemetry.get_instance'
+            ) as mock_tm,
+            patch('backend.ledger.observation_cause.attach_observation_cause'),
+            patch(
+                'backend.orchestration.session_orchestrator.ErrorObservation'
+            ) as mock_err_cls,
+        ):
+            mock_obs = MagicMock()
+            mock_err_cls.return_value = mock_obs
+            mock_tm.return_value.on_blocked = MagicMock()
+            self.ctrl.handle_blocked_invocation(mock_action, ctx)
+
+        mock_err_cls.assert_called_once_with(
+            content='safety_validator_blocked',
+            error_id='TOOL_PIPELINE_BLOCKED',
+            agent_only=False,
+        )
+
+
 # ── Properties ───────────────────────────────────────────────────────
 
 

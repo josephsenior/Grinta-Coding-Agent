@@ -112,9 +112,10 @@ class TestCollectPrunedIds:
 class TestFindSummaryInfo:
     def test_no_summary_returns_none(self):
         evts = [_event(1)]
-        summary, offset = View._find_summary_info(evts)
+        summary, offset, is_prewarmed = View._find_summary_info(evts)
         assert summary is None
         assert offset is None
+        assert is_prewarmed is False
 
     def test_finds_summary_from_condensation(self):
         ca = CondensationAction(
@@ -124,9 +125,10 @@ class TestFindSummaryInfo:
             summary_offset=1,
         )
         evts = [_event(0), ca, _event(4)]
-        summary, offset = View._find_summary_info(evts)
+        summary, offset, is_prewarmed = View._find_summary_info(evts)
         assert summary == 'Summary text'
         assert offset == 1
+        assert is_prewarmed is False
 
     def test_returns_last_condensation_summary(self):
         ca1 = CondensationAction(
@@ -142,8 +144,10 @@ class TestFindSummaryInfo:
             summary_offset=1,
         )
         evts: list[Any] = [ca1, ca2]
-        summary, offset = View._find_summary_info(evts)
+        summary, offset, is_prewarmed = View._find_summary_info(evts)
         assert summary == 'New'
+        assert offset == 1
+        assert is_prewarmed is False
 
 
 # ===================================================================
