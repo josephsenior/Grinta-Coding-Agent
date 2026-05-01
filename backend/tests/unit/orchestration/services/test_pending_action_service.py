@@ -414,7 +414,7 @@ class TestPendingActionService(unittest.TestCase):
         mock_time.return_value = 100.0
         service.set(action)
 
-        # Still within browser_tool floor (165s default), past default pending (120s).
+        # Still within browser_tool floor (300s default), past default pending (120s).
         mock_time.return_value = 100.0 + float(BROWSER_TOOL_SYNC_TIMEOUT_SECONDS) - 10.0
         self.assertEqual(service.get(), action)
 

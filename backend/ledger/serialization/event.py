@@ -44,6 +44,7 @@ DELETE_FROM_TRAJECTORY_EXTRAS = {
 DELETE_FROM_TRAJECTORY_EXTRAS_AND_SCREENSHOTS = DELETE_FROM_TRAJECTORY_EXTRAS | {
     'screenshot',
     'set_of_marks',
+    'image_b64',
 }
 
 

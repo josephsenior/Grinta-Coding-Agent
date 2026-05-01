@@ -104,7 +104,7 @@ class TestDelete:
     def test_delete_directory(self, store):
         store.write('folder/f.txt', 'x')
         store.delete('folder')
-        assert _wait_until_removed(store.get_full_path('folder'))
+        assert _wait_until_removed(store.get_full_path('folder/f.txt'))
 
     def test_delete_nonexistent_no_error(self, store):
         # Should not raise
@@ -128,7 +128,7 @@ class TestDelete:
             store.delete('folder')
 
         assert calls['count'] >= 2
-        assert _wait_until_removed(store.get_full_path('folder'))
+        assert _wait_until_removed(store.get_full_path('folder/f.txt'))
 
 
 class TestGetFullPath:

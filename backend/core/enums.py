@@ -139,6 +139,7 @@ class ObservationType(str, Enum):
     WRITE = 'write'
     EDIT = 'edit'
     BROWSE = 'browse'
+    BROWSER_SCREENSHOT = 'browser_screenshot'
     RUN = 'run'
     CHAT = 'chat'
     MESSAGE = 'message'

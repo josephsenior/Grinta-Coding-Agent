@@ -472,6 +472,57 @@ def create_controller(
     # Store the runtime so downstream code (worker delegation, middleware)
     # can access it via controller.runtime.
     controller.runtime = runtime
+    try:
+        from backend.execution.drivers.local.local_runtime_inprocess import (
+            LocalRuntimeInProcess,
+        )
+
+        if isinstance(runtime, LocalRuntimeInProcess):
+
+            async def _browser_structured_extract(
+                page_text: str,
+                schema: dict[str, Any],
+                instruction: str | None,
+            ) -> str:
+                import json as _json
+
+                from backend.core.message import Message, TextContent
+
+                llm = agent.llm
+                schema_s = _json.dumps(schema, ensure_ascii=False)
+                chunks = [
+                    'Extract structured data from the web page text below.',
+                    'Respond with ONLY valid JSON matching this JSON Schema '
+                    '(no markdown fences):',
+                    schema_s,
+                ]
+                if instruction:
+                    chunks.append(f'Additional instructions: {instruction}')
+                chunks.append('--- Page text ---')
+                chunks.append(page_text[:120000])
+                resp = await llm.acompletion(
+                    [
+                        Message(
+                            role='user',
+                            content=[TextContent(text='\n'.join(chunks))],
+                        )
+                    ],
+                    temperature=0,
+                    max_tokens=8192,
+                )
+                text = ''
+                choices = getattr(resp, 'choices', None) or []
+                if choices:
+                    msg = getattr(choices[0], 'message', None)
+                    if msg is not None:
+                        text = str(getattr(msg, 'content', '') or '')
+                return text.strip()
+
+            runtime.set_browser_structured_extract(_browser_structured_extract)
+    except Exception:
+        logger.debug(
+            'Could not wire browser structured extract on runtime', exc_info=True
+        )
     return (controller, initial_state)
 
 

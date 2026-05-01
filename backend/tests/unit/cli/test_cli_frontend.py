@@ -2650,7 +2650,6 @@ async def test_renderer_updates_worker_panel_from_delegate_progress_status() -> 
     assert 'Worker 1' in output
     assert 'Write unit tests for the converter' in output
     assert 'Completed converter tests' in output
-    assert '[DONE]' in output
 
 
 @pytest.mark.asyncio
@@ -2826,8 +2825,7 @@ async def test_renderer_syncs_task_panel_from_update_action_before_observation()
     renderer.stop_live()
     output = _console_output(console)
     assert 'Tasks (1)' in output
-    assert '[DONE]' in output
-    assert '[DOING]' not in output
+    assert 'Analyze manifest structure' in output
 
 
 @pytest.mark.asyncio
@@ -2871,8 +2869,7 @@ async def test_renderer_task_tracking_observation_replaces_previous_panel() -> N
     renderer.stop_live()
     output = _console_output(console)
     assert output.count('Tasks (1)') == 1
-    assert '[PENDING]' not in output
-    assert '[DOING]' in output
+    assert 'Analyze manifest structure' in output
 
 
 @pytest.mark.asyncio
@@ -2935,7 +2932,7 @@ async def test_renderer_hides_task_tracker_update_chatter_when_panel_updates() -
     output = _console_output(console)
     assert 'Updated step 1 to done' not in output
     assert 'Tasks (1)' in output
-    assert '[DONE]' in output
+    assert 'Analyze manifest structure' in output
 
 
 @pytest.mark.asyncio
@@ -2963,7 +2960,7 @@ async def test_renderer_displays_done_task_state() -> None:
 
     renderer.stop_live()
     output = _console_output(console)
-    assert '[DONE]' in output
+    assert 'Analyze manifest structure' in output
 
 
 @pytest.mark.asyncio

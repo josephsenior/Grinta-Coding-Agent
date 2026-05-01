@@ -16,6 +16,7 @@ from backend.ledger.observation.agent import (
     RecallObservation,
 )
 from backend.ledger.observation.code_nav import LspQueryObservation
+from backend.ledger.observation.browser_screenshot import BrowserScreenshotObservation
 from backend.ledger.observation.commands import (
     CmdOutputMetadata,
     CmdOutputObservation,
@@ -40,6 +41,7 @@ from backend.ledger.observation.terminal import TerminalObservation
 observations = (
     NullObservation,
     CmdOutputObservation,
+    BrowserScreenshotObservation,
     FileReadObservation,
     FileWriteObservation,
     FileEditObservation,

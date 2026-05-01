@@ -400,9 +400,10 @@ class TestRollbackManager:
         """Test exception handling when saving manifest."""
         rm = RollbackManager(str(workspace))
         monkeypatch.setattr(
-            rm,
-            '_save_manifest',
-            lambda: (_ for _ in ()).throw(PermissionError('simulated write failure')),
+            'backend.core.rollback.rollback_manager.json.dump',
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                PermissionError('simulated write failure')
+            ),
         )
 
         # This should handle the exception gracefully

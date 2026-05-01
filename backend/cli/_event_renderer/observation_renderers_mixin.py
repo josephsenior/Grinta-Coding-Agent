@@ -73,6 +73,7 @@ from backend.ledger.observation import (
     AgentCondensationObservation,
     AgentStateChangedObservation,
     AgentThinkObservation,
+    BrowserScreenshotObservation,
     CmdOutputObservation,
     DelegateTaskObservation,
     ErrorObservation,
@@ -148,6 +149,7 @@ class ObservationRenderersMixin:
     _OBSERVATION_DISPATCH: tuple[tuple[type, str], ...] = (
         (AgentStateChangedObservation, '_handle_state_change'),
         (AgentThinkObservation, '_render_agent_think_observation'),
+        (BrowserScreenshotObservation, '_render_browser_screenshot_observation'),
         (CmdOutputObservation, '_render_cmd_output_observation'),
         (FileEditObservation, '_render_file_edit_observation'),
         (FileWriteObservation, '_render_file_write_observation'),
@@ -184,6 +186,16 @@ class ObservationRenderersMixin:
             return
         thought = getattr(obs, 'thought', '') or getattr(obs, 'content', '')
         self._apply_reasoning_text(thought)
+        self.refresh()
+
+    def _render_browser_screenshot_observation(
+        self, obs: BrowserScreenshotObservation
+    ) -> None:
+        """Same UX as browser ``CmdOutputObservation``: suppress duplicate shell row."""
+        del obs
+        self._stop_reasoning()
+        self._flush_pending_activity_card()
+        self._reset_pending_shell()
         self.refresh()
 
     def _render_cmd_output_observation(self, obs: CmdOutputObservation) -> None:
