@@ -166,18 +166,29 @@ class DiffPanel:
         )
 
     @staticmethod
-    def _render_groups(groups: list[dict[str, list[str]]]) -> Text:
-        """Build a Rich Text from edit groups with colored +/- lines."""
-        result = Text()
+    def _render_groups(groups: list[dict[str, list[str]]]) -> Any:
+        """Build a Rich Syntax from edit groups with colored +/- lines."""
+        from rich.syntax import Syntax
+        
+        lines = []
         for i, group in enumerate(groups):
             if i > 0:
-                result.append('  ···\n', style=STYLE_DIM)
+                lines.append('···\n')
             for line in group.get('before_edits', []):
-                result.append(line + '\n', style=CLR_DIFF_REM)
+                lines.append(line + '\n')
             for line in group.get('after_edits', []):
-                result.append(line + '\n', style=CLR_DIFF_ADD)
-        # Truncate if too long
-        if len(result.plain) > 3000:
-            result.truncate(3000)
-            result.append('\n… (truncated)', style=STYLE_DIM)
-        return result
+                lines.append(line + '\n')
+                
+        diff_str = "".join(lines)
+        if len(diff_str) > 3000:
+            diff_str = diff_str[:3000] + '\n… (truncated)'
+            
+        return Syntax(
+            diff_str,
+            lexer="diff",
+            theme="monokai",
+            word_wrap=True,
+            padding=(1, 2),
+            background_color="default",
+            line_numbers=False
+        )

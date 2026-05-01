@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
+from rich import box
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
@@ -138,6 +139,8 @@ def _print_provider_table(console: Console, detected: list[str]) -> None:
         title='Pick a provider',
         title_style=CLR_CARD_TITLE,
         border_style=CLR_CARD_BORDER,
+        box=box.ROUNDED,
+        padding=(1, 2)
     )
     table.add_column('Key', style=CLR_BRAND)
     table.add_column('Description')
@@ -181,6 +184,8 @@ def run_init(project_root: Path | None = None, console: Console | None = None) -
             'API keys are stored in a sibling [bold].env[/bold] file when provided.\n'
             f'Re-run any time with [{CLR_BRAND}]grinta init[/].',
             border_style=CLR_CARD_BORDER,
+            box=box.ROUNDED,
+            padding=(1, 2)
         )
     )
 

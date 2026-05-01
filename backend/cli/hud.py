@@ -17,6 +17,9 @@ from backend.cli.theme import (
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
+    CLR_AUTONOMY_BALANCED,
+    CLR_AUTONOMY_CONSERVATIVE,
+    CLR_AUTONOMY_FULL,
     HUD_BG,
 )
 
@@ -182,21 +185,37 @@ class HUDBar:
             model_display = model
         else:
             model_display = f'{provider}/{model}'
-        sep = (' · ', CLR_SEP)
+            
+        group_sep = ('  │  ', CLR_SEP)
+        item_sep = (' · ', CLR_SEP)
+        
+        autonomy = self.state.autonomy_level or 'balanced'
+        if autonomy == 'full':
+            auto_style = CLR_AUTONOMY_FULL
+            auto_lbl = 'Full'
+        elif autonomy == 'conservative':
+            auto_style = CLR_AUTONOMY_CONSERVATIVE
+            auto_lbl = 'Conservative'
+        else:
+            auto_style = CLR_AUTONOMY_BALANCED
+            auto_lbl = 'Balanced'
+        
         parts: list[tuple[str, str]] = [
             (' ', ''),
+            (auto_lbl, auto_style),
+            (' ', ''),
             (model_display, CLR_HUD_MODEL),
-            sep,
+            item_sep,
             (token_display, CLR_HUD_DETAIL),
-            sep,
-            (f'${self.state.cost_usd:.3f}', CLR_HUD_DETAIL),
-            sep,
-            (f'{self.state.llm_calls}c', CLR_HUD_DETAIL),
-            sep,
-            (f'MCP·{mcp_short}', CLR_HUD_DETAIL),
-            sep,
-            (f'sk·{sk_short}', CLR_HUD_DETAIL),
-            sep,
+            group_sep,
+            (f'Cost: ${self.state.cost_usd:.3f}', CLR_HUD_DETAIL),
+            item_sep,
+            (f'Calls: {self.state.llm_calls}', CLR_HUD_DETAIL),
+            group_sep,
+            (f'MCP: {mcp_short}', CLR_HUD_DETAIL),
+            item_sep,
+            (f'Skills: {sk_short}', CLR_HUD_DETAIL),
+            group_sep,
             (self._ledger_icon(), self._ledger_style()),
         ]
         txt = Text()
