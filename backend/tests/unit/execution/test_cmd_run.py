@@ -1,10 +1,12 @@
 # pyright: reportUnknownParameterType=false, reportMissingParameterType=false, reportUnknownVariableType=false, reportUnknownMemberType=false, reportUnknownArgumentType=false
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
 from backend.execution.action_execution_server import RuntimeExecutor
 from backend.execution.utils.unified_shell import BaseShellSession
 from backend.ledger.action import CmdRunAction, FileReadAction
@@ -191,7 +193,7 @@ async def test_windows_prefers_powershell_rewrites_python3_when_both_available(
     )
 
     action = CmdRunAction(command='python3 --version')
-    with patch('sys.platform', 'win32'):
+    with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
         await mock_executor.run(action)
 
     assert action.command == 'python --version'
@@ -214,7 +216,7 @@ async def test_windows_powershell_rewrites_python3(mock_executor):
     )
 
     action = CmdRunAction(command='python3 --version')
-    with patch('sys.platform', 'win32'):
+    with override_os_capabilities(replace(OS_CAPS, is_windows=True)):
         await mock_executor.run(action)
 
     assert action.command == 'python --version'

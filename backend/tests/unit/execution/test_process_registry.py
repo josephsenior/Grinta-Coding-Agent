@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import replace
 from unittest.mock import MagicMock, patch
 
+from backend.core.os_capabilities import OS_CAPS, override_os_capabilities
 from backend.execution.utils.process_registry import TaskCancellationService
 
 # ===================================================================
