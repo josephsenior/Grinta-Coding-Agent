@@ -1080,7 +1080,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         return f' {controls}\n {telemetry} '
 
     def _prompt_stats_row1_fragments(
-        self, data: dict[str, str], compact: bool
+        self, data: dict[str, str]
     ) -> list[tuple[str, str]]:
         frags: list[tuple[str, str]] = []
         frags.append(('class:prompt.brand', 'GRINTA'))
@@ -1088,13 +1088,10 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         frags.append((self._prompt_state_style(), f' {data["state_label"].upper()} '))
         frags.append(('class:prompt.dim', '  '))
         frags.append((self._prompt_autonomy_style(), data['autonomy_label']))
-        if not compact:
-            frags.append(('class:prompt.dim', '  '))
-            frags.append(('class:prompt.hint', 'Tab for commands'))
         return frags
 
     def _prompt_stats_row2_fragments(
-        self, data: dict[str, str], compact: bool, width: int = 120
+        self, data: dict[str, str], width: int = 120
     ) -> list[tuple[str, str]]:
         """Build row-2 fragments, wrapping to a second line when content exceeds width."""
         sep = '  \u2022  '
@@ -1165,7 +1162,6 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
         """Two-line status under the input; no filled backgrounds (terminal default)."""
         width = shutil.get_terminal_size((110, 24)).columns
         data = self._prompt_panel_data()
-        compact = width < 110
 
         # Keep HUD state/autonomy in sync so the Live-mode HUD matches.
         self._hud.update_agent_state(data['state_label'])
@@ -1197,10 +1193,10 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
 
         add('class:prompt.dim', '\u2500' * width)
         add('', '\n')
-        fragments.extend(self._prompt_stats_row1_fragments(data, compact))
+        fragments.extend(self._prompt_stats_row1_fragments(data))
         add('', '\n')
         # Pass actual terminal width so row 2 never overflows.
-        fragments.extend(self._prompt_stats_row2_fragments(data, compact, width=width))
+        fragments.extend(self._prompt_stats_row2_fragments(data, width=width))
         self._append_footer_system_fragments(fragments, add)
         return fragments
 

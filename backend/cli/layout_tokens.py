@@ -26,8 +26,8 @@ TRANSCRIPT_RIGHT_INSET = 5
 # Inner padding for rounded callout-style panels (vertical, horizontal).
 CALLOUT_PANEL_PADDING = (1, 2)
 
-# Inner padding for compact activity/live panels so rows align across sections.
-ACTIVITY_PANEL_PADDING = (0, 1)
+# Inner padding for activity tool cards (tight horizontal rhythm).
+ACTIVITY_PANEL_PADDING = (0, 0)
 
 # Space below each activity block (tool rows) for scanability. A single blank
 # row keeps adjacent cards visually separated without making rapid tool

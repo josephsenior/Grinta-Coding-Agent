@@ -45,7 +45,7 @@ def test_prompt_stats_row2_omits_mcp_and_skills_by_default() -> None:
         'ledger': 'Healthy',
     }
 
-    fragments = repl._prompt_stats_row2_fragments(data, compact=False, width=160)
+    fragments = repl._prompt_stats_row2_fragments(data, width=160)
     rendered = ''.join(text for _, text in fragments)
 
     assert 'provider:' in rendered

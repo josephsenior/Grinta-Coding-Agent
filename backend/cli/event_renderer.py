@@ -24,6 +24,7 @@ from rich.live import Live
 from rich.markdown import Markdown
 from rich.padding import Padding
 from rich.panel import Panel
+from rich.style import Style
 from rich.table import Table
 from rich.text import Text
 
@@ -66,6 +67,7 @@ from backend.cli.theme import (
     STYLE_EMPTY,
     STYLE_ITALIC_DIM,
 )
+from backend.cli.path_links import file_uri_for_path, linkify_plain
 from backend.cli.tool_call_display import (
     looks_like_streaming_tool_arguments,
     streaming_args_hint,
@@ -734,15 +736,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         items: list[Any] = [
             self._fake_prompt_input_row(hud),
             Text('─' * width, style=CLR_SEP),
+            self._fake_prompt_row1(hud),
         ]
-        if width < 72:
-            items.append(self._fake_prompt_compact_row(hud, provider, model))
-            return Group(*items)
-        items.append(self._fake_prompt_row1(hud))
-        ws_row = self._fake_prompt_workspace_row(hud, width)
-        if ws_row is not None:
-            items.append(ws_row)
-        items.extend(self._fake_prompt_metrics_rows(hud, provider, model, width))
+        items.extend(self._fake_prompt_metrics_rows(hud, provider, model))
         return Group(*items)
 
     @staticmethod
@@ -767,46 +763,6 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         return input_row
 
     @classmethod
-    def _fake_prompt_compact_row(
-        cls,
-        hud: Any,
-        provider: str,
-        model: str,
-    ) -> Text:
-        sep = cls._FAKE_PROMPT_SEP
-        state_label = hud.agent_state_label or 'Running'
-        autonomy = hud.autonomy_level or 'balanced'
-        model_short = (
-            model
-            if provider in cls._FAKE_PROMPT_UNKNOWN_PROVIDERS
-            else f'{provider}/{model}'
-        )
-        ctx = (
-            HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
-        )
-        line = Text()
-        first = True
-        ws_compact = (hud.workspace_path or '').strip()
-        if ws_compact:
-            line.append(
-                HUDBar.ellipsize_path(ws_compact, 22),
-                style=f'dim {CLR_MUTED_TEXT}',
-            )
-            first = False
-        for content in (
-            state_label,
-            f'autonomy:{autonomy}',
-            model_short,
-            ctx,
-            f'${hud.cost_usd:.4f}',
-        ):
-            if not first:
-                line.append(sep[0], style=sep[1])
-            line.append(content, style=STYLE_DIM)
-            first = False
-        return line
-
-    @classmethod
     def _fake_prompt_row1(cls, hud: Any) -> Text:
         state_label = hud.agent_state_label or 'Running'
         autonomy = hud.autonomy_level or 'balanced'
@@ -828,30 +784,21 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         row1.append(f'autonomy:{autonomy}', style=auto_style)
         return row1
 
-    @staticmethod
-    def _fake_prompt_workspace_row(hud: Any, width: int) -> Text | None:
-        ws_full = (hud.workspace_path or '').strip()
-        if not ws_full:
-            return None
-        row_ws = Text()
-        row_ws.append('workspace ', style=f'dim {CLR_META}')
-        row_ws.append(
-            HUDBar.ellipsize_path(ws_full, max(28, width - 14)),
-            style=CLR_MUTED_TEXT,
-        )
-        return row_ws
-
     @classmethod
     def _fake_prompt_token_display(cls, hud: Any) -> str:
-        ctx = (
-            HUDBar._format_tokens(hud.context_tokens) if hud.context_tokens > 0 else '0'
+        ctx = HUDBar._format_tokens(hud.context_tokens)
+        lim = (
+            HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
         )
         if hud.context_tokens == 0 and hud.context_limit == 0:
-            return '0 tokens'
-        if hud.context_limit == 0:
-            return f'{ctx} tokens'
-        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else '?'
-        return f'{ctx}/{lim}'
+            token_display = '0t'
+        elif hud.context_limit == 0:
+            token_display = f'{ctx}t'
+        else:
+            token_display = f'{ctx}/{lim}' if lim else f'{ctx}t'
+        if getattr(hud, 'token_usage_estimated', False):
+            token_display += '~'
+        return token_display
 
     @classmethod
     def _fake_prompt_ledger_style(cls, ledger_status: str) -> str:
@@ -866,12 +813,15 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         hud: Any,
         provider: str,
         model: str,
-        width: int,
     ) -> list[Text]:
         sep = self._FAKE_PROMPT_SEP
         token_display = self._fake_prompt_token_display(hud)
-        mcp_label = HUDBar._format_mcp_servers_label(hud.mcp_servers)
-        skills_label = HUDBar._format_skills_label(self._hud.bundled_skill_count)
+        mcp_short = (
+            '?'
+            if hud.mcp_servers is None
+            else str(min(hud.mcp_servers, 99))
+        )
+        sk_short = str(min(self._hud.bundled_skill_count, 99))
         ledger_style = self._fake_prompt_ledger_style(hud.ledger_status)
         if provider in self._FAKE_PROMPT_UNKNOWN_PROVIDERS:
             model_display = model
@@ -882,35 +832,21 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             sep,
             (token_display, CLR_HUD_DETAIL),
             sep,
-            (f'${hud.cost_usd:.4f}', CLR_HUD_DETAIL),
+            (f'${hud.cost_usd:.3f}', CLR_HUD_DETAIL),
+            sep,
+            (f'{hud.llm_calls}c', CLR_HUD_DETAIL),
+            sep,
+            (f'MCP·{mcp_short}', CLR_HUD_DETAIL),
+            sep,
+            (f'sk·{sk_short}', CLR_HUD_DETAIL),
             sep,
             (hud.ledger_status, ledger_style),
         ]
-        optional_parts: list[tuple[str, str]] = [
-            (f'{hud.llm_calls} calls', CLR_HUD_DETAIL),
-            (mcp_label, CLR_HUD_DETAIL),
-            (skills_label, CLR_HUD_DETAIL),
-        ]
         parts: list[tuple[str, str]] = list(primary_parts)
-        for content, style in optional_parts:
-            parts.append(sep)
-            parts.append((content, style))
-        total_len = sum(len(c) for c, _ in parts)
-        if total_len <= width:
-            row = Text()
-            for content, style in parts:
-                row.append(content, style=style)
-            return [row]
-        # Split: essentials on line 1, optionals on line 2.
-        row_a = Text()
-        for content, style in primary_parts:
-            row_a.append(content, style=style)
-        row_b = Text()
-        for i, (content, style) in enumerate(optional_parts):
-            if i:
-                row_b.append(sep[0], style=sep[1])
-            row_b.append(content, style=style)
-        return [row_a, row_b]
+        row = Text()
+        for content, style in parts:
+            row.append(content, style=style)
+        return [row]
 
     def _handle_streaming_chunk(self, action: StreamingChunkAction) -> None:
         raw = action.accumulated
@@ -1245,6 +1181,15 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             return
         plain_summary = self._summarize_plain_match_lines(s)
         if plain_summary is not None:
+            lines = [ln for ln in s.splitlines() if ln.strip()]
+            if len(lines) <= 24:
+                for ln in lines:
+                    self._append_history(
+                        self._linkify_ripgrep_line(
+                            ln.strip(), accent_style=LIVE_PANEL_ACCENT_STYLE
+                        )
+                    )
+                return
             self._append_history(Text(plain_summary, style=LIVE_PANEL_ACCENT_STYLE))
             return
         self._append_history(Padding(Markdown(display_content), (0, 0, 1, 0)))
@@ -1281,6 +1226,29 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
 
     # Ripgrep-style lines: path/to/file.ext:LINE:text (LINE must be numeric).
     _PLAIN_RG_LOCATION_LINE = re.compile(r'^[^:]+:\d+:')
+    _RG_PATH_LINE_COLON = re.compile(r'^([^:]+):(\d+):(.*)$')
+
+    @staticmethod
+    def _linkify_ripgrep_line(line: str, *, accent_style: str) -> Text:
+        """Hyperlink the file path in ``path:line:text`` ripgrep output."""
+        m = CLIEventRenderer._RG_PATH_LINE_COLON.match(line.strip())
+        base = Style.parse(accent_style)
+        if not m:
+            return linkify_plain(
+                line,
+                plain_style=accent_style,
+                link_files=True,
+                link_urls=False,
+            )
+        path_s, ln_s, rest = m.group(1), m.group(2), m.group(3)
+        uri = file_uri_for_path(path_s)
+        t = Text()
+        if uri:
+            t.append(path_s, style=base.update_link(uri))
+        else:
+            t.append(path_s, style=base)
+        t.append(f':{ln_s}:{rest}', style=base)
+        return t
 
     @staticmethod
     def _format_match_count(lines: list[str]) -> str:
@@ -1311,7 +1279,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     def _print_activity(
         self,
         verb: str,
-        detail: str,
+        detail: str | Text,
         stats: str | None = None,
         *,
         shell_rail: bool = False,

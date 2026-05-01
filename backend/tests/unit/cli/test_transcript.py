@@ -16,6 +16,7 @@ from backend.cli.transcript import (
     format_activity_secondary,
     format_activity_shell_block,
     format_activity_turn_header,
+    format_activity_validation_callout,
     format_callout_panel,
     format_ground_truth_tool_line,
     format_reasoning_snapshot,
@@ -153,6 +154,12 @@ def test_format_shell_result_secondary_uses_bright_icon_and_message() -> None:
 def test_format_reasoning_snapshot_empty() -> None:
     g = format_reasoning_snapshot([])
     assert len(g.renderables) == 0
+
+
+def test_format_activity_validation_callout_contains_marker() -> None:
+    panel = format_activity_validation_callout('Syntax Error: unexpected token')
+    assert 'Validation' in panel.renderable.plain
+    assert 'Syntax Error' in panel.renderable.plain
 
 
 def test_format_reasoning_snapshot_lines() -> None:

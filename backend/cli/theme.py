@@ -54,6 +54,7 @@ CLR_INFO_ICON = 'bold #38bdf8'  # info icon / accent
 # One canonical set used across transcript cards and prompt affordances.
 MARK_OK = '✓'
 MARK_ERR = '✗'
+MARK_WARN = '⚠'
 MARK_INFO = '•'
 MARK_PROMPT = '❯'
 

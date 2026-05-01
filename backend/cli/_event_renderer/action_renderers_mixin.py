@@ -37,6 +37,7 @@ from backend.cli._event_renderer.text_utils import (
     sync_reasoning_after_tool_line as _sync_reasoning_after_tool_line,
 )
 from backend.cli._typing import ActionRenderersHost
+from backend.cli.path_links import linkify_plain
 from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
     ACTIVITY_CARD_TITLE_BROWSER,
@@ -409,10 +410,17 @@ class ActionRenderersMixin:
         cmd = getattr(action, 'command', '') or 'browser'
         params = getattr(action, 'params', None) or {}
         url = params.get('url') if isinstance(params, dict) else None
-        detail = str(url)[:80] if url else str(cmd)
+        if url:
+            detail: str | Text = linkify_plain(
+                str(url)[:500], link_files=True, link_urls=True
+            )
+            reasoning_detail = str(url)[:500]
+        else:
+            detail = str(cmd)
+            reasoning_detail = detail
         self._print_activity(str(cmd), detail, None, title=ACTIVITY_CARD_TITLE_BROWSER)
         thought = getattr(action, 'thought', '') or ''
-        _sync_reasoning_after_tool_line(self._reasoning, detail, thought)
+        _sync_reasoning_after_tool_line(self._reasoning, reasoning_detail, thought)
         self.refresh()
 
     def _render_browse_interactive_action(
@@ -422,12 +430,17 @@ class ActionRenderersMixin:
         browser_actions = getattr(action, 'browser_actions', '') or ''
         url_match = re.search(r'https?://[^\s\'")\]]+', browser_actions)
         if url_match:
-            detail = url_match.group(0)[:80]
+            raw_url = url_match.group(0)[:500]
+            detail: str | Text = linkify_plain(
+                raw_url, link_files=True, link_urls=True
+            )
+            reasoning_detail = raw_url
         else:
             detail = 'interactive session'
+            reasoning_detail = detail
         self._print_activity('Opened', detail, None, title=ACTIVITY_CARD_TITLE_BROWSER)
         thought = getattr(action, 'thought', '') or ''
-        _sync_reasoning_after_tool_line(self._reasoning, detail, thought)
+        _sync_reasoning_after_tool_line(self._reasoning, reasoning_detail, thought)
         self.refresh()
 
     def _render_lsp_query_action(self, action: LspQueryAction) -> None:
