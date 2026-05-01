@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
+from rich import box
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -81,7 +82,9 @@ def _build_session_table() -> Table:
         title='Sessions',
         title_style=CLR_CARD_TITLE,
         border_style=CLR_CARD_BORDER,
-        show_lines=False,
+        show_lines=True,
+        box=box.ROUNDED,
+        padding=(1, 2),
     )
     table.add_column('#', style=STYLE_DIM)
     table.add_column('ID')
@@ -170,7 +173,12 @@ def _session_summary_table(
     count: int,
     path: Path,
 ) -> Table:
-    table = Table.grid(padding=(0, 2))
+    table = Table(
+        show_header=False,
+        box=box.ROUNDED,
+        border_style=CLR_CARD_BORDER,
+        padding=(1, 2)
+    )
     table.add_column(style=CLR_CARD_TITLE, no_wrap=True)
     table.add_column(overflow='fold')
 

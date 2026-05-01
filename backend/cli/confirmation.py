@@ -127,9 +127,9 @@ def render_confirmation(
     table = Table(
         show_header=True,
         header_style=STYLE_BOLD_DIM,
-        border_style=STYLE_DIM,
+        border_style=CLR_CARD_BORDER,
         show_lines=False,
-        box=box.SIMPLE,
+        box=box.ROUNDED,
         pad_edge=False,
     )
     table.add_column('Target', style=STYLE_DIM, no_wrap=True, overflow='fold')
@@ -156,7 +156,7 @@ def render_confirmation(
             title_align='left',
             border_style=frame_style,
             box=box.ROUNDED,
-            padding=(0, 1),
+            padding=(1, 2),
         )
     )
 
@@ -170,7 +170,7 @@ def render_confirmation(
                 title_align='left',
                 border_style=CLR_CARD_BORDER,
                 box=box.ROUNDED,
-                padding=(0, 2),
+                padding=(1, 2),
             ),
         )
 

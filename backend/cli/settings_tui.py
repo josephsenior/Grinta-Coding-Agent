@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from rich.console import Console
+from rich import box
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.rule import Rule
@@ -122,18 +123,19 @@ def _render_tab_bar(active: int) -> Text:
     tabs = ('AI Config', 'MCP Servers')
     for i, label in enumerate(tabs):
         is_active = i == active
-        marker = '●' if is_active else '○'
         # Bracket the digit so it visually reads as a key affordance, the same
         # way command hints render ``[k] label`` below the panel.
         if is_active:
-            bar.append(f'{marker} ', style=f'bold {CLR_BRAND}')
+            bar.append('▌ ', style=f'bold {CLR_BRAND}')
             bar.append(f'[{i + 1}] {label}', style=f'bold {CLR_BRAND}')
+            bar.append('  ', style='')
         else:
-            bar.append(f'{marker} ', style=CLR_META)
-            bar.append(f'[{i + 1}]', style=f'bold {CLR_BRAND}')
+            bar.append('  ', style='')
+            bar.append(f'[{i + 1}]', style=f'dim {CLR_BRAND}')
             bar.append(f' {label}', style=CLR_META)
+            bar.append('  ', style='')
         if i != len(tabs) - 1:
-            bar.append('   ·   ', style=CLR_META)
+            bar.append('   ', style=STYLE_EMPTY)
     return bar
 
 
@@ -142,8 +144,8 @@ def _render_ai_tab(console: Console) -> None:
     table = Table(
         show_header=False,
         border_style=CLR_CARD_BORDER,
-        padding=(0, 2),
-        box=None,
+        padding=(1, 2),
+        box=box.ROUNDED,
     )
     table.add_column('Field', style=CLR_CARD_TITLE, no_wrap=True)
     table.add_column('Value')
@@ -186,8 +188,8 @@ def _render_mcp_tab(console: Console) -> None:
     table = Table(
         border_style=CLR_CARD_BORDER,
         header_style=CLR_CARD_TITLE,
-        padding=(0, 2),
-        box=None,
+        padding=(1, 2),
+        box=box.ROUNDED,
     )
     table.add_column('#', style=CLR_META, no_wrap=True, justify='right')
     table.add_column('Name', style=CLR_CARD_TITLE, no_wrap=True)
@@ -254,6 +256,7 @@ def open_settings(console: Console) -> None:
     while True:
         console.print()
         console.print(_render_tab_bar(active_tab))
+        console.print(Rule(style=CLR_META))
         console.print()
 
         if active_tab == 0:

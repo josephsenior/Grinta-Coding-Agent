@@ -21,13 +21,13 @@ from __future__ import annotations
 HUD_BG = 'grey15'  # HUD footer background
 
 # ── Separators & borders ───────────────────────────────────────────────────────
-CLR_SEP = '#3a5368'  # · bullet separator and lightweight dividers
-CLR_CARD_BORDER = '#435f73'  # rounded card / panel border (blue-gray)
+CLR_SEP = '#4a6b82'  # · bullet separator and lightweight dividers
+CLR_CARD_BORDER = '#5a7f95'  # rounded card / panel border (blue-gray)
 
 # ── HUD display text ──────────────────────────────────────────────────────────
 CLR_HUD_MODEL = 'bold #dbe7f3'  # model name (bright)
 CLR_HUD_DETAIL = '#b4c4d5'  # tokens, cost, calls (secondary)
-CLR_META = '#5d7286'  # subdued metadata, timers, helper text
+CLR_META = '#6d8596'  # subdued metadata, timers, helper text
 CLR_MUTED_TEXT = '#94a3b8'  # long-form secondary labels / values
 CLR_BRAND = 'bold #7dd3fc'  # GRINTA wordmark / active spinner hue
 CLR_BRAND_HUE = '#7dd3fc'  # brand cyan without bold modifier
@@ -62,17 +62,17 @@ MARK_PROMPT = '❯'
 STYLE_DIM = 'dim'
 STYLE_DEFAULT = 'default'
 STYLE_BOLD = 'bold'
-STYLE_BOLD_DIM = 'bold dim'
+STYLE_BOLD_DIM = 'bold #a8b8c8'
 STYLE_ITALIC_DIM = 'dim italic'
 STYLE_EMPTY = ''
 
 # ── Activity card chrome ──────────────────────────────────────────────────────
-CLR_CARD_TITLE = 'bold #8fa5b6'  # panel title text (gray-blue)
+CLR_CARD_TITLE = 'bold #a0b9cc'  # panel title text (gray-blue)
 
 # ── Activity row text ─────────────────────────────────────────────────────────
-CLR_VERB = 'dim'  # action verb (muted)
+CLR_VERB = 'bold #94a3b8'  # action verb (muted but distinct)
 CLR_DETAIL = 'default'  # action detail (normal foreground)
-CLR_SECONDARY = 'dim'  # secondary row (neutral)
+CLR_SECONDARY = '#6d8596'  # secondary row (neutral)
 CLR_SECONDARY_OK = 'dim green'  # secondary row (success)
 CLR_SECONDARY_ERR = 'dim red'  # secondary row (error)
 

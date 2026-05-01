@@ -108,12 +108,11 @@ def build_task_panel(task_list: list[dict[str, Any]]) -> Any:
 
     for task_id, status, desc in task_panel_signature(task_list):
         badge = Text()
-        badge.append('[', style=STYLE_DIM)
+        badge.append('• ', style=f'bold {TASK_STATUS_PANEL_STYLES.get(status, "dim")}')
         badge.append(
             status.upper(),
             style=f'bold {TASK_STATUS_PANEL_STYLES.get(status, "dim")}',
         )
-        badge.append(']', style=STYLE_DIM)
 
         body = Text()
         if task_id and task_id != '?':
@@ -145,12 +144,12 @@ def build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
 
     for _order, label, status, task, detail in delegate_worker_panel_signature(workers):
         badge = Text()
-        badge.append('[', style=STYLE_DIM)
+        badge_style = DELEGATE_WORKER_STATUS_STYLES.get(status, STYLE_DIM)
+        badge.append('• ', style=f'bold {badge_style}')
         badge.append(
             status.upper(),
-            style=f'bold {DELEGATE_WORKER_STATUS_STYLES.get(status, "dim")}',
+            style=f'bold {badge_style}',
         )
-        badge.append(']', style=STYLE_DIM)
 
         body = Text()
         if label:

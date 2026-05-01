@@ -78,11 +78,13 @@ def format_activity_primary(verb: str, detail: str | Text) -> Text:
     Plain-string *detail* is linkified for ``file://`` and workspace paths so
     terminals can open them via OSC-8 hyperlinks.
     """
+    from backend.cli.theme import CLR_VERB
+    
     line = Text()
     line.append(_ACTIVITY_PRIMARY_INDENT, style=STYLE_EMPTY)
     line.append(
         f'{(verb or "Did").strip():<{_ACTIVITY_VERB_WIDTH}}',
-        style=STYLE_DIM,
+        style=CLR_VERB,
     )
     if isinstance(detail, Text):
         if detail.plain.strip():
