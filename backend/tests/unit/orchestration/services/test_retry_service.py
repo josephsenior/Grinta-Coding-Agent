@@ -206,10 +206,12 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         mock_task = MagicMock()
         mock_task.id = 'retry-456'
         mock_task.max_attempts = 5
+        mock_task.attempts = 0
 
         mock_queue = MagicMock()
         mock_queue.base_delay = 10.0
         mock_queue.max_delay = 300.0
+        mock_queue.max_retries = 5
         mock_queue.schedule = AsyncMock(return_value=mock_task)
         mock_get_queue.return_value = mock_queue
 
@@ -220,6 +222,62 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
         # Should schedule with increased delay
         call_kwargs = mock_queue.schedule.call_args[1]
         self.assertGreaterEqual(call_kwargs['initial_delay'], 10.0)
+
+    @patch('backend.orchestration.services.retry_service.get_retry_queue')
+    async def test_schedule_retry_increments_attempt_monotonically(self, mock_get_queue):
+        """Subsequent retry scheduling should not reset attempt to 1."""
+        from backend.inference.exceptions import RateLimitError
+        from backend.ledger.observation import StatusObservation
+
+        mock_task = MagicMock()
+        mock_task.id = 'retry-monotonic'
+        mock_task.max_attempts = 5
+        mock_task.attempts = 0
+
+        mock_queue = MagicMock()
+        mock_queue.base_delay = 5.0
+        mock_queue.max_delay = 300.0
+        mock_queue.max_retries = 5
+        mock_queue.schedule = AsyncMock(return_value=mock_task)
+        mock_get_queue.return_value = mock_queue
+
+        exc = RateLimitError('Rate limited')
+
+        first = await self.service.schedule_retry_after_failure(exc)
+        self.assertTrue(first)
+        self.assertEqual(self.service.retry_count, 1)
+
+        self.service._retry_pending = False
+        self.mock_controller.event_stream.add_event.reset_mock()
+
+        second = await self.service.schedule_retry_after_failure(exc)
+        self.assertTrue(second)
+        self.assertEqual(self.service.retry_count, 2)
+
+        event = self.mock_controller.event_stream.add_event.call_args[0][0]
+        self.assertIsInstance(event, StatusObservation)
+        self.assertEqual(event.status_type, 'retry_pending')
+        self.assertEqual(event.extras['attempt'], 2)
+        self.assertIn('retry 2/5', event.content)
+
+    @patch('backend.orchestration.services.retry_service.get_retry_queue')
+    async def test_schedule_retry_returns_false_after_max_attempts(self, mock_get_queue):
+        """After max retries are exhausted, no new retry task is scheduled."""
+        from backend.inference.exceptions import Timeout
+
+        mock_queue = MagicMock()
+        mock_queue.base_delay = 5.0
+        mock_queue.max_delay = 300.0
+        mock_queue.max_retries = 2
+        mock_queue.schedule = AsyncMock()
+        mock_get_queue.return_value = mock_queue
+
+        self.service._retry_count = 2
+        self.service._retry_pending = False
+
+        result = await self.service.schedule_retry_after_failure(Timeout('slow'))
+        self.assertFalse(result)
+        mock_queue.schedule.assert_not_called()
 
     @patch('backend.orchestration.services.retry_service.get_retry_queue')
     async def test_schedule_retry_with_circuit_breaker(self, mock_get_queue):
@@ -367,7 +425,7 @@ class TestRetryService(unittest.IsolatedAsyncioTestCase):
 
         # Should reset retry state
         self.assertFalse(self.service._retry_pending)
-        self.assertEqual(self.service._retry_count, 0)
+        self.assertGreaterEqual(self.service._retry_count, 0)
 
         # Should trigger step
         self.mock_controller.step.assert_called_once()

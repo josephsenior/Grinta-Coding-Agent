@@ -417,7 +417,10 @@ class RecoveryService:
         elif isinstance(exc, AgentRuntimeError):
             err_id = 'AGENT_RUNTIME_ERROR'
 
-        text = f'{type(exc).__name__}: {exc}'
+        if isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
+            text = f'{type(exc).__name__}: provider limit reached.'
+        else:
+            text = f'{type(exc).__name__}: {exc}'
 
         # Hard stops need user action; survivable errors get guidance for the model.
         if isinstance(exc, _HARD_STOP_EXCEPTIONS):
@@ -426,7 +429,7 @@ class RecoveryService:
                 'or context window). Wait for the user to fix the configuration.'
             )
         elif isinstance(exc, _RATE_LIMITED_EXCEPTIONS):
-            guidance = 'Rate limit reached. Waiting before retrying — no action needed.'
+            guidance = 'Waiting before retrying - no action needed.'
         elif isinstance(exc, Timeout):
             guidance = (
                 'The provider timed out on this step. Automatic backoff and retry '

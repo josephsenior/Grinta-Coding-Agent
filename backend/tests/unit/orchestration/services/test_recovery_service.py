@@ -94,6 +94,22 @@ class TestRecoveryService:
         mock_context.set_agent_state.assert_awaited_once_with(AgentState.RATE_LIMITED)
 
     @pytest.mark.asyncio
+    async def test_rate_limit_error_message_is_compact(self, mock_context, ctrl):
+        ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(
+            RateLimitError(
+                'Rate limit reached. Upgrade to the next tier for more requests: https://example.com/pricing'
+            )
+        )
+
+        err_obs = mock_context.emit_event.call_args[0][0]
+        assert 'provider limit reached' in err_obs.content
+        assert 'https://example.com/pricing' not in err_obs.content
+        assert 'Waiting before retrying - no action needed.' in err_obs.content
+
+    @pytest.mark.asyncio
     async def test_rate_limit_does_not_pollute_agent_context(self, mock_context, ctrl):
         """Silent-rate-limit policy: transient 429s must NOT add an
         ``AgentThinkObservation`` to the event stream. The agent has no

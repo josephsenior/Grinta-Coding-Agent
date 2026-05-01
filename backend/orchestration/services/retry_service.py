@@ -22,6 +22,7 @@ class RetryService:
         self._retry_worker_task: asyncio.Task | None = None
         self._retry_pending = False
         self._retry_count = 0
+        self._last_retry_status_signature: tuple[str, int, int, str] | None = None
         self._task_loop: asyncio.AbstractEventLoop | None = None
 
     @property
@@ -66,6 +67,7 @@ class RetryService:
         """Reset retry tracking state after successful execution or initialization."""
         self._retry_count = 0
         self._retry_pending = False
+        self._last_retry_status_signature = None
 
     def increment_retry_count(self) -> int:
         """Increment retry counter, returning the updated value."""
@@ -140,6 +142,14 @@ class RetryService:
         content: str,
         extras: dict[str, Any],
     ) -> None:
+        attempt = int(extras.get('attempt') or 0)
+        max_attempts = int(extras.get('max_attempts') or 0)
+        reason = str(extras.get('reason') or '')
+        signature = (status_type, attempt, max_attempts, reason)
+        if signature == self._last_retry_status_signature:
+            return
+        self._last_retry_status_signature = signature
+
         from backend.ledger import EventSource
         from backend.ledger.observation import StatusObservation
 
@@ -165,6 +175,20 @@ class RetryService:
             self._retry_queue = queue
             self.initialize()
 
+        max_retries = max(1, int(getattr(queue, 'max_retries', 3)))
+        # Keep retry attempts monotonic across queue-task IDs for the same
+        # recovery episode. This prevents repeated "retry 1/N" loops when each
+        # resumed step fails quickly and schedules a fresh queue task.
+        next_attempt = self.increment_retry_count()
+        if next_attempt > max_retries:
+            logger.warning(
+                'Autonomous recovery exhausted for controller %s (%d/%d)',
+                controller.id,
+                next_attempt - 1,
+                max_retries,
+            )
+            return False
+
         metadata: dict[str, Any] = {
             'error': str(exc),
             'retry_reason': type(exc).__name__,
@@ -181,6 +205,7 @@ class RetryService:
             reason=type(exc).__name__,
             metadata=metadata,
             initial_delay=initial_delay,
+            max_attempts=max_retries,
         )
         self._retry_queue = queue
         self._retry_pending = True
@@ -189,7 +214,6 @@ class RetryService:
         # budget so recovery overhead doesn't burn into the task runway.
         self._compensate_iterations_for_connection_error(exc)
 
-        next_attempt = max(1, int(getattr(task, 'attempts', 0) or 0) + 1)
         human_message = (
             'Waiting on autonomous recovery: retry '
             f'{next_attempt}/{task.max_attempts} in '
@@ -506,7 +530,7 @@ class RetryService:
 
         controller = self.controller
         retry_reason = self._retry_resume_reason(task)
-        attempt = self._retry_resume_attempt(task)
+        attempt = max(self._retry_resume_attempt(task), self._retry_count)
 
         # Guard: if budget or iteration limit is already exceeded, resuming the
         # agent would immediately raise the same RuntimeError in _run_control_flags
@@ -520,7 +544,6 @@ class RetryService:
 
         if controller.state.agent_state != AgentState.RUNNING:
             await controller.set_agent_state_to(AgentState.RUNNING)
-        self.reset_retry_metrics()
         controller.step()
 
     async def stop_if_idle(self) -> None:
