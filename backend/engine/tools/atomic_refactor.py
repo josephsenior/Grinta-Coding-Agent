@@ -325,12 +325,12 @@ class AtomicRefactor:
 
         """
         if os.path.exists(edit.path) and edit.new_path:
-            os.makedirs(os.path.dirname(edit.new_path), exist_ok=True)
+            _ensure_parent_dir(edit.new_path)
             shutil.move(edit.path, edit.new_path)
 
     def _write_edit_content(self, edit: RefactorEdit) -> None:
         """Write file content for modify/create."""
-        os.makedirs(os.path.dirname(edit.path), exist_ok=True)
+        _ensure_parent_dir(edit.path)
         with open(edit.path, 'w', encoding='utf-8') as f:
             f.write(edit.new_content or '')
 
@@ -346,7 +346,7 @@ class AtomicRefactor:
     def _apply_rename_impl(self, edit: RefactorEdit) -> None:
         """Apply rename: move file to new path."""
         if edit.new_path and os.path.exists(edit.path):
-            os.makedirs(os.path.dirname(edit.new_path), exist_ok=True)
+            _ensure_parent_dir(edit.new_path)
             shutil.move(edit.path, edit.new_path)
 
     def _apply_single_edit(

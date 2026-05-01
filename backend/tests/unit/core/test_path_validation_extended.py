@@ -45,7 +45,7 @@ class TestSafePath:
     def test_validate_relative_path(self):
         sp = SafePath.validate('file.txt', workspace_root=self.tmpdir)
         assert sp.path == Path(self.tmpdir).resolve() / 'file.txt'
-        assert sp.workspace_root == Path(self.tmpdir)
+        assert sp.workspace_root == Path(self.tmpdir).resolve()
 
     def test_relative_to_workspace(self):
         sp = SafePath.validate('sub/file.txt', workspace_root=self.tmpdir)
