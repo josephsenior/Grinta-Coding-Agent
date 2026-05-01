@@ -248,9 +248,8 @@ _GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='Autonomous recovery is in progress.',
             steps=(
-                'Automatic retry in progress. No action needed.',
-                'Watch the Backoff / Auto Retry status in the footer for attempt progress.',
-                'If automatic retries exhaust, the prompt will return automatically.',
+                'Automatic retry is running. No action needed.',
+                'If retries exhaust, control returns to the prompt automatically.',
             ),
         ),
     ),

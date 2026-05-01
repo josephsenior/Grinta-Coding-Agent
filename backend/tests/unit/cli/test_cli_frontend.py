@@ -758,7 +758,7 @@ async def test_renderer_timeout_error_with_autonomous_retry_uses_recovery_copy()
     )
     output = _console_output(console)
     assert 'Autonomous recovery' in output
-    assert 'Automatic retry in progress. No action needed.' in output
+    assert 'Automatic retry is running. No action needed.' in output
     assert 'Confirm your network' not in output
 
 
@@ -2707,6 +2707,27 @@ async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> 
 
     assert hud.state.ledger_status == 'Backoff'
     assert hud.state.agent_state_label.startswith('Auto Retry 1/3')
+
+
+@pytest.mark.asyncio
+async def test_renderer_dedupes_identical_retry_status_lines() -> None:
+    from backend.ledger.observation import StatusObservation
+
+    console = _make_console()
+    renderer = CLIEventRenderer(
+        console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    obs = StatusObservation(
+        content='Waiting on autonomous recovery: retry 1/3 in 5s after RateLimitError.',
+        status_type='retry_pending',
+        extras={'attempt': 1, 'max_attempts': 3, 'reason': 'RateLimitError'},
+    )
+
+    await renderer.handle_event(obs)
+    await renderer.handle_event(obs)
+
+    output = _console_output(console)
+    assert output.count('status · Waiting on autonomous recovery') == 1
 
 
 @pytest.mark.asyncio

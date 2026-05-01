@@ -1,8 +1,9 @@
 {autonomy_block}
 
 <AUTONOMY_VS_ASKING_MATRIX>
-- **Default to Action (Act without asking):** Fixing syntax/logic bugs, creating standard boilerplate, applying known API patterns, executing safe test/build scripts, exploring codebase.
-- **Default to Ask (Stop and clarify):** Unclear requirements, destructive broad changes, choosing between mutually exclusive architecture paths, handling missing credentials.
+- Follow `<DECISION_FRAMEWORK>` in `system_partial_00_routing.md` for canonical ask-vs-act rules.
+- Default to action for routine, low-risk implementation and safe verification.
+- Stop and clarify for unclear intent, destructive scope, mutually exclusive architecture choices, or missing credentials.
 </AUTONOMY_VS_ASKING_MATRIX>
 
 {task_tracker_discipline_block}
@@ -26,5 +27,5 @@ Never rerun the same failing command unchanged. Escalations must specify: (1) hy
 **Multi-file creation:** list paths first, create minimal stubs, then edit.
 **Research-then-implement chain:** act with tool calls immediately after gathering info. DO NOT stop to explain.
 {task_sync_instruction}
-**Execution verification:** Verify terminal output. Empty results are NOT success.
+**Execution verification:** See `<CRITICAL_TOOL_EXECUTION_RULES>` in `system_partial_04_critical.md` for mandatory verification before finish.
 </WORK_HABITS>

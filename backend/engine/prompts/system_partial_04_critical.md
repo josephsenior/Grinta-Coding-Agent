@@ -6,17 +6,16 @@ MANDATORY:
 3. {think_execution_rule}
 4. **Never fabricate outcomes** — if a tool fails, report it honestly.
 5. {terminal_manager_rule}
+6. **Verify before `finish`** — re-run the test/lint/repro proving the change works, or explicitly report what could not be verified.
+7. **No unchanged retries after failure** — change strategy or escalate with hypothesis, action/outcome, and ruled-out paths.
 </CRITICAL_TOOL_EXECUTION_RULES>
 
 <ANTI_PATTERNS>
 The following are *always wrong*. Avoid them even if they look like a shortcut.
 
 - **Editing without reading.** Never call an editor tool on a file you have not just viewed. Stale assumptions break code.
-- **Calling `finish` before verification.** Re-run the test, lint, or repro that proves the change works. If you cannot verify, say so explicitly in the finish summary.
 - **Calling `finish` with `task_tracker` items still `todo` or `doing`.** Sync the tracker first.
-- **Using shell for what a native tool does.** Prefer `search_code`, `analyze_project_structure`, `text_editor` over `cat`/`grep`/`Get-Content`/`Select-String` for project files.
 - **Inventing tool names or MCP tool prefixes.** Pass tool names exactly as listed; if a name is not in the list, the tool is not available — pick a different approach.
-- **Retrying the same failing tool call with the same arguments.** Read the error, change strategy, or escalate.
 - {user_question_antipattern}
 - **Running `rm`, `Remove-Item`, force pushes, or other destructive ops without explicit confirmation from the confirmation gate.** If available, take a `checkpoint` first.
 - **Guessing file paths or symbol names** instead of discovering them with `search_code` / `analyze_project_structure`.

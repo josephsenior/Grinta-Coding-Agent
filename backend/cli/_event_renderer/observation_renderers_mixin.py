@@ -349,6 +349,13 @@ class ObservationRenderersMixin:
         self._clear_streaming_preview()
         error_content = getattr(obs, 'content', str(obs))
         use_notice = _use_recoverable_notice_style(error_content)
+        if use_notice:
+            last_notice_content = getattr(self, '_last_notice_error_content', None)
+            if isinstance(last_notice_content, str) and last_notice_content == error_content:
+                return
+            setattr(self, '_last_notice_error_content', error_content)
+        else:
+            setattr(self, '_last_notice_error_content', None)
         self._append_history(
             _build_error_panel(
                 error_content,
@@ -385,13 +392,21 @@ class ObservationRenderersMixin:
     def _render_status_observation(self, obs: StatusObservation) -> None:
         status_type = str(getattr(obs, 'status_type', '') or '')
         force_visible_status = False
+        retry_signature: tuple[str, str] | None = None
         if status_type == 'delegate_progress':
             if self._handle_delegate_progress_status(obs):
                 return
         elif status_type in ('retry_pending', 'retry_resuming'):
             self._handle_retry_status(obs, status_type=status_type)
             force_visible_status = True
-        self._render_status_content(obs, force_visible_status=force_visible_status)
+            retry_signature = (status_type, str(getattr(obs, 'content', '') or ''))
+        else:
+            setattr(self, '_last_retry_status_signature', None)
+        self._render_status_content(
+            obs,
+            force_visible_status=force_visible_status,
+            retry_signature=retry_signature,
+        )
 
     def _handle_delegate_progress_status(self, obs: StatusObservation) -> bool:
         """Update the delegate panel; return True if the obs is fully consumed."""
@@ -480,6 +495,7 @@ class ObservationRenderersMixin:
         obs: StatusObservation,
         *,
         force_visible_status: bool,
+        retry_signature: tuple[str, str] | None = None,
     ) -> None:
         host = cast(ObservationRenderersHost, self)
         content = getattr(obs, 'content', '')
@@ -498,6 +514,11 @@ class ObservationRenderersMixin:
             return
         if self._pending_activity_card is not None and not force_visible_status:
             return
+        if retry_signature is not None:
+            last_retry_signature = getattr(self, '_last_retry_status_signature', None)
+            if last_retry_signature == retry_signature:
+                return
+            setattr(self, '_last_retry_status_signature', retry_signature)
         self._flush_pending_tool_cards()
         self._append_history(
             format_activity_result_secondary(

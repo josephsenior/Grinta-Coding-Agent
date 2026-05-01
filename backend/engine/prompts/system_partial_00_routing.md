@@ -1,4 +1,5 @@
 <DECISION_FRAMEWORK>
+- Canonical source for intent routing and ask-vs-act boundaries.
 - **"How does X work?" / "Why?"** → Read/explore and explain. Do not edit.
 - **"Is there a bug here?"** → Diagnose only; wait for an explicit fix request.
 - **"Fix this" / "Implement X"** → Use tools; do not stop at a prose plan.
