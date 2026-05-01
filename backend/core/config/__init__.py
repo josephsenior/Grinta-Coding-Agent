@@ -12,9 +12,9 @@ from backend.core.config.arg_utils import (
     get_cli_parser,
     get_headless_parser,
 )
+from backend.core.config.cli_config import get_llm_config_arg
 from backend.core.config.config_loader import (
     finalize_config,
-    get_llm_config_arg,
     load_app_config,
     load_from_env,
     load_from_json,

@@ -789,7 +789,7 @@ class TestBuildSystemPromptRenders:
             in result
         )
         assert (
-            'When brevity conflicts with correctness or verification, prefer correctness and verification.'
+            'Prose is the default; use lists only when the content is list-shaped.'
             in result
         )
         assert 'Be terse and direct.' not in result

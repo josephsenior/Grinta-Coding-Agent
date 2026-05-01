@@ -2,14 +2,34 @@ import os
 import re
 import sys
 
+# Exclude generated/vendor trees so local checkouts stay fast and do not emit
+# false-positive version tokens from tooling output.
+SKIP_DIR_NAMES = frozenset(
+    {
+        '.git',
+        '.mypy_cache',
+        '.pytest_cache',
+        '.ruff_cache',
+        '.venv',
+        '.tox',
+        '__pycache__',
+        'build',
+        'dist',
+        'htmlcov',
+        'node_modules',
+    }
+)
+
 
 def find_version_references(directory: str) -> tuple[set[str], set[str]]:
     product_versions = set()
     runtime_versions = set()
     version_pattern_product = re.compile(r'(?:Grinta|App):(\\d{1})\\.(\\d{2})')
     version_pattern_runtime = re.compile('runtime:(\\d{1})\\.(\\d{2})')
-    for root, _, files in os.walk(directory):
-        if '.git' in root or 'docs/build' in root:
+    for root, dirs, files in os.walk(directory):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIR_NAMES]
+        norm = root.replace(os.sep, '/')
+        if 'docs/build' in norm:
             continue
         for file in files:
             if file.endswith(
