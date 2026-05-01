@@ -285,7 +285,11 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
         action: Action,
         ctx: ToolInvocationContext,
     ) -> None:
-        """Clean up and emit a user-visible error when middleware blocks a tool."""
+        """Clean up and emit an error observation when middleware blocks a tool.
+
+        Agent-guidance blocks (``block(..., agent_only=True)``) still reach the
+        model but are not rendered in the CLI transcript.
+        """
         from backend.ledger.observation_cause import attach_observation_cause
         from backend.orchestration.tool_telemetry import ToolTelemetry
 
@@ -301,6 +305,7 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             error_obs = ErrorObservation(
                 content=error_content,
                 error_id='TOOL_PIPELINE_BLOCKED',
+                agent_only=bool(ctx.metadata.get('block_agent_only')),
             )
             attach_observation_cause(
                 error_obs,
@@ -848,15 +853,53 @@ class SessionOrchestrator(SessionOrchestratorAccessorsMixin):
             history_events=history_events
         ):
             level = 'CRITICAL' if self.memory_pressure.is_critical() else 'WARNING'
+            
+            if level == 'WARNING' and not self.memory_pressure.is_prewarming and not self.memory_pressure.has_prewarmed:
+                # Phase 3.11: Opportunistically pre-warm condensation in the background.
+                # Creates an isolated copy of state/history so the foreground agent
+                # can keep mutating the real state.
+                mm = getattr(self.agent, 'memory_manager', None)
+                if mm is not None and getattr(mm, 'compactor', None) is not None:
+                    import asyncio
+                    from copy import copy
+                    compactor = mm.compactor
+                    state_copy = copy(self.state)
+                    state_copy.history = list(history) if history else []
+                    
+                    async def _run_bg():
+                        return await asyncio.to_thread(compactor.compacted_history, state_copy)
+                        
+                    self.memory_pressure.start_prewarm(_run_bg)
+                    logger.debug('Kicked off background condensation pre-warm')
+
             logger.warning(
                 'Memory pressure %s (RSS=%.0f MB) — signalling condensation',
                 level,
                 self.memory_pressure._last_rss_mb,
             )
-            self.memory_pressure.record_condensation()
+            # Only record sync blocks as full condensations (Phase 3.14).
+            if level == 'CRITICAL' and not self.memory_pressure.has_prewarmed and not self.memory_pressure.is_prewarming:
+                self.memory_pressure.record_condensation()
+            
             # Set a metadata flag the orchestrator can check during next step()
             if hasattr(self.state, 'turn_signals'):
+                # Wait for any active prewarm to finish if we hit critical
+                if level == 'CRITICAL' and self.memory_pressure.is_prewarming:
+                    logger.debug('Critical memory pressure: awaiting in-flight prewarm task...')
+                    import asyncio
+                    try:
+                        if self.memory_pressure._prewarm_task:
+                            await asyncio.shield(self.memory_pressure._prewarm_task)
+                    except Exception as e:
+                        logger.warning('Prewarm task failed during critical await: %s', e)
+
                 self.state.set_memory_pressure(level, source='SessionOrchestrator')
+                
+                # If we have a prewarmed value ready, inject it for condense_history!
+                if level == 'CRITICAL' and self.memory_pressure.has_prewarmed:
+                    prewarmed = self.memory_pressure.consume_prewarmed()
+                    self.state.turn_signals.prewarmed_compaction = prewarmed
+                    logger.info('Injected prewarmed compaction into turn signals.')
     async def _run_control_flags_safely(self) -> bool:
         """Run control flags with exception handling."""
         try:

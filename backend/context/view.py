@@ -110,16 +110,16 @@ class View(BaseModel):
         return pruned_event_ids
 
     @staticmethod
-    def _find_summary_info(events: list[Event]) -> tuple[str | None, int | None]:
+    def _find_summary_info(events: list[Event]) -> tuple[str | None, int | None, bool]:
         """Find summary and its offset from condensation actions."""
         return next(
             (
-                (event.summary, event.summary_offset)
+                (event.summary, event.summary_offset, getattr(event, 'is_prewarmed', False))
                 for event in reversed(events)
                 if isinstance(event, CondensationAction)
                 and (event.summary is not None and event.summary_offset is not None)
             ),
-            (None, None),
+            (None, None, False),
         )
 
     @staticmethod
@@ -140,11 +140,11 @@ class View(BaseModel):
         kept_events = [event for event in events if event.id not in pruned_event_ids]
 
         # Find and insert summary if available
-        summary, summary_offset = View._find_summary_info(events)
+        summary, summary_offset, is_prewarmed = View._find_summary_info(events)
         if summary is not None and summary_offset is not None:
             logger.info('Inserting summary at offset %s', summary_offset)
             kept_events.insert(
-                summary_offset, AgentCondensationObservation(content=summary)
+                summary_offset, AgentCondensationObservation(content=summary, is_prewarmed=is_prewarmed)
             )
 
         # Check for unhandled condensation requests

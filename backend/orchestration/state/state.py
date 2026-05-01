@@ -79,7 +79,12 @@ def _serialize_state_typed_fields(data: dict) -> dict[str, Any]:
     """Extract dataclass/dataclass-like and metrics fields."""
     doc: dict[str, Any] = {}
     ts = data.get('turn_signals')
-    doc['turn_signals'] = asdict(ts) if ts else None
+    if ts:
+        ts_dict = asdict(ts)
+        ts_dict.pop('prewarmed_compaction', None)
+        doc['turn_signals'] = ts_dict
+    else:
+        doc['turn_signals'] = None
     for key in ('iteration_flag', 'budget_flag'):
         flag = data.get(key)
         doc[key] = asdict(flag) if flag else None
@@ -286,6 +291,7 @@ class TurnSignals:
 
     planning_directive: str | None = None
     memory_pressure: str | None = None
+    prewarmed_compaction: Any | None = None
     repetition_score: float = 0.0
 
 

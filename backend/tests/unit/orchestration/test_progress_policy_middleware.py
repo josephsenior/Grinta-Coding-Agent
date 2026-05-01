@@ -33,6 +33,7 @@ async def test_progress_policy_blocks_repeated_signature_without_progress() -> N
         and isinstance(ctx.block_reason, str)
         and 'POLICY_GATE_REPLAN_REQUIRED' in ctx.block_reason
     )
+    assert ctx.metadata.get('block_agent_only') is True
 
 
 @pytest.mark.asyncio
@@ -62,6 +63,7 @@ async def test_progress_policy_ignores_error_observations_for_progress() -> None
     await mw.execute(ctx)
     await mw.execute(ctx)
     assert ctx.blocked is True
+    assert ctx.metadata.get('block_agent_only') is True
 
 
 @pytest.mark.asyncio
@@ -78,6 +80,7 @@ async def test_progress_policy_blocks_repeated_terminal_input_without_progress()
 
     await mw.execute(ctx)
     assert ctx.blocked is True
+    assert ctx.metadata.get('block_agent_only') is True
 
 
 def test_progress_policy_fingerprint_includes_terminal_control() -> None:
@@ -106,3 +109,4 @@ async def test_progress_policy_blocks_repeated_terminal_read_earlier() -> None:
     assert blocked
     assert isinstance(block_reason, str)
     assert 'POLICY_GATE_REPLAN_REQUIRED' in block_reason
+    assert ctx.metadata.get('block_agent_only') is True

@@ -29,6 +29,7 @@ class AgentStateChangedObservation(Observation):
 class AgentCondensationObservation(Observation):
     """The output of a condensation action."""
 
+    is_prewarmed: bool = False
     observation: ClassVar[str] = ObservationType.CONDENSE
 
     @property

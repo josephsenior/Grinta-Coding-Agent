@@ -128,6 +128,7 @@ async def test_middleware_blocks_str_replace_without_prior_read(
 
     assert ctx.blocked is True
     assert 'FILE_STATE_GUARD' in (ctx.block_reason or '')
+    assert ctx.metadata.get('block_agent_only') is True
 
 
 @pytest.mark.asyncio
@@ -197,6 +198,7 @@ async def test_middleware_blocks_mutating_edit_on_stale_file(
 
     assert ctx.blocked is True
     assert 'FILE_STATE_GUARD' in (ctx.block_reason or '')
+    assert ctx.metadata.get('block_agent_only') is True
 
 
 # ---------------------------------------------------------------------------

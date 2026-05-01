@@ -365,7 +365,8 @@ class FileStateMiddleware(ToolInvocationMiddleware):
                     '[FILE_STATE_GUARD] File has not been read yet in this '
                     f'session: {target_path}. Read it first (use read_file or '
                     'grep to locate the exact text) before editing, otherwise '
-                    'your old_str / anchor context will likely not match.'
+                    'your old_str / anchor context will likely not match.',
+                    agent_only=True,
                 )
 
         if (
@@ -376,7 +377,7 @@ class FileStateMiddleware(ToolInvocationMiddleware):
         ):
             stale_msg = self._tracker.check_read_stale(target_path)
             if stale_msg:
-                ctx.block(stale_msg)
+                ctx.block(stale_msg, agent_only=True)
 
     async def observe(
         self, ctx: ToolInvocationContext, observation: Observation | None

@@ -169,6 +169,8 @@ class CondensationAction(Action):
     'An optional summary of the events being pruned.'
     summary_offset: int | None = None
     'An optional offset to the start of the resulting view indicating where the summary should be inserted.'
+    is_prewarmed: bool = False
+    'Indicates if this condensation was generated proactively in the background.'
 
     def _validate_field_polymorphism(self) -> bool:
         """Check if the optional fields are instantiated in a valid configuration."""
