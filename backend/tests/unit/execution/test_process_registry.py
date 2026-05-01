@@ -175,7 +175,7 @@ class TestCancelAll:
         svc = TaskCancellationService()
         svc.register_pid(999)
         with (
-            patch('backend.execution.utils.process_registry.os.name', 'nt'),
+            override_os_capabilities(replace(OS_CAPS, is_windows=True)),
             patch(
                 'backend.execution.utils.process_registry.subprocess.run'
             ) as mock_run,

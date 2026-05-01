@@ -152,7 +152,9 @@ class TestCondenseHistory:
         state = MagicMock()
         state.history = events or []
         state.extra_data = {}
-        state.turn_signals = MagicMock(memory_pressure=None)
+        turn_signals = MagicMock(memory_pressure=None)
+        turn_signals.prewarmed_compaction = None
+        state.turn_signals = turn_signals
         state.ack_memory_pressure = MagicMock()
         state.view = MagicMock(unhandled_condensation_request=False)
         return state
