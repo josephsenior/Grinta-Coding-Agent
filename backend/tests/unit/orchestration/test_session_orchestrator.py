@@ -903,7 +903,8 @@ class TestPostExecution(unittest.IsolatedAsyncioTestCase):
 
         await self.ctrl._handle_post_execution()
 
-        self.ctrl.memory_pressure.record_condensation.assert_called_once()
+        # WARNING path signals condensation but only CRITICAL records a sync block.
+        self.ctrl.memory_pressure.record_condensation.assert_not_called()
         self.ctrl.state_tracker.state.set_memory_pressure.assert_called_once_with(
             'WARNING', source='SessionOrchestrator'
         )
