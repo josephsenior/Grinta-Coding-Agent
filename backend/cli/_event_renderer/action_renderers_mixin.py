@@ -37,7 +37,6 @@ from backend.cli._event_renderer.text_utils import (
     sync_reasoning_after_tool_line as _sync_reasoning_after_tool_line,
 )
 from backend.cli._typing import ActionRenderersHost
-from backend.cli.path_links import linkify_plain
 from backend.cli.layout_tokens import (
     ACTIVITY_BLOCK_BOTTOM_PAD,
     ACTIVITY_CARD_TITLE_BROWSER,
@@ -53,6 +52,7 @@ from backend.cli.layout_tokens import (
     ACTIVITY_CARD_TITLE_TOOL,
     DECISION_PANEL_ACCENT_STYLE,
 )
+from backend.cli.path_links import linkify_plain
 from backend.cli.theme import (
     CLR_OPTION_RECOMMENDED,
     CLR_OPTION_TEXT,
@@ -431,9 +431,7 @@ class ActionRenderersMixin:
         url_match = re.search(r'https?://[^\s\'")\]]+', browser_actions)
         if url_match:
             raw_url = url_match.group(0)[:500]
-            detail: str | Text = linkify_plain(
-                raw_url, link_files=True, link_urls=True
-            )
+            detail: str | Text = linkify_plain(raw_url, link_files=True, link_urls=True)
             reasoning_detail = raw_url
         else:
             detail = 'interactive session'
@@ -579,7 +577,9 @@ class ActionRenderersMixin:
         if reason:
             escalate_parts.append(Text(reason, style=CLR_QUESTION_TEXT))
         if help_needed:
-            escalate_parts.append(Text(f'Help needed: {help_needed}', style=CLR_QUESTION_TEXT))
+            escalate_parts.append(
+                Text(f'Help needed: {help_needed}', style=CLR_QUESTION_TEXT)
+            )
         if not escalate_parts:
             escalate_parts.append(
                 Text('The agent needs your input to continue.', style=CLR_QUESTION_TEXT)
@@ -629,7 +629,9 @@ class ActionRenderersMixin:
             concern_line.append(str(concern), style=STYLE_DIM)
             uncertainty_parts.append(concern_line)
         if info_needed:
-            uncertainty_parts.append(Text(f'Need: {info_needed}', style=CLR_QUESTION_TEXT))
+            uncertainty_parts.append(
+                Text(f'Need: {info_needed}', style=CLR_QUESTION_TEXT)
+            )
         if uncertainty_parts:
             self._append_history(
                 format_callout_panel(
@@ -660,7 +662,9 @@ class ActionRenderersMixin:
             )
             proposal_line.append(
                 f'{label}{marker}',
-                style=f'bold {CLR_OPTION_RECOMMENDED}' if i == recommended else f'bold {CLR_OPTION_TEXT}',
+                style=f'bold {CLR_OPTION_RECOMMENDED}'
+                if i == recommended
+                else f'bold {CLR_OPTION_TEXT}',
             )
             proposal_parts.append(proposal_line)
             if desc:

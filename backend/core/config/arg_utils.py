@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from argparse import ArgumentParser, _SubParsersAction
 
+
 def get_subparser(parser: ArgumentParser, name: str) -> ArgumentParser:
     """Get a subparser by name from an argument parser.
 

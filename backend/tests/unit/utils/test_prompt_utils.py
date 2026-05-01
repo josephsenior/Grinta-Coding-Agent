@@ -256,9 +256,7 @@ class TestOrchestratorPromptManager:
             in result
         )
 
-    def test_get_system_message_uses_lsp_when_lsp_is_available(
-        self, tmp_path
-    ):
+    def test_get_system_message_uses_lsp_when_lsp_is_available(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
         config = SimpleNamespace(
@@ -283,9 +281,7 @@ class TestOrchestratorPromptManager:
         assert '`lsp`' in result
         assert '`lsp_query`' not in result
 
-    def test_get_system_message_omits_lsp_when_lsp_unavailable(
-        self, tmp_path
-    ):
+    def test_get_system_message_omits_lsp_when_lsp_unavailable(self, tmp_path):
         from backend.utils.prompt import OrchestratorPromptManager
 
         config = SimpleNamespace(

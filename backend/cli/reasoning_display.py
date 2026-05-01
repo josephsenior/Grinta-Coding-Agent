@@ -304,16 +304,16 @@ class ReasoningDisplay:
     ) -> None:
         stable: int | None = None
         if self._streaming and max_width and max_width > _PANEL_CHROME_WIDTH + 12:
-            inner = max(12, max_width - _PANEL_CHROME_WIDTH - _THOUGHT_LINE_PREFIX_CHARS)
+            inner = max(
+                12, max_width - _PANEL_CHROME_WIDTH - _THOUGHT_LINE_PREFIX_CHARS
+            )
             if self._stream_wrap_width is None:
                 self._stream_wrap_width = inner
             stable = self._stream_wrap_width
         wrapped_rows: list[str] = []
         for line in self._thought_lines:
             wrapped_rows.extend(
-                _thought_lines_for_display(
-                    line, max_width, stable_wrap_width=stable
-                )
+                _thought_lines_for_display(line, max_width, stable_wrap_width=stable)
             )
 
         clipped = False

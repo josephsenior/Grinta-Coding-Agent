@@ -13,8 +13,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from rich.console import Console
 from rich import box
+from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -174,10 +174,7 @@ def _session_summary_table(
     path: Path,
 ) -> Table:
     table = Table(
-        show_header=False,
-        box=box.ROUNDED,
-        border_style=CLR_CARD_BORDER,
-        padding=(1, 2)
+        show_header=False, box=box.ROUNDED, border_style=CLR_CARD_BORDER, padding=(1, 2)
     )
     table.add_column(style=CLR_CARD_TITLE, no_wrap=True)
     table.add_column(overflow='fold')

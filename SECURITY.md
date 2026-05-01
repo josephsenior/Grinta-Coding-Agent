@@ -36,13 +36,13 @@ shared infrastructure, and access to systems you do not own.
 
 ## Supported versions
 
-Only the most recent minor release line receives security fixes. Earlier
-versions are best-effort.
+Only the active release line receives security fixes. Earlier versions are
+best-effort.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.56.x  | :white_check_mark: |
-| < 0.56  | :x:                |
+| 1.0.x   | :white_check_mark: |
+| < 1.0   | :x:                |
 
 ## Security architecture
 
@@ -99,7 +99,7 @@ captures the boundaries operators care about most.
   opt-in. See `backend/telemetry/`.
 - The legacy local web surface — when enabled — restricts CORS to localhost,
   ships strict security headers, and supports CSRF protection via
-  `APP_CSRF_ENABLED`. The supported interactive surface for 0.56 is the CLI.
+  `APP_CSRF_ENABLED`. The supported interactive surface for 1.0 is the CLI.
 
 ### Data storage
 

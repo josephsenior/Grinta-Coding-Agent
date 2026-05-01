@@ -26,10 +26,8 @@ from backend.core.app_paths import get_canonical_settings_path
 from backend.core.config.agent_config import AgentConfig
 from backend.core.config.app_config import AppConfig
 from backend.core.config.cli_config import (
-    _load_json_config,
     apply_additional_overrides,
     apply_llm_config_override,
-    get_llm_config_arg,
 )
 from backend.core.config.env_loader import (
     export_llm_api_keys,
@@ -44,6 +42,7 @@ from backend.utils.import_utils import get_impl
 
 if TYPE_CHECKING:
     import argparse
+
     from backend.persistence.files import FileStore
 
 

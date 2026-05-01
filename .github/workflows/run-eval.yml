@@ -39,7 +39,7 @@ jobs:
   trigger-job:
     name: Trigger remote eval job
     if: ${{ (github.event_name == 'pull_request' && (github.event.label.name == 'run-eval-1' || github.event.label.name == 'run-eval-2' || github.event.label.name == 'run-eval-50' || github.event.label.name == 'run-eval-100')) || github.event_name == 'release' || github.event_name == 'workflow_dispatch' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout branch

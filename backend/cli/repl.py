@@ -31,13 +31,13 @@ from backend.cli.theme import (
     CLR_HUD_MODEL,
     CLR_META,
     CLR_MUTED_TEXT,
-    MARK_PROMPT,
     CLR_SEP,
     CLR_STATE_RUNNING,
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
     CLR_THINKING_BORDER,
+    MARK_PROMPT,
 )
 from backend.core.config import (
     AppConfig,

@@ -18,6 +18,7 @@ from backend.cli.theme import STYLE_DEFAULT
 def _parse_style(plain_style: str) -> Style:
     return Style.parse(plain_style) if plain_style else Style()
 
+
 # Likely file paths / URLs — matched in order; URLs first when enabled.
 # Windows drive paths, POSIX absolute/relative with slash, or segmented relpaths.
 _PATH_RE = re.compile(

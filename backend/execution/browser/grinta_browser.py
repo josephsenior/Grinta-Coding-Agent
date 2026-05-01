@@ -12,7 +12,6 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Awaitable, Callable
-
 from urllib.parse import urlparse
 
 from backend.core.constants import (
@@ -41,9 +40,7 @@ _MAX_TYPE_LEN = 8000
 _INDEX_LINE_RE = re.compile(r'^\s*\[\d+\]')
 
 
-StructuredExtractFn = Callable[
-    [str, dict[str, Any], str | None], Awaitable[str]
-]
+StructuredExtractFn = Callable[[str, dict[str, Any], str | None], Awaitable[str]]
 
 
 def _browser_trace(msg: str) -> None:
@@ -884,9 +881,11 @@ class GrintaNativeBrowser:
     async def _execute_wait(self, cmd: str, params: dict[str, Any]) -> Observation:
         from browser_use.browser.events import WaitEvent
 
-        wait_kind = str(
-            params.get('wait_kind') or params.get('wait_for') or 'timeout'
-        ).strip().lower()
+        wait_kind = (
+            str(params.get('wait_kind') or params.get('wait_for') or 'timeout')
+            .strip()
+            .lower()
+        )
         timeout_sec = float(params.get('timeout_sec') or 10.0)
         timeout_sec = min(timeout_sec, BROWSER_WAIT_TIMEOUT_SEC)
         browser = await self._ensure_session()
@@ -984,7 +983,9 @@ class GrintaNativeBrowser:
             CmdOutputObservation(content=content, command='browser wait', exit_code=0),
         )
 
-    async def _execute_switch_tab(self, cmd: str, params: dict[str, Any]) -> Observation:
+    async def _execute_switch_tab(
+        self, cmd: str, params: dict[str, Any]
+    ) -> Observation:
         from browser_use.browser.events import SwitchTabEvent
 
         idx, err = self._parse_browser_index(
@@ -1118,9 +1119,7 @@ class GrintaNativeBrowser:
             )
         return _finalize_observation(
             cmd,
-            CmdOutputObservation(
-                content=out, command='browser extract', exit_code=0
-            ),
+            CmdOutputObservation(content=out, command='browser extract', exit_code=0),
         )
 
     async def _execute_upload_file(
@@ -1168,9 +1167,8 @@ class GrintaNativeBrowser:
 
         opt_text = params.get('option_text')
         opt_val = params.get('option_value')
-        choice = (
-            (str(opt_text).strip() if opt_text else '')
-            or (str(opt_val).strip() if opt_val else '')
+        choice = (str(opt_text).strip() if opt_text else '') or (
+            str(opt_val).strip() if opt_val else ''
         )
         if not choice:
             return _finalize_observation(

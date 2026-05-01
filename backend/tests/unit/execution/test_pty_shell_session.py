@@ -388,7 +388,9 @@ class TestLivePtyShellSession:
             assert _wait_for(
                 lambda: marker in obs.content or marker in session.read_output(),
                 timeout=8.0,
-            ), f'marker not observed; obs={obs.content!r}; buffer={session.read_output()!r}'
+            ), (
+                f'marker not observed; obs={obs.content!r}; buffer={session.read_output()!r}'
+            )
         finally:
             session.close()
 

@@ -5,6 +5,7 @@ under the per-file LOC budget.  All methods rely on attributes/methods
 defined on ``CLIEventRenderer``; this mixin is meant to be combined with
 that class via multiple inheritance.
 """
+
 from __future__ import annotations
 
 import json
@@ -61,7 +62,10 @@ from backend.cli.theme import (
     CLR_QUESTION_TEXT,
     CLR_STATUS_WARN,
 )
-from backend.cli.tool_call_display import mcp_result_syntax_extras, mcp_result_user_preview
+from backend.cli.tool_call_display import (
+    mcp_result_syntax_extras,
+    mcp_result_user_preview,
+)
 from backend.cli.transcript import (
     format_activity_delta_secondary,
     format_activity_result_secondary,

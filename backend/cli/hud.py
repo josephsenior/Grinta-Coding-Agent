@@ -11,15 +11,15 @@ from rich.text import Text
 
 import backend
 from backend.cli.theme import (
+    CLR_AUTONOMY_BALANCED,
+    CLR_AUTONOMY_CONSERVATIVE,
+    CLR_AUTONOMY_FULL,
     CLR_HUD_DETAIL,
     CLR_HUD_MODEL,
     CLR_SEP,
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
-    CLR_AUTONOMY_BALANCED,
-    CLR_AUTONOMY_CONSERVATIVE,
-    CLR_AUTONOMY_FULL,
     HUD_BG,
 )
 
@@ -201,10 +201,10 @@ class HUDBar:
             model_display = model
         else:
             model_display = f'{provider}/{model}'
-            
+
         group_sep = ('  │  ', CLR_SEP)
         item_sep = (' · ', CLR_SEP)
-        
+
         autonomy = self.state.autonomy_level or 'balanced'
         if autonomy == 'full':
             auto_style = CLR_AUTONOMY_FULL
@@ -215,7 +215,7 @@ class HUDBar:
         else:
             auto_style = CLR_AUTONOMY_BALANCED
             auto_lbl = 'Balanced'
-        
+
         parts: list[tuple[str, str]] = [
             (' ', ''),
             (auto_lbl, auto_style),

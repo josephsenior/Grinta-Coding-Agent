@@ -64,13 +64,19 @@ def get_event_runtime_defaults() -> EventRuntimeDefaults:
 
     return EventRuntimeDefaults(
         max_queue_size=int(
-            _get_env('EVENT_STREAM_MAX_QUEUE_SIZE', 'APP_EVENTSTREAM_MAX_QUEUE', default='2000')
+            _get_env(
+                'EVENT_STREAM_MAX_QUEUE_SIZE',
+                'APP_EVENTSTREAM_MAX_QUEUE',
+                default='2000',
+            )
         ),
         drop_policy=_get_env(
             'EVENT_STREAM_DROP_POLICY', 'APP_EVENTSTREAM_POLICY', default='drop_oldest'
         ).lower(),
         hwm_ratio=float(
-            _get_env('EVENT_STREAM_HWM_RATIO', 'APP_EVENTSTREAM_HWM_RATIO', default='0.8')
+            _get_env(
+                'EVENT_STREAM_HWM_RATIO', 'APP_EVENTSTREAM_HWM_RATIO', default='0.8'
+            )
         ),
         block_timeout=float(
             _get_env(
@@ -88,7 +94,9 @@ def get_event_runtime_defaults() -> EventRuntimeDefaults:
         ),
         workers=max(
             1,
-            int(_get_env('EVENT_STREAM_WORKERS', 'APP_EVENTSTREAM_WORKERS', default='1')),
+            int(
+                _get_env('EVENT_STREAM_WORKERS', 'APP_EVENTSTREAM_WORKERS', default='1')
+            ),
         ),
         async_write=_get_env(
             'EVENT_STREAM_ASYNC_WRITE',

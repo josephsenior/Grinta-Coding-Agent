@@ -114,7 +114,11 @@ class View(BaseModel):
         """Find summary and its offset from condensation actions."""
         return next(
             (
-                (event.summary, event.summary_offset, getattr(event, 'is_prewarmed', False))
+                (
+                    event.summary,
+                    event.summary_offset,
+                    getattr(event, 'is_prewarmed', False),
+                )
                 for event in reversed(events)
                 if isinstance(event, CondensationAction)
                 and (event.summary is not None and event.summary_offset is not None)
@@ -144,7 +148,10 @@ class View(BaseModel):
         if summary is not None and summary_offset is not None:
             logger.info('Inserting summary at offset %s', summary_offset)
             kept_events.insert(
-                summary_offset, AgentCondensationObservation(content=summary, is_prewarmed=is_prewarmed)
+                summary_offset,
+                AgentCondensationObservation(
+                    content=summary, is_prewarmed=is_prewarmed
+                ),
             )
 
         # Check for unhandled condensation requests

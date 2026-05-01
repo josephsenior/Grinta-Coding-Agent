@@ -42,6 +42,7 @@ from backend.cli.layout_tokens import (
     gap_below_live_section,
     spacer_live_section,
 )
+from backend.cli.path_links import file_uri_for_path, linkify_plain
 from backend.cli.theme import (
     CLR_AUTONOMY_BALANCED,
     CLR_AUTONOMY_CONSERVATIVE,
@@ -52,7 +53,6 @@ from backend.cli.theme import (
     CLR_HUD_DETAIL,
     CLR_HUD_MODEL,
     CLR_META,
-    CLR_MUTED_TEXT,
     CLR_SEP,
     CLR_STATE_RUNNING,
     CLR_STATUS_ERR,
@@ -67,7 +67,6 @@ from backend.cli.theme import (
     STYLE_EMPTY,
     STYLE_ITALIC_DIM,
 )
-from backend.cli.path_links import file_uri_for_path, linkify_plain
 from backend.cli.tool_call_display import (
     looks_like_streaming_tool_arguments,
     streaming_args_hint,
@@ -787,9 +786,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     @classmethod
     def _fake_prompt_token_display(cls, hud: Any) -> str:
         ctx = HUDBar._format_tokens(hud.context_tokens)
-        lim = (
-            HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
-        )
+        lim = HUDBar._format_tokens(hud.context_limit) if hud.context_limit else None
         if hud.context_tokens == 0 and hud.context_limit == 0:
             token_display = '0t'
         elif hud.context_limit == 0:
@@ -816,11 +813,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     ) -> list[Text]:
         sep = self._FAKE_PROMPT_SEP
         token_display = self._fake_prompt_token_display(hud)
-        mcp_short = (
-            '?'
-            if hud.mcp_servers is None
-            else str(min(hud.mcp_servers, 99))
-        )
+        mcp_short = '?' if hud.mcp_servers is None else str(min(hud.mcp_servers, 99))
         sk_short = str(min(self._hud.bundled_skill_count, 99))
         ledger_style = self._fake_prompt_ledger_style(hud.ledger_status)
         if provider in self._FAKE_PROMPT_UNKNOWN_PROVIDERS:

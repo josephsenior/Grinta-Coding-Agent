@@ -40,10 +40,7 @@ async def connect_postgresql(env_prefix: str, connection_name: str) -> dict[str,
     try:
         import asyncpg  # type: ignore[import-not-found, import-untyped]
     except ImportError as exc:
-        msg = (
-            'asyncpg not installed. Run: uv sync --extra database or '
-            "pip install 'grinta-ai[database]'"
-        )
+        msg = 'asyncpg not installed. Run: pip install asyncpg'
         raise ImportError(msg) from exc
 
     # Get connection parameters from environment

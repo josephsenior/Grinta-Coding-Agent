@@ -89,9 +89,7 @@ class SafePath:
         validated_path = validate_and_sanitize_path(
             path, workspace_root, must_exist, must_be_relative
         )
-        workspace_path = (
-            Path(workspace_root).resolve() if workspace_root else None
-        )
+        workspace_path = Path(workspace_root).resolve() if workspace_root else None
         return cls(validated_path, workspace_path)
 
     @property

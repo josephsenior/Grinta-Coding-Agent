@@ -316,9 +316,7 @@ class TestSummarizeToolArguments(unittest.TestCase):
         self.assertIn('parse_args', s)
 
     def test_lsp(self) -> None:
-        s = summarize_tool_arguments(
-            'lsp', {'command': 'hover', 'symbol': 'Foo'}
-        )
+        s = summarize_tool_arguments('lsp', {'command': 'hover', 'symbol': 'Foo'})
         self.assertIn('Foo', s)
 
     def test_analyze_project(self) -> None:

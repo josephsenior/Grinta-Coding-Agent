@@ -95,7 +95,9 @@ def test_analyze_project_structure_unknown_command_emits_diag() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_analyze_project_structure_dependencies_missing_anchor(monkeypatch, tmp_path) -> None:
+def test_analyze_project_structure_dependencies_missing_anchor(
+    monkeypatch, tmp_path
+) -> None:
     monkeypatch.chdir(tmp_path)
     action = build_analyze_project_structure_action(
         {'command': 'dependencies', 'path': 'does_not_exist.py'}
@@ -104,7 +106,9 @@ def test_analyze_project_structure_dependencies_missing_anchor(monkeypatch, tmp_
     assert 'anchor file not found' in action.thought
 
 
-def test_analyze_project_structure_dependencies_invalid_direction(monkeypatch, tmp_path) -> None:
+def test_analyze_project_structure_dependencies_invalid_direction(
+    monkeypatch, tmp_path
+) -> None:
     f = tmp_path / 'a.py'
     f.write_text('x = 1\n', encoding='utf-8')
     monkeypatch.chdir(tmp_path)
@@ -115,7 +119,9 @@ def test_analyze_project_structure_dependencies_invalid_direction(monkeypatch, t
     assert 'invalid direction' in action.thought
 
 
-def test_analyze_project_structure_dependencies_downstream(monkeypatch, tmp_path) -> None:
+def test_analyze_project_structure_dependencies_downstream(
+    monkeypatch, tmp_path
+) -> None:
     pkg = tmp_path / 'pkg'
     pkg.mkdir()
     (pkg / '__init__.py').write_text('', encoding='utf-8')
@@ -140,7 +146,9 @@ def test_analyze_project_structure_dependencies_downstream(monkeypatch, tmp_path
     assert '=== EDGES (json) ===' in action.thought
 
 
-def test_analyze_project_structure_dependencies_cycle_safe(monkeypatch, tmp_path) -> None:
+def test_analyze_project_structure_dependencies_cycle_safe(
+    monkeypatch, tmp_path
+) -> None:
     pkg = tmp_path / 'pkg'
     pkg.mkdir()
     (pkg / '__init__.py').write_text('', encoding='utf-8')

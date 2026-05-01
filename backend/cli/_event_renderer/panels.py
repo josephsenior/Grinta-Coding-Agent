@@ -247,7 +247,9 @@ def build_system_notice_panel(
     # ``accent_style`` is a "bold #hex" pair: use the colour-only suffix for
     # the border (Rich draws border characters; bold has no visible effect)
     # and keep the bolded version for the title text.
-    border_color = accent_style.split(' ', 1)[1] if ' ' in accent_style else accent_style
+    border_color = (
+        accent_style.split(' ', 1)[1] if ' ' in accent_style else accent_style
+    )
     panel_title = Text(normalized_title, style=accent_style)
     body = Text((text or '').strip(), style=body_style)
     return Panel(

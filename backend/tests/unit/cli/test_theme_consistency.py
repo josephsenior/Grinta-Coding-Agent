@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import cast
 from unittest.mock import MagicMock
-from pathlib import Path
 
 from backend.cli.hud import HUDBar
 from backend.cli.repl import Repl

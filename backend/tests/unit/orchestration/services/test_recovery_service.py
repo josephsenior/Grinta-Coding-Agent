@@ -94,9 +94,7 @@ class TestRecoveryService:
         mock_context.set_agent_state.assert_awaited_once_with(AgentState.RATE_LIMITED)
 
     @pytest.mark.asyncio
-    async def test_rate_limit_does_not_pollute_agent_context(
-        self, mock_context, ctrl
-    ):
+    async def test_rate_limit_does_not_pollute_agent_context(self, mock_context, ctrl):
         """Silent-rate-limit policy: transient 429s must NOT add an
         ``AgentThinkObservation`` to the event stream. The agent has no
         rate-limit mitigation tools; the inner Tenacity loop + outer retry

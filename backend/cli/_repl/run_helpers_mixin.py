@@ -5,6 +5,7 @@ user-turn dispatch, and finalization helpers — extracted from
 :mod:`backend.cli.repl` to keep the main module under the project's per-file
 LOC budget.
 """
+
 from __future__ import annotations
 
 import asyncio
