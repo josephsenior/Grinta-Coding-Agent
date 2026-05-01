@@ -17,6 +17,20 @@ visually coherent across components.
 
 from __future__ import annotations
 
+import os
+
+
+def _env_truthy(name: str) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return False
+    return raw.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def no_color_enabled() -> bool:
+    """Respect NO_COLOR and a Grinta-specific override."""
+    return _env_truthy('NO_COLOR') or _env_truthy('GRINTA_NO_COLOR')
+
 # ── Backgrounds ────────────────────────────────────────────────────────────────
 HUD_BG = 'grey15'  # HUD footer background
 

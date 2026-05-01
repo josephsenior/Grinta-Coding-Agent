@@ -1053,7 +1053,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._stop_reasoning()
         self._clear_streaming_preview()
         self._append_history(
-            Text('  error — send a follow-up to retry.', style=f'dim {CLR_ERR_BODY}'),
+            Text(
+                '  error - use /retry to resend the last message, or send a new instruction.',
+                style=f'dim {CLR_ERR_BODY}',
+            ),
         )
 
     def _after_state_stopped(self, *, previous_state: Any) -> None:

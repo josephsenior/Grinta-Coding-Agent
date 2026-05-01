@@ -248,7 +248,7 @@ _GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ErrorGuidance(
             summary='Autonomous recovery is in progress.',
             steps=(
-                'No action needed. Grinta already scheduled a retry.',
+                'Automatic retry in progress. No action needed.',
                 'Watch the Backoff / Auto Retry status in the footer for attempt progress.',
                 'If automatic retries exhaust, the prompt will return automatically.',
             ),

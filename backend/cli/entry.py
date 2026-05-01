@@ -54,6 +54,79 @@ _EPILOG = """examples:
 """
 
 
+def _add_common_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        '--model',
+        '-m',
+        help='Override LLM model (e.g. anthropic/claude-sonnet-4-20250514)',
+    )
+    parser.add_argument(
+        '--project',
+        '-p',
+        type=_project_dir,
+        help='Set project root directory',
+    )
+    parser.add_argument(
+        '--no-splash',
+        action='store_true',
+        help='Start without the animated splash screen',
+    )
+    parser.add_argument(
+        '--cleanup-storage',
+        action='store_true',
+        help='Consolidate legacy project data into the workspace storage root and exit',
+    )
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'%(prog)s {_version_string()}',
+    )
+
+
+def build_parser(*, include_subcommands: bool = True) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog='grinta',
+        description='Grinta - AI coding agent for the terminal',
+        epilog=_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    _add_common_args(parser)
+    if not include_subcommands:
+        return parser
+
+    subparsers = parser.add_subparsers(dest='subcommand')
+
+    # `grinta init`
+    p_init = subparsers.add_parser(
+        'init', help='First-run wizard: pick provider, paste key, write settings.json'
+    )
+    p_init.set_defaults(func=_run_init)
+
+    # `grinta sessions ...`
+    p_sessions = subparsers.add_parser('sessions', help='Manage past sessions')
+    sessions_sub = p_sessions.add_subparsers(dest='sessions_cmd', required=True)
+
+    p_list = sessions_sub.add_parser('list', help='List past sessions')
+    p_list.add_argument('--limit', type=_positive_int, default=50)
+
+    p_show = sessions_sub.add_parser('show', help='Show one session')
+    p_show.add_argument('target', help='Session index (1-based) or id prefix')
+
+    p_export = sessions_sub.add_parser('export', help='Export a session')
+    p_export.add_argument('target', help='Session index or id prefix')
+    p_export.add_argument('out', help='Output directory or .zip path')
+
+    p_delete = sessions_sub.add_parser('delete', help='Delete one session')
+    p_delete.add_argument('target', help='Session index or id prefix')
+    p_delete.add_argument('--yes', action='store_true', help='Skip confirmation')
+
+    p_prune = sessions_sub.add_parser('prune', help='Delete sessions older than --days')
+    p_prune.add_argument('--days', type=_non_negative_int, default=30)
+    p_prune.add_argument('--yes', action='store_true', help='Skip confirmation')
+    p_sessions.set_defaults(func=_run_sessions)
+    return parser
+
+
 def _version_string() -> str:
     try:
         from backend import get_version
@@ -102,19 +175,24 @@ def _run_init(_args: argparse.Namespace) -> int:
     from rich.console import Console
 
     from backend.cli.init_wizard import run_init
+    from backend.cli.theme import no_color_enabled
 
     project = getattr(_args, 'project', None)
     _pin_project(project)
-    return run_init(project_root=Path(project) if project else None, console=Console())
+    return run_init(
+        project_root=Path(project) if project else None,
+        console=Console(no_color=no_color_enabled()),
+    )
 
 
 def _run_sessions(args: argparse.Namespace) -> int:
     from rich.console import Console
 
     from backend.cli import sessions_cli
+    from backend.cli.theme import no_color_enabled
 
     _pin_project(getattr(args, 'project', None))
-    console = Console()
+    console = Console(no_color=no_color_enabled())
     sub = args.sessions_cmd
     if sub == 'list':
         return sessions_cli.cmd_list(console, limit=args.limit)
@@ -132,70 +210,7 @@ def _run_sessions(args: argparse.Namespace) -> int:
 
 def main() -> None:
     """Parse flags and launch the interactive REPL or a subcommand."""
-    parser = argparse.ArgumentParser(
-        prog='grinta',
-        description='Grinta — AI coding agent for the terminal',
-        epilog=_EPILOG,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument(
-        '--model',
-        '-m',
-        help='Override LLM model (e.g. anthropic/claude-sonnet-4-20250514)',
-    )
-    parser.add_argument(
-        '--project',
-        '-p',
-        type=_project_dir,
-        help='Set project root directory',
-    )
-    parser.add_argument(
-        '--no-splash',
-        action='store_true',
-        help='Start without the animated splash screen',
-    )
-    parser.add_argument(
-        '--cleanup-storage',
-        action='store_true',
-        help='Consolidate legacy project data into the canonical workspace store and exit',
-    )
-    parser.add_argument(
-        '--version',
-        action='version',
-        version=f'%(prog)s {_version_string()}',
-    )
-
-    subparsers = parser.add_subparsers(dest='subcommand')
-
-    # `grinta init`
-    p_init = subparsers.add_parser(
-        'init', help='First-run wizard: pick provider, paste key, write settings.json'
-    )
-    p_init.set_defaults(func=_run_init)
-
-    # `grinta sessions ...`
-    p_sessions = subparsers.add_parser('sessions', help='Manage past sessions')
-    sessions_sub = p_sessions.add_subparsers(dest='sessions_cmd', required=True)
-
-    p_list = sessions_sub.add_parser('list', help='List past sessions')
-    p_list.add_argument('--limit', type=_positive_int, default=50)
-
-    p_show = sessions_sub.add_parser('show', help='Show one session')
-    p_show.add_argument('target', help='Session index (1-based) or id prefix')
-
-    p_export = sessions_sub.add_parser('export', help='Export a session')
-    p_export.add_argument('target', help='Session index or id prefix')
-    p_export.add_argument('out', help='Output directory or .zip path')
-
-    p_delete = sessions_sub.add_parser('delete', help='Delete one session')
-    p_delete.add_argument('target', help='Session index or id prefix')
-    p_delete.add_argument('--yes', action='store_true', help='Skip confirmation')
-
-    p_prune = sessions_sub.add_parser('prune', help='Delete sessions older than --days')
-    p_prune.add_argument('--days', type=_non_negative_int, default=30)
-    p_prune.add_argument('--yes', action='store_true', help='Skip confirmation')
-
-    p_sessions.set_defaults(func=_run_sessions)
+    parser = build_parser(include_subcommands=True)
 
     args = parser.parse_args(sys.argv[1:])
 

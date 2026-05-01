@@ -71,8 +71,9 @@ def cmd_list(console: Console, limit: int = 50) -> int:
         table.add_row(*_format_session_row(i, sid, meta, count))
     console.print(table)
     console.print(
-        f'[{CLR_META}]Use [bold]grinta sessions show <N|id>[/bold] for details, '
-        'or [bold]grinta sessions export <N|id> <path>[/bold] to save one.[/]'
+        f'[{CLR_META}]Shell: [bold]grinta sessions show <N|id>[/bold] for details, '
+        '[bold]grinta sessions export <N|id> <path>[/bold] to save one. '
+        'REPL: [bold]/sessions[/bold], [bold]/resume <id>[/bold].[/]'
     )
     return 0
 
@@ -250,7 +251,7 @@ def cmd_delete(console: Console, target: str, *, yes: bool = False) -> int:
         if not Confirm.ask(
             f'Delete session {sid}? This cannot be undone.', default=False
         ):
-            console.print(f'[{CLR_META}]Aborted.[/]')
+            console.print(f'[{CLR_META}]Cancelled. No changes were made.[/]')
             return 0
     shutil.rmtree(path, ignore_errors=True)
     console.print(f'[{CLR_STATUS_OK}]{MARK_OK}[/] Deleted [bold]{sid}[/bold]')
@@ -279,12 +280,14 @@ def cmd_prune(console: Console, *, days: int = 30, yes: bool = False) -> int:
     if not yes:
         from rich.prompt import Confirm
 
-        if not Confirm.ask('Proceed?', default=False):
-            console.print(f'[{CLR_META}]Aborted.[/]')
+        if not Confirm.ask(
+            'Delete these sessions? This action cannot be undone.', default=False
+        ):
+            console.print(f'[{CLR_META}]Cancelled. No changes were made.[/]')
             return 0
     for sid, path in to_delete:
         shutil.rmtree(path, ignore_errors=True)
-        console.print(f'  [{CLR_STATUS_OK}]{MARK_OK}[/] deleted {sid}')
+        console.print(f'  [{CLR_STATUS_OK}]{MARK_OK}[/] Deleted {sid}')
     return 0
 
 

@@ -9,7 +9,6 @@ Usage::
 
 from __future__ import annotations
 
-import argparse
 import asyncio
 import logging
 import os
@@ -38,7 +37,9 @@ warnings.filterwarnings(
 
 def _create_console(*args: Any, **kwargs: Any) -> Any:
     from rich.console import Console as RichConsole
+    from backend.cli.theme import no_color_enabled
 
+    kwargs.setdefault('no_color', no_color_enabled())
     return RichConsole(*args, **kwargs)
 
 
@@ -350,24 +351,6 @@ def _read_piped_stdin() -> str | None:
     return data
 
 
-def _version_string() -> str:
-    try:
-        from backend import get_version
-
-        return get_version()
-    except Exception:
-        return 'unknown'
-
-
-def _project_dir_arg(value: str) -> str:
-    from backend.core.workspace_resolution import resolve_existing_directory
-
-    try:
-        return str(resolve_existing_directory(value))
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(str(exc)) from exc
-
-
 def _env_truthy(name: str) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -389,38 +372,9 @@ def _resolve_invocation(
     if not argv:
         return None, None, False, False
 
-    parser = argparse.ArgumentParser(
-        prog='grinta',
-        description='Grinta — AI coding agent for the terminal',
-    )
-    parser.add_argument(
-        '--model',
-        '-m',
-        help='Override LLM model (e.g. anthropic/claude-sonnet-4-20250514)',
-    )
-    parser.add_argument(
-        '--project',
-        '-p',
-        type=_project_dir_arg,
-        help='Set project root directory',
-    )
-    parser.add_argument(
-        '--no-splash',
-        action='store_true',
-        default=False,
-        help='Start without the animated splash screen',
-    )
-    parser.add_argument(
-        '--cleanup-storage',
-        action='store_true',
-        default=False,
-        help='Consolidate legacy project data into .grinta/storage and exit',
-    )
-    parser.add_argument(
-        '--version',
-        action='version',
-        version=f'%(prog)s {_version_string()}',
-    )
+    from backend.cli.entry import build_parser
+
+    parser = build_parser(include_subcommands=False)
     args = parser.parse_args(argv)
     if args.cleanup_storage:
         return args.model, args.project, True, args.no_splash
@@ -534,9 +488,8 @@ async def _ensure_onboarded(
             f'([cyan]{detected_provider}[/cyan])',
         )
         console.print(
-            '  [dim][bold]Next:[/bold] type [bold]/help[/bold] for commands, '
-            '[bold]/settings[/bold] for model and MCP, '
-            '[bold]grinta --help[/bold] for CLI flags.[/dim]',
+            '  [dim][bold]Next:[/bold] REPL: [bold]/help[/bold], [bold]/settings[/bold]. '
+            'Shell: [bold]grinta --help[/bold], [bold]grinta sessions list[/bold].[/dim]',
         )
         ensure_default_model(config)
         return config
@@ -545,7 +498,9 @@ async def _ensure_onboarded(
     ensure_default_model(config)
     _apply_cli_overrides(config, model, resolved_project, get_project_local_data_root)
     if needs_onboarding(config):
-        console.print('[red]No API key configured. Exiting.[/red]')
+        console.print(
+            '[red]No API key configured. Run `grinta init` to configure provider, model, and API key.[/red]'
+        )
         return None
     return config
 

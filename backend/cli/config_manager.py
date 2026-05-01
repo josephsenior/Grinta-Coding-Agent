@@ -21,6 +21,7 @@ from backend.cli.theme import (
     CLR_STATUS_ERR,
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
+    no_color_enabled,
 )
 from backend.core.app_paths import get_app_settings_root
 from backend.core.config import AppConfig, load_app_config
@@ -29,14 +30,14 @@ from backend.core.constants import LLM_API_KEY_SETTINGS_PLACEHOLDER
 
 logger = logging.getLogger(__name__)
 
-_console = Console()
-_DEFAULT_ONBOARDING_MODEL = 'openai/gpt-4.1'
-_DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
+_console = Console(no_color=no_color_enabled())
+DEFAULT_ONBOARDING_MODEL = 'openai/gpt-4.1'
+DEFAULT_MODEL_BY_PROVIDER: dict[str, str] = {
     'anthropic': 'anthropic/claude-sonnet-4.6',
     'google': 'google/gemini-3-flash-preview',
     'groq': 'groq/meta-llama/llama-4-scout',
     'lightning': 'lightning/meta-llama/Meta-Llama-3.1-8B-Instruct',
-    'openai': _DEFAULT_ONBOARDING_MODEL,
+    'openai': DEFAULT_ONBOARDING_MODEL,
     'openrouter': 'openrouter/anthropic/claude-4.5-sonnet',
     'xai': 'xai/grok-4.1-fast',
     'deepseek': 'deepseek/deepseek-chat',
@@ -141,8 +142,8 @@ def _infer_provider_from_api_key(api_key: str | None) -> str | None:
 
 def _default_model_for_provider(provider: str | None) -> str:
     if not provider:
-        return _DEFAULT_ONBOARDING_MODEL
-    return _DEFAULT_MODEL_BY_PROVIDER.get(provider, _DEFAULT_ONBOARDING_MODEL)
+        return DEFAULT_ONBOARDING_MODEL
+    return DEFAULT_MODEL_BY_PROVIDER.get(provider, DEFAULT_ONBOARDING_MODEL)
 
 
 def _default_model_for_api_key(api_key: str | None) -> str:
@@ -226,9 +227,9 @@ def run_onboarding() -> AppConfig:
     """Interactive first-run setup. Clean, minimal, validates before saving."""
     if not os.isatty(0):
         _console.print(
-            f'[{CLR_STATUS_ERR}]No API key configured and stdin is not interactive.[/]\n'
-            'Run [bold]grinta[/bold] in a terminal to complete setup,\n'
-            'or create [bold]settings.json[/bold] in the Grinta repo root.'
+            f'[{CLR_STATUS_ERR}]No API key configured.[/]\n'
+            'Run [bold]grinta init[/bold] in an interactive terminal to set provider, model, and API key,\n'
+            'or create [bold]settings.json[/bold] and [bold].env[/bold] under your app settings root.'
         )
         raise SystemExit(1)
 
@@ -282,7 +283,7 @@ def run_onboarding() -> AppConfig:
                 '  • Describe what you want in plain language, or type [bold]/help[/bold] for commands\n'
                 '  • [bold]grinta -p /path/to/repo[/bold] — pin a project directory (or stay in the current folder)\n'
                 '  • [bold]/autonomy[/bold] — choose conservative, balanced, or full autonomy\n'
-                '  • [bold]/sessions[/bold] — list past sessions; [bold]/resume[/bold] to continue one\n'
+                '  • REPL: [bold]/sessions[/bold], [bold]/resume[/bold] · Shell: [bold]grinta sessions list[/bold]\n'
                 '  • [bold]/settings[/bold] — change model, API key, or MCP servers anytime\n\n'
                 f'[{CLR_META}]Tip: run [bold]grinta --help[/bold] for CLI flags.[/]'
             ),
@@ -392,7 +393,7 @@ def _select_model(provider_key: str, custom_name: str | None = None) -> str:
     """Model selection with smart defaults."""
     _console.print()
 
-    default = _DEFAULT_MODEL_BY_PROVIDER.get(provider_key, '')
+    default = DEFAULT_MODEL_BY_PROVIDER.get(provider_key, '')
     if default:
         _console.print(f'[bold]Model[/bold] [dim](Enter for {default})[/dim]\n')
     else:
