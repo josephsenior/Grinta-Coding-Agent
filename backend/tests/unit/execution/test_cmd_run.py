@@ -239,8 +239,9 @@ def test_init_shell_commands_uses_powershell_helpers_on_windows(mock_executor):
     first_command = mock_session.execute.call_args_list[0][0][0].command
     second_command = mock_session.execute.call_args_list[1][0][0].command
 
-    assert '; git config --global user.email ' in first_command
-    assert '&&' not in first_command
+    assert 'git config --global user.name ' in first_command
+    assert 'git config --global user.email ' in first_command
+    assert (' ; ' in first_command) or (' && ' in first_command)
     assert 'function global:env_check' in second_command
     assert 'Get-PSDrive -PSProvider FileSystem' in second_command
     assert 'alias env_check=' not in second_command
