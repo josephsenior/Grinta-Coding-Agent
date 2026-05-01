@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from backend.execution.debugger import DAPClient, DAPDebugManager
+from backend.execution.debugger import DAPClient, DAPDebugManager, DAPStartPhaseError
 from backend.ledger.action.debugger import DebuggerAction
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.debugger import DebuggerObservation
@@ -115,3 +115,29 @@ def test_manager_requires_adapter_command_for_non_python(tmp_path) -> None:
     obs = manager.handle(DebuggerAction(debug_action='start', adapter='node'))
     assert isinstance(obs, ErrorObservation)
     assert 'adapter_command' in obs.content
+
+
+def test_manager_start_error_includes_startup_phase_metadata(monkeypatch, tmp_path) -> None:
+    class FakeSession:
+        def __init__(self, session_id: str, **kwargs: Any) -> None:
+            self.session_id = session_id
+            self.kwargs = kwargs
+
+        def start(self, timeout: float = 15.0) -> dict[str, Any]:
+            raise DAPStartPhaseError(
+                'initialized event',
+                'DAP adapter did not send initialized event',
+                timeout=timeout,
+            )
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr('backend.execution.debugger.DAPDebugSession', FakeSession)
+    manager = DAPDebugManager(str(tmp_path))
+    obs = manager.handle(
+        DebuggerAction(debug_action='start', program='app.py', session_id='dbg-phase')
+    )
+    assert isinstance(obs, ErrorObservation)
+    assert 'startup_phase: initialized event' in obs.content
+    assert 'startup_timeout_seconds' in obs.content

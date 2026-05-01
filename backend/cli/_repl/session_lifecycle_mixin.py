@@ -91,6 +91,7 @@ class SessionLifecycleMixin:
         # to a positive value to re-enable limits.
         hard_timeout, cmd_timeout = self._resolve_hard_timeouts()
         start = time.monotonic()
+        last_periodic_drain = start
         host = cast(SessionLifecycleHost, self)
 
         while True:
@@ -122,6 +123,13 @@ class SessionLifecycleMixin:
                 await asyncio.sleep(0.1)
             else:
                 await renderer.wait_for_state_change(wait_timeout_sec=0.1)
+                # Keep transcript rendering moving even if no explicit state
+                # transition arrives (e.g. long-running tool with queued output).
+                renderer.drain_events()
+                now = time.monotonic()
+                if now - last_periodic_drain >= 0.5:
+                    renderer.refresh(force=True)
+                    last_periodic_drain = now
 
             # Hard timeout — surface error and return to prompt instead of
             # hanging forever (e.g. LLM API unresponsive). Allow a longer

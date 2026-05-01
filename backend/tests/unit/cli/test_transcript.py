@@ -102,10 +102,9 @@ def test_format_activity_turn_header_plain() -> None:
     import io
 
     from rich.console import Console
-    from rich.rule import Rule
 
     r = format_activity_turn_header()
-    assert isinstance(r, Rule)
+    assert isinstance(r, Text)
     buf = io.StringIO()
     Console(file=buf, width=80, force_terminal=False, color_system=None).print(r)
     assert 'Activity' in buf.getvalue()

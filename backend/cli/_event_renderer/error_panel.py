@@ -186,6 +186,37 @@ _GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ),
     ),
     _GuidanceRule(
+        _any(
+            'debugger start failed during',
+            'dap adapter did not send initialized event',
+            'initialize request timeout',
+            'configurationdone timeout',
+        ),
+        ErrorGuidance(
+            summary='Debugger startup stalled during adapter handshake.',
+            steps=(
+                'Retry ``debugger start`` once; startup may fail transiently on cold adapter boot.',
+                'If it repeats, inspect the ``adapter_stderr`` block and fix adapter/runtime issues first.',
+                'Use a shorter focused run after startup (status/stack) to confirm the session is responsive.',
+            ),
+        ),
+    ),
+    _GuidanceRule(
+        _any(
+            'render drain stalled',
+            'flush only on interrupt',
+            'output only after interrupt',
+        ),
+        ErrorGuidance(
+            summary='The UI output pipeline fell behind and flushed late.',
+            steps=(
+                'Retry the same prompt once; if output remains delayed, restart the CLI session.',
+                'Prefer shorter steps while troubleshooting so pending output drains continuously.',
+                'If reproducible, capture the exact action that stalls so drain/wakeup handling can be tightened further.',
+            ),
+        ),
+    ),
+    _GuidanceRule(
         _and(
             _any('call_async_from_sync', 'browser_tool'),
             _any('timeout', 'timed out'),
@@ -384,6 +415,17 @@ _GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ),
     ),
     _GuidanceRule(
+        _has('default shell session not initialized'),
+        ErrorGuidance(
+            summary='The runtime shell session is missing or was interrupted.',
+            steps=(
+                'Retry once to let Grinta recreate the default shell session.',
+                'If this keeps happening after interrupts, restart the session/runtime and run the task again.',
+                'If the issue persists, run one focused read/check step first to re-ground state before editing.',
+            ),
+        ),
+    ),
+    _GuidanceRule(
         _has('initialization failed'),
         ErrorGuidance(
             summary='Startup did not complete successfully.',
@@ -486,6 +528,8 @@ _NOTICE_TITLE_RULES: tuple[tuple[Callable[[str], bool], str], ...] = (
         _any('connection', 'unreachable', 'connect error', 'dns', 'ssl', 'certificate'),
         'Connection issue',
     ),
+    (_has('debugger start failed during'), 'Debugger startup issue'),
+    (_has('default shell session not initialized'), 'Shell session issue'),
     (_has('stuck loop'), 'Stuck pattern'),
     (_any('timeout', 'timed out', 'did not answer'), 'Request timed out'),
 )

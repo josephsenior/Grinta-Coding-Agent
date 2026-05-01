@@ -326,12 +326,17 @@ class LocalRuntimeInProcess(ActionExecutionClient):
 
     def hard_kill(self) -> None:
         """Best-effort immediate termination of processes started by this runtime."""
-        if self._executor is None:
-            return
-        try:
-            call_async_from_sync(self._executor.hard_kill, 5.0)
-        except Exception:
-            logger.debug('LocalRuntimeInProcess hard_kill failed', exc_info=True)
+        if self._executor is not None:
+            try:
+                call_async_from_sync(self._executor.hard_kill, 5.0)
+            except Exception:
+                logger.debug('LocalRuntimeInProcess hard_kill failed', exc_info=True)
+
+        # ``hard_kill`` is a destructive lifecycle boundary. Keep runtime state
+        # honest so subsequent tool calls fail fast via the reconnect path
+        # instead of running against a partially torn-down executor.
+        self._runtime_initialized = False
+        self._executor = None
 
     def run(self, action: CmdRunAction) -> Observation:
         """Execute command via RuntimeExecutor."""
@@ -398,7 +403,12 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         """
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        timeout = self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_DEBUGGER)
+        # Keep sync-bridge timeout aligned with the pending-action floor for
+        # debugger actions so the bridge never expires before watchdog policy.
+        timeout = max(
+            self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_DEBUGGER),
+            float(TOOL_BRIDGE_TIMEOUT_DEBUGGER),
+        )
         return call_async_from_sync(self._executor.debugger, timeout, action)
 
     def lsp_query(self, action: LspQueryAction) -> Observation:

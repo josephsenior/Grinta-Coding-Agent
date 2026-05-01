@@ -411,11 +411,14 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
     async def wait_for_state_change(
         self, wait_timeout_sec: float = 0.25
     ) -> AgentState | None:
+        if self._pending_events:
+            return self._current_state
         try:
             await asyncio.wait_for(self._state_event.wait(), timeout=wait_timeout_sec)
         except asyncio.TimeoutError:
             return self._current_state
-        self._state_event.clear()
+        if not self._pending_events:
+            self._state_event.clear()
         return self._current_state
 
     def clear_history(self) -> None:

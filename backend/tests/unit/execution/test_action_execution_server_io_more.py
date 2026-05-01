@@ -14,7 +14,11 @@ from backend.ledger.action import (
     FileReadAction,
     FileWriteAction,
 )
-from backend.ledger.observation import ErrorObservation, FileReadObservation
+from backend.ledger.observation import (
+    CmdOutputObservation,
+    ErrorObservation,
+    FileReadObservation,
+)
 
 
 @pytest.fixture
@@ -63,13 +67,36 @@ async def test_run_action_strips_ansi_and_tolerates_message_setter_error(
 
 
 @pytest.mark.asyncio
-async def test_run_foreground_returns_error_when_default_session_missing(
+async def test_run_foreground_recreates_default_session_when_missing(mock_executor) -> None:
+    recreated = MagicMock(spec=BaseShellSession)
+    recreated.execute.return_value = CmdOutputObservation(
+        content='C:/ws',
+        command='pwd',
+        metadata={'exit_code': 0},
+    )
+    mock_executor.session_manager.get_session.return_value = None
+    mock_executor.session_manager.create_session.return_value = recreated
+
+    out = await mock_executor._run_foreground_cmd(CmdRunAction(command='pwd'))
+
+    assert isinstance(out, CmdOutputObservation)
+    assert out.content == 'C:/ws'
+    mock_executor.session_manager.create_session.assert_called_once_with(
+        session_id='default'
+    )
+
+
+@pytest.mark.asyncio
+async def test_read_returns_error_when_default_session_recreation_fails(
     mock_executor,
 ) -> None:
     mock_executor.session_manager.get_session.return_value = None
-    out = await mock_executor._run_foreground_cmd(CmdRunAction(command='pwd'))
+    mock_executor.session_manager.create_session.side_effect = RuntimeError('boom')
+
+    out = await mock_executor.read(FileReadAction(path='foo.txt'))
+
     assert isinstance(out, ErrorObservation)
-    assert 'not initialized' in out.content
+    assert 'recreation failed' in out.content
 
 
 @pytest.mark.asyncio
@@ -98,7 +125,9 @@ async def test_run_static_closes_temp_session_even_on_success(mock_executor) -> 
 
 @pytest.mark.asyncio
 async def test_read_binary_file_returns_binary_error(mock_executor) -> None:
-    mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
+    session = MagicMock(spec=BaseShellSession)
+    session.cwd = 'C:/ws'
+    mock_executor.session_manager.get_session.return_value = session
     with (
         patch('os.path.isfile', return_value=True),
         patch(
@@ -112,7 +141,9 @@ async def test_read_binary_file_returns_binary_error(mock_executor) -> None:
 
 @pytest.mark.asyncio
 async def test_read_file_editor_source_uses_aci_handler(mock_executor) -> None:
-    mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
+    session = MagicMock(spec=BaseShellSession)
+    session.cwd = 'C:/ws'
+    mock_executor.session_manager.get_session.return_value = session
     expected = FileReadObservation(path='x.py', content='ok')
     with patch.object(mock_executor, '_handle_aci_file_read', return_value=expected):
         out = await mock_executor.read(
@@ -123,7 +154,9 @@ async def test_read_file_editor_source_uses_aci_handler(mock_executor) -> None:
 
 @pytest.mark.asyncio
 async def test_read_workspace_permission_error_returns_guidance(mock_executor) -> None:
-    mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
+    session = MagicMock(spec=BaseShellSession)
+    session.cwd = 'C:/ws'
+    mock_executor.session_manager.get_session.return_value = session
     with patch.object(
         mock_executor, '_resolve_workspace_file_path', side_effect=PermissionError()
     ):
@@ -134,7 +167,9 @@ async def test_read_workspace_permission_error_returns_guidance(mock_executor) -
 
 @pytest.mark.asyncio
 async def test_read_dispatches_by_extension(mock_executor) -> None:
-    mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
+    session = MagicMock(spec=BaseShellSession)
+    session.cwd = 'C:/ws'
+    mock_executor.session_manager.get_session.return_value = session
     with (
         patch.object(
             mock_executor, '_resolve_workspace_file_path', return_value='C:/ws/a.png'
@@ -151,7 +186,9 @@ async def test_read_dispatches_by_extension(mock_executor) -> None:
 
 @pytest.mark.asyncio
 async def test_write_permission_error_path(mock_executor) -> None:
-    mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
+    session = MagicMock(spec=BaseShellSession)
+    session.cwd = 'C:/ws'
+    mock_executor.session_manager.get_session.return_value = session
     with patch.object(
         mock_executor,
         '_resolve_workspace_file_path',
@@ -164,7 +201,9 @@ async def test_write_permission_error_path(mock_executor) -> None:
 
 @pytest.mark.asyncio
 async def test_write_success_path(mock_executor) -> None:
-    mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
+    session = MagicMock(spec=BaseShellSession)
+    session.cwd = 'C:/ws'
+    mock_executor.session_manager.get_session.return_value = session
     with (
         patch.object(
             mock_executor, '_resolve_workspace_file_path', return_value='C:/ws/a.txt'
@@ -185,7 +224,9 @@ async def test_write_success_path(mock_executor) -> None:
 async def test_edit_permission_error_command_missing_and_directory_view(
     mock_executor,
 ) -> None:
-    mock_executor.session_manager.get_session.return_value = MagicMock(cwd='C:/ws')
+    session = MagicMock(spec=BaseShellSession)
+    session.cwd = 'C:/ws'
+    mock_executor.session_manager.get_session.return_value = session
     with patch.object(
         mock_executor, '_resolve_workspace_file_path', side_effect=PermissionError()
     ):

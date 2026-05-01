@@ -25,6 +25,16 @@ class DAPError(RuntimeError):
     """Raised when DAP communication fails."""
 
 
+class DAPStartPhaseError(DAPError):
+    """Debugger start failed during a specific startup phase."""
+
+    def __init__(self, phase: str, detail: str, *, timeout: float | None = None) -> None:
+        self.phase = phase
+        self.timeout = timeout
+        timeout_msg = f' after {timeout:.1f}s' if timeout and timeout > 0 else ''
+        super().__init__(f'debugger start failed during {phase}{timeout_msg}: {detail}')
+
+
 # ── Auto-discovery of DAP adapters ─────────────────────────────────────────
 #
 # Each entry maps a language label (matching ``adapter`` / ``language``) to a
@@ -520,43 +530,80 @@ class DAPDebugSession:
     def start(self, timeout: float = 15.0) -> dict[str, Any]:
         """Start the adapter, send launch/attach, and configure breakpoints."""
         session_started = time.monotonic()
-        self.client.start()
-        logger.info('DAP: sending initialize (session=%s)', self.session_id)
-        self.client.request('initialize', self._initialize_arguments(), timeout=timeout)
-        logger.info(
-            'DAP: sending %s request (session=%s)', self.request, self.session_id
-        )
-        self.start_request_seq = self.client.request_nowait(
-            self.request, self._start_arguments()
-        )
-        initialized = self.client.wait_for_event('initialized', timeout=timeout)
-        if initialized is None:
-            raise DAPError('DAP adapter did not send initialized event')
-        logger.info('DAP: initialized event received (session=%s)', self.session_id)
-        breakpoint_results = self._sync_all_breakpoints(timeout=timeout)
-        self.client.request('configurationDone', {}, timeout=timeout)
-        logger.info(
-            'DAP: configurationDone ack (session=%s, breakpoints=%d)',
-            self.session_id,
-            sum(len(v) for v in self.breakpoints_by_file.values()),
-        )
-        if self.start_request_seq is not None:
+        phase = 'spawn adapter'
+        try:
+            self.client.start()
+            logger.info('DAP: sending initialize (session=%s)', self.session_id)
+            phase = 'initialize request'
             try:
-                self.client.wait_for_response(
-                    self.start_request_seq, timeout=min(timeout, 1.0)
+                self.client.request(
+                    'initialize', self._initialize_arguments(), timeout=timeout
                 )
-            except DAPError:
-                logger.debug('DAP start response was not available yet', exc_info=True)
-        event = self._wait_for_pause_or_exit(timeout=0.5)
-        logger.info(
-            'DAP: ready in %.2fs (session=%s)',
-            time.monotonic() - session_started,
-            self.session_id,
-        )
-        return self._snapshot(
-            state='started',
-            extra={'breakpoints': breakpoint_results, 'event': event},
-        )
+            except DAPError as exc:
+                raise DAPStartPhaseError(
+                    phase, str(exc), timeout=timeout
+                ) from exc
+
+            logger.info(
+                'DAP: sending %s request (session=%s)', self.request, self.session_id
+            )
+            phase = f'{self.request} request'
+            self.start_request_seq = self.client.request_nowait(
+                self.request, self._start_arguments()
+            )
+            phase = 'initialized event'
+            initialized = self.client.wait_for_event('initialized', timeout=timeout)
+            if initialized is None:
+                raise DAPStartPhaseError(
+                    phase,
+                    'DAP adapter did not send initialized event',
+                    timeout=timeout,
+                )
+
+            logger.info('DAP: initialized event received (session=%s)', self.session_id)
+            phase = 'set breakpoints'
+            breakpoint_results = self._sync_all_breakpoints(timeout=timeout)
+            phase = 'configurationDone request'
+            try:
+                self.client.request('configurationDone', {}, timeout=timeout)
+            except DAPError as exc:
+                raise DAPStartPhaseError(
+                    phase, str(exc), timeout=timeout
+                ) from exc
+            logger.info(
+                'DAP: configurationDone ack (session=%s, breakpoints=%d)',
+                self.session_id,
+                sum(len(v) for v in self.breakpoints_by_file.values()),
+            )
+            if self.start_request_seq is not None:
+                try:
+                    self.client.wait_for_response(
+                        self.start_request_seq, timeout=min(timeout, 1.0)
+                    )
+                except DAPError:
+                    logger.debug('DAP start response was not available yet', exc_info=True)
+            event = self._wait_for_pause_or_exit(timeout=0.5)
+            logger.info(
+                'DAP: ready in %.2fs (session=%s)',
+                time.monotonic() - session_started,
+                self.session_id,
+            )
+            return self._snapshot(
+                state='started',
+                extra={'breakpoints': breakpoint_results, 'event': event},
+            )
+        except DAPStartPhaseError:
+            try:
+                self.client.close()
+            except Exception:
+                logger.debug('DAP client close after start-phase failure', exc_info=True)
+            raise
+        except Exception as exc:
+            try:
+                self.client.close()
+            except Exception:
+                logger.debug('DAP client close after startup failure', exc_info=True)
+            raise DAPStartPhaseError(phase, str(exc), timeout=timeout) from exc
 
     def set_breakpoints(
         self,
@@ -950,6 +997,14 @@ class DAPDebugManager:
             return self._observation(debug_action, payload)
         except Exception as exc:
             stderr_tail = self._stderr_tail_for(action)
+            phase = getattr(exc, 'phase', None)
+            timeout = getattr(exc, 'timeout', None)
+            phase_suffix = f'\nstartup_phase: {phase}' if phase else ''
+            timeout_suffix = (
+                f'\nstartup_timeout_seconds: {float(timeout):.1f}'
+                if isinstance(timeout, (int, float)) and timeout > 0
+                else ''
+            )
             suffix = f'\nadapter_stderr:\n{stderr_tail}' if stderr_tail else ''
             logger.warning(
                 'DAP: %s failed for session=%s: %s',
@@ -958,7 +1013,7 @@ class DAPDebugManager:
                 exc,
             )
             return ErrorObservation(
-                f'Debugger error: {type(exc).__name__}: {exc}{suffix}'
+                f'Debugger error: {type(exc).__name__}: {exc}{phase_suffix}{timeout_suffix}{suffix}'
             )
 
     def _drop_session(self, session: DAPDebugSession) -> None:
