@@ -288,7 +288,11 @@ def _process_files(files: list[Path], apply: bool) -> list[str]:
     changed_files: list[str] = []
 
     for path in files:
-        rel = os.path.relpath(path)
+        try:
+            rel = os.path.relpath(path)
+        except ValueError:
+            # e.g. Windows: path and cwd on different drive letters
+            rel = os.fspath(path)
         changed = process_file(path, apply=apply)
         if changed:
             changed_files.append(rel)
