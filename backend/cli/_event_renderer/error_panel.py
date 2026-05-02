@@ -336,6 +336,16 @@ _GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ),
     ),
     _GuidanceRule(
+        _any('provider limit reached', 'ratelimiterror:', 'serviceunavailableerror:'),
+        ErrorGuidance(
+            summary='The provider is briefly limiting requests (rate or capacity).',
+            steps=(
+                'Grinta retries automatically when this happens — no action needed for a single pause.',
+                'If it keeps repeating, wait a minute, try another model in /settings, or check quota/billing on the provider dashboard.',
+            ),
+        ),
+    ),
+    _GuidanceRule(
         _any(
             '429',
             'rate limit',
@@ -560,7 +570,14 @@ _NOTICE_TITLE_RULES: tuple[tuple[Callable[[str], bool], str], ...] = (
     (_has('intermediate control tool'), 'Continuing work'),
     (_has('fallback completion timed out'), 'Still no reply'),
     (
-        _any('rate limit', 'too many requests', '429', 'quota', 'billing'),
+        _any(
+            'rate limit',
+            'provider limit',
+            'too many requests',
+            '429',
+            'quota',
+            'billing',
+        ),
         'Rate or quota limit',
     ),
     (

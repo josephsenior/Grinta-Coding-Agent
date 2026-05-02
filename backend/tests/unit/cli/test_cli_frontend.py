@@ -764,6 +764,31 @@ async def test_renderer_timeout_error_with_autonomous_retry_uses_recovery_copy()
 
 
 @pytest.mark.asyncio
+async def test_renderer_rate_limit_queue_error_uses_notice_not_red_error() -> None:
+    """Compact provider limit copy must use calm notice panels, not Error / red chrome."""
+    from backend.ledger.observation import ErrorObservation
+
+    console = _make_console()
+    hud = HUDBar()
+    renderer = CLIEventRenderer(
+        console, hud, ReasoningDisplay(), loop=asyncio.get_running_loop()
+    )
+    await renderer.handle_event(
+        ErrorObservation(
+            content=(
+                'RateLimitError: provider limit reached.\n\n'
+                'Waiting before retrying - no action needed.'
+            )
+        )
+    )
+    output = _console_output(console)
+    assert 'Autonomous recovery' in output
+    assert 'Autonomous recovery is in progress' in output
+    assert hud.state.ledger_status != 'Error'
+    assert 'What you can try' not in output
+
+
+@pytest.mark.asyncio
 async def test_renderer_null_action_loop_uses_notice_panel_copy() -> None:
     from backend.ledger.observation import ErrorObservation
 
@@ -2725,7 +2750,7 @@ async def test_renderer_shows_retry_pending_status_in_hud() -> None:
 
     await renderer.handle_event(
         StatusObservation(
-            content=('Waiting on autonomous recovery: retry 1/3 in 5s after Timeout.'),
+            content='Auto-recovering · 1/3 in 5s · Timeout',
             status_type='retry_pending',
             extras={
                 'attempt': 1,
@@ -2737,7 +2762,7 @@ async def test_renderer_shows_retry_pending_status_in_hud() -> None:
     )
 
     output = _console_output(console)
-    assert 'autonomous recovery' in output.lower()
+    assert 'auto-recovering' in output.lower()
     assert hud.state.ledger_status == 'Backoff'
     assert hud.state.agent_state_label.startswith('Auto Retry 1/3')
 
@@ -2757,7 +2782,7 @@ async def test_renderer_preserves_retry_label_on_rate_limited_state_change() -> 
 
     await renderer.handle_event(
         StatusObservation(
-            content=('Waiting on autonomous recovery: retry 1/3 in 5s after Timeout.'),
+            content='Auto-recovering · 1/3 in 5s · Timeout',
             status_type='retry_pending',
             extras={'attempt': 1, 'max_attempts': 3, 'reason': 'Timeout'},
         )
@@ -2779,7 +2804,7 @@ async def test_renderer_dedupes_identical_retry_status_lines() -> None:
         console, HUDBar(), ReasoningDisplay(), loop=asyncio.get_running_loop()
     )
     obs = StatusObservation(
-        content='Waiting on autonomous recovery: retry 1/3 in 5s after RateLimitError.',
+        content='Auto-recovering · 1/3 in 5s · RateLimitError',
         status_type='retry_pending',
         extras={'attempt': 1, 'max_attempts': 3, 'reason': 'RateLimitError'},
     )
@@ -2788,7 +2813,7 @@ async def test_renderer_dedupes_identical_retry_status_lines() -> None:
     await renderer.handle_event(obs)
 
     output = _console_output(console)
-    assert output.count('status · Waiting on autonomous recovery') == 1
+    assert output.count('status · Auto-recovering') == 1
 
 
 @pytest.mark.asyncio

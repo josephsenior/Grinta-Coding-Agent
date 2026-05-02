@@ -121,6 +121,11 @@ RECOVERABLE_NOTICE_FRAGMENTS: tuple[str, ...] = (
     'retrying without streaming',
     'stream timed out',
     'fallback completion timed out',
+    # RecoveryService / providers: compact line has no space in "RateLimitError".
+    'provider limit',
+    'ratelimiterror',
+    'serviceunavailableerror',
+    'waiting before retrying',
     'rate limit',
     'too many requests',
     '429',

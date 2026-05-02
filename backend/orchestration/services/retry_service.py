@@ -215,9 +215,8 @@ class RetryService:
         self._compensate_iterations_for_connection_error(exc)
 
         human_message = (
-            'Waiting on autonomous recovery: retry '
-            f'{next_attempt}/{task.max_attempts} in '
-            f'{self._format_retry_delay(initial_delay)} after {type(exc).__name__}.'
+            f'Auto-recovering · {next_attempt}/{task.max_attempts} in '
+            f'{self._format_retry_delay(initial_delay)} · {type(exc).__name__}'
         )
         controller.state.set_last_error(
             f'{type(exc).__name__}: retry scheduled', source='RetryService'
@@ -463,10 +462,7 @@ class RetryService:
     def _emit_retry_resume_status(
         self, task: RetryTask, *, retry_reason: str, attempt: int
     ) -> None:
-        message = (
-            f'Autonomous recovery attempt {attempt}/{task.max_attempts} '
-            f'starting after {retry_reason}.'
-        )
+        message = f'Resuming · {attempt}/{task.max_attempts} · {retry_reason}'
         self._emit_retry_status(
             status_type='retry_resuming',
             content=message,
