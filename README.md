@@ -18,7 +18,13 @@
 >
 > **Current status:** `v1.0.0-rc1` public release candidate. Intended for real-world use, with focused community feedback requested before GA.
 
-![Grinta in action](docs/grinta-demo.gif)
+![Grinta in action — teaser (~35s)](docs/grinta-demo.gif)
+
+Full demo (~2.5 min, with audio):
+
+<video src="https://github.com/josephsenior/Grinta-Coding-Agent/raw/refs/heads/main/grinta-demo.mp4" controls playsinline width="100%"></video>
+
+If the player does not appear in your viewer, open the [full demo MP4](https://github.com/josephsenior/Grinta-Coding-Agent/raw/refs/heads/main/grinta-demo.mp4) directly.
 
 ## Release status
 
