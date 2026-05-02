@@ -30,7 +30,7 @@ from backend.cli.status_chrome import (
     pt_stats_row2_fragments,
     status_fields_from_hud,
 )
-from backend.cli.theme import MARK_PROMPT, prompt_toolkit_style_dict
+from backend.cli.theme import mark_prompt, prompt_toolkit_style_dict
 from backend.core.config import (
     AppConfig,
 )
@@ -972,7 +972,7 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             label = 'retry '
         else:
             label = ''
-        return f'{label}{MARK_PROMPT} '
+        return f'{label}{mark_prompt()} '
 
     def _prompt_placeholder(self) -> Any:
         from prompt_toolkit.formatted_text import FormattedText
@@ -1083,7 +1083,10 @@ class Repl(SlashCommandsMixin, SessionLifecycleMixin, RunHelpersMixin):
             fragments.append((style, text))
 
         if width < STATUS_CHROME_COMPACT_WIDTH:
-            add('class:prompt.dim', pt_compact_line_plain(fields))
+            add(
+                'class:prompt.dim',
+                pt_compact_line_plain(fields, term_width=width),
+            )
             self._append_footer_system_fragments(fragments, add)
             return fragments
 

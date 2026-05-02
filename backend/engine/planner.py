@@ -148,7 +148,7 @@ class OrchestratorPlanner:
             create_task_tracker_tool,
         )
 
-        if getattr(self._config, 'enable_internal_task_tracker', False):
+        if getattr(self._config, 'enable_task_tracker_tool', False):
             tools.append(create_task_tracker_tool())
         tools.append(create_search_code_tool())
         tools.append(create_read_symbol_definition_tool())
@@ -167,7 +167,7 @@ class OrchestratorPlanner:
             )
 
             tools.append(create_terminal_manager_tool())
-        if getattr(self._config, 'enable_debugger', True):
+        if getattr(self._config, 'enable_debugger', False):
             from backend.engine.tools.debugger import (
                 create_debugger_tool,
             )

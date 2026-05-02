@@ -468,7 +468,7 @@ async def test_read_blocks_when_session_cwd_drifts_outside_workspace(
     mock_executor._initial_cwd = str(workspace)
     mock_executor.security_config = SimpleNamespace(execution_profile='hardened_local')
 
-    mock_session = MagicMock(cwd=str(outside))
+    mock_session = MagicMock(spec=BaseShellSession, cwd=str(outside))
     mock_executor.session_manager.get_session.return_value = mock_session
 
     obs = await mock_executor.read(FileReadAction(path='secret.txt'))
@@ -487,7 +487,7 @@ async def test_read_allows_relative_file_within_workspace(mock_executor, tmp_pat
     mock_executor._initial_cwd = str(workspace)
     mock_executor.security_config = SimpleNamespace(execution_profile='hardened_local')
 
-    mock_session = MagicMock(cwd=str(nested))
+    mock_session = MagicMock(spec=BaseShellSession, cwd=str(nested))
     mock_executor.session_manager.get_session.return_value = mock_session
 
     obs = await mock_executor.read(FileReadAction(path='../allowed.txt'))

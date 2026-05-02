@@ -24,6 +24,13 @@ from backend.cli.theme import (
     CLR_WARN_ICON,
     STYLE_DEFAULT,
     STYLE_DIM,
+    STYLE_SYSTEM_TAG_AUTONOMY,
+    STYLE_SYSTEM_TAG_NOTE,
+    STYLE_SYSTEM_TAG_SETTINGS,
+    STYLE_SYSTEM_TAG_STATUS,
+    STYLE_SYSTEM_TAG_SYSTEM,
+    STYLE_SYSTEM_TAG_TIMEOUT,
+    STYLE_SYSTEM_TAG_WARNING,
 )
 from backend.cli.transcript import format_callout_panel
 from backend.core.task_status import (
@@ -181,12 +188,12 @@ def build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
 
 
 _SYSTEM_TAG_MAP: dict[str, tuple[str, str]] = {
-    'warning': ('[!]', 'yellow'),
-    'autonomy': ('[auto]', 'magenta'),
-    'status': ('[*]', 'blue'),
-    'settings': ('[cfg]', 'cyan'),
-    'system': ('[grinta]', 'cyan'),
-    'grinta': ('[grinta]', 'cyan'),
+    'warning': ('[!]', STYLE_SYSTEM_TAG_WARNING),
+    'autonomy': ('[auto]', STYLE_SYSTEM_TAG_AUTONOMY),
+    'status': ('[*]', STYLE_SYSTEM_TAG_STATUS),
+    'settings': ('[cfg]', STYLE_SYSTEM_TAG_SETTINGS),
+    'system': ('[grinta]', STYLE_SYSTEM_TAG_SYSTEM),
+    'grinta': ('[grinta]', STYLE_SYSTEM_TAG_SYSTEM),
 }
 
 
@@ -196,11 +203,11 @@ def system_message_tag(title: str) -> tuple[str, str]:
     if normalized in _SYSTEM_TAG_MAP:
         return _SYSTEM_TAG_MAP[normalized]
     if 'timeout' in normalized:
-        return '[time]', 'yellow'
+        return '[time]', STYLE_SYSTEM_TAG_TIMEOUT
     label = (title.strip() or 'note').replace('\n', ' ')
     if len(label) > 24:
         label = label[:21] + '...'
-    return f'[{label}]', 'cyan'
+    return f'[{label}]', STYLE_SYSTEM_TAG_NOTE
 
 
 _CANONICAL_SYSTEM_TITLES: dict[str, str] = {

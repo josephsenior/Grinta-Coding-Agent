@@ -9,6 +9,13 @@ from pathlib import Path
 
 from rich.console import Console
 
+from backend.cli.theme import (
+    CLR_BRAND_HUE,
+    CLR_STATUS_ERR,
+    CLR_STATUS_OK,
+    CLR_STATUS_WARN,
+    STYLE_DIM,
+)
 from backend.core.workspace_resolution import (
     workspace_agent_state_dir,
     workspace_grinta_root,
@@ -94,18 +101,19 @@ def run_storage_cleanup_command(
     try:
         report = cleanup_project_storage(resolved_project)
     except ValueError as exc:
-        active_console.print(f'[red]{exc}[/red]')
+        active_console.print(f'[{CLR_STATUS_ERR}]{exc}[/]')
         return 2
 
     if not report.touched_sources:
         active_console.print(
-            f'[dim]No legacy project data found. Canonical storage root: {report.canonical_root}[/dim]'
+            f'[{STYLE_DIM}]No legacy project data found. Canonical storage root: '
+            f'{report.canonical_root}[/]'
         )
         return 0
 
-    active_console.print('[bold green]Project storage cleanup complete.[/bold green]')
-    active_console.print(f'Project: [cyan]{report.project_root}[/cyan]')
-    active_console.print(f'Canonical root: [cyan]{report.canonical_root}[/cyan]')
+    active_console.print(f'[{CLR_STATUS_OK} bold]Project storage cleanup complete.[/]')
+    active_console.print(f'Project: [{CLR_BRAND_HUE}]{report.project_root}[/]')
+    active_console.print(f'Canonical root: [{CLR_BRAND_HUE}]{report.canonical_root}[/]')
     active_console.print(
         'Migrated entries: '
         f'[bold]{report.migrated_entries}[/bold]  '
@@ -116,7 +124,7 @@ def run_storage_cleanup_command(
     )
     if report.archived_conflicts:
         active_console.print(
-            f'[yellow]Conflicts were archived under {report.conflict_root}[/yellow]'
+            f'[{CLR_STATUS_WARN}]Conflicts were archived under {report.conflict_root}[/]'
         )
     return 0
 

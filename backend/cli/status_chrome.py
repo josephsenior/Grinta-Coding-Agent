@@ -29,6 +29,7 @@ from backend.cli.theme import (
     CLR_STATUS_OK,
     CLR_STATUS_WARN,
     STYLE_EMPTY,
+    use_ascii_cli_symbols,
 )
 
 # Below this terminal width, toolbar and Live fake prompt use one dense status line.
@@ -55,6 +56,16 @@ _FAKE_PROMPT_AUTONOMY_STYLES: dict[str, str] = {
 }
 
 SEP_ITEM: tuple[str, str] = (' · ', CLR_SEP)
+
+
+def workspace_path_display_max(term_width: int) -> int:
+    """Path ellipsis budget for compact status lines (tighter when *term_width* is small)."""
+    w = int(term_width)
+    if w < 48:
+        return 12
+    if w < STATUS_CHROME_COMPACT_WIDTH:
+        return 18
+    return 28
 
 
 @dataclass(frozen=True)
@@ -133,6 +144,17 @@ def autonomy_chrome_suffix(level: str) -> str:
 
 
 def ledger_icon(ledger_status: str) -> str:
+    if use_ascii_cli_symbols():
+        mapping = {
+            'Healthy': '*',
+            'Ready': 'o',
+            'Idle': 'o',
+            'Starting': '.',
+            'Review': '!',
+            'Paused': '=',
+            'Error': 'x',
+        }
+        return mapping.get(ledger_status, '?')
     mapping = {
         'Healthy': '●',
         'Ready': '○',
@@ -258,10 +280,13 @@ def rich_fake_prompt_input_row(fields: StatusFields) -> Any:
     return input_row
 
 
-def rich_fake_prompt_compact_line(fields: StatusFields) -> Text:
+def rich_fake_prompt_compact_line(
+    fields: StatusFields, *, term_width: int = 120
+) -> Text:
     """One dense line for narrow terminals (matches PT compact toolbar)."""
     ws = fields.workspace_path
-    ws_prefix = f'{HUDBar.ellipsize_path(ws, 28)} · ' if ws else ''
+    path_budget = workspace_path_display_max(term_width)
+    ws_prefix = f'{HUDBar.ellipsize_path(ws, path_budget)} · ' if ws else ''
     autonomy_display = autonomy_chrome_suffix(fields.autonomy_level)
     line = (
         f'{ws_prefix}{fields.agent_state_label} · {autonomy_display} · '
@@ -274,7 +299,7 @@ def rich_fake_prompt_compact_line(fields: StatusFields) -> Text:
 def rich_fake_prompt_group(fields: StatusFields, width: int) -> Group:
     """Full fake prompt body for Live mode at *width* columns."""
     if width < STATUS_CHROME_COMPACT_WIDTH:
-        return Group(rich_fake_prompt_compact_line(fields))
+        return Group(rich_fake_prompt_compact_line(fields, term_width=width))
     items: list[Any] = [
         rich_fake_prompt_input_row(fields),
         Text('─' * width, style=CLR_SEP),
@@ -284,10 +309,11 @@ def rich_fake_prompt_group(fields: StatusFields, width: int) -> Group:
     return Group(*items)
 
 
-def pt_compact_line_plain(fields: StatusFields) -> str:
+def pt_compact_line_plain(fields: StatusFields, *, term_width: int = 120) -> str:
     """Plain string for prompt_toolkit compact toolbar (single styled line)."""
     ws = fields.workspace_path
-    ws_prefix = f'{HUDBar.ellipsize_path(ws, 28)} · ' if ws else ''
+    path_budget = workspace_path_display_max(term_width)
+    ws_prefix = f'{HUDBar.ellipsize_path(ws, path_budget)} · ' if ws else ''
     autonomy_display = autonomy_chrome_suffix(fields.autonomy_level)
     return (
         f'{ws_prefix}{fields.agent_state_label} · {autonomy_display} · '

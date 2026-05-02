@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 from backend.cli.repl import Repl
 from backend.cli.status_chrome import StatusFields, pt_stats_row2_fragments
-from backend.cli.theme import MARK_ERR, MARK_INFO, MARK_OK, MARK_PROMPT
+from backend.cli.theme import mark_err, mark_info, mark_ok, mark_prompt
 from backend.cli.transcript import format_activity_result_secondary
 from backend.core.config import AppConfig
 
@@ -20,14 +20,21 @@ def test_transcript_uses_canonical_markers() -> None:
     err = format_activity_result_secondary('failed', kind='err')
     neutral = format_activity_result_secondary('note', kind='neutral')
 
-    assert MARK_OK in ok.plain
-    assert MARK_ERR in err.plain
-    assert MARK_INFO in neutral.plain
+    assert mark_ok() in ok.plain
+    assert mark_err() in err.plain
+    assert mark_info() in neutral.plain
+
+
+def test_mark_ok_uses_ascii_when_flagged(monkeypatch) -> None:
+    from backend.cli import theme as theme_mod
+
+    monkeypatch.setattr(theme_mod, 'use_ascii_cli_symbols', lambda: True)
+    assert theme_mod.mark_ok() == '+'
 
 
 def test_prompt_marker_uses_theme_constant() -> None:
     repl = _make_repl()
-    assert MARK_PROMPT in repl._prompt_message()
+    assert mark_prompt() in repl._prompt_message()
 
 
 def test_prompt_stats_row2_omits_mcp_and_skills_by_default() -> None:
@@ -71,13 +78,20 @@ def test_core_cli_renderers_avoid_raw_style_literals() -> None:
         repo / 'backend/cli/confirmation.py',
         repo / 'backend/cli/_event_renderer/panels.py',
         repo / 'backend/cli/_event_renderer/action_renderers_mixin.py',
+        repo / 'backend/cli/_event_renderer/apply_patch.py',
         repo / 'backend/cli/session_manager.py',
         repo / 'backend/cli/sessions_cli.py',
         repo / 'backend/cli/diff_renderer.py',
-        repo / 'backend/cli/main.py',
+        repo / 'backend/cli/storage_cleanup.py',
+        repo / 'backend/cli/_repl/run_helpers_mixin.py',
     )
     banned = ("style='dim'", "style='default'", "style='bold'", "style='bold dim'")
     for path in targets:
         content = path.read_text(encoding='utf-8')
         for needle in banned:
             assert needle not in content, f'{path} still contains {needle}'
+    patch_src = (repo / 'backend/cli/_event_renderer/apply_patch.py').read_text(
+        encoding='utf-8'
+    )
+    assert "style='dim green'" not in patch_src
+    assert "style='dim red'" not in patch_src

@@ -29,7 +29,7 @@ If you observe latencies meaningfully worse than p95 targets, investigate before
 ## Tuning levers
 
 - **`/compact`** — manually condense history when context gets tight.
-- **`enable_internal_task_tracker`** — improves long-task discipline at a small token cost.
+- **`enable_task_tracker_tool`** — improves long-task discipline at a small token cost.
 - **`enable_think`** — improves weak-model success at a moderate token cost; usually not needed for o1/r1/deepseek-reasoner.
 - **Disable unused MCP servers** — every connected server adds tools to the prompt.
 - **Use `--model`** to switch to a cheaper model for routine tasks (`gpt-4o-mini`, `gemini-2.5-flash`, local 7B).

@@ -6,7 +6,7 @@
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Install: pipx](https://img.shields.io/badge/install-pipx-brightgreen)](docs/INSTALL.md)
 [![mypy: checked](https://img.shields.io/badge/mypy-checked-2A6DB2.svg)](https://mypy-lang.org/)
-[![code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![code style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Tests](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/py-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/py-tests.yml)
 [![Lint](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/lint.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/lint.yml)
 [![CLI Regression](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml/badge.svg)](https://github.com/josephsenior/Grinta-Coding-Agent/actions/workflows/e2e-tests.yml)
@@ -111,9 +111,7 @@ Contributors: CI runs the full unit corpus on Linux and Windows ([docs/CI.md](do
 
 ## The story behind Grinta
 
-Grinta is a single-author project, written and rewritten in public. The journey — what was killed, what was wrong, what got rebuilt — lives in the **Book of Grinta**:
-
-[`preface-why-this-story-matters.md`](preface-why-this-story-matters.md) → [`00-the-meaning-of-grinta.md`](00-the-meaning-of-grinta.md) → … → [`31-the-myth-of-the-committee.md`](31-the-myth-of-the-committee.md). Full index in [BOOK_OF_GRINTA.md](BOOK_OF_GRINTA.md).
+Grinta is a single-author project, written and rewritten in public. The journey — what was killed, what was wrong, what got rebuilt — is **The Book of Grinta**: start at [Preface](docs/journey/preface-why-this-story-matters.md) → [00 · Meaning of Grinta](docs/journey/00-the-meaning-of-grinta.md) through the numbered chapters to [38 · Vendor-Neutral Bench](docs/journey/38-the-vendor-neutral-bench.md), then the epilogue [07 · The Road Ahead](docs/journey/07-the-road-ahead.md). Full index and act structure: [docs/journey/README.md](docs/journey/README.md). Stable shortcut from the repo root: [BOOK_OF_GRINTA.md](BOOK_OF_GRINTA.md).
 
 ## Quick start (from source)
 
@@ -201,6 +199,7 @@ Task validation can block finish calls when tracked work is incomplete.
 
 ## Documentation
 
+- [Documentation hub](docs/README.md)
 - [User Guide](docs/USER_GUIDE.md)
 - [Quick Start](docs/QUICK_START.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)

@@ -56,3 +56,28 @@ class DebuggerAction(Action):
             f'ADAPTER: {self.adapter or self.adapter_id or self.language or ""}\n'
             f'PROGRAM: {self.program or ""}'
         )
+
+
+def is_debugger_action(action: object) -> bool:
+    """Return True for debugger tool actions.
+
+    ``isinstance(..., DebuggerAction)`` can fail when duplicate module loads produce
+    distinct ``DebuggerAction`` classes. Fall back to the string tool id, instance
+    fields, and the concrete class name (agent replay / schema paths).
+    """
+
+    def _is_dbg_token(v: object) -> bool:
+        if v is None:
+            return False
+        if v == ActionType.DEBUGGER or v == 'debugger':
+            return True
+        return getattr(v, 'value', None) == 'debugger'
+
+    if isinstance(action, DebuggerAction):
+        return True
+    if type(action).__name__ == 'DebuggerAction':
+        return True
+    for key in (getattr(type(action), 'action', None), getattr(action, 'action', None)):
+        if _is_dbg_token(key):
+            return True
+    return False

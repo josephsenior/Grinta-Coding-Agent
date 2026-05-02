@@ -11,6 +11,7 @@ from backend.core.constants import (
     DEFAULT_AGENT_NAME,
     DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY,
     DEFAULT_AGENT_STREAMING_CHECKPOINT_MAX_AGE_SECONDS,
+    DEFAULT_AGENT_TASK_TRACKER_TOOL_ENABLED,
 )
 
 
@@ -67,6 +68,10 @@ class TestAgentConfigDefaults:
             cfg.streaming_checkpoint_discard_stale_on_recovery
             is DEFAULT_AGENT_STREAMING_CHECKPOINT_DISCARD_STALE_ON_RECOVERY
         )
+
+    def test_default_enable_task_tracker_tool(self):
+        cfg = AgentConfig()
+        assert cfg.enable_task_tracker_tool is DEFAULT_AGENT_TASK_TRACKER_TOOL_ENABLED
 
 
 class TestAgentConfigValidation:

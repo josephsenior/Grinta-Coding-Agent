@@ -29,13 +29,14 @@ from backend.core.constants import (
     DEFAULT_AGENT_COMPLEXITY_ITERATION_MULTIPLIER,
     DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED,
     DEFAULT_AGENT_CONFIRM_ACTIONS,
+    DEFAULT_AGENT_DEBUGGER_ENABLED,
     DEFAULT_AGENT_DYNAMIC_ITERATIONS_ENABLED,
     DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT,
     DEFAULT_AGENT_ERROR_RATE_WINDOW,
     DEFAULT_AGENT_FINISH_ENABLED,
     DEFAULT_AGENT_HISTORY_TRUNCATION_ENABLED,
     DEFAULT_AGENT_HYBRID_RETRIEVAL_ENABLED,
-    DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED,
+    DEFAULT_AGENT_TASK_TRACKER_TOOL_ENABLED,
     DEFAULT_AGENT_MAX_AUTONOMOUS_ITERATIONS,
     DEFAULT_AGENT_MAX_CONSECUTIVE_ERRORS,
     DEFAULT_AGENT_MAX_ERROR_RATE,
@@ -178,7 +179,13 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
 
     # Agent Tools configuration
     enable_terminal: bool = Field(default=True)
-    enable_debugger: bool = Field(default=True)
+    enable_debugger: bool = Field(
+        default=DEFAULT_AGENT_DEBUGGER_ENABLED,
+        description=(
+            'Expose the interactive DAP `debugger` tool. When false, the tool is omitted '
+            'and the system prompt states that debugging is disabled for this run.'
+        ),
+    )
     enable_editor: bool = Field(default=True)
     enable_working_memory: bool = Field(default=True)
     enable_lsp_query: bool = Field(
@@ -281,9 +288,9 @@ class AgentConfig(BaseModel, metaclass=CanonicalModelMetaclass):
         default=DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS,
         description='Number of iterations without progress before triggering stuck handling',
     )
-    enable_internal_task_tracker: bool = Field(
-        default=DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED,
-        description='Enable the internal task progress tracker tool',
+    enable_task_tracker_tool: bool = Field(
+        default=DEFAULT_AGENT_TASK_TRACKER_TOOL_ENABLED,
+        description='Enable the task_tracker tool for structured multi-step plans.',
     )
 
     # Memory features

@@ -283,7 +283,10 @@ def show_grinta_splash(console: Any | None = None) -> None:
     _D = STYLE_DIM
 
     _TAGLINE = 'AI coding agent for the terminal.'
-    _HINT = 'Describe a task in plain language · /help for commands · /quit to leave'
+    _HINT = (
+        'Describe a task · /help · /settings · /sessions · '
+        'grinta sessions list · /quit to leave'
+    )
 
     def _body(visible: int, *, tagline: bool = False) -> Group:
         figlet = Text()
@@ -315,7 +318,9 @@ def show_grinta_splash(console: Any | None = None) -> None:
             rows.append(Text(''))
         return Group(*rows)
 
-    if not console.is_terminal:
+    from backend.cli.theme import splash_anim_disabled
+
+    if not console.is_terminal or splash_anim_disabled():
         console.print(_frame(len(_figlet_lines), tagline=True, hint=True))
         return
 
@@ -481,15 +486,24 @@ async def _ensure_onboarded(
         ensure_default_model(config)
         return config
 
+    from backend.cli.theme import (
+        CLR_STATUS_ERR,
+        MSG_STYLE_PROVIDER_HINT,
+        MSG_STYLE_SUCCESS_MARK,
+        STYLE_DIM,
+        mark_ok,
+    )
+
     detected_provider = auto_detect_api_keys(config)
     if detected_provider and not needs_onboarding(config):
         console.print(
-            f'  [green]✓[/green] Auto-detected API key from environment '
-            f'([cyan]{detected_provider}[/cyan])',
+            f'  [{MSG_STYLE_SUCCESS_MARK}]{mark_ok()}[/] Auto-detected API key from '
+            f'environment ([{MSG_STYLE_PROVIDER_HINT}]{detected_provider}[/])',
         )
         console.print(
-            '  [dim][bold]Next:[/bold] REPL: [bold]/help[/bold], [bold]/settings[/bold]. '
-            'Shell: [bold]grinta --help[/bold], [bold]grinta sessions list[/bold].[/dim]',
+            f'  [{STYLE_DIM}][bold]Next:[/bold] REPL: [bold]/help[/bold], '
+            '[bold]/settings[/bold]. Shell: [bold]grinta --help[/bold], '
+            f'[bold]grinta sessions list[/bold].[/{STYLE_DIM}]',
         )
         ensure_default_model(config)
         return config
@@ -499,7 +513,8 @@ async def _ensure_onboarded(
     _apply_cli_overrides(config, model, resolved_project, get_project_local_data_root)
     if needs_onboarding(config):
         console.print(
-            '[red]No API key configured. Run `grinta init` to configure provider, model, and API key.[/red]'
+            f'[{CLR_STATUS_ERR}]No API key configured. Run `grinta init` to configure '
+            'provider, model, and API key.[/]'
         )
         return None
     return config

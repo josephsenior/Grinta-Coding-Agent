@@ -66,7 +66,7 @@ def cmd_list(console: Console, limit: int = 50) -> int:
             '[bold]grinta[/bold], then use this view to resume or export it.[/]'
         )
         return 0
-    table = _build_session_table()
+    table = _build_session_table(console)
     for i, (sid, meta, count, _path) in enumerate(rows, 1):
         table.add_row(*_format_session_row(i, sid, meta, count))
     console.print(table)
@@ -78,22 +78,26 @@ def cmd_list(console: Console, limit: int = 50) -> int:
     return 0
 
 
-def _build_session_table() -> Table:
+def _build_session_table(console: Console) -> Table:
+    tw = max(40, int(getattr(console, 'width', None) or 80))
+    title_max = max(12, min(40, (tw * 32) // 100))
+    id_max = max(8, min(14, tw // 8))
     table = Table(
         title='Sessions',
         title_style=CLR_CARD_TITLE,
         border_style=CLR_CARD_BORDER,
         show_lines=True,
         box=box.ROUNDED,
-        padding=(1, 2),
+        padding=(1, 1),
+        expand=False,
     )
-    table.add_column('#', style=STYLE_DIM)
-    table.add_column('ID')
-    table.add_column('Title')
-    table.add_column('Model', style=STYLE_DIM)
-    table.add_column('Events', justify='right')
-    table.add_column('Cost', justify='right')
-    table.add_column('Updated', style=STYLE_DIM)
+    table.add_column('#', style=STYLE_DIM, no_wrap=True)
+    table.add_column('ID', max_width=id_max, overflow='fold', no_wrap=False)
+    table.add_column('Title', max_width=title_max, overflow='fold')
+    table.add_column('Model', style=STYLE_DIM, max_width=max(10, tw // 12), overflow='fold')
+    table.add_column('Events', justify='right', no_wrap=True)
+    table.add_column('Cost', justify='right', no_wrap=True)
+    table.add_column('Updated', style=STYLE_DIM, max_width=22, overflow='fold')
     return table
 
 

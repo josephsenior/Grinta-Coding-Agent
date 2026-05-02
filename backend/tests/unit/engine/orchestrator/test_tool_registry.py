@@ -17,11 +17,12 @@ def _make_config(**kwargs):
     cfg.enable_editor = True
     cfg.enable_run_tests = True
     cfg.enable_apply_patch = True
-    cfg.enable_internal_task_tracker = True
+    cfg.enable_task_tracker_tool = True
     cfg.enable_checkpoints = True
     cfg.enable_working_memory = True
     cfg.enable_verify_file_lines = True
     cfg.enable_browsing = True
+    cfg.enable_debugger = True
     cfg.mcp.servers = []
 
     for k, v in kwargs.items():
@@ -126,6 +127,15 @@ class TestFeatureFlagToolPresence:
         names = _build_toolset(enable_terminal=False)
         assert 'terminal_manager' not in names
 
+    def test_debugger_enabled(self):
+        names = _build_toolset(enable_debugger=True)
+        assert 'debugger' in names
+        self._assert_dispatch_covered(names)
+
+    def test_debugger_disabled(self):
+        names = _build_toolset(enable_debugger=False)
+        assert 'debugger' not in names
+
     def test_editor_enabled(self):
         names = _build_toolset(enable_editor=True)
         assert 'text_editor' in names
@@ -163,12 +173,12 @@ class TestFeatureFlagToolPresence:
         assert 'communicate_with_user' not in names
 
     def test_task_tracker_enabled(self):
-        names = _build_toolset(enable_internal_task_tracker=True)
+        names = _build_toolset(enable_task_tracker_tool=True)
         assert 'task_tracker' in names
         self._assert_dispatch_covered(names)
 
     def test_task_tracker_disabled(self):
-        names = _build_toolset(enable_internal_task_tracker=False)
+        names = _build_toolset(enable_task_tracker_tool=False)
         assert 'task_tracker' not in names
 
     def test_condensation_request_enabled(self):
@@ -227,12 +237,13 @@ class TestFeatureFlagToolPresence:
             enable_checkpoints=False,
             enable_mcp=False,
             enable_meta_cognition=False,
-            enable_internal_task_tracker=False,
+            enable_task_tracker_tool=False,
             enable_condensation_request=False,
             enable_working_memory=False,
             enable_swarming=False,
             enable_lsp_query=False,
             enable_browsing=False,
+            enable_debugger=False,
         )
         self._assert_dispatch_covered(names)
 
@@ -251,10 +262,11 @@ class TestFeatureFlagToolPresence:
                 enable_checkpoints=True,
                 enable_mcp=True,
                 enable_meta_cognition=True,
-                enable_internal_task_tracker=True,
+                enable_task_tracker_tool=True,
                 enable_condensation_request=True,
                 enable_working_memory=True,
                 enable_swarming=True,
                 enable_lsp_query=True,
+                enable_debugger=True,
             )
         self._assert_dispatch_covered(names)

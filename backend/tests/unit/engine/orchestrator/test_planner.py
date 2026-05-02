@@ -24,6 +24,7 @@ def _make_config(**kwargs):
     cfg.enable_browsing = False
     cfg.enable_native_browser = False
     cfg.enable_editor = True
+    cfg.enable_debugger = True
     cfg.enable_first_turn_orientation_prompt = False
     cfg.merge_control_system_into_primary = False
     for k, v in kwargs.items():

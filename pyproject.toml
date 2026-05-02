@@ -10,7 +10,7 @@ version = "1.0.0rc1"
 description = "Grinta: Your AI-Powered Development Platform"
 readme = "README.md"
 license = "MIT"
-authors = [ { name = "Grinta Team" } ]
+authors = [ { name = "Youssef Mejdi" } ]
 requires-python = ">=3.12,<3.14"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
@@ -106,6 +106,7 @@ dev = [
   "types-requests>=2.32.4.20260107",
   "types-setuptools>=80.9.0.20250529",
   "types-toml>=0.10.8.20240310",
+  "vulture>=2.14",
 ]
 test = [
   "pytest>=8.4",
@@ -243,6 +244,18 @@ exclude_dirs = [ "backend/tests" ]
 
 # Use a project-local environment only: run `uv sync` in this repo, then `uv run …`.
 # Avoid `pip install` into the global Python alongside unrelated agent stacks; that causes resolver conflicts.
+
+[tool.vulture]
+# Find dead code: `uv run vulture` (optionally: `--min-confidence 100`).
+paths = [ "backend", "launch", "packaging/vulture_whitelist.py" ]
+exclude = [
+  "backend/tests",
+  "backend/evaluation",
+  "backend/conftest.py",
+  "**/__pycache__",
+]
+min_confidence = 90
+sort_by_size = true
 
 [tool.uv]
 constraint-dependencies = [ "transformers<4.47.0" ]

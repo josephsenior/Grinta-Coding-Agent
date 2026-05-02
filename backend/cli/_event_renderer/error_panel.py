@@ -354,6 +354,45 @@ _GUIDANCE_RULES: tuple[_GuidanceRule, ...] = (
         ),
     ),
     _GuidanceRule(
+        _any(
+            '503',
+            '502',
+            '504',
+            'service unavailable',
+            'temporarily unavailable',
+            'bad gateway',
+            'gateway timeout',
+            'overloaded',
+            'over capacity',
+            'capacity error',
+        ),
+        ErrorGuidance(
+            summary='The provider endpoint is temporarily overloaded or unavailable.',
+            steps=(
+                'Wait briefly and retry — these errors are often transient.',
+                'Check the provider status page for outages.',
+                'If it persists, try another model in /settings or a different provider.',
+            ),
+        ),
+    ),
+    _GuidanceRule(
+        _any(
+            'econnrefused',
+            'connection refused',
+            'name or service not known',
+            'nodename nor servname',
+            'getaddrinfo failed',
+        ),
+        ErrorGuidance(
+            summary='Grinta could not open a network connection to the host.',
+            steps=(
+                'Verify the base URL in /settings and that the service is running.',
+                'Check VPN, proxy, and firewall rules; retry on a stable network.',
+                'For local servers (Ollama, LM Studio), confirm the port is listening.',
+            ),
+        ),
+    ),
+    _GuidanceRule(
         _any('404', 'model not found', 'does not exist', 'unknown model'),
         ErrorGuidance(
             summary='The configured model name is not available from the selected provider.',

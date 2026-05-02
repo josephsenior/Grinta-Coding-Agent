@@ -1,21 +1,31 @@
-import json
-import os
+"""Historical helper for estimating aggregate tool-schema token count.
+
+Constructing an accurate OpenAI-style tool list requires a fully wired
+``OrchestratorPlanner`` (``AppConfig`` / ``LLM`` / ``OrchestratorSafetyManager``),
+which this standalone script does not build.
+
+For dead-code and maintenance scans, prefer::
+
+    uv run vulture
+
+For prompt/tool size debugging at runtime, use ``APP_DEBUG_PROMPT_METRICS`` (see
+``OrchestratorPlanner`` / CLI) or inspect ``build_toolset()`` from a REPL session.
+
+See ``docs/investigations/dead_code_audit_report.md``.
+"""
+
+from __future__ import annotations
+
 import sys
 
-sys.path.insert(0, '.')
-os.environ['APP_SETTINGS_FILE'] = 'settings.json'
 
-from backend.engine.planner import OrchestratorPlanner
-from backend.persistence.data_models.settings import Settings
+def main() -> None:
+    sys.stderr.write(
+        'measure_tokens.py no longer mirrors the planner stack; '
+        'see docs/investigations/dead_code_audit_report.md\n'
+    )
+    raise SystemExit(2)
 
-settings = Settings.model_validate(json.load(open('settings.json')))
-planner = OrchestratorPlanner(settings)  # type: ignore
-tools = planner.get_tools()  # type: ignore
-tools_json = json.dumps(tools, default=str)
-print(f'Tool count: {len(tools)}')
-print(f'Tool schema total chars: {len(tools_json)}')
-print(f'Approx tool tokens: {len(tools_json) // 4}')
-for t in tools:
-    n = t.get('name') or t.get('function', {}).get('name', '?')
-    sz = len(json.dumps(t))
-    print(f'  {n}: ~{sz // 4} tokens')
+
+if __name__ == '__main__':
+    main()

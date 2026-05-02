@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from backend.cli._typing import RunHelpersHost
 from backend.cli.event_renderer import CLIEventRenderer
+from backend.cli.theme import CLR_STATUS_ERR, STYLE_DIM
 from backend.core.config import AppConfig
 from backend.core.enums import AgentState, EventSource
 from backend.ledger.action import MessageAction
@@ -294,11 +295,12 @@ class RunHelpersMixin:
         session: Any | None,
         renderer: Any,
     ) -> None:
+        tip = '/help · /settings · /sessions'
         if agent.config.enable_mcp:
-            msg = 'Chat ready. MCP tools warming in background.'
+            msg = f'Chat ready. MCP tools warming in background. {tip}'
         else:
             self._hud.update_mcp_servers(0)
-            msg = 'Ready. Describe a task or type /help.'
+            msg = f'Ready. Describe a task or type {tip}.'
         if session is not None:
             self._set_footer_system_line(msg)
         else:
@@ -324,18 +326,20 @@ class RunHelpersMixin:
         except KeyboardInterrupt:
             if not self._prompt_ctrl_c_hint_shown:
                 self._console.print(
-                    '[dim]At the prompt, type /quit to exit. During a run, '
+                    f'[{STYLE_DIM}]At the prompt, type /quit to exit. During a run, '
                     'Ctrl+C asks the agent to stop; some terminals may need '
-                    'a second press.[/dim]'
+                    'a second press.[/]'
                 )
                 self._prompt_ctrl_c_hint_shown = True
             return ''
         except EOFError:
-            self._console.print('[dim]Input closed. Exiting.[/dim]')
+            self._console.print(f'[{STYLE_DIM}]Input closed. Exiting.[/]')
             return None
         except Exception as e:
             logger.exception('Prompt input failed')
-            self._console.print(f'[red]Prompt input failed:[/red] {e}')
+            self._console.print(
+                f'[{CLR_STATUS_ERR}]Prompt input failed:[/] {e}',
+            )
             return None
 
         if not self._running:

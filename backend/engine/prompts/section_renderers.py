@@ -163,7 +163,7 @@ def _render_routing(
     meta_cognition_on = getattr(config, 'enable_meta_cognition', False)
     working_memory_on = getattr(config, 'enable_working_memory', True)
     condensation_on = getattr(config, 'enable_condensation_request', False)
-    tracker_on = getattr(config, 'enable_internal_task_tracker', False)
+    tracker_on = getattr(config, 'enable_task_tracker_tool', False)
     batch_cmds = _choose(
         is_windows,
         f'Use **PowerShell** only for environment actions (install, build, test, git, processes). '
@@ -270,32 +270,41 @@ def _render_system_capabilities(
 
     fc_line = f'- **Function-calling mode**: `{fc_mode}`.'
 
-    # Runtime-detected language servers and debug adapters. These come from a
-    # live probe so the agent never has to shell out (`Get-Command`, `which`)
-    # to answer "do I have an LSP / debugger" questions.
+    # Runtime-detected language servers / debug adapters — only when those tools
+    # are enabled in config (omit bullets entirely when gated off).
     lsp_line, dap_line = _render_runtime_detection_lines(config)
+    detection_block = '\n'.join(line for line in (lsp_line, dap_line) if line)
+    runtime_discovery_hint = (
+        '\nIn particular, **never run shell commands like `Get-Command`/`which`/`where` '
+        'to discover language servers or debug adapters** — the bullets in this section '
+        'for those tools are the authoritative answer.'
+        if detection_block
+        else ''
+    )
 
     return (
         '# 🧭 System Capabilities (verified at runtime)\n'
         'The following statements are derived from live config and feature flags. '
-        'Treat them as authoritative — do not contradict them in user-facing replies. '
-        'In particular, **never run shell commands like `Get-Command`/`which`/`where` '
-        'to discover language servers or debug adapters** — the lines below are the '
-        'authoritative answer.\n\n'
+        'Treat them as authoritative — do not contradict them in user-facing replies.'
+        f'{runtime_discovery_hint}\n\n'
         f'{parallel_line}\n'
         f'{provider_line}\n'
         f'{multi_edit_line}\n'
         f'{condensation_line}\n'
         f'{checkpoint_line}\n'
         f'{fc_line}\n'
-        f'{lsp_line}\n'
-        f'{dap_line}'
+        f'{detection_block}'
     )
 
 
 def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
-    """Return ``(lsp_line, dap_line)`` summarizing detected runtimes."""
+    """Return ``(lsp_line, dap_line)`` summarizing detected runtimes.
+
+    When ``enable_lsp_query`` / ``enable_debugger`` is false, returns ``''`` for that
+    line so the capability block omits the tool entirely (no \"DISABLED\" bullet).
+    """
     lsp_enabled = bool(getattr(config, 'enable_lsp_query', True))
+    debugger_enabled = bool(getattr(config, 'enable_debugger', False))
     try:
         from backend.utils.runtime_detect import (
             detection_summary,
@@ -303,8 +312,8 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
             has_any_lsp_server,
         )
 
-        any_lsp = bool(has_any_lsp_server())
-        any_dap = bool(has_any_debug_adapter())
+        any_lsp = bool(has_any_lsp_server()) if lsp_enabled else False
+        any_dap = bool(has_any_debug_adapter()) if debugger_enabled else False
         summary = (
             detection_summary()
             if (any_lsp or any_dap)
@@ -320,7 +329,7 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
 
     lsp_available = summary.get('lsp_available', []) if any_lsp else []
     if not lsp_enabled:
-        lsp_line = '- **Language servers (LSP)**: tool DISABLED in this run.'
+        lsp_line = ''
     elif lsp_available:
         lsp_line = (
             '- **Language servers (LSP / `lsp`)**: detected on PATH → '
@@ -338,19 +347,22 @@ def _render_runtime_detection_lines(config: Any) -> tuple[str, str]:
             'typescript-language-server`, `rustup component add rust-analyzer`.'
         )
 
-    debug_available = summary.get('debug_available', []) if any_dap else []
-    if debug_available:
-        dap_line = (
-            '- **Debug adapters (DAP / `debugger`)**: detected → '
-            f'{", ".join(debug_available)}. The `debugger` tool resolves the right '
-            'adapter automatically from the file extension or `adapter` field; do not '
-            'pass `adapter_command` unless you have a custom binary.'
-        )
+    if not debugger_enabled:
+        dap_line = ''
     else:
-        dap_line = (
-            '- **Debug adapters (DAP / `debugger`)**: none detected (Python `debugpy` '
-            'normally ships bundled — if it is missing the install is broken).'
-        )
+        debug_available = summary.get('debug_available', []) if any_dap else []
+        if debug_available:
+            dap_line = (
+                '- **Debug adapters (DAP / `debugger`)**: detected → '
+                f'{", ".join(debug_available)}. The `debugger` tool resolves the right '
+                'adapter automatically from the file extension or `adapter` field; do not '
+                'pass `adapter_command` unless you have a custom binary.'
+            )
+        else:
+            dap_line = (
+                '- **Debug adapters (DAP / `debugger`)**: none detected (Python `debugpy` '
+                'normally ships bundled — if it is missing the install is broken).'
+            )
     return lsp_line, dap_line
 
 
@@ -368,9 +380,8 @@ def _render_security(cli_mode: bool = True) -> str:
         '# 🔐 Security Risk Policy\n'
         '`security_risk` is **required** on every call to `execute_bash`/`execute_powershell`, '
         '`text_editor`, `symbol_editor`, and `browser`. Pick one of `LOW` / `MEDIUM` / `HIGH` '
-        'based on the action you are about to take. The server runs an independent analyzer '
-        'and may **escalate** your label (never lower it); a HIGH escalation can require user '
-        'confirmation. Missing or invalid values fail the tool call.\n\n'
+        'based on the action you are about to take. The server may escalate your risk label; '
+        'it never lowers it. Missing or invalid values fail the call.\n\n'
         f'{risk_block}\n\n'
         '**Global Rules**\n'
         '- Always escalate to **HIGH** if sensitive data leaves the environment.\n'
@@ -418,7 +429,7 @@ def _render_autonomy(
         if lsp_available
         else '- `search_code` returns nothing → try alternate search terms, do not fall back to shell.'
     )
-    tracker_on = getattr(config, 'enable_internal_task_tracker', False)
+    tracker_on = getattr(config, 'enable_task_tracker_tool', False)
     if tracker_on:
         task_tracker_discipline_block = (
             '<TASK_TRACKING>\n'

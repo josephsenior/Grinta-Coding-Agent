@@ -413,7 +413,7 @@ def _collect_system_prompt_sections(
                 'system_partial_05_examples',
                 _render_examples(
                     tracker_on=bool(
-                        getattr(config, 'enable_internal_task_tracker', False)
+                        getattr(config, 'enable_task_tracker_tool', False)
                     ),
                     enable_think=effective_enable_think,
                     meta_cognition_on=bool(
@@ -765,7 +765,7 @@ def _cli_measure_default() -> None:
         autonomy_level='balanced',
         enable_checkpoints=False,
         enable_lsp_query=False,
-        enable_internal_task_tracker=False,
+        enable_task_tracker_tool=False,
         enable_permissions=False,
         enable_meta_cognition=False,
     )

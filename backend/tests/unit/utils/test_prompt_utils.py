@@ -172,7 +172,7 @@ class TestOrchestratorPromptManager:
             autonomy_level='balanced',
             enable_checkpoints=False,
             enable_lsp_query=False,
-            enable_internal_task_tracker=False,
+            enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -196,7 +196,7 @@ class TestOrchestratorPromptManager:
             autonomy_level='balanced',
             enable_checkpoints=False,
             enable_lsp_query=False,
-            enable_internal_task_tracker=False,
+            enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -217,7 +217,7 @@ class TestOrchestratorPromptManager:
             autonomy_level='balanced',
             enable_checkpoints=False,
             enable_lsp_query=False,
-            enable_internal_task_tracker=False,
+            enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -238,7 +238,7 @@ class TestOrchestratorPromptManager:
             autonomy_level='balanced',
             enable_checkpoints=False,
             enable_lsp_query=False,
-            enable_internal_task_tracker=False,
+            enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -263,7 +263,7 @@ class TestOrchestratorPromptManager:
             autonomy_level='balanced',
             enable_checkpoints=False,
             enable_lsp_query=True,
-            enable_internal_task_tracker=False,
+            enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -288,7 +288,7 @@ class TestOrchestratorPromptManager:
             autonomy_level='balanced',
             enable_checkpoints=False,
             enable_lsp_query=True,
-            enable_internal_task_tracker=False,
+            enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -315,7 +315,7 @@ class TestOrchestratorPromptManager:
             autonomy_level='balanced',
             enable_checkpoints=False,
             enable_lsp_query=False,
-            enable_internal_task_tracker=False,
+            enable_task_tracker_tool=False,
             enable_permissions=False,
             enable_meta_cognition=False,
             enable_think=False,
@@ -532,7 +532,7 @@ class TestPromptBuilderSectionTokens:
         cfg.autonomy_level = 'balanced'
         cfg.enable_checkpoints = False
         cfg.enable_lsp_query = False
-        cfg.enable_internal_task_tracker = False
+        cfg.enable_task_tracker_tool = False
         cfg.enable_permissions = False
         cfg.enable_meta_cognition = False
 
@@ -559,8 +559,8 @@ def _make_budget_cfg(**overrides: object) -> MagicMock:
     cfg.autonomy_level = overrides.get('autonomy_level', 'balanced')
     cfg.enable_checkpoints = False
     cfg.enable_lsp_query = False
-    cfg.enable_internal_task_tracker = bool(
-        overrides.get('enable_internal_task_tracker', False)
+    cfg.enable_task_tracker_tool = bool(
+        overrides.get('enable_task_tracker_tool', False)
     )
     cfg.enable_permissions = False
     cfg.enable_meta_cognition = False
@@ -620,7 +620,7 @@ class TestPromptBudgetRegression:
     def test_full_autonomy_tracker_mcp_token_ceiling(self) -> None:
         from backend.engine.prompts.prompt_builder import measure_system_prompt_sections
 
-        cfg = _make_budget_cfg(autonomy_level='full', enable_internal_task_tracker=True)
+        cfg = _make_budget_cfg(autonomy_level='full', enable_task_tracker_tool=True)
         report = measure_system_prompt_sections(
             active_llm_model='gpt-4',
             is_windows=False,
@@ -652,8 +652,8 @@ def _base_config(**overrides: object) -> SimpleNamespace:
         autonomy_level=overrides.get('autonomy_level', 'balanced'),
         enable_checkpoints=bool(overrides.get('enable_checkpoints', False)),
         enable_lsp_query=bool(overrides.get('enable_lsp_query', False)),
-        enable_internal_task_tracker=bool(
-            overrides.get('enable_internal_task_tracker', False)
+        enable_task_tracker_tool=bool(
+            overrides.get('enable_task_tracker_tool', False)
         ),
         enable_permissions=False,
         enable_meta_cognition=bool(overrides.get('enable_meta_cognition', False)),
@@ -756,6 +756,55 @@ class TestValidateRenderKeys:
                 _render_partial('fake_partial.md')  # no kwargs
 
 
+def test_render_runtime_detection_omits_disabled_tools() -> None:
+    """Gated-off LSP/debugger: no capability bullet (not a DISABLED line)."""
+    from backend.engine.prompts.section_renderers import _render_runtime_detection_lines
+
+    lsp_empty, dap_empty = _render_runtime_detection_lines(
+        SimpleNamespace(enable_lsp_query=False, enable_debugger=False)
+    )
+    assert lsp_empty == ''
+    assert dap_empty == ''
+
+    with (
+        patch(
+            'backend.utils.runtime_detect.has_any_debug_adapter',
+            return_value=True,
+        ),
+        patch(
+            'backend.utils.runtime_detect.detection_summary',
+            return_value={
+                'lsp_available': [],
+                'debug_available': ['debugpy'],
+            },
+        ),
+    ):
+        _, dap_on = _render_runtime_detection_lines(
+            SimpleNamespace(enable_debugger=True, enable_lsp_query=False)
+        )
+    assert 'detected' in dap_on
+    assert '`debugger`' in dap_on
+
+
+def test_system_capabilities_skips_lsp_dap_discovery_hint_when_both_gated_off() -> None:
+    """No runtime-probe paragraph if there are no LSP/DAP bullets."""
+    from backend.engine.prompts.section_renderers import _render_system_capabilities
+
+    cfg = SimpleNamespace(
+        enable_parallel_tool_scheduling=False,
+        enable_checkpoints=False,
+        enable_lsp_query=False,
+        enable_debugger=False,
+    )
+    text = _render_system_capabilities(
+        cfg,
+        function_calling_mode='native',
+        multi_edit_available=False,
+        parallel_tool_calls_provider_flag=False,
+    )
+    assert 'Get-Command' not in text
+
+
 class TestBuildSystemPromptRenders:
     """Integration-level tests: build_system_prompt must not raise PromptRenderError
     for any supported feature-flag combination, and must produce non-empty output.
@@ -831,7 +880,7 @@ class TestBuildSystemPromptRenders:
         result = self._assert_renders_cleanly(
             active_llm_model='gpt-4o',
             is_windows=False,
-            config=_base_config(enable_internal_task_tracker=True),
+            config=_base_config(enable_task_tracker_tool=True),
             function_calling_mode='native',
         )
         assert 'task_tracker' in result

@@ -19,7 +19,6 @@ from backend.core.config.security_config import SecurityConfig
 from backend.core.constants import (
     BROWSER_TOOL_SYNC_TIMEOUT_SECONDS,
     TOOL_BRIDGE_TIMEOUT_BUFFER,
-    TOOL_BRIDGE_TIMEOUT_DEBUGGER,
     TOOL_BRIDGE_TIMEOUT_FILE_IO,
     TOOL_BRIDGE_TIMEOUT_LSP_QUERY,
     TOOL_BRIDGE_TIMEOUT_TERMINAL_IO,
@@ -51,7 +50,7 @@ from backend.ledger.action.terminal import (
     TerminalReadAction,
     TerminalRunAction,
 )
-from backend.ledger.observation import Observation
+from backend.ledger.observation import ErrorObservation, Observation
 from backend.security.analyzer import SecurityAnalyzer
 from backend.utils.async_utils import call_async_from_sync
 
@@ -394,22 +393,31 @@ class LocalRuntimeInProcess(ActionExecutionClient):
         return call_async_from_sync(self._executor.terminal_read, timeout, action)
 
     def debugger(self, action: DebuggerAction) -> Observation:
-        """Execute a debugger action via RuntimeExecutor.
+        """Execute a debugger action via :meth:`DAPDebugManager.handle`.
 
-        The bridge timeout is taken from ``action.timeout`` when set, capped at the
-        debugger pending-action floor. This prevents the historical mismatch where
-        a hardcoded 60 s sync bridge fired before the controller's 600 s ceiling,
-        making cold ``debugpy.adapter`` startups look frozen in the UI.
+        ``run_action`` runs ``LocalRuntimeInProcess.debugger`` on asyncio's default
+        executor (sync bridge). Avoid ``RuntimeExecutor.debugger`` here: that path
+        uses ``asyncio.to_thread(handle, ...)`` on a nested event loop, and on Windows
+        the inner default pool could still queue ``handle`` for tens of seconds under
+        load — ``app.log`` then showed ``_handle_action START DebuggerAction`` with no
+        ``DEBUGGER_DISPATCH``. Calling sync ``handle`` on this worker matches the
+        intended offload (we are already off the agent event loop) and removes the
+        extra scheduling hop.
+
+        Pending-action timeouts are enforced by the controller; see
+        ``pending_action_service`` for debugger ceilings.
         """
+        if not self._agent_debugger_enabled():
+            return ErrorObservation(
+                content=(
+                    'Interactive debugger is disabled for this session '
+                    '(enable_debugger is false in agent config). '
+                    'Set enable_debugger=true on the agent to use the DAP debugger tool.'
+                )
+            )
         if self._executor is None:
             raise AgentRuntimeDisconnectedError('Runtime not initialized')
-        # Keep sync-bridge timeout aligned with the pending-action floor for
-        # debugger actions so the bridge never expires before watchdog policy.
-        timeout = max(
-            self._bridge_timeout(action, TOOL_BRIDGE_TIMEOUT_DEBUGGER),
-            float(TOOL_BRIDGE_TIMEOUT_DEBUGGER),
-        )
-        return call_async_from_sync(self._executor.debugger, timeout, action)
+        return self._executor.debug_manager.handle(action)
 
     def lsp_query(self, action: LspQueryAction) -> Observation:
         """Execute LSP query via RuntimeExecutor."""

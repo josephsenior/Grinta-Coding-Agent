@@ -4,6 +4,13 @@ from __future__ import annotations
 
 import re
 
+from backend.cli.theme import (
+    STYLE_DELEGATE_DONE,
+    STYLE_DELEGATE_FAILED,
+    STYLE_DELEGATE_RUNNING,
+    STYLE_DELEGATE_STARTING,
+)
+
 # -- Reasoning / thought sanitisation ----------------------------------------
 
 # Matches both <redacted_thinking> (Anthropic/MiniMax) and <think> (DeepSeek
@@ -150,8 +157,8 @@ CRITICAL_ERROR_FRAGMENTS: tuple[str, ...] = (
 )
 
 DELEGATE_WORKER_STATUS_STYLES: dict[str, str] = {
-    'starting': 'cyan',
-    'running': 'yellow',
-    'done': 'green',
-    'failed': 'red',
+    'starting': STYLE_DELEGATE_STARTING,
+    'running': STYLE_DELEGATE_RUNNING,
+    'done': STYLE_DELEGATE_DONE,
+    'failed': STYLE_DELEGATE_FAILED,
 }

@@ -12,6 +12,7 @@ from backend.cli.status_chrome import (
     rich_compact_hud_line,
     rich_fake_prompt_group,
     status_fields_from_hud,
+    workspace_path_display_max,
 )
 from backend.cli.theme import prompt_toolkit_style_dict
 
@@ -23,6 +24,28 @@ def test_status_fields_token_display_matches_hud_style() -> None:
     bar.state.token_usage_estimated = True
     fields = status_fields_from_hud(bar.state, bar.bundled_skill_count)
     assert fields.token_display_compact == '1.5K/8.0K~'
+
+
+def test_workspace_path_display_max_tiers() -> None:
+    assert workspace_path_display_max(40) == 12
+    assert workspace_path_display_max(60) == 18
+    assert workspace_path_display_max(100) == 28
+
+
+def test_pt_compact_line_shortens_path_on_narrow_terminal() -> None:
+    bar = HUDBar()
+    bar.state.workspace_path = '/very/long/nested/project/app/src'
+    bar.state.agent_state_label = 'Ready'
+    bar.state.autonomy_level = 'balanced'
+    bar.state.model = 'openai/gpt-4o-mini'
+    bar.state.context_tokens = 0
+    bar.state.context_limit = 0
+    bar.state.cost_usd = 0.0
+    fields = status_fields_from_hud(bar.state, bar.bundled_skill_count)
+    wide = pt_compact_line_plain(fields, term_width=120)
+    narrow = pt_compact_line_plain(fields, term_width=44)
+    assert len(narrow) < len(wide)
+    assert '…' in narrow or '/' in narrow
 
 
 def test_pt_compact_line_joins_same_segments_as_toolbar_contract() -> None:

@@ -19,6 +19,34 @@ import logging
 
 from backend.core.logger import app_logger as logger
 
+_LOGRECORD_EXTRA_FORBIDDEN: frozenset[str] | None = None
+
+
+def _logrecord_keys_that_forbid_extra() -> frozenset[str]:
+    """Names that cannot appear in ``Logger.log(..., extra=...)`` without raising.
+
+    ``logging.Logger.makeRecord`` rejects any ``extra`` key that already exists on
+    ``LogRecord`` (see CPython ``logging/__init__.py``). A collision raises
+    ``KeyError`` and the log line is never emitted — easy to mistake for “logging
+    is broken” when structured fields reuse names like ``filename``, ``module``, or
+    ``process``.
+    """
+    global _LOGRECORD_EXTRA_FORBIDDEN
+    if _LOGRECORD_EXTRA_FORBIDDEN is None:
+        sample = logging.LogRecord(
+            name='',
+            level=logging.DEBUG,
+            pathname='',
+            lineno=0,
+            msg='',
+            args=(),
+            exc_info=None,
+        )
+        _LOGRECORD_EXTRA_FORBIDDEN = frozenset(sample.__dict__) | frozenset(
+            ('message', 'asctime')
+        )
+    return _LOGRECORD_EXTRA_FORBIDDEN
+
 
 def _dap_log(
     level: int,
@@ -32,10 +60,13 @@ def _dap_log(
     INFO is promoted to WARNING so traces survive ``LOG_LEVEL=WARNING`` and match
     how operators grep ``app.log`` for hangs (startup lines are never silently dropped).
     """
+    forbidden = _logrecord_keys_that_forbid_extra()
     extra: dict[str, Any] = {'msg_type': msg_type}
     for key, val in fields.items():
-        if val is not None:
-            extra[key] = val
+        if val is None:
+            continue
+        safe_key = key if key not in forbidden else f'dap_{key}'
+        extra[safe_key] = val
     effective = logging.WARNING if level == logging.INFO else level
     # Prefix so plain-text grep on app.log ``message`` finds traces even if JSON
     # formatting or tooling only surfaces the main record message.
@@ -232,10 +263,12 @@ class DAPClient:
             return
         if not self.adapter_command:
             raise DAPError('DAP adapter command is empty')
-        logger.info(
-            'DAP: spawning adapter %s (cwd=%s)',
-            self.adapter_command[0],
-            self.cwd,
+        _dap_log(
+            logging.INFO,
+            f'spawning adapter {self.adapter_command[0]} (cwd={self.cwd})',
+            msg_type='DAP_ADAPTER_SPAWN',
+            adapter_argv0=self.adapter_command[0],
+            dap_cwd=self.cwd,
         )
         spawn_started = time.monotonic()
         try:
@@ -267,10 +300,12 @@ class DAPClient:
             # the half-spawned subprocess so we never leak a debugpy.adapter.
             self.close()
             raise
-        logger.info(
-            'DAP: adapter pid=%s alive after %.2fs',
-            getattr(self.process, 'pid', None),
-            time.monotonic() - spawn_started,
+        _dap_log(
+            logging.INFO,
+            'adapter subprocess alive after spawn',
+            msg_type='DAP_ADAPTER_SPAWN',
+            adapter_pid=getattr(self.process, 'pid', None),
+            spawn_elapsed_seconds=round(time.monotonic() - spawn_started, 3),
         )
 
     def close(self) -> None:
@@ -596,7 +631,13 @@ class DAPDebugSession:
                 process_poll=proc.poll() if proc is not None else None,
                 elapsed_seconds=round(time.monotonic() - session_started, 3),
             )
-            logger.info('DAP: sending initialize (session=%s)', self.session_id)
+            _dap_log(
+                logging.INFO,
+                'sending DAP initialize',
+                msg_type='DAP_START_PHASE',
+                dap_phase='initialize_send',
+                dap_session_id=self.session_id,
+            )
             phase = 'initialize request'
             try:
                 self.client.request(
@@ -615,9 +656,6 @@ class DAPDebugSession:
                 elapsed_seconds=round(time.monotonic() - session_started, 3),
             )
 
-            logger.info(
-                'DAP: sending %s request (session=%s)', self.request, self.session_id
-            )
             phase = f'{self.request} request'
             self.start_request_seq = self.client.request_nowait(
                 self.request, self._start_arguments()
@@ -648,7 +686,6 @@ class DAPDebugSession:
                 elapsed_seconds=round(time.monotonic() - session_started, 3),
             )
 
-            logger.info('DAP: initialized event received (session=%s)', self.session_id)
             phase = 'set breakpoints'
             breakpoint_results = self._sync_all_breakpoints(time_left)
             phase = 'configurationDone request'
@@ -658,10 +695,16 @@ class DAPDebugSession:
                 raise DAPStartPhaseError(
                     phase, str(exc), timeout=wall_budget
                 ) from exc
-            logger.info(
-                'DAP: configurationDone ack (session=%s, breakpoints=%d)',
-                self.session_id,
-                sum(len(v) for v in self.breakpoints_by_file.values()),
+            _dap_log(
+                logging.INFO,
+                'configurationDone acknowledged',
+                msg_type='DAP_START_PHASE',
+                dap_phase='configuration_done_ok',
+                dap_session_id=self.session_id,
+                breakpoint_entries_count=sum(
+                    len(v) for v in self.breakpoints_by_file.values()
+                ),
+                elapsed_seconds=round(time.monotonic() - session_started, 3),
             )
             if self.start_request_seq is not None:
                 try:
@@ -672,11 +715,6 @@ class DAPDebugSession:
                     logger.debug('DAP start response was not available yet', exc_info=True)
             event = self._wait_for_pause_or_exit(timeout=min(0.5, time_left()))
             elapsed_total = time.monotonic() - session_started
-            logger.info(
-                'DAP: ready in %.2fs (session=%s)',
-                elapsed_total,
-                self.session_id,
-            )
             _dap_log(
                 logging.INFO,
                 'DAP session started successfully',
@@ -1107,20 +1145,25 @@ class DAPDebugManager:
         """Dispatch a debugger action and wrap it as an observation."""
         debug_action = (action.debug_action or '').strip().lower()
         timeout = float(action.timeout or 10.0)
+        start_timeout = max(timeout, 15.0)
+        _dap_log(
+            logging.INFO,
+            f'Debugger dispatch: {debug_action or "<empty>"}',
+            msg_type='DEBUGGER_DISPATCH',
+            debug_action=debug_action or None,
+            session_id=action.session_id,
+            program=action.program,
+            workspace_root=str(self.workspace_root),
+            process_cwd=str(Path.cwd()),
+            adapter_hint=action.adapter_id or action.language or action.adapter,
+            timeout_seconds=timeout,
+            effective_timeout_seconds=start_timeout
+            if debug_action == 'start'
+            else timeout,
+        )
         try:
             if debug_action == 'start':
-                _dap_log(
-                    logging.INFO,
-                    'Debugger tool: start',
-                    msg_type='DEBUGGER_TOOL',
-                    debug_action='start',
-                    program=action.program,
-                    workspace_root=str(self.workspace_root),
-                    process_cwd=str(Path.cwd()),
-                    adapter_hint=action.adapter_id or action.language,
-                    timeout_seconds=max(timeout, 15.0),
-                )
-                payload = self._start(action, timeout=max(timeout, 15.0))
+                payload = self._start(action, timeout=start_timeout)
             else:
                 session = self._get_session(action.session_id)
                 try:

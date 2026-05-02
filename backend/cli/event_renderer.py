@@ -44,16 +44,9 @@ from backend.cli.layout_tokens import (
 )
 from backend.cli.path_links import file_uri_for_path, linkify_plain
 from backend.cli.theme import (
-    CLR_BRAND,
     CLR_ERR_BODY,
     CLR_ERR_ICON,
-    CLR_HUD_DETAIL,
-    CLR_HUD_MODEL,
-    CLR_META,
-    CLR_SEP,
-    CLR_STATE_RUNNING,
     CLR_STATUS_ERR,
-    CLR_STATUS_OK,
     CLR_STATUS_WARN,
     CLR_USER_BORDER,
     CLR_WARN_BODY,

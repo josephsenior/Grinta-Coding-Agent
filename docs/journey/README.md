@@ -4,6 +4,8 @@
 
 By Youssef Mejdi, AI Engineering Student, 4th Year
 
+**Inventory note:** Chapter-specific counts (services, tools, heuristics, compactors, and similar) and file paths track the codebase around **[v1.0.0-rc1](../RELEASE_NOTES_v1.0.0-rc1.md)** unless a chapter says otherwise. For what shipped today, prefer **[Architecture](../ARCHITECTURE.md)** and the source under `backend/`.
+
 ---
 
 ## Why This Exists
@@ -36,7 +38,7 @@ What survived was the engine: a single, focused agent that plans, implements, te
 
 Seven months. Three distinct phases. One principle.
 
-**Month 1 (September 2025):** Research. I spent the entire first month not writing code. I studied tech stacks, architectures, agent behaviors, terminal multiplexing, event sourcing patterns, and the design decisions of every major coding agent I could find — Claude Code, OpenHands, SWE-Agent, Devin, Aider, LangChain. I mapped out what they did well, where they cut corners, and where the gaps were. I learned how OpenHands treats sessions as durable event streams. I studied how Claude Code uses PTY-based terminal multiplexing. I analyzed how SWE-Agent makes tool design the center of agent behavior. This month produced no code, but it produced the design convictions that survived every pivot.
+**Month 1 (September 2025):** Research. I spent the entire first month not writing code. I studied tech stacks, architectures, agent behaviors, terminal multiplexing, event sourcing patterns, and the design decisions of every major coding agent I could find — Claude Code, OpenHands, SWE-Agent, Devin, Aider, LangChain. I mapped out what they did well, where they cut corners, and where the gaps were. I learned how OpenHands treats sessions as durable event streams. I analyzed how SWE-Agent makes tool design the center of agent behavior. This month produced no code, but it produced the design convictions that survived every pivot.
 
 **Months 2–3 (October–November 2025):** The Core. I built the agent loop, the reasoning engine via function-calling dispatch, the tool system with 30+ tools, and the LLM abstraction layer with three native client families plus a compatibility fallback. I designed the event stream with pub/sub, the event store with append-only persistence, and the state machine with 12 explicit states and validated transitions. This was the foundation — the behavior, the state machine, the event stream. The hardest, most intellectually demanding phase. Everything that came after was built on top of what I got right (and wrong) during these two months.
 
@@ -113,6 +115,26 @@ Chapter 07 was written earlier in the repo's life, but it now reads best as the 
 | [37](38-the-vendor-neutral-bench.md) | **The Vendor-Neutral Bench** | The internal eval pack: why the scorer refuses to drive other agents, how the five 0–5 metrics compose, why failure caps the score at 49, and what vendor-neutral honestly does (and does not) mean. |
 | [07](07-the-road-ahead.md) | **The Road Ahead** | What is still experimental, what deserves improvement, and why the most honest ending for this project is still unfinished. |
 
+### Short reading paths
+
+If you will not read linearly, three curated arcs:
+
+- **Reliability and proof:** [19 · Surviving the Crash](19-surviving-the-crash.md) → [20 · Circuit Breakers](20-circuit-breakers-and-hallucinations.md) → [21 · Safety Sandbox](21-the-safety-sandbox-is-not-optional.md) → [22 · Who Grades the Agent](22-who-grades-the-agent.md) → [23 · Middleware Contract](23-the-middleware-contract.md).
+- **Pivot and subtraction:** [02 · Killed Darlings](02-the-killed-darlings.md) → [12 · Open Source Was the Better Business](12-open-source-was-the-better-business.md) → [31 · Myth of the Committee](31-the-myth-of-the-committee.md).
+- **Terminal and execution:** [11 · Console Wars](11-the-console-wars.md) → [31 · Two Lives of the Terminal](32-the-two-lives-of-the-terminal.md) → [32 · Small Async Wars](33-the-small-async-wars.md) → [33 · Fuzzy Match Heresy](34-the-fuzzy-match-heresy.md).
+
+### Reference companion
+
+Use these when a chapter names a subsystem and you want current behavior in prose:
+
+| Topic | Doc |
+| --- | --- |
+| Orchestration, ledger, pipeline, inference | [Architecture](../ARCHITECTURE.md); implementation under `backend/inference/` |
+| CLI usage, flags, UX | [User Guide](../USER_GUIDE.md), [Quick Start](../QUICK_START.md) |
+| Repo layout, tests, contribution | [Developer Guide](../DEVELOPER.md), [CI](../CI.md) |
+| Terms and symbols | [Vocabulary](../VOCABULARY.md) |
+| Security posture | [Security checklist](../SECURITY_CHECKLIST.md), [Reliability](../RELIABILITY.md) |
+
 ---
 
 ## Who This Is For
@@ -142,7 +164,7 @@ If you are a student and want to follow a similar path:
 
 ## A Note on Honesty
 
-I was inspired by OpenHands' event sourcing. I studied Claude Code's terminal multiplexing. I looked at how SWE-Agent designs tools. I'm not hiding that.
+I was inspired by OpenHands' event sourcing. I looked at how SWE-Agent designs tools. I'm not hiding that.
 
 What I built on top of those inspirations — the service decomposition, the multi-strategy compaction system, the stuck detector, the model-agnostic inference layer, the security hardening — that's mine. And the things I tried and failed at — the multi-agent swarm, the self-improvement framework, the prompt optimizer — those are mine too.
 

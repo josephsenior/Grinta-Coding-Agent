@@ -44,6 +44,7 @@ from backend.ledger.action import (
     AgentThinkAction,
     CmdRunAction,
     FileEditAction,
+    is_debugger_action,
     FileReadAction,
     FileWriteAction,
     TaskTrackingAction,
@@ -60,6 +61,7 @@ from backend.ledger.observation_cause import attach_observation_cause
 from backend.ledger.serialization.action import ACTION_TYPE_TO_CLASS
 from backend.security import SecurityAnalyzer, options
 from backend.utils.async_utils import (
+    DEBUGGER_SYNC_EXECUTOR,
     GENERAL_TIMEOUT,
     call_async_from_sync,
     call_sync_from_async,
@@ -419,6 +421,16 @@ class Runtime(
         message = f'[runtime {self.sid}] {message}'
         getattr(logger, level)(message, stacklevel=2)
 
+    def _agent_debugger_enabled(self) -> bool:
+        """Whether agent config enables the interactive DAP debugger tool."""
+        from backend.core.config.app_config import AppConfig
+
+        cfg = self.config
+        if isinstance(cfg, AppConfig):
+            return bool(cfg.get_agent_config(cfg.default_agent).enable_debugger)
+        # Tests may pass a slim stub; default permissive when unspecified.
+        return bool(getattr(cfg, 'enable_debugger', True))
+
     def set_runtime_status(
         self, runtime_status: RuntimeStatus, msg: str = '', level: str = 'info'
     ) -> None:
@@ -491,6 +503,35 @@ class Runtime(
             # and returns a graceful ErrorObservation when no servers are
             # connected.
             return await self.call_tool_mcp(event)
+        # ``call_sync_from_async`` schedules ``run_action`` on the asyncio loop's
+        # *default* executor. Under load those workers can sit queued behind other
+        # sync actions while the controller already logged ``_handle_action START
+        # DebuggerAction`` — producing multi‑minute gaps with no ``DEBUGGER_DISPATCH``.
+        # Routing through ``EXECUTOR`` alone still queued debugger work behind heavy
+        # ``call_async_from_sync`` bridge traffic; use ``DEBUGGER_SYNC_EXECUTOR``.
+        if is_debugger_action(event):
+            if not self._agent_debugger_enabled():
+                return ErrorObservation(
+                    content=(
+                        'Interactive debugger is disabled for this session '
+                        '(enable_debugger is false in agent config). '
+                        'Set enable_debugger=true on the agent to use the DAP debugger tool.'
+                    )
+                )
+            loop = asyncio.get_running_loop()
+            logger.warning(
+                '[DEBUGGER_BRIDGE] scheduling run_action on DEBUGGER_SYNC_EXECUTOR '
+                '(action id=%s, type=%s)',
+                getattr(event, 'id', '?'),
+                type(event).__name__,
+                extra={
+                    'msg_type': 'DEBUGGER_RUN_ACTION_SCHEDULED',
+                    'action_id': getattr(event, 'id', None),
+                },
+            )
+            return await loop.run_in_executor(
+                DEBUGGER_SYNC_EXECUTOR, self.run_action, event
+            )
         return await call_sync_from_async(self.run_action, event)
 
     def _handle_runtime_error(
@@ -670,6 +711,24 @@ class Runtime(
 
         if isinstance(action, TaskTrackingAction):
             return self._handle_task_tracking_action(action)
+
+        if is_debugger_action(action):
+            if not self._agent_debugger_enabled():
+                return ErrorObservation(
+                    content=(
+                        'Interactive debugger is disabled for this session '
+                        '(enable_debugger is false in agent config). '
+                        'Set enable_debugger=true on the agent to use the DAP debugger tool.'
+                    )
+                )
+            logger.warning(
+                '[DEBUGGER_BRIDGE] run_action entered on worker thread (action id=%s)',
+                getattr(action, 'id', '?'),
+                extra={
+                    'msg_type': 'DEBUGGER_RUN_ACTION_ENTER',
+                    'action_id': getattr(action, 'id', None),
+                },
+            )
 
         # Check confirmation state
         confirmation_result = self._check_action_confirmation(action)
