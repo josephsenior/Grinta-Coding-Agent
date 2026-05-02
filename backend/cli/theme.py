@@ -31,6 +31,39 @@ def no_color_enabled() -> bool:
     """Respect NO_COLOR and a Grinta-specific override."""
     return _env_truthy('NO_COLOR') or _env_truthy('GRINTA_NO_COLOR')
 
+
+def use_ascii_cli_symbols() -> bool:
+    """When true, use ASCII-friendly markers instead of Unicode (``GRINTA_ASCII=1``)."""
+    if _env_truthy('GRINTA_ASCII'):
+        return True
+    enc = (os.environ.get('PYTHONIOENCODING') or '').strip().lower()
+    return enc == 'ascii'
+
+
+def mark_ok() -> str:
+    return '+' if use_ascii_cli_symbols() else MARK_OK
+
+
+def mark_err() -> str:
+    return 'x' if use_ascii_cli_symbols() else MARK_ERR
+
+
+def mark_warn() -> str:
+    return '!' if use_ascii_cli_symbols() else MARK_WARN
+
+
+def mark_info() -> str:
+    return '*' if use_ascii_cli_symbols() else MARK_INFO
+
+
+def mark_prompt() -> str:
+    return '>' if use_ascii_cli_symbols() else MARK_PROMPT
+
+
+def splash_anim_disabled() -> bool:
+    """Skip splash ``Live`` animation (``GRINTA_NO_SPLASH_ANIM=1``)."""
+    return _env_truthy('GRINTA_NO_SPLASH_ANIM')
+
 # ── Backgrounds ────────────────────────────────────────────────────────────────
 HUD_BG = 'grey15'  # HUD footer background
 
@@ -93,6 +126,27 @@ CLR_SECONDARY_ERR = 'dim red'  # secondary row (error)
 # ── Diff colors ───────────────────────────────────────────────────────────────
 CLR_DIFF_ADD = 'green'  # added lines
 CLR_DIFF_REM = 'red'  # removed lines
+CLR_DIFF_ADD_DIM = 'dim green'  # apply_patch +N delta (secondary line)
+CLR_DIFF_REM_DIM = 'dim red'  # apply_patch -N delta
+
+# ── Inline Rich markup (prefer these over raw [red] / [green] in prose) ───────
+MSG_STYLE_SUCCESS_MARK = 'bold #8fdfb1'  # short ✓ success flashes (onboarding)
+MSG_STYLE_PROVIDER_HINT = 'cyan'  # provider name in onboarding lines
+
+# ── System message tags (panels / notices) ────────────────────────────────────
+STYLE_SYSTEM_TAG_WARNING = 'yellow'
+STYLE_SYSTEM_TAG_AUTONOMY = 'magenta'
+STYLE_SYSTEM_TAG_STATUS = 'blue'
+STYLE_SYSTEM_TAG_SETTINGS = 'cyan'
+STYLE_SYSTEM_TAG_SYSTEM = 'cyan'
+STYLE_SYSTEM_TAG_TIMEOUT = 'yellow'
+STYLE_SYSTEM_TAG_NOTE = 'cyan'
+
+# ── Delegate worker row accents ────────────────────────────────────────────────
+STYLE_DELEGATE_STARTING = 'cyan'
+STYLE_DELEGATE_RUNNING = 'yellow'
+STYLE_DELEGATE_DONE = 'green'
+STYLE_DELEGATE_FAILED = 'red'
 
 # ── Reasoning / thinking chrome ────────────────────────────────────────────────
 CLR_SPINNER = '#7dd3fc'  # spinner icon

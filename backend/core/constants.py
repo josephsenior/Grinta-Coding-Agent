@@ -214,6 +214,8 @@ DEFAULT_AGENT_AUTONOMY_LEVEL = 'balanced'
 # burns context without improving accuracy. Off by default; flip to True only for
 # legacy models without native reasoning, or for traceability during evals.
 DEFAULT_AGENT_THINK_ENABLED = False
+# DAP / interactive debugger: off by default; enable per agent when stable for your release.
+DEFAULT_AGENT_DEBUGGER_ENABLED = False
 DEFAULT_AGENT_FINISH_ENABLED = True
 # Optional LLM-initiated compaction; automatic condensation still runs when needed.
 DEFAULT_AGENT_CONDENSATION_REQUEST_ENABLED = False
@@ -235,7 +237,7 @@ DEFAULT_AGENT_MAX_AUTONOMOUS_ITERATIONS = 0
 DEFAULT_AGENT_STUCK_DETECTION_ENABLED = True
 DEFAULT_AGENT_STUCK_THRESHOLD_ITERATIONS = 0
 # On by default; disable per-deploy via env (AGENT_*) or settings.json agent.* if needed.
-DEFAULT_AGENT_INTERNAL_TASK_TRACKER_ENABLED = True
+DEFAULT_AGENT_TASK_TRACKER_TOOL_ENABLED = True
 DEFAULT_AGENT_SOM_VISUAL_BROWSING_ENABLED = True
 DEFAULT_AGENT_CLI_MODE = True
 DEFAULT_AGENT_ENABLE_FIRST_TURN_ORIENTATION_PROMPT = False
@@ -524,6 +526,10 @@ ENV_VAR_REGISTRY: dict[str, tuple[str, str]] = {
         'false',
         'CLI: log ReasoningDisplay lifecycle/thought/action updates with shared astep_id '
         '(see APP_DEBUG_PROMPT_ROLES) to correlate UI with LLM steps',
+    ),
+    'GRINTA_DEBUGGER_SYNC_POOL_WORKERS': (
+        '6',
+        'Thread cap for dedicated DebuggerAction sync pool (isolated from general bridge EXECUTOR)',
     ),
     # API versioning
     'APP_PERMISSIVE_API': (

@@ -96,6 +96,8 @@ class TestCreateTaskTrackerTool:
         assert 'todo' in status_enum
         assert 'doing' in status_enum
         assert 'done' in status_enum
+        assert 'skipped' in status_enum
+        assert 'blocked' in status_enum
 
     def test_task_list_not_in_required(self):
         # task_list is optional (only required for update command)

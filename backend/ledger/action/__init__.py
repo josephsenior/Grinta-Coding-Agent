@@ -24,7 +24,7 @@ from backend.ledger.action.browse import BrowseInteractiveAction
 from backend.ledger.action.browser_tool import BrowserToolAction
 from backend.ledger.action.code_nav import LspQueryAction
 from backend.ledger.action.commands import CmdRunAction
-from backend.ledger.action.debugger import DebuggerAction
+from backend.ledger.action.debugger import DebuggerAction, is_debugger_action
 from backend.ledger.action.empty import NullAction
 from backend.ledger.action.files import (
     FileEditAction,
@@ -59,6 +59,7 @@ __all__ = [
     'BrowserToolAction',
     'BrowseInteractiveAction',
     'DebuggerAction',
+    'is_debugger_action',
     'DelegateTaskAction',
     'EscalateToHumanAction',
     'FileEditAction',

@@ -77,6 +77,29 @@ _MAX_WORKERS = _get_max_workers()
 EXECUTOR: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=_MAX_WORKERS)
 
 
+def _debugger_sync_pool_workers() -> int:
+    """Dedicated capacity for :class:`~backend.ledger.action.DebuggerAction` sync bridges."""
+    raw = os.getenv('GRINTA_DEBUGGER_SYNC_POOL_WORKERS', '6')
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        _logger.warning(
+            'Invalid GRINTA_DEBUGGER_SYNC_POOL_WORKERS=%r; using default 6',
+            raw,
+        )
+        return 6
+    return max(2, min(n, 32))
+
+
+# Separate pool so debugger ``run_action`` never queues behind unrelated
+# ``call_async_from_sync`` / bridge work on ``EXECUTOR`` (seen in app.log as
+# ``_handle_action START DebuggerAction`` with no ``DEBUGGER_DISPATCH`` for minutes).
+DEBUGGER_SYNC_EXECUTOR: ThreadPoolExecutor = ThreadPoolExecutor(
+    max_workers=_debugger_sync_pool_workers(),
+    thread_name_prefix='grinta-dbg-sync',
+)
+
+
 def _shutdown_executor_atexit() -> None:
     """Cancel queued work and request worker termination at interpreter exit.
 
@@ -88,11 +111,12 @@ def _shutdown_executor_atexit() -> None:
     ``cancel_futures=True`` drops queued tasks; running tasks are not
     interrupted but are bounded by their own timeouts.
     """
-    try:
-        EXECUTOR.shutdown(wait=True, cancel_futures=True)
-    except Exception:
-        # atexit handlers must never raise.
-        pass
+    for ex in (EXECUTOR, DEBUGGER_SYNC_EXECUTOR):
+        try:
+            ex.shutdown(wait=True, cancel_futures=True)
+        except Exception:
+            # atexit handlers must never raise.
+            pass
 
 
 atexit.register(_shutdown_executor_atexit)

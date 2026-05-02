@@ -2,12 +2,38 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
+from backend.execution import debugger as debugger_module
 from backend.execution.debugger import DAPClient, DAPDebugManager, DAPStartPhaseError
-from backend.ledger.action.debugger import DebuggerAction
+from backend.ledger.action.debugger import DebuggerAction, is_debugger_action
 from backend.ledger.observation import ErrorObservation
 from backend.ledger.observation.debugger import DebuggerObservation
+
+
+def test_dap_log_renames_reserved_logrecord_extra_keys(monkeypatch: Any) -> None:
+    """``logging`` forbids ``extra`` keys that collide with ``LogRecord`` attributes."""
+    captured: dict[str, Any] = {}
+
+    def fake_log(level: int, msg: str, extra: dict[str, Any] | None = None) -> None:
+        captured['level'] = level
+        captured['msg'] = msg
+        captured['extra'] = dict(extra or {})
+
+    monkeypatch.setattr(debugger_module.logger, 'log', fake_log)
+    debugger_module._dap_log(
+        logging.INFO,
+        'probe',
+        msg_type='TEST',
+        filename='would_collide.py',
+        module='also_collides',
+    )
+    extra = captured['extra']
+    assert 'filename' not in extra
+    assert 'module' not in extra
+    assert extra.get('dap_filename') == 'would_collide.py'
+    assert extra.get('dap_module') == 'also_collides'
 
 
 def test_dap_client_send_request_frames_content_length() -> None:
@@ -171,3 +197,35 @@ def test_manager_start_error_includes_startup_phase_metadata(monkeypatch, tmp_pa
     assert isinstance(obs, ErrorObservation)
     assert 'startup_phase: initialized event' in obs.content
     assert 'startup_timeout_seconds' in obs.content
+
+
+def test_is_debugger_action_string_tool_id_and_instance_attr() -> None:
+    """Duplicate classes / replay paths may expose ``action`` as str or only on instance."""
+
+    class OtherDebugger:
+        action = 'debugger'
+
+    assert is_debugger_action(OtherDebugger()) is True
+
+    class Shell:
+        pass
+
+    inst = Shell()
+    inst.action = 'debugger'
+    assert is_debugger_action(inst) is True
+
+
+def test_is_debugger_action_name_fallback_for_duplicate_module_load() -> None:
+    """Last resort: distinct class objects both named ``DebuggerAction``."""
+
+    from backend.core.schemas import ActionType
+
+    ns: dict[str, Any] = {}
+    exec(
+        'from backend.core.schemas import ActionType\n'
+        'class DebuggerAction:\n'
+        '    action = ActionType.DEBUGGER\n',
+        ns,
+    )
+    FakeCls = ns['DebuggerAction']
+    assert is_debugger_action(FakeCls()) is True

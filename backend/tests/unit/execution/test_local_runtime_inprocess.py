@@ -22,7 +22,7 @@ from backend.ledger.action.terminal import (
     TerminalRunAction,
 )
 from backend.ledger.action import CmdRunAction
-from backend.ledger.observation import NullObservation
+from backend.ledger.observation import ErrorObservation, NullObservation
 from backend.ledger.observation.code_nav import LspQueryObservation
 from backend.ledger.observation.commands import CmdOutputObservation
 
@@ -91,16 +91,18 @@ def test_lsp_query_forwards_to_runtime_executor() -> None:
     executor.lsp_query.assert_awaited_once_with(action)
 
 
-def test_debugger_forwards_to_runtime_executor() -> None:
+def test_debugger_forwards_to_debug_manager_handle() -> None:
     runtime = _make_runtime()
     obs = NullObservation(content='debug')
     executor = MagicMock()
-    executor.debugger = AsyncMock(return_value=obs)
+    dm = MagicMock()
+    dm.handle = MagicMock(return_value=obs)
+    executor.debug_manager = dm
     runtime._executor = executor
     action = DebuggerAction(debug_action='status', session_id='dbg-1')
     result = runtime.debugger(action)
     assert result is obs
-    executor.debugger.assert_awaited_once_with(action)
+    dm.handle.assert_called_once_with(action)
 
 
 def test_browser_tool_uses_persistent_loop_runner() -> None:
@@ -190,18 +192,39 @@ def test_cmd_run_bridge_timeout_aligns_with_default_cmd_floor() -> None:
     assert float(call_sync.call_args.args[1]) == pytest.approx(expected)
 
 
-def test_debugger_bridge_timeout_respects_floor_when_action_timeout_is_small() -> None:
+@pytest.mark.asyncio
+async def test_execute_action_debugger_disabled_returns_error() -> None:
+    from backend.core.config.agent_config import AgentConfig
+    from backend.core.config.app_config import AppConfig
+
+    cfg = AppConfig()
+    cfg.set_agent_config(AgentConfig(enable_debugger=False))
+
+    with patch.object(LocalRuntimeInProcess, '_init_tooling_and_platform'):
+        runtime = LocalRuntimeInProcess(
+            config=cfg,
+            event_stream=MagicMock(),
+            llm_registry=MagicMock(),
+            sid='t',
+        )
+    runtime._runtime_initialized = True
+    obs = await runtime._execute_action(
+        DebuggerAction(debug_action='status', session_id='dbg-off')
+    )
+    assert isinstance(obs, ErrorObservation)
+    assert 'disabled' in obs.content.lower()
+
+
+def test_debugger_returns_handle_result_when_action_carries_short_timeout() -> None:
+    """Short ``action.timeout`` does not affect in-process dispatch (controller owns watchdog)."""
     runtime = _make_runtime()
     obs = NullObservation(content='debug')
     executor = MagicMock()
-    executor.debugger = AsyncMock(return_value=obs)
+    dm = MagicMock()
+    dm.handle = MagicMock(return_value=obs)
+    executor.debug_manager = dm
     runtime._executor = executor
     action = DebuggerAction(debug_action='status', session_id='dbg-1', timeout=5)
-    with patch(
-        'backend.execution.drivers.local.local_runtime_inprocess.call_async_from_sync',
-        return_value=obs,
-    ) as call_sync:
-        result = runtime.debugger(action)
+    result = runtime.debugger(action)
     assert result is obs
-    call_sync.assert_called_once()
-    assert float(call_sync.call_args.args[1]) >= float(TOOL_BRIDGE_TIMEOUT_DEBUGGER)
+    dm.handle.assert_called_once_with(action)

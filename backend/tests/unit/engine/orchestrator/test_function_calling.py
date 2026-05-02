@@ -387,6 +387,18 @@ class TestHandleTaskTrackerTool:
         assert task['subtasks'][0]['description'] == 'Child step'
         assert task['subtasks'][0]['status'] == 'done'
 
+    def test_normalizes_skipped_and_blocked_statuses(self):
+        args = {
+            'command': 'update',
+            'task_list': [
+                {'id': 'a', 'description': 'Skip me', 'status': 'skipped'},
+                {'id': 'b', 'description': 'Blocked', 'status': 'blocked'},
+            ],
+        }
+        action = cast(TaskTrackingAction, _handle_task_tracker_tool(args))
+        assert action.task_list[0]['status'] == 'skipped'
+        assert action.task_list[1]['status'] == 'blocked'
+
     @pytest.mark.parametrize('legacy_status', ['pending', 'in_progress', 'completed'])
     def test_rejects_legacy_task_status_aliases(self, legacy_status: str):
         args = {

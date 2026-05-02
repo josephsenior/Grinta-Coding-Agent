@@ -456,8 +456,9 @@ def test_show_grinta_splash_renders_logo_text() -> None:
 
     # Non-TTY StringIO console: static frame with tagline + hint (see show_grinta_splash).
     assert 'AI coding agent' in output
-    assert 'Describe a task in plain language' in output
-    assert '/help for commands' in output
+    assert 'Describe a task' in output
+    assert '/help' in output
+    assert '/settings' in output
     assert '/quit to leave' in output
 
 
@@ -2296,6 +2297,28 @@ def test_error_guidance_routes_debugger_start_timeout_to_debugger_branch() -> No
     )
     assert guidance is not None
     assert 'debugger startup' in guidance.summary.lower()
+
+
+def test_error_guidance_http_503_overload() -> None:
+    from backend.cli._event_renderer.error_panel import (
+        error_guidance as _error_guidance,
+    )
+
+    guidance = _error_guidance(
+        'HTTP 503 Service Unavailable: The model is temporarily overloaded.'
+    )
+    assert guidance is not None
+    assert 'unavailable' in guidance.summary.lower()
+
+
+def test_error_guidance_connection_refused() -> None:
+    from backend.cli._event_renderer.error_panel import (
+        error_guidance as _error_guidance,
+    )
+
+    guidance = _error_guidance('[Errno 111] Connection refused')
+    assert guidance is not None
+    assert 'connection' in guidance.summary.lower()
 
 
 @pytest.mark.asyncio

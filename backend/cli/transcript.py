@@ -17,10 +17,8 @@ from rich.panel import Panel
 from rich.text import Text
 
 from backend.cli.layout_tokens import (
-    ACTIVITY_CARD_BORDER_STYLE,
     ACTIVITY_CARD_TITLE_STYLE,
     ACTIVITY_CARD_TITLE_TERMINAL,
-    ACTIVITY_PANEL_PADDING,
     ACTIVITY_SECTION_TITLE,
     CALLOUT_PANEL_PADDING,
 )
@@ -39,10 +37,10 @@ from backend.cli.theme import (
     CLR_TURN_RULE,
     CLR_WARN_BODY,
     CLR_WARN_ICON,
-    MARK_ERR,
-    MARK_INFO,
-    MARK_OK,
     MARK_WARN,
+    mark_err,
+    mark_info,
+    mark_ok,
     STYLE_DIM,
     STYLE_EMPTY,
 )
@@ -120,9 +118,9 @@ def format_activity_secondary(message: str, *, kind: str = 'neutral') -> Text:
 def format_activity_result_secondary(message: str, *, kind: str = 'neutral') -> Text:
     """Continuation row for user-visible results within an activity card."""
     styles: dict[str, tuple[str, str, str]] = {
-        'ok': (MARK_OK, CLR_OK_ICON, CLR_OK_BODY),
-        'err': (MARK_ERR, CLR_ERR_ICON, CLR_ERR_BODY),
-        'neutral': (MARK_INFO, CLR_INFO_ICON, CLR_INFO_BODY),
+        'ok': (mark_ok(), CLR_OK_ICON, CLR_OK_BODY),
+        'err': (mark_err(), CLR_ERR_ICON, CLR_ERR_BODY),
+        'neutral': (mark_info(), CLR_INFO_ICON, CLR_INFO_BODY),
     }
     icon, icon_style, text_style = styles.get(kind, styles['neutral'])
     line = Text(_ACTIVITY_SECONDARY_INDENT, style=STYLE_EMPTY)

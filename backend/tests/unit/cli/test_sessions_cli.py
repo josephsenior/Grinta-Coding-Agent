@@ -84,8 +84,9 @@ class TestFormatSessionRow:
 
 class TestBuildSessionTable:
     def test_returns_table_with_columns(self) -> None:
-        table = _build_session_table()
-        # Rich Table has column_headers list
+        from rich.console import Console
+
+        table = _build_session_table(Console(width=100))
         col_names = [c.header for c in table.columns]
         assert '#' in col_names
         assert 'ID' in col_names

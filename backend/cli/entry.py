@@ -42,7 +42,7 @@ _EPILOG = """examples:
   grinta --project /path/to/repo sessions list
       List sessions for an explicit project root.
   grinta sessions list
-      List past sessions.
+      List past sessions (REPL: /sessions, /resume <id>).
   grinta sessions prune --days 30 --yes
       Delete sessions older than 30 days, no prompt.
   grinta -p .
@@ -51,6 +51,10 @@ _EPILOG = """examples:
       Use that project folder and override the model for this session only.
   grinta --cleanup-storage
       Consolidate legacy project data into the canonical workspace store and exit.
+
+In the REPL: /help for slash commands, /settings for model and keys.
+Environment: NO_COLOR=1 or GRINTA_NO_COLOR=1 disables color;
+GRINTA_ASCII=1 uses ASCII markers; GRINTA_NO_SPLASH_ANIM=1 skips splash animation.
 """
 
 

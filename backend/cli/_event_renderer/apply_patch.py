@@ -11,6 +11,7 @@ from backend.cli._event_renderer.constants import (
     CMD_SUMMARY_PRIORITY_PATTERNS,
 )
 from backend.cli._event_renderer.text_utils import truncate_activity_detail
+from backend.cli.theme import CLR_DIFF_ADD_DIM, CLR_DIFF_REM_DIM, STYLE_DIM
 from backend.cli.transcript import format_activity_secondary
 
 
@@ -93,10 +94,10 @@ def extract_apply_patch_delta(content: str) -> tuple[int | None, int | None]:
 def _apply_patch_success_line(added: int | None, removed: int | None) -> Text:
     line = format_activity_secondary('succeeded', kind='ok')
     if added is not None and removed is not None:
-        line.append('  ', style='dim')
-        line.append(f'+{added}', style='dim green')
-        line.append('  ', style='dim')
-        line.append(f'-{removed}', style='dim red')
+        line.append('  ', style=STYLE_DIM)
+        line.append(f'+{added}', style=CLR_DIFF_ADD_DIM)
+        line.append('  ', style=STYLE_DIM)
+        line.append(f'-{removed}', style=CLR_DIFF_REM_DIM)
     return line
 
 

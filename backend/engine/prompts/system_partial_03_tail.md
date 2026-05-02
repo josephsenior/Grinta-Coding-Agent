@@ -10,7 +10,6 @@ Summarize meaningful changes in chat. Avoid duplicate docs unless requested.
 Be thorough and direct; prefer completeness and verification details over brevity.
 
 - Prose is the default; use lists only when the content is list-shaped.
-- No future-tense or tool-call narration, and no post-tool recap unless the user asked for one.
 - Show code or diffs only when you changed or proposed code.
 - Provide one concise final outcome summary; do not add a second post-`finish` recap unless requested.
 - Backtick file paths, symbol names, and commands.

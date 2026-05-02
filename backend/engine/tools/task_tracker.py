@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import Any
 
 from backend.core.task_status import (
+    TASK_STATUS_BLOCKED,
     TASK_STATUS_DOING,
     TASK_STATUS_DONE,
+    TASK_STATUS_SKIPPED,
     TASK_STATUS_TODO,
 )
 from backend.engine.contracts import ChatCompletionToolParam
@@ -20,7 +22,8 @@ _TASK_TRACKER_DESCRIPTION = (
     'Maintain a structured plan to track progress. '
     'Use `update` with a task_list to create or overwrite the plan. '
     'Use `view` (without a task_list) to read the current plan. '
-    'Use only these statuses: `todo`, `doing`, and `done`.'
+    'Statuses: `todo`, `doing`, `done`, `skipped`, `blocked` '
+    '(terminal states for finish are done, skipped, blocked).'
 )
 
 
@@ -99,11 +102,15 @@ def create_task_tracker_tool() -> ChatCompletionToolParam:
                         },
                         'status': {
                             'type': 'string',
-                            'description': 'Current status. Allowed values: todo | doing | done.',
+                            'description': (
+                                'Current status: todo | doing | done | skipped | blocked.'
+                            ),
                             'enum': [
                                 TASK_STATUS_TODO,
                                 TASK_STATUS_DOING,
                                 TASK_STATUS_DONE,
+                                TASK_STATUS_SKIPPED,
+                                TASK_STATUS_BLOCKED,
                             ],
                         },
                         'result': {

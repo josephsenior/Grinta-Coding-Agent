@@ -160,7 +160,7 @@ class TaskTrackingMixin:
         content = '# Task List\n\n'
         for i, task in enumerate(task_list, 1):
             status = normalize_task_status(task.get('status'), default=TASK_STATUS_TODO)
-            status_icon = TASK_STATUS_MARKDOWN_ICONS[status]
+            status_icon = TASK_STATUS_MARKDOWN_ICONS.get(status, '•')
             desc = task.get('description') or 'Untitled'
             result = task.get('result') or ''
             line = f'{i}. {status_icon} **{desc}** `[{status}]`\n'

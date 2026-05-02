@@ -403,10 +403,28 @@ class SecurityEnforcementMixin:
         LOW so the action proceeds without confirmation.
         """
         from backend.core.enums import ActionSecurityRisk
+        from backend.ledger.action.debugger import is_debugger_action
 
         declared = getattr(action, 'security_risk', ActionSecurityRisk.UNKNOWN)
         if not isinstance(declared, ActionSecurityRisk):
             declared = ActionSecurityRisk.UNKNOWN
+
+        if is_debugger_action(action):
+            # Do not call ``call_async_from_sync`` (async security analyzer) here.
+            # ``run_action`` can run on ``DEBUGGER_SYNC_EXECUTOR``; that nested
+            # wait on the shared ``EXECUTOR`` may not start until the pool is free,
+            # so the controller logs ``_handle_action START DebuggerAction`` while
+            # ``DAPDebugManager.handle`` (and ``DEBUGGER_DISPATCH``) never runs.
+            # The debugger tool is a vetted, typed action — use declared risk with
+            # a LOW default when the agent omitted it.
+            effective = (
+                ActionSecurityRisk.LOW
+                if declared == ActionSecurityRisk.UNKNOWN
+                else declared
+            )
+            if hasattr(action, 'security_risk'):
+                action.security_risk = effective
+            return effective
 
         analyzer_risk: ActionSecurityRisk | None = None
         if self.security_analyzer is not None:  # type: ignore[attr-defined]

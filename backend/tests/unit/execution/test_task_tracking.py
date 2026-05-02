@@ -212,6 +212,8 @@ class TestTaskTrackingMixin(TestCase):
             {'description': 'Task 1', 'status': 'todo', 'result': 'Note 1'},
             {'description': 'Task 2', 'status': 'doing', 'result': 'Note 2'},
             {'description': 'Task 3', 'status': 'done', 'result': 'Note 3'},
+            {'description': 'Task 4', 'status': 'skipped', 'result': 'N/A'},
+            {'description': 'Task 5', 'status': 'blocked', 'result': 'Waiting'},
         ]
 
         content = TaskTrackingMixin._generate_task_list_content(task_list)
@@ -220,6 +222,8 @@ class TestTaskTrackingMixin(TestCase):
         self.assertIn('1. ⏳ **Task 1** `[todo]`', content)
         self.assertIn('2. 🔄 **Task 2** `[doing]`', content)
         self.assertIn('3. ✅ **Task 3** `[done]`', content)
+        self.assertIn('4. ⏭️ **Task 4** `[skipped]`', content)
+        self.assertIn('5. 🚫 **Task 5** `[blocked]`', content)
         self.assertIn('Note 1', content)
         self.assertIn('Note 2', content)
         self.assertIn('Note 3', content)
