@@ -156,18 +156,50 @@ def _render_routing(
     is_windows: bool,
     config: Any = None,
     function_calling_mode: str | None = None,
+    *,
+    windows_with_bash: bool = False,
+    shell_is_powershell: bool = False,
 ) -> str:
     return _render_routing_impl(
-        _render_partial, is_windows, config, function_calling_mode
+        _render_partial,
+        is_windows,
+        config,
+        function_calling_mode,
+        windows_with_bash=windows_with_bash,
+        shell_is_powershell=shell_is_powershell,
     )
 
 
-def _render_autonomy(config: Any, is_windows: bool) -> str:
-    return _render_autonomy_impl(_render_partial, config, is_windows)
+def _render_autonomy(
+    config: Any,
+    *,
+    is_windows: bool,
+    windows_with_bash: bool,
+    shell_is_powershell: bool,
+) -> str:
+    return _render_autonomy_impl(
+        _render_partial,
+        config,
+        is_windows=is_windows,
+        windows_with_bash=windows_with_bash,
+        shell_is_powershell=shell_is_powershell,
+    )
 
 
-def _render_tool_reference(is_windows: bool, config: Any = None) -> str:
-    return _render_tool_reference_impl(_render_partial, is_windows, config)
+def _render_tool_reference(
+    config: Any = None,
+    *,
+    is_windows: bool,
+    windows_with_bash: bool,
+    shell_is_powershell: bool,
+) -> str:
+    return _render_tool_reference_impl(
+        _render_partial,
+        config,
+        is_windows=is_windows,
+        windows_with_bash=windows_with_bash,
+        shell_is_powershell=shell_is_powershell,
+    )
 
 
 def _render_critical(
@@ -368,13 +400,32 @@ def _collect_system_prompt_sections(
     sections += [
         (
             'system_partial_00_routing',
-            _render_routing(is_windows, config, function_calling_mode),
+            _render_routing(
+                is_windows,
+                config,
+                function_calling_mode,
+                windows_with_bash=windows_with_bash,
+                shell_is_powershell=shell_is_powershell,
+            ),
         ),
         ('security_risk_policy', _render_security(cli_mode)),
-        ('system_partial_01_autonomy', _render_autonomy(config, shell_is_powershell)),
+        (
+            'system_partial_01_autonomy',
+            _render_autonomy(
+                config,
+                is_windows=is_windows,
+                windows_with_bash=windows_with_bash,
+                shell_is_powershell=shell_is_powershell,
+            ),
+        ),
         (
             'system_partial_02_tools',
-            _render_tool_reference(shell_is_powershell, config),
+            _render_tool_reference(
+                config,
+                is_windows=is_windows,
+                windows_with_bash=windows_with_bash,
+                shell_is_powershell=shell_is_powershell,
+            ),
         ),
         (
             'system_partial_03_capabilities',
