@@ -121,8 +121,8 @@ class TestLlmSupportsToolChoice:
         [
             'gpt-4o',
             'gpt-4-turbo',
-            'claude-opus-4',
-            'claude-4-sonnet',
+            'claude-opus-4-7',
+            'claude-sonnet-4-6',
             'gpt-5.2',
             'gpt-4.1-mini',
         ],

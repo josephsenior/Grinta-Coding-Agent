@@ -38,19 +38,19 @@ _PROVIDER_PRESETS: dict[str, dict[str, str]] = {
         'env': 'OPENAI_API_KEY',
         'default_model': DEFAULT_MODEL_BY_PROVIDER['openai'],
         'base_url': '',
-        'help': 'OpenAI / compatible (gpt-4o, gpt-4.1, o1, o3, ...)',
+        'help': 'OpenAI / compatible (gpt-4o, gpt-5.x, ...)',
     },
     'anthropic': {
         'env': 'ANTHROPIC_API_KEY',
         'default_model': DEFAULT_MODEL_BY_PROVIDER['anthropic'],
         'base_url': '',
-        'help': 'Anthropic (claude-sonnet-4, claude-opus-4, claude-haiku-4)',
+        'help': 'Anthropic (claude-sonnet-4-6, claude-opus-4-7, claude-haiku-4-5, ...)',
     },
     'google': {
         'env': 'GEMINI_API_KEY',
         'default_model': DEFAULT_MODEL_BY_PROVIDER['google'],
         'base_url': '',
-        'help': 'Google Gemini (gemini-2.5-pro, gemini-2.5-flash)',
+        'help': 'Google Gemini (gemini-2.5-pro, gemini-3-flash, ...)',
     },
     'ollama': {
         'env': '',
