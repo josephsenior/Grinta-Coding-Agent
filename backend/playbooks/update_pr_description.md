@@ -2,7 +2,7 @@
 name: update_pr_description
 type: task
 version: 1.0.0
-author: App
+author: Grinta
 agent: Orchestrator
 triggers:
   - /update_pr_description

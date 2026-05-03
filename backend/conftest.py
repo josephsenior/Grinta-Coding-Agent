@@ -208,7 +208,7 @@ def use_repo_root_cwd(tmp_path, monkeypatch):
     """Autouse fixture that sets CWD to repository root for the test run.
 
     It uses the location of this conftest.py as a hint: repo root is the parent
-    directory of the `App` package directory. This is intentionally
+    directory of the `backend` package directory. This is intentionally
     conservative and only changes cwd for the duration of each test.
     """
     repo_root = pathlib.Path(__file__).resolve().parent

@@ -68,7 +68,7 @@ CLI arguments can override selected runtime fields after config load.
 Here's an example of how to use `load_app_config()`:
 
 ```python
-from app.core.config import load_app_config
+from backend.core.config.config_loader import load_app_config
 
 # Load all configuration settings
 config = load_app_config()

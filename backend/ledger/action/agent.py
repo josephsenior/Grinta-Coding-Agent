@@ -1,4 +1,4 @@
-"""Agent-focused action types emitted in App event streams."""
+"""Agent-focused action types emitted in Grinta event streams."""
 
 from __future__ import annotations
 

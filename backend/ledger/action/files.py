@@ -1,4 +1,4 @@
-"""File manipulation action types used by App agents."""
+"""File manipulation action types used by Grinta agents."""
 
 from __future__ import annotations
 

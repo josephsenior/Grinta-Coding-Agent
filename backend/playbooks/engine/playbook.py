@@ -1,4 +1,4 @@
-"""Utilities and models for loading and instantiating App playbooks."""
+"""Utilities and models for loading and instantiating Grinta playbooks."""
 
 from __future__ import annotations
 

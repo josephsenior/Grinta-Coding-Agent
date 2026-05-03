@@ -1,6 +1,6 @@
-r"""App plugin system — lightweight hook-based extension API.
+r"""Grinta plugin system — lightweight hook-based extension API.
 
-There are **two** plugin surfaces in App — this module provides the
+There are **two** plugin surfaces in Grinta — this module provides the
 *core hook API* while :mod:`backend.execution.plugins` provides the
 *runtime plugin API*.  They serve different purposes:
 
@@ -15,7 +15,7 @@ There are **two** plugin surfaces in App — this module provides the
 | ``app.plugins`` →          | ``ALL_PLUGINS`` or entry-point discovery.  |
 | ``register(registry)``       |                                            |
 +------------------------------+--------------------------------------------+
-| Runs **in the App process**| Runs **inside the runtime environment**.   |
+| Runs **in the Grinta process**| Runs **inside the runtime environment**.   |
 +------------------------------+--------------------------------------------+
 
 If a third-party package needs both, it should register *two* objects —
@@ -129,7 +129,7 @@ class HookType(str, Enum):
 
 
 class AppPlugin(ABC):
-    """Base class for App plugins.
+    """Base class for Grinta plugins.
 
     Subclasses should set ``name`` and ``version`` and override any
     ``on_*`` methods they want to hook into.  All hooks are optional —

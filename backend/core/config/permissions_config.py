@@ -1,4 +1,4 @@
-"""Configuration schemas for App permission and capability settings."""
+"""Configuration schemas for Grinta permission and capability settings."""
 
 from __future__ import annotations
 

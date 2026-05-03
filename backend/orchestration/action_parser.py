@@ -1,4 +1,4 @@
-"""Abstract interfaces for parsing LLM responses into App actions."""
+"""Abstract interfaces for parsing LLM responses into Grinta actions."""
 
 from abc import ABC, abstractmethod
 from typing import Any
@@ -19,7 +19,7 @@ class ActionParseError(Exception):
 
 
 class ResponseParser(ABC):
-    """Common interface for converting LLM responses into App actions."""
+    """Common interface for converting LLM responses into Grinta actions."""
 
     def __init__(self) -> None:
         """Initialize the parser with an empty list of action parsers."""

@@ -1,4 +1,4 @@
-"""Convenience exports for App's Model Context Protocol client utilities."""
+"""Convenience exports for Grinta's Model Context Protocol client utilities."""
 
 from backend.integrations.mcp.client import MCPClient
 from backend.integrations.mcp.error_collector import mcp_error_collector

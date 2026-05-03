@@ -1,4 +1,4 @@
-"""Utilities for serialising App events to external formats."""
+"""Utilities for serialising Grinta events to external formats."""
 
 from backend.ledger.serialization.action import action_from_dict
 from backend.ledger.serialization.event import (

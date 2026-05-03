@@ -1,4 +1,4 @@
-"""Dynamic import utilities used across App for extensibility hooks."""
+"""Dynamic import utilities used across Grinta for extensibility hooks."""
 
 from __future__ import annotations
 
@@ -13,19 +13,19 @@ def import_from(qual_name: str) -> Any:
     """Import a value from its fully qualified name.
 
     This function is a utility to dynamically import any Python value (class, function, variable)
-    from its fully qualified name. For example, 'app.server.user_auth.UserAuth' would
-    import the UserAuth class from the app.server.user_auth module.
+    from its fully qualified name. For example, ``'builtins.len'`` loads the built-in ``len``.
 
     Args:
-        qual_name: A fully qualified name in the format 'module.submodule.name'
-                  e.g. 'app.server.user_auth.UserAuth'
+        qual_name: A fully qualified name in the format ``module.submodule.symbol``
+                  e.g. ``'backend.inference.llm.LLM'``
 
     Returns:
         The imported value (class, function, or variable)
 
     Example:
-        >>> UserAuth = import_from('app.server.user_auth.UserAuth')
-        >>> auth = UserAuth()
+        >>> LLM = import_from('backend.inference.llm.LLM')
+        >>> LLM.__name__
+        'LLM'
 
     """
     parts = qual_name.split('.')
@@ -38,9 +38,9 @@ def import_from(qual_name: str) -> Any:
 def get_impl[T](cls: type[T], impl_name: str | None) -> type[T]:
     """Import and validate a named implementation of a base class.
 
-    This function is an extensibility mechanism in App that allows runtime substitution
+    This function is an extensibility mechanism in Grinta that allows runtime substitution
     of implementations. It enables applications to customize behavior by providing their own
-    implementations of App base classes.
+    implementations of Grinta base classes.
 
     The function ensures type safety by validating that the imported class is either the same as
     or a subclass of the specified base class.
@@ -48,21 +48,17 @@ def get_impl[T](cls: type[T], impl_name: str | None) -> type[T]:
     Args:
         cls: The base class that defines the interface
         impl_name: Fully qualified name of the implementation class, or None to use the base class
-                  e.g. 'app.server.conversation_manager.StandaloneConversationManager'
+                  e.g. ``'builtins.list'`` when ``cls`` is ``list``
 
     Returns:
         The implementation class, which is guaranteed to be a subclass of cls
 
     Example:
-        >>> # Get default implementation
-        >>> ConversationManager = get_impl(ConversationManager, None)
-        >>> # Get custom implementation
-        >>> CustomManager = get_impl(ConversationManager, 'myapp.CustomConversationManager')
+        >>> get_impl(dict, None) is dict
+        True
 
-    Common Use Cases:
-        - Server components (ConversationManager, UserAuth, etc.)
-        - Storage implementations (ConversationStore, SettingsStore, etc.)
-        - Service integrations (GitHub service)
+    Common use cases in this repo include runtime classes, MCP config overrides, and
+    persistence stores configured via fully qualified import paths.
 
     The implementation is cached to avoid repeated imports of the same class.
 

@@ -13,13 +13,13 @@ if TYPE_CHECKING:
 class SettingsStore(ABC):
     """Abstract base class for storing user settings.
 
-    This is an extension point in App that allows applications to customize how
+    This is an extension point in Grinta that allows applications to customize how
     user settings are stored. Applications can substitute their own implementation by:
     1. Creating a class that inherits from SettingsStore
     2. Implementing all required methods
     3. Setting server_config.settings_store_class to the fully qualified name of the class
 
-    The class is instantiated via get_impl() in app.server.shared.py.
+    Resolved via get_impl() from a configured fully qualified class path at runtime.
 
     The implementation may or may not support multiple users depending on the environment.
     """

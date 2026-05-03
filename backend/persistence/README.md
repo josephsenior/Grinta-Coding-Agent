@@ -61,7 +61,7 @@ Grinta now uses local-first storage only. Remote webhook forwarding and database
 
 ## Configuration
 
-To configure the storage module in App, use the following configuration options:
+To configure the storage module in Grinta, use the following configuration options:
 
 ```toml
 [core]

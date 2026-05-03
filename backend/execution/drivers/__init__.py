@@ -1,4 +1,4 @@
-"""Runtime implementations for App.
+"""Runtime implementations for Grinta.
 
 This package exposes implementation classes lazily to avoid importing heavy
 runtime dependencies unless they are actually used.

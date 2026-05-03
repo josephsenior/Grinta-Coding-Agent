@@ -49,7 +49,7 @@ _SETTINGS_FROM_CONFIG_CACHE_TTL: float = 60.0  # seconds (OPTIMIZED)
 
 
 class Settings(BaseModel):
-    """Persisted settings for App sessions."""
+    """Persisted settings for Grinta sessions."""
 
     language: str | None = None
     agent: str | None = None

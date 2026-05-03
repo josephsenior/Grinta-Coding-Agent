@@ -1,4 +1,4 @@
-"""Action event definitions emitted by App agents."""
+"""Action event definitions emitted by Grinta agents."""
 
 from __future__ import annotations
 

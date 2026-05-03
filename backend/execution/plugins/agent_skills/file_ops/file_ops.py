@@ -1,6 +1,6 @@
-"""File operations module for App agent.
+"""File operations module for Grinta agent.
 
-This module provides a collection of file manipulation skills that enable the App
+This module provides a collection of file manipulation skills that enable the Grinta
 agent to perform various file operations such as opening, searching, and navigating
 through files and directories.
 

@@ -166,7 +166,7 @@ class OrchestratorExecutor:
 
         # Write-ahead checkpoint before invoking the model.
         #
-        # NOTE: App's DirectLLMClient implementations intentionally expose
+        # NOTE: Grinta's DirectLLMClient implementations intentionally expose
         # deterministic *non-streaming* completion for all providers. Native
         # streaming support varies widely across SDKs and tends to be the
         # source of flakiness. To keep UX responsive without relying on

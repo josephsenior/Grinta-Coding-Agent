@@ -1,4 +1,4 @@
-"""Utility helpers for configuring and invoking Model Context Protocol clients in App."""
+"""Utility helpers for configuring and invoking Model Context Protocol clients in Grinta."""
 
 from __future__ import annotations
 

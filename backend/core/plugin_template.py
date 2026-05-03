@@ -1,4 +1,4 @@
-"""App plugin template — copy and adapt for your own plugin.
+"""Grinta plugin template — copy and adapt for your own plugin.
 
 Quick start:
 
@@ -10,7 +10,7 @@ Quick start:
    [project.entry-points."app.plugins"]
    my_plugin = "my_plugin:register"
 
-5. ``pip install -e .`` your package — App discovers it automatically.
+5. ``pip install -e .`` your package — Grinta discovers it automatically.
 
 Available hooks (all async, all optional):
 
@@ -37,11 +37,11 @@ logger = logging.getLogger(__name__)
 
 
 class MyPlugin(AppPlugin):
-    """Example App plugin — replace with your implementation."""
+    """Example Grinta plugin — replace with your implementation."""
 
     name = 'my-plugin'
     version = '0.1.0'
-    description = 'A template plugin for App.'
+    description = 'A template plugin for Grinta.'
     min_api_version = (1, 0)
 
     # ── Override the hooks you need ─────────────────────
@@ -70,7 +70,7 @@ class MyPlugin(AppPlugin):
 
 
 def register(registry: PluginRegistry) -> None:
-    """Entry point called by App's plugin discovery."""
+    """Entry point called by Grinta's plugin discovery."""
     plugin = MyPlugin()
     validation_warnings = plugin.validate()
     if validation_warnings:

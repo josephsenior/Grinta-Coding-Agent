@@ -1,4 +1,4 @@
-"""Model capability detection helpers used to gate App LLM features."""
+"""Model capability detection helpers used to gate Grinta LLM features."""
 
 from __future__ import annotations
 

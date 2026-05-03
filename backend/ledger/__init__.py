@@ -1,4 +1,4 @@
-"""Event data structures and helpers used across App runtimes."""
+"""Event data structures and helpers used across Grinta runtimes."""
 
 from backend.core.enums import RecallType
 from backend.ledger.action import Action

@@ -10,8 +10,9 @@ from pathlib import Path
 from backend.core.logger import app_logger as logger
 from backend.execution.utils import git_changes, git_diff
 
-GIT_CHANGES_CMD = 'python3 /App/code/App/runtime/utils/git_changes.py'
-GIT_DIFF_CMD = 'python3 /App/code/App/runtime/utils/git_diff.py "{file_path}"'
+# Placeholder paths fail on first use; GitHandler then copies in-tree helpers (see get_git_changes).
+GIT_CHANGES_CMD = 'python3 /__grinta__/git_changes_placeholder.py'
+GIT_DIFF_CMD = 'python3 /__grinta__/git_diff_placeholder.py "{file_path}"'
 GIT_BRANCH_CMD = 'git branch --show-current'
 
 

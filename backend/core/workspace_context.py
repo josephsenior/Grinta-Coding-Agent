@@ -42,7 +42,7 @@ _CHANGELOG_FILE = 'changelog.jsonl'
 _CONTEXT_TEMPLATE = """\
 # Project Context
 
-<!-- App reads this file at the start of every session. -->
+<!-- Grinta reads this file at the start of every session. -->
 <!-- Describe your project, code conventions, and working preferences. -->
 <!-- Changes here take effect immediately on the next session start.  -->
 

@@ -300,7 +300,7 @@ class TestGetPlaybooksFromSelectedRepo:
         # Make read return a FileReadObservation for .APP_instructions
         cast(Any, rt).read = MagicMock(
             return_value=FileReadObservation(
-                content='# App instructions content', path='.APP_instructions'
+                content='# Grinta instructions content', path='.APP_instructions'
             )
         )
         cast(Any, rt).list_files = MagicMock(return_value=[])

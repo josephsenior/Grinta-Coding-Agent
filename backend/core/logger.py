@@ -1,4 +1,4 @@
-"""App logging utilities and formatters for console and structured outputs."""
+"""Grinta logging utilities and formatters for console and structured outputs."""
 
 from __future__ import annotations
 

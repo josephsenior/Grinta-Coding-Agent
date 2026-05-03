@@ -1,6 +1,6 @@
 """Build a combined Tree-sitter language shared library.
 
-App primarily uses `tree-sitter-language-pack` (prebuilt grammars) and does
+Grinta primarily uses `tree-sitter-language-pack` (prebuilt grammars) and does
 not require vendored grammar repos. This script exists for advanced scenarios
 where you want to build a custom combined library from Tree-sitter grammar
 sources.

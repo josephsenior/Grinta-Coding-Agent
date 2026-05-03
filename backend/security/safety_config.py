@@ -1,4 +1,4 @@
-"""Safety configuration for App security controls."""
+"""Safety configuration for Grinta security controls."""
 
 from __future__ import annotations
 

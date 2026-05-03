@@ -6,9 +6,10 @@ can paste into the REPL after `START_HERE.ps1` (Windows) or `./start_here.sh`
 
 ## 1 — Python project: refactor + run tests
 
-> Refactor `backend/utils/string_utils.py` to expose a single
-> `slugify(text: str) -> str` helper, update all callers, and run
-> `pytest backend/tests/unit/utils/test_string_utils.py` to confirm.
+> Refactor `backend/utils/regex_limits.py` so the maximum pattern length check
+> lives in a small private helper used by `try_compile_user_regex`, keep
+> behavior the same, and run `pytest backend/tests/unit/utils/test_regex_limits.py -q`
+> to confirm.
 
 Expected behaviour:
 

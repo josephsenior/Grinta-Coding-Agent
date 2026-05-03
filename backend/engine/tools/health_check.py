@@ -1,6 +1,6 @@
 """Production health check for verifying critical dependencies.
 
-Ensures all App competitive advantages are available at startup.
+Ensures all Grinta competitive advantages are available at startup.
 """
 
 from typing import TypedDict
@@ -23,7 +23,7 @@ class HealthCheckResult(TypedDict):
 def check_structure_editor_dependencies() -> tuple[bool, str]:
     """Verify Structure Editor (Tree-sitter) is available.
 
-    This is CRITICAL for production - Structure Editor is App's competitive moat!
+    This is CRITICAL for production - Structure Editor is Grinta's competitive moat!
 
     Returns:
         (success, message): Success status and detailed message
@@ -56,8 +56,8 @@ def check_structure_editor_dependencies() -> tuple[bool, str]:
         error_msg = f"""
 🚨 CRITICAL: Ultimate Editor dependencies missing!
 
-This is App's competitive moat - structure-aware editing with Tree-sitter.
-Without it, App falls back to basic string matching (like competitors).
+This is Grinta's competitive moat - structure-aware editing with Tree-sitter.
+Without it, Grinta falls back to basic string matching (like competitors).
 
 Missing: {e}
 
@@ -153,13 +153,13 @@ def run_production_health_check(raise_on_failure: bool = True) -> HealthCheckRes
         if raise_on_failure:
             raise RuntimeError(
                 f'Production health check failed! Critical dependencies missing: {critical_failures}\n'
-                'App cannot operate without Ultimate Editor (Tree-sitter).'
+                'Grinta cannot operate without Ultimate Editor (Tree-sitter).'
             )
     else:
         results['overall_status'] = 'HEALTHY'
         logger.info('=' * 60)
         logger.info('✅ HEALTH CHECK PASSED')
-        logger.info('   App is production-ready!')
+        logger.info('   Grinta is production-ready!')
         logger.info('=' * 60)
 
     return results

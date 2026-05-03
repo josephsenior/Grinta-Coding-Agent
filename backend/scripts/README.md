@@ -1,60 +1,25 @@
-# Backend Scripts
+# Backend scripts (`backend/scripts`)
 
-Organized collection of utility scripts for the Grinta backend.
+Small Python utilities used by maintainers and CI. Most day-to-day developer commands (`uv sync`, `pytest`, `make`) run from the repository root; larger automation lives in the top-level [`scripts/`](../../scripts/) directory.
 
-## Directory Structure
+## Layout
 
 ```text
-scripts/
-├── database/     # Database setup, backup, and query scripts
-├── setup/        # Installation and configuration scripts
-├── dev/          # Development utilities and test helpers
-├── verify/       # Verification and check scripts
-├── build/        # Build and code generation scripts
-└── mcp/          # MCP-related scripts
+backend/scripts/
+├── verify/       # Import checks, API versioning, reliability gate, optional-deps probe
+└── build/        # README only (historical); no build scripts ship here today
 ```
 
-## Quick Reference
+## Verification (`verify/`)
 
-### Database Operations
+| Script | Purpose |
+| --- | --- |
+| `check_layer_imports.py` | Layer boundary checks (also wired into pre-commit where configured) |
+| `check_fastmcp_import.py` | FastMCP import smoke check |
+| `verify_api_versioning.py` | Public API / versioning checks |
+| `verify_optional_imports.py` | Optional dependency import probes |
+| `reliability_gate.py` | Reliability / migration gate harness |
 
-```bash
-python backend/scripts/database/setup_database.py
-python backend/scripts/database/backup_database.py --backup
-```
+Run from the repository root with `python backend/scripts/verify/<script>.py` (or `uv run python …` if you use `uv` as your runner).
 
-### Build Tasks
-
-```bash
-python backend/scripts/build/compile_protos.py
-python backend/scripts/build/update_openapi.py
-```
-
-### Development
-
-```bash
-bash backend/scripts/dev/clean_pycache.sh
-python backend/scripts/dev/coverage_inspect.py
-```
-
-### Verification
-
-```bash
-python backend/scripts/verify/verify_api_routes.py
-python backend/scripts/verify/check_mcp_types.py
-```
-
-### Setup
-
-```bash
-python backend/scripts/setup/setup_sentry.py
-.\backend\scripts\setup\start-with-shadcn.ps1
-```
-
-## See Also
-
-- [Database Scripts](database/README.md)
-- [Setup Scripts](setup/README.md)
-- [Development Scripts](dev/README.md)
-- [Verification Scripts](verify/README.md)
-- [Build Scripts](build/README.md)
+Details: [verify/README.md](verify/README.md).

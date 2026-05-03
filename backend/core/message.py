@@ -1,4 +1,4 @@
-"""Message models and serialization utilities for App.
+"""Message models and serialization utilities for Grinta.
 
 Classes:
     - ContentType: Enum of supported content kinds (text, image_url)

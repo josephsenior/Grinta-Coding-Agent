@@ -1,4 +1,4 @@
-"""Security-related configuration schemas for App deployments."""
+"""Security-related configuration schemas for Grinta deployments."""
 
 from __future__ import annotations
 

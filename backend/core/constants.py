@@ -124,15 +124,9 @@ IDLE_RECLAIM_SPIKE_THRESHOLD = 3
 EVICTION_SPIKE_THRESHOLD = 1
 
 # ── Runtime Bootstrap ───────────────────────────────────────────────
-DEFAULT_PYTHON_PREFIX = [
-    '/App/micromamba/bin/micromamba',
-    'run',
-    '-n',
-    'App',
-    'uv',
-    'run',
-]
-DEFAULT_MAIN_MODULE = 'app.runtime.action_execution_server'
+# Empty prefix: invoke ``python_executable`` directly. Container images may inject a prefix.
+DEFAULT_PYTHON_PREFIX: list[str] = []
+DEFAULT_MAIN_MODULE = 'backend.execution.action_execution_server'
 
 # ── Storage ─────────────────────────────────────────────────────────
 # Relative sub-directory under local_data_root for conversation files.
@@ -145,7 +139,7 @@ DEFAULT_CACHE_DIR = '/tmp/cache'
 DEFAULT_CONVERSATION_MAX_AGE_SECONDS = 864000
 DEFAULT_MAX_CONCURRENT_CONVERSATIONS = 3
 DEFAULT_VCS_USER_NAME = 'app'
-DEFAULT_VCS_USER_EMAIL = 'App@app.dev'
+DEFAULT_VCS_USER_EMAIL = 'grinta@localhost'
 DEFAULT_LOG_FORMAT = 'text'
 DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_ENABLE_BROWSER = True

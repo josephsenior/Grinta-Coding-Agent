@@ -57,7 +57,7 @@ class LLMRegistry:
         """Initialize LLM registry with configuration.
 
         Args:
-            config: App configuration with LLM settings
+            config: Grinta configuration with LLM settings
             agent_cls: Optional agent class name to determine default LLM
             retry_listener: Optional callback for retry events (attempt, max_attempts)
             require_llm: When True, load the default agent LLM during init

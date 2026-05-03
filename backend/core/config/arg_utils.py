@@ -1,4 +1,4 @@
-"""Helper utilities for building App CLI argument parsers."""
+"""Helper utilities for building Grinta CLI argument parsers."""
 
 from __future__ import annotations
 
@@ -106,15 +106,15 @@ def add_headless_specific_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def get_cli_parser() -> argparse.ArgumentParser:
-    """Create argument parser for App."""
+    """Create argument parser for Grinta (legacy parser shape)."""
     description = (
-        'Welcome to App: Code Less, Make More\n\n'
-        "App is now a GUI-only application. Use 'app serve' to launch "
-        'the web interface.'
+        'Grinta — local-first coding agent\n\n'
+        'Primary interface: `grinta` or `uv run python -m backend.cli.entry`. '
+        'This parser is retained for compatibility with older automation.'
     )
     parser = argparse.ArgumentParser(
         description=description,
-        prog='app',
+        prog='grinta',
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     subparsers = parser.add_subparsers(
@@ -122,13 +122,13 @@ def get_cli_parser() -> argparse.ArgumentParser:
         title='commands',
         metavar='COMMAND',
     )
-    subparsers.add_parser('serve', help='Launch the App GUI server (web interface)')
+    subparsers.add_parser('serve', help='Legacy serve subcommand (optional HTTP tooling)')
 
     subparsers.add_parser(
         'health', help='Run production health checks for critical dependencies'
     )
 
-    init_parser = subparsers.add_parser('init', help='Initialize a new App project')
+    init_parser = subparsers.add_parser('init', help='Initialize a new Grinta workspace')
     init_parser.add_argument(
         'project_name',
         nargs='?',

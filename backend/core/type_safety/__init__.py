@@ -1,4 +1,4 @@
-"""Type safety and defensive programming utilities for App.
+"""Type safety and defensive programming utilities for Grinta.
 
 Provides:
 - Sentinel objects for explicit None handling

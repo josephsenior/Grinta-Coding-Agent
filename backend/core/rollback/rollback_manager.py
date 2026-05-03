@@ -189,7 +189,7 @@ class RollbackManager:
                     'git',
                     'commit',
                     '-m',
-                    '[App Checkpoint] Auto-snapshot',
+                    '[Grinta Checkpoint] Auto-snapshot',
                     '--allow-empty',
                 ],
                 check=False,

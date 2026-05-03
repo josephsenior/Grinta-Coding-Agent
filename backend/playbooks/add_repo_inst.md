@@ -1,7 +1,7 @@
 ---
 name: add_repo_inst
 version: 1.0.0
-author: App
+author: Grinta
 agent: Orchestrator
 triggers:
   - /add_repo_inst
@@ -25,7 +25,7 @@ type: repo
 agent: Orchestrator
 ---
 
-This repository contains the code for App, an automated AI software engineer. It has a Python backend
+This repository contains the code for Grinta, a local-first CLI coding agent. It has a Python backend
 (in the `backend` directory) and ships primarily as a terminal CLI. Optional raw HTTP/OpenAPI tooling may
 still exist for compatibility or export workflows, but the supported interactive product surface is the CLI.
 

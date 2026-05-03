@@ -1,4 +1,4 @@
-"""Persistence and retrieval primitives for App conversational memory."""
+"""Persistence and retrieval primitives for Grinta conversational memory."""
 
 # Lazy imports to avoid heavy dependencies at package-level import.
 

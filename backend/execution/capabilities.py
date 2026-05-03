@@ -1,4 +1,4 @@
-"""Startup-time capability matrix for App runtimes.
+"""Startup-time capability matrix for Grinta runtimes.
 
 :class:`RuntimeCapabilities` is a frozen snapshot of what a runtime can
 (and cannot) do, populated once during ``connect()`` and queryable by

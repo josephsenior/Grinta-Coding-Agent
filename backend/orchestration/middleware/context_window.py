@@ -22,7 +22,7 @@ class ContextWindowMiddleware(ToolInvocationMiddleware):
 
     Why this matters: without proactive warnings the LLM only learns the
     context window is full *after* the API returns an error — at which point
-    App must trigger emergency condensation.  This middleware gives the LLM
+    Grinta must trigger emergency condensation.  This middleware gives the LLM
     a chance to call ``request_condensation()`` voluntarily before overflow.
     """
 

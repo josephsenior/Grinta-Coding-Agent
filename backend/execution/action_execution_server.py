@@ -241,7 +241,7 @@ class RuntimeExecutor(RuntimeExecutorIOAndTerminalMixin):
             raise
 
     async def call_tool_mcp(self, action: MCPAction) -> Observation:
-        """Execute an MCP tool call using App's MCP client integration."""
+        """Execute an MCP tool call using Grinta's MCP client integration."""
         try:
             from backend.core.config.config_loader import load_app_config
             from backend.core.config.mcp_config import _filter_windows_stdio_servers

@@ -1,6 +1,6 @@
 """Provider resolution and local endpoint discovery.
 
-Provider resolution is intentionally strict for configured models: App trusts
+Provider resolution is intentionally strict for configured models: Grinta trusts
 an explicit provider prefix (``provider/model``) or an exact catalog entry, and
 does not infer providers from model-name patterns.
 """
