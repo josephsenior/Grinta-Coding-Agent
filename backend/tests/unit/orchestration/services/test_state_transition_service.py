@@ -56,6 +56,26 @@ class TestStateTransitionService(unittest.IsolatedAsyncioTestCase):
         # Should save state
         self.mock_context.save_state.assert_called_once()
 
+    async def test_set_agent_state_stopped_to_error_is_suppressed(self):
+        """Late runtime tail must not promote STOPPED → ERROR (WAL / reconnect)."""
+        self.mock_context.state.agent_state = AgentState.STOPPED
+
+        await self.service.set_agent_state(AgentState.ERROR)
+
+        self.mock_context.state.set_agent_state.assert_not_called()
+        self.mock_context.event_stream.add_event.assert_not_called()
+        self.mock_context.save_state.assert_not_called()
+
+    async def test_set_agent_state_finished_to_error_is_suppressed(self):
+        """Same suppression when the session already finished successfully."""
+        self.mock_context.state.agent_state = AgentState.FINISHED
+
+        await self.service.set_agent_state(AgentState.ERROR)
+
+        self.mock_context.state.set_agent_state.assert_not_called()
+        self.mock_context.event_stream.add_event.assert_not_called()
+        self.mock_context.save_state.assert_not_called()
+
     async def test_set_agent_state_invalid_transition(self):
         """Test set_agent_state raises error for invalid transition."""
         self.mock_context.state.agent_state = AgentState.FINISHED

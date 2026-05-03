@@ -62,6 +62,9 @@ from backend.ledger import EventSource, EventStreamSubscriber
 from backend.ledger.action import MessageAction, NullAction
 from backend.ledger.observation import AgentStateChangedObservation
 from backend.orchestration.replay import ReplayManager
+from backend.orchestration.runtime_late_error_guard import (
+    should_skip_agent_error_transition_for_runtime_callback,
+)
 from backend.utils.async_utils import call_async_from_sync
 from backend.utils.core_utils import create_registry_and_conversation_stats
 
@@ -254,22 +257,25 @@ def _create_early_status_callback(
                     'Failed to record error state on controller', exc_info=True
                 )
             # Schedule safely across threads without requiring a running loop
-            try:
-                run_or_schedule(controller.set_agent_state_to(AgentState.ERROR))
-            except Exception:
+            if should_skip_agent_error_transition_for_runtime_callback(controller):
+                pass
+            else:
                 try:
-                    from backend.utils.async_utils import create_tracked_task
-
-                    create_tracked_task(
-                        controller.set_agent_state_to(AgentState.ERROR),
-                        name='error-state-last-resort',
-                    )
+                    run_or_schedule(controller.set_agent_state_to(AgentState.ERROR))
                 except Exception:
-                    logger.error(
-                        'CRITICAL: Failed to transition agent to ERROR state — '
-                        'agent may be stuck in an inconsistent state',
-                        exc_info=True,
-                    )
+                    try:
+                        from backend.utils.async_utils import create_tracked_task
+
+                        create_tracked_task(
+                            controller.set_agent_state_to(AgentState.ERROR),
+                            name='error-state-last-resort',
+                        )
+                    except Exception:
+                        logger.error(
+                            'CRITICAL: Failed to transition agent to ERROR state — '
+                            'agent may be stuck in an inconsistent state',
+                            exc_info=True,
+                        )
         else:
             logger.info(msg)
 

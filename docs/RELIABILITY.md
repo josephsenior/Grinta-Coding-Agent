@@ -86,9 +86,41 @@ instead of seeing a bare `DAPError`.
   see no progress for > 30 s, copy the tail and file an issue.
 * **Wedged debug session.** Run `/health` in the REPL — it verifies that
   `debugpy.adapter` is importable and reports `git`/`rg` availability.
-* **Provider failure.** The agent retries with exponential back-off and
-  surfaces the underlying provider error verbatim. Use `/cost` to see
-  cumulative spend before retrying.
+* **Provider failure.** The agent retries with exponential back-off; the UI
+  may show compact messages while some transient classes are kept out of the
+  model transcript (`notify_ui_only`). Use `/cost` to see cumulative spend
+  before retrying.
+
+## Late runtime errors after user stop
+
+Memory/runtime status callbacks can still fire **after** the user stops the
+agent or after a **finished** run. Those diagnostics are recorded on the
+controller (`set_last_error`, logs), but Grinta **does not** transition
+`STOPPED → ERROR` or `FINISHED → ERROR`: that would conflate a deliberate
+terminal with a broken session and could break WAL/reconnect semantics.
+See `backend/orchestration/runtime_late_error_guard.py`, early status
+handling in `backend/core/bootstrap/main.py`, and
+`backend/core/bootstrap/agent_control_loop.py`.
+
+## Two kinds of rate limiting
+
+* **LLM provider limits (TPM/RPM/429).** Grinta’s inference client and
+  `RecoveryService` / retry queue handle back-off; optional HUD toasts may
+  appear. Grinta does **not** require Redis or any other in-repo store for
+  that path.
+* **Application / API rate limits.** If the project you are editing throttles
+  its own HTTP surface (in-memory, gateway, database-backed, etc.), that is
+  separate infrastructure: it does **not** fix provider 429s on the agent’s
+  model calls.
+
+## Edit verification (grounding gate)
+
+After an edit is followed by **failing** feedback (tests, linters, etc.),
+`ActionExecutionService` can require a **grounding** read or terminal check
+before further writes or `finish`. Default is strict for safety; relaxing it
+(e.g. more edits before the gate, or narrower path rules) is a deliberate
+product trade-off—see `backend/orchestration/services/action_execution_service.py`
+and `step_guard_service.py`.
 
 ## What this document does not promise
 
