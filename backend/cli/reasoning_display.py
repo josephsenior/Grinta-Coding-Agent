@@ -1,12 +1,10 @@
-"""Live reasoning panel — compact *activity* chrome while the agent works.
+"""Live reasoning panel — activity chrome while the agent works.
 
-Model reasoning streams into this object; :meth:`renderable` shows the header
-(spinner + current action + elapsed/cost) and, when there is thought text, the
-latest lines inside the Thinking strip so streaming CoT updates in real time
-(subject to the Live viewport budget). When the Live strip already showed thought lines, the renderer skips printing
-the same text again as a transcript snapshot on turn end; otherwise thoughts
-are flushed via :func:`backend.cli.transcript.format_reasoning_snapshot` using
-the same tone as :data:`backend.cli.theme.CLR_THOUGHT_BODY`.
+Streaming updates the same ``_thought_lines`` buffer shown in the Rich Live
+Thinking strip; when the turn ends, :meth:`CLIEventRenderer._flush_thinking_block`
+prints those lines into the transcript with :func:`backend.cli.transcript.format_reasoning_snapshot`,
+using the same body style token as the live text (:data:`backend.cli.theme.CLR_THOUGHT_BODY`)
+so live vs committed reasoning differs only by context (panel vs plain lines), not by a separate pipeline.
 
 No duplicate Ctrl+C hint (the fake-prompt bar directly below the panel
 already shows "Agent working… ctrl+c to interrupt"), and no inline
