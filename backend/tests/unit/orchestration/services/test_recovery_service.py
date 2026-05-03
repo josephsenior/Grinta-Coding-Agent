@@ -6,8 +6,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from backend.core.errors import LLMNoResponseError
 from backend.core.schemas import AgentState
-from backend.inference.exceptions import AuthenticationError, RateLimitError, Timeout
+from backend.inference.exceptions import (
+    APIConnectionError,
+    AuthenticationError,
+    InternalServerError,
+    RateLimitError,
+    ServiceUnavailableError,
+    Timeout,
+)
 from backend.ledger.observation import ErrorObservation
 from backend.orchestration.services.recovery_service import RecoveryService
 
@@ -50,6 +58,7 @@ class TestRecoveryService:
         assert isinstance(err_obs, ErrorObservation)
         assert err_obs.error_id == 'LLM_TIMEOUT'
         assert 'Timeout' in err_obs.content
+        assert err_obs.notify_ui_only is True
         ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
         mock_context.set_agent_state.assert_awaited_once_with(AgentState.RATE_LIMITED)
 
@@ -62,6 +71,8 @@ class TestRecoveryService:
         svc = RecoveryService(mock_context)
         await svc.react_to_exception(Timeout('slow'))
 
+        err_obs = mock_context.emit_event.call_args[0][0]
+        assert err_obs.notify_ui_only is True
         ctrl.retry_service.schedule_retry_after_failure.assert_awaited_once()
         mock_context.set_agent_state.assert_awaited_once_with(
             AgentState.AWAITING_USER_INPUT
@@ -108,14 +119,45 @@ class TestRecoveryService:
         assert 'provider limit reached' in err_obs.content
         assert 'https://example.com/pricing' not in err_obs.content
         assert 'Waiting before retrying - no action needed.' in err_obs.content
+        assert err_obs.notify_ui_only is True
+
+    @pytest.mark.asyncio
+    async def test_service_unavailable_sets_notify_ui_only(self, mock_context, ctrl):
+        ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
+
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(ServiceUnavailableError('unavailable'))
+
+        err_obs = mock_context.emit_event.call_args[0][0]
+        assert err_obs.notify_ui_only is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        'exc',
+        [
+            APIConnectionError('connection reset'),
+            InternalServerError('upstream 500'),
+            LLMNoResponseError('empty completion'),
+        ],
+    )
+    async def test_transient_llm_infra_sets_notify_ui_only(
+        self, mock_context, ctrl, exc
+    ):
+        """Matches ``LLM_RETRY_EXCEPTIONS`` infra types after inner retries."""
+        svc = RecoveryService(mock_context)
+        await svc.react_to_exception(exc)
+
+        err_obs = mock_context.emit_event.call_args[0][0]
+        assert err_obs.notify_ui_only is True
+        assert 'Transient provider or network issue' in err_obs.content
 
     @pytest.mark.asyncio
     async def test_rate_limit_does_not_pollute_agent_context(self, mock_context, ctrl):
         """Silent-rate-limit policy: transient 429s must NOT add an
-        ``AgentThinkObservation`` to the event stream. The agent has no
-        rate-limit mitigation tools; the inner Tenacity loop + outer retry
-        queue handle recovery autonomously. Only terminal failures (after
-        all retries are exhausted) should reach the agent.
+        ``AgentThinkObservation`` to the event stream, and the compact
+        ``ErrorObservation`` uses ``notify_ui_only`` so it is omitted from
+        LLM message assembly. The inner Tenacity loop + outer retry queue
+        handle recovery autonomously.
         """
         ctrl.retry_service.schedule_retry_after_failure = AsyncMock(return_value=True)
         ctrl.event_stream = MagicMock()
@@ -123,6 +165,9 @@ class TestRecoveryService:
 
         svc = RecoveryService(mock_context)
         await svc.react_to_exception(RateLimitError('rate limited'))
+
+        err_obs = mock_context.emit_event.call_args[0][0]
+        assert err_obs.notify_ui_only is True
 
         # No AgentThinkObservation may have been pushed by the recovery service.
         for call in ctrl.event_stream.add_event.call_args_list:
