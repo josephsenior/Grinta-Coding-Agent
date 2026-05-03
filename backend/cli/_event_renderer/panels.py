@@ -11,10 +11,7 @@ from rich.table import Table
 from rich.text import Text
 
 from backend.cli._event_renderer.constants import DELEGATE_WORKER_STATUS_STYLES
-from backend.cli.layout_tokens import (
-    ACTIVITY_PANEL_PADDING,
-    LIVE_PANEL_ACCENT_STYLE,
-)
+from backend.cli.layout_tokens import LIVE_PANEL_ACCENT_STYLE
 from backend.cli.theme import (
     CLR_INFO_BODY,
     CLR_INFO_ICON,
@@ -32,7 +29,7 @@ from backend.cli.theme import (
     STYLE_SYSTEM_TAG_TIMEOUT,
     STYLE_SYSTEM_TAG_WARNING,
 )
-from backend.cli.transcript import format_callout_panel
+from backend.cli.transcript import format_live_panel
 from backend.core.task_status import (
     TASK_STATUS_PANEL_STYLES,
     TASK_STATUS_TODO,
@@ -135,11 +132,11 @@ def build_task_panel(task_list: list[dict[str, Any]]) -> Any:
             style=STYLE_DIM,
         )
     )
-    return format_callout_panel(
+    return format_live_panel(
         f'Tasks ({len(task_list)})',
         empty_state,
         accent_style=LIVE_PANEL_ACCENT_STYLE,
-        padding=ACTIVITY_PANEL_PADDING,
+        padding=(0, 1),
     )
 
 
@@ -174,11 +171,11 @@ def build_delegate_worker_panel(workers: dict[str, dict[str, Any]]) -> Any:
             style=STYLE_DIM,
         )
     )
-    return format_callout_panel(
+    return format_live_panel(
         f'Workers ({len(workers)})',
         empty_state,
         accent_style=LIVE_PANEL_ACCENT_STYLE,
-        padding=ACTIVITY_PANEL_PADDING,
+        padding=(0, 1),
     )
 
 

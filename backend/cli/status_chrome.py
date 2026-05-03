@@ -302,7 +302,7 @@ def rich_fake_prompt_group(fields: StatusFields, width: int) -> Group:
         return Group(rich_fake_prompt_compact_line(fields, term_width=width))
     items: list[Any] = [
         rich_fake_prompt_input_row(fields),
-        Text('─' * width, style=CLR_SEP),
+        Text('─' * width, style=f'dim {CLR_SEP}'),
         rich_fake_prompt_row1(fields),
         rich_fake_prompt_metrics_row(fields),
     ]

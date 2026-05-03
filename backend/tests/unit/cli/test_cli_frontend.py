@@ -1804,8 +1804,8 @@ def test_start_live_passes_vertical_overflow_crop() -> None:
     taller than the terminal. With streaming reasoning that grows line by
     line, this stacked dozens of duplicate copies per turn in the scrollback
     — the panel looked like it was stuttering. ``crop`` redraws in place;
-    panels that could exceed height (streaming preview, reasoning thoughts)
-    clamp themselves via ``options.max_height`` inside their renderables.
+    tall sections (e.g. draft tail preview) still respect line budgets; the
+    Live region itself is cropped in place rather than re-printed.
     """
     console = _make_console()
     loop = asyncio.new_event_loop()
@@ -2085,7 +2085,7 @@ async def test_streaming_preview_renders_streaming_panel() -> None:
     output = _console_output(console)
 
     # _render_streaming_preview uses a titled panel so live draft text is visually separated.
-    assert 'Draft Reply' in output
+    assert 'Draft reply' in output
     assert 'Hello' in output
 
 
@@ -2105,7 +2105,7 @@ def test_streaming_preview_auto_scroll_shows_latest_content() -> None:
     console.print(renderer._render_streaming_preview(max_width=80, max_lines=10))
     output = _console_output(console)
 
-    assert 'Draft Reply' in output
+    assert 'Draft reply' in output
     assert 'Tail preview' in output
     assert 'line 060' in output
     assert 'line 001' not in output
@@ -3559,10 +3559,7 @@ def test_reasoning_display_auto_scroll_shows_latest_lines() -> None:
         rd.update_thought(f'thought {i:02d}')
 
     console = _make_console(width=90)
-    with patch.object(
-        ReasoningDisplay, 'live_panel_shows_thought_rows', return_value=True
-    ):
-        console.print(rd.renderable(max_width=90, max_lines=4))
+    console.print(rd.renderable(max_width=90, max_lines=4))
     output = _console_output(console)
 
     assert 'showing latest thoughts' in output
@@ -3588,16 +3585,16 @@ def test_reasoning_display_has_no_redundant_ctrl_c_hint() -> None:
     assert 'interrupts' not in lowered
 
 
-def test_reasoning_display_live_panel_is_header_only_by_default() -> None:
-    """Thought bodies are transcript-only; the live Thinking card is header-only."""
+def test_reasoning_display_live_panel_streams_thought_bodies() -> None:
+    """Streaming reasoning text appears in the live Thinking strip with a cursor."""
     rd = ReasoningDisplay()
     rd.set_streaming_thought('partial reasoning in flight')
     console = _make_console(width=90)
     console.print(rd.renderable(max_width=90))
     output = _console_output(console)
     assert 'Thinking' in output
-    assert 'partial reasoning in flight' not in output
-    assert '▌' not in output
+    assert 'partial reasoning in flight' in output
+    assert '▌' in output
 
 
 def test_reasoning_display_no_cursor_when_action_changes() -> None:
@@ -3628,8 +3625,8 @@ def test_reasoning_display_no_breadcrumb_trail() -> None:
     assert '→' not in output
 
 
-def test_reasoning_display_live_panel_omits_long_thought_bodies() -> None:
-    """Long thoughts are not echoed in the live Thinking panel (transcript only)."""
+def test_reasoning_display_live_panel_includes_long_thought_wrapped() -> None:
+    """Long thoughts wrap inside the live Thinking panel instead of being dropped."""
     rd = ReasoningDisplay()
     rd.start()
     long_line = 'rgba(12,34,56,0.7) ' * 25
@@ -3637,19 +3634,12 @@ def test_reasoning_display_live_panel_omits_long_thought_bodies() -> None:
     console = _make_console(width=72)
     console.print(rd.renderable(max_width=72))
     output = _console_output(console)
-    assert 'rgba(12,34,56,0.7)' not in output
+    assert 'rgba(12,34,56,0.7)' in output
 
 
 @pytest.mark.asyncio
 async def test_reasoning_gets_generous_budget_when_alone() -> None:
-    """When only the reasoning panel is active, it should get >= 12 lines.
-
-    Regression guard: the previous layout reserved 10 rows for bottom
-    chrome and then clamped reasoning to ``max(6, …)``, which in practice
-    made long thoughts appear truncated to ~2 visible rows on mid-height
-    terminals. The new layout reserves only ~6 rows and floors the
-    reasoning budget at 12 lines so thoughts stream cleanly.
-    """
+    """Live layout passes ``max_lines=None`` into Thinking so rows are not capped."""
     console = _make_console(width=100)
     hud = HUDBar()
     renderer = CLIEventRenderer(
@@ -3680,18 +3670,12 @@ async def test_reasoning_gets_generous_budget_when_alone() -> None:
     )
 
     list(renderer.__rich_console__(console, options))
-    assert captured['max_lines'] is not None
-    # Header-only Thinking panel uses a small vertical budget; the draft
-    # reply preview owns most of the Live viewport.
-    assert captured['max_lines'] >= 4, (
-        f'reasoning budget was {captured["max_lines"]} lines; '
-        'expected a minimal header budget'
-    )
+    assert captured['max_lines'] is None
 
 
 @pytest.mark.asyncio
 async def test_reasoning_keeps_meaningful_budget_when_sharing_with_stream() -> None:
-    """Reasoning + streaming preview should each keep a usable vertical budget."""
+    """Draft tail stays capped while reasoning receives ``max_lines=None`` (uncapped)."""
     console = _make_console(width=100)
     hud = HUDBar()
     renderer = CLIEventRenderer(
@@ -3729,10 +3713,8 @@ async def test_reasoning_keeps_meaningful_budget_when_sharing_with_stream() -> N
     )
     list(renderer.__rich_console__(console, options))
 
-    assert (captured['reasoning'] or 0) >= 4
+    assert captured['reasoning'] is None
     assert (captured['stream'] or 0) >= 6
-    # Draft reply is the primary live signal; header-only Thinking stays small.
-    assert (captured['stream'] or 0) >= (captured['reasoning'] or 0)
 
 
 @pytest.mark.asyncio

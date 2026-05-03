@@ -68,6 +68,7 @@ from backend.cli.transcript import (
     format_activity_turn_header,
     format_callout_panel,
     format_ground_truth_tool_line,
+    format_live_panel,
     format_reasoning_snapshot,
 )
 from backend.core.enums import AgentState, EventSource
@@ -584,11 +585,10 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # Committed transcript lines are printed via console.print immediately
         # so Rich does not clip tall turns (Live vertical_overflow ellipsis).
         live_sections: list[Any] = self._collect_live_sections()
-        stream_max_lines, reasoning_max_lines = self._live_section_budgets(options)
+        stream_max_lines = self._live_section_budgets(options)
         reasoning_section = self._append_streaming_and_reasoning_sections(
             live_sections,
             stream_max_lines,
-            reasoning_max_lines,
             options.max_width,
         )
         body_items = self._frame_live_sections(live_sections, reasoning_section)
@@ -609,50 +609,29 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             sections.append(self._delegate_panel)
         return sections
 
-    def _live_section_budgets(
-        self, options: ConsoleOptions
-    ) -> tuple[int | None, int | None]:
-        # Split the available vertical budget between the streaming preview
-        # and the reasoning panel so neither one grows unbounded and pushes
-        # its sibling off-screen (which, with ``vertical_overflow='crop'``,
-        # would hide the streamed content entirely).
-        #
-        # The reserve below accounts for the fake-prompt block at the bottom
-        # of the Live display: input row (1) + separator (1) + branded row
-        # (1) + stats row (1-2) + padding (~1) = ~6 rows. Previously we
-        # reserved 10 rows, which — combined with a very defensive
-        # ``max(4, …)`` floor — left as few as 4 physical rows for reasoning
-        # content and made long thoughts appear truncated to ~2 lines.
-        if not options.max_height:
-            return None, None
-        available = max(12, options.max_height - 6)
-        thought_rows = self._reasoning.live_panel_shows_thought_rows()
-        if self._streaming_accumulated and self._reasoning.active:
-            return self._budgets_with_both(available, thought_rows)
-        if self._streaming_accumulated:
-            return max(10, min(28, available)), None
-        if self._reasoning.active:
-            return None, (max(12, min(32, available)) if thought_rows else 6)
-        return None, None
+    def _live_section_budgets(self, options: ConsoleOptions) -> int | None:
+        """Max lines for the draft-reply tail preview inside Live.
 
-    @staticmethod
-    def _budgets_with_both(
-        available: int,
-        thought_rows: bool,
-    ) -> tuple[int, int]:
-        if thought_rows:
-            reasoning_share = max(10, available * 3 // 5)
-            stream_max = max(6, min(16, available - reasoning_share - 1))
-            reasoning_max = max(10, min(reasoning_share, available - stream_max - 1))
-            return stream_max, reasoning_max
-        # Header-only Thinking panel: give the draft-reply preview the bulk.
-        return max(10, min(28, available - 5)), 6
+        Reasoning thought text is not line-capped here (``max_lines=None`` on
+        the Thinking renderable); only the draft preview uses a viewport limit.
+        """
+        if not options.max_height:
+            return None
+        available = max(12, options.max_height - 6)
+        has_draft = bool(self._streaming_accumulated)
+        has_reasoning = self._reasoning.active
+        if has_draft and has_reasoning:
+            if self._reasoning.live_panel_shows_thought_rows():
+                return max(6, min(16, available // 2))
+            return max(10, min(28, available - 5))
+        if has_draft:
+            return max(10, min(28, available))
+        return None
 
     def _append_streaming_and_reasoning_sections(
         self,
         live_sections: list[Any],
         stream_max_lines: int | None,
-        reasoning_max_lines: int | None,
         max_width: int,
     ) -> Any | None:
         if self._streaming_accumulated:
@@ -664,9 +643,12 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             )
         reasoning_section: Any | None = None
         if self._reasoning.active:
+            # Do not cap thought rows in the Live strip: show the full CoT so
+            # users are not limited to a trailing viewport (tall panels may be
+            # cropped by the terminal / Rich ``vertical_overflow='crop'``).
             reasoning_section = self._reasoning.renderable(
                 max_width=max_width,
-                max_lines=reasoning_max_lines,
+                max_lines=None,
             )
             live_sections.append(reasoning_section)
         return reasoning_section
@@ -750,7 +732,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             self._reasoning.update_action(f'{headline}…')
         # Clear any text content that arrived before the tool call started
         # (e.g. a preamble "[" or task-list header). Keeping it would leave
-        # a stale "Draft Reply … Still streaming…" panel alongside the
+        # a stale draft-reply preview panel alongside the
         # Thinking spinner for the entire duration of the tool call stream.
         self._streaming_accumulated = ''
         self.refresh()
@@ -1381,20 +1363,18 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
             )
 
         body: list[Any] = [Markdown(clipped)]
+        status_bits: list[str] = []
         if clipped != full:
-            body.append(
-                Text(
-                    'Tail preview — full reply will appear in chat when streaming finishes',
-                    style=STYLE_ITALIC_DIM,
-                )
-            )
+            status_bits.append('Tail preview — full reply follows when done')
         if not self._streaming_final:
-            body.append(Text('Still streaming…', style=STYLE_DIM))
-        return format_callout_panel(
-            'Draft Reply',
+            status_bits.append('streaming')
+        if status_bits:
+            body.append(Text(' · '.join(status_bits), style=STYLE_ITALIC_DIM))
+        return format_live_panel(
+            'Draft reply',
             Group(*body),
             accent_style=DRAFT_PANEL_ACCENT_STYLE,
-            padding=ACTIVITY_PANEL_PADDING,
+            padding=(0, 1),
         )
 
     @staticmethod
