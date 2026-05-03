@@ -166,7 +166,7 @@ def redact_streamed_tool_call_markers(text: str) -> str:
         span = _scan_tool_call_marker(text, j)
         if span is None:
             # JSON not yet complete — drop everything from the prefix onwards
-            # to avoid leaking a stray '[' into the Draft Reply panel.
+            # to avoid leaking a stray '[' into the draft-reply live preview.
             return ''.join(out).rstrip()
         _start, end = span
         i = end

@@ -1,10 +1,12 @@
 """Live reasoning panel — compact *activity* chrome while the agent works.
 
-Thought text is **not** duplicated here: model reasoning streams into this
-object for snapshotting, but :meth:`renderable` shows only the header (spinner
-+ current action + elapsed/cost). Committed thoughts are flushed to the main
-transcript via :func:`backend.cli.transcript.format_reasoning_snapshot`, styled
-dim so they read as internal monologue rather than assistant reply.
+Model reasoning streams into this object; :meth:`renderable` shows the header
+(spinner + current action + elapsed/cost) and, when there is thought text, the
+latest lines inside the Thinking strip so streaming CoT updates in real time
+(subject to the Live viewport budget). The same thoughts are flushed to the
+main transcript on turn end via :func:`backend.cli.transcript.format_reasoning_snapshot`
+(dim), with duplicate leading lines skipped via the renderer's last-committed
+pointer.
 
 No duplicate Ctrl+C hint (the fake-prompt bar directly below the panel
 already shows "Agent working… ctrl+c to interrupt"), and no inline
@@ -28,7 +30,7 @@ from backend.cli.layout_tokens import (
     LIVE_PANEL_ACCENT_STYLE,
 )
 from backend.cli.theme import CLR_ACTION, CLR_META, CLR_SPINNER, CLR_THOUGHT_BODY
-from backend.cli.transcript import format_callout_panel
+from backend.cli.transcript import format_live_panel
 from backend.engine import prompt_role_debug as _prompt_role_debug
 
 # Thought lines are rendered without an extra manual prefix so they align with
@@ -38,8 +40,8 @@ _THOUGHT_LINE_PREFIX_CHARS = 0
 _MAX_STORED_THOUGHT_LINES = 50_000
 
 
-# Panel chrome overhead: ``╭─ Thinking ─╮`` borders + horizontal padding added
-# by ``format_callout_panel``. Sourced from ``layout_tokens`` so the wrap
+# Panel chrome overhead: live ``MINIMAL`` frame + horizontal padding from
+# :func:`backend.cli.transcript.format_live_panel`. Sourced from ``layout_tokens`` so the wrap
 # width tracks the actual rendered panel and never desynchronises if the
 # padding token is retuned in one place but forgotten here.
 _PANEL_CHROME_WIDTH = CALLOUT_PANEL_CHROME_WIDTH
@@ -212,16 +214,15 @@ class ReasoningDisplay:
         """Set cost baseline at the start of a turn."""
         self._cost_at_start = cost_usd
 
-    @staticmethod
-    def live_panel_shows_thought_rows() -> bool:
+    def live_panel_shows_thought_rows(self) -> bool:
         """Whether the Rich Live layout should reserve vertical space for thought lines.
 
-        When ``False`` (default), only the Thinking *header* (spinner + action)
-        appears in the live panel; thought bodies are transcript-only. This
-        avoids duplicating long CoT next to the draft reply and keeps the two
-        streams visually distinct.
+        When there is no thought text yet, only the Thinking *header* (spinner +
+        action) appears so idle states stay compact. As soon as the model
+        supplies reasoning (streaming or snapshot lines), the strip grows to
+        show the live-updating body within the renderer's line budget.
         """
-        return False
+        return bool(self._thought_lines)
 
     # -- rendering ---------------------------------------------------------
 
@@ -243,15 +244,13 @@ class ReasoningDisplay:
 
         rows: list[Any] = [self._build_header_row(action_label, meta_right)]
 
-        # Thought bodies are intentionally omitted from the live panel — they
-        # are flushed to the transcript (dim) so they are not mistaken for the
-        # assistant reply and do not compete with the draft-reply preview for
-        # vertical space. ``_thought_lines`` are still maintained for
-        # :meth:`snapshot_thoughts` / :meth:`CLIEventRenderer._flush_thinking_block`.
+        # Thought bodies stream in the live panel when present. Callers may pass
+        # ``max_lines`` to clamp height (e.g. tests); the main agent Live layout
+        # passes ``None`` so the full CoT is shown (terminal may crop the block).
         if self.live_panel_shows_thought_rows():
             self._append_thought_rows(rows, max_width, max_lines)
 
-        return format_callout_panel(
+        return format_live_panel(
             'Thinking',
             Group(*rows),
             accent_style=LIVE_PANEL_ACCENT_STYLE,
@@ -328,4 +327,4 @@ class ReasoningDisplay:
             rows.append(Text(row, style=CLR_THOUGHT_BODY))
 
         if clipped:
-            rows.append(Text('… showing latest thoughts', style=f'{CLR_META} italic'))
+            rows.append(Text('… showing latest thoughts', style=CLR_META))

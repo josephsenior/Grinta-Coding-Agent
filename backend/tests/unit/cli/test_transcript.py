@@ -19,6 +19,7 @@ from backend.cli.transcript import (
     format_activity_validation_callout,
     format_callout_panel,
     format_ground_truth_tool_line,
+    format_live_panel,
     format_reasoning_snapshot,
     format_shell_result_secondary,
     strip_tool_result_validation_annotations,
@@ -117,6 +118,17 @@ def test_format_callout_panel_uses_layout_padding() -> None:
 
 def test_format_callout_panel_accepts_custom_padding() -> None:
     panel = format_callout_panel('Title', Text('body'), padding=(0, 1))
+    assert panel.padding == (0, 1)
+
+
+def test_format_live_panel_uses_minimal_box_and_live_border() -> None:
+    from rich import box
+
+    from backend.cli.theme import CLR_LIVE_PANEL_BORDER
+
+    panel = format_live_panel('Live', Text('body'), accent_style='cyan')
+    assert panel.box == box.MINIMAL
+    assert panel.border_style == CLR_LIVE_PANEL_BORDER
     assert panel.padding == (0, 1)
 
 

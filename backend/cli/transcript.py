@@ -30,6 +30,7 @@ from backend.cli.theme import (
     CLR_ERR_ICON,
     CLR_INFO_BODY,
     CLR_INFO_ICON,
+    CLR_LIVE_PANEL_BORDER,
     CLR_OK_BODY,
     CLR_OK_ICON,
     CLR_REASONING_COMMITTED,
@@ -300,6 +301,29 @@ def format_callout_panel(
         border_style=accent_style,
         box=box.ROUNDED,
         padding=padding if padding is not None else CALLOUT_PANEL_PADDING,
+    )
+
+
+def format_live_panel(
+    title: str,
+    body: Any,
+    *,
+    accent_style: str,
+    padding: tuple[int, int] | None = None,
+) -> Panel:
+    """Chrome for the Rich ``Live`` block: minimal frame, subdued border.
+
+    Stacked draft / thinking / task strips stay readable without the visual
+    weight of rounded transcript callouts (:func:`format_callout_panel`).
+    """
+    panel_title = Text((title or '').strip(), style=f'bold {accent_style}')
+    return Panel(
+        body,
+        title=panel_title,
+        title_align='left',
+        border_style=CLR_LIVE_PANEL_BORDER,
+        box=box.MINIMAL,
+        padding=padding if padding is not None else (0, 1),
     )
 
 
