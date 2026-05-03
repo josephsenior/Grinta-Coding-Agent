@@ -896,7 +896,7 @@ class GeminiClient(DirectLLMClient):
         return ProviderAPIError(str(exc), llm_provider='google', model=self.model_name)
 
     def _map_gemini_error(self, exc: Exception) -> Exception:
-        """Map google.genai exceptions to App LLM exceptions."""
+        """Map google.genai exceptions to Grinta LLM exceptions."""
         import asyncio
 
         import aiohttp

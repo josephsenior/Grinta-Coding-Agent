@@ -1,4 +1,4 @@
-"""LLM configuration schemas and helpers for App agents."""
+"""LLM configuration schemas and helpers for Grinta agents."""
 
 from __future__ import annotations
 

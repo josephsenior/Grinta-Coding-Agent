@@ -1,4 +1,4 @@
-"""Filtering utilities for querying App event streams."""
+"""Filtering utilities for querying Grinta event streams."""
 
 from __future__ import annotations
 

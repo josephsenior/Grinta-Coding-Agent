@@ -156,7 +156,7 @@ LANGUAGE_EXTENSIONS = {
     '.nims': 'nim',
     '.v': 'v',
     '.d': 'd',
-    # Mobile/App development
+    # Mobile / app development
     '.swift': 'swift',
     '.m': 'objective_c',
     '.mm': 'objective_c',
@@ -375,7 +375,7 @@ class TreeSitterEditor:
             raise ImportError(
                 '🚨 CRITICAL: Tree-sitter not available!\n\n'
                 'Ultimate Editor requires Tree-sitter for structure-aware editing.\n'
-                "This is App's competitive advantage - without it, only basic editing works.\n\n"
+                "This is Grinta's competitive advantage - without it, only basic editing works.\n\n"
                 'PRODUCTION DEPLOYMENT ERROR:\n'
                 '  Tree-sitter should be a required dependency in pyproject.toml.\n'
                 '  Check that your runtime environment has the latest dependencies installed.\n\n'

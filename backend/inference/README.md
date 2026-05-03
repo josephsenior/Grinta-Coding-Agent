@@ -54,8 +54,8 @@ Response + cost tracking + metrics
 Main interface for LLM calls:
 
 ```python
-from app.models import LLM
-from app.core.config import LLMConfig
+from backend.inference.llm import LLM
+from backend.core.config.llm_config import LLMConfig
 
 # Create LLM instance
 config = LLMConfig(
@@ -129,7 +129,7 @@ python -m backend.inference.discover_models status
 Secure multi-provider API key management:
 
 ```python
-from app.core.config.api_key_manager import api_key_manager
+from backend.core.config.api_key_manager import api_key_manager
 
 # Get correct API key for model
 key = api_key_manager.get_api_key_for_model(
@@ -156,7 +156,7 @@ api_key_manager.set_environment_variables(
 Pre-configured settings for 30+ providers:
 
 ```python
-from app.core.config.provider_config import provider_config_manager
+from backend.core.config.provider_config import provider_config_manager
 
 # Get provider config
 config = provider_config_manager.get_provider_config("anthropic")
@@ -184,7 +184,7 @@ cleaned = provider_config_manager.validate_and_clean_params(
 Automatic feature detection:
 
 ```python
-from app.models.model_features import get_features
+from backend.inference.model_features import get_features
 
 features = get_features("claude-haiku-4-5-20251001")
 
@@ -338,7 +338,7 @@ LLM_API_VERSION=2024-12-01
 
 ### Step 1: Add Provider Config
 
-Edit `Grinta/core/config/provider_config.py`:
+Edit `backend/core/config/provider_config.py`:
 
 ```python
 configs['newprovider'] = ProviderConfig(
@@ -356,7 +356,7 @@ configs['newprovider'] = ProviderConfig(
 
 ### Step 2: Add Feature Patterns (if needed)
 
-Edit `Grinta/llm/model_features.py`:
+Edit `backend/inference/model_features.py`:
 
 ```python
 FUNCTION_CALLING_PATTERNS: list[str] = [
@@ -368,8 +368,8 @@ FUNCTION_CALLING_PATTERNS: list[str] = [
 ### Step 3: Test
 
 ```python
-from app.models import LLM
-from app.core.config import LLMConfig
+from backend.inference.llm import LLM
+from backend.core.config.llm_config import LLMConfig
 
 config = LLMConfig(
     model="newprovider/model-name",
@@ -484,7 +484,7 @@ if response.choices[0].message.tool_calls:
 **Supported models:** GPT-4o, Claude 3.5+, Gemini 2.0+
 
 ```python
-from app.core.message import Message
+from backend.core.message import Message
 
 # Image message
 message = Message(
@@ -518,7 +518,7 @@ for chunk in response:
 ### LLM Metrics Class
 
 ```python
-from app.models.metrics import Metrics
+from backend.inference.metrics import Metrics
 
 metrics = Metrics(model_name="claude-4")
 
@@ -600,7 +600,7 @@ LLM_MODEL=gpt-4o-mini
 
 ```python
 # Check if model supports function calling
-from app.models.model_features import get_features
+from backend.inference.model_features import get_features
 
 features = get_features(your_model)
 print(f"Function calling: {features.supports_function_calling}")

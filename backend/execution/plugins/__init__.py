@@ -1,6 +1,6 @@
 """Runtime plugin registration and convenience exports.
 
-.. note:: **Two plugin systems exist in App:**
+.. note:: **Two plugin systems exist in Grinta:**
 
    * :mod:`backend.core.plugin` — *core hooks* (host-side, lifecycle hooks,
      entry-point group ``app.plugins``).

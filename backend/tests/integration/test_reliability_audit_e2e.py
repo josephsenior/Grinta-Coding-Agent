@@ -1,4 +1,4 @@
-"""Integration tests for App's comprehensive reliability guardrails.
+"""Integration tests for Grinta's comprehensive reliability guardrails.
 
 This module actively verifies the edge cases and interactions between:
 
@@ -31,7 +31,7 @@ def mock_controller_context():
 
 
 class TestReliabilityGuardrailsIntegration:
-    """Rigorous audit of App's behavioral and token safety constraints."""
+    """Rigorous audit of Grinta's behavioral and token safety constraints."""
 
     @pytest.mark.asyncio
     async def test_rate_governor_adaptive_backoff(self):

@@ -1,4 +1,4 @@
-"""Database helper library for App agent runtime.
+"""Database helper library for Grinta agent runtime.
 
 This library provides database connection and query functions that execute
 in the user's runtime environment, ensuring credentials never leave their infrastructure.

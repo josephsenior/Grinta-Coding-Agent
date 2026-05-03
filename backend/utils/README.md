@@ -1,78 +1,18 @@
-# Grinta Utilities
+# Grinta utilities (`backend/utils`)
 
-This directory contains various utility functions and classes used throughout Grinta.
+Small shared helpers used across orchestration, execution, CLI, and inference.
 
-## Runtime Implementation Substitution
+## Dynamic imports (`import_utils.py`)
 
-App provides an extensibility mechanism through the `get_impl` and `import_from` functions in `import_utils.py`. This mechanism allows applications built on App to customize behavior by providing their own implementations of App base classes.
+`import_from(qual_name)` loads any object from a fully qualified module path (for example `'builtins.ValueError'`).
 
-### How It Works
+`get_impl(base_cls, impl_name)` returns `base_cls` when `impl_name` is `None`, otherwise imports the named class and checks that it is a compatible subclass of `base_cls`. Results are cached.
 
-1. Base classes define interfaces through abstract methods and properties
-2. Default implementations are provided by App
-3. Applications can provide custom implementations by:
-   - Creating a class that inherits from the base class
-   - Implementing all required methods
-   - Configuring App to use the custom implementation via configuration
+Real call sites include:
 
-### Example
+- `backend/execution/runtime_factory.py` — resolve the concrete `Runtime` implementation.
+- `backend/core/config/config_loader.py` — optional `Agent` classpath from settings.
+- `backend/core/config/mcp_config.py` — optional MCP config class override.
+- `backend/persistence/conversation/conversation_validator.py` — store/validator class selection.
 
-```python
-# In App base code:
-class ConversationManager:
-    @abstractmethod
-    async def attach_to_conversation(self, sid: str) -> Conversation:
-        """Attach to an existing conversation."""
-
-# Default implementation in App:
-class StandaloneConversationManager(ConversationManager):
-    async def attach_to_conversation(self, sid: str) -> Conversation:
-        # Single-server implementation
-        ...
-
-# In your application:
-class ClusteredConversationManager(ConversationManager):
-    async def attach_to_conversation(self, sid: str) -> Conversation:
-        # Custom distributed implementation
-        ...
-
-# In configuration:
-server_config.conversation_manager_class = 'myapp.ClusteredConversationManager'
-```
-
-### Common Extension Points
-
-App provides several components that can be extended:
-
-1. Server Components:
-   - `ConversationManager`: Manages conversation lifecycles
-   - `UserAuth`: Handles user authentication
-   - `MonitoringListener`: Provides monitoring capabilities
-
-2. Storage:
-   - `ConversationStore`: Stores conversation data
-   - `SettingsStore`: Manages user settings
-   - `SecretsStore`: Handles sensitive data
-
-3. Service Integrations:
-   - GitHub service
-
-### Implementation Details
-
-The mechanism is implemented through two key functions:
-
-1. `import_from(qual_name: str)`: Imports any Python value from its fully qualified name
-
-   ```python
-   UserAuth = import_from('App.server.user_auth.UserAuth')
-   ```
-
-2. `get_impl(cls: type[T], impl_name: str | None) -> type[T]`: Imports and validates a class implementation
-   ```python
-   ConversationManagerImpl = get_impl(
-       ConversationManager,
-       server_config.conversation_manager_class
-   )
-   ```
-
-The `get_impl` function ensures type safety by validating that the imported class is either the same as or a subclass of the specified base class. It also caches results to avoid repeated imports.
+Use fully qualified names under the `backend.` package (or stdlib/third-party modules) in configuration — not legacy `app.*` placeholders.

@@ -1,4 +1,4 @@
-"""Pydantic schemas for all App action types."""
+"""Pydantic schemas for all Grinta action types."""
 
 from __future__ import annotations
 

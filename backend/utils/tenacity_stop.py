@@ -1,4 +1,4 @@
-"""Tenacity stop condition integrating App shutdown listener."""
+"""Tenacity stop condition integrating the Grinta shutdown listener."""
 
 from typing import TYPE_CHECKING
 

@@ -2,11 +2,11 @@
 
 ## Overview
 
-App uses its own `Message` class (`App/core/message.py`) which provides rich content support while maintaining compatibility with major LLM provider SDKs (OpenAI, Anthropic, Google Gemini, and xAI Grok).
+Grinta uses its own `Message` class (`backend/core/message.py`) which provides rich content support while maintaining compatibility with major LLM provider SDKs (OpenAI, Anthropic, Google Gemini, and xAI Grok).
 
 ## Class Structure
 
-Our `Message` class (`App/core/message.py`):
+Our `Message` class (`backend/core/message.py`):
 
 ```python
 class Message(BaseModel):

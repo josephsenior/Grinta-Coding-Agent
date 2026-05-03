@@ -17,7 +17,7 @@ This script handles everything:
 
 - Checks for `uv` and Python versions
 - Syncs dependencies
-- Discover local models (Ollama/LM Studio)
+- Discovers local models (Ollama/LM Studio)
 - Starts the Grinta terminal CLI
 
 ## Option 2: Manual start

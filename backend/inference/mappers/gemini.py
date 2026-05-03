@@ -77,7 +77,7 @@ def convert_messages(
         content = m.get('content', '')
         role_name = m.get('role', 'user')
 
-        # Handle list-style content (from App's message serialization)
+        # Handle list-style content (from Grinta's message serialization)
         text_parts = []
         if isinstance(content, list):
             for item in content:

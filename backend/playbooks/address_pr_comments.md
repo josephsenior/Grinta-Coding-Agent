@@ -2,7 +2,7 @@
 name: address_pr_comments
 type: task
 version: 1.0.0
-author: App
+author: Grinta
 agent: Orchestrator
 triggers:
   - /address_pr_comments

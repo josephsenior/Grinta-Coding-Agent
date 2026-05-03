@@ -353,7 +353,7 @@ class SafetyValidator:
             import aiohttp
 
             async with aiohttp.ClientSession() as session:
-                payload = {'text': message, 'username': 'App Security'}
+                payload = {'text': message, 'username': 'Grinta Security'}
                 async with session.post(
                     url,
                     json=payload,

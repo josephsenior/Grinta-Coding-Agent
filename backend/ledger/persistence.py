@@ -515,7 +515,7 @@ def _truncate_payload(payload: dict[str, Any], max_bytes: int) -> None:
     values, and truncates them until the estimated JSON size falls below
     *max_bytes*.
     """
-    trunc_marker = '\n\n[… truncated by App — event exceeded size cap …]'
+    trunc_marker = '\n\n[… truncated by Grinta — event exceeded size cap …]'
 
     def _string_fields(d: dict, prefix: str = '') -> list[tuple[str, dict, str]]:
         results: list[tuple[str, dict, str]] = []

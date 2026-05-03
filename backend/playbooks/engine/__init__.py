@@ -1,4 +1,4 @@
-"""Public playbook interfaces and metadata types for App."""
+"""Public playbook interfaces and metadata types for Grinta."""
 
 from .playbook import (
     BasePlaybook,

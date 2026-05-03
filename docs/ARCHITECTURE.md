@@ -42,7 +42,8 @@ backend/
   cli/            CLI entrypoints and rendering
   context/        Memory and compaction
   core/           Config, constants, logging, shared utilities
-  engine/         Agent reasoning and prompt assembly
+  engine/         Agent reasoning, prompt assembly, and tool implementations
+  evaluation/     Agent eval pack and related evaluation helpers
   execution/      Local runtime, shell/session plumbing, and executor internals
   inference/      Provider routing and direct LLM clients
   integrations/   External integration adapters
@@ -53,7 +54,8 @@ backend/
   playbooks/      Playbook definitions and helpers
   security/       Command risk analysis and policies
   telemetry/      Lightweight instrumentation
-  tools/          Tool implementations and schemas
+  tools/          Repo maintenance utilities (not agent-facing tools)
+  utils/          Shared helpers (imports, LSP, HTTP, etc.)
   validation/     Completion and quality validation
 ```
 
@@ -69,6 +71,7 @@ Current service modules include:
 - `confirmation_service.py`
 - `event_router_service.py`
 - `exception_handler_service.py`
+- `guard_bus.py`
 - `iteration_guard_service.py`
 - `iteration_service.py`
 - `lifecycle_service.py`

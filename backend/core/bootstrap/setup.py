@@ -417,7 +417,7 @@ def create_controller(
     Args:
         agent: Agent instance
         runtime: Runtime environment
-        config: App configuration
+        config: Grinta configuration
         conversation_stats: Conversation statistics tracker
         headless_mode: Whether running in headless mode
         replay_events: Optional events to replay

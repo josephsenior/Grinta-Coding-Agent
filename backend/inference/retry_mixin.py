@@ -1,4 +1,4 @@
-"""Retry utilities shared by App LLM clients for resilient completions."""
+"""Retry utilities shared by Grinta LLM clients for resilient completions."""
 
 import contextlib
 from collections.abc import Callable

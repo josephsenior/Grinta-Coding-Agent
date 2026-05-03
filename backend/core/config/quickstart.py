@@ -1,4 +1,4 @@
-"""Quick-start configuration generator for new App users.
+"""Quick-start configuration generator for new Grinta users.
 
 Generates a minimal ``settings.json`` with only the settings that matter
 on day one.  Every other knob inherits sensible defaults.
@@ -57,7 +57,7 @@ def generate_quickstart_config(
 
 def _interactive_init(dest: Path) -> None:
     """Walk the user through creating a minimal config file."""
-    print('\n🚀 App Quick-Start Configuration')
+    print('\n🚀 Grinta Quick-Start Configuration')
     print('=' * 60)
 
     # 1. Detect local models

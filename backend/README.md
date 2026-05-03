@@ -6,21 +6,27 @@ This folder contains all backend-related code and resources for the Grinta proje
 
 ```text
 backend/
-├── core/            # Shared config, schemas, logging, and bootstrap
-├── orchestration/   # Session orchestration loop and services
-├── engine/          # LLM-facing agent engine
-├── ledger/          # Record stream, persistence, and serialization
+├── cli/             # Terminal UI, REPL, and CLI entry
 ├── context/         # Context memory and compaction
+├── core/            # Shared config, schemas, logging, and bootstrap
+├── engine/          # LLM-facing agent engine and tools
+├── evaluation/      # Agent eval pack and related helpers
 ├── execution/       # Local runtime execution and policy enforcement
 ├── inference/       # Model/provider abstraction layer
+├── integrations/    # External adapters (e.g. MCP plumbing)
 ├── knowledge/       # Knowledge base logic
+├── ledger/          # Record stream, event types, serialization
+├── orchestration/   # Session orchestration loop and services
 ├── persistence/     # Local file-backed persistence
 ├── playbooks/       # Built-in playbook content and engine
-├── security/        # Security analysis and policy checks
-├── validation/      # Validation and code-quality checks
 ├── scripts/         # Backend utility scripts
-├── tests/           # Test suite
-└── conftest.py      # Pytest configuration
+├── security/        # Security analysis and policy checks
+├── telemetry/       # Lightweight instrumentation
+├── tools/           # Repo maintenance utilities (e.g. trajectory sanitization)
+├── utils/           # Shared utilities (LSP client, imports, etc.)
+├── validation/    # Validation and completion guards
+├── tests/         # Test suite
+└── conftest.py    # Pytest configuration
 ```
 
 ## Package Structure
@@ -43,19 +49,16 @@ make test-unit
 
 ## Scripts
 
-Backend scripts are organized in `backend/scripts/` subdirectories:
+`backend/scripts/` currently holds **verification** utilities used in CI and local gates (`verify/`). One-off automation, smoke installs, and eval helpers live under the repository root [`scripts/`](../scripts/) instead.
 
-- **`setup/`** - Installation and configuration scripts
-- **`dev/`** - Development utilities and test helpers
-- **`verify/`** - Verification and check scripts
-- **`build/`** - Build and code generation scripts
-- **`mcp/`** - MCP-related scripts
-
-Run them from the project root:
+From the project root:
 
 ```bash
-python backend/scripts/build/compile_protos.py
+python backend/scripts/verify/check_layer_imports.py
+python backend/scripts/verify/reliability_gate.py --phase full
 ```
+
+See [`backend/scripts/README.md`](scripts/README.md) for the full list.
 
 ## Development
 

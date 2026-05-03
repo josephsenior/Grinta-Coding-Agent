@@ -1,4 +1,4 @@
-"""Runtime and supporting infrastructure for App agents.
+"""Runtime and supporting infrastructure for Grinta agents.
 
 This module provides the Runtime interface and its implementations.
 In this version, only LocalRuntimeInProcess is supported.

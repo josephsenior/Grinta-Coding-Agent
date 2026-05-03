@@ -1,4 +1,4 @@
-"""Core enumeration types for App.
+"""Core enumeration types for Grinta.
 
 Extracted from constants.py to keep single-responsibility modules.
 """
@@ -9,7 +9,7 @@ from enum import Enum
 class QuotaPlan(str, Enum):
     """User quota plan.
 
-    App is a local-first, single-user application so only UNLIMITED
+    Grinta is a local-first, single-user application so only UNLIMITED
     is supported.  The enum is kept for backward compatibility with the
     cost-tracking infrastructure.
     """
@@ -192,7 +192,7 @@ class ActionSecurityRisk(int, Enum):
 
 
 class AppMode(str, Enum):
-    """Enumerate supported deployment modes for the App server."""
+    """Enumerate supported deployment modes for optional HTTP / serve-style surfaces."""
 
     OSS = 'oss'
     SAAS = 'saas'

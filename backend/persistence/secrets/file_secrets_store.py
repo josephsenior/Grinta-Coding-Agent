@@ -86,7 +86,7 @@ class FileSecretsStore(SecretsStore):
         Same root as ``settings.json`` — see :func:`backend.core.app_paths.get_app_settings_root`.
 
         Args:
-            config: App configuration
+            config: Grinta configuration
             user_id: Optional user ID
 
         Returns:

@@ -1,4 +1,4 @@
-"""Pydantic schemas for all App observation types."""
+"""Pydantic schemas for all Grinta observation types."""
 
 from __future__ import annotations
 

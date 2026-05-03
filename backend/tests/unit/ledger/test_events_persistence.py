@@ -210,7 +210,7 @@ class TestTruncatePayloadPersist:
         payload = {'content': big_value, 'id': 1}
         _truncate_payload(payload, max_bytes=10_000)
         assert len(cast(str, payload['content'])) < 100_000
-        assert 'truncated by App' in cast(str, payload['content'])
+        assert 'truncated by Grinta' in cast(str, payload['content'])
 
     def test_leaves_small_payloads_untouched(self):
         payload = {'content': 'small', 'id': 1}

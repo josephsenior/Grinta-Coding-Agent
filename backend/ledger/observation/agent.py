@@ -1,4 +1,4 @@
-"""Agent-scoped observation types emitted by App event stream."""
+"""Agent-scoped observation types emitted by Grinta event stream."""
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, ClassVar

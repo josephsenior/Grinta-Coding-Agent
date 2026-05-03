@@ -1,6 +1,6 @@
 """Trajectory regression harness.
 
-This harness validates recorded App trajectories to catch reliability drift
+This harness validates recorded Grinta trajectories to catch reliability drift
 between releases. It is opt-in and runs only when
 `APP_TRAJECTORY_REGRESSION_DIR` points to a directory containing JSON
 trajectory files.

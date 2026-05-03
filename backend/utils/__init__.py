@@ -1,4 +1,4 @@
-"""App common utilities."""
+"""Grinta common utilities."""
 
 from .retry import RetryError, retry
 

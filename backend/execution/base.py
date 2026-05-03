@@ -155,7 +155,7 @@ class Runtime(
 ):
     """Abstract base class for agent runtime environments.
 
-    This is an extension point in App that allows applications to customize how
+    This is an extension point in Grinta that allows applications to customize how
     agents interact with the external environment. The runtime provides an environment with:
     - Bash shell access
     - Browser interaction

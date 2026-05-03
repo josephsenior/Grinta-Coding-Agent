@@ -84,7 +84,7 @@ class FileSettingsStore(SettingsStore):
 
     async def store(self, settings: Settings) -> None:
         """Store settings and invalidate cache."""
-        # Persist LLM connectivity plus MCP overrides. App still supplies defaults;
+        # Persist LLM connectivity plus MCP overrides. Grinta still supplies defaults;
         # merged MCP from GET is optional to save, but when the user edits MCP in the
         # UI we must not drop it on the next LLM-only save (merge happens before store).
         minimal = model_dump_with_options(

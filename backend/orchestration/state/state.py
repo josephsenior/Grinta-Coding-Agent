@@ -410,7 +410,7 @@ class TrackedHistoryList(list):
 
 @dataclass
 class State:
-    """Represents the running state of an agent in the App system, saving data of its operation and memory.
+    """Represents the running state of an agent in the Grinta system, saving data of its operation and memory.
 
     - Multi-agent/delegate state:
       - store the task (conversation between the agent and the user)

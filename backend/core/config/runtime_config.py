@@ -16,7 +16,7 @@ from backend.core.constants import (
 class RuntimeConfig(BaseModel, metaclass=CanonicalModelMetaclass):
     """Configuration for the runtime.
 
-    Simplified for App Core (LocalRuntime only).
+    Simplified for Grinta Core (LocalRuntime only).
     """
 
     timeout: int = Field(

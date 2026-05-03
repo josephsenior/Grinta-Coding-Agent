@@ -60,7 +60,7 @@ def validate_mcp_tool_name_collisions(
     """Detect collisions between internal tool names and MCP tool names.
 
     Collisions are ambiguous for the model: the same tool name may refer to an
-    internal handler or an MCP tool. App currently resolves collisions by
+    internal handler or an MCP tool. Grinta currently resolves collisions by
     preferring the internal tool handler.
 
     Returns a sorted list of colliding names.

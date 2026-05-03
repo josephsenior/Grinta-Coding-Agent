@@ -1,6 +1,6 @@
-"""Central location for App action/agent/observation enums.
+"""Central location for Grinta action/agent/observation enums.
 
-These enums were historically defined in ``app.core.schema``; they now live here
+These enums were historically defined in ``backend.core.schemas``; they now live here
 alongside the Pydantic schema models so there is a single source of truth.
 """
 

@@ -2,7 +2,7 @@
 name: update_test
 type: task
 version: 1.0.0
-author: App
+author: Grinta
 agent: Orchestrator
 triggers:
   - /update_test

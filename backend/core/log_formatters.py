@@ -1,4 +1,4 @@
-"""Log formatters and filters for App.
+"""Log formatters and filters for Grinta.
 
 Extracted from logger.py to keep single-responsibility modules.
 Classes are re-exported from logger.py as the canonical import surface.

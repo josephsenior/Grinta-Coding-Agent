@@ -30,7 +30,8 @@ backend/
   cli/            Terminal UI, entrypoint, interaction loop
   context/        Conversation memory and compaction
   core/           Config, constants, app paths, logging
-  engine/         Prompt assembly and model interaction flow
+  engine/         Prompt assembly, model interaction flow, and agent tools
+  evaluation/     Agent eval pack and related evaluation helpers
   execution/      Runtime executor, shell/session plumbing, policy enforcement
   inference/      Provider resolver and direct LLM clients
   integrations/   External integrations (including MCP plumbing)
@@ -41,7 +42,8 @@ backend/
   playbooks/      Task playbook assets and loading logic
   security/       Safety analysis and execution policies
   telemetry/      Lightweight telemetry
-  tools/          Tool interfaces and implementations
+  tools/          Repo maintenance utilities (e.g. trajectory sanitization)
+  utils/          Shared helpers (imports, LSP client, retries, etc.)
   validation/     Validation and completion guards
   tests/          Unit and integration tests
 ```
@@ -76,6 +78,7 @@ Current service files:
 - `confirmation_service.py`
 - `event_router_service.py`
 - `exception_handler_service.py`
+- `guard_bus.py`
 - `iteration_guard_service.py`
 - `iteration_service.py`
 - `lifecycle_service.py`
@@ -182,4 +185,4 @@ If a change touches orchestration, run at least one focused orchestration suite 
 
 ---
 
-For architecture decisions beyond implementation details, keep `docs/journey/` as the source of truth and use this document for current contributor operations.
+For current architecture and contracts, use `docs/ARCHITECTURE.md` and `docs/ADR.md`. The journey under `docs/journey/` is narrative context, not a live spec — use this document for day-to-day contributor operations.

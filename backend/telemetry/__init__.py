@@ -1,4 +1,4 @@
-"""Audit logging system for App autonomous agents."""
+"""Audit logging system for Grinta autonomous agents."""
 
 from backend.telemetry.audit_logger import AuditLogger
 from backend.telemetry.models import AuditEntry

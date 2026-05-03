@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The App Runtime folder contains the core components responsible for executing actions and managing the runtime environment for the App project. This README provides an overview of the main components and their interactions.
+This folder contains the components responsible for executing actions and managing the local runtime environment for Grinta. This README summarizes the main modules and how they fit together.
 
 ## Main Components
 
@@ -16,11 +16,11 @@ The `base.py` file defines the `Runtime` class, which serves as the primary [int
 - Environment variable management
 - Plugin management
 
-### 2. impl/local/local_runtime_inprocess.py
+### 2. drivers/local/local_runtime_inprocess.py
 
-The `local_runtime_inprocess.py` file contains the `LocalRuntime` class (aliased as `LocalRuntimeInProcess`), which implements the Runtime interface.
+The `local_runtime_inprocess.py` module defines `LocalRuntime` (aliased as `LocalRuntimeInProcess`), which implements the `Runtime` interface.
 
-This implementation runs the runtime executor (`RuntimeExecutor`) directly in the same process as the App backend, eliminating the overhead of subprocesses or HTTP communication. It is designed for desktop applications and local development.
+This implementation runs the runtime executor (`RuntimeExecutor`) in the same process as the CLI/orchestrator, avoiding subprocess or HTTP hops to the executor. It is the default path for local development and installed CLI use.
 
 ### 3. action_execution_server.py
 
@@ -69,12 +69,12 @@ The Local Runtime is the primary and only supported runtime in this architecture
 - Fastest execution speed
 - Simplified architecture
 
-**Important: This runtime provides no isolation as it runs directly on the host machine. All actions are executed with the same permissions as the user running App.**
+**Important: this runtime does not isolate the host. Actions run with the same permissions as the user running Grinta.**
 
-App also supports a `hardened_local` execution profile. This adds stricter local policy enforcement for workspace-scoped commands, file access, sensitive paths, network-capable commands, package installs, background processes, and interactive terminal behavior. It improves local safety, but it is still not sandboxing or host isolation.
+Grinta also supports a `hardened_local` execution profile. This adds stricter local policy enforcement for workspace-scoped commands, file access, sensitive paths, network-capable commands, package installs, background processes, and interactive terminal behavior. It improves local safety, but it is still not sandboxing or host isolation.
 
 ## Related Components
 
 - The runtime interacts closely with the ledger defined in `backend.ledger`.
-- It relies on configuration classes from `app.core.config`.
-- Logging is handled through `app.core.logger`.
+- It relies on configuration from `backend.core.config`.
+- Logging uses the shared backend logging setup under `backend.core`.

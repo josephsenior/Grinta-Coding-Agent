@@ -1,6 +1,6 @@
 """Event store integrity helpers.
 
-App stores each event as an individual JSON file. A crash or partial write can
+Grinta stores each event as an individual JSON file. A crash or partial write can
 leave a file unreadable. These helpers provide best-effort iteration that stops
 cleanly at the last valid event.
 """

@@ -220,8 +220,8 @@ class ActionExecutionClient(Runtime):
             return ErrorObservation(
                 content=(
                     'MCP tools are not supported on Windows. '
-                    'To use MCP, run App on Linux or macOS, or '
-                    'use App in a Linux/macOS environment.'
+                    'To use MCP, run Grinta on Linux or macOS, or '
+                    'use Grinta in a Linux/macOS environment.'
                 )
             )
 

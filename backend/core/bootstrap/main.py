@@ -1,4 +1,4 @@
-"""Bootstrap entry point for the App agent framework.
+"""Bootstrap entry point for the Grinta agent framework.
 
 Classes:
     FakeUserResponseFunc
