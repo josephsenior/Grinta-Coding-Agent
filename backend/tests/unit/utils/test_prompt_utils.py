@@ -820,7 +820,7 @@ class TestBuildSystemPromptRenders:
 
     def test_unix_balanced_default(self) -> None:
         self._assert_renders_cleanly(
-            active_llm_model='claude-3-5-sonnet-20241022',
+            active_llm_model='claude-sonnet-4-6',
             is_windows=False,
             config=_base_config(),
             function_calling_mode='native',

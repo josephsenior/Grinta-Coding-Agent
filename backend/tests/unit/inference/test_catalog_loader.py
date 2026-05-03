@@ -419,7 +419,7 @@ class TestPrefersShortToolDescriptions:
         assert prefers_short_tool_descriptions('gpt-4o') is True
 
     def test_o_family_prefers_short(self):
-        assert prefers_short_tool_descriptions('o3-mini') is True
+        assert prefers_short_tool_descriptions('gpt-4o-mini') is True
 
     def test_claude_does_not_prefer_short(self):
         assert prefers_short_tool_descriptions('claude-3-opus') is False
@@ -436,7 +436,7 @@ class TestSupportsToolChoice:
         assert supports_tool_choice('google/gemini-3-flash') is False
 
     def test_prefixed_lightning_model_supports(self):
-        assert supports_tool_choice('lightning/claude-sonnet-4-20250514') is True
+        assert supports_tool_choice('lightning/claude-sonnet-4-6') is True
 
     def test_unknown_model_defaults_false(self):
         assert supports_tool_choice('some-obscure-model') is False

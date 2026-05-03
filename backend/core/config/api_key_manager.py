@@ -237,7 +237,7 @@ class APIKeyManager(BaseModel, metaclass=CanonicalModelMetaclass):
         Args:
             model: The LLM model identifier. Format varies by provider:
                 - OpenAI: 'gpt-4o', 'gpt-5-2025-08-07'
-                - Anthropic: 'claude-sonnet-4-20250514'
+                - Anthropic: 'claude-sonnet-4-6'
                 - OpenRouter: 'openrouter/anthropic/claude-3.5-sonnet'
                 - xAI: 'openrouter/x-ai/grok-4-fast'
                 - Ollama: 'ollama/llama3.3:70b'

@@ -5,6 +5,7 @@ Use this list before declaring a **1.0.0** (or any major) release and before pub
 ## Pre-release verification
 
 - [ ] **Unit tests (full corpus):** `PYTHONPATH=. uv run pytest backend/tests/unit` passes on your machine (same scope as [py-tests workflow](../.github/workflows/py-tests.yml) `gates-on-linux` / `gates-on-windows`).
+- [ ] **Optional — full Python test tree:** `PYTHONPATH=. uv run pytest` from the repo root (discovers `backend/tests` per [`pytest.ini`](../pytest.ini); long run; may need services). Run before a major release if you want confidence beyond the unit gates.
 - [ ] **Lint:** pre-commit and mypy pass (see [lint workflow](../.github/workflows/lint.yml)); run `pre-commit run --all-files` locally if you change Python.
 - [ ] **CLI smoke:** from a clean venv or `uv run`, start `grinta` or `uv run python -m backend.cli.entry` and confirm the REPL loads; run [e2e-tests workflow](../.github/workflows/e2e-tests.yml) steps locally if you changed CLI/launch/packaging:
   - `uv run pytest -m integration backend/tests/integration/test_cli_entry_integration.py backend/tests/integration/test_cli_task_e2e.py -q`

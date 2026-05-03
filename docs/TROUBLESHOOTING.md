@@ -204,6 +204,8 @@ Quick local checks:
 uv run pytest backend/tests/unit/ --tb=short -q
 ```
 
+That matches the required CI unit gates. A bare `uv run pytest` from the repo root runs the full **`backend/tests`** tree per [`pytest.ini`](../pytest.ini) (much slower).
+
 ---
 
 If the issue persists, open an issue with:

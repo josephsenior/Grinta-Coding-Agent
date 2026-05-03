@@ -94,7 +94,7 @@ class TestOrchestratorPromptManager:
 
     def test_active_llm_model_id_fallback_from_app_config(self, prompt_dir):
         mock_llm_cfg = MagicMock()
-        mock_llm_cfg.model = 'anthropic/claude-3-5-sonnet'
+        mock_llm_cfg.model = 'anthropic/claude-sonnet-4-6'
         mock_app_config = MagicMock()
         mock_app_config.get_llm_config_from_agent_config.return_value = mock_llm_cfg
         mock_agent_config = MagicMock()
@@ -105,7 +105,7 @@ class TestOrchestratorPromptManager:
             resolved_llm_model_id='',
             app_config=mock_app_config,
         )
-        assert opm._active_llm_model_id() == 'anthropic/claude-3-5-sonnet'
+        assert opm._active_llm_model_id() == 'anthropic/claude-sonnet-4-6'
         mock_app_config.get_llm_config_from_agent_config.assert_called_once_with(
             mock_agent_config
         )

@@ -47,20 +47,20 @@ class TestProviderResolver(TestCase):
         """Bare family names no longer trigger heuristic provider guessing."""
         with patch('backend.inference.provider_resolver.lookup', return_value=None):
             with self.assertRaises(ValueError):
-                self.resolver.resolve_provider('claude-3-7-sonnet')
+                self.resolver.resolve_provider('noncatalog-bare-model-xyz')
             with self.assertRaises(ValueError):
                 self.resolver.resolve_provider('anthropic-model')
 
     def test_resolve_provider_prefixed_google_model(self):
         """Explicit provider prefixes remain valid."""
         self.assertEqual(
-            self.resolver.resolve_provider('google/gemini-2.0-flash'), 'google'
+            self.resolver.resolve_provider('google/gemini-2.5-flash'), 'google'
         )
 
     def test_resolve_provider_prefixed_gemini_model_raises(self):
         """Legacy provider aliases are no longer accepted as prefixes."""
         with self.assertRaises(ValueError):
-            self.resolver.resolve_provider('gemini/gemini-2.0-flash')
+            self.resolver.resolve_provider('gemini/gemini-2.5-flash')
 
     def test_resolve_provider_catalog_entry_xai(self):
         """Exact catalog entries remain valid without heuristics."""
@@ -73,7 +73,7 @@ class TestProviderResolver(TestCase):
     def test_resolve_provider_prefixed_lightning_model(self):
         """Prefixed Lightning models resolve by prefix."""
         self.assertEqual(
-            self.resolver.resolve_provider('lightning/claude-sonnet-4-20250514'),
+            self.resolver.resolve_provider('lightning/claude-sonnet-4-6'),
             'lightning',
         )
 
@@ -108,8 +108,8 @@ class TestProviderResolver(TestCase):
     def test_is_local_model_false(self):
         """Test is_local_model returns False for cloud models."""
         self.assertFalse(self.resolver.is_local_model('gpt-4o'))
-        self.assertFalse(self.resolver.is_local_model('claude-3-7-sonnet'))
-        self.assertFalse(self.resolver.is_local_model('gemini-2.0-flash'))
+        self.assertFalse(self.resolver.is_local_model('claude-sonnet-4-6'))
+        self.assertFalse(self.resolver.is_local_model('gemini-2.5-flash'))
         self.assertFalse(self.resolver.is_local_model('lmstudio/model'))
         self.assertFalse(self.resolver.is_local_model('lm-studio/qwen'))
 
@@ -134,13 +134,13 @@ class TestProviderResolver(TestCase):
         """Test resolve_base_url returns None for cloud providers."""
         self.assertIsNone(self.resolver.resolve_base_url('gpt-4o'))
         self.assertIsNone(
-            self.resolver.resolve_base_url('anthropic/claude-sonnet-4-20250514')
+            self.resolver.resolve_base_url('anthropic/claude-sonnet-4-6')
         )
-        self.assertIsNone(self.resolver.resolve_base_url('google/gemini-2.0-flash'))
+        self.assertIsNone(self.resolver.resolve_base_url('google/gemini-2.5-flash'))
 
     def test_resolve_base_url_lightning_provider(self):
         """Lightning models use the hosted OpenAI-compatible proxy."""
-        result = self.resolver.resolve_base_url('lightning/claude-sonnet-4-20250514')
+        result = self.resolver.resolve_base_url('lightning/claude-sonnet-4-6')
         self.assertEqual(result, 'https://lightning.ai/api/v1')
 
     def test_resolve_base_url_ollama_from_env(self):
@@ -368,8 +368,8 @@ class TestProviderResolver(TestCase):
         )
         self.assertEqual(self.resolver.strip_provider_prefix('openai/gpt-4o'), 'gpt-4o')
         self.assertEqual(
-            self.resolver.strip_provider_prefix('google/gemini-2.0-flash'),
-            'gemini-2.0-flash',
+            self.resolver.strip_provider_prefix('google/gemini-2.5-flash'),
+            'gemini-2.5-flash',
         )
 
     def test_strip_provider_prefix_with_unknown_prefix(self):
@@ -378,8 +378,8 @@ class TestProviderResolver(TestCase):
             self.resolver.strip_provider_prefix('custom/model'), 'custom/model'
         )
         self.assertEqual(
-            self.resolver.strip_provider_prefix('gemini/gemini-2.0-flash'),
-            'gemini/gemini-2.0-flash',
+            self.resolver.strip_provider_prefix('gemini/gemini-2.5-flash'),
+            'gemini/gemini-2.5-flash',
         )
         self.assertEqual(
             self.resolver.strip_provider_prefix('lmstudio/qwen'), 'lmstudio/qwen'

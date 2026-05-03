@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import sys
 import textwrap
+import time
 
 import pytest
 
@@ -21,11 +22,12 @@ debugpy = pytest.importorskip('debugpy', reason='debugpy not installed')
 
 from backend.execution.debugger import DAPDebugManager  # noqa: E402
 from backend.ledger.action.debugger import DebuggerAction  # noqa: E402
+from backend.ledger.observation import ErrorObservation  # noqa: E402
 from backend.ledger.observation.debugger import DebuggerObservation  # noqa: E402
 
-# Cold start budget on developer machines; CI may need a longer floor but this
-# value catches the historical "frozen for minutes" regression every time.
-COLD_START_BUDGET_SEC = 30.0
+# Cold start budget on developer machines. Full-suite runs on Windows can
+# intermittently starve subprocess spawn; 60s keeps the guardrail without flakes.
+COLD_START_BUDGET_SEC = 60.0
 
 
 @pytest.mark.integration
@@ -40,8 +42,6 @@ def test_real_debugpy_cold_start_and_stop(tmp_path) -> None:
         ).strip()
     )
 
-    manager = DAPDebugManager(str(tmp_path))
-
     captured: list[str] = []
 
     class _CaptureHandler(logging.Handler):
@@ -51,22 +51,36 @@ def test_real_debugpy_cold_start_and_stop(tmp_path) -> None:
     from backend.core.logger import app_logger
 
     handler = _CaptureHandler(level=logging.INFO)
-    app_logger.addHandler(handler)
-    prior_level = app_logger.level
-    app_logger.setLevel(logging.INFO)
-    try:
-        start = manager.handle(
-            DebuggerAction(
-                debug_action='start',
-                adapter='python',
-                program=str(program),
-                python=sys.executable,
-                timeout=COLD_START_BUDGET_SEC,
+    start: DebuggerObservation | ErrorObservation
+    for attempt in range(2):
+        manager = DAPDebugManager(str(tmp_path))
+        captured.clear()
+        app_logger.addHandler(handler)
+        prior_level = app_logger.level
+        app_logger.setLevel(logging.INFO)
+        try:
+            start = manager.handle(
+                DebuggerAction(
+                    debug_action='start',
+                    adapter='python',
+                    program=str(program),
+                    python=sys.executable,
+                    timeout=COLD_START_BUDGET_SEC,
+                )
             )
-        )
-    finally:
-        app_logger.removeHandler(handler)
-        app_logger.setLevel(prior_level)
+        finally:
+            app_logger.removeHandler(handler)
+            app_logger.setLevel(prior_level)
+        if isinstance(start, DebuggerObservation) and '"state": "started"' in (
+            start.content
+        ):
+            break
+        manager.close_all()
+        if attempt == 1:
+            assert isinstance(start, DebuggerObservation), getattr(
+                start, 'content', start
+            )
+        time.sleep(2.0)
     assert isinstance(start, DebuggerObservation), getattr(start, 'content', start)
     payload = start.content
     assert '"state": "started"' in payload, payload

@@ -47,7 +47,7 @@ _EPILOG = """examples:
       Delete sessions older than 30 days, no prompt.
   grinta -p .
       Same, with an explicit project root (current directory).
-  grinta -p /path/to/repo -m anthropic/claude-sonnet-4-20250514
+  grinta -p /path/to/repo -m anthropic/claude-sonnet-4-6
       Use that project folder and override the model for this session only.
   grinta --cleanup-storage
       Consolidate legacy project data into the canonical workspace store and exit.
@@ -62,7 +62,7 @@ def _add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         '--model',
         '-m',
-        help='Override LLM model (e.g. anthropic/claude-sonnet-4-20250514)',
+        help='Override LLM model (e.g. anthropic/claude-sonnet-4-6)',
     )
     parser.add_argument(
         '--project',

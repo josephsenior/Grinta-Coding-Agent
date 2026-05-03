@@ -233,7 +233,7 @@ class TestAPIKeyHandling:
     def test_api_key_from_environment_fallback(self, monkeypatch):
         """Test fallback to environment when api_key_manager doesn't return key."""
         monkeypatch.setenv('ANTHROPIC_API_KEY', 'sk-ant-test12345678901234567890')
-        cfg = LLMConfig(model='anthropic/claude-3-5-sonnet-20241022')
+        cfg = LLMConfig(model='anthropic/claude-sonnet-4-6')
         # Should pick up from environment
         assert cfg.api_key is not None
 
@@ -279,10 +279,10 @@ class TestBaseURLCleaning:
         with suppress_llm_env_export():
             # Anthropic forbids custom_llm_provider
             cfg = LLMConfig(
-                model='claude-3-5-sonnet-20241022', custom_llm_provider='anthropic'
+                model='claude-sonnet-4-6', custom_llm_provider='anthropic'
             )
         # Should still create config (just logs warning)
-        assert cfg.model == 'claude-3-5-sonnet-20241022'
+        assert cfg.model == 'claude-sonnet-4-6'
 
 
 # ---------------------------------------------------------------------------

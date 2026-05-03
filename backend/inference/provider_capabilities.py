@@ -107,8 +107,8 @@ _PROVIDER_REGISTRY: dict[str, ProviderCapabilities] = {
         requires_thought_signature=True,
         flatten_tool_history=True,
         inherent_reasoning_models=(
-            'gemini-2.0-flash-thinking',
             'gemini-2.5-pro',
+            'gemini-3.1-pro-preview',
         ),
         small_model_patterns=('gemini-2.5-flash-lite',),
     ),

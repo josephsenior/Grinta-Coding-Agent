@@ -7,16 +7,16 @@ from backend.inference.prompt_caching import model_supports_prompt_cache_hints
 
 
 def test_model_supports_hints_for_catalog_claude() -> None:
-    assert model_supports_prompt_cache_hints('claude-4-sonnet')
-    assert model_supports_prompt_cache_hints('anthropic/claude-4-sonnet')
+    assert model_supports_prompt_cache_hints('claude-sonnet-4-6')
+    assert model_supports_prompt_cache_hints('anthropic/claude-sonnet-4-6')
 
 
-def test_model_supports_hints_pattern_claude3() -> None:
-    assert model_supports_prompt_cache_hints('claude-3.5-sonnet-20241022')
+def test_model_supports_hints_pattern_claude_haiku() -> None:
+    assert model_supports_prompt_cache_hints('claude-haiku-4-5-20251001')
 
 
 def test_model_supports_hints_gemini_pattern() -> None:
-    assert model_supports_prompt_cache_hints('google/gemini-2.0-flash')
+    assert model_supports_prompt_cache_hints('google/gemini-2.5-flash')
     assert model_supports_prompt_cache_hints('gemini-2.5-pro')
 
 

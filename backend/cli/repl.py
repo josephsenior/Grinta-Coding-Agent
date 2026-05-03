@@ -349,9 +349,9 @@ _SLASH_COMMANDS = (
 _KNOWN_MODELS: tuple[tuple[str, str], ...] = (
     ('openai/gpt-4.1', 'OpenAI'),
     ('openai/gpt-4o', 'OpenAI'),
-    ('openai/o4-mini', 'OpenAI'),
+    ('openai/gpt-5.5', 'OpenAI'),
     ('anthropic/claude-opus-4-20250514', 'Anthropic'),
-    ('anthropic/claude-sonnet-4-20250514', 'Anthropic'),
+    ('anthropic/claude-sonnet-4-6', 'Anthropic'),
     ('anthropic/claude-haiku-4-20250514', 'Anthropic'),
     ('google/gemini-2.5-pro', 'Google'),
     ('google/gemini-2.5-flash', 'Google'),

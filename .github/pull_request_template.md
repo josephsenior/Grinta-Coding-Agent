@@ -17,8 +17,10 @@ If any impact is "yes", explain:
 List exact commands you ran and the result.
 
 ```text
-# Example:
+# Example (matches required Linux/Windows gates):
 uv run pytest backend/tests/unit -q
+# Full tree (pytest.ini testpaths; slower, optional before merge):
+# uv run pytest -q
 uv run mypy --config-file mypy.ini
 ```
 
