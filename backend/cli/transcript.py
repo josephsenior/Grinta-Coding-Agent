@@ -243,8 +243,8 @@ def format_reasoning_snapshot(lines: list[str]) -> Group:
     last = cleaned[-1]
     if last and not last.endswith(_REASONING_SENTENCE_ENDERS):
         cleaned[-1] = f'{last}…'
-    # Stronger separation from assistant Markdown (default foreground): dimmer
-    # blue-gray + italic so internal reasoning never reads as the main reply.
+    # Same blue-gray roman style as the live Thinking body (see ``CLR_THOUGHT_BODY``)
+    # so post-turn snapshots match what streamed, without italic fade-out.
     return Group(*[Text(line, style=CLR_REASONING_COMMITTED) for line in cleaned])
 
 

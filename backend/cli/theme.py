@@ -154,10 +154,10 @@ CLR_ACTION = 'bold #dbe7f3'  # current action label text
 CLR_THINKING_BORDER = '#587487'  # reasoning / live panel border accent
 # Live Rich block only (MINIMAL panel frame) — softer than transcript cards.
 CLR_LIVE_PANEL_BORDER = '#2a3a4a'
-# Live Thinking body: dimmed for lower visual weight; no italic (transcript
-# snapshots use italic separately via CLR_REASONING_SNAP / CLR_REASONING_COMMITTED).
-CLR_THOUGHT_BODY = 'dim #7a8fa3'  # thought lines (live panel)
-CLR_REASONING_SNAP = 'italic #64748b dim'  # committed reasoning (transcript)
+# Live Thinking + flushed reasoning snapshot: readable blue-gray, roman (no
+# italic) so it stays distinct from the main reply without looking washed out.
+CLR_THOUGHT_BODY = '#b4c9dc'
+CLR_REASONING_SNAP = CLR_THOUGHT_BODY  # legacy alias; keep in sync
 CLR_DRAFT_BORDER = '#6b8ea4'  # draft reply preview border accent
 CLR_DECISION_BORDER = '#c4a35a'  # approval / question / options accent
 CLR_USER_BORDER = 'dim cyan'  # user message panel border
@@ -190,7 +190,7 @@ CLR_OUTPUT_PANEL_BORDER = '#1e3a4a'  # nested terminal output panel
 CLR_OUTPUT_PANEL_TITLE = 'dim #9ca3af'  # nested panel title (session id, lines)
 
 # ── Reasoning / activity rule chrome ─────────────────────────────────────────
-CLR_REASONING_COMMITTED = 'italic #7e99b5'  # snapshot block after spinner stops
+CLR_REASONING_COMMITTED = CLR_THOUGHT_BODY  # transcript snapshot (same as live body)
 CLR_TURN_RULE = 'dim #6d8596'  # "Activity" rule above first tool row
 CLR_RECOVERY_HINT = 'cyan'  # "Next steps" headline body in recovery notice
 CLR_RECOVERY_HINT_DIM = 'dim cyan'  # recovery body / numbered steps

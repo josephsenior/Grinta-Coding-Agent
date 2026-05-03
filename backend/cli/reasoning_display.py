@@ -3,10 +3,10 @@
 Model reasoning streams into this object; :meth:`renderable` shows the header
 (spinner + current action + elapsed/cost) and, when there is thought text, the
 latest lines inside the Thinking strip so streaming CoT updates in real time
-(subject to the Live viewport budget). The same thoughts are flushed to the
-main transcript on turn end via :func:`backend.cli.transcript.format_reasoning_snapshot`
-(dim), with duplicate leading lines skipped via the renderer's last-committed
-pointer.
+(subject to the Live viewport budget). When the Live strip already showed thought lines, the renderer skips printing
+the same text again as a transcript snapshot on turn end; otherwise thoughts
+are flushed via :func:`backend.cli.transcript.format_reasoning_snapshot` using
+the same tone as :data:`backend.cli.theme.CLR_THOUGHT_BODY`.
 
 No duplicate Ctrl+C hint (the fake-prompt bar directly below the panel
 already shows "Agent working… ctrl+c to interrupt"), and no inline

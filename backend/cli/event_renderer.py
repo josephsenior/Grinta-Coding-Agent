@@ -246,6 +246,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._last_refresh_time: float = 0.0
         #: Last reasoning lines committed to transcript (for prefix de-dup per turn).
         self._last_committed_reasoning_lines: list[str] | None = None
+        #: True once this turn showed thought text in the Rich Live Thinking strip.
+        #: Used to skip re-printing the same block as a dim snapshot when Live ends.
+        self._reasoning_bodies_shown_in_live_turn: bool = False
 
     @property
     def current_state(self) -> AgentState | None:
@@ -388,6 +391,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._pending_activity_card = None
         self._activity_turn_header_emitted = False
         self._last_committed_reasoning_lines = None
+        self._reasoning_bodies_shown_in_live_turn = False
         self._current_state = AgentState.RUNNING
         self._hud.update_ledger('Healthy')
         self._hud.update_agent_state('Running')
@@ -427,6 +431,7 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         self._delegate_panel_signature = None
         self._last_printed_delegate_panel_signature = None
         self._last_committed_reasoning_lines = None
+        self._reasoning_bodies_shown_in_live_turn = False
         self._clear_streaming_preview()
         self._reasoning.stop()
         self.refresh()
@@ -586,6 +591,8 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         # so Rich does not clip tall turns (Live vertical_overflow ellipsis).
         live_sections: list[Any] = self._collect_live_sections()
         stream_max_lines = self._live_section_budgets(options)
+        if self._reasoning.active and self._reasoning.live_panel_shows_thought_rows():
+            self._reasoning_bodies_shown_in_live_turn = True
         reasoning_section = self._append_streaming_and_reasoning_sections(
             live_sections,
             stream_max_lines,
@@ -1295,6 +1302,9 @@ class CLIEventRenderer(ActionRenderersMixin, ObservationRenderersMixin):
         )
         self._last_committed_reasoning_lines = list(thoughts)
         if not fresh:
+            return
+        if self._reasoning_bodies_shown_in_live_turn:
+            self._reasoning_bodies_shown_in_live_turn = False
             return
         self._print_or_buffer(
             Padding(format_reasoning_snapshot(fresh), pad=ACTIVITY_BLOCK_BOTTOM_PAD)
