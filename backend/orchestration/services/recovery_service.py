@@ -6,10 +6,15 @@ import asyncio
 import json
 from typing import TYPE_CHECKING
 
-from backend.core.errors import AgentRuntimeError, LLMContextWindowExceedError
+from backend.core.errors import (
+    AgentRuntimeError,
+    LLMContextWindowExceedError,
+    LLMNoResponseError,
+)
 from backend.core.logger import app_logger as logger
 from backend.core.schemas import AgentState
 from backend.inference.exceptions import (
+    APIConnectionError,
     AuthenticationError,
     ContentPolicyViolationError,
     ContextWindowExceededError,
@@ -50,6 +55,14 @@ _RATE_LIMITED_EXCEPTIONS = (
 # dropping straight back to the user. Timeouts are included here on purpose:
 # they indicate provider/network stall, not a task-level dead end.
 _QUEUED_RETRY_EXCEPTIONS = _RATE_LIMITED_EXCEPTIONS + (Timeout,)
+
+# After inner LLM retries (see ``LLM_RETRY_EXCEPTIONS`` in ``llm.py``), these
+# are still transport/provider issues—not actionable by the model.
+_TRANSIENT_LLM_INFRA_EXCEPTIONS = (
+    APIConnectionError,
+    InternalServerError,
+    LLMNoResponseError,
+)
 
 
 def _is_limit_exceeded_error(exc: Exception) -> bool:
@@ -168,8 +181,10 @@ class RecoveryService:
             the LLM context).
           * The CLI HUD still shows ``[TPM · ETA Xs]`` because the retry
             service emits a separate ``StatusObservation`` that is UI-only.
-          * Final, unrecoverable failures bubble up through the normal
-            exception path and reach the agent as an error observation.
+          * The compact ``ErrorObservation`` for 429/503 uses
+            ``notify_ui_only=True`` so it never appears in LLM message assembly
+            (orchestrator handles retries; the model should see the next
+            successful tool result only).
 
         We keep a structured DEBUG log so operators can still trace events.
         """
@@ -321,6 +336,9 @@ class RecoveryService:
         # Rate-limited errors (429, 503) and provider/network timeouts:
         #   → AWAITING_USER_INPUT + retry queue — the queue handles the
         #     back-off delay and transitions back to RUNNING automatically.
+        #     For 429/503/Timeout and transient LLM infra (connection, 5xx,
+        #     empty response) the ``ErrorObservation`` is ``notify_ui_only``
+        #     (HUD), not embedded in the LLM transcript.
         #
         # All other errors (transient 5xx, bad-request from wrong tool args,
         #   timeout, unexpected runtime exceptions):
@@ -405,9 +423,15 @@ class RecoveryService:
 
     @staticmethod
     def _format_exception(exc: Exception) -> tuple[str, str, bool]:
+        # Rate-limit / 503 / LLM Timeout / connection & 5xx after inner retries:
+        # orchestrator recovers without model help. Same mechanism as auth failures:
+        # emit for HUD/toast but omit from LLM context (see
+        # ContextMemory._process_observation notify_ui_only guard).
         notify_ui_only = isinstance(
             exc,
-            (AuthenticationError, ContentPolicyViolationError),
+            (AuthenticationError, ContentPolicyViolationError, Timeout),
+        ) or isinstance(exc, _RATE_LIMITED_EXCEPTIONS) or isinstance(
+            exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS
         )
         err_id = 'AGENT_STEP_EXCEPTION'
         if isinstance(exc, Timeout):
@@ -435,6 +459,11 @@ class RecoveryService:
                 'The provider timed out on this step. Automatic backoff and retry '
                 'will run if the retry queue is available; otherwise the agent will '
                 'return to the prompt.'
+            )
+        elif isinstance(exc, _TRANSIENT_LLM_INFRA_EXCEPTIONS):
+            guidance = (
+                'Transient provider or network issue; the runtime retries automatically. '
+                'No change to your approach is required unless this keeps failing.'
             )
         else:
             guidance = (
